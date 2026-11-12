@@ -310,5 +310,16 @@ export function idleRowWords(minutes: number): string {
   return `Stop ${choice ? choice.label.toLowerCase() : `after ${minutes} minutes`} idle`;
 }
 
+/**
+ * "Kept awake while it works; GitHub stops it 240 minutes after that." (#4803;
+ * OfflineWords.keptAwakeLine): a codespace is kept awake while its machine works (#4637), and
+ * GitHub's own idle timeout stops it once the machine is idle. Null with no idle timeout.
+ */
+export function keptAwakeLine(workspace: { idleTimeoutMinutes?: number }): string | null {
+  const minutes = workspace.idleTimeoutMinutes;
+  if (!minutes || minutes <= 0) return null;
+  return `Kept awake while it works; GitHub stops it ${minutes === 1 ? "1 minute" : `${minutes} minutes`} after that.`;
+}
+
 /** WorkspaceLink.defaultIdleMinutes. */
 export const defaultIdleMinutes = 120;

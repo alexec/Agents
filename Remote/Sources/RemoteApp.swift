@@ -209,6 +209,13 @@ struct RemoteView: View {
                 })
     }
 
+    /// The ⌘K command menu (#4792), with Folder Terminal when a folder is open.
+    private var commandMenu: RemoteCommandMenuOverlay {
+        guard model.selectedFolder != nil else { return RemoteCommandMenuOverlay(openTerminal: nil) }
+        let shows = $showsFolderTerminal
+        return RemoteCommandMenuOverlay { @MainActor in shows.wrappedValue = true }
+    }
+
     var body: some View {
         @Bindable var model = model
         NavigationSplitView(preferredCompactColumn: $compactColumn) {
@@ -231,6 +238,8 @@ struct RemoteView: View {
             .id(model.sidebarItem)
         }
         .navigationSplitViewStyle(.balanced)
+        // ⌘K, the command menu (#4792), over the whole window, as on the Mac.
+        .modifier(commandMenu)
         // A label's chip, in a card or the chat, filters the sidebar by it (#3898). The
         // chat stays open; on a phone, Back shows the list it filtered.
         .environment(\.labelFilter, LabelFilter(query: model.sidebarSearch) { model.sidebarSearch = $0 })
@@ -263,8 +272,8 @@ struct RemoteView: View {
         // A host's git asked to use a Mac's git access (#1122).
         .alert(model.gitLendAsk?.title ?? "", isPresented: Binding(get: { model.gitLendAsk != nil }, set: { _ in }),
                presenting: model.gitLendAsk) { ask in
-            Button("Allow") { Task { await model.answerGitLend(ask, allowed: true) } }
-            Button("Don’t Allow", role: .cancel) { Task { await model.answerGitLend(ask, allowed: false) } }
+            Button("Approve") { Task { await model.answerGitLend(ask, allowed: true) } }
+            Button("Deny", role: .cancel) { Task { await model.answerGitLend(ask, allowed: false) } }
         } message: { ask in
             Text(ask.message)
         }
@@ -442,6 +451,7 @@ struct RemoteView: View {
         case .accountsStatus: RemoteStatusSecretsPage(kind: .accounts).paperGround()
         case .machine(let host): RemoteMachinePage(host: host).paperGround()
         case .multiplier: RemoteMultiplierPage().paperGround()
+        case .velocity: RemoteVelocityPage().paperGround()
         case .work: WorkView(model: model).paperGround()
         case .summary:
             SummaryPageView(pages: model.summaryPages, settings: model.dailySummarySettings,
@@ -449,7 +459,7 @@ struct RemoteView: View {
                             setSettings: { changed in Task { _ = await model.setDailySummarySettings(changed) } },
                             openAgent: { model.open($0) })
                 .paperGround()
-        // Usage and connectors are Mac + web (#2798): nothing opens them here.
+        // Cost, Tokens, Time and connectors are Mac + web (#2798): nothing opens them here.
         default: NothingPickedPage()
         }
     }
@@ -535,6 +545,23 @@ private struct MoveToMachineAsk: ViewModifier {
 struct NothingPickedPage: View {
     var body: some View {
         RemoteMultiplierPage()
+    }
+}
+
+/// Velocity (#4758): the window's bars (`VelocityChartsSection`), from the Mac's host, read on
+/// open and again on `multiplier/changed`. Full width on a phone, the detail column on an iPad.
+struct RemoteVelocityPage: View {
+    @Environment(RemoteModel.self) private var model
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    var body: some View {
+        ScrollView {
+            VelocityChartsSection(load: { await model.velocityHistory() }, refresh: model.work.multiplier)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(sizeClass == .compact ? 16 : 24)
+        }
+        .navigationTitle("Velocity")
+        .toolbarTitleDisplayMode(.inline)
     }
 }
 

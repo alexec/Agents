@@ -68,18 +68,18 @@ func TestLineageOnAnAzureReposFolder(t *testing.T) {
 		a.Worktree = &wire.AgentWorktree{Name: "7-fix", Branch: &branch, Folder: store.FolderURL(folder)}
 	})
 	d.noteLineage(nil, a)
-	s := sessionNode(a.ID)
+	s := d.sessionNode(a.ID)
 	d.lineageEvent(wire.Event{Name: "pr.opened", Details: map[string]string{"payload": `{"pr":{"number":8,"branch":"agents/7-fix",` +
 		`"url":"https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/8","fixes":["#7"]}}`}})
-	pr := wire.LineageNode{Kind: "pr", Ref: "azuredevops:acme/web app/app#8"}
-	item := wire.LineageNode{Kind: "issue", Ref: "azureboards:acme/web app#7"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "azuredevops:pr:acme/web app/app#8"}
+	item := wire.LineageNode{Kind: "issue", Ref: "azureboards:issue:acme/web app#7"}
 	wantLinks(t, active(d, pr),
 		s.Ref+" opens "+pr.Ref+" (branch)",
 		pr.Ref+" fixes "+item.Ref+" (pr-body)")
 	wantLinks(t, active(d, s),
 		s.Ref+" works-on "+item.Ref+" (start)",
 		s.Ref+" opens "+pr.Ref+" (branch)")
-	if n, ok := d.labelNode(folder, "P#4"); !ok || n != (wire.LineageNode{Kind: "pr", Ref: "azuredevops:acme/web app/app#4"}) {
+	if n, ok := d.labelNode(folder, "P#4"); !ok || n != (wire.LineageNode{Kind: "pr", Ref: "azuredevops:pr:acme/web app/app#4"}) {
 		t.Fatalf("P#4: %+v", n)
 	}
 	if _, _, ok := nodeOfRepo(pr); ok {
@@ -93,7 +93,7 @@ func TestLineageOnAnAzureReposFolder(t *testing.T) {
 	d.lineageCIEvent(wire.Event{Name: "checks.failed", Details: map[string]string{"payload": `{"pr":{"number":8,` +
 		`"url":"https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/8"},"run":{"id":12}}`}})
 	settleParents(t, d)
-	if !active(d, pr)["azuredevops:acme/web app/app/builds/12 builds "+pr.Ref+" (forge)"] {
+	if !active(d, pr)["azuredevops:run:acme/web app/app#12 builds "+pr.Ref+" (forge)"] {
 		t.Errorf("the build: %v", active(d, pr))
 	}
 
@@ -125,7 +125,7 @@ func TestLineageAsksAzureDevOps(t *testing.T) {
 	release := repo.release("v0.2.0")
 	wantLinks(t, active(d, release),
 		pr.Ref+" part-of "+release.Ref+" (forge)",
-		"azuredevops:acme/web app/app#9 part-of "+release.Ref+" (forge)")
+		"azuredevops:pr:acme/web app/app#9 part-of "+release.Ref+" (forge)")
 
 	asks, _ := d.connectionAsks("azuredevops")
 	if id, err := asks.costComment(ctx, prCommentRecord{Folder: folder, Forge: "azuredevops", Path: repo.path, Number: 8}, "body"); err != nil || id != "77/1" {
@@ -143,13 +143,13 @@ func TestLineageAsksAzureDevOps(t *testing.T) {
 // Server of any name, and back.
 func TestAzureReposAddresses(t *testing.T) {
 	for raw, want := range map[string]string{
-		"https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/8":                      "azuredevops:acme/web app/app#8",
-		"https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/8?_a=files":             "azuredevops:acme/web app/app#8",
-		"https://acme.visualstudio.com/Web%20App/_git/App/pullrequest/8":                   "azuredevops:acme/web app/app#8",
-		"https://acme.visualstudio.com/DefaultCollection/Web%20App/_git/App/pullrequest/8": "azuredevops:acme/web app/app#8",
-		"https://dev.azure.com/acme/_git/App/pullrequest/8":                                "azuredevops:acme/app/app#8",
-		"https://tfs.example/tfs/Main/Web/_git/App/pullrequest/8":                          "azuredevops:main/web/app#8",
-		"https://ado.example/Main/Web/_git/App/pullrequest/8":                              "azuredevops:main/web/app#8",
+		"https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/8":                      "azuredevops:pr:acme/web app/app#8",
+		"https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/8?_a=files":             "azuredevops:pr:acme/web app/app#8",
+		"https://acme.visualstudio.com/Web%20App/_git/App/pullrequest/8":                   "azuredevops:pr:acme/web app/app#8",
+		"https://acme.visualstudio.com/DefaultCollection/Web%20App/_git/App/pullrequest/8": "azuredevops:pr:acme/web app/app#8",
+		"https://dev.azure.com/acme/_git/App/pullrequest/8":                                "azuredevops:pr:acme/app/app#8",
+		"https://tfs.example/tfs/Main/Web/_git/App/pullrequest/8":                          "azuredevops:pr:main/web/app#8",
+		"https://ado.example/Main/Web/_git/App/pullrequest/8":                              "azuredevops:pr:main/web/app#8",
 		"https://dev.azure.com/acme/Web/pullrequest/8":                                     "",
 		"https://example.com/a/pullrequest/8":                                              "",
 	} {
@@ -206,7 +206,7 @@ func TestAnAzureBoardsViewListsItsAzureReposPullRequests(t *testing.T) {
 		t.Fatalf("the work item's: %s", raw)
 	}
 	v := r.StructuredContent
-	if v.Ref != "azureboards:acme/web app#7" || len(v.Sessions) != 1 || v.Sessions[0].Title != "Fix the walk" {
+	if v.Ref != "azureboards:issue:acme/web app#7" || len(v.Sessions) != 1 || v.Sessions[0].Title != "Fix the walk" {
 		t.Errorf("the work item's: %+v", v)
 	}
 	if len(v.PRs) != 1 || v.PRs[0].URL != "https://dev.azure.com/acme/web%20app/_git/app/pullrequest/8" {
@@ -227,11 +227,11 @@ func TestAzureReposAddressesOnAServerUnderAPath(t *testing.T) {
 		[]byte("AZURE_DEVOPS_URL=https://tfs.example/tfs\nAZURE_DEVOPS_TOKEN=tok\n"), 0o600)
 
 	for raw, want := range map[string]string{
-		"https://tfs.example/tfs/Main/_git/App/pullrequest/8":         "azuredevops:main/app/app#8",
-		"https://tfs.example/tfs/Main/Web/_git/App/pullrequest/8":     "azuredevops:main/web/app#8",
-		"https://TFS.example/tfs/Main/Web/_git/App/pullrequest/8?a=1": "azuredevops:main/web/app#8",
-		"https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/8": "azuredevops:acme/web app/app#8",
-		"https://tfs.example/other/Main/Web/_git/App/pullrequest/8":   "azuredevops:main/web/app#8",
+		"https://tfs.example/tfs/Main/_git/App/pullrequest/8":         "azuredevops:pr:main/app/app#8",
+		"https://tfs.example/tfs/Main/Web/_git/App/pullrequest/8":     "azuredevops:pr:main/web/app#8",
+		"https://TFS.example/tfs/Main/Web/_git/App/pullrequest/8?a=1": "azuredevops:pr:main/web/app#8",
+		"https://dev.azure.com/acme/Web%20App/_git/App/pullrequest/8": "azuredevops:pr:acme/web app/app#8",
+		"https://tfs.example/other/Main/Web/_git/App/pullrequest/8":   "azuredevops:pr:main/web/app#8",
 	} {
 		repo, n, ok := d.prOfURLHere(raw)
 		got := ""
@@ -248,14 +248,14 @@ func TestAzureReposAddressesOnAServerUnderAPath(t *testing.T) {
 	}
 
 	node, base, ok := d.nodeOfURLHere("https://tfs.example/tfs/Main/_git/App/pullrequest/8")
-	if !ok || node.Ref != "azuredevops:main/app/app#8" || base != "https://tfs.example/tfs" {
+	if !ok || node.Ref != "azuredevops:pr:main/app/app#8" || base != "https://tfs.example/tfs" {
 		t.Fatalf("the pull request's node: %+v %q %v", node, base, ok)
 	}
 	if u := refURL(node, base); u != "https://tfs.example/tfs/main/app/_git/app/pullrequest/8" {
 		t.Errorf("the pull request's address: %s", u)
 	}
 	item, base, ok := d.nodeOfURLHere("https://tfs.example/tfs/Main/Web/_workitems/edit/7")
-	if !ok || item.Ref != "azureboards:main/web#7" || base != "https://tfs.example/tfs" {
+	if !ok || item.Ref != "azureboards:issue:main/web#7" || base != "https://tfs.example/tfs" {
 		t.Fatalf("the work item's node: %+v %q %v", item, base, ok)
 	}
 	server := forgeRepo{"azuredevops", "main/web/app"}
@@ -276,7 +276,7 @@ func TestAzureReposAddressesOnAServerUnderAPath(t *testing.T) {
 	if root := d.azureDevOpsServerRoot(); root != "https://ado.example/collections/" {
 		t.Errorf("the connected Server's root: %q", root)
 	}
-	if repo, n, ok := d.prOfURLHere("https://ado.example/collections/Main/_git/App/pullrequest/3"); !ok || repo.pr(n).Ref != "azuredevops:main/app/app#3" {
+	if repo, n, ok := d.prOfURLHere("https://ado.example/collections/Main/_git/App/pullrequest/3"); !ok || repo.pr(n).Ref != "azuredevops:pr:main/app/app#3" {
 		t.Errorf("a pull request on the connected Server: %+v %d %v", repo, n, ok)
 	}
 }
@@ -306,7 +306,7 @@ func TestTheAzureDevOpsServersViewsAskForLineage(t *testing.T) {
 		t.Fatalf("the pull request's: %s", raw)
 	}
 	v := r.StructuredContent
-	if v.Ref != "azuredevops:acme/web app/app#8" || len(v.Sessions) != 1 || v.Sessions[0].Title != "Fix the walk" {
+	if v.Ref != "azuredevops:pr:acme/web app/app#8" || len(v.Sessions) != 1 || v.Sessions[0].Title != "Fix the walk" {
 		t.Errorf("the pull request's: %+v", v)
 	}
 }

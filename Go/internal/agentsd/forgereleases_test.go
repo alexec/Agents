@@ -81,8 +81,8 @@ func TestForgeReleasesListsEveryForge(t *testing.T) {
 	if err := json.Unmarshal(c.call(t, 1, "forge/releases", wire.ForgeReleasesRequest{}), &list); err != nil {
 		t.Fatal(err)
 	}
-	want := "github:alexec/agents/release/v0.18.0 github:alexec/web/release/v1.1.0-rc.1 github:alexec/agents/release/v0.17.0* " +
-		"gitlab:group/app/release/v2.0.0* github:alexec/web/release/v1.0.0* github:alexec/agents/release/v0.16.0 gitlab:group/app/release/v1.9.0"
+	want := "github:release:alexec/agents#v0.18.0 github:release:alexec/web#v1.1.0-rc.1 github:release:alexec/agents#v0.17.0* " +
+		"gitlab:release:group/app#v2.0.0* github:release:alexec/web#v1.0.0* github:release:alexec/agents#v0.16.0 gitlab:release:group/app#v1.9.0"
 	if got := releaseTags(list.Releases); got != want {
 		t.Fatalf("releases:\n%s\nwant\n%s", got, want)
 	}
@@ -112,23 +112,23 @@ func TestForgeReleasesListsEveryForge(t *testing.T) {
 func TestForgeReleaseReadsItsPullRequests(t *testing.T) {
 	_, c, _, _, _, _ := allForgesDaemon(t)
 	var got wire.ForgeReleaseDetail
-	json.Unmarshal(c.call(t, 1, "forge/release", wire.ForgeReleaseRequest{Node: wire.LineageNode{Kind: "release", Ref: "github:alexec/agents/release/v0.17.0"}}), &got)
+	json.Unmarshal(c.call(t, 1, "forge/release", wire.ForgeReleaseRequest{Node: wire.LineageNode{Kind: "release", Ref: "github:release:alexec/agents#v0.17.0"}}), &got)
 	if got.Release.Tag != "v0.17.0" || deref(got.Previous) != "v0.16.0" || got.Commits != 2 ||
 		deref(got.CompareUrl) != "https://github.com/alexec/agents/compare/v0.16.0...v0.17.0" {
 		t.Fatalf("release: %+v", got)
 	}
-	if len(got.Pulls) != 2 || got.Pulls[0] != (wire.ForgeReleasePull{Node: wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#3587"}, Number: 3587,
+	if len(got.Pulls) != 2 || got.Pulls[0] != (wire.ForgeReleasePull{Node: wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#3587"}, Number: 3587,
 		Title: "Waiting deploys in Needs You", Sha: "a1"}) || got.Pulls[1].Number != 3585 {
 		t.Fatalf("pulls: %+v", got.Pulls)
 	}
 
-	json.Unmarshal(c.call(t, 2, "forge/release", wire.ForgeReleaseRequest{Node: wire.LineageNode{Kind: "release", Ref: "gitlab:group/app/release/v2.0.0"}}), &got)
-	if deref(got.Previous) != "v1.9.0" || got.Commits != 2 || len(got.Pulls) != 1 || got.Pulls[0].Node.Ref != "gitlab:group/app!4" ||
+	json.Unmarshal(c.call(t, 2, "forge/release", wire.ForgeReleaseRequest{Node: wire.LineageNode{Kind: "release", Ref: "gitlab:release:group/app#v2.0.0"}}), &got)
+	if deref(got.Previous) != "v1.9.0" || got.Commits != 2 || len(got.Pulls) != 1 || got.Pulls[0].Node.Ref != "gitlab:mr:group/app#4" ||
 		got.Pulls[0].Title != "Faster lists" || deref(got.CompareUrl) != "https://gitlab.com/Group/App/-/compare/v1.9.0...v2.0.0" {
 		t.Fatalf("GitLab release: %+v", got)
 	}
 
-	for _, ref := range []string{"github:alexec/agents/release/v0.18.0", "github:alexec/agents/release/v0.16.0"} {
+	for _, ref := range []string{"github:release:alexec/agents#v0.18.0", "github:release:alexec/agents#v0.16.0"} {
 		got = wire.ForgeReleaseDetail{}
 		json.Unmarshal(c.call(t, 3, "forge/release", wire.ForgeReleaseRequest{Node: wire.LineageNode{Kind: "release", Ref: ref}}), &got)
 		if got.Previous != nil || got.Commits != 0 || got.Pulls == nil || len(got.Pulls) != 0 {
@@ -137,12 +137,12 @@ func TestForgeReleaseReadsItsPullRequests(t *testing.T) {
 	}
 
 	for ref, words := range map[string]string{
-		"github:alexec/agents/release/v9.9.9": "no release v9.9.9",
+		"github:release:alexec/agents#v9.9.9": "no release v9.9.9",
 		"linear:eng/release/v1":               "Linear has no releases",
-		"github:alexec/agents#12":             "not a release's node",
+		"github:issue:alexec/agents#12":       "not a release's node",
 	} {
 		kind := "release"
-		if strings.Contains(ref, "#") {
+		if strings.Contains(ref, ":issue:") {
 			kind = "pr"
 		}
 		if err := c.callErr(t, 4, "forge/release", wire.ForgeReleaseRequest{Node: wire.LineageNode{Kind: kind, Ref: ref}}); !strings.Contains(err, words) {
@@ -162,7 +162,7 @@ func TestForgeReleasesOnForgejo(t *testing.T) {
 			forgejo = append(forgejo, r)
 		}
 	}
-	if got := releaseTags(forgejo); got != "forgejo:walkalex/app/release/v0.2.0* forgejo:walkalex/app/release/v0.1.0" {
+	if got := releaseTags(forgejo); got != "forgejo:release:walkalex/app#v0.2.0* forgejo:release:walkalex/app#v0.1.0" {
 		t.Fatalf("Forgejo releases: %s (errors %+v)", got, list.Errors)
 	}
 	var got wire.ForgeReleaseDetail

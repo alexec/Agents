@@ -29,6 +29,9 @@ type mergedLineage struct {
 	hostOf []string
 	byNode map[wire.LineageNode][]int
 	states map[wire.LineageNode]wire.LineageSessionState
+	// names names each node in the full ref form (#4800): a machine on a release before it
+	// sends the old form.
+	names lineage.Names
 }
 
 // linksOf is the indexes in links of a node's links, newest start first.
@@ -64,7 +67,7 @@ func (m *Methods) lineageReadMethod(ctx context.Context, method string, params j
 		if request.Depth != nil {
 			depth = int(*request.Depth)
 		}
-		return lineage.WalkOver(g.links, g.linksOf, g.stateNow, request.Node, depth), nil
+		return lineage.WalkOver(g.links, g.linksOf, g.stateNow, g.names.Ask(request.Node), depth), nil
 	}
 	request, err := require[wire.LineageSessionsOnRequest](params, "LineageSessionsOnRequest")
 	if err != nil {
@@ -133,6 +136,7 @@ func (s *Service) scopeLineageGraph(ctx context.Context, scope *wire.ReportScope
 				continue
 			}
 			for _, c := range kept.States {
+				c.Node = g.names.Name(c.Node)
 				if have, ok := g.states[c.Node]; !ok || c.At >= have.At {
 					g.states[c.Node] = wire.LineageSessionState{State: c.State, At: c.At}
 				}
@@ -144,6 +148,7 @@ func (s *Service) scopeLineageGraph(ctx context.Context, scope *wire.ReportScope
 			continue
 		}
 		for _, l := range kept.Links {
+			l.From, l.To = g.names.Name(l.From), g.names.Name(l.To)
 			// An issue's link is on each machine that knows it only once it is the same link.
 			k := syncLinkKey{l.From, l.To, l.Rel, l.At}
 			if seen[k] {
@@ -177,8 +182,10 @@ func (s *Service) scopeLineageGraph(ctx context.Context, scope *wire.ReportScope
 // link's start and its state now, the earliest first, at most lineage.MostAnswer.
 func sessionsOn(g *mergedLineage, nodes []wire.LineageNode) wire.LineageSessionsOn {
 	asked := map[wire.LineageNode]bool{}
-	for _, n := range nodes {
-		asked[n] = true
+	nodes = slices.Clone(nodes)
+	for i, n := range nodes {
+		nodes[i] = g.names.Ask(n)
+		asked[nodes[i]] = true
 	}
 	at := map[wire.LineageNode]int{}
 	var out []wire.LineageSessionOn

@@ -69,7 +69,7 @@ func (d *Daemon) sessionsOnIssue(n int) wire.LineageSessions {
 	limited := false
 	seen := map[string]bool{}
 	add := func(session wire.LineageNode, on wire.LineageNode) {
-		id, ok := strings.CutPrefix(session.Ref, "session:")
+		id, ok := lineage.SessionID(session.Ref)
 		if !ok || seen[id] {
 			return
 		}

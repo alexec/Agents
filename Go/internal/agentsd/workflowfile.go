@@ -346,6 +346,11 @@ func parseWorkflow(text, id, folder string) wire.Workflow {
 						b.Cooldown = &c
 					}
 				}
+				if n, ok := m["hours"]; ok {
+					if h, err := parseHours(n); err == nil {
+						b.Hours = h
+					}
+				}
 				e, has := m["enabled"]
 				b.Enabled = flag(e, has)
 				a, has := m["archived"]
@@ -424,6 +429,13 @@ func parseWorkflow(text, id, folder string) wire.Workflow {
 			w.Cooldown = &c
 		}
 	}
+	if n, ok := m["hours"]; ok {
+		h, err := parseHours(n)
+		if err != nil {
+			return broken(failureMessage(err, ""))
+		}
+		w.Hours = h
+	}
 	for _, key := range []string{"enabled", "archived", "continue-when-back", "muted"} {
 		if n, ok := m[key]; ok {
 			t, _ := n.Text()
@@ -488,7 +500,7 @@ func parseWorkflow(text, id, folder string) wire.Workflow {
 	}
 	w.Settings = s
 	known := map[string]bool{"on": true, "agent": true, "name": true, "permission-mode": true, "runtime": true, "model": true,
-		"labels": true, "effort": true, "options": true, "enabled": true, "archived": true, "cooldown": true, "runs-on": true, "when-done": true,
+		"labels": true, "effort": true, "options": true, "enabled": true, "archived": true, "cooldown": true, "hours": true, "runs-on": true, "when-done": true,
 		"continue-when-back": true, "permission-requests": true, "sandbox": true}
 	for k, v := range m {
 		if !known[k] {
@@ -541,6 +553,25 @@ func parseTrigger(n yamlnode.Node) (wire.WorkflowTrigger, error) {
 	if name, ok := n.Text(); ok {
 		return triggerNamed(name, map[string]yamlnode.Node{})
 	}
+	// `- type: pr.merged` with its settings beside it (#4730); name is read the same way,
+	// for one release.
+	if n.IsMapping() {
+		for _, key := range []string{"type", "name"} {
+			if v, ok := n.Mapping[key]; ok {
+				name, isText := v.Text()
+				if !isText || name == "" {
+					return wire.WorkflowTrigger{}, failure("`" + key + ":` in a trigger is the event's type, such as pr.merged")
+				}
+				settings := map[string]yamlnode.Node{}
+				for k, s := range n.Mapping {
+					if k != "type" && k != "name" {
+						settings[k] = s
+					}
+				}
+				return triggerNamed(name, settings)
+			}
+		}
+	}
 	if !n.IsMapping() || len(n.Mapping) != 1 {
 		return wire.WorkflowTrigger{}, failure("A trigger must be a name, or a name with settings under it")
 	}
@@ -573,6 +604,39 @@ func triggerNamed(name string, keys map[string]yamlnode.Node) (wire.WorkflowTrig
 		}
 		return wire.WorkflowTrigger{Schedule: &wire.WorkflowTriggerStoredSchedule{Value: s}}, nil
 	}
+	// provider, topic, subject and debounce say what of the envelope it hears (#4730).
+	busRaw := map[string]any{}
+	busValues := map[string][]string{}
+	own := map[string]yamlnode.Node{}
+	for k, v := range keys {
+		if !busKeys[k] {
+			own[k] = v
+			continue
+		}
+		if t, ok := v.Text(); ok {
+			busValues[k], busRaw[k] = []string{t}, t
+		} else if vs, isList := v.Values(); isList && k == "topic" {
+			busValues[k], busRaw[k] = vs, vs
+		} else {
+			return wire.WorkflowTrigger{}, failure("The \"" + k + "\" under \"" + name + "\" should be one value (a topic can be a list)")
+		}
+	}
+	if _, problem := readBusFilter(busValues); problem != "" {
+		return wire.WorkflowTrigger{}, failure(name + ": " + strings.TrimSuffix(problem, "."))
+	}
+	t, err := triggerNamedOwn(name, own)
+	if err != nil || t.Unrecognised == nil {
+		return t, err
+	}
+	for k, v := range busRaw {
+		b, _ := json.Marshal(v)
+		t.Unrecognised.Keys[k] = b
+	}
+	return t, nil
+}
+
+// triggerNamedOwn is triggerNamed for the keys that are not the envelope's.
+func triggerNamedOwn(name string, keys map[string]yamlnode.Node) (wire.WorkflowTrigger, error) {
 	raw := map[string]any{}
 	for k, v := range keys {
 		raw[k] = v.JSON()
@@ -659,43 +723,19 @@ func parseSchedule(keys map[string]yamlnode.Node) (wire.WorkflowSchedule, error)
 	}
 	sort.Slice(s.Minutes, func(i, j int) bool { return s.Minutes[i] < s.Minutes[j] })
 	if b, ok := keys["between"].Text(); ok && b != "" {
-		halves := strings.SplitN(b, "-", 2)
-		bad := failure("\"" + b + "\" is not a range of times, like \"09:00-18:00\"")
-		if len(halves) != 2 {
-			return wire.WorkflowSchedule{}, bad
-		}
-		fh, fm, ok1 := clockTime(strings.TrimSpace(halves[0]))
-		th, tm, ok2 := clockTime(strings.TrimSpace(halves[1]))
-		if !ok1 || !ok2 || fh*60+fm > th*60+tm {
-			return wire.WorkflowSchedule{}, bad
+		fh, fm, th, tm, err := parseBetween(b)
+		if err != nil {
+			return wire.WorkflowSchedule{}, err
 		}
 		s.Hours, s.StartMinute, s.EndMinute = [2]int64{fh, th}, fm, tm
 	}
-	all := []wire.Weekday{wire.WeekdaySun, wire.WeekdayMon, wire.WeekdayTue, wire.WeekdayWed, wire.WeekdayThu, wire.WeekdayFri, wire.WeekdaySat}
-	s.Days = all
+	s.Days = allWeekdays
 	if n, ok := keys["days"]; ok {
-		named, _ := n.Values()
-		got := map[wire.Weekday]bool{}
-		for _, d := range named {
-			w := wire.Weekday(strings.ToLower(strings.TrimSpace(d)))
-			valid := false
-			for _, x := range all {
-				valid = valid || x == w
-			}
-			if !valid {
-				return wire.WorkflowSchedule{}, failure("\"" + d + "\" is not a day of the week")
-			}
-			got[w] = true
+		days, err := parseDays(n)
+		if err != nil {
+			return wire.WorkflowSchedule{}, err
 		}
-		if len(got) == 0 {
-			return wire.WorkflowSchedule{}, failure("`days:` names no days")
-		}
-		s.Days = nil
-		for _, x := range all {
-			if got[x] {
-				s.Days = append(s.Days, x)
-			}
-		}
+		s.Days = days
 	}
 	return s, nil
 }
@@ -737,6 +777,9 @@ func triggerPattern(t wire.WorkflowTrigger) (waitPattern, bool) {
 	}
 	filters := map[string][]string{}
 	for k, raw := range u.Keys {
+		if busKeys[k] {
+			continue
+		}
 		var one string
 		var list []string
 		if json.Unmarshal(raw, &one) == nil {
@@ -748,7 +791,12 @@ func triggerPattern(t wire.WorkflowTrigger) (waitPattern, bool) {
 		}
 	}
 	p, problem := parsePattern(u.Name, filters)
-	return p, problem == ""
+	if problem != "" {
+		return p, false
+	}
+	bus, _, ok := triggerBus(t)
+	p.bus = bus
+	return p, ok
 }
 
 // triggerSupported is WorkflowTrigger.isSupported: a schedule or an event this host raises.

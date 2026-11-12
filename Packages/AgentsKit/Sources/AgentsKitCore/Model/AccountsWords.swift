@@ -52,7 +52,7 @@ public enum AccountsWords {
 
     /// Under the sheet's Ask before use toggle. The toggle and the row's mark are `AskBeforeUseWords`'.
     public static func askHint(_ isOn: Bool) -> String {
-        isOn ? "An agent's read of it waits for your approval: Allow Once, for This Session, Always or Deny."
+        isOn ? "An agent's read of it waits for your approval: Approve, Approve for This Session, Always Approve or Deny."
             : "Every agent can read it with no approval."
     }
 

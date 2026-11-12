@@ -10,6 +10,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The MCP events message.received and question.answered (#1352), polled only: `events/list` and
@@ -313,6 +316,12 @@ func (s *Events) Poll(_ context.Context, raw json.RawMessage) (map[string]any, *
 	}
 	out := []any{}
 	next := c
+	number := ""
+	if s.Inbox.Account != nil {
+		if acct, err := s.Inbox.Account(); err == nil {
+			number = acct.PhoneNumberID
+		}
+	}
 	for _, it := range found {
 		next.Seq = it.Seq
 		if !a.match(it) {
@@ -322,12 +331,23 @@ func (s *Events) Poll(_ context.Context, raw json.RawMessage) (map[string]any, *
 		if it.Kind == Answer {
 			name = AnswerEvent
 		}
-		out = append(out, map[string]any{
+		out = append(out, mcpevents.Enveloped(map[string]any{
 			"eventId": name + ":" + it.ID, "name": name, "timestamp": it.At.UTC().Format(time.RFC3339),
 			"data": dataOf(it), "sender": senderOf(it),
-		})
+		}, messageRef(number, it), ""))
 	}
 	return answer(out, next, more), nil
+}
+
+// messageRef is the ref of the message an event is about (#4728): the message that came, an
+// answer's too, as whatsapp:message:<phone number id>#<wamid>. The topic is the business
+// number's id, as the account names it (not the number itself). A message comes once, so
+// there is no key.
+func messageRef(number string, it Item) wire.Ref {
+	if it.ID == "" {
+		return wire.Ref{}
+	}
+	return mcpevents.Ref("whatsapp", "message", number, it.ID)
 }
 
 // eventsError is a failure as the events draft's error codes.

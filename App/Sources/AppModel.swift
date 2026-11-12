@@ -24,6 +24,9 @@ final class AppModel {
     /// half typed, and what it has cost since it opened. None of that is the daemon's
     /// and none of it is the phone's.
     let work = AgentsModel()
+    /// This window's local copy (#4791): sessions and chat ends kept in its root's Caches,
+    /// drawn at launch before the host answers. The host always wins.
+    @ObservationIgnored private(set) var localCopy: LocalCopyKeeper?
 
     private(set) var runtimes: [RuntimeStatus] = []
     /// The start-up sheet offering to install what is missing (048). Raised once per
@@ -222,6 +225,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -248,6 +252,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -273,6 +278,7 @@ final class AppModel {
             statusSecretsPage = nil
             showsEvents = false
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -295,6 +301,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -313,10 +320,34 @@ final class AppModel {
     var showsTime = false {
         didSet {
             guard showsTime, showsTime != oldValue else { return }
+            showsVelocity = false
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
             statusSecretsPage = nil
+            showsTokens = false
+            machinePage = nil
+            showsWork = false
+            showsDocs = false
+            showsMessages = false
+            showsSummary = false
+            selection = nil
+            openWorkflow = nil
+            folderPage = nil
+            composing = false
+        }
+    }
+
+    /// Whether the window is showing Velocity: the pull requests that landed, over time (#4597).
+    /// A page like Time, and not persisted for the same reason.
+    var showsVelocity = false {
+        didSet {
+            guard showsVelocity, showsVelocity != oldValue else { return }
+            showsSpending = false
+            showsEvents = false
+            showsRuntimes = false
+            statusSecretsPage = nil
+            showsTime = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -340,6 +371,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             machinePage = nil
             showsWork = false
             showsDocs = false
@@ -366,6 +398,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             selection = nil
             openWorkflow = nil
@@ -388,6 +421,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             selection = nil
@@ -408,6 +442,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -430,6 +465,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -455,6 +491,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -537,6 +574,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -563,6 +601,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -614,6 +653,7 @@ final class AppModel {
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
             if showsTime { return .time }
+            if showsVelocity { return .velocity }
             if showsWork { return .work(workPlace.kind) }
             if showsDocs { return .docs }
             if showsMessages { return .messages }
@@ -641,6 +681,7 @@ final class AppModel {
                 showsRuntimes = false
                 statusSecretsPage = nil
                 showsTime = false
+                showsVelocity = false
                 showsTokens = false
                 machinePage = nil
                 showsWork = false
@@ -667,6 +708,8 @@ final class AppModel {
                 showsTokens = true
             case .time:
                 showsTime = true
+            case .velocity:
+                showsVelocity = true
             case .work(let kind):
                 // The list's row: its list, or the place in it still open.
                 showWork(workPlace.kind == kind ? workPlace : WorkPlace(kind: kind))
@@ -695,6 +738,7 @@ final class AppModel {
                 showsRuntimes = false
                 statusSecretsPage = nil
                 showsTime = false
+                showsVelocity = false
                 showsTokens = false
                 machinePage = nil
                 showsWork = false
@@ -719,6 +763,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -735,6 +780,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -766,6 +812,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -1006,6 +1053,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -1149,6 +1197,10 @@ final class AppModel {
 
     init() {
         userScope.lock = lock
+        let localCopy = LocalCopyKeeper(copy: .mac(), work: work)
+        self.localCopy = localCopy
+        // At once, so the sidebar and a chat restored at launch draw before the host answers.
+        Task { await localCopy.drawMachines() }
         // On `controlLink` itself, not a link of its own (#445): a second connection that
         // nothing else knew of was never let go of, so a wedged one stayed for good.
         if let controlLink { client = DaemonClient(link: hostLink(.mac, through: controlLink), machine: .mac) }
@@ -2273,13 +2325,28 @@ final class AppModel {
                                                         returning: DesktopControlSettings.self)
     }
 
-    /// The person turned desktop control on or off (#3004, US2, FR-004).
-    func setDesktopControlEnabled(_ on: Bool) async {
+    /// The person set desktop control: Ask, Always Approve or Off (#3004, US2, FR-004, #4264).
+    func setDesktopControl(_ mode: DriveApproval) async {
         await attempt {
             self.desktopControlSettings = try await self.macClient.call(DaemonAPI.Method.desktopControlSet,
-                                                                     DesktopControlSettings(enabled: on),
+                                                                     DesktopControlSettings(mode: mode),
                                                                      returning: DesktopControlSettings.self)
         }
+    }
+
+    /// Settings ▸ Browser's Ask, Always Approve or Off (#4264). Nil from a daemon too old to know it.
+    func browserControl() async -> BrowserControlSettings? {
+        try? await macClient.call(DaemonAPI.Method.browserControlState, DaemonAPI.Empty(), returning: BrowserControlSettings.self)
+    }
+
+    /// The person set the browser: Ask, Always Approve or Off (#4264).
+    func setBrowserControl(_ mode: DriveApproval) async -> BrowserControlSettings? {
+        var saved: BrowserControlSettings?
+        await attempt {
+            saved = try await self.macClient.call(DaemonAPI.Method.browserControlSet, BrowserControlSettings(mode: mode),
+                                                  returning: BrowserControlSettings.self)
+        }
+        return saved
     }
 
     /// Settings ▸ Browser (#3535): this Mac's browser, its sites with sign-ins and its
@@ -2450,6 +2517,15 @@ final class AppModel {
         return histories.isEmpty ? nil : .merged(histories)
     }
 
+    /// The PRs that landed (#4597), for the Velocity page: this Mac's lineage alone, as the
+    /// Multiplier is (#4595, v1), since two hosts that worked on one PR would count it twice.
+    /// Nil when the host does not know the method, and the page keeps its progress wheel.
+    func velocityHistory() async -> VelocityHistory? {
+        guard let history = try? await macClient.call(DaemonAPI.Method.velocityHistory, Optional<String>.none,
+                                                    returning: VelocityHistory.self) else { return nil }
+        return .merged([history])
+    }
+
     /// This Mac first, then every server that has said what it spends.
     private var chartHosts: [MachineRef] { [.mac] + serverCosts.keys.filter { $0 != .mac } }
 
@@ -2576,6 +2652,15 @@ final class AppModel {
     func setUserPart(_ part: DaemonAPI.UserSettingsPartName, _ value: some Encodable) async -> String? {
         guard let encoded = try? JSONValue.encoding(value) else { return "That could not be written." }
         return await userScope.set(part, to: encoded, on: controlRequests)
+    }
+
+    /// The person's time zone (#4818): this Mac's, set at the user scope when it differs, so
+    /// a workflow's `hours:` with no `time-zone:` go by it on a server too. It has no control.
+    func keepTimeZone() async {
+        guard let settings = userScope.settings else { return }
+        let here = TimeZone.current.identifier
+        if (try? settings.timeZone?.decode(DaemonAPI.UserTimeZone.self))?.identifier == here { return }
+        _ = await setUserPart(.timeZone, DaemonAPI.UserTimeZone(identifier: here))
     }
 
     /// After an edit in Agent Configuration or Agent Runtimes: a part that follows the person
@@ -3841,6 +3926,15 @@ final class AppModel {
                     await self?.signIn.connected(control)
                     // Status ▸ Secrets and Accounts' rows say when the newest operation was (#4161).
                     await self?.userScope.load(control)
+                    await self?.keepTimeZone()
+                    // A change of this Mac's zone is the person's, while connected (#4818).
+                    let zoneWatch = Task { [weak self] in
+                        for await _ in NotificationCenter.default.notifications(named: .NSSystemTimeZoneDidChange) {
+                            NSTimeZone.resetSystemTimeZone()
+                            await self?.keepTimeZone()
+                        }
+                    }
+                    defer { zoneWatch.cancel() }
                     if let client = ControlConfig.client { await self?.lock.connected(control, client: client) }
                     await Self.sealWaiting(on: control, lock: self?.lock)
                     for await note in control.notifications() {
@@ -5234,6 +5328,11 @@ final class AppModel {
         // Only the latest load of this chat puts its answer on screen: it is loaded on
         // opening, on every reconnect and on its host's lists, and these overlap (#400).
         let load = work.beginTranscriptLoad()
+        // What was fetched for it under the pointer or beside the last one opened, at once
+        // (#4795); else this device's copy of its end, while the host's page is on its way (#4791).
+        if localCopy?.drawPrefetched(of: selection, load: load) != true {
+            Task { [localCopy] in await localCopy?.drawOpening(of: selection, load: load) }
+        }
         // Beside the transcript rather than before it: neither waits on the other.
         async let whole = loadWholeAgent(selection)
         // The chat's own host, both for the call and for the check that it is up: a
@@ -5270,6 +5369,9 @@ final class AppModel {
                 guard self.selection == selection else { return }
                 let dataIn = self.chatOpening.map { Perf.elapsed($0.timing) }
                 guard self.work.takeOpening(opening, load: load) else { return }
+                self.localCopy?.opened(selection, opening)
+                // The rows either side, which the arrow keys open next (#4795).
+                self.prefetchNeighbours(of: selection)
                 if let why = opening.turnsFailure { Self.chatLog.notice("turns of \(selection) did not load: \(why, privacy: .public)") }
                 if let started = self.chatOpening, started.agent == selection {
                     self.chatOpening = nil
@@ -5301,6 +5403,47 @@ final class AppModel {
             Self.chatLog.notice("record of \(selection) did not load from \(host.rawValue, privacy: .public)")
             work.failOpening("Its host has this session, but this Mac could not read its record.", load: load)
         }
+    }
+
+    /// A chat's opening page from its host, as `loadTranscript` reads it, for a prefetch.
+    private func fetchOpening(_ id: UUID) async throws -> ChatOpening.Loaded {
+        let client = client(for: host(ofAgent: id))
+        return try await ChatOpening.load(
+            turns: {
+                try await client.call(DaemonAPI.Method.agentsTurns, DaemonAPI.TurnsRequest.opening(id),
+                                      returning: TurnsPage.self)
+            },
+            transcript: { from, limit in
+                try await client.call(DaemonAPI.Method.agentsTranscript,
+                                      DaemonAPI.TranscriptRequest(agentID: id, limit: limit, from: from),
+                                      returning: TranscriptPage.self)
+            },
+            entry: { index in
+                try await client.call(DaemonAPI.Method.agentsTranscript,
+                                      DaemonAPI.TranscriptRequest.entry(index, of: id),
+                                      returning: TranscriptPage.self)
+            },
+            describe: { self.describe($0) })
+    }
+
+    /// Fetches a chat before it is opened (#4795): the row under the pointer, and the rows
+    /// beside the open one. Not the open one, and not one whose host is not answering.
+    func prefetch(_ id: UUID) {
+        guard id != selection, let agent = work.agent(id), !hostUnreachable(agent.host) else { return }
+        localCopy?.prefetched.prefetch(id) { [weak self] in
+            guard let self else { throw CancellationError() }
+            return try await self.fetchOpening(id)
+        }
+    }
+
+    /// The selected folder's live sessions, in the order its page and the sidebar draw
+    /// them: the list ⌥⌘↑ and ⌥⌘↓ step through.
+    var sessionsInFront: [UUID] {
+        AgentGroup.live.flatMap { agents(in: selectedFolderKey, group: $0) }.map(\.id)
+    }
+
+    private func prefetchNeighbours(of id: UUID) {
+        for neighbour in OpeningPrefetch.neighbours(of: id, in: sessionsInFront) { prefetch(neighbour) }
     }
 
     /// A session's transcript in a window of its own (#826), loaded as the main window's
@@ -5998,10 +6141,12 @@ final class AppModel {
     }
 
     func setLabels(on id: UUID, add: [String] = [], remove: [String] = []) async {
-        await attempt(on: work.agent(id)?.host ?? .mac) {
-            try await self.client(forAgent: id).call(
-                DaemonAPI.Method.agentsSetLabels,
-                DaemonAPI.SetLabelsRequest(agentID: id, add: add, remove: remove))
+        await optimistic(.labels(add: add, remove: remove), on: id) {
+            await attempt(on: work.agent(id)?.host ?? .mac) {
+                try await self.client(forAgent: id).call(
+                    DaemonAPI.Method.agentsSetLabels,
+                    DaemonAPI.SetLabelsRequest(agentID: id, add: add, remove: remove))
+            }
         }
     }
 
@@ -6081,7 +6226,18 @@ final class AppModel {
     private func act(_ act: AgentAct, on id: UUID, _ call: () async throws -> Void) async -> Bool {
         guard work.begin(act, on: id) else { return false }
         defer { work.end(act, on: id) }
-        return await attempt(on: work.agent(id)?.host ?? .mac, call)
+        let host = work.agent(id)?.host ?? .mac
+        return await optimistic(act.write, on: id) { await attempt(on: host, call) }
+    }
+
+    /// A change drawn on the agent's record at once, before its host answers (#4786):
+    /// the kit's one pending layer holds it, and puts the record back when the call
+    /// fails, with one line that says what failed.
+    @discardableResult
+    private func optimistic(_ write: AgentWrite, on id: UUID, _ send: () async -> Bool) async -> Bool {
+        let sent = await work.optimistically(write, on: id, send)
+        if !sent, let said = problem { problem = write.failure(said) }
+        return sent
     }
 
     /// What is on its way to this agent, if anything: for the control that sent it to
@@ -6253,7 +6409,11 @@ final class AppModel {
     }
 
     func unarchive(_ id: UUID) async {
-        await attempt { try await self.client(forAgent: id).call(DaemonAPI.Method.agentsUnarchive, DaemonAPI.AgentRequest(agentID: id)) }
+        await optimistic(.unarchive, on: id) {
+            await attempt(on: work.agent(id)?.host ?? .mac) {
+                try await self.client(forAgent: id).call(DaemonAPI.Method.agentsUnarchive, DaemonAPI.AgentRequest(agentID: id))
+            }
+        }
     }
 
     /// Mark as Unread / Mark as Read, from the row's menu (#70).
@@ -6273,9 +6433,11 @@ final class AppModel {
 
     /// The person's title for a session (#751), or with an empty one the runtime's again.
     func rename(_ id: UUID, to title: String) async {
-        await attempt(on: work.agent(id)?.host ?? .mac) {
-            try await self.client(forAgent: id).call(DaemonAPI.Method.agentsRename,
-                                                     DaemonAPI.RenameRequest(agentID: id, title: title))
+        await optimistic(.rename(title), on: id) {
+            await attempt(on: work.agent(id)?.host ?? .mac) {
+                try await self.client(forAgent: id).call(DaemonAPI.Method.agentsRename,
+                                                         DaemonAPI.RenameRequest(agentID: id, title: title))
+            }
         }
     }
 
@@ -6288,9 +6450,11 @@ final class AppModel {
 
     /// Mute Notifications, or Unmute, from the row's or the Session menu (#2003).
     func setMuted(_ id: UUID, _ muted: Bool) async {
-        await attempt(on: work.agent(id)?.host ?? .mac) {
-            try await self.client(forAgent: id).call(DaemonAPI.Method.agentsSetMuted,
-                                                     DaemonAPI.SetMutedRequest(agentID: id, muted: muted))
+        await optimistic(.mute(muted), on: id) {
+            await attempt(on: work.agent(id)?.host ?? .mac) {
+                try await self.client(forAgent: id).call(DaemonAPI.Method.agentsSetMuted,
+                                                         DaemonAPI.SetMutedRequest(agentID: id, muted: muted))
+            }
         }
     }
 
@@ -6304,6 +6468,11 @@ final class AppModel {
     /// answer and not a second one (#86).
     @discardableResult
     func answer(_ request: PermissionRequest, optionID: String) async -> Bool {
+        // The card goes at once, and comes back if the answer did not go (#4786).
+        await work.answering(request) { await sendAnswer(request, optionID: optionID) }
+    }
+
+    private func sendAnswer(_ request: PermissionRequest, optionID: String) async -> Bool {
         let host = work.agent(request.agentID)?.host ?? .mac
         let sendID = UUID()
         if host != .mac {
@@ -7027,13 +7196,17 @@ final class AppModel {
     /// session that asked. It stays open, in Later, until it comes back.
     @discardableResult
     func deferRequest(_ request: NeedRequest, _ params: DaemonAPI.RequestsDefer) async -> Bool {
-        await changeRequest(request, DaemonAPI.Method.requestsDefer, params)
+        await work.changing(request, to: request.deferring(params)) {
+            await changeRequest(request, DaemonAPI.Method.requestsDefer, params)
+        }
     }
 
     /// Bring back now (#4234): out of Later, to the top of Needs you.
     @discardableResult
     func undeferRequest(_ request: NeedRequest) async -> Bool {
-        await changeRequest(request, DaemonAPI.Method.requestsUndefer, DaemonAPI.RequestsUndefer(id: request.id))
+        await work.changing(request, to: request.broughtBack) {
+            await changeRequest(request, DaemonAPI.Method.requestsUndefer, DaemonAPI.RequestsUndefer(id: request.id))
+        }
     }
 
     private func changeRequest(_ request: NeedRequest, _ method: String, _ params: some Encodable & Sendable) async -> Bool {
@@ -7054,14 +7227,15 @@ final class AppModel {
         let sendID = UUID()
         // An empty reason is No thanks (#4039).
         let reason = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let sent = await attempt {
+        // The card goes at once, and comes back if the answer did not go (#4786).
+        let sent = await work.answering(request) { await attempt {
             try await self.client(forAgent: request.agentID).call(DaemonAPI.Method.elicitationsAnswer,
                                        DaemonAPI.AnswerElicitationRequest(requestID: request.id,
                                                                           action: action,
                                                                           content: content,
                                                                           sendID: sendID,
                                                                           reason: reason?.isEmpty == false ? reason : nil))
-        }
+        } }
         await refreshElicitations()
         return sent
     }

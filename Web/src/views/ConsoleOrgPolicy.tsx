@@ -181,7 +181,7 @@ export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) 
             <input type="text" class="wide" placeholder="Marketplace ids, commas between" aria-label="Marketplaces allowed"
               value={form.marketplaces} onInput={text("marketplaces")} />
             <label class="setting">
-              <span>Refuse MCP servers added by hand</span>
+              <span>Deny MCP servers added by hand</span>
               <input type="checkbox" role="switch" checked={form.refuseCustomServers} onChange={check("refuseCustomServers")} />
             </label>
           </>

@@ -39,6 +39,7 @@ type fireRequest struct {
 	fromQueue       bool
 	event           *wire.Event // the event that fired it, for a bot's claim (#1761)
 	fromControl     bool        // sent by the control plane, which took it once (#2011)
+	burst           string      // what a debounce held, said in the prompt (#4730)
 }
 
 // refusalWords is WorkflowRefusal.message.
@@ -87,6 +88,11 @@ func refusalWords(r wire.WorkflowRefusal) string {
 			return "it is cooling down until " + clock(*r.CoolingDown.Until) + ", and runs once then"
 		}
 		return "a run is still going, and it runs once more when that ends"
+	case r.OutsideHours != nil:
+		if r.OutsideHours.Until != nil {
+			return "it is outside its hours until " + clock(*r.OutsideHours.Until) + ", and runs once then"
+		}
+		return "it is outside its hours, and its hours name no day"
 	}
 	return ""
 }
@@ -99,7 +105,7 @@ func refusalCode(r wire.WorkflowRefusal) string {
 		"agent_unavailable": r.AgentUnavailable != nil, "no_triggering_agent": r.NoTriggeringAgent != nil,
 		"missed_while_closed": r.MissedWhileClosed != nil, "folder_gone": r.FolderGone != nil, "day_limit_reached": r.DayLimitReached != nil,
 		"setting_refused": r.SettingRefused != nil, "awaiting_approval": r.AwaitingApproval != nil, "denied_here": r.DeniedHere != nil,
-		"cooling_down": r.CoolingDown != nil} {
+		"cooling_down": r.CoolingDown != nil, "outside_hours": r.OutsideHours != nil} {
 		if set {
 			return code
 		}
@@ -175,13 +181,20 @@ func (d *Daemon) fireWorkflows(e wire.Event) {
 				continue
 			}
 			for _, t := range w.Triggers {
-				p, isPattern := triggerPattern(t)
-				mt, isServer := serverTrigger(t)
-				if isPattern && p.matches(e) || isServer && mt.matches(e) {
+				if triggerMatches(t, e) {
 					pos := e.Position
 					ev := e
-					fires = append(fires, fireRequest{folder: folder, id: id, trigger: t, triggeringAgent: triggering, depth: e.ChainDepth,
-						causingEvent: &pos, event: &ev})
+					fr := fireRequest{folder: folder, id: id, trigger: t, triggeringAgent: triggering, depth: e.ChainDepth,
+						causingEvent: &pos, event: &ev}
+					// A burst on one subject and type is held, and runs it once (#4730).
+					if hold := triggerDebounce(t); hold > 0 && d.holdBurst("workflow:"+folder+"\n"+id, hold, e, func(last wire.Event, n int) {
+						pos := last.Position
+						fr.causingEvent, fr.event, fr.burst = &pos, &last, burstWords(n, hold)
+						d.goAfterTurn("workflow fire", func() { d.fire(fr) })
+					}) {
+						break
+					}
+					fires = append(fires, fr)
 					break
 				}
 			}
@@ -261,6 +274,17 @@ func (d *Daemon) refusalLocked(fr fireRequest, f *workflowFile) *wire.WorkflowRe
 	if l, ok := d.ceilingsLocked()[workflowKey(fr.folder, fr.id)]; ok {
 		n := d.workflowTotal()
 		return r(func(x *wire.WorkflowRefusal) { x.OverLimit = &wire.WorkflowRefusalOverLimit{Value: l, Allowed: &n} })
+	}
+	// Outside its hours (#4818), a fire is held for when they open; Run now always runs.
+	if !fr.byHand {
+		if win := d.windowLocked(w); !win.open(time.Now()) {
+			var until *wire.Date
+			if at, ok := d.heldStartLocked(w, st, win, time.Now()); ok {
+				u := wire.DateOf(at)
+				until = &u
+			}
+			return r(func(x *wire.WorkflowRefusal) { x.OutsideHours = &wire.WorkflowRefusalOutsideHours{Until: until} })
+		}
 	}
 	if w.Cooldown != nil && !fr.byHand {
 		if fr.depth > workflowChainLimit {
@@ -399,7 +423,7 @@ func (d *Daemon) fire(fr fireRequest) {
 		switch {
 		case refused.Queued != nil:
 			st.QueuedFires = append(st.QueuedFires, hf)
-		case refused.CoolingDown != nil:
+		case refused.CoolingDown != nil, refused.OutsideHours != nil:
 			st.HeldFire = &hf
 		}
 		d.saveRecordsLocked(false)
@@ -665,10 +689,13 @@ func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
 			text += " The event was " + e.Name + ": " + e.Sentence + eventDetails(*e)
 		}
 		text += ")"
+		if e != nil {
+			text += eventHintLines(*e, fr.burst)
+		}
 	case e != nil && e.Details["subscription"] != "" && e.Details["server"] != "":
-		return serverEventPrompt(w, *e, e.Details["server"])
+		return serverEventPrompt(w, *e, e.Details["server"]) + eventHintLines(*e, fr.burst)
 	case e != nil:
-		text += started + "of the event " + e.Name + ": " + e.Sentence + eventDetails(*e) + ")"
+		text += started + "of the event " + e.Name + ": " + e.Sentence + eventDetails(*e) + ")" + eventHintLines(*e, fr.burst)
 	case fr.byAgent != nil:
 		text += started + "the agent " + d.agentWords(*fr.byAgent) + " (id " + string(*fr.byAgent) + ") ran it.)"
 	case fr.byHand:
@@ -682,6 +709,19 @@ func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
 		return w.Prompt
 	}
 	return text + "\n\n" + w.Prompt
+}
+
+// eventHintLines is the event's ref and subject, that it is a hint, and what a debounce
+// held (#4730), as a paragraph; "" when it has no ref.
+func eventHintLines(e wire.Event, burst string) string {
+	hint := hintWords(e)
+	if burst != "" {
+		hint = strings.TrimSpace(hint + " " + burst)
+	}
+	if hint == "" {
+		return ""
+	}
+	return "\n\n" + hint
 }
 
 // agentWords is an agent's title in quotes, or "an untitled agent".
@@ -750,7 +790,7 @@ func (d *Daemon) recordOutcome(fr fireRequest, name string, o wire.WorkflowOutco
 		}
 	} else {
 		r := o.Refused.Value
-		if r.Disabled == nil && r.CoolingDown == nil && r.Queued == nil {
+		if r.Disabled == nil && r.CoolingDown == nil && r.OutsideHours == nil && r.Queued == nil {
 			d.raise(wire.EventDraft{Name: "workflow.refused", At: now(), Scope: scope, Sentence: "Workflow " + name + " did not run: " + refusalWords(r) + ".",
 				Details: map[string]string{"workflow": fr.id, "reason": refusalCode(r)}, ChainDepth: fr.depth + 1})
 		}
@@ -870,7 +910,8 @@ func (d *Daemon) releaseQueued(folder, id string) {
 	} else if st.HeldFire != nil {
 		cooled := f.wf.Cooldown == nil || st.LastFiredAt == nil ||
 			!st.LastFiredAt.Time().Add(time.Duration(*f.wf.Cooldown*float64(time.Second))).After(time.Now())
-		if cooled {
+		// Held by its cooldown, its hours or both (#4818): it starts when both allow it.
+		if cooled && d.windowLocked(f.wf).open(time.Now()) {
 			next, st.HeldFire = st.HeldFire, nil
 		}
 	}
@@ -1004,11 +1045,13 @@ func (d *Daemon) workflowTickOnce(at time.Time) {
 					}
 					continue
 				}
+				win := d.windowLocked(w)
 				for _, t := range w.Triggers {
 					if t.Schedule == nil {
 						continue
 					}
-					if due, ok := nextDue(t.Schedule.Value, *since); ok && !due.After(at) {
+					// A schedule fires only when its own window and hours: both allow it (#4818).
+					if due, ok := nextDue(t.Schedule.Value, *since); ok && !due.After(at) && win.open(due) {
 						fr := fireRequest{folder: folder, id: id, trigger: t, dueAt: &due}
 						if away {
 							missed = append(missed, fr)

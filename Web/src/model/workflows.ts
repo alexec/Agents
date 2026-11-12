@@ -8,7 +8,7 @@
 // MCPEventTrigger.summary: "When ci reports checks.failed (repo alexec/Agents)".
 import type {
   JSONValue, MCPTriggerStatus, Weekday, Workflow, WorkflowCause, WorkflowLimit, WorkflowOutcome, WorkflowProblem, WorkflowRefusal,
-  WorkflowSchedule, WorkflowSettings, WorkflowSummary, WorkflowTriggerStored,
+  WorkflowHours, WorkflowSchedule, WorkflowSettings, WorkflowSummary, WorkflowTriggerStored,
 } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
@@ -302,6 +302,8 @@ export function workflowStatus(s: WorkflowSummary): { mark: string; words: strin
   // A bot's workflow heard here (#2027).
   if (s.hearsFor !== undefined) return { mark: "◉", words: `Heard for ${s.hearsFor}`, tinted };
   if (s.isRunning) return { mark: "◌", words: "Running", tinted };
+  // A trigger held until its hours open (#4819).
+  if (waitsForItsHours(s)) return { mark: "⧗", words: hoursOpenSentence(s) ?? "Waits for its hours", tinted };
   // A trigger held by its cooldown (#103): it runs once when the cooldown ends.
   if (s.holdsAFire) return { mark: "⧗", words: "Cooling down, then it runs once", tinted };
   if (runsOnlyByHand(s.workflow) && !s.workflow.problem) return { mark: "☝\uFE0E", words: "Runs by hand", tinted };
@@ -637,6 +639,11 @@ export function refusalMessage(refusal: WorkflowRefusal): string {
       ? `it is cooling down until ${shortTime(fromWireDate(refusal.coolingDown.until))}, and runs once then`
       : "a run is still going, and it runs once more when that ends";
   }
+  if ("outsideHours" in refusal) {
+    return refusal.outsideHours.until !== undefined
+      ? `it is outside its hours until ${shortTime(fromWireDate(refusal.outsideHours.until))}, and runs once then`
+      : "it is outside its hours, and its hours name no day";
+  }
   return "it is waiting for your OK";
 }
 
@@ -645,7 +652,7 @@ function refusedSummary(outcome: Extract<WorkflowOutcome, { refused: unknown }>)
   const { _0: refusal, repeats } = outcome.refused;
   const many = repeats > 1;
   // Held, not dropped: it is going to run, and "did not run" would say otherwise.
-  if ("coolingDown" in refusal) {
+  if ("coolingDown" in refusal || "outsideHours" in refusal) {
     return many ? `Waiting — ${repeats} triggers held into one run, as ${refusalMessage(refusal)}` : `Waiting — ${refusalMessage(refusal)}`;
   }
   if ("queued" in refusal) {
@@ -696,6 +703,118 @@ function shortTime(date: Date): string {
   return date.toLocaleTimeString("en", { hour: "numeric", minute: "2-digit" });
 }
 
+// MARK: Hours (#4819): WorkflowHours.sentence and WorkflowSummary.hoursOpenSentence, ported by hand.
+
+/** The viewer's own time zone, as `TimeZone.current.identifier`. */
+export function viewerZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+/** WorkflowHours.zoneNote: the file's time-zone:, only when it is not the viewer's own. */
+function hoursZoneNote(h: WorkflowHours, viewer: string): string | null {
+  return h.timeZone !== undefined && h.timeZone !== viewer ? h.timeZone : null;
+}
+
+/** WorkflowHours.parse(between:) as minutes of the day, or null when it cannot be read. */
+function parseBetween(text: string): [number, number] | null {
+  const halves = text.split("-");
+  if (halves.length !== 2) return null;
+  const clockOf = (part: string): number | null => {
+    const bits = part.trim().split(":");
+    if (bits.length < 1 || bits.length > 2 || !/^\d+$/.test(bits[0]!)) return null;
+    const hour = Number(bits[0]);
+    if (hour > 23) return null;
+    if (bits.length === 1) return hour * 60;
+    if (!/^\d+$/.test(bits[1]!)) return null;
+    const minute = Number(bits[1]);
+    return minute === 0 || minute === 30 ? hour * 60 + minute : null;
+  };
+  const from = clockOf(halves[0]!), to = clockOf(halves[1]!);
+  return from === null || to === null || from === to ? null : [from, to];
+}
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const capital = (d: string) => d.charAt(0).toUpperCase() + d.slice(1);
+
+/** WorkflowHours.dayWords: "Mon–Fri", "Mon, Wed, Fri"; null for every day. */
+function hoursDayWords(days: Weekday[]): string | null {
+  if (sameSet([...new Set(days)], allWeekdays)) return null;
+  const parts: string[] = [];
+  let run: Weekday[] = [];
+  const flush = () => {
+    if (run.length >= 3) parts.push(`${capital(run[0]!)}–${capital(run[run.length - 1]!)}`);
+    else parts.push(...run.map(capital));
+    run = [];
+  };
+  for (const d of ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as Weekday[]) {
+    if (days.includes(d)) run.push(d); else flush();
+  }
+  flush();
+  return parts.join(", ");
+}
+
+/** WorkflowHours.sentence: "Runs 09:00–18:00, Mon–Fri", and the zone when it is not the viewer's. */
+export function hoursSentence(h: WorkflowHours, viewer = viewerZone()): string | null {
+  if (h.days !== undefined && h.days.length === 0) return "Never runs on its own: its hours name no day";
+  let time: string | null = null;
+  if (h.between !== undefined) {
+    const range = parseBetween(h.between);
+    time = range ? `${pad(Math.floor(range[0] / 60))}:${pad(range[0] % 60)}–${pad(Math.floor(range[1] / 60))}:${pad(range[1] % 60)}` : h.between;
+  }
+  const day = h.days !== undefined ? hoursDayWords(h.days) : null;
+  if (time === null && day === null) return null;
+  let out = `Runs ${[time, day].filter((x) => x !== null).join(", ")}`;
+  const note = hoursZoneNote(h, viewer);
+  if (note) out += ` (${note})`;
+  return out;
+}
+
+/** WorkflowHours.dayAndClock: "Mon 09:00" in `zone`, on a 24-hour clock. */
+export function dayAndClock(date: Date, zone: string): string {
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat("en-US", { timeZone: zone, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
+  } catch {
+    parts = new Intl.DateTimeFormat("en-US", { weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(date);
+  }
+  const part = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("weekday")} ${part("hour")}:${part("minute")}`;
+}
+
+/** WorkflowSummary.hoursOpenSentence: "Waits for its hours: opens Mon 09:00", while they are shut. */
+export function hoursOpenSentence(s: WorkflowSummary, viewer = viewerZone()): string | null {
+  if (s.hoursOpenAt === undefined) return null;
+  const h = s.workflow.hours ?? {};
+  let when = dayAndClock(fromWireDate(s.hoursOpenAt), h.timeZone ?? viewer);
+  const note = hoursZoneNote(h, viewer);
+  if (note) when += ` (${note})`;
+  return `${s.holdsAFire ? "Waits for its hours" : "Outside its hours"}: opens ${when}`;
+}
+
+/** WorkflowSummary.waitsForItsHours: a trigger held until its hours open, the row's hourglass. */
+export function waitsForItsHours(s: WorkflowSummary): boolean {
+  return s.holdsAFire && s.hoursOpenAt !== undefined;
+}
+
+/** WorkflowSummary.hoursRowSentence: when they open while shut, else the window; for the row. */
+export function hoursRowSentence(s: WorkflowSummary, viewer = viewerZone()): string | null {
+  if (s.isArchived || s.workflow.hours === undefined) return null;
+  return hoursOpenSentence(s, viewer) ?? hoursSentence(s.workflow.hours, viewer);
+}
+
+/** WorkflowSummary.hoursLine: the window, or when it opens while shut (#4819). */
+function hoursLine(s: WorkflowSummary): StatusLine | null {
+  const h = s.workflow.hours;
+  const window = h ? hoursSentence(h) : null;
+  if (!window) return null;
+  const open = hoursOpenSentence(s);
+  if (open) {
+    return { glyph: "⧗", text: open, detail: s.holdsAFire ? `${window}. A trigger came in outside them; it runs once then`
+      : `${window}. A trigger before then waits, and runs once then` };
+  }
+  return { glyph: "◴", text: window, detail: "A trigger outside them waits, and runs once when they open. Run now always runs" };
+}
+
 /** WorkflowSummary.statusLines: what stops it, then what it is doing, then when it next runs. */
 export function workflowStatusLines(s: WorkflowSummary, now = new Date()): StatusLine[] {
   const w = s.workflow;
@@ -741,9 +860,14 @@ export function workflowStatusLines(s: WorkflowSummary, now = new Date()): Statu
     lines.push({ glyph: "⧗", text: `Cooling down until ${shortTime(fromWireDate(s.cooldownEndsAt))}`,
       detail: s.holdsAFire ? "A trigger came in meanwhile; it runs once then" : undefined });
   }
+  // Its hours (#4819): the window, or when it opens while it is shut.
+  const hours = hoursLine(s);
+  if (hours) lines.push(hours);
   const outcome = s.lastOutcome;
-  // Not for one queued: the line above says it, with how many (#422).
-  if (outcome && "refused" in outcome && !("queued" in outcome.refused._0)) {
+  // Not for one queued: the line above says it, with how many (#422); nor for one held outside
+  // its hours, which the hours' line says with the day (#4819).
+  if (outcome && "refused" in outcome && !("queued" in outcome.refused._0)
+    && !("outsideHours" in outcome.refused._0 && s.hoursOpenAt !== undefined)) {
     lines.push({ glyph: "✕", text: refusedSummary(outcome),
       tint: workflowNeedsAPerson(s) && !s.awaitingApproval && !s.overLimit ? "attention" : undefined });
   }

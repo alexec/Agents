@@ -47,7 +47,7 @@ func TestMultiplierFollowsTheMerges(t *testing.T) {
 	d.lineageEvent(event("pr.opened", 9, branch, "Fix it"))
 	d.lineageEvent(event("pr.merged", 9, branch, "Fix it"))
 	c.until(t, "the merge told", func(m string, p json.RawMessage) bool {
-		return m == "multiplier/changed" && strings.Contains(string(p), `"github:alexec/agents#9"`) &&
+		return m == "multiplier/changed" && strings.Contains(string(p), `"github:pr:alexec/agents#9"`) &&
 			strings.Contains(string(p), `"prsMerged":1`)
 	})
 	if m := state(2); m.PrsMerged != 1 || m.Multiplier == nil || *m.Multiplier != 0.7 || *m.EngineerHours != 29 ||
@@ -64,7 +64,7 @@ func TestMultiplierFollowsTheMerges(t *testing.T) {
 	d.lineageEvent(event("pr.opened", 10, revert, "Revert \\\"Fix it\\\""))
 	d.lineageEvent(event("pr.merged", 10, revert, "Revert \\\"Fix it\\\""))
 	c.until(t, "the revert told", func(m string, p json.RawMessage) bool {
-		return m == "multiplier/changed" && strings.Contains(string(p), `"github:alexec/agents#10"`) &&
+		return m == "multiplier/changed" && strings.Contains(string(p), `"github:pr:alexec/agents#10"`) &&
 			strings.Contains(string(p), `"reverts":1`)
 	})
 	// The page still knows they merged before (#4250).

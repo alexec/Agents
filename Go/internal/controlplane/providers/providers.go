@@ -254,8 +254,10 @@ type Providers struct {
 	// The machines installing Agents in a codespace for Add as Machine… (#3497), by how
 	// many installs: only their machine/installProgress is said to clients.
 	installing map[string]int
-	done       chan struct{}
-	stopOnce   sync.Once
+	// The hosts whose codespaces their carrying machines are asked to keep awake (#4637).
+	awake    map[string]keptAwake
+	done     chan struct{}
+	stopOnce sync.Once
 }
 
 // NewProviders is WorkspaceProviders.init.
@@ -360,7 +362,10 @@ func (p *Providers) Start() {
 	}
 	p.Refresh("")
 	go p.every(p.timing.ListEvery, func() { p.Refresh("") })
-	go p.every(p.timing.WakeLookEvery, func() { p.wakeUps(time.Now()) })
+	go p.every(p.timing.WakeLookEvery, func() {
+		p.wakeUps(time.Now())
+		p.keepAwake(time.Now())
+	})
 }
 
 func (p *Providers) every(interval time.Duration, do func()) {
@@ -2170,6 +2175,10 @@ func (p *Providers) Heard(host string, status MachineStatus) {
 	if status.Idle && (!hadStatus || !was.Idle || timer == nil) {
 		p.countIdle(host)
 	}
+	// Kept awake as soon as it works, and let sleep as soon as it is idle (#4637).
+	if !hadStatus || was.Idle != status.Idle {
+		p.keepAwake(time.Now())
+	}
 }
 
 // countIdle starts counting down a linked host's stop when idle, from now, if it is idle,
@@ -2491,6 +2500,7 @@ func (p *Providers) overlay(record records.MachineRecord) *MachineWorkspace {
 	if found != nil {
 		ws.WorkspaceName = found.Name
 		ws.Cost = found.Cost
+		ws.IdleTimeoutMinutes = found.IdleTimeoutMinutes
 	}
 	if a != nil {
 		ws.Since = dateOf(a.since)

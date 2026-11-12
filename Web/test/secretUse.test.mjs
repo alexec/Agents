@@ -16,12 +16,18 @@ test("a secret's use says which secret and where it goes, never its value (#4017
   assert.equal(words.secretUseTitle(account), "Wants to read gitlab.com (a@example.com)");
   assert.equal(words.secretUseWhere(account), "Account: manage_accounts get");
   assert.deepEqual(words.secretUseActions(account), ["once", "session", "always", "deny"]);
+  // #4264: an agent's lease of the browser or the screen on a machine that asks.
+  const browser = { name: "the browser", use: "browser", place: "Studio" };
+  assert.equal(words.secretUseTitle(browser), "Wants to use the browser");
+  assert.equal(words.secretUseWhere(browser), "Browser on Studio");
+  assert.deepEqual(words.secretUseActions(browser), ["once", "session", "always", "deny"]);
+  assert.equal(words.secretUseWhere({ name: "the screen", use: "screen", place: "Studio", app: "TextEdit" }), "Screen: TextEdit on Studio");
 });
 
-test("a secret's use has four answers, and a session's own secret no Allow always", () => {
+test("a secret's use has four answers, and a session's own secret no Always Approve", () => {
   const use = { name: "X", use: "fill", place: "a.com" };
   assert.deepEqual(words.secretUseActions(use).map((a) => words.secretUseWords[a]),
-    ["Allow Once", "Allow for This Session", "Allow Always", "Deny"]);
+    ["Approve", "Approve for This Session", "Always Approve", "Deny"]);
   assert.deepEqual(words.secretUseActions({ ...use, sessionOnly: true }), ["once", "session", "deny"]);
 });
 
@@ -45,6 +51,6 @@ test("a terminal's agents-secret has no session: once, for 1 hour or deny, and i
   assert.equal(words.isTerminalRequest({ ...terminal, askedBy: "A-1" }), false);
   assert.equal(words.isTerminalRequest(request({ name: "X", use: "fill", place: "a.com" })), false);
   const use = words.secretUseOf(terminal);
-  assert.deepEqual(words.secretUseActions(use).map((a) => words.secretUseWords[a]), ["Allow Once", "Allow for 1 Hour", "Deny"]);
+  assert.deepEqual(words.secretUseActions(use).map((a) => words.secretUseWords[a]), ["Approve", "Approve for 1 Hour", "Deny"]);
   assert.equal(words.secretUseWhere(use), "Terminal: zsh · Agents cannot tell a terminal from an agent outside its session.");
 });

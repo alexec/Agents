@@ -7,7 +7,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { ControlMachine, ProviderSummary, MachineInfo } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
-  addAsMachine, carrierChoices, carrierLine, carrierStart, defaultIdleMinutes, idleChoices, idleRowWords, kindChip, kindFields, kindNeeds,
+  addAsMachine, carrierChoices, carrierLine, carrierStart, defaultIdleMinutes, idleChoices, idleRowWords, keptAwakeLine, kindChip, kindFields, kindNeeds,
   kindOfPreset, kindTitle, linkableHosts, mayBe, movesTo, noHostLine, providerKinds, providerLine, providerRequest, providerWords as words, sshDestination, workspaceLine, type ProviderKind,
 } from "../model/machineProviders";
 import { Modal } from "./Modal";
@@ -136,6 +136,7 @@ function WorkspaceRow({ store, provider, workspace, hosts, say, link, install }:
   const free = linkableHosts(workspace, hosts);
   const noHost = noHostLine(workspace, hosts);
   const adding = addAsMachine(workspace);
+  const awake = linked ? keptAwakeLine(linked) : null;
   return (
     <li class="connection workspace-row">
       <span class={`dot ${workspace.state === "running" ? "online" : workspace.state === "unknown" ? "attention" : "offline"}`} aria-hidden="true" />
@@ -143,6 +144,7 @@ function WorkspaceRow({ store, provider, workspace, hosts, say, link, install }:
         <p>{workspace.name}</p>
         <p class="small quiet">{linked?.phase ?? workspaceLine(workspace, hosts)}</p>
         {noHost && <p class="small quiet">{noHost}</p>}
+        {awake && <p class="small quiet">{awake}</p>}
       </div>
       {host && linked?.canStart && (
         <button type="button" disabled={starting} onClick={() => void store.startHost(host.id)}>{starting ? "Starting…" : "Start"}</button>

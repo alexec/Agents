@@ -137,7 +137,7 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
                   {/* Not on this host, without archiving it everywhere (#391). */}
                   {canBeDenied(summary) && (
                     <button class="deny" disabled={down} title="Don't run it on this machine. Other machines still see it waiting; Approve takes this back"
-                      onClick={() => void store.denyWorkflow(host, summary)}>Deny on This Machine</button>
+                      onClick={() => void store.denyWorkflow(host, summary)}>Deny</button>
                   )}
                 </>
                 : <RunNow store={store} host={host} summary={summary} disabled={down} wide />}

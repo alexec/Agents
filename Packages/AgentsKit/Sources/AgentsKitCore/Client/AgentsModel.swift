@@ -202,6 +202,16 @@ public final class AgentsModel {
     /// load used to leave it blank without a word.
     public private(set) var transcriptLoadFailure: TranscriptLoadFailure?
 
+    /// The machines whose folders and sessions on screen are this device's copy (#4791),
+    /// drawn before their host answered. A host's own list takes its machine out.
+    public private(set) var drawnFromCopy: Set<MachineRef> = []
+    /// Whether the open chat is this device's copy, until its host's page lands (#4791).
+    public private(set) var transcriptFromCopy = false
+    /// A host listed a machine's agents or folders (#4791): the local copy writes them.
+    @ObservationIgnored public var onListed: ((MachineRef) -> Void)?
+    /// The chat being read is left (#4791): what it showed, so the local copy keeps its end.
+    @ObservationIgnored public var onLeavingChat: ((LocalCopy.Transcript) -> Void)?
+
     /// The latest load of the open chat's first page. A chat is loaded from more than
     /// one place at once (opening it, a reconnect, a host's lists), and only the last
     /// one asked for may put its answer on screen: an older answer landing after it
@@ -268,6 +278,7 @@ public final class AgentsModel {
     public var watching: UUID? {
         didSet {
             guard watching != oldValue else { return }
+            if let oldValue, let left = shownTranscript(of: oldValue) { onLeavingChat?(left) }
             shown.id = watching
             clearTranscript()
             // A chat opens at its end, whatever the last one was left at.
@@ -457,6 +468,28 @@ public final class AgentsModel {
     /// notice.
     public private(set) var pendingOptions: [UUID: [String: PendingOption]] = [:]
     @ObservationIgnored private var pendingOptionSequence = 0
+
+    /// A change to an agent's record that its host has not yet confirmed (#4786).
+    public struct PendingWrite: Equatable, Sendable {
+        public let id: Int
+        public let write: AgentWrite
+        /// The host said yes. The record it sends next is its word, whatever it says.
+        var answered = false
+    }
+
+    /// The changes a person asked of each agent, drawn on its record at once and held
+    /// until the host's record agrees or the call fails (#4786). One layer for every
+    /// reversible action, on both apps: no action keeps its own copy.
+    @ObservationIgnored private var pendingWrites: [UUID: [PendingWrite]] = [:]
+    /// The host's own record of an agent with a change pending, without the change:
+    /// what goes back when the call fails.
+    @ObservationIgnored private var hostRecords: [UUID: Agent] = [:]
+    @ObservationIgnored private var pendingWriteSequence = 0
+    /// The permissions and question cards answered here whose answer is on its way
+    /// (#4786): out of the lists until it is back.
+    @ObservationIgnored private var answering: Set<UUID> = []
+    /// Of those, the ones the host said were settled while the answer was going.
+    @ObservationIgnored private var answeredElsewhere: Set<UUID> = []
 
     /// What each agent has been asked to do and has not yet answered (#87): the control
     /// that sent it shows it is on its way, and every control that would send another is
@@ -701,12 +734,16 @@ public final class AgentsModel {
 
         case .permission(let notification):
             permissions.removeAll { $0.agentID == notification.agentID && $0.id == notification.requestID }
-            if let request = notification.request { permissions.append(request) }
+            if answering.contains(notification.requestID) {
+                if notification.request == nil { answeredElsewhere.insert(notification.requestID) }
+            } else if let request = notification.request { permissions.append(request) }
             permissions.sort { $0.askedAt < $1.askedAt }
 
         case .elicitation(let notification):
             elicitations.removeAll { $0.id == notification.requestID }
-            if let request = notification.request { elicitations.append(request) }
+            if answering.contains(notification.requestID) {
+                if notification.request == nil { answeredElsewhere.insert(notification.requestID) }
+            } else if let request = notification.request { elicitations.append(request) }
 
         case .attention(let notification):
             if let need = notification.need {
@@ -720,7 +757,8 @@ public final class AgentsModel {
         case .usage(let notification):
             if var agent = byID[notification.agentID] {
                 agent.usage = notification.usage
-                file(agent)
+                hostRecords[agent.id]?.usage = notification.usage
+                fileShown(agent)
             }
 
         case .workflowChanged(let summary):
@@ -1200,12 +1238,27 @@ public final class AgentsModel {
         // A lean list (#107) keeps the lists already held for an agent: the open chat's menus.
         let held = byID.filter { $0.value.host == host }
         let stamped = listed.map { var agent = $0.keepingLists(of: held[$0.id]); agent.host = host; return agent }
-        refile(byID.values.filter { $0.host != host } + stamped)
+        refile(byID.values.filter { $0.host != host }.map { hostRecords[$0.id] ?? $0 } + stamped, heard: stamped.map(\.id))
+        drawnFromCopy.remove(host)
+        onListed?(host)
     }
 
     public func replaceFolders(_ listed: [DaemonAPI.FolderSummary], from host: MachineRef) {
         let stamped = listed.map { var summary = $0; summary.host = host; return summary }
         folders = (folders.filter { $0.host != host } + stamped).sorted(by: SidebarOrder.byAdded)
+        onListed?(host)
+    }
+
+    /// A machine as this device last kept it (#4791), drawn before its host answers: taken
+    /// only when nothing of that machine is held, so a host's own list always wins.
+    public func takeCopy(_ machine: LocalCopy.Machine) {
+        guard !holdsFolders(of: machine.host), !agents.contains(where: { $0.host == machine.host }) else { return }
+        let listed = onListed
+        onListed = nil
+        defer { onListed = listed }
+        replaceFolders(machine.folders, from: machine.host)
+        replaceAgents(machine.agents, from: machine.host)
+        drawnFromCopy.insert(machine.host)
     }
 
     /// What an offline host last listed (#962), for a client that started while it was down:
@@ -1451,6 +1504,68 @@ public final class AgentsModel {
         if pendingOptions[agentID]?.isEmpty == true { pendingOptions[agentID] = nil }
     }
 
+    // MARK: Changes drawn before the host answers (#4786)
+
+    /// Draw a change on an agent's record now, before its host has it. Returns which
+    /// change this was, for `settleWrite` when the call comes back. An agent not held
+    /// here has nothing to draw; the call still goes.
+    @discardableResult
+    public func beginWrite(_ write: AgentWrite, on agentID: UUID) -> Int {
+        pendingWriteSequence += 1
+        let id = pendingWriteSequence
+        guard let shown = byID[agentID] else { return id }
+        if hostRecords[agentID] == nil { hostRecords[agentID] = shown }
+        pendingWrites[agentID, default: []].append(PendingWrite(id: id, write: write))
+        fileShown(write.applied(to: shown))
+        return id
+    }
+
+    /// The call for one change came back. Failed, the change is taken off and the host's
+    /// record goes back, with any other change still pending drawn over it. Answered, it
+    /// stays drawn until the host's record says so, or until the host next speaks about
+    /// this agent: its word is the last one either way.
+    public func settleWrite(_ id: Int, on agentID: UUID, failed: Bool) {
+        guard var writes = pendingWrites[agentID], let at = writes.firstIndex(where: { $0.id == id }),
+              let host = hostRecords[agentID] else { return }
+        if failed || writes[at].write.isSettled(by: host) {
+            writes.remove(at: at)
+        } else {
+            writes[at].answered = true
+            pendingWrites[agentID] = writes
+            return
+        }
+        pendingWrites[agentID] = writes.isEmpty ? nil : writes
+        if writes.isEmpty { hostRecords[agentID] = nil }
+        fileShown(writes.reduce(host) { $1.write.applied(to: $0) })
+    }
+
+    /// One change, drawn now and settled by the call: `send` says whether it went.
+    @discardableResult
+    public func optimistically(_ write: AgentWrite, on agentID: UUID, _ send: () async -> Bool) async -> Bool {
+        let id = beginWrite(write, on: agentID)
+        let sent = await send()
+        settleWrite(id, on: agentID, failed: !sent)
+        return sent
+    }
+
+    /// Whether a change is drawn on this agent that its host has not confirmed.
+    public func hasPendingWrite(on agentID: UUID) -> Bool { pendingWrites[agentID] != nil }
+
+    /// The host's record with what is still pending drawn over it. A change the record
+    /// already shows is done; so is one the host answered, once it speaks again.
+    private func overlaid(_ agent: Agent, heard: Bool) -> Agent {
+        guard var writes = pendingWrites[agent.id] else { return agent }
+        writes.removeAll { $0.write.isSettled(by: agent) || (heard && $0.answered) }
+        guard !writes.isEmpty else {
+            pendingWrites[agent.id] = nil
+            hostRecords[agent.id] = nil
+            return agent
+        }
+        pendingWrites[agent.id] = writes
+        hostRecords[agent.id] = agent
+        return writes.reduce(agent) { $1.write.applied(to: $0) }
+    }
+
     // MARK: Actions in flight (#87)
 
     /// Begin one, unless another is already on its way to this agent. False means the
@@ -1485,9 +1600,57 @@ public final class AgentsModel {
         return agent.isAtCostLimit(under: limits)
     }
 
-    public func replacePermissions(_ listed: [PermissionRequest]) { permissions = listed }
+    public func replacePermissions(_ listed: [PermissionRequest]) {
+        permissions = listed.filter { !answering.contains($0.id) }
+    }
 
-    public func replaceElicitations(_ listed: [ElicitationRequest]) { elicitations = listed }
+    public func replaceElicitations(_ listed: [ElicitationRequest]) {
+        elicitations = listed.filter { !answering.contains($0.id) }
+    }
+
+    /// Answer a permission: its card goes at once, before the host has the answer
+    /// (#4786), and comes back when the answer did not go, unless the host said in the
+    /// meantime that it was answered elsewhere.
+    @discardableResult
+    public func answering(_ request: PermissionRequest, _ send: () async -> Bool) async -> Bool {
+        let held = permissions.first { $0.id == request.id }
+        answering.insert(request.id)
+        permissions.removeAll { $0.id == request.id }
+        let sent = await send()
+        let resolved = answeredElsewhere.remove(request.id) != nil
+        answering.remove(request.id)
+        if !sent, !resolved, let held, !permissions.contains(where: { $0.id == held.id }) {
+            permissions.append(held)
+            permissions.sort { $0.askedAt < $1.askedAt }
+        }
+        return sent
+    }
+
+    /// Later, or Bring Back, on a request: drawn at once as `shown` (#4786), and put
+    /// back as it was when the call did not go, unless the host changed it meanwhile.
+    @discardableResult
+    public func changing(_ request: NeedRequest, to shown: NeedRequest, _ send: () async -> Bool) async -> Bool {
+        let held = requests.first { $0.id == request.id } ?? request
+        apply(.requestChanged(shown))
+        let sent = await send()
+        if !sent, requests.first(where: { $0.id == request.id }) == shown { apply(.requestChanged(held)) }
+        return sent
+    }
+
+    /// Answer a question card, the same way as a permission (#4786).
+    @discardableResult
+    public func answering(_ request: ElicitationRequest, _ send: () async -> Bool) async -> Bool {
+        let held = elicitations.first { $0.id == request.id }
+        answering.insert(request.id)
+        elicitations.removeAll { $0.id == request.id }
+        let sent = await send()
+        let resolved = answeredElsewhere.remove(request.id) != nil
+        answering.remove(request.id)
+        if !sent, !resolved, let held, !elicitations.contains(where: { $0.id == held.id }) {
+            elicitations.append(held)
+        }
+        return sent
+    }
 
     /// What `attention/pending` said on connect: the outstanding needs and where each
     /// is showing, replacing whatever this surface believed while it was not listening.
@@ -1539,6 +1702,31 @@ public final class AgentsModel {
         return transcriptLoads
     }
 
+    /// The open chat's end as this device kept it (#4791), drawn while `load` is the latest
+    /// and nothing of the chat is on screen yet. What is heard meanwhile is still laid over
+    /// the host's page when it lands; the host's page always replaces the copy.
+    @discardableResult
+    public func takeCopiedOpening(_ copy: LocalCopy.Transcript, load: Int) -> Bool {
+        guard isLatestTranscriptLoad(load), copy.session == watching, entries.isEmpty, turns.isEmpty else { return false }
+        let heard = heardSincePage
+        replaceTurns(with: copy.turns)
+        replaceTranscript(with: copy.page, ask: copy.ask)
+        heardSincePage = heard
+        transcriptFromCopy = true
+        return true
+    }
+
+    /// What the chat on screen holds of `session`, as a copy to keep: nil when it holds
+    /// nothing of it, or only the copy it was drawn from.
+    public func shownTranscript(of session: UUID) -> LocalCopy.Transcript? {
+        guard shown.id == session, !transcriptFromCopy, !entries.isEmpty || !turns.isEmpty else { return nil }
+        return LocalCopy.Transcript(
+            session: session,
+            turns: TurnsPage(turns: turns, firstTurn: firstTurn, openStart: openTurnStart, firstPrompt: firstPrompt),
+            page: TranscriptPage(firstIndex: firstEntryIndex, total: firstEntryIndex + entries.count, entries: entries),
+            ask: leadAsk)
+    }
+
     /// Whether `load` is still the latest asked for, and so the one to show.
     public func isLatestTranscriptLoad(_ load: Int) -> Bool { load == transcriptLoads }
 
@@ -1554,6 +1742,7 @@ public final class AgentsModel {
         // notification is the newer copy of that entry.
         entries = Self.entriesKeepingLatest(page.entries + (heardSincePage ?? []))
         heardSincePage = nil
+        transcriptFromCopy = false
         firstEntryIndex = page.firstIndex
         hasMoreBefore = page.firstIndex > openTurnStart
         leadAsk = page.firstIndex > openTurnStart ? ask.flatMap { TranscriptItem.entry($0).isPersonsAsk ? $0 : nil } : nil
@@ -1589,6 +1778,7 @@ public final class AgentsModel {
 
     public func clearTranscript() {
         entries = []
+        transcriptFromCopy = false
         // A chat chosen is a page on its way.
         heardSincePage = []
         transcriptLoadFailure = nil
@@ -1981,7 +2171,13 @@ public final class AgentsModel {
     // MARK: Filing (#165)
 
     /// One agent into its place everywhere, out of where it was.
+    /// A host's record of one agent, with what is pending drawn over it (#4786).
     private func file(_ agent: Agent) {
+        fileShown(overlaid(agent, heard: true))
+    }
+
+    /// The record as this client shows it, filed in every place it goes.
+    private func fileShown(_ agent: Agent) {
         let old = byID[agent.id]
         if let old, let workflowID = old.startedByWorkflow {
             workflowRunShelves[Folder.standardize(old.folderPath).path + "\n" + workflowID]?.remove(old.id)
@@ -2086,6 +2282,8 @@ public final class AgentsModel {
 
     /// One agent out of everything (deleted, #398).
     private func unfile(_ id: UUID) {
+        pendingWrites[id] = nil
+        hostRecords[id] = nil
         guard let old = byID.removeValue(forKey: id) else { return }
         if let workflowID = old.startedByWorkflow {
             workflowRunShelves[Folder.standardize(old.folderPath).path + "\n" + workflowID]?.remove(old.id)
@@ -2124,9 +2322,18 @@ public final class AgentsModel {
 
     /// Everything filed again from a list: what a connect, a host's re-list or a big
     /// page does, once, rather than a change at a time.
-    private func refile(_ held: [Agent]) {
+    /// Every agent again, from hosts' records. `heard` is those just heard from their
+    /// host, whose word settles a change it already answered; nil is all of them.
+    private func refile(_ held: [Agent], heard: [UUID]? = nil) {
+        let heard = heard.map(Set.init)
         var unique: [UUID: Agent] = [:]
-        for agent in held where unique[agent.id] == nil { unique[agent.id] = agent }
+        for agent in held where unique[agent.id] == nil {
+            unique[agent.id] = overlaid(agent, heard: heard?.contains(agent.id) ?? true)
+        }
+        for id in pendingWrites.keys where unique[id] == nil {
+            pendingWrites[id] = nil
+            hostRecords[id] = nil
+        }
         byID = unique
         started = [:]
         for agent in unique.values {

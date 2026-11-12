@@ -30,8 +30,8 @@ func TestRollupKeepsTheCostOnLinks(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	send(node("github:o/r#1", 1, now), node("github:o/r#2", 2, now), node("github:o/r#3", 4, now.Add(-91*24*time.Hour)))
-	send(node("github:o/r#1", 5, now))
+	send(node("github:issue:o/r#1", 1, now), node("github:issue:o/r#2", 2, now), node("github:issue:o/r#3", 4, now.Add(-91*24*time.Hour)))
+	send(node("github:issue:o/r#1", 5, now))
 	read := func() map[string]float64 {
 		t.Helper()
 		object, err := mem.Get(context.Background(), lineageKey(host))
@@ -48,7 +48,7 @@ func TestRollupKeepsTheCostOnLinks(t *testing.T) {
 		}
 		return out
 	}
-	if got := read(); len(got) != 2 || got["github:o/r#1"] != 5 || got["github:o/r#2"] != 2 {
+	if got := read(); len(got) != 2 || got["github:issue:o/r#1"] != 5 || got["github:issue:o/r#2"] != 2 {
 		t.Fatalf("%v", got)
 	}
 

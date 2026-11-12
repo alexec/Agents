@@ -28,7 +28,14 @@ struct SecretUseRequestTests {
         #expect(account.title(asker: "Sign up") == "Wants to read gitlab.com (a@example.com)")
         #expect(account.line(asker: "Sign up") == "Sign up · Account: manage_accounts get")
         #expect(account.secretUse?.actions == [.once, .session, .always, .deny])
-        #expect(NeedRequest.Action.allCases.map(\.word) == ["Allow Once", "Allow for This Session", "Allow Always", "Allow for 1 Hour", "Deny"])
+        // #4264: an agent's lease of the browser or the screen on a machine that asks.
+        let browser = try request(#"{"secretUse":{"name":"the browser","use":"browser","place":"Studio"}}"#)
+        #expect(browser.title(asker: "Sign up") == "Wants to use the browser")
+        #expect(browser.line(asker: "Sign up") == "Sign up · Browser on Studio")
+        #expect(browser.secretUse?.actions == [.once, .session, .always, .deny])
+        let screen = try request(#"{"secretUse":{"name":"the screen","use":"screen","place":"Studio","app":"TextEdit"}}"#)
+        #expect(screen.line(asker: nil) == "Screen: TextEdit on Studio")
+        #expect(NeedRequest.Action.allCases.map(\.word) == ["Approve", "Approve for This Session", "Always Approve", "Approve for 1 Hour", "Deny"])
     }
 
     /// #4179: a terminal's agents-secret has no session; its answers are once, for 1 hour and

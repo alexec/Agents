@@ -81,7 +81,7 @@ Cursor's questions come as the same card, one question to a page; any of them ca
 empty. A question with choices shows those choices, and a question without choices has a
 text box.
 
-When Cursor, Grok or OpenCode is set to **Always-approve** under its prompt, every
+When Cursor, Grok or OpenCode is set to **Always Approve** under its prompt, every
 permission request from that runtime is answered for you: no card, no **Needs you**, and
 no notification. The value applies to every agent on that runtime, including workflow
 agents and agents in server folders. Questions that are not permission to act still wait

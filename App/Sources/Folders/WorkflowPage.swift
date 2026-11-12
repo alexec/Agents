@@ -265,7 +265,7 @@ struct WorkflowPage: View {
                         Button {
                             Task { await model.denyWorkflow(summary) }
                         } label: {
-                            Label("Deny on This Machine", systemImage: "hand.raised.slash")
+                            Label("Deny", systemImage: "hand.raised.slash")
                         }
                         .help("Don't run it on this machine. Other machines still see it waiting; Approve takes this back")
                     }

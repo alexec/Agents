@@ -58,6 +58,8 @@ public enum Capability {
     public static let dropbox1 = "dropbox/1"
     public static let elicitations1 = "elicitations/1"
     public static let eventsAudit1 = "events.audit/1"
+    public static let eventsBus1 = "events.bus/1"
+    public static let eventsLeases1 = "events.leases/1"
     public static let eventsTeam1 = "events.team/1"
     public static let events1 = "events/1"
     public static let features1 = "features/1"
@@ -82,6 +84,7 @@ public enum Capability {
     public static let handover1 = "handover/1"
     public static let hostBrowserSettings1 = "host.browser-settings/1"
     public static let hostDesktopControl1 = "host.desktop-control/1"
+    public static let hostDriveApproval1 = "host.drive-approval/1"
     public static let hostLock1 = "host.lock/1"
     public static let hostLock2 = "host.lock/2"
     public static let hostLock3 = "host.lock/3"
@@ -156,6 +159,7 @@ public enum Capability {
     public static let projectsSessions1 = "projects.sessions/1"
     public static let projects1 = "projects/1"
     public static let providersCarry1 = "providers.carry/1"
+    public static let providersCarry2 = "providers.carry/2"
     public static let providers1 = "providers/1"
     public static let providers2 = "providers/2"
     public static let readapi1 = "readapi/1"
@@ -285,6 +289,8 @@ public enum Capability {
         "browser/state": "host.browser-settings/1",
         "browser/unwatch": "browser/1",
         "browser/watch": "browser/1",
+        "browserControl/set": "host.drive-approval/1",
+        "browserControl/state": "host.drive-approval/1",
         "capacity/state": "capacity/1",
         "catalog/destination-state": "catalog/1",
         "catalog/preview": "catalog/1",
@@ -493,7 +499,7 @@ public enum Capability {
         "providers/carry": "providers.carry/1",
         "providers/forget": "providers.carry/1",
         "providers/keepSecrets": "providers.carry/1",
-        "providers/ssh": "providers.carry/1",
+        "providers/ssh": "providers.carry/2",
         "relay/grant": "relay/1",
         "relay/offer": "relay/1",
         "reports/features": "features/1",
@@ -686,6 +692,9 @@ public enum Capability {
         "bots/make": "bots/1",
         "bots/setCaps": "bots/1",
         "bots/stopRun": "bots/1",
+        "bus/lease": "events.leases/1",
+        "bus/publish": "events.bus/1",
+        "bus/subscribe": "events.bus/1",
         "clients/announce": "clients/1",
         "clients/connections": "clients/1",
         "clients/forget": "clients/1",
@@ -899,6 +908,7 @@ public enum Capability {
         "workflows/claimRun": "bots/1",
         "workflows/fire": "events.team/1",
         "workflows/trigger": "events.team/1",
+        "bus/deliver": "events.bus/1",
         "control/budgetRequested": "policy.ask/1",
         "control/capReached": "bots/1",
         "control/clientChanged": "control/1",
@@ -976,6 +986,7 @@ public enum Capability {
             "host.secret-grants/1",
             "host.session-secrets/1",
             "host.desktop-control/1",
+            "host.drive-approval/1",
             "host.org-routes/2",
             "host.user-settings/1",
             "host.user-settings/2",

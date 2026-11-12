@@ -9,6 +9,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The MCP events (#3583), polled only: `events/list` and `events/poll` of the events draft
@@ -242,6 +245,10 @@ type candidate struct {
 	at  time.Time
 	// data is the event's data, read from the issue's own page when it is raised.
 	data func(context.Context) (map[string]any, error)
+	// subject and refKey are its envelope (#4728): the issue, as sentry:issue:org/project#id,
+	// and for a regression, which can happen again, its time as Sentry says it.
+	subject wire.Ref
+	refKey  string
 }
 
 // Poll answers events/poll's params.
@@ -299,8 +306,8 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			return nil, eventsError(err)
 		}
 		raised[cand.key] = true
-		out = append(out, map[string]any{"eventId": p.Name + ":" + s.Account.Org + ":" + cand.key, "name": p.Name,
-			"timestamp": cand.at.Format(time.RFC3339), "data": data})
+		out = append(out, mcpevents.Enveloped(map[string]any{"eventId": p.Name + ":" + s.Account.Org + ":" + cand.key, "name": p.Name,
+			"timestamp": cand.at.Format(time.RFC3339), "data": data}, cand.subject, cand.refKey))
 	}
 	more := !first && len(fresh) > len(taken)
 	next := now
@@ -340,7 +347,7 @@ func (s *Events) candidates(ctx context.Context, name string, a args, since time
 			if !ok || at.Before(since) {
 				continue
 			}
-			out = append(out, candidate{key: it.ID, at: at, data: func(ctx context.Context) (map[string]any, error) {
+			out = append(out, candidate{key: it.ID, at: at, subject: s.issueRef(it), data: func(ctx context.Context) (map[string]any, error) {
 				d, err := s.Account.Issue(ctx, it.ID)
 				if err != nil {
 					return nil, err
@@ -367,10 +374,15 @@ func (s *Events) candidates(ctx context.Context, name string, a args, since time
 		if !ok || at.Before(since) {
 			continue
 		}
-		out = append(out, candidate{key: it.ID + "@" + at.Format(time.RFC3339), at: at,
+		out = append(out, candidate{key: it.ID + "@" + at.Format(time.RFC3339), at: at, subject: s.issueRef(it), refKey: at.Format(time.RFC3339),
 			data: func(context.Context) (map[string]any, error) { return s.data(it, release, "regressedAt", at), nil }})
 	}
 	return out, truncated, nil
+}
+
+// issueRef is the ref of an issue: sentry:issue:<org>/<project>#<id>.
+func (s *Events) issueRef(it Issue) wire.Ref {
+	return mcpevents.Ref("sentry", "issue", s.Account.Org+"/"+it.Project.Slug, it.ID)
 }
 
 // regression is the issue's last set_regression: when, and the release it names, or the

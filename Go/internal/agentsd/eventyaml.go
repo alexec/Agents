@@ -87,3 +87,14 @@ func yamlOf(v any) *yaml.Node {
 		return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!null", Value: "null"}
 	}
 }
+
+// yamlFence is lines in a Markdown code block marked yaml. Its fence is longer than any run
+// of backticks in lines, so a detail or message with ``` in it cannot end the block early.
+func yamlFence(lines []string) string {
+	body := strings.Join(lines, "\n")
+	fence := "```"
+	for strings.Contains(body, fence) {
+		fence += "`"
+	}
+	return fence + "yaml\n" + body + "\n" + fence
+}

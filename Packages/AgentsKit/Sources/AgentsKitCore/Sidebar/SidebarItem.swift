@@ -30,6 +30,9 @@ public enum SidebarItem: Hashable, Sendable {
     case tokens
     /// Where the time of running chats went (#852): the agent, its tools, and waiting.
     case time
+    /// The pull requests that landed, over time (#4597): the Multiplier's count drawn by hour,
+    /// day and week. Core: the Remote has it under Status, after the Multiplier (#4758).
+    case velocity
     /// One of Work's lists (#3119), a row each under the Work group (#4004): the issues and pull
     /// requests from the forges, with lineage on top, the features, and the releases
     /// lineage knows. An item's page keeps its list's row. The Remote has no Features row (#3269).

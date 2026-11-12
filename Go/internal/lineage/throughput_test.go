@@ -24,16 +24,16 @@ func landedNodes(ls ...landed) []wire.LineageCostNode {
 	closed, merged := "closed", OutcomeMerged
 	var out []wire.LineageCostNode
 	for _, l := range ls {
-		ref := "github:o/r#" + strconv.Itoa(l.n)
+		ref := "github:issue:o/r#" + strconv.Itoa(l.n)
 		start, end := wire.DateOf(l.at.Add(-time.Duration(l.cycle*float64(time.Second)))), wire.DateOf(l.at)
 		level := l.level
-		c := wire.LineageCostNode{Node: wire.LineageNode{Kind: KindIssue, Ref: ref}, Repo: new("github:o/r"), Banked: blankCost(),
+		c := wire.LineageCostNode{Node: wire.LineageNode{Kind: KindIssue, Ref: ref}, Repo: new("github:repo:#o/r"), Banked: blankCost(),
 			StartedAt: &start, Level: &level, Resolved: &wire.LineageResolved{Title: ref, State: &closed, Labels: []string{"enhancement", level}}}
 		if l.parent != "" {
 			p := l.parent
 			c.Parent = &p
 		}
-		pr := wire.LineageCostNode{Node: wire.LineageNode{Kind: KindPR, Ref: "github:o/r#" + strconv.Itoa(100000+l.n)}, Repo: new("github:o/r"),
+		pr := wire.LineageCostNode{Node: wire.LineageNode{Kind: KindPR, Ref: "github:pr:o/r#" + strconv.Itoa(100000+l.n)}, Repo: new("github:repo:#o/r"),
 			Banked: wire.LineageCost{Cost: map[string]float64{"USD": l.usd}}, Fixes: []string{ref}, Outcome: &merged, EndedAt: &end}
 		out = append(out, c, pr)
 	}
@@ -74,7 +74,7 @@ func TestForecastOfAnEpic(t *testing.T) {
 	// Five closed epics, four children each, landed in their own four hours.
 	epicNode := func(e int) wire.LineageCostNode {
 		closed := "closed"
-		return wire.LineageCostNode{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#" + strconv.Itoa(9000+e)}, Repo: new("github:o/r"),
+		return wire.LineageCostNode{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#" + strconv.Itoa(9000+e)}, Repo: new("github:repo:#o/r"),
 			Banked: blankCost(), Resolved: &wire.LineageResolved{Title: "epic", State: &closed, Labels: []string{"epic"}}}
 	}
 	var extra []wire.LineageCostNode
@@ -87,11 +87,11 @@ func TestForecastOfAnEpic(t *testing.T) {
 		}
 	}
 	nodes := append(landedNodes(ls...), extra...)
-	asked := wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9999"}
+	asked := wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#9999"}
 	children := []EpicChild{
-		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9990"}, Step: 1, Open: true},
-		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9991"}, Step: 2, Open: true},
-		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9992"}, Step: 2, Open: true},
+		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#9990"}, Step: 1, Open: true},
+		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#9991"}, Step: 2, Open: true},
+		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#9992"}, Step: 2, Open: true},
 	}
 	f := ForecastOf(nodes, &asked, true, children, now, WhatIf{})
 	if f.NoForecast != nil || f.Lands == nil {
@@ -159,7 +159,7 @@ func TestSpendDrawsDays(t *testing.T) {
 // #4526: the closed children's actual over their kept estimate scales the open ones, and the
 // lead's share of the closed children's cost is added.
 func TestToCompleteScalesTheOpenChildren(t *testing.T) {
-	epic := wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#500"}
+	epic := wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#500"}
 	now := time.Now()
 	var ls []landed
 	for i := 1; i <= 5; i++ {
@@ -177,9 +177,9 @@ func TestToCompleteScalesTheOpenChildren(t *testing.T) {
 	}
 	// The lead spent $6 of its own: half the children's $12.
 	nodes = append(nodes, wire.LineageCostNode{Node: epic, Banked: wire.LineageCost{Cost: map[string]float64{"USD": 6}}})
-	children := []EpicChild{{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#20"}, Labels: []string{"enhancement", "task"}, Open: true}}
+	children := []EpicChild{{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#20"}, Labels: []string{"enhancement", "task"}, Open: true}}
 	for i := 10; i < 13; i++ {
-		children = append(children, EpicChild{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#" + strconv.Itoa(i)}})
+		children = append(children, EpicChild{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#" + strconv.Itoa(i)}})
 	}
 	history := History(nodes)
 	tc := ToComplete(history, nodes, epic, children)

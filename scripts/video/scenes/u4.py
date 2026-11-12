@@ -3,6 +3,7 @@ list of files, and the changed words coloured."""
 GROUP = "usage"
 LAYOUT = "mac"
 TITLE = "Read an agent's changes"
+DOCS = "how-to/read-an-agents-changes/"  # the docs page, on docs.agentloops.dev (upload.py)
 WINDOW = (1360, 820)
 
 LINES = {
@@ -35,7 +36,7 @@ PROMPT = ("In Forecast.swift, the Celsius conversions multiply by 9/5; they shou
 
 
 def setup(v):
-    folder = v.project("weather-app", {"Forecast.swift": FORECAST, "README.md": "# Weather\n"})
+    folder = v.add_folder("weather-app", {"Forecast.swift": FORECAST, "README.md": "# Weather\n"})
     agent = v.start(folder, PROMPT)
     v.wait_state(agent, states=("finished", "idle", "done"), timeout=300)
     v.tidy()

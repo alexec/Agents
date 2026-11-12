@@ -127,7 +127,7 @@ test("the stop card names the rule and the layer, and offers Change only for a l
 
 test("a waiting change to a folder's policy asks Allow, Keep the old value, or Show Change", () => {
   assert.deepEqual(p.policyChangeButtons({ looser: ["permissionMode"], words: "Permission mode: Ask → Bypass Permissions", was: "Ask" }),
-    { allow: "Allow", undo: "Keep Ask", review: "Show Change" });
+    { allow: "Approve", undo: "Keep Ask", review: "Show Change" });
   assert.equal(p.policyChangeButtons({ looser: ["permissionMode", "sandbox"], words: "w" }).undo, "Keep Old Rules");
 });
 

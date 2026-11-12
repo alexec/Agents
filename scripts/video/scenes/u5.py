@@ -5,6 +5,7 @@ import re
 GROUP = "usage"
 LAYOUT = "mac"
 TITLE = "Follow a live document"
+DOCS = "how-to/follow-a-live-document/"  # the docs page, on docs.agentloops.dev (upload.py)
 WINDOW = (1360, 820)
 
 LINES = {
@@ -33,7 +34,7 @@ def last_passage(v):
 
 
 def setup(v):
-    v.folder = v.project("weather-app", {"README.md": "# Weather\n\nA day's forecast, in Fahrenheit and Celsius.\n"})
+    v.folder = v.add_folder("weather-app", {"README.md": "# Weather\n\nA day's forecast, in Fahrenheit and Celsius.\n"})
     v.tidy()
     v.select("New Session")
     v.sleep(1.0)

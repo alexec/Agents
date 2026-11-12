@@ -25,7 +25,8 @@ public enum WorkReleaseLook {
         }
     }
 
-    /// The tag of a release's ref: "v0.42.0" of "github:alexec/Agents/release/v0.42.0".
+    /// The tag of a release's ref: "v0.42.0" of "github:release:alexec/agents#v0.42.0" (or the old
+    /// "github:alexec/Agents/release/v0.42.0").
     public static func tag(_ ref: String) -> String { WorkList.shortRef(ref) }
 
     /// The refs of the latest release of each repo: the highest version (milestones.md note 19).

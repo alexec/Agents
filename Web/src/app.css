@@ -358,7 +358,6 @@ button.link {
   border: 0; background: none; padding: 8px 0; text-align: left; font: inherit; color: inherit; cursor: pointer;
 }
 .status-list-row > .hint { grid-column: 1 / -1; margin: 0; padding: 0; }
-.status-mark { color: var(--tint-attention); margin-right: 6px; }
 
 .identity {
   border-top: 1px solid var(--paper-rule);
@@ -465,6 +464,13 @@ button.link {
 /* A turn (069): the ask, the steps in the turn's margin (no rule, no indent: #148), and the outcome; no control hides them (#2170). */
 /* Its text at the window's reading step (15, sans, as every other step since #326); Load steps and Earlier steps are chrome, at fine (11). */
 .turn { display: flex; flex-direction: column; gap: 10px; font-family: var(--font-text); font-size: 0.9375rem; }
+/* The transcript is windowed (#4789), as the Mac's TranscriptStack: the browser lays out and paints
+   only the turns near the view. A turn never drawn takes 240px; one drawn keeps its own height when
+   it leaves the view (`auto`), so the scroll bar and the held turn stay put. Every turn stays in the
+   page, so Find, a jump to an entry, the held turn (Chat.tsx, #2310) and a screen reader still read it.
+   A turn that grows as it comes into view resizes, and the chat holds the reader's turn as for any growth.
+   The transcript is a flex column: a turn never shrinks, or one not drawn would shrink to nothing. */
+.transcript > .turn { content-visibility: auto; contain-intrinsic-block-size: auto 240px; flex-shrink: 0; }
 /* Plain text you click, flush with the turn's edge: no capsule, no padding (#758). */
 .steps-control {
   align-self: flex-start;
@@ -648,10 +654,13 @@ a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underli
   background: conic-gradient(var(--notch, var(--paper-ink)) 0 80%, transparent 0);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), var(--paper-ink) calc(100% - var(--notch-width, 2px)));
   mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), var(--paper-ink) calc(100% - var(--notch-width, 2px)));
-  animation: spin 1s linear infinite;
+  /* Nothing for 300 ms, then the spinner (#4795): a wait shorter than that, as most are, shows no flash of one. */
+  opacity: 0;
+  animation: spin 1s linear infinite, spinner-shown 0s linear 300ms forwards;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+@keyframes spinner-shown { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s, 0s; } }
 /* A working session's mark on all three clients (#2044, #2332), as WorkingRing: three dots on a ring
    seen edge on that spins once in 1.8 s while it thinks or replies, and also pivots ±30° once in
    3.6 s while it runs a tool. The keyframes (ring-think-*, ring-do-*) come from spinnerClock.ts,

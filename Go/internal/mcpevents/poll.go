@@ -6,6 +6,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"github.com/alexec/agents/Go/wire"
 )
 
 // MaxEvents is the most events one poll gives; a poll that asks for none gives 50.
@@ -91,6 +93,22 @@ type Poller struct {
 	Fail func(error) *Error
 }
 
+// Enveloped is a polled event with its envelope as the server says it (#4728, spec
+// 4724-event-bus, "An event"): its subject, the ref of what it happened to, and its key,
+// set when the same event can happen again to that thing. Both come from the provider's
+// data only, never from the machine or the clock, so two machines say the same. A zero or
+// bad ref says none.
+func Enveloped(event map[string]any, subject wire.Ref, key string) map[string]any {
+	if subject.IsZero() || subject.Check() != nil {
+		return event
+	}
+	event["subject"] = subject.String()
+	if key != "" {
+		event["key"] = key
+	}
+	return event
+}
+
 func (pl Poller) fail(err error) *Error {
 	if pl.Fail != nil {
 		return pl.Fail(err)
@@ -128,6 +146,17 @@ type Candidate struct {
 	EventID string
 	Time    string
 	Data    func() (map[string]any, error)
+	// Subject and Key are the event's envelope (Enveloped). Envelope, when set, gives them
+	// instead, after Data: for what only its data finds, such as a run's pull request.
+	Subject  wire.Ref
+	Key      string
+	Envelope func() (wire.Ref, string)
+}
+
+// Ref is a ref with its topic in lower case, as a ref's topic is: an owner/name keeps its
+// case on the forge.
+func Ref(provider, typ, topic, id string) wire.Ref {
+	return wire.Ref{Provider: provider, Type: typ, Topic: strings.ToLower(topic), ID: id}
 }
 
 // Data is data, for a candidate that has it already.
@@ -201,7 +230,11 @@ func (pl Poller) Poll(name string, p Params, start func() string, find func(sinc
 			return nil, pl.fail(err)
 		}
 		if data != nil {
-			out = append(out, map[string]any{"eventId": t.EventID, "name": name, "timestamp": t.Time, "data": data})
+			subject, key := t.Subject, t.Key
+			if t.Envelope != nil {
+				subject, key = t.Envelope()
+			}
+			out = append(out, Enveloped(map[string]any{"eventId": t.EventID, "name": name, "timestamp": t.Time, "data": data}, subject, key))
 		}
 	}
 	return pl.Answer(out, Cursor{Since: since, IDs: ids}.Encoded(), listed.Truncated, len(fresh) > len(taken)), nil
@@ -215,6 +248,10 @@ type State struct {
 	Number int
 	On     *bool
 	Data   map[string]any
+	// Subject and Key are the event's envelope (Enveloped); no Key makes the poll's time
+	// the key, as a state can come on again.
+	Subject wire.Ref
+	Key     string
 }
 
 // Diff is events/poll of the event name by a state's diff: one event for each state that is
@@ -267,7 +304,13 @@ func (pl Poller) Diff(name, key string, p Params, now func() string, states func
 			for k, v := range t.Data {
 				data[k] = v
 			}
-			out = append(out, map[string]any{"eventId": t.ID + ":" + at, "name": name, "timestamp": at, "data": data})
+			key := t.Key
+			if key == "" {
+				// A state has no time or id of its own: its key is when this poll saw it,
+				// so two machines can make two ids for one change (best effort, #4728).
+				key = at
+			}
+			out = append(out, Enveloped(map[string]any{"eventId": t.ID + ":" + at, "name": name, "timestamp": at, "data": data}, t.Subject, key))
 		}
 	}
 	return pl.Answer(out, Cursor{Since: at, IDs: ids}.Encoded(), false, !first && len(fresh) > len(taken)), nil

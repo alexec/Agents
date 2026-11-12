@@ -33,7 +33,7 @@ var sandboxCatalog = map[string]sandboxRoute{
 	"cursor":      {fixed: wire.SandboxStateRuntimeControlled, why: "Cursor’s own sandbox setting decides. The app cannot change it."},
 	"copilot":     {fixed: wire.SandboxStateRuntimeControlled, why: "Copilot’s own sandbox setting decides. The app cannot change it yet."},
 	"antigravity": {fixed: wire.SandboxStateNone, why: "Antigravity sandboxes commands only when a business account’s admin turns Sandbox mode on."},
-	"opencode":    {fixed: wire.SandboxStateNone, why: "OpenCode has no command sandbox. It asks before running commands unless set to Always-approve."},
+	"opencode":    {fixed: wire.SandboxStateNone, why: "OpenCode has no command sandbox. It asks before running commands unless set to Always Approve."},
 }
 
 const (

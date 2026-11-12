@@ -65,6 +65,11 @@ type mcpPolled struct {
 	// Sender is who sent a channel message (#1762): such an event starts work only as the
 	// person the identity is linked to.
 	Sender *wire.ChannelSender `json:"sender"`
+	// Subject and Key are the event's envelope as its server says it (#4728): the ref of
+	// what it happened to, and the server's key for this one when the same event can
+	// happen again to it.
+	Subject *string `json:"subject"`
+	Key     *string `json:"key"`
 }
 
 // mcpPollResult is events/poll's answer; a nil cursor keeps the one before.

@@ -56,7 +56,12 @@ type costLedgerFile struct {
 	// MilestonesLate is the due date each milestone's late notice told (#4654), by its repo and
 	// name in lower case.
 	MilestonesLate map[string]string `json:"milestonesLate,omitempty"`
+	// Refs is the form its refs are in: ledgerRefsFull since #4800, 0 before.
+	Refs int `json:"refs,omitempty"`
 }
+
+// ledgerRefsFull is a ledger whose refs are in the full form (#4800).
+const ledgerRefsFull = 1
 
 type costLedgerBook struct {
 	workMu     sync.Mutex
@@ -67,6 +72,10 @@ type costLedgerBook struct {
 	multiplierMerges map[wire.LineageNode]lineage.Merge
 	// milestoneChecked is when spend last made each milestone's forecast (#4654), by its key.
 	milestoneChecked map[string]time.Time
+	// prFactsSlots holds a place for each merged PR's facts being asked (#4552); prFactsLookup,
+	// when set, is asked in place of forgePRFacts.
+	prFactsSlots  chan struct{}
+	prFactsLookup prFactsLookup
 }
 
 func costKey(n wire.LineageNode) string { return n.Kind + "\t" + n.Ref }
@@ -83,8 +92,55 @@ func (d *Daemon) costLedgerLocked() *costLedgerFile {
 		if d.workLedger.Unsent == nil {
 			d.workLedger.Unsent = map[string]int64{}
 		}
+		d.fullLedgerRefsLocked(d.workLedger)
 	}
 	return d.workLedger
+}
+
+// fullLedgerRefsLocked reads a ledger written before #4800 in the full ref form: each node's
+// refs, and the keys that name a node or a repo. A ledger in the full form already is left
+// as it is.
+func (d *Daemon) fullLedgerRefsLocked(f *costLedgerFile) {
+	if f.Refs >= ledgerRefsFull {
+		return
+	}
+	f.Refs = ledgerRefsFull
+	fullKey := func(k string) string {
+		kind, ref, ok := strings.Cut(k, "\t")
+		if !ok {
+			return k
+		}
+		return costKey(d.lineage().Canon(lineage.Full(wire.LineageNode{Kind: kind, Ref: ref}, "")))
+	}
+	nodes := make(map[string]wire.LineageCostNode, len(f.Nodes))
+	for _, c := range f.Nodes {
+		c = lineage.FullCostNode(c, d.agentsTopic)
+		c.Node = d.lineage().Canon(c.Node)
+		nodes[costKey(c.Node)] = c
+	}
+	f.Nodes = nodes
+	unsent := make(map[string]int64, len(f.Unsent))
+	for k, v := range f.Unsent {
+		unsent[fullKey(k)] = v
+	}
+	f.Unsent = unsent
+	if f.Overruns != nil {
+		overruns := make(map[string]int64, len(f.Overruns))
+		for k, v := range f.Overruns {
+			overruns[fullKey(k)] = v
+		}
+		f.Overruns = overruns
+	}
+	if f.MilestonesLate != nil {
+		late := make(map[string]string, len(f.MilestonesLate))
+		for k, v := range f.MilestonesLate {
+			if repo, name, ok := strings.Cut(k, "\t"); ok {
+				k = strings.ToLower(lineage.FullRepoText(repo) + "\t" + name)
+			}
+			late[k] = v
+		}
+		f.MilestonesLate = late
+	}
 }
 
 // bankWork banks add under the work agent a is on now.
@@ -124,21 +180,22 @@ func (d *Daemon) bankWork(a *wire.Agent, add wire.LineageCost) {
 	})
 }
 
-// sessionRepo is a session's repo: its folder's repo, or folder:<name> without one.
+// sessionRepo is a session's repo (#4800): its folder's repo, github:repo:#owner/repo, or
+// folder:repo:#<name> without one.
 func (d *Daemon) sessionRepo(folder string) string {
 	if r := d.folderRepo(folder); r.forge != "" {
-		return r.forge + ":" + r.path
+		return lineage.RepoNode(wire.Ref{Provider: r.forge, Topic: r.path}).Ref
 	}
 	if folder == "" || folder == "/" {
 		return ""
 	}
-	return "folder:" + filepath.Base(folder)
+	return lineage.FullRepoText("folder:" + filepath.Base(folder))
 }
 
 // workOf is what a session works on now: its own work, else its parent's, else the work of
 // the sessions it started in this turn (#4524), else itself.
 func (d *Daemon) workOf(id wire.UUID) []wire.LineageNode {
-	s := sessionNode(id)
+	s := d.sessionNode(id)
 	seen := map[wire.LineageNode]bool{}
 	for range lineage.MostDepth {
 		seen[s] = true
@@ -151,10 +208,10 @@ func (d *Daemon) workOf(id wire.UUID) []wire.LineageNode {
 		}
 		s = *parent
 	}
-	if work := d.startedWork(sessionNode(id)); len(work) > 0 {
+	if work := d.startedWork(d.sessionNode(id)); len(work) > 0 {
 		return work
 	}
-	return []wire.LineageNode{sessionNode(id)}
+	return []wire.LineageNode{d.sessionNode(id)}
 }
 
 // isWork says n is work a turn's cost can go on: an issue, a PR, or a release (#4524).
@@ -499,12 +556,19 @@ func (d *Daemon) saveCostLocked() {
 }
 
 // pruneCost drops the nodes banked longer ago than costNodeKeep, then the oldest past
-// costNodesKept. The control plane keeps what it was sent.
+// costNodesKept, and a PR's files lineage.FilesKeep after it ended. The control plane keeps what it was sent.
 func pruneCost(f *costLedgerFile, now time.Time) {
 	oldest := wire.DateOf(now.Add(-costNodeKeep))
+	filesOldest := wire.DateOf(now.Add(-lineage.FilesKeep))
 	for k, c := range f.Nodes {
 		if c.LastAt < oldest {
 			delete(f.Nodes, k)
+			continue
+		}
+		// A PR's files are for the rework rate only (#4552): kept while it can count.
+		if len(c.Files) > 0 && c.EndedAt != nil && *c.EndedAt < filesOldest {
+			c.Files = nil
+			f.Nodes[k] = c
 		}
 	}
 	if over := len(f.Nodes) - costNodesKept; over > 0 {

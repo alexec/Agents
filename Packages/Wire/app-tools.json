@@ -679,7 +679,7 @@
   {
     "name": "wait_for_event",
     "title": "Wait for an event",
-    "description": "Wait for an event in this folder or on this Mac, such as agent.ended, workflow.completed, mac.wake or branch.moved. The call stays open for up to 45 seconds. If no event happens, it keeps your place and your turn can end. You are started again when one happens. Use this instead of polling. To wait for sessions, wait on agent.ended alone with where {\"agent\": [ids or exact titles]}: they can be in this project on any of the person's machines, your turn ends at once, and you resume with how each ended; one that has already ended answers at once. The same names work as workflow triggers. Unknown events and filters say what is offered.",
+    "description": "Wait for an event in this folder or on this Mac, such as agent.ended, workflow.completed, mac.wake or branch.moved. The call stays open for up to 45 seconds. If no event happens, it keeps your place and your turn can end. You are started again when one happens. Use this instead of polling. To wait for sessions, wait on agent.ended alone with where {\"agent\": [ids or exact titles]}: they can be in this project on any of the person's machines, your turn ends at once, and you resume with how each ended; one that has already ended answers at once. The same names work as workflow triggers. With provider, topic or subject it also hears events from the person's other machines. An event is a hint: before you act, read the state of its subject (its ref) now, and when a wait times out, check the state now instead of taking no event as nothing happened. Unknown events and filters say what is offered.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -689,6 +689,46 @@
             "type": "string"
           },
           "description": "Events to wait for. Any one will do."
+        },
+        "type": {
+          "description": "The same as events: one type (noun.verbed, or noun.* for all of a noun) or a list. name is read the same way, for one release.",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "provider": {
+          "type": "string",
+          "description": "Only events of this provider: github, gitlab, jira, linear, slack, agents and so on. With provider, topic or subject, the wait also hears events from the person's other machines. With none of them, a type means what it means now: this folder's servers and the app."
+        },
+        "topic": {
+          "description": "Only events about this topic, or one of a list: a repo's full name (alexec/agents), a Jira project, a Slack channel.",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "subject": {
+          "type": "string",
+          "description": "Only events about this one thing, by its ref, such as github:pr:alexec/agents#4702: the plain way to say \"this pull request\", on any machine."
+        },
+        "debounce": {
+          "type": "string",
+          "description": "Such as 30s or 2m: hold a burst of events on one subject and type that long, then wake once with the last one and how many came. Best effort."
         },
         "where": {
           "type": "object",
@@ -718,7 +758,6 @@
         }
       },
       "required": [
-        "events",
         "until_minutes"
       ]
     }

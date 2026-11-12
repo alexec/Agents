@@ -669,6 +669,9 @@ func (f *RealBoards) Activity(ctx context.Context, kind Kind, since string) ([]A
 			}
 		}
 	}
+	for i := range out {
+		out[i].Project = project
+	}
 	return out, truncated, nil
 }
 

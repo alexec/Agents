@@ -40,7 +40,7 @@ running, and reads the meter that says how full its context is.
 
    Cursor, Grok and OpenCode also have a **Permission requests** pill under the prompt.
    Choose **Request cards** to be asked, with a card, before an action that needs permission,
-   or **Yes to all** for the app to say yes to each permission request. Questions that are
+   or **Always Approve** for the app to say yes to each permission request. Questions that are
    not permission still wait. The choice is for this agent only. The value from
    **Settings ▸ Agent Runtimes ▸ Cursor** (or Grok, OpenCode) is marked **follows Settings**.
 

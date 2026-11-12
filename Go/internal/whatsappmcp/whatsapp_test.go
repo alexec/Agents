@@ -149,6 +149,10 @@ func TestMessagesAndAnswersAreRaisedWithTheirSender(t *testing.T) {
 		data["spaceType"] != "DIRECT_MESSAGE" || data["type"] != "text" {
 		t.Fatalf("the message: %v", got[0])
 	}
+	// Its envelope (#4728): the message's ref, the business number's id as its topic, no key.
+	if _, keyed := got[0]["key"]; got[0]["subject"] != "whatsapp:message:"+fakePhoneNumberID+"#wamid.A1" || keyed {
+		t.Fatalf("the message's subject and key: %v %v", got[0]["subject"], got[0]["key"])
+	}
 	if want := map[string]any{"channel": "whatsapp", "identity": "15551234567", "name": "Sam"}; !reflect.DeepEqual(got[0]["sender"], want) {
 		t.Fatalf("its sender: %v", got[0]["sender"])
 	}

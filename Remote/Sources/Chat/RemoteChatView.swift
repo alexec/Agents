@@ -62,8 +62,8 @@ struct RemoteChatView: View {
                     if let popped { await model.loadTranscript(of: popped) } else { await model.loadTranscript() }
                 }
             } else {
-                // Not looked for yet: on its way, not gone.
-                ProgressView()
+                // Not looked for yet: on its way, not gone. Said only after 300 ms (#4795).
+                DelayedProgress()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
@@ -93,6 +93,16 @@ struct RemoteChatView: View {
                 .accessibilityHidden(true)
         }
         .onChange(of: agent?.id) { searchingFiles = false }
+        // What the ⌘K command menu asked of the open chat (#4792); not of a popped-out one.
+        .onChange(of: model.chatAsk, initial: true) {
+            guard popped == nil, let ask = model.chatAsk else { return }
+            model.chatAsk = nil
+            switch ask {
+            case .findInChat: if findsInChat { finding = true }
+            case .openFile: if agent != nil { searchingFiles = true }
+            case .prompts: if agent != nil { showingPrompts = true }
+            }
+        }
     }
 
     /// Open File… (#415): the session's files by name, found on its host. The one chosen

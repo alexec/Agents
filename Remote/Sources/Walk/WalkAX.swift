@@ -95,6 +95,18 @@ struct WalkAX {
         if object.accessibilityTraits.contains(.notEnabled) { return false }
         // A `Menu`'s button, and a row of the menu it opened (#4381).
         if WalkMenu.open(object) || WalkMenu.run(object) { return true }
+        // A segment of a segmented Picker (#4758): its label activates nothing, so pick the
+        // segment drawn under it, as a tap there would.
+        var above = (object as? UIView)?.superview
+        while let next = above, !(next is UISegmentedControl) { above = next.superview }
+        if let view = object as? UIView, let segments = above as? UISegmentedControl,
+           segments.isEnabled, segments.numberOfSegments > 0 {
+            let middle = view.convert(CGPoint(x: view.bounds.midX, y: view.bounds.midY), to: segments)
+            let width = segments.bounds.width / CGFloat(segments.numberOfSegments)
+            segments.selectedSegmentIndex = min(segments.numberOfSegments - 1, max(0, Int(middle.x / width)))
+            segments.sendActions(for: .valueChanged)
+            return true
+        }
         if let control = object as? UIControl, control.isEnabled {
             control.sendActions(for: .primaryActionTriggered)
             control.sendActions(for: .touchUpInside)

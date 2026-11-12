@@ -3,6 +3,7 @@ each in a worktree of its own."""
 GROUP = "usage"
 LAYOUT = "mac"
 TITLE = "Start in a worktree"
+DOCS = "how-to/start-in-a-worktree/"  # the docs page, on docs.agentloops.dev (upload.py)
 
 LINES = {
     "two": "Two agents can work in one repository without getting in each other's way.",
@@ -18,7 +19,7 @@ PROMPTS = [
 
 
 def setup(v):
-    v.folder = v.project("weather-app", {
+    v.folder = v.add_folder("weather-app", {
         "settings.py": "THEME = 'light'\n",
         "report.py": "def report(days):\n    return [d.summary() for d in days]\n",
     })

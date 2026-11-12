@@ -114,8 +114,13 @@ type workflowBook struct {
 	workflowStarting map[wire.UUID]bool // runs whose agent has not returned from startFor
 	workflowRecsBad  bool
 	workflowFiles    map[string]map[string]*workflowFile // folder → id → file
-	machineIDOnce    sync.Once
-	machineValue     string
+	// workflowTold is the digest each watched folder's workflows were last told with
+	// (folder → id → digest). The folder watch compares against it, not workflowFiles:
+	// every reader scans workflowFiles afresh, so a file that arrived just before a
+	// workflows/list was in it already, and the watch told nothing (#4750).
+	workflowTold  map[string]map[string]string
+	machineIDOnce sync.Once
+	machineValue  string
 	// clockStop ends the workflow clock, and clockRunning waits for a tick still going:
 	// Shutdown stops it, as a host on a context nobody cancels would keep ticking (#2823).
 	clockStop     chan struct{}
@@ -604,13 +609,27 @@ func (d *Daemon) summaryLocked(folder, id string, over map[string]wire.WorkflowL
 		}
 		s.OffReason = &reason
 	}
+	// Outside its hours by the time its cooldown lets it, a fire waits for them (#4818).
+	win := d.windowLocked(f.wf)
+	if win != nil {
+		from := time.Now()
+		if s.CooldownEndsAt != nil {
+			from = s.CooldownEndsAt.Time()
+		}
+		if !win.open(from) {
+			if at, ok := d.heldStartLocked(f.wf, st, win, time.Now()); ok {
+				v := wire.DateOf(at)
+				s.HoursOpenAt = &v
+			}
+		}
+	}
 	runs := !s.IsArchived && s.IsEnabled && s.OverLimit == nil && s.AwaitingApproval == nil && s.DeniedHere == nil && f.wf.Problem == nil
 	if runs {
 		var next *wire.Date
 		for _, t := range f.wf.Triggers {
 			var at *wire.Date
 			if t.Schedule != nil {
-				if due, ok := nextDue(t.Schedule.Value, time.Now()); ok {
+				if due, ok := nextDueOpen(t.Schedule.Value, win, time.Now()); ok {
 					v := wire.DateOf(due)
 					at = &v
 					if next == nil || v < *next {
@@ -638,20 +657,8 @@ func nextDue(s wire.WorkflowSchedule, t time.Time) (time.Time, bool) {
 	} else {
 		c = c.Add(time.Hour)
 	}
-	days := map[string]bool{}
-	for _, d := range s.Days {
-		days[string(d)] = true
-	}
-	names := []string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}
 	for i := 0; i < 8*48; i++ {
-		h, m := int64(c.Hour()), int64(c.Minute())
-		ok := days[names[c.Weekday()]] && h >= s.Hours[0] && h <= s.Hours[1]
-		minuteOK := false
-		for _, x := range s.Minutes {
-			minuteOK = minuteOK || x == m
-		}
-		ok = ok && minuteOK && !(h == s.Hours[0] && m < s.StartMinute) && !(h == s.Hours[1] && m > s.EndMinute)
-		if ok {
+		if scheduleAdmits(s, c) {
 			return c, true
 		}
 		c = c.Add(30 * time.Minute)
@@ -741,6 +748,13 @@ func (d *Daemon) editWorkflowLocked(folder, id string, byPerson bool, edit func(
 func (d *Daemon) tellWorkflow(folder, id string) {
 	d.workflowMu.Lock()
 	f := d.fileLocked(folder, id)
+	if told := d.workflowTold[folder]; told != nil {
+		if f == nil {
+			delete(told, id)
+		} else {
+			told[id] = f.digest
+		}
+	}
 	if f == nil {
 		d.workflowMu.Unlock()
 		Broadcast(d, wire.NotifyWorkflowRemoved, wire.WorkflowRemovedNotification{Folder: store.FolderURL(folder), WorkflowID: id})

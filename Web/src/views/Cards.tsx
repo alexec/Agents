@@ -120,18 +120,18 @@ export function useWaitingCards({ store, host, session, down = false, handOffsOn
     held.value = held.value.map((c) => (c.request.id === id ? { ...c, answered } : c));
   };
   /**
-   * Sends an answer. A refusal means it was no longer waiting: answered somewhere else. While it
-   * is on its way the button that sent it says so and every other answer is held, so a second
-   * click is not a second answer; they come back if it fails (#86).
+   * Sends an answer. The card goes at once, before the host has it (#4786), and comes back with
+   * its buttons when the answer did not go, under the line that says why. A refusal means it was
+   * no longer waiting: answered somewhere else. One `sendID` for every try, so a retry is the same
+   * answer and not a second one (#86).
    */
   const send = async (id: string, chosen: string, call: (sendID: UUID) => Promise<unknown>) => {
     const card = held.value.find((c) => c.request.id === id);
     if (!card || card.answered !== null) return;
     const sendID = card.sendID ?? (crypto.randomUUID().toUpperCase() as UUID);
-    held.value = held.value.map((c) => (c.request.id === id ? { ...c, answered: "sending", chosen, sendID } : c));
+    held.value = held.value.map((c) => (c.request.id === id ? { ...c, answered: "here", chosen, sendID } : c));
     try {
       await call(sendID);
-      mark(id, "here");
       held.value = held.value.filter((c) => c.request.id !== id);
     } catch (error) {
       // The host refusing means it was no longer waiting; the link dropping, or the host

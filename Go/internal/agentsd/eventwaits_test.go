@@ -128,7 +128,7 @@ func TestAHeldWaitWakesTheAgentLater(t *testing.T) {
 	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: folderScope(dir), Sentence: "cd moved.", Details: map[string]string{"branch": "cd"}})
 	waitFor(t, "the wake in its chat", func() bool {
 		for _, u := range userMessages(d, a.ID) {
-			if strings.HasPrefix(u, "The event you were waiting for happened.\n\nbranch.moved at ") && strings.Contains(u, "\ncd moved.\nbranch: cd") {
+			if strings.HasPrefix(u, "The event you were waiting for happened.\n\nbranch.moved at ") && strings.Contains(u, "\ncd moved.\n\n```yaml\nbranch: cd\n```") {
 				return true
 			}
 		}
@@ -215,7 +215,7 @@ func TestAWaitEnds(t *testing.T) {
 		a.EventWait = &w
 	})
 	d.waitDeadlinesPassed()
-	if text := <-answered; !strings.HasPrefix(text, "Your wait for lease.granted timed out at ") || !strings.HasSuffix(text, " with no match.") {
+	if text := <-answered; !strings.HasPrefix(text, "Your wait for lease.granted timed out at ") || !strings.Contains(text, " with no match. ") || !strings.HasSuffix(text, "check the state now, by its ref, before you go on.") {
 		t.Fatal(text)
 	}
 	// A second wait replaces the first, which hears so.

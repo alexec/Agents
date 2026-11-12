@@ -26,7 +26,7 @@ import (
 // machine's key cannot sign as a person's device.
 //
 // The opened value is kept in agentsd's memory only, which no other process of the user
-// reads (keepMemoryPrivate). "Allow for this session" and "Allow always" use it until
+// reads (keepMemoryPrivate). "Approve for This Session" and "Always Approve" use it until
 // agentsd restarts; after a restart, the first use asks again. The release key's public
 // half is asked for at each run and kept in memory, never in a file an agent could change.
 

@@ -1,6 +1,6 @@
 ---
 name: release
-description: Take main to a new version with nobody watching (#914), started by Alex. Every release is a minor (x.y.0), with no patch after it (#3212). Run the three checks once each (runtimes, competitors, the feature matrix; the five reviews are not part of a release, #3215), read the Dependabot alerts, have the high issues fixed through the Scrum Master's lanes, check the gate, choose the version, write the notes with the milestones finished, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the finished milestones, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
+description: Take main to a new version with nobody watching (#914), started by Alex. Every release is a minor (x.y.0), with no patch after it (#3212). Run the three checks once each (runtimes, competitors, the feature matrix; the five reviews are not part of a release, #3215), read the Dependabot alerts, have the high issues fixed through the bug lane's lead (#4207), check the gate, choose the version, write the notes with the milestones finished, tag and push, check the GitHub release and both TestFlight builds, deploy the live control plane, close the finished milestones, and review how the release went. Use when the Release workflow runs, or when Alex asks for a release. Not for installing on Alex's Mac or devices (ship-app), and never for App Review.
 ---
 
 # Release
@@ -48,15 +48,15 @@ Alex decided (2026-10-13, #914):
   (step 6), and this skill closes it (step 9).
 - **Security findings stay private** until they ship: a draft GitHub security advisory
   per finding, fixed on its private fork. The paused security review made them; the
-  release no longer makes new ones, and hands the unfixed drafts to the Scrum Master as
+  release no longer makes new ones, and hands the unfixed drafts to the bug lane's lead (#4207) as
   priority work (step 3). A Dependabot alert is public already, so it gets an issue, not
   an advisory. The notes say only "Security fixes".
 
 ## Rules for the whole run
 
 - Never push to `main`, never merge, never start lanes. (Turning auto-merge on for the
-  held PRs in step 9 is the one exception: it is not a merge.) Fix lanes are the Scrum Master's
-  (`.agents/personas/scrum-master.md`). You file and label issues, and you wait.
+  held PRs in step 9 is the one exception: it is not a merge.) Fix lanes are the leads'
+  (`.agents/personas/lead.md`). You file and label issues, and you wait.
 - Never submit to App Review, and never change an App Store Connect record.
 - Never write a security finding anywhere public: not in an issue, a pull request, a
   commit, the notes or a message to another session. Use its id (`S20261011-2`) only in
@@ -150,22 +150,21 @@ Collect, in order:
 For each runtime finding with no issue yet, file one: title `Runtime (<severity>): <title>`,
 the finding's fields in the body, the labels `priority:medium` and `bug`. No milestone.
 
-Then send the Scrum Master one message (`list_sessions`, then `message_session` to the
-session not archived whose title has "scrum master" in it, any case, and that is labelled
-`lead`): the high issues in priority order (security, runtimes, the rest), then the
+Then send the bug lane's lead one message (`list_sessions`, then `message_session` to the
+session not archived that is labelled `#4207` and `lead`): the high issues in priority order (security, runtimes, the rest), then the
 unfixed draft security advisory URLs as priority work. Say that the release waits for
-high issues and never waits for a draft advisory. Other medium issues go to the ordinary
+high issues and never waits for a draft advisory. A high issue that is a child of another epic goes to that epic's lead as well. Other medium issues go to the ordinary
 lanes after the release as their label and milestone say (a bug to the bug lane).
 
-**No Scrum Master running, and work to hand over** (#1908; in v0.7.0 the highs sat
+**No bug lane lead running, and work to hand over** (#1908; in v0.7.0 the highs sat
 40 minutes with no owner): start one when there are high issues or unfixed draft
-security advisories. Call `start_session` with the persona in
-`.agents/personas/scrum-master.md` (its prompt, `runtime:` and `labels:`), the title
-`<x.y> scrum master` for the version being released, and a prompt that names the version,
-the high issues in the order above, then the draft security advisory URLs as priority
-work, that the release waits for high issues but not for draft advisories, and that it
-reports to the release session (this one, by its id). The release still starts no fix
-lane itself: the Scrum Master does. With nothing to hand over, start none, and say so in
+security advisories. Call `start_session` with the Lead persona
+(`.agents/personas/lead.md`: its `runtime:` and `labels:`), the title and labels of the
+`lead` skill's "Starting a lead" for #4207, and its prompt, followed by the version, the
+high issues in the order above, then the draft security advisory URLs as priority work,
+that the release waits for high issues but not for draft advisories, and that it reports
+to the release session (this one, by its id). The release still starts no fix lane
+itself: the lead does. With nothing to hand over, start none, and say so in
 the report.
 
 ### Security findings
@@ -182,7 +181,7 @@ ones. For each draft advisory
    `python3 .agents/skills/release/scripts/advisory.py fixed <ghsa_id> <merge commit>`.
    `.claude/settings.json` allows it, and no other change to an advisory. Do not hand it
    off.
-2. Otherwise leave it a draft and send its URL only (it is private) to the Scrum Master as
+2. Otherwise leave it a draft and send its URL only (it is private) to the bug lane's lead (#4207) as
    priority work. Its lane fixes the finding on the advisory's private fork, then opens
    the pull request on `main` with a title and body that name no attack ("Harden token
    comparison"), and runs `advisory.py fixed <ghsa_id> <merge commit>`. A draft advisory
@@ -241,7 +240,7 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
    A newer push never cancels a running run on `main` (#2218), but it replaces a pending
    one: when the pin's CI was replaced and never ran, start over on the newest main. If a
    run on `<sha>` failed, end with `partly_done`; main broken is fixed by its own PR,
-   through the Scrum Master.
+   through the bug lane's lead.
 2. **No open high:** none of step 3's high issues is open at the pin (for 1.0.0, none of
    `1.0 Public release`'s issues either, step 1, item 3). When one closed by a PR that
    merged after the pin, start over on the newest main from item 1.
@@ -262,7 +261,7 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
    runner with an empty build cache, which no lane or merge wave does (#2773 spent
    v0.12.0's tag). A run of it on a pull request does not count: run it on `<sha>`. If it
    failed, end with `partly_done`, naming the job and its first error; the fix goes through
-   the Scrum Master as for main broken.
+   the bug lane's lead as for main broken.
 
    **A job that no runner took is not a failure** (#3445). GitHub can cancel a job before
    it starts ("The job was not acquired by Runner of type hosted even after multiple
@@ -396,7 +395,7 @@ that the notes name under `## Milestones finished` (#3760):
 2. Close it: `gh api -X PATCH repos/alexec/Agents/milestones/<number> -f state=closed`.
 
 Make no new milestone. The next milestone is the open one with the earliest due date. Its
-work did not wait for this release (#3465), so there is nothing to unpark. The Scrum Master may not read a message from you
+work did not wait for this release (#3465), so there is nothing to unpark. A lead may not read a message from you
 until Alex speaks to it (#1728), so do the rest yourself:
 
 3. **Lift a hold:** there should be none, as nothing is held for a milestone (#3465) or a
@@ -408,7 +407,7 @@ until Alex speaks to it (#1728), so do the rest yourself:
    instead. For every other one, `gh pr merge N --auto --squash`. Turning auto-merge on
    is not merging: CI and the branch rules still decide. A stacked PR whose base is not
    `main` refuses auto-merge; leave it, and name it in the report.
-4. Tell the Scrum Master (`message_session`) that the release shipped, which PRs you
+4. Tell the bug lane's lead (`message_session`) that the release shipped, which PRs you
    released and which you could not.
 
 If step 8 failed, leave the milestones open and say so in the report.

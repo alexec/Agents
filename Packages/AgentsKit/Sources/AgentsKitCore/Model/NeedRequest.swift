@@ -150,6 +150,20 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
     /// Whether it is in Later (#4233).
     public var isDeferred: Bool { deferred != nil }
 
+    /// As it will read once its host has put it in Later (#4786): drawn before the answer.
+    public func deferring(_ params: DaemonAPI.RequestsDefer, at now: Date = .now) -> NeedRequest {
+        var request = self
+        request.deferred = Deferral(until: params.until, atMac: params.atMac, at: now)
+        return request
+    }
+
+    /// As it will read once Bring Back has taken it out of Later (#4786).
+    public var broughtBack: NeedRequest {
+        var request = self
+        request.deferred = nil
+        return request
+    }
+
     /// How many sessions wait on it: at least its asker.
     public var blocks: Int { max(waiters.count, askedBy == nil ? 0 : 1) }
 
@@ -203,14 +217,15 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
     /// puts the value.
     public struct SecretUse: Codable, Sendable, Hashable {
         /// fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's header, #4120),
-        /// terminal (`agents-secret NAME` with no session's grant, #4179) or account (a
-        /// manage_accounts read of an account with Ask before use, #4163).
+        /// terminal (`agents-secret NAME` with no session's grant, #4179), account (a
+        /// manage_accounts read of an account with Ask before use, #4163), or browser and screen
+        /// (an agent's lease of the browser or the screen on a machine that asks, #4264).
         public var use: String
         public var name: String
         /// The page's domain for a fill, owner/repo for CI, the server's name for MCP, the
         /// command that ran agents-secret for a terminal, as it says it.
         public var place: String
-        /// The session's own secret (#3548): Allow always is the same as Allow for this session.
+        /// The session's own secret (#3548): Always Approve is the same as Approve for This Session.
         public var sessionOnly: Bool?
         /// A Linux machine (#4058): an answer that allows the use goes signed with this
         /// device's lock key (`LockChannel.secretUseApproval`), or the machine refuses it.
@@ -218,14 +233,18 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         /// For account (#4163): the manage_accounts call that waits, such as get. `name` is then
         /// the account's service and address, and `place` its id.
         public var call: String?
+        /// For screen (#4264): the app drive_screen names. `name` is then "the screen", and
+        /// `place` the machine.
+        public var app: String?
 
-        public init(name: String, use: String, place: String, sessionOnly: Bool? = nil, needsSignature: Bool? = nil, call: String? = nil) {
+        public init(name: String, use: String, place: String, sessionOnly: Bool? = nil, needsSignature: Bool? = nil, call: String? = nil, app: String? = nil) {
             self.name = name
             self.use = use
             self.place = place
             self.sessionOnly = sessionOnly
             self.needsSignature = needsSignature
             self.call = call
+            self.app = app
         }
 
         /// Whether `action` goes signed: it allows the use, on a machine that asks for a signature.
@@ -243,6 +262,8 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
             case "mcp": "MCP server \(place)"
             case "terminal": "Terminal: \(place) · \(Self.terminalCaveat)"
             case "account": "Account: manage_accounts \(call ?? "get")"
+            case "browser": "Browser on \(place)"
+            case "screen": app.map { "Screen: \($0) on \(place)" } ?? "Screen on \(place)"
             default: "Fill on \(place)"
             }
         }
@@ -265,10 +286,10 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         /// The words on the row's menu, its swipes and the banner's buttons.
         public var word: String {
             switch self {
-            case .once: "Allow Once"
-            case .session: "Allow for This Session"
-            case .always: "Allow Always"
-            case .hour: "Allow for 1 Hour"
+            case .once: "Approve"
+            case .session: "Approve for This Session"
+            case .always: "Always Approve"
+            case .hour: "Approve for 1 Hour"
             case .deny: "Deny"
             }
         }

@@ -1,7 +1,7 @@
 // The bar of sections at the top of every page (#2141), in place of Workspace | Console | Reports
 // (#1804), and every section but the Overview and Agents drawn as the Console was: its list of pages
 // on the left, the page open on the right. Below 760 the bar is one menu with the open section's
-// name. g then a letter goes to a section, when the focus is not in a field.
+// name. g then a letter goes to a section, when the focus is not in a field; ⌘K opens the command menu (#4788).
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { Fragment, type ComponentChildren } from "preact";
@@ -34,7 +34,7 @@ import { addMachineWords } from "../model/addMachine";
 import { SettingsPage } from "./Settings";
 import { SecretsSection } from "./UserScope";
 import { AccountsSection } from "./Accounts";
-import { StatusListMark, StatusSecretsPage, useUserScopeStatus } from "./StatusSecrets";
+import { StatusListMark, StatusListReadLine, StatusSecretsPage, useUserScopeStatus } from "./StatusSecrets";
 import { SessionSecretsSection } from "./settings/SessionSecrets";
 import { WorkflowRow } from "./WorkflowRow";
 import { BackToList } from "./BackToList";
@@ -45,6 +45,7 @@ import { MultiplierPage } from "./Multiplier";
 import { lowWords, runtimeTally, setupRuntimes } from "../model/runtimes";
 import type { Session } from "../session";
 import { ask } from "./MessageKinds";
+import { CommandMenu } from "./CommandMenu";
 
 /**
  * How many requests and sessions need the person, across every folder: Agents' count in the bar.
@@ -121,6 +122,7 @@ export function NavBar({ store, session }: { store: Store; session: Session }) {
       </nav>
       <SearchBox store={store} />
       <PersonMenu store={store} session={session} />
+      <CommandMenu store={store} />
     </header>
   );
 }
@@ -136,7 +138,7 @@ const isRuntimesPage = (page: NavPage) => page.draw.kind === "activity" && page.
 
 /** A page's mark beside its row in the list: a count, or that it is not saved. */
 function PageMark({ store, page }: { store: Store; page: NavPage }) {
-  // Status ▸ Secrets and Accounts (#4161): the newest operation's age, and a dot when one is not backed up.
+  // Status ▸ Secrets and Accounts (#4161): the newest operation's age.
   if (page.draw.kind === "statusList") return <StatusListMark store={store} list={page.draw.list} />;
   // Status ▸ Runtimes (#3956): an allowance below 10% left, in the warning tint, as the window's orange Runtimes icon.
   if (isRuntimesPage(page)) {
@@ -218,6 +220,7 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
                     <PageMark store={store} page={p} />
                   </button>
                   {isRuntimesPage(p) && <RuntimesLowLine store={store} />}
+                  {p.draw.kind === "statusList" && <StatusListReadLine store={store} list={p.draw.list} />}
                 </Fragment>
               ))}
               {machinesHead(group) && makingRows(store.machinesMaking.value, store.providers.list.value, store.hosts.value)

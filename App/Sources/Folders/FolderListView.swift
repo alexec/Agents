@@ -233,12 +233,12 @@ struct FolderListView: View {
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
                 EventsRow().activityIcon("list.bullet.rectangle")
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
-                // What happened last to the person's secrets and accounts (#4161): the newest's age,
-                // and the mark in the warning tint when one is not backed up.
+                // What happened last to the person's secrets and accounts (#4161): the newest's age, and
+                // the one read last in grey. The mark keeps its plain tint; "not backed up" is on the page.
                 ForEach([StatusSecretsKind.secrets, .accounts], id: \.self) { kind in
                     let item: SidebarItem = kind == .secrets ? .secretsStatus : .accountsStatus
-                    StatusSecretsRow(kind: kind, state: model.userScope)
-                        .activityIcon(kind.systemImage, warns: StatusSecretsWords.warns(model.userScope.statusLines(kind)), tint: .attention)
+                    StatusSecretsRow(kind: kind, state: model.userScope) { model.work.agent($0)?.title }
+                        .activityIcon(kind.systemImage)
                         .appText(.supporting).sidebarInk(item).tag(item)
                 }
             } header: {
@@ -277,6 +277,8 @@ struct FolderListView: View {
                     .appText(.supporting).sidebarInk(.tokens).tag(SidebarItem.tokens)
                 TimeRow().activityIcon("clock")
                     .appText(.supporting).sidebarInk(.time).tag(SidebarItem.time)
+                VelocityRow().activityIcon("arrow.triangle.merge")
+                    .appText(.supporting).sidebarInk(.velocity).tag(SidebarItem.velocity)
             } header: {
                 // The size of every other group's heading (#495).
                 Text("Usage").appText(.supporting)
@@ -868,6 +870,8 @@ struct SessionSidebarRow: View {
             .listRowInsets(.vertical, 2)
             .sidebarInk(.session(agent.id))
             .tag(SidebarItem.session(agent.id))
+            // Its chat fetched while the pointer rests on it, so a click draws it at once (#4795).
+            .prefetchesOnHover { [model, id = agent.id] in model.prefetch(id) }
             // A click on the session already open goes to its latest message, as opening it
             // does (#1349): the list hears no change of selection for it.
             .simultaneousGesture(TapGesture().onEnded {

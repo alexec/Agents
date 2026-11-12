@@ -23,8 +23,8 @@ func TestLineageSyncKeepsAMergedCopy(t *testing.T) {
 	host := p.host("OWNERS-MAC").member.Host
 	ctx := context.Background()
 	now := time.Now()
-	session := wire.LineageNode{Kind: "session", Ref: "session:a1"}
-	issue := wire.LineageNode{Kind: "issue", Ref: "github:o/r#1"}
+	session := wire.LineageNode{Kind: "session", Ref: "agents:session:#a1"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:issue:o/r#1"}
 	pr := wire.LineageNode{Kind: "pr", Ref: "github:o/r!2"}
 	send := func(sync wire.LineageSync) (wire.LineageSyncAnswer, error) {
 		t.Helper()
@@ -126,7 +126,7 @@ func TestLineageSyncKeepsAMergedCopy(t *testing.T) {
 	if _, err := send(wire.LineageSync{Links: []wire.LineageLink{old}}); err != nil {
 		t.Fatal(err)
 	}
-	other := wire.LineageNode{Kind: "session", Ref: "session:b2"}
+	other := wire.LineageNode{Kind: "session", Ref: "agents:session:#b2"}
 	archived := wire.LineageStateChange{Node: other, State: wire.LineageSessionStateNameArchived, At: wire.DateOf(now)}
 	if _, err := send(wire.LineageSync{States: []wire.LineageStateChange{archived}}); err != nil {
 		t.Fatal(err)
@@ -159,7 +159,7 @@ func TestLineageStatesAreBounded(t *testing.T) {
 	now := time.Now()
 	var changes []wire.LineageStateChange
 	for i := range lineage.MostStates + 10 {
-		changes = append(changes, wire.LineageStateChange{Node: wire.LineageNode{Kind: "session", Ref: "session:x"},
+		changes = append(changes, wire.LineageStateChange{Node: wire.LineageNode{Kind: "session", Ref: "agents:session:#x"},
 			State: wire.LineageSessionStateNameWorking, At: wire.DateOf(now.Add(time.Duration(i) * time.Second))})
 	}
 	kept := boundStates(changes, now)

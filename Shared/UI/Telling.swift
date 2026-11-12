@@ -11,7 +11,7 @@ import SwiftUI
 struct Telling: View {
     let host: String
     /// What is being done, said first ("Archiving — telling your Mac"); nil where the
-    /// button beside it already says ("Allow once  telling your Mac").
+    /// button beside it already says ("Approve  telling your Mac").
     var doing: String? = nil
 
     var body: some View {

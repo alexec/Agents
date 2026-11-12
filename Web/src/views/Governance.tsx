@@ -107,7 +107,7 @@ export function GovernanceRequests({ store, down }: { store: Store; down: boolea
                 <option value="">For {r.userName}</option>
                 {groups.map((g) => <option key={g.id} value={g.id}>For {g.name}</option>)}
               </select>
-              <button type="button" disabled={down} onClick={() => void decide(r, false)}>Refuse</button>
+              <button type="button" disabled={down} onClick={() => void decide(r, false)}>Deny</button>
               <button type="button" class="prominent" disabled={down} onClick={() => void decide(r, true)}>Approve</button>
             </span>
           </li>

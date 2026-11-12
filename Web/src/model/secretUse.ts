@@ -7,7 +7,7 @@ export type SecretUseAction = RequestSecretUseAnswer["action"];
 
 /** The words on the row's menu, as the banner's buttons say them. */
 export const secretUseWords: Record<SecretUseAction, string> = {
-  once: "Allow Once", session: "Allow for This Session", always: "Allow Always", hour: "Allow for 1 Hour", deny: "Deny",
+  once: "Approve", session: "Approve for This Session", always: "Always Approve", hour: "Approve for 1 Hour", deny: "Deny",
 };
 
 /** The known gap (#4179), as agentsd's banner and NeedRequest.SecretUse.terminalCaveat say it. */
@@ -33,10 +33,12 @@ export function secretUseWhere(use: RequestSecretUse): string {
   if (use.use === "ci") return `CI secret in ${use.place}`;
   if (use.use === "terminal") return `Terminal: ${use.place} · ${terminalCaveat}`;
   if (use.use === "account") return `Account: manage_accounts ${use.call ?? "get"}`;
+  if (use.use === "browser") return `Browser on ${use.place}`;
+  if (use.use === "screen") return use.app ? `Screen: ${use.app} on ${use.place}` : `Screen on ${use.place}`;
   return use.use === "mcp" ? `MCP server ${use.place}` : `Fill on ${use.place}`;
 }
 
-/** The answers, in order. A session's own secret has no Allow always: it is the same as for this session.
+/** The answers, in order. A session's own secret has no Always Approve: it is the same as for this session.
  * A terminal's are once, for 1 hour and deny (#4179). */
 export function secretUseActions(use: RequestSecretUse): SecretUseAction[] {
   if (use.use === "terminal") return ["once", "hour", "deny"];

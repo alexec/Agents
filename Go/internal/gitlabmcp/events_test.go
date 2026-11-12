@@ -147,11 +147,17 @@ func TestMergedAndClosedSinceTheCursor(t *testing.T) {
 	})
 	ids, result := merged.poll()
 	same(t, ids, []string{"pr.merged:group/app:2"})
+	if sub, key := envelopeOf(result, 0); sub != "gitlab:mr:group/app#2" || key != "" {
+		t.Fatalf("merged: subject %q, key %q", sub, key)
+	}
 	if d := data(t, result, 0); d["mergeSha"] != "sq2" || d["mergedAt"] != at(1) {
 		t.Fatalf("merged %v", d)
 	}
-	ids, _ = closed.poll()
+	ids, result = closed.poll()
 	same(t, ids, []string{"pr.closed:group/app:3:" + at(2)})
+	if sub, key := envelopeOf(result, 0); !strings.HasSuffix(sub, "#3") || key == "" {
+		t.Fatalf("closed: subject %q, key %q (#4728: a PR closed again is a new event)", sub, key)
+	}
 	ids, _ = merged.poll()
 	same(t, ids, nil)
 	for _, r := range f.asked() {
@@ -674,4 +680,12 @@ func TestFixesAndMineNarrowMergedMRs(t *testing.T) {
 	same(t, ids, []string{id(1)})
 	ids, _ = all.poll()
 	same(t, ids, []string{id(1), id(2), id(3)})
+}
+
+// envelopeOf is a polled event's subject and key (#4728).
+func envelopeOf(result map[string]any, i int) (subject, key string) {
+	e := result["events"].([]any)[i].(map[string]any)
+	subject, _ = e["subject"].(string)
+	key, _ = e["key"].(string)
+	return subject, key
 }

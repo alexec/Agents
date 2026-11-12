@@ -20,6 +20,9 @@ import Observation
 @Observable
 final class RemoteModel {
     let work = AgentsModel()
+    /// This device's local copy (#4791): sessions and chat ends kept in the app's Caches,
+    /// drawn at launch before the Mac answers. The Mac always wins.
+    @ObservationIgnored private(set) var localCopy: LocalCopyKeeper?
     private var labelVocabularies: [URL: [String]] = [:]
     @ObservationIgnored private var attentionRefreshTask: Task<Void, Never>?
 
@@ -351,6 +354,11 @@ final class RemoteModel {
         userScope.lock = lock
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
+        // At once, so the list and a chat restored at launch draw before the Mac answers.
+        // An unpaired device has none: a forget deletes it.
+        let localCopy = LocalCopyKeeper(copy: .remote(), work: work)
+        self.localCopy = localCopy
+        Task { await localCopy.drawMachines() }
         #if DEBUG
         WalkNotify.model = work
         WalkNotify.also = { [weak self] method, params in
@@ -465,6 +473,8 @@ final class RemoteModel {
     /// every banner delivered from it.
     private func forgetKept() {
         StartDraftKeeper.shared.forgetAll()
+        // The copy of its sessions and chats goes with the pairing (#4791).
+        Task { [localCopy] in await localCopy?.forget() }
         liveActivities.endAll()
         notifier.forgetAll()
         AttentionSnapshotStore.clear()
@@ -591,6 +601,12 @@ final class RemoteModel {
     /// chat can ask it for that label.
     var sidebarSearch = ""
 
+    /// The ⌘K command menu (#4792) while it is open: what is typed in it to start with, the
+    /// sidebar's search when a phone with no keyboard opens it from there. Nil when shut.
+    var commandMenu: String?
+    /// What the command menu asked the open chat to do (#4792): the chat does it and clears it.
+    var chatAsk: RemoteChatAsk?
+
     /// What the sidebar has picked (#226), the Mac's one value for it: the first of what is
     /// open over the folder — a pinned page, a workflow, a chat — and what
     /// was opened from that is pushed over it in the detail. A folder chosen with nothing
@@ -684,13 +700,13 @@ final class RemoteModel {
             case .machine:
                 // A machine's page (#4034), as the window's Machines group opens it.
                 openActivity = newValue
-            case .multiplier:
-                // The Multiplier page (#4116), from its row under Status.
+            case .multiplier, .velocity:
+                // The Multiplier page (#4116) and Velocity (#4758), from their rows under Status.
                 openActivity = newValue
             case .spending, .tokens, .time,
                  .folderMCPServers, .docs, .messages:
-                // Usage, a folder's connectors and Docs are Mac + web (#2798, #3321): the
-                // Remote opens none of them.
+                // Cost, Tokens, Time, a folder's connectors and Docs are Mac + web (#2798,
+                // #3321): the Remote opens none of them.
                 break
             }
         }
@@ -1429,6 +1445,15 @@ final class RemoteModel {
         work.replaceMultiplier(multiplier)
     }
 
+    /// The PRs that landed (#4758), for the Velocity page: the Mac's host's lineage alone, as
+    /// the window asks it (#4597). Nil when the host does not know the method, and the page
+    /// keeps its progress wheel.
+    func velocityHistory() async -> VelocityHistory? {
+        guard let history = try? await client.call(DaemonAPI.Method.velocityHistory, Optional<String>.none,
+                                                   returning: VelocityHistory.self) else { return nil }
+        return .merged([history])
+    }
+
     /// The achievements (#984), for the Multiplier page's badges (#4116), from the Mac's host;
     /// then heard on `achievements/changed`.
     func refreshAchievements() async {
@@ -1661,6 +1686,10 @@ final class RemoteModel {
     }
 
     func setLabels(on id: UUID, add: [String] = [], remove: [String] = []) async -> Bool {
+        await optimistic(.labels(add: add, remove: remove), on: id) { await sendLabels(on: id, add: add, remove: remove) }
+    }
+
+    private func sendLabels(on id: UUID, add: [String], remove: [String]) async -> Bool {
         do {
             let request = DaemonAPI.SetLabelsRequest(agentID: id, add: add, remove: remove)
             let agent: Agent = try await client(for: request).call(DaemonAPI.Method.agentsSetLabels, request,
@@ -2054,13 +2083,18 @@ final class RemoteModel {
     /// of the session that asked. It stays open, in Later, until it comes back.
     @discardableResult
     func deferRequest(_ request: NeedRequest, _ later: NeedRequest.Later) async -> Bool {
-        await changeRequest(request, DaemonAPI.Method.requestsDefer, later.params(id: request.id))
+        let params = later.params(id: request.id)
+        return await work.changing(request, to: request.deferring(params)) {
+            await changeRequest(request, DaemonAPI.Method.requestsDefer, params)
+        }
     }
 
     /// Bring Back Now (#4235): out of Later, to the top of Needs you.
     @discardableResult
     func undeferRequest(_ request: NeedRequest) async -> Bool {
-        await changeRequest(request, DaemonAPI.Method.requestsUndefer, DaemonAPI.RequestsUndefer(id: request.id))
+        await work.changing(request, to: request.broughtBack) {
+            await changeRequest(request, DaemonAPI.Method.requestsUndefer, DaemonAPI.RequestsUndefer(id: request.id))
+        }
     }
 
     private func changeRequest(_ request: NeedRequest, _ method: String,
@@ -2840,7 +2874,7 @@ final class RemoteModel {
         GitLendAsk.first(in: controlHosts, thisMac: nil, answered: gitAsksAnswered)
     }
 
-    /// Allow or Don’t Allow on the ask.
+    /// Approve or Deny on the ask.
     func answerGitLend(_ ask: GitLendAsk, allowed: Bool) async {
         gitAsksAnswered.insert(ask.id)
         await lendGit(host: ask.host, from: ask.from, server: ask.server, allowed: allowed)
@@ -4809,6 +4843,11 @@ final class RemoteModel {
         // Only the latest load puts its answer on screen: opening the chat and a
         // catch-up both load it, and the older answer could land last (#400).
         let load = work.beginTranscriptLoad()
+        // What was fetched for it under the pointer or beside the last one opened, at once
+        // (#4795); else this device's copy of its end, while the Mac's page is on its way (#4791).
+        if localCopy?.drawPrefetched(of: selection, load: load) != true {
+            Task { [localCopy] in await localCopy?.drawOpening(of: selection, load: load) }
+        }
         let turnsRequest = DaemonAPI.TurnsRequest.opening(selection)
         let pageSize = firstPageSize
         // Whether its host answered: with the history, or that it has no such session.
@@ -4834,7 +4873,11 @@ final class RemoteModel {
             // A chat left before its page arrived does not get that page shown under the
             // next one's name.
             guard self.selection == selection else { return }
-            work.takeOpening(opening, load: load)
+            if work.takeOpening(opening, load: load) {
+                localCopy?.opened(selection, opening)
+                // The rows either side, which are opened next (#4795).
+                prefetchNeighbours(of: selection)
+            }
             if let why = opening.turnsFailure { note("chat: turns of \(selection) did not load: \(why)") }
         } catch {
             // Said in the chat, with Try Again, where it used to stay blank without a
@@ -4849,6 +4892,47 @@ final class RemoteModel {
         // Again rather than calling the session deleted (#2743).
         guard await whole.value, answered, self.selection == selection else { return }
         lookedForSelection = selection
+    }
+
+    /// A chat's opening page from its host, as `loadTranscript` reads it, for a prefetch.
+    private func fetchOpening(_ id: UUID) async throws -> ChatOpening.Loaded {
+        let turnsRequest = DaemonAPI.TurnsRequest.opening(id)
+        return try await ChatOpening.load(
+            limit: firstPageSize,
+            turns: {
+                try await self.client(for: turnsRequest).call(DaemonAPI.Method.agentsTurns, turnsRequest,
+                                                              returning: TurnsPage.self)
+            },
+            transcript: { from, limit in
+                let request = DaemonAPI.TranscriptRequest(agentID: id, limit: limit, from: from)
+                return try await self.client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                                returning: TranscriptPage.self)
+            },
+            entry: { index in
+                let request = DaemonAPI.TranscriptRequest.entry(index, of: id)
+                return try await self.client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                                returning: TranscriptPage.self)
+            },
+            describe: Self.describeLoadFailure)
+    }
+
+    /// Fetches a chat before it is opened (#4795): the row under an iPad's pointer, and the
+    /// rows beside the open one. Not the open one, and not one whose host is not answering.
+    func prefetch(_ id: UUID) {
+        guard id != selection, let agent = work.agent(id), !isStale(agent) else { return }
+        localCopy?.prefetched.prefetch(id) { [weak self] in
+            guard let self else { throw CancellationError() }
+            return try await self.fetchOpening(id)
+        }
+    }
+
+    /// The live sessions of the open one's folder, in the order its list draws them, either
+    /// side of it.
+    private func prefetchNeighbours(of id: UUID) {
+        guard let agent = work.agent(id) else { return }
+        let key = FolderKey(host: agent.host, folder: agent.folderPath)
+        let list = AgentGroup.live.flatMap { work.agents(in: key, group: $0) }.map(\.id)
+        for neighbour in OpeningPrefetch.neighbours(of: id, in: list) { prefetch(neighbour) }
     }
 
     /// A chat's history that did not come, in words (#400).
@@ -5006,6 +5090,11 @@ final class RemoteModel {
     /// quietly dropped (FR-033). An answer that cannot be delivered is not an answer.
     @discardableResult
     func answer(_ request: PermissionRequest, optionID: String) async -> Bool {
+        // The card goes at once, and comes back if the answer did not go (#4786).
+        await work.answering(request) { await sendAnswer(request, optionID: optionID) }
+    }
+
+    private func sendAnswer(_ request: PermissionRequest, optionID: String) async -> Bool {
         let host = work.agent(request.agentID)?.host ?? .mac
         guard !isStale(on: host) else {
             problem = notAnswering(host, "that could not be sent.")
@@ -5031,6 +5120,14 @@ final class RemoteModel {
     func answer(_ request: ElicitationRequest,
                 action: DaemonAPI.AnswerElicitationRequest.Action,
                 content: [String: JSONValue] = [:], reason: String? = nil) async -> Bool {
+        // The card goes at once, and comes back if the answer did not go (#4786).
+        await work.answering(request) {
+            await sendAnswer(request, action: action, content: content, reason: reason)
+        }
+    }
+
+    private func sendAnswer(_ request: ElicitationRequest, action: DaemonAPI.AnswerElicitationRequest.Action,
+                            content: [String: JSONValue], reason: String?) async -> Bool {
         let host = work.agent(request.agentID)?.host ?? .mac
         // An empty reason is No thanks (#4039).
         let reason = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -5589,7 +5686,9 @@ final class RemoteModel {
             problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
         }
     }
-    func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
+    func unarchive(_ agentID: UUID) async {
+        await optimistic(.unarchive, on: agentID) { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
+    }
 
     /// The archived session a menu's Delete… is asking about, until it is answered (#398).
     var askingToDelete: Agent?
@@ -5608,16 +5707,20 @@ final class RemoteModel {
     /// The person's title for a session (#751), kept by its host and told to every client.
     /// Empty, the runtime names it again.
     func rename(_ agentID: UUID, to title: String) async {
-        let host = work.agent(agentID)?.host ?? .mac
-        guard !isStale(on: host) else {
-            problem = notAnswering(host, "that could not be sent.")
-            return
-        }
-        do {
-            let request = DaemonAPI.RenameRequest(agentID: agentID, title: title)
-            try await client(for: request).call(DaemonAPI.Method.agentsRename, request)
-        } catch {
-            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+        await optimistic(.rename(title), on: agentID) {
+            let host = work.agent(agentID)?.host ?? .mac
+            guard !isStale(on: host) else {
+                problem = notAnswering(host, "that could not be sent.")
+                return false
+            }
+            do {
+                let request = DaemonAPI.RenameRequest(agentID: agentID, title: title)
+                try await client(for: request).call(DaemonAPI.Method.agentsRename, request)
+                return true
+            } catch {
+                problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+                return false
+            }
         }
     }
 
@@ -5673,17 +5776,21 @@ final class RemoteModel {
 
     /// Mute Notifications, or Unmute, from the row's menu or the chat's ··· (#2003).
     func setMuted(_ agentID: UUID, _ muted: Bool) async {
-        let host = work.agent(agentID)?.host ?? .mac
-        guard !isStale(on: host) else {
-            problem = notAnswering(host, "that could not be sent.")
-            return
-        }
-        do {
-            // The mark is kept by the agent's own host, which sends no push for it.
-            let request = DaemonAPI.SetMutedRequest(agentID: agentID, muted: muted)
-            try await client(for: request).call(DaemonAPI.Method.agentsSetMuted, request)
-        } catch {
-            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+        await optimistic(.mute(muted), on: agentID) {
+            let host = work.agent(agentID)?.host ?? .mac
+            guard !isStale(on: host) else {
+                problem = notAnswering(host, "that could not be sent.")
+                return false
+            }
+            do {
+                // The mark is kept by the agent's own host, which sends no push for it.
+                let request = DaemonAPI.SetMutedRequest(agentID: agentID, muted: muted)
+                try await client(for: request).call(DaemonAPI.Method.agentsSetMuted, request)
+                return true
+            } catch {
+                problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+                return false
+            }
         }
     }
 
@@ -5698,6 +5805,22 @@ final class RemoteModel {
     @discardableResult
     private func act(_ act: AgentAct, on agentID: UUID, _ method: String,
                      _ request: some Encodable & Sendable) async -> Bool {
+        guard work.acting[agentID] == nil else { return false }
+        return await optimistic(act.write, on: agentID) { await self.sendAct(act, on: agentID, method, request) }
+    }
+
+    /// A change drawn on the agent's record at once, before its host answers (#4786):
+    /// the kit's one pending layer holds it and puts the record back when the call
+    /// fails, with one line that says what failed.
+    @discardableResult
+    private func optimistic(_ write: AgentWrite, on agentID: UUID, _ send: () async -> Bool) async -> Bool {
+        let sent = await work.optimistically(write, on: agentID, send)
+        if !sent, let said = problem { problem = write.failure(said) }
+        return sent
+    }
+
+    private func sendAct(_ act: AgentAct, on agentID: UUID, _ method: String,
+                         _ request: some Encodable & Sendable) async -> Bool {
         guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
             problem = "Your Mac is not answering, so that could not be sent."
             return false
@@ -5718,18 +5841,20 @@ final class RemoteModel {
         }
     }
 
-    private func act(_ method: String, _ agentID: UUID) async {
+    private func act(_ method: String, _ agentID: UUID) async -> Bool {
         guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
             problem = "Your Mac is not answering, so that could not be sent."
-            return
+            return false
         }
         do {
             // To the agent's own host: one on another of the control plane's hosts is not
             // the home host's to stop or archive (073).
             let request = DaemonAPI.AgentRequest(agentID: agentID)
             try await sendOnce(method, request)
+            return true
         } catch {
             problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+            return false
         }
     }
 
@@ -5799,6 +5924,12 @@ final class RemoteModel {
                 try? await Task.sleep(for: .seconds(2))
                 movingToMachine = work.agent(agent.id)
             }
+        }
+        // `-command-menu WORDS`: the ⌘K command menu open with them typed, for a walk (#4792): the
+        // walk socket sends no ⌘K. An empty string opens it with nothing typed.
+        if let words = value("-command-menu") {
+            try? await Task.sleep(for: .seconds(1))
+            commandMenu = words
         }
         // `-problem WORDS`: a failure, as an action that failed reports it, for a walk of the
         // scene's failure toast (#4739).

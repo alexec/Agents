@@ -15,7 +15,7 @@ export const fieldWords: Record<AutoField, string> = {
 const words: Record<AutoField, Record<string, string>> = {
   model: { fast: "Fast", balanced: "Balanced", smart: "Smart" },
   permission: { plan: "Plan", ask: "Ask", approveForMe: "Approve for me", bypassPermissions: "Bypass Permissions" },
-  permissionRequests: { default: "Request cards", alwaysApprove: "Yes to all" },
+  permissionRequests: { default: "Request cards", alwaysApprove: "Always Approve" },
   sandbox: { runtime: "Default sandbox", on: "Runtime sandbox", off: "No sandbox" },
 };
 
@@ -47,7 +47,7 @@ export const levelWords = (field: AutoField, level: string): string => words[fie
 export const levelMeaning = (field: AutoField, level: string): string => meanings[field][level] ?? "";
 
 export const customWords = "Custom";
-/** Bypass Permissions asks once more before it is set, as Yes to all does (#2892, #2746). */
+/** Bypass Permissions asks once more before it is set, as Always Approve does (#2892, #2746). */
 export const asksFirst = (field: AutoField, level: string): boolean => field === "permission" && level === "bypassPermissions";
 export const bypassConfirm = {
   title: "Let this agent bypass every permission?",

@@ -147,9 +147,9 @@ struct SmartFold: View {
 
 /// One request to the person under Needs You (#3864): a click opens the session that asked
 /// it, where its card takes the answer. A secret's use (#4017) has no card: its menu has Allow
-/// Once, Allow for This Session, Allow Always and Deny, Allow Once is a leading swipe and Deny a
+/// Once, Approve for This Session, Always Approve and Deny, Approve is a leading swipe and Deny a
 /// trailing one, as an approval's row has (#3763). A terminal's agents-secret (#4179) has no
-/// session to open: its menu has Allow Once, Allow for 1 Hour and Deny, and its grey line says
+/// session to open: its menu has Approve, Approve for 1 Hour and Deny, and its grey line says
 /// that Agents cannot tell a terminal from an agent outside its session.
 private struct RequestListRow: View {
     @Environment(AppModel.self) private var model
@@ -230,7 +230,7 @@ private struct LaterRows: View {
     }
 }
 
-/// A secret's use's swipes: Allow Once leading, Deny trailing.
+/// A secret's use's swipes: Approve leading, Deny trailing.
 private struct SecretUseAnswers: ViewModifier {
     @Environment(AppModel.self) private var model
     let request: NeedRequest

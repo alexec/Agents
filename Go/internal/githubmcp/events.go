@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The MCP events (#383) of CIWatcher.swift, the same names, arguments, data and eventIds,
@@ -436,7 +437,11 @@ func (s *Events) pollDiff(_ context.Context, name, key string, a args, p pollPar
 			for k, v := range st.extra {
 				data[k] = v
 			}
-			out = append(out, mcpevents.State{ID: id, Number: st.pr.Number, On: st.on, Data: data})
+			subject := prRef(a.repo, st.pr.Number)
+			if root == "issue" {
+				subject = issueRef(a.repo, st.pr.Number)
+			}
+			out = append(out, mcpevents.State{ID: id, Number: st.pr.Number, On: st.on, Data: data, Subject: subject, Key: st.key})
 		}
 		return out, err
 	})
@@ -471,7 +476,8 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 				continue
 			}
 			list = append(list, candidate{EventID: name + ":" + repo + ":" + it.ID, Time: at,
-				Data: func() (map[string]any, error) { return it.data(), nil }})
+				Data:    func() (map[string]any, error) { return it.data(), nil },
+				Subject: issueRef(repo, it.Issue.Number), Key: it.ID})
 		}
 		return list, truncated, nil
 	}
@@ -500,7 +506,8 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 				continue
 			}
 			list = append(list, candidate{EventID: name + ":" + repo + ":" + it.ID, Time: at,
-				Data: func() (map[string]any, error) { return it.data(), nil }})
+				Data:    func() (map[string]any, error) { return it.data(), nil },
+				Subject: prRef(repo, it.PR.Number), Key: it.ID})
 		}
 		return list, truncated, nil
 	}
@@ -517,7 +524,8 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 				continue
 			}
 			list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d", repo, c.ID), Time: at,
-				Data: func() (map[string]any, error) { return c.data(), nil }})
+				Data:    func() (map[string]any, error) { return c.data(), nil },
+				Subject: prRef(repo, c.PR.Number), Key: fmt.Sprint(c.ID)})
 		}
 		return list, truncated, nil
 	}
@@ -534,6 +542,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 				continue
 			}
 			list = append(list, candidate{EventID: fmt.Sprintf("pr.commented:%s:%d", repo, c.ID), Time: at,
+				Subject: prRef(repo, c.PR.Number), Key: fmt.Sprint(c.ID),
 				Data: func() (map[string]any, error) {
 					if c.Other || (a.pr != 0 && c.PR.Number != a.pr) || !(a.anyone || c.Trusted) || !a.closesOne(c.PR) || !a.byMe(c.PR, yours) {
 						return nil, nil
@@ -556,7 +565,8 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 				continue
 			}
 			list = append(list, candidate{EventID: fmt.Sprintf("pr.reviewed:%s:%d", repo, r.ID), Time: at,
-				Data: func() (map[string]any, error) { return r.data(), nil }})
+				Data:    func() (map[string]any, error) { return r.data(), nil },
+				Subject: prRef(repo, r.PR.Number), Key: fmt.Sprint(r.ID)})
 		}
 		return list, false, nil
 	}
@@ -572,7 +582,8 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 				continue
 			}
 			list = append(list, candidate{EventID: "deploy.waiting:" + repo + ":" + w.key(), Time: at,
-				Data: func() (map[string]any, error) { return w.data(), nil }})
+				Data:    func() (map[string]any, error) { return w.data(), nil },
+				Subject: runRef(repo, w.Run.Run.ID), Key: strings.TrimPrefix(w.key(), fmt.Sprint(w.Run.Run.ID)+":")})
 		}
 		return list, false, nil
 	}
@@ -588,6 +599,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 				continue
 			}
 			list = append(list, candidate{EventID: fmt.Sprintf("run.completed:%s:%d:%d", repo, r.Run.ID, r.Run.Attempt), Time: at,
+				Subject: runRef(repo, r.Run.ID), Key: fmt.Sprint(r.Run.Attempt),
 				Data: func() (map[string]any, error) {
 					if !a.anyone && !r.Trusted {
 						return nil, nil
@@ -621,6 +633,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		for _, m := range merged {
 			if at := normalized(m.MergedAt); wanted(m.PR, m.Trusted) && at != "" {
 				list = append(list, candidate{EventID: fmt.Sprintf("pr.merged:%s:%d", repo, m.PR.Number), Time: at,
+					Subject: prRef(repo, m.PR.Number),
 					Data: func() (map[string]any, error) {
 						return map[string]any{"pr": m.PR.json(), "mergedAt": m.MergedAt, "mergeSha": m.MergeSHA}, nil
 					}})
@@ -632,6 +645,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 	for _, c := range closed {
 		if at := normalized(c.ClosedAt); wanted(c.PR, c.Trusted) && at != "" {
 			list = append(list, candidate{EventID: fmt.Sprintf("pr.closed:%s:%d:%s", repo, c.PR.Number, c.ClosedAt), Time: at,
+				Subject: prRef(repo, c.PR.Number), Key: c.ClosedAt,
 				Data: func() (map[string]any, error) {
 					return map[string]any{"pr": c.PR.json(), "closedAt": c.ClosedAt}, nil
 				}})
@@ -669,7 +683,10 @@ func checkRunCandidates(ctx context.Context, gh GitHub, name string, a args, you
 		if at == "" {
 			continue
 		}
+		// The subject is the run's PR, keyed by its head commit, once its details say the PR.
+		subject, key := runRef(repo, ref.ID), fmt.Sprint(ref.Attempt)
 		list = append(list, candidate{EventID: fmt.Sprintf("%s:%s:%d:%d", name, repo, ref.ID, ref.Attempt), Time: at,
+			Envelope: func() (wire.Ref, string) { return subject, key },
 			Data: func() (map[string]any, error) {
 				if (a.pr != 0 && ref.PRNumber != 0 && ref.PRNumber != a.pr) || (yours != nil && ref.PRNumber != 0 && !yours.owns(ref.PRNumber)) {
 					return nil, nil
@@ -685,10 +702,22 @@ func checkRunCandidates(ctx context.Context, gh GitHub, name string, a args, you
 				if yours != nil && !yours.ownsPR(details.PR) || yours == nil && !a.anyone && !details.Trusted {
 					return nil, nil
 				}
+				if details.PR.Number != 0 && details.HeadSHA != "" {
+					subject, key = prRef(repo, details.PR.Number), details.HeadSHA
+				}
 				return toJSON(*details), nil
 			}})
 	}
 	return list, truncated, nil
+}
+
+// The refs of what GitHub's events happen to (#4728, spec 4724-event-bus, "A ref").
+func prRef(repo string, n int) wire.Ref { return mcpevents.Ref("github", "pr", repo, fmt.Sprint(n)) }
+func issueRef(repo string, n int) wire.Ref {
+	return mcpevents.Ref("github", "issue", repo, fmt.Sprint(n))
+}
+func runRef(repo string, id int) wire.Ref {
+	return mcpevents.Ref("github", "run", repo, fmt.Sprint(id))
 }
 
 // eventsError is a GitHub failure as the events draft's error codes.

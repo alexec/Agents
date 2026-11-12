@@ -1254,7 +1254,7 @@ func (d *Daemon) policyStart(r *wire.StartRequest, by startedBy, client *wire.Cl
 	if err != nil {
 		return "", nil, err
 	}
-	// Yes to all, the agent's own answer to permission requests, is under the ceiling too:
+	// Always Approve, the agent's own answer to permission requests, is under the ceiling too:
 	// a person who asked for it is refused; a helper, a workflow, or Auto's Approve for me
 	// cell starts asking.
 	if client != nil && *client == wire.ClientPermissionModeAlwaysApprove {
@@ -1264,7 +1264,7 @@ func (d *Daemon) policyStart(r *wire.StartRequest, by startedBy, client *wire.Cl
 				return "", nil, d.alwaysApproveRefusal()
 			}
 			client = requestCards
-			note = strings.TrimSpace(note + " It asked to answer Yes to all requests. " + orgSetBy + " " + modeWords(ceiling) + " It asks.")
+			note = strings.TrimSpace(note + " It asked to Always Approve requests. " + orgSetBy + " " + modeWords(ceiling) + " It asks.")
 		}
 	}
 	return note, client, nil

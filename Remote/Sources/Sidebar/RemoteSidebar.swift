@@ -10,7 +10,7 @@ import UIKit
 ///
 /// The rules are the Mac's own, from `SidebarFolderFold`, `SidebarSmartRow`,
 /// `SidebarOrder` and `SidebarFolds` in AgentsKitCore: the same groups, order, pins and
-/// folds, kept the same way. Usage, connectors and folder management are Mac + web (#2798); the Multiplier is first under Status (#4116). The views are this device's: on an iPad the list sits beside
+/// folds, kept the same way. Usage, connectors and folder management are Mac + web (#2798); the Multiplier is first under Status (#4116), and Velocity after it (#4758). The views are this device's: on an iPad the list sits beside
 /// what it picked; on an iPhone it is the screen the app opens on and a pick is pushed
 /// over it. Swipe actions and a long press stand in for the Mac's context menus.
 struct RemoteSidebar: View {
@@ -67,6 +67,17 @@ struct RemoteSidebar: View {
         let groups = SidebarProjects.groups(folders)
         let labels = groupLabels(groups)
         List(selection: selection) {
+            // The ⌘K command menu from the search (#4792), for a phone with no keyboard: what
+            // is typed, found in the actions, folders, issues and pull requests too.
+            if !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                Section {
+                    Button { model.commandMenu = query } label: {
+                        Label(CommandMenuWords.searchRow(query), systemImage: CommandFinder.Kind.action.symbol)
+                            .lineLimit(1)
+                    }
+                    .accessibilityHint(CommandMenuWords.label)
+                }
+            }
             // A machine asking to join as this person (#994): at the top, as it waits on
             // an answer and its code lasts ten minutes.
             let joining = model.people.open()
@@ -175,15 +186,19 @@ struct RemoteSidebar: View {
                     // The Multiplier page (#4116), first, as the window has it first under Usage.
                     MultiplierRow().accessibilityHint(MultiplierRow.help)
                         .activityIcon("multiply.circle").appText(.supporting).tag(SidebarItem.multiplier)
+                    // Velocity (#4758): the Multiplier's PRs over time, the one Usage page the
+                    // Remote has (tier Core), after the Multiplier as the window has it in Usage.
+                    HStack { Text("Velocity"); Spacer() }
+                        .accessibilityHint("The pull requests that landed, over time")
+                        .activityIcon("arrow.triangle.merge").appText(.supporting).tag(SidebarItem.velocity)
                     EventsRow().activityIcon("list.bullet.rectangle").appText(.supporting).tag(SidebarItem.events)
                     RuntimesRow().activityIcon("cpu", warns: runtimesTally.map { $0.noneWorking || $0.isLow } ?? false,
                                                tint: runtimesTally?.isLow == true ? .attention : .failure)
                         .appText(.supporting).tag(SidebarItem.runtimes)
                     // What happened last to the person's secrets and accounts (#4161), as the window's.
                     ForEach([StatusSecretsKind.secrets, .accounts], id: \.self) { kind in
-                        StatusSecretsRow(kind: kind, state: model.userScope)
-                            .activityIcon(kind.systemImage, warns: StatusSecretsWords.warns(model.userScope.statusLines(kind)),
-                                          tint: .attention)
+                        StatusSecretsRow(kind: kind, state: model.userScope) { model.work.agent($0)?.title }
+                            .activityIcon(kind.systemImage)
                             .appText(.supporting).tag(kind == .secrets ? SidebarItem.secretsStatus : .accountsStatus)
                     }
                 } header: {
@@ -615,9 +630,9 @@ private struct RemoteCheckSuggestionRow: View {
 
 /// One request to the person under Needs You (#3864), the window's `RequestListRow`: a tap
 /// opens the session that asked it, where its card takes the answer. A secret's use (#4017)
-/// has no card: Allow Once is a leading swipe, Deny a trailing one, and the long press has
+/// has no card: Approve is a leading swipe, Deny a trailing one, and the long press has
 /// all its answers, as an approval's row has. A terminal's agents-secret (#4179) has no session
-/// to open: its long press has Allow Once, Allow for 1 Hour and Deny.
+/// to open: its long press has Approve, Approve for 1 Hour and Deny.
 ///
 /// Later (#4235) is a trailing swipe, after Deny, that asks when, and a menu in the long press,
 /// with the window's choices. In Later, Bring Back Now is a leading swipe and in the long press.

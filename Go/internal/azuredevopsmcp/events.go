@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The MCP events (#2829) of an Azure DevOps repository's pull requests and their Azure
@@ -303,11 +304,22 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 				continue
 			}
 			out = append(out, mcpevents.State{ID: fmt.Sprintf("%s:%s:%d", name, a.repo, st.mr.Number), Number: st.mr.Number,
-				On: st.on, Data: map[string]any{root: st.json}})
+				On: st.on, Data: map[string]any{root: st.json}, Subject: diffRef(root, a.repo, st.mr.Number)})
 		}
 		return out, err
 	})
 }
+
+// The refs of what azuredevops's events happen to (#4728, spec 4724-event-bus, "A ref").
+func prRef(repo string, n int) wire.Ref {
+	return mcpevents.Ref("azuredevops", "pr", repo, fmt.Sprint(n))
+}
+func runRef(repo string, id int) wire.Ref {
+	return mcpevents.Ref("azuredevops", "run", repo, fmt.Sprint(id))
+}
+
+// diffRef is a state's subject: its pull request (no work item state is diffed here).
+func diffRef(_ string, repo string, n int) wire.Ref { return prRef(repo, n) }
 
 // candidates finds what an event may raise at or after since.
 func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *Yours, since string) ([]candidate, Listed, error) {
@@ -329,6 +341,7 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		for _, b := range builds {
 			if b.At != "" && (a.anyone || b.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("run.completed:%s:%d:%s", repo, b.ID, b.At), Time: b.At,
+					Subject: runRef(repo, b.ID), Key: b.At,
 					Data: func() (map[string]any, error) {
 						deploys, err := f.BuildDeploys(ctx, repo, b.ID)
 						if err != nil {
@@ -348,7 +361,8 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		for _, w := range waiting {
 			if w.Since != "" && (a.anyone || w.Build.Trusted) {
 				list = append(list, candidate{EventID: "deploy.waiting:" + repo + ":" + w.key(), Time: w.Since,
-					Data: func() (map[string]any, error) { return w.data(), nil }})
+					Data:    func() (map[string]any, error) { return w.data(), nil },
+					Subject: runRef(repo, w.Build.ID), Key: strings.TrimPrefix(w.key(), fmt.Sprint(w.Build.ID)+":")})
 			}
 		}
 		return list, Listed{}, nil
@@ -364,7 +378,8 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 			if at := normalized(c.At); at != "" && (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) &&
 				a.closesOne(m) && a.byMe(m, yours) && (a.anyone || c.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d:%d:%d", repo, c.PR.Number, c.ThreadID, c.ID), Time: at,
-					Data: func() (map[string]any, error) { return c.data(), nil }})
+					Data:    func() (map[string]any, error) { return c.data(), nil },
+					Subject: prRef(repo, c.PR.Number), Key: fmt.Sprintf("%d:%d", c.ThreadID, c.ID)})
 			}
 		}
 		return list, listed, nil
@@ -378,7 +393,8 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		for _, d := range failed {
 			if at := normalized(d.At); at != "" && wanted(d.PR, d.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("checks.failed:%s:%s:%s", repo, d.HeadSHA, at), Time: at,
-					Data: func() (map[string]any, error) { return d.json(), nil }})
+					Data:    func() (map[string]any, error) { return d.json(), nil },
+					Subject: prRef(repo, d.PR.Number), Key: d.HeadSHA + ":" + at})
 			}
 		}
 		return list, listed, nil
@@ -392,7 +408,8 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		for _, d := range passed {
 			if at := normalized(d.At); at != "" && wanted(d.PR, d.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("checks.passed:%s:%s:%s:%s", repo, d.HeadSHA, d.Key, at), Time: at,
-					Data: func() (map[string]any, error) { return d.json(), nil }})
+					Data:    func() (map[string]any, error) { return d.json(), nil },
+					Subject: prRef(repo, d.PR.Number), Key: d.HeadSHA + ":" + d.Key + ":" + at})
 			}
 		}
 		return list, listed, nil
@@ -406,6 +423,7 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		for _, m := range merged {
 			if at := normalized(m.MergedAt); wanted(m.PR, m.Trusted) && at != "" {
 				list = append(list, candidate{EventID: fmt.Sprintf("pr.merged:%s:%d", repo, m.PR.Number), Time: at,
+					Subject: prRef(repo, m.PR.Number),
 					Data: func() (map[string]any, error) {
 						return map[string]any{"pr": m.PR.json(), "mergedAt": m.MergedAt, "mergeSha": m.MergeSHA}, nil
 					}})
@@ -417,6 +435,7 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 	for _, c := range closed {
 		if at := normalized(c.ClosedAt); wanted(c.PR, c.Trusted) && at != "" {
 			list = append(list, candidate{EventID: fmt.Sprintf("pr.closed:%s:%d:%s", repo, c.PR.Number, at), Time: at,
+				Subject: prRef(repo, c.PR.Number), Key: at,
 				Data: func() (map[string]any, error) {
 					return map[string]any{"pr": c.PR.json(), "closedAt": c.ClosedAt}, nil
 				}})

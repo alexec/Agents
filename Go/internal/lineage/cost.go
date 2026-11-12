@@ -80,31 +80,32 @@ func Split(c wire.LineageCost, n int) []wire.LineageCost {
 	return out
 }
 
-// RepoOf is the repo or tracker an issue's, PR's or release's ref is in: github:alexec/agents
-// for github:alexec/agents#12 or github:alexec/agents/release/v1.2.0, gitlab:group/repo for
-// gitlab:group/repo!4, linear for linear:ENG-4. Other refs have none.
+// RepoOf is the ref of the repo or tracker an issue's, PR's or release's ref is in (#4800):
+// github:repo:#alexec/agents for github:issue:alexec/agents#12 or
+// github:release:alexec/agents#v1.2.0, linear:repo:#eng for linear:issue:eng#ENG-4. An old
+// form is read as RefOf reads it. Other refs have none.
 func RepoOf(n wire.LineageNode) string {
-	if n.Kind == KindRelease {
-		if repo, _, ok := strings.Cut(n.Ref, "/release/"); ok {
-			return repo
-		}
+	if n.Kind != KindIssue && n.Kind != KindPR && n.Kind != KindRelease {
 		return ""
 	}
-	if n.Kind != KindIssue && n.Kind != KindPR {
+	r, ok := RefOf(n)
+	if !ok {
 		return ""
 	}
-	scheme, id, _ := strings.Cut(n.Ref, ":")
-	if i := strings.LastIndexAny(id, "#!"); i > 0 {
-		return scheme + ":" + id[:i]
-	}
-	return scheme
+	return RepoNode(r).Ref
 }
 
 func blankCost() wire.LineageCost { return wire.LineageCost{Cost: map[string]float64{}} }
 
-// IsReleaseRef says a ref in a node's PartOf is a release's (#3023): .../release/<tag>. A host
-// from before #3878 sends its milestones there too, which nothing adds up now.
-func IsReleaseRef(ref string) bool { return strings.Contains(ref, "/release/") }
+// IsReleaseRef says a ref in a node's PartOf is a release's (#3023): <forge>:release:<repo>#<tag>
+// (.../release/<tag> in the old form). A host from before #3878 sends its milestones there
+// too, which nothing adds up now.
+func IsReleaseRef(ref string) bool {
+	if r, err := wire.ParseRef(ref); err == nil {
+		return r.Type == KindRelease
+	}
+	return strings.Contains(ref, "/release/")
+}
 
 // Rollup adds up of's cost from nodes, which hold each node once:
 //
@@ -154,7 +155,7 @@ func Rollup(nodes []wire.LineageCostNode, of wire.LineageNode) wire.LineageCostR
 		}
 	case KindRepo:
 		for _, n := range nodes {
-			if n.Repo != nil && *n.Repo == of.Ref {
+			if n.Repo != nil && SameRepo(*n.Repo, of.Ref) {
 				in[n.Node] = true
 			}
 		}

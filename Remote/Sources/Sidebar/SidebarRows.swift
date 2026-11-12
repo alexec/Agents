@@ -192,6 +192,8 @@ struct SidebarSessionRow: View {
         .accessibilityValue(agent.drawsUnread ? "unread" : "")
         .modifier(FoldAction(tree: tree, toggle: toggleFold))
         .tag(SidebarItem.session(agent.id))
+        // Its chat fetched while an iPad's pointer rests on it, so a tap draws it at once (#4795).
+        .prefetchesOnHover { [model, id = agent.id] in model.prefetch(id) }
         .contextMenu { AgentMenuItems(agent: agent) }
         // Out of the sidebar into a scene of its own, on an iPad (#888).
         .draggableToNewWindow(agent)
@@ -364,7 +366,7 @@ struct SidebarWorkflowRow: View {
         .accessibilityElement(children: .combine)
         // A user workflow says it is in every folder (#2759), pinned or under Needs You too.
         .accessibilityValue([!summary.isEnabled && !summary.isArchived ? "turned off" : nil, summary.scopeSentence,
-                             summary.readyMadeUpdatedSentence]
+                             summary.hoursRowSentence(), summary.readyMadeUpdatedSentence]
             .compactMap { $0 }.joined(separator: ", "))
         .tag(SidebarItem.workflow(summary.id, in: folder))
         // Pin or Unpin (#432), from the leading edge, as a session's row has it.
@@ -398,7 +400,7 @@ struct SidebarWorkflowRow: View {
                 }
                 // Not on this host, without archiving it everywhere (#391).
                 if summary.canBeDenied {
-                    Button("Deny on This Machine", systemImage: "hand.raised.slash") {
+                    Button("Deny", systemImage: "hand.raised.slash") {
                         Task { await model.denyWorkflow(summary) }
                     }
                 }
@@ -493,6 +495,8 @@ struct WorkflowMark: View {
         if !summary.isEnabled { return "pause.circle" }
         // Waiting behind a run is not something wrong (#422).
         if summary.queued > 0 { return "tray.full" }
+        // A trigger held until its hours open (#4819): waiting, not wrong, as the Mac's.
+        if summary.waitsForItsHours { return "hourglass" }
         if case .refused = summary.lastOutcome { return "exclamationmark.triangle" }
         // A bot's workflow heard here (#2027).
         if !summary.runsHere { return "ear" }

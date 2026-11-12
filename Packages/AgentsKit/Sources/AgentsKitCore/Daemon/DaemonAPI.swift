@@ -494,6 +494,8 @@ public enum DaemonAPI {
         /// and its download's size. The person's own clients only.
         public static let browserState = "browser/state"
         public static let browserClear = "browser/clear"
+        public static let browserControlState = "browserControl/state"
+        public static let browserControlSet = "browserControl/set"
         /// Secrets for this session only (#3548): Settings ▸ Secrets lists, sets and removes
         /// them on the machine that runs the session. The person's own clients only.
         public static let secretsSessionList = "secrets/sessionList"

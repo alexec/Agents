@@ -50,6 +50,8 @@ type lineageSyncFile struct {
 	Links map[string]wire.LineageLink `json:"links,omitempty"`
 	// States is the changes of state to send, oldest first.
 	States []wire.LineageStateChange `json:"states,omitempty"`
+	// Refs is the form of the refs sent: ledgerRefsFull since #4800, 0 before.
+	Refs int `json:"refs,omitempty"`
 }
 
 type lineageSyncBook struct {
@@ -91,7 +93,7 @@ func (s notingStore) End(r wire.LineageEndRequest, at time.Time) ([]wire.Lineage
 func (s notingStore) SetState(n wire.LineageNode, state wire.LineageSessionStateName, at time.Time) (bool, error) {
 	moved, err := s.Store.SetState(n, state, at)
 	if err == nil && moved {
-		s.state(wire.LineageStateChange{Node: n, State: state, At: wire.DateOf(at)})
+		s.state(wire.LineageStateChange{Node: s.Store.Canon(n), State: state, At: wire.DateOf(at)})
 	}
 	return moved, err
 }
@@ -112,7 +114,12 @@ func (d *Daemon) syncLocked() *lineageSyncFile {
 		f := &lineageSyncFile{}
 		readStore(d.lineageSyncPath(), f, "all of lineage goes to the control plane again")
 		if !f.Kept {
-			*f = lineageSyncFile{Kept: true, Full: true}
+			*f = lineageSyncFile{Kept: true, Full: true, Refs: ledgerRefsFull}
+		}
+		// Since #4800 the refs are in the full form: the control plane's copy starts again
+		// from a whole send, so a session is not two nodes there.
+		if f.Refs < ledgerRefsFull {
+			*f = lineageSyncFile{Kept: true, Full: true, Refs: ledgerRefsFull}
 		}
 		if f.Links == nil {
 			f.Links = map[string]wire.LineageLink{}

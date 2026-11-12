@@ -149,6 +149,10 @@ func TestAnIncidentIsRaisedOnceWhenItStartsAndWhenItEnds(t *testing.T) {
 	if len(events) != 1 || !reflect.DeepEqual(events[0]["data"], want) || events[0]["eventId"] != "health.incident_started:2" {
 		t.Fatalf("events: %v", events)
 	}
+	// Its envelope (#4728): the incident, and no key, as it starts once.
+	if events[0]["subject"] != "betterstack:incident:acme#2" || events[0]["key"] != nil {
+		t.Fatalf("envelope: subject %v, key %v", events[0]["subject"], events[0]["key"])
+	}
 	c.now = c.now.Add(time.Minute)
 	if events, _ = mustPoll(t, e, IncidentStarted, nil, started); len(events) != 0 {
 		t.Fatalf("raised again: %v", events)

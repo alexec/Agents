@@ -131,6 +131,10 @@ func TestMessagesAndAnswersAreRaisedWithTheirSender(t *testing.T) {
 		data["space"] != "spaces/AAA" || data["spaceType"] != "SPACE" {
 		t.Fatalf("the message: %v", first)
 	}
+	// Its envelope (#4728): the message's ref, the space as its topic, and no key.
+	if _, keyed := first["key"]; first["subject"] != "googlechat:message:spaces/aaa#x1" || keyed {
+		t.Fatalf("the message's subject and key: %v %v", first["subject"], first["key"])
+	}
 	if want := map[string]any{"channel": "googlechat", "identity": "users/111", "name": "Sam", "email": "sam@example.com"}; !reflect.DeepEqual(first["sender"], want) {
 		t.Fatalf("its sender: %v", first["sender"])
 	}
@@ -145,6 +149,9 @@ func TestMessagesAndAnswersAreRaisedWithTheirSender(t *testing.T) {
 	data = got[0]["data"].(map[string]any)
 	if data["question"] != "s-42" || data["answer"] != "yes" || data["label"] != "Yes, merge it" || data["message"] != "spaces/AAA/messages/q1" {
 		t.Fatalf("the answer: %v", got[0])
+	}
+	if got[0]["subject"] != "googlechat:message:spaces/aaa#q1" {
+		t.Fatalf("the answer's subject is its question: %v", got[0]["subject"])
 	}
 
 	// Everything pulled is acknowledged, and the answered card loses its buttons.

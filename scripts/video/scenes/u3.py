@@ -3,6 +3,7 @@ Submit, on the Mac and the phone at once."""
 GROUP = "usage"
 LAYOUT = "mac+phone"
 TITLE = "Answer a question"
+DOCS = "how-to/answer-a-question/"  # the docs page, on docs.agentloops.dev (upload.py)
 
 LINES = {
     "card": "When an agent asks you something, its card waits in the conversation, on your Mac and on your phone.",
@@ -23,7 +24,7 @@ PROMPT = "Add a hero banner to index.html. Ask me the colour first: Ocean blue, 
 
 
 def setup(v):
-    folder = v.project("landing-page", {"index.html": INDEX})
+    folder = v.add_folder("landing-page", {"index.html": INDEX})
     v.start(folder, PROMPT)
     v.wait_until(v.pending_question, timeout=120, what="the question")
     v.tidy()

@@ -67,21 +67,37 @@ export function codeKey(secret: Uint8Array): Promise<CryptoKey> {
 }
 
 /**
+ * The page's database, `agents`: store `key` (below) and, since version 2, store `copy`, the
+ * local copy of sessions and transcript ends (#4790, model/localCopy.ts). One database, so a
+ * forget, which deletes it, drops the copy with the keys.
+ */
+export function openAgentsDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("agents", 2);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      for (const name of ["key", "copy"]) if (!db.objectStoreNames.contains(name)) db.createObjectStore(name);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/** Deletes the page's database, keys and copy together; done also when it is blocked or fails. */
+export function deleteAgentsDatabase(): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const request = indexedDB.deleteDatabase("agents");
+    request.onsuccess = request.onerror = request.onblocked = () => resolve();
+  });
+}
+
+/**
  * The record in IndexedDB: database `agents`, store `key`, key `self`. The machine lock's
  * signing key is in the same store, key `lockSigning`, so a forget drops it too.
  */
 export class IndexedKeyStore implements KeyStore {
-  private open(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open("agents", 1);
-      request.onupgradeneeded = () => request.result.createObjectStore("key");
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
   private async run<T>(mode: IDBTransactionMode, act: (store: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-    const db = await this.open();
+    const db = await openAgentsDatabase();
     try {
       return await new Promise<T>((resolve, reject) => {
         const tx = db.transaction("key", mode);
@@ -127,10 +143,7 @@ export class IndexedKeyStore implements KeyStore {
   }
 
   async forget(): Promise<void> {
-    await new Promise<void>((resolve) => {
-      const request = indexedDB.deleteDatabase("agents");
-      request.onsuccess = request.onerror = request.onblocked = () => resolve();
-    });
+    await deleteAgentsDatabase();
   }
 }
 

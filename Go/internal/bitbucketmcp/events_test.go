@@ -128,8 +128,11 @@ func TestMergedAndDeclinedAtTheirActivitysTime(t *testing.T) {
 	})
 	ids, result := merged.poll()
 	same(t, ids, []string{"pr.merged:acme/app:2"})
+	if sub, key := envelopeOf(result, 0); sub != "bitbucket:pr:acme/app#2" || key != "" {
+		t.Fatalf("merged: subject %q, key %q", sub, key)
+	}
 	same(t, data(t, result, 0)["mergeSha"], "m2")
-	ids, _ = closed.poll()
+	ids, result = closed.poll()
 	if len(ids) != 1 || !strings.HasPrefix(ids[0], "pr.closed:acme/app:3:") {
 		t.Fatalf("closed: %v", ids)
 	}
@@ -137,6 +140,9 @@ func TestMergedAndDeclinedAtTheirActivitysTime(t *testing.T) {
 	f.set(func() { f.pulls[1]["updated_on"] = at(3) })
 	ids, _ = merged.poll()
 	same(t, ids, []string(nil))
+	if sub, key := envelopeOf(result, 0); !strings.HasSuffix(sub, "#3") || key == "" {
+		t.Fatalf("closed: subject %q, key %q (#4728: a PR closed again is a new event)", sub, key)
+	}
 }
 
 func TestChecksFailedForAPullRequestsHead(t *testing.T) {
@@ -447,4 +453,12 @@ func TestIssueTakesAList(t *testing.T) {
 	same(t, ids, []string{"issue.closed:acme/app:3:" + timeString(start.Add(60e9))})
 	ids, _ = notListed.poll()
 	same(t, ids, []string(nil))
+}
+
+// envelopeOf is a polled event's subject and key (#4728).
+func envelopeOf(result map[string]any, i int) (subject, key string) {
+	e := result["events"].([]any)[i].(map[string]any)
+	subject, _ = e["subject"].(string)
+	key, _ = e["key"].(string)
+	return subject, key
 }

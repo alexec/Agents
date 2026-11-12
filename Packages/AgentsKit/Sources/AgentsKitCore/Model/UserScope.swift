@@ -6,7 +6,16 @@ import Foundation
 public extension DaemonAPI {
     /// A part of the user settings. Each keeps the shape its file has on a machine.
     enum UserSettingsPartName: String, Codable, Sendable, Hashable, CaseIterable {
-        case mcpServers, agentConfig, runtimes, costLimits, notifications, accounts
+        case mcpServers, agentConfig, runtimes, costLimits, notifications, accounts, timeZone
+    }
+
+    /// The timeZone part (#4818): the person's time zone, which their Mac sets from its own
+    /// clock. A workflow's `hours:` with no `time-zone:` go by it, on every machine.
+    struct UserTimeZone: Codable, Sendable, Hashable {
+        /// An IANA name, as `TimeZone.identifier` says it: `Europe/London`.
+        public var identifier: String
+
+        public init(identifier: String) { self.identifier = identifier }
     }
 
     /// The agentConfig part: the person's own instructions, personas and skills.
@@ -54,10 +63,14 @@ public extension DaemonAPI {
         public var notifications: JSONValue?
         /// The person's outside accounts (#3967), as an `OutsideAccounts`.
         public var accounts: JSONValue?
+        /// The person's time zone (#4818), as a `UserTimeZone`.
+        public var timeZone: JSONValue?
         public var updated: String?
 
         public init(mcpServers: JSONValue? = nil, agentConfig: JSONValue? = nil, agentConfigFiles: AgentConfigFiles? = nil, runtimes: JSONValue? = nil,
-                    costLimits: JSONValue? = nil, notifications: JSONValue? = nil, accounts: JSONValue? = nil, updated: String? = nil) {
+                    costLimits: JSONValue? = nil, notifications: JSONValue? = nil, accounts: JSONValue? = nil, timeZone: JSONValue? = nil,
+                    updated: String? = nil) {
+            self.timeZone = timeZone
             self.mcpServers = mcpServers
             self.agentConfig = agentConfig
             self.agentConfigFiles = agentConfigFiles
@@ -76,6 +89,7 @@ public extension DaemonAPI {
             case .costLimits: costLimits
             case .notifications: notifications
             case .accounts: accounts
+            case .timeZone: timeZone
             }
         }
     }
@@ -131,14 +145,17 @@ public extension DaemonAPI {
         }
     }
 
-    /// An account's newest operation (#4157): `read`, `added` or `edited`, and when.
+    /// An account's newest operation (#4157): `read`, `added` or `edited`, when, and the session that did it.
     struct AccountLastOp: Codable, Sendable, Hashable {
         public var what: String
         public var at: Date
+        /// The session that did it; nil when no session did.
+        public var agent: UUID?
 
-        public init(what: String, at: Date) {
+        public init(what: String, at: Date, agent: UUID? = nil) {
             self.what = what
             self.at = at
+            self.agent = agent
         }
     }
 
@@ -199,15 +216,18 @@ public extension DaemonAPI {
         public var at: String
     }
 
-    /// A secret's last operation (#4158): what it was and when. No session, no place, no value.
+    /// A secret's last operation (#4158): what it was, when, and the session that did it. No place, no value.
     struct SecretLastOp: Codable, Sendable, Hashable {
         /// `read`, `denied`, `added`, `replaced` or `removed`.
         public var what: String
         public var at: Date
+        /// The session that did it; nil for a change no session made.
+        public var agent: UUID?
 
-        public init(what: String, at: Date) {
+        public init(what: String, at: Date, agent: UUID? = nil) {
             self.what = what
             self.at = at
+            self.agent = agent
         }
     }
 

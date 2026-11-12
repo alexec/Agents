@@ -176,6 +176,19 @@ func (r *reader) sequence(indent int) ([]Node, error) {
 					return nil, err
 				}
 				pairs[key] = n
+				// `- type: pr.merged` with more keys under it, in line with type (#4730).
+				if next, ok := r.current(); ok && next.indent == indent+2 && !isDash(next.text) {
+					more, err := r.mapping(indent + 2)
+					if err != nil {
+						return nil, err
+					}
+					for k, v := range more {
+						if _, dup := pairs[k]; dup {
+							return nil, fail("Line %d: \"%s\" is given twice", next.number, k)
+						}
+						pairs[k] = v
+					}
+				}
 			}
 			items = append(items, Node{Mapping: pairs})
 		default:

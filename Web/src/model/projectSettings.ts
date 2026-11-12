@@ -60,7 +60,7 @@ export function writtenIn(path: string, machine: string): string {
 
 export const helperDefaults = { running: 3, notArchived: 5, queued: 5, agentsMayArchive: true, archiveWhenMerged: true } as const;
 /** DiskThresholds' defaults: each line a percent of the disk, so one setting fits a laptop and a server. */
-export const diskDefaults = { lowPercent: 20, criticalPercent: 1, lowChoices: [5, 10, 20, 30, 50], criticalChoices: [1, 2, 5, 10] } as const;
+export const diskDefaults = { lowPercent: 10, criticalPercent: 1, lowChoices: [5, 10, 20, 30, 50], criticalChoices: [1, 2, 5, 10] } as const;
 
 /** Under the Helpers line: HelperLimitWords.helpersNote, the window's words. */
 export const helpersNote = "Set in Agents ▸ Policy, or for this project in Policy. Running counts sessions in a turn: "

@@ -239,7 +239,14 @@ func (s *Events) candidates(ctx context.Context, e event, a args, since string) 
 		if at == "" {
 			continue
 		}
-		list = append(list, candidate{EventID: e.Name + ":" + it.ID, Time: at, Data: mcpevents.Data(it.data())})
+		// The work item is the subject; opened happens once to it, the rest are keyed by
+		// the comment's, tag's or update's own id (#4728).
+		key := ""
+		if it.Kind != Opened {
+			key = it.ID
+		}
+		list = append(list, candidate{EventID: e.Name + ":" + it.ID, Time: at, Data: mcpevents.Data(it.data()),
+			Subject: mcpevents.Ref("azureboards", "issue", it.Project, itoa(w.ID)), Key: key})
 	}
 	return list, truncated, nil
 }

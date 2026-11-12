@@ -263,6 +263,19 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 	if err != nil {
 		return report, err
 	}
+	// The bus log past its last busLogKept envelopes (#4729), counted with them too. Its own
+	// bound: a busy bus can add more than a sweep's in an hour.
+	busOld, err := sweepBus(ctx, s, busLogKept, busLogKept/10)
+	report.usage += busOld
+	if err != nil {
+		return report, err
+	}
+	// Producer leases that ended a day ago (#4731).
+	leases, err := sweepBusLeases(ctx, s, now, left-report.usage)
+	report.usage += leases
+	if err != nil {
+		return report, err
+	}
 	// The merged copy of lineage (#4275): old links and states, and a removed machine's.
 	graph, err := sweepLineageGraph(ctx, s, rs, now, left-report.usage)
 	report.usage += graph

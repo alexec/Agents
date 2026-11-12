@@ -109,7 +109,7 @@ func (d *Daemon) postOverrunNotices(told []overrunNotice) {
 // the store and not archived.
 func (d *Daemon) overrunAgent(sessions []string) (wire.UUID, bool) {
 	for _, ref := range sessions {
-		id, ok := strings.CutPrefix(ref, "session:")
+		id, ok := lineage.SessionID(ref)
 		if !ok {
 			continue
 		}

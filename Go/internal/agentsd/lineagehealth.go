@@ -91,7 +91,7 @@ func incidentOf(e wire.Event) (incidentPayload, wire.LineageNode, bool) {
 		json.Unmarshal([]byte(e.Details["payload"]), &p) != nil || p.Incident.ID == "" {
 		return p, wire.LineageNode{}, false
 	}
-	return p, wire.LineageNode{Kind: lineage.KindHealth, Ref: "betterstack:" + p.Incident.ID}, true
+	return p, lineage.NodeOf(lineage.KindHealth, wire.Ref{Provider: "betterstack", Type: "incident", ID: p.Incident.ID}), true
 }
 
 // healthNode is the health node a health.* event names, from any health source.
@@ -110,14 +110,14 @@ func healthOf(e wire.Event) (healthPayload, wire.LineageNode, bool) {
 		json.Unmarshal([]byte(e.Details["payload"]), &p) != nil || p.Org == "" || p.Issue.ID == "" {
 		return p, wire.LineageNode{}, false
 	}
-	return p, wire.LineageNode{Kind: lineage.KindHealth, Ref: "sentry:" + p.Org + "/" + p.Issue.ID}, true
+	return p, lineage.NodeOf(lineage.KindHealth, wire.Ref{Provider: "sentry", Type: "issue", Topic: strings.ToLower(p.Org), ID: p.Issue.ID}), true
 }
 
 // lineageHealthStarted links health started session, for the session a health.* event's
 // workflow run started.
 func (d *Daemon) lineageHealthStarted(e wire.Event, session wire.UUID) {
 	if health, ok := healthNode(e); ok {
-		d.lineageDo(func() { d.link(health, sessionNode(session), lineage.RelStarted, lineage.SourceHelper) })
+		d.lineageDo(func() { d.link(health, d.sessionNode(session), lineage.RelStarted, lineage.SourceHelper) })
 	}
 }
 
@@ -161,7 +161,7 @@ func (d *Daemon) lineageHealthEvent(e wire.Event) {
 			d.linkAt(health, release, lineage.RelSeenIn, lineage.SourceHealth, at)
 		}
 		if pkg != "" && build != "" {
-			deploy := wire.LineageNode{Kind: kindDeploy, Ref: "testflight:" + pkg + "/" + build}
+			deploy := lineage.Full(wire.LineageNode{Kind: kindDeploy, Ref: "testflight:" + pkg + "/" + build}, "")
 			if d.lineageKnows(deploy) {
 				d.linkAt(health, deploy, lineage.RelSeenIn, lineage.SourceHealth, at)
 			}

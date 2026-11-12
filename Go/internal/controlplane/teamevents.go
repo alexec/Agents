@@ -186,7 +186,20 @@ func (s *Service) serverEventChecked(ctx context.Context, in wire.Event) (wire.E
 		details["sender_user"], details["sender_name"] = link.User, name
 		sentence += " from " + name
 	}
-	return wire.Event{Name: in.Name, At: in.At, Sentence: sentence, Details: details, Consequences: []wire.Consequence{}}, nil
+	out := wire.Event{Name: in.Name, At: in.At, Sentence: sentence, Details: details, Consequences: []wire.Consequence{}}
+	keepEnvelope(&out, in)
+	return out, nil
+}
+
+// keepEnvelope keeps a server's event's envelope (#4728) as the machine that heard it sent
+// it: its id, type, provider, topic, subject, source, time, producer and data. A type that is
+// not the event's name, or a subject that is not a ref, is dropped with the rest of it.
+func keepEnvelope(out *wire.Event, in wire.Event) {
+	if in.ID == nil || in.Type == nil || *in.Type != in.Name || in.Subject != nil && in.Subject.Check() != nil {
+		return
+	}
+	out.Specversion, out.ID, out.Type, out.Provider, out.Topic = in.Specversion, in.ID, in.Type, in.Provider, in.Topic
+	out.Subject, out.Source, out.Time, out.Producer, out.Data = in.Subject, in.Source, in.Time, in.Producer, in.Data
 }
 
 // sendTrigger asks the bot's online machines held here, in turn, to run a trigger, until

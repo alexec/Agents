@@ -39,6 +39,8 @@ func TestMain(m *testing.M) {
 	}
 	// A test's writes are not synced to the disk: on a Mac each sync costs about 4 ms (#4709).
 	store.SyncWrites = false
+	// The browser and the screen do not ask in a test unless it says so (askDrive, #4264).
+	askDriveByDefault = false
 	// The sealed-secret tests are the Mac's path on every system; a test of the Linux release
 	// layer turns it on for its daemon (releaseOn).
 	releaseLayerHere = false
@@ -52,6 +54,8 @@ func TestMain(m *testing.M) {
 	parentLookup = func(context.Context, string, forgeRepo, int) (issueOnForge, error) {
 		return issueOnForge{}, errNoForgeInTests
 	}
+	// Nor for a merged PR's files (#4552): a test sets prFactsLookup.
+	prFactsAsk = func(context.Context, string, forgeRepo, int) (prFacts, error) { return prFacts{}, errNoForgeInTests }
 	// Nor erases a deleted agent's runtime copy (#1001): that starts the runtime.
 	erasing = false
 	// Nor asks a runtime its version (#3674): that starts the runtime too.

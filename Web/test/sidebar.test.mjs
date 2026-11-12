@@ -731,7 +731,7 @@ test("a waiting deploy is approved or rejected, and its row says Deploy (#3587)"
   const { actionWord, approvalLine, opensItsSubject, isSessionApproval } = await load("src/model/approvals.ts");
   const deploy = approval("deploy", "o/r/77", { line: "v0.17.0 waits for your approval", actions: ["approve", "deny"] });
   assert.equal(actionWord("deploy", "approve"), "Approve");
-  assert.equal(actionWord("deploy", "deny"), "Reject");
+  assert.equal(actionWord("deploy", "deny"), "Deny");
   assert.equal(approvalLine(deploy), "Deploy · v0.17.0 waits for your approval");
   assert.equal(opensItsSubject(deploy), false);
   assert.equal(isSessionApproval(deploy), false);

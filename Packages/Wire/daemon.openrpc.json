@@ -44,7 +44,7 @@
     {
       "name": "host.secret-grants/1",
       "by": "host",
-      "description": "A use of a secret with Ask before use (fill_secret, set_ci_secret) waits on a person's approval (#4015): a request of kind approve, answered Allow once, Allow for this session, Allow always or Deny by the control and device roles. secrets/grants, secrets/addGrant and secrets/removeGrant keep the Allow always places."
+      "description": "A use of a secret with Ask before use (fill_secret, set_ci_secret) waits on a person's approval (#4015): a request of kind approve, answered Approve, Approve for This Session, Always Approve or Deny by the control and device roles. secrets/grants, secrets/addGrant and secrets/removeGrant keep the Always Approve places."
     },
     {
       "name": "host.session-secrets/1",
@@ -54,7 +54,12 @@
     {
       "name": "host.desktop-control/1",
       "by": "host",
-      "description": "The host serves the app tool drive_screen (#3004, US1): an agent drives an app on this Mac through its own screen, mouse and keyboard, holding the screen lease while it does, only while the person has turned desktop control on (desktopControl/state, desktopControl/set; Off by default). Mac only."
+      "description": "The host serves the app tool drive_screen (#3004, US1): an agent drives an app on this Mac through its own screen, mouse and keyboard, holding the screen lease while it does, only while the person has turned desktop control on (desktopControl/state, desktopControl/set): Ask, the default on a machine a person uses, asks a person before each lease of the screen (#4264). Mac only."
+    },
+    {
+      "name": "host.drive-approval/1",
+      "by": "host",
+      "description": "Browser and Desktop control are Ask, Always Approve or Off (#4264): with Ask, an agent's lease of the browser or the screen waits on a request of kind approve (secretUse, use browser or screen), answered Approve (this lease), Approve for This Session, Always Approve (the setting) or Deny. browserControl/state and browserControl/set are the browser's; desktopControl's settings carry mode."
     },
     {
       "name": "host.org-routes/2",
@@ -2115,6 +2120,58 @@
       }
     },
     {
+      "name": "browserControl/set",
+      "x-capability": "host.drive-approval/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Set the browser for this machine: Ask, Always Approve or Off (#4264). Refused notPermitted from any caller but the person's own clients: never an agent, an MCP tool or a workflow.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BrowserControlSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BrowserControlSettings"
+        }
+      }
+    },
+    {
+      "name": "browserControl/state",
+      "x-capability": "host.drive-approval/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The browser for this machine (#4264): when never set, Ask on a machine a person uses and Always Approve on one only agents use.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BrowserControlSettings"
+        }
+      }
+    },
+    {
       "name": "capacity/changed",
       "x-capability": "capacity/1",
       "description": "The machine's capacity level moved (#4748): its rows say Near capacity or At capacity, as a low disk.",
@@ -3187,7 +3244,7 @@
           "name": "web"
         }
       ],
-      "description": "Turn desktop control on or off for this Mac (#3004, FR-004). Refused notPermitted from any caller but the person's own clients: never an agent, an MCP tool or a workflow.",
+      "description": "Set desktop control for this Mac: Ask, Always Approve or Off (#3004, FR-004, #4264). Refused notPermitted from any caller but the person's own clients: never an agent, an MCP tool or a workflow.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3213,7 +3270,7 @@
           "name": "web"
         }
       ],
-      "description": "Whether desktop control is on for this Mac (#3004). Off when never set.",
+      "description": "Desktop control for this Mac (#3004, #4264): when never set, Ask on a machine a person uses and Always Approve on one only agents use.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -7569,8 +7626,8 @@
     },
     {
       "name": "providers/ssh",
-      "x-capability": "providers.carry/1",
-      "description": "Asked by the control plane on channel 0 (#3398): start a codespace's agentsd over ssh, or read its host key, with the token of the codespaces provider carried here.",
+      "x-capability": "providers.carry/2",
+      "description": "Asked by the control plane on channel 0 (#3398): start a codespace's agentsd over ssh, read its host key, install Agents in it, or keep it awake while its machine works (keepAwake and letSleep, #4637: providers.carry/2), with the token of the codespaces provider carried here.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -8832,7 +8889,7 @@
     {
       "name": "secrets/terminalValue",
       "x-capability": "host.secret-terminal/1",
-      "description": "agents-secret NAME with no session's grant, such as from a terminal (#4179): the value of this machine's secret with Ask before use off, once a person allowed it. A call with no allow opens a Needs you request (secretUse, use terminal) and is held up to 45 seconds on it; while it stays open the answer names it, and the same call again waits on the same request. Allow for 1 Hour is kept in agentsd's memory only. A secret with Ask before use is refused. Any process of this machine's account may call it on daemon.sock: agentsd cannot tell a terminal from an agent that dropped its grant, which the request's words say.",
+      "description": "agents-secret NAME with no session's grant, such as from a terminal (#4179): the value of this machine's secret with Ask before use off, once a person allowed it. A call with no allow opens a Needs you request (secretUse, use terminal) and is held up to 45 seconds on it; while it stays open the answer names it, and the same call again waits on the same request. Approve for 1 Hour is kept in agentsd's memory only. A secret with Ask before use is refused. Any process of this machine's account may call it on daemon.sock: agentsd cannot tell a terminal from an agent that dropped its grant, which the request's words say.",
       "paramStructure": "by-name",
       "params": [
         {

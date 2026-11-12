@@ -228,7 +228,7 @@ func (d *Daemon) setClientPermissions(in wire.ClientPermissionSettings) (wire.Cl
 }
 
 // clientPermissionsState is clientPermissions/state: the saved choices, and who turned
-// Always-approve off when the organisation's policy does, as sandboxState says it.
+// Always Approve off when the organisation's policy does, as sandboxState says it.
 func (d *Daemon) clientPermissionsState() wire.ClientPermissionSettings {
 	s := d.clientPermissions()
 	if ceiling, _, ok := d.alwaysApproveCeiling(); ok {
@@ -238,7 +238,7 @@ func (d *Daemon) clientPermissionsState() wire.ClientPermissionSettings {
 }
 
 // alwaysApproveCeiling is the policy's mode ceiling when it ranks below approving every
-// request, which Always-approve does.
+// request, which Always Approve does.
 func (d *Daemon) alwaysApproveCeiling() (string, int, bool) {
 	ceiling, rank, ok := modeCeiling(d.orgPolicy())
 	if !ok || !approvesAll("on", rank) {
@@ -247,7 +247,7 @@ func (d *Daemon) alwaysApproveCeiling() (string, int, bool) {
 	return ceiling, rank, true
 }
 
-// alwaysApproveRefusal is why the policy does not allow Always-approve, by your layer's
+// alwaysApproveRefusal is why the policy does not allow Always Approve, by your layer's
 // permissionRequests rule (#2957, FR-002: tighter is Ask me) or the organisation's mode
 // ceiling, or nil.
 func (d *Daemon) alwaysApproveRefusal() error {
@@ -260,7 +260,7 @@ func (d *Daemon) alwaysApproveRefusal() error {
 	return nil
 }
 
-// agentAlwaysApproves is the agent's own Yes to all, else the person's in Settings (#2658,
+// agentAlwaysApproves is the agent's own Always Approve, else the person's in Settings (#2658,
 // FR-019).
 // Under a policy's mode ceiling below approving every request, neither answers (#2307
 // does the same for Copilot's). A helper or a workflow's agent follows its own choice
@@ -281,7 +281,7 @@ func (d *Daemon) agentAlwaysApproves(a *wire.Agent) bool {
 	return d.alwaysApproves(a.RuntimeID)
 }
 
-// alwaysApproves is the person's Always-approve for Cursor, Grok and OpenCode (061).
+// alwaysApproves is the person's Always Approve for Cursor, Grok and OpenCode (061).
 func (d *Daemon) alwaysApproves(runtimeID string) bool {
 	s := d.clientPermissions()
 	var mode wire.ClientPermissionMode
@@ -331,8 +331,8 @@ const gigabyte = 1_000_000_000
 // fits a 256 GB laptop and a 4 TB server alike.
 type diskThresholds struct{ lowPercent, criticalPercent float64 }
 
-// defaultDiskThresholds is DiskThresholds' defaults: low below 20%, critical below 1%.
-var defaultDiskThresholds = diskThresholds{20, 1}
+// defaultDiskThresholds is DiskThresholds' defaults: low below 10%, critical below 1% (#4699).
+var defaultDiskThresholds = diskThresholds{10, 1}
 
 func (t diskThresholds) lowLine(total int64) int64 { return int64(float64(total) / 100 * t.lowPercent) }
 func (t diskThresholds) criticalLine(total int64) int64 {

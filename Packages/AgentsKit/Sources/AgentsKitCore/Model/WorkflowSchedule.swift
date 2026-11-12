@@ -32,8 +32,13 @@ public enum Weekday: String, Codable, Hashable, Sendable, CaseIterable {
 public struct WorkflowSchedule: Codable, Hashable, Sendable {
     /// Which minutes of the hour. A subset of `{0, 30}`, enforced where it is parsed.
     public var minutes: Set<Int>
-    /// The hours of the day it may run in, inclusive at both ends.
-    public var hours: ClosedRange<Int>
+    /// The first and the last hour of the day it may run in, inclusive at both ends. The
+    /// first is after the last when `between:` goes past midnight (#4818), `22:00-02:00`:
+    /// the hours after midnight then belong to the day before, so `days: [fri]` runs on
+    /// Friday night into Saturday. Two numbers rather than a `ClosedRange`, which cannot
+    /// hold a range that wraps and refuses to decode one.
+    public var firstHour: Int
+    public var lastHour: Int
     /// Where in its first hour the range begins, and where in its last it ends: `0` or
     /// `30`. What makes `between: 09:00-18:00` stop at six rather than at half past,
     /// and `09:30-17:00` start at half past nine rather than at nine. The defaults are
@@ -49,11 +54,43 @@ public struct WorkflowSchedule: Codable, Hashable, Sendable {
     public init(minutes: Set<Int> = [0], hours: ClosedRange<Int> = 0...23,
                 startMinute: Int = 0, endMinute: Int = 30,
                 days: Set<Weekday> = Weekday.everyDay) {
+        self.init(minutes: minutes, firstHour: hours.lowerBound, lastHour: hours.upperBound,
+                  startMinute: startMinute, endMinute: endMinute, days: days)
+    }
+
+    /// One whose range can go past midnight: `firstHour` after `lastHour`.
+    public init(minutes: Set<Int> = [0], firstHour: Int, lastHour: Int,
+                startMinute: Int = 0, endMinute: Int = 30,
+                days: Set<Weekday> = Weekday.everyDay) {
         self.minutes = minutes
-        self.hours = hours
+        self.firstHour = firstHour
+        self.lastHour = lastHour
         self.startMinute = startMinute
         self.endMinute = endMinute
         self.days = days
+    }
+
+    private enum CodingKeys: String, CodingKey { case minutes, hours, startMinute, endMinute, days }
+
+    /// `hours` is `[first, last]` on the wire, as it always was.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let hours = try c.decode([Int].self, forKey: .hours)
+        guard hours.count == 2 else {
+            throw DecodingError.dataCorruptedError(forKey: .hours, in: c, debugDescription: "hours is not [first, last]")
+        }
+        self.init(minutes: try c.decode(Set<Int>.self, forKey: .minutes), firstHour: hours[0], lastHour: hours[1],
+                  startMinute: try c.decode(Int.self, forKey: .startMinute), endMinute: try c.decode(Int.self, forKey: .endMinute),
+                  days: try c.decode(Set<Weekday>.self, forKey: .days))
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(minutes, forKey: .minutes)
+        try c.encode([firstHour, lastHour], forKey: .hours)
+        try c.encode(startMinute, forKey: .startMinute)
+        try c.encode(endMinute, forKey: .endMinute)
+        try c.encode(days, forKey: .days)
     }
 
     /// Whether a given moment is one this schedule names.
@@ -64,10 +101,13 @@ public struct WorkflowSchedule: Codable, Hashable, Sendable {
         let parts = calendar.dateComponents([.hour, .minute, .weekday], from: date)
         guard let hour = parts.hour, let minute = parts.minute,
               let weekday = parts.weekday.flatMap(Weekday.init(calendarValue:)) else { return false }
-        guard minutes.contains(minute), hours.contains(hour), days.contains(weekday) else { return false }
-        if hour == hours.lowerBound, minute < startMinute { return false }
-        if hour == hours.upperBound, minute > endMinute { return false }
-        return true
+        guard minutes.contains(minute) else { return false }
+        let x = hour * 60 + minute, lo = firstHour * 60 + startMinute, hi = lastHour * 60 + endMinute
+        if lo <= hi { return x >= lo && x <= hi && days.contains(weekday) }
+        // Past midnight (#4818): the part after midnight is the day before's.
+        if x >= lo { return days.contains(weekday) }
+        let dayBefore = Weekday(calendarValue: (weekday.calendarValue + 5) % 7 + 1) ?? weekday
+        return x <= hi && days.contains(dayBefore)
     }
 
     /// The next moment at or after `date` that this schedule names, or nil when it names
@@ -78,7 +118,7 @@ public struct WorkflowSchedule: Codable, Hashable, Sendable {
     /// arithmetic is where daylight saving hides: on the morning the clocks go forward
     /// there is no 1:30am, and `Calendar` is the only thing that knows it.
     public func nextDue(after date: Date, calendar: Calendar = .current) -> Date? {
-        guard !minutes.isEmpty, !days.isEmpty, !hours.isEmpty else { return nil }
+        guard !minutes.isEmpty, !days.isEmpty else { return nil }
 
         // Start at the boundary after `date`, so a schedule due exactly now is the
         // caller's to have already fired rather than one this hands back again.
@@ -117,14 +157,14 @@ public struct WorkflowSchedule: Codable, Hashable, Sendable {
             let ordered = Weekday.allCases.filter(days.contains).map(\.rawValue.capitalized)
             dayPart = ordered.joined(separator: ", ")
         }
-        if hours == 0...23 { return "\(dayPart) \(when)" }
-        if hours.lowerBound == hours.upperBound, minutes.count == 1, let minute = minutes.first {
-            return "\(dayPart) at \(Self.clock(hours.lowerBound, minute))"
+        if firstHour == 0, lastHour == 23 { return "\(dayPart) \(when)" }
+        if firstHour == lastHour, minutes.count == 1, let minute = minutes.first {
+            return "\(dayPart) at \(Self.clock(firstHour, minute))"
         }
         // The end as a time it can actually run at: a range ending on the half hour
         // says so only when the schedule runs on the half hour.
         let end = endMinute == 30 && minutes.contains(30) ? 30 : 0
-        return "\(dayPart) \(when) between \(Self.clock(hours.lowerBound, startMinute)) and \(Self.clock(hours.upperBound, end))"
+        return "\(dayPart) \(when) between \(Self.clock(firstHour, startMinute)) and \(Self.clock(lastHour, end))"
     }
 
     /// A time of day the way somebody would say it, not the way a file writes it.

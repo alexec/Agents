@@ -31,10 +31,12 @@ func (d *Daemon) estimateNode(caller wire.UUID, issue string) (wire.LineageNode,
 	if issue == "" {
 		return wire.LineageNode{}, Invalid("Nothing estimated: give the issue or epic, such as #12, in issue.")
 	}
-	for _, forge := range []string{"github:", "gitlab:", "linear:", "jira:", "azureboards:"} {
-		if strings.HasPrefix(issue, forge) {
-			return wire.LineageNode{Kind: lineage.KindIssue, Ref: issue}, nil
+	if r, ok := lineage.RefOfText(issue); ok && (r.Type == "issue" || r.Type == "pr" || r.Type == "mr") {
+		kind := lineage.KindIssue
+		if r.Type != "issue" {
+			kind = lineage.KindPR
 		}
+		return lineage.NodeOf(kind, r), nil
 	}
 	m := issueNumberRef.FindStringSubmatch(issue)
 	if m == nil {

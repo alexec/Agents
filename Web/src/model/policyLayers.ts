@@ -356,7 +356,7 @@ export function askRefusal(error: unknown): string | undefined {
 
 // A waiting change to a folder's .agents/policy.json (#2957, T058, frame D): the guarded-change card's words.
 
-/** The card's three answers: Allow keeps the change, Keep <was> undoes it, Show Change reviews it. */
+/** The card's three answers: Approve keeps the change, Keep <was> undoes it, Show Change reviews it. */
 export function policyChangeButtons(policy: GuardedChangePolicy): { allow: string; undo: string; review: string } {
-  return { allow: "Allow", undo: policy.was ? `Keep ${policy.was}` : "Keep Old Rules", review: "Show Change" };
+  return { allow: "Approve", undo: policy.was ? `Keep ${policy.was}` : "Keep Old Rules", review: "Show Change" };
 }

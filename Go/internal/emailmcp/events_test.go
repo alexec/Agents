@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -55,6 +56,13 @@ func TestReceivedStartsFromNowAndFilters(t *testing.T) {
 	if data["subject"] != "Your sign-in code" || data["folder"] != "INBOX" || data["date"] != "2026-10-20T09:30:00Z" ||
 		first["name"] != EventName || first["eventId"] != EventName+":"+data["id"].(string) {
 		t.Fatalf("event: %v", first)
+	}
+	// Its envelope (#4728): the mail's ref under the mailbox, and no key, as a mail comes once.
+	if subject, _ := first["subject"].(string); !strings.HasPrefix(subject, "email:message:"+fakeUser+"#") || len(subject) == len("email:message:"+fakeUser+"#") {
+		t.Fatalf("the mail's subject: %v", first["subject"])
+	}
+	if _, keyed := first["key"]; keyed {
+		t.Fatalf("a mail has a key: %v", first["key"])
 	}
 	for _, key := range []string{"body", "text"} {
 		if _, ok := data[key]; ok {

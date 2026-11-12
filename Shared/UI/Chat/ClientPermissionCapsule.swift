@@ -4,8 +4,8 @@ import SwiftUI
 /// One agent's answer to permission requests, for runtimes whose requests the app answers
 /// (Cursor, Grok, OpenCode): its own choice, else the one Settings gives (#2658, FR-019).
 ///
-/// It says its value alone, **Request cards** or **Yes to all**, as every pill does (#2658);
-/// the menu's header names the field. Yes to all answers every request, so it asks once
+/// It says its value alone, **Request cards** or **Always Approve**, as every pill does (#2658);
+/// the menu's header names the field. Always Approve answers every request, so it asks once
 /// more before it is set (#2746).
 struct ClientPermissionCapsule: View {
     let runtimeID: String
@@ -110,7 +110,7 @@ struct ClientPermissionCapsule: View {
 }
 
 enum ClientPermissionWords {
-    /// In the words every runtime shares (#2658): **Request cards** or **Yes to all**.
+    /// In the words every runtime shares (#2658): **Request cards** or **Always Approve**.
     static func title(_ mode: ClientPermissionMode) -> String {
         LevelWords.requests(mode)
     }

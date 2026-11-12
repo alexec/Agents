@@ -123,6 +123,7 @@ func (d *Daemon) loadEvents() {
 			if e.Consequences == nil {
 				e.Consequences = []wire.Consequence{}
 			}
+			d.envelopeOld(&e)
 			d.insertEvent(e)
 		case line.Consequence != nil && line.Position != nil:
 			d.addConsequenceLocked(*line.Consequence, *line.Position)
@@ -219,9 +220,10 @@ func consequenceWorkflow(c wire.Consequence) string {
 	return ""
 }
 
-// waitingFire is Consequence.isWaiting: a fire queued behind a run or held by a cooldown.
+// waitingFire is Consequence.isWaiting: a fire queued behind a run or held by a cooldown or
+// by its hours (#4818).
 func waitingFire(c wire.Consequence) bool {
-	return c.Refused != nil && (c.Refused.Reason.Queued != nil || c.Refused.Reason.CoolingDown != nil)
+	return c.Refused != nil && (c.Refused.Reason.Queued != nil || c.Refused.Reason.CoolingDown != nil || c.Refused.Reason.OutsideHours != nil)
 }
 
 // addConsequenceLocked is EventLog.addConsequence: what came of a waiting fire takes the
@@ -423,15 +425,23 @@ func (d *Daemon) raise(draft wire.EventDraft) wire.Event { return d.raiseAs(draf
 
 // raiseAs is raise for an event a person's call raised: it carries their actor (#1751).
 func (d *Daemon) raiseAs(draft wire.EventDraft, actor *wire.AuditActor) wire.Event {
+	return d.raiseEnveloped(draft, actor, nil)
+}
+
+// raiseEnveloped is raiseAs for a server's event, with what its server said of its
+// envelope (#4728); nil for the app's own.
+func (d *Daemon) raiseEnveloped(draft wire.EventDraft, actor *wire.AuditActor, server *serverEnvelope) wire.Event {
 	if draft.Details == nil {
 		draft.Details = map[string]string{}
 	}
 	if draft.Scope.Folder != nil {
 		draft.Scope = folderScope(store.FolderPath(draft.Scope.Folder.Value))
+		d.envelopeProject(store.FolderPath(draft.Scope.Folder.Value)) // read before the lock
 	}
 	d.eventMu.Lock()
 	t := nowFunc()
 	var e wire.Event
+	publish := false
 	if n := len(d.eventList); n > 0 && d.isRepeat(draft, actor, d.eventList[n-1], t) {
 		last := &d.eventList[n-1]
 		last.Count++
@@ -447,6 +457,7 @@ func (d *Daemon) raiseAs(draft wire.EventDraft, actor *wire.AuditActor) wire.Eve
 		e = wire.Event{Position: d.eventStateNow.NextPosition, Name: draft.Name, At: draft.At, Count: 1, Scope: draft.Scope,
 			Sentence: draft.Sentence, Details: draft.Details, Message: draft.Message, ChainDepth: draft.ChainDepth,
 			Consequences: []wire.Consequence{}, Actor: actor}
+		d.envelope(&e, server)
 		// The next position is written before the event, a block at a time, so a host
 		// killed between the two leaves a gap, never one position given out twice.
 		d.eventStateNow.NextPosition = e.Position + 1
@@ -456,11 +467,17 @@ func (d *Daemon) raiseAs(draft wire.EventDraft, actor *wire.AuditActor) wire.Eve
 		}
 		d.eventList = append(d.eventList, e)
 		d.appendEventLocked(eventLine{Event: &e})
+		if server == nil || server.bus == nil {
+			publish = true
+		}
 		if len(d.eventList) > eventMaximum+eventCapMargin {
 			d.pruneEventsLocked()
 		}
 	}
 	d.eventMu.Unlock()
+	if publish {
+		d.publishSoon(e)
+	}
 	d.noteSecretRead(e)
 	d.tellEvents(&e)
 	d.matchWaits(e)

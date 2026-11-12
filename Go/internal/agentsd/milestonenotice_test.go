@@ -30,7 +30,7 @@ func milestoneNotices(d *Daemon) []postedNotice {
 func TestAMilestonePastItsDueDateTellsThePerson(t *testing.T) {
 	d, _, gh, _ := forgeDaemon(t)
 	lane := seeded(t, d, t.TempDir(), nil).ID
-	repo := "github:alexec/agents"
+	repo := "github:repo:#alexec/agents"
 	issue := wire.LineageNode{Kind: lineage.KindIssue, Ref: repo + "#1"}
 	planning := "Planning"
 	d.workMu.Lock()

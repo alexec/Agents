@@ -75,4 +75,58 @@ struct WireRefTests {
         #expect(String(decoding: try JSONEncoder().encode(r), as: UTF8.self) == #"["github:pr:alexec\/agents#4702"]"#)
         #expect(throws: DecodingError.self) { try JSONDecoder().decode([WireRef].self, from: Data(##"["#4702"]"##.utf8)) }
     }
+
+    /// #4800: the old lineage forms, as Go's `TestRefFromLineage` reads them.
+    @Test func theOldLineageForms() {
+        let rows: [(String, String, String)] = [
+            ("issue", "github:alexec/agents#123", "github:issue:alexec/agents#123"),
+            ("pr", "github:alexec/Agents#4702", "github:pr:alexec/agents#4702"),
+            ("pr", "gitlab:group/sub/repo!45", "gitlab:mr:group/sub/repo#45"),
+            ("issue", "linear:ENG-4", "linear:issue:eng#ENG-4"),
+            ("issue", "jira:ABC-9", "jira:issue:abc#ABC-9"),
+            ("issue", "azureboards:project#12", "azureboards:issue:project#12"),
+            ("session", "session:7F3C", "agents:session:alexec/agents#7F3C"),
+            ("release", "github:alexec/agents/release/v1.2.0", "github:release:alexec/agents#v1.2.0"),
+            ("doc", "github:alexec/agents/doc/specs/a/spec.md", "github:doc:alexec/agents#specs/a/spec.md"),
+            ("doc", "file:/Users/me/folder/docs/a.md", "file:doc:#/Users/me/folder/docs/a.md"),
+            ("doc", "https://www.notion.so/Page-1", "web:doc:www.notion.so#/Page-1"),
+            ("ci-run", "github:alexec/agents/actions/run/19283746", "github:run:alexec/agents#19283746"),
+            ("ci-run", "gitlab:group/repo/pipelines/9", "gitlab:run:group/repo#9"),
+            ("deploy", "testflight:com.Example.App/42", "testflight:deploy:com.example.app#42"),
+            ("target", "target:testflight:com.Example.App", "testflight:target:#com.example.app"),
+            ("health", "sentry:acme/12345", "sentry:issue:acme#12345"),
+            ("health", "betterstack:987", "betterstack:incident:#987"),
+            ("workflow", "workflow:/Users/me/folder/nightly", "agents:workflow:alexec/agents#/Users/me/folder/nightly"),
+            ("workflow-run", "run:R1", "agents:workflow-run:alexec/agents#R1"),
+            ("repo", "github:alexec/Agents", "github:repo:#alexec/agents"),
+            ("pr", "github:pr:alexec/agents#4702", "github:pr:alexec/agents#4702"),
+        ]
+        for (kind, old, want) in rows {
+            #expect(WireRef(lineageKind: kind, ref: old, topic: "Alexec/Agents")?.description == want, "\(kind) \(old)")
+        }
+        for (kind, old) in [("release", "github:alexec/agents"), ("issue", "linear:ENG"), ("repo", "github:o/r#12"), ("session", "nonsense")] {
+            #expect(WireRef(lineageKind: kind, ref: old) == nil, "\(kind) \(old)")
+        }
+        #expect(WireRef.sessionID(fromRef: "agents:session:alexec/agents#A1") == "A1")
+        #expect(WireRef.sessionID(fromRef: "session:A1") == "A1")
+        #expect(WireRef.sessionID(fromRef: "github:issue:o/r#1") == nil)
+        #expect(WireRef(anyLineage: "github:alexec/agents#12")?.repoRef?.description == "github:repo:#alexec/agents")
+        #expect(WireRef(anyLineage: "github:alexec/agents/release/v1")?.type == "release")
+        for (full, old) in [
+            ("github:issue:alexec/agents#12", "github:alexec/agents#12"), ("gitlab:mr:g/r#4", "gitlab:g/r!4"),
+            ("agents:session:alexec/agents#A1", "session:A1"), ("github:run:o/r#9", "github:o/r/actions/run/9"),
+            ("testflight:deploy:com.x.app#42", "testflight:com.x.app/42"), ("sentry:issue:acme#42", "sentry:acme/42"),
+            ("github:repo:#alexec/agents", "github:alexec/agents"), ("github:alexec/agents#12", "github:alexec/agents#12"),
+        ] {
+            #expect(WireRef.legacy(full) == old, "\(full)")
+        }
+        // The words a page shows are the same in either form.
+        for (full, old) in [("github:issue:alexec/agents#12", "github:alexec/agents#12"), ("gitlab:mr:g/r#4", "gitlab:g/r!4"),
+                            ("linear:issue:eng#ENG-4", "linear:ENG-4"), ("github:release:o/r#v1.2.0", "github:o/r/release/v1.2.0")] {
+            #expect(WorkList.shortRef(full) == WorkList.shortRef(old), "\(full)")
+            #expect(WorkList.number(full) == WorkList.number(old), "\(full)")
+            #expect(WorkList.forgeName(full) == WorkList.forgeName(old), "\(full)")
+            #expect(WorkList.repoName(WorkList.repo(of: full)) == WorkList.repoName(WorkList.repo(of: old)), "\(full)")
+        }
+    }
 }

@@ -300,17 +300,15 @@ func forgejoOfURLOn(raw, root, sep string) (forgeRepo, int, bool) {
 	return forgeRepo{"forgejo", repoPath(repo)}, n, true
 }
 
-// issueOfNode is the repo and number of a forge issue node: github:o/r#12, forgejo:o/r#12,
-// bitbucket:w/r#12.
+// issueOfNode is the repo and number of a forge issue node: github:issue:o/r#12,
+// forgejo:issue:o/r#12, bitbucket:issue:w/r#12.
 func issueOfNode(n wire.LineageNode) (forgeRepo, int, bool) {
-	forge, rest, ok := strings.Cut(n.Ref, ":")
-	if _, known := kindOf(forge); n.Kind != lineage.KindIssue || !ok || !known {
+	if n.Kind != lineage.KindIssue {
 		return forgeRepo{}, 0, false
 	}
-	path, num, ok := strings.Cut(rest, "#")
-	i, err := strconv.Atoi(num)
-	if !ok || err != nil || i <= 0 || path == "" {
+	repo, i, ok := repoOfRef(n)
+	if !ok || i <= 0 {
 		return forgeRepo{}, 0, false
 	}
-	return forgeRepo{forge, path}, i, true
+	return repo, i, true
 }

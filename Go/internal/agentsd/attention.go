@@ -300,21 +300,24 @@ func secretUseWanted(u wire.RequestSecretUse) string {
 	if u.Use == wire.SecretUseTerminal {
 		return "Wants to print " + u.Name + " for " + u.Place + ". " + terminalCaveat
 	}
+	if u.Use == wire.SecretUseScreen && u.App != nil {
+		return "Wants to use the screen on " + u.Place + " to drive " + *u.App
+	}
 	return "Wants to use " + u.Name + " on " + u.Place
 }
 
 // secretUseAnswers is NeedRequest.SecretUse.actions: the row's answers, as the banner's
-// buttons. A session's own secret has no Allow always: it is the same as for this session.
+// buttons. A session's own secret has no Always Approve: it is the same as for this session.
 func secretUseAnswers(u wire.RequestSecretUse) []wire.QuickAnswer {
 	if u.Use == wire.SecretUseTerminal {
-		return []wire.QuickAnswer{{Kind: wire.QuickAnswerKindChoice, ID: secretUseOnce, Title: "Allow Once"},
-			{Kind: wire.QuickAnswerKindChoice, ID: secretUseHour, Title: "Allow for 1 Hour"},
+		return []wire.QuickAnswer{{Kind: wire.QuickAnswerKindChoice, ID: secretUseOnce, Title: "Approve"},
+			{Kind: wire.QuickAnswerKindChoice, ID: secretUseHour, Title: "Approve for 1 Hour"},
 			{Kind: wire.QuickAnswerKindChoice, ID: secretUseDeny, Title: "Deny", IsDestructive: true}}
 	}
-	out := []wire.QuickAnswer{{Kind: wire.QuickAnswerKindChoice, ID: secretUseOnce, Title: "Allow Once"},
-		{Kind: wire.QuickAnswerKindChoice, ID: secretUseSession, Title: "Allow for This Session"}}
+	out := []wire.QuickAnswer{{Kind: wire.QuickAnswerKindChoice, ID: secretUseOnce, Title: "Approve"},
+		{Kind: wire.QuickAnswerKindChoice, ID: secretUseSession, Title: "Approve for This Session"}}
 	if u.SessionOnly == nil || !*u.SessionOnly {
-		out = append(out, wire.QuickAnswer{Kind: wire.QuickAnswerKindChoice, ID: secretUseAlways, Title: "Allow Always"})
+		out = append(out, wire.QuickAnswer{Kind: wire.QuickAnswerKindChoice, ID: secretUseAlways, Title: "Always Approve"})
 	}
 	return append(out, wire.QuickAnswer{Kind: wire.QuickAnswerKindChoice, ID: secretUseDeny, Title: "Deny", IsDestructive: true})
 }
@@ -763,6 +766,10 @@ func (d *Daemon) SetControl(tell func(method string, params any)) {
 // of offers dropped while it was down, so every live need is offered again, the stale ones
 // withdrawn, and the count said again.
 func (d *Daemon) ControlUplinkChanged(up bool) {
+	// The control plane holds this machine's bus subscriptions only while it is connected.
+	if up {
+		go d.sendBusSubscriptions(true)
+	}
 	if !up || d.tellControl.Load() == nil {
 		return
 	}

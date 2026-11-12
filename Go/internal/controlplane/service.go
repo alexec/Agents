@@ -238,6 +238,8 @@ type Service struct {
 	sealingWants sealingWants
 	// A bot's machine started for its triggers (#2011, FR-034).
 	starts botStarts
+	// The subscriptions of the machines held here, and what the bus kept and dropped (#4729).
+	bus eventBus
 	// What Reports and the Console read from the store, by entity tag (#2054, #2056).
 	storeReads readCache
 	// What each machine here was last sent of its projects (#2735).
