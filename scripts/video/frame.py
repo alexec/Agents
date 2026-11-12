@@ -366,10 +366,31 @@ def compose(scene, takes, work, out_dir):
         t = timeline(at - start)
         cues.append((t, t + take["duration"], take["text"]))
         i = add(take["path"], loop=False)
-        audio.append(f"[{i}:a]adelay={int(t * 1000)}:all=1[a{len(audio)}]")
+        audio.append(f"[{i}:a]{MIXED},adelay={int(t * 1000)}:all=1[a{len(audio)}]")
+    # Voice mode's tape (#4854): each sentence of speech.wav and each sound at its place.
+    for at, mark in tape_marks(work):
+        t = timeline(at - start)
+        if "seconds" in mark:
+            i = add(work / "voice/speech.wav", loop=False)
+            audio.append(f"[{i}:a]atrim=start={mark['t']:.4f}:duration={mark['seconds']:.4f},asetpts=PTS-STARTPTS,"
+                         f"{MIXED},adelay={int(t * 1000)}:all=1[a{len(audio)}]")
+            if mark.get("said"):
+                cues.append((t, t + mark["seconds"], mark["said"]))
+        elif "sound" in mark:
+            sound = Path(f"/System/Library/Sounds/{mark['sound']}.aiff")
+            if not sound.exists():
+                print(f"  warning: no {sound} for the tape's sound at {mark['t']:.1f}s (a Remote's SystemSoundID?): left out")
+                continue
+            i = add(sound, loop=False)
+            audio.append(f"[{i}:a]volume={mark.get('volume', 1):.3f},{MIXED},adelay={int(t * 1000)}:all=1[a{len(audio)}]")
+    cues.sort()
     graph += audio
-    graph.append("".join(f"[a{i}]" for i in range(len(audio))) +
-                 f"amix=inputs={len(audio)}:normalize=0,apad,atrim=0:{length:.3f},loudnorm=I=-16:TP=-1.5,aresample=48000[aout]")
+    if audio:
+        graph.append("".join(f"[a{i}]" for i in range(len(audio))) +
+                     f"amix=inputs={len(audio)}:normalize=0,apad,atrim=0:{length:.3f},loudnorm=I=-16:TP=-1.5,aresample=48000[aout]")
+    else:
+        # A scene with no narration and no tape: a silent track, as long as the frames.
+        graph.append(f"anullsrc=r=48000:cl=stereo,atrim=0:{length:.3f}[aout]")
 
     args = []
     for i, path in enumerate(inputs):
@@ -392,6 +413,23 @@ def compose(scene, takes, work, out_dir):
     write_vtt(cues, out_dir / f"{scene.ID}.vtt")
     check_overlaps(cues)
     return mp4
+
+
+# Each sound in the mix in one format, so amix joins mono and stereo ones.
+MIXED = "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo"
+
+
+def tape_marks(work):
+    """[(recorded time, mark)] of voice mode's tape (#4854, `VoiceTape`), in the clock of the
+    frames: each sentence (`said`, `seconds`) and each sound (`sound`, `volume`). None when the
+    scene made no tape."""
+    path = work / "voice/marks.json"
+    if not path.exists():
+        return []
+    tape = json.loads(path.read_text())
+    if not (work / "voice/speech.wav").exists() and any("seconds" in m for m in tape["marks"]):
+        raise RuntimeError(f"{path.parent}: the tape has speech but no speech.wav (was it ended?)")
+    return sorted(((tape["start"] + mark["t"], mark) for mark in tape["marks"]), key=lambda pair: pair[0])
 
 
 def write_vtt(cues, path):
