@@ -12,6 +12,9 @@ extension RemoteModel {
         sidebarItem = .work(place.kind)
     }
 
+    /// Work's part of this device's copy (#4930).
+    var workCopy: LocalCopy? { localCopy?.copy }
+
     var forgeMachines: [(id: MachineRef, name: String)] {
         workMachines { $0.has(Capability.forge1) && $0.state != "offline" }
     }

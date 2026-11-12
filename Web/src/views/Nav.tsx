@@ -2,6 +2,8 @@
 // (#1804), and every section but the Overview and Agents drawn as the Console was: its list of pages
 // on the left, the page open on the right. Below 760 the bar is one menu with the open section's
 // name. g then a letter goes to a section, when the focus is not in a field; ⌘K opens the command menu (#4788).
+import { forgeHosts, loadList, workList } from "../model/workLists";
+import type { WorkKind } from "../model/work";
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import { Fragment, type ComponentChildren } from "preact";
@@ -194,6 +196,14 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
   const list = pagesShown(section, admin, open?.id, more);
   const registering = useSignal(false);
   useUserScopeStatus(store, section === "status");
+  // Work shown: the list it opens on read ahead (#4930), from this device's copy and then the machines, so it draws at once.
+  const forgeOn = forgeHosts(store).map((h) => h.id).join(",");
+  useEffect(() => {
+    if (section !== "work" || !forgeOn) return;
+    const kind: WorkKind = r.section === "pr" || r.section === "release" ? r.section : "issue";
+    const l = workList(kind);
+    if (l.lists.peek() === null && !l.loading.peek()) void loadList(store, l);
+  }, [section, forgeOn]);
   // Status ▸ Events' grey line reads who waits on each machine that answers; events/changed keeps it.
   const online = store.hosts.value.filter((h) => hostAnswers(h.state)).map((h) => h.id);
   useEffect(() => {

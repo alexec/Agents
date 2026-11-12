@@ -41,12 +41,27 @@ export interface TranscriptCopy {
   at: number;
 }
 
-export type CopyRecord = MachineCopy | TranscriptCopy;
+/** What each Work entry holds (#4930), with how many of it are kept, the newest first; the pictures also to `imageCap`. */
+export const workKept = { list: 30, item: 50, plan: 50, features: 10, timeline: 20, boards: 10, image: 2000 } as const;
+export type WorkGroup = keyof typeof workKept;
+
+/** One of Work's last answers (#4930), kept by what was asked: a cache, never the record. */
+export interface WorkCopy {
+  kind: "work";
+  ref: string;
+  group: WorkGroup;
+  value: unknown;
+  at: number;
+}
+
+export type CopyRecord = MachineCopy | TranscriptCopy | WorkCopy;
 
 /** What the copy knows of each record without reading it, kept as one record of its own. */
 export interface CopyIndexRow {
   ref: string;
   kind: CopyRecord["kind"];
+  /** A Work entry's group (#4930). */
+  group?: WorkGroup | undefined;
   at: number;
   bytes: number;
 }
@@ -64,15 +79,40 @@ export function sessionRef(session: string): string {
   return formatRef({ provider: "agents", type: "session", topic: "", id: session });
 }
 
+/** A Work entry's ref (#4727, #4930): its group, and what was asked. */
+export function workRef(group: WorkGroup, asked: string): string {
+  return formatRef({ provider: "agents", type: "work", topic: group, id: asked });
+}
+
 /**
  * The refs to drop so the copy keeps its caps: transcripts past the newest `kept`, then the
  * oldest transcript while the whole is over `cap`. Machines are never dropped: all of them are
  * well under a megabyte.
  */
-export function overCaps(rows: readonly CopyIndexRow[], cap = copyCap, kept = transcriptsKept): string[] {
-  const transcripts = rows.filter((r) => r.kind === "transcript").sort((a, b) => b.at - a.at);
+export function overCaps(rows: readonly CopyIndexRow[], cap = copyCap, kept = transcriptsKept, imageCap = cap / 4): string[] {
+  const newest = (a: CopyIndexRow, b: CopyIndexRow) => b.at - a.at;
+  const transcripts = rows.filter((r) => r.kind === "transcript").sort(newest);
   const drop = transcripts.slice(kept);
+  // Each Work group to its count, and the pictures to their own cap (#4930).
+  const work: CopyIndexRow[] = [];
+  for (const group of Object.keys(workKept) as WorkGroup[]) {
+    const held = rows.filter((r) => r.kind === "work" && r.group === group).sort(newest);
+    let bytes = held.reduce((sum, r) => sum + r.bytes, 0);
+    while (held.length > workKept[group] || (group === "image" && held.length > 0 && bytes > imageCap)) {
+      const oldest = held.pop()!;
+      bytes -= oldest.bytes;
+      drop.push(oldest);
+    }
+    work.push(...held);
+  }
   let total = rows.reduce((sum, r) => sum + r.bytes, 0) - drop.reduce((sum, r) => sum + r.bytes, 0);
+  // Over the cap, the oldest Work entry goes first, then the oldest transcript.
+  work.sort(newest);
+  while (total > cap && work.length > 0) {
+    const oldest = work.pop()!;
+    drop.push(oldest);
+    total -= oldest.bytes;
+  }
   for (let i = kept - 1; i >= 0 && total > cap; i--) {
     const oldest = transcripts[i];
     if (!oldest || drop.includes(oldest)) continue;
@@ -179,7 +219,8 @@ export class LocalCopy {
     if (!this.writing || (records.length === 0 && drop.length === 0)) return this.queue;
     for (const ref of drop) this.index.delete(ref);
     for (const record of records) {
-      this.index.set(record.ref, { ref: record.ref, kind: record.kind, at: record.at, bytes: JSON.stringify(record).length * 2 });
+      this.index.set(record.ref, { ref: record.ref, kind: record.kind, ...(record.kind === "work" ? { group: record.group } : {}), at: record.at,
+        bytes: JSON.stringify(record).length * 2 });
     }
     for (const ref of overCaps([...this.index.values()], this.cap)) {
       this.index.delete(ref);
@@ -188,6 +229,21 @@ export class LocalCopy {
     const put: Array<[string, unknown]> = [...records.map((r): [string, unknown] => [r.ref, r]), [indexKey, [...this.index.values()]]];
     this.queue = this.queue.then(() => (this.writing ? this.store.write(put, drop) : undefined)).catch(() => undefined);
     return this.queue;
+  }
+
+  /** Work's last answer for what was asked (#4930); undefined with none. */
+  async work<T>(group: WorkGroup, asked: string): Promise<T | undefined> {
+    try {
+      const got = (await this.store.get(workRef(group, asked))) as WorkCopy | undefined;
+      return got?.kind === "work" && got.group === group ? got.value as T : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** A host's answer, kept for the next open (#4930). Only a host's answers are kept, never what came from the copy. */
+  keepWork(group: WorkGroup, asked: string, value: unknown, at = Date.now()): Promise<void> {
+    return this.put([{ kind: "work", ref: workRef(group, asked), group, value, at }]);
   }
 
   /** At sign-out: nothing more is written, and what is in memory goes. The database itself goes with the keys. */
@@ -282,4 +338,28 @@ export function startLocalCopy(store: Store, copy: LocalCopy, now: () => number 
     if (timer) clearTimeout(timer);
     if (transcriptTimer) clearTimeout(transcriptTimer);
   };
+}
+
+/** The page's copy, for Work's pages (#4930): set at start, none in the tests that do not set it. */
+let pageCopy: LocalCopy | undefined;
+export function setWorkCopy(copy: LocalCopy | undefined): void { pageCopy = copy; }
+
+/** Work's last answer this device kept for what was asked (#4930). */
+export function keptWork<T>(group: WorkGroup, asked: string): Promise<T | undefined> {
+  return pageCopy ? pageCopy.work<T>(group, asked) : Promise.resolve(undefined);
+}
+
+/** A host's answer to a Work page, kept (#4930). */
+export function keepWork(group: WorkGroup, asked: string, value: unknown): void {
+  void pageCopy?.keepWork(group, asked, value);
+}
+
+/** A forge's picture (#4930): from this device's copy when it holds it, as a picture does not change at its URL; else
+ * read, and kept. */
+export async function keptPicture<T>(url: string, read: (url: string) => Promise<T>): Promise<T> {
+  const kept = await keptWork<T>("image", url);
+  if (kept !== undefined) return kept;
+  const got = await read(url);
+  keepWork("image", url, got);
+  return got;
 }

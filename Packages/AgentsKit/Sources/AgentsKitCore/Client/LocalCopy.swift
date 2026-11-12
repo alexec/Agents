@@ -102,7 +102,7 @@ public actor LocalCopy {
     }
 
     /// The file's form: the ref beside what it holds, so a file is read back only for its ref.
-    private struct Record<Value: Codable & Sendable>: Codable, Sendable {
+    struct Record<Value: Codable & Sendable>: Codable, Sendable {
         var ref: WireRef
         var value: Value
     }
@@ -155,23 +155,26 @@ public actor LocalCopy {
         trim()
     }
 
-    /// Transcripts past the newest `transcriptsKept`, then the oldest while the whole copy
-    /// is over `cap`. Machines are never dropped: all of them are well under a megabyte.
-    private func trim() {
-        let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey]
+    /// Transcripts past the newest `transcriptsKept`, then, while the whole copy is over `cap`,
+    /// the oldest Work entry (#4930) and, with none left, the oldest transcript. Machines are
+    /// never dropped: all of them are well under a megabyte.
+    func trim() {
         let fm = FileManager.default
-        func files(_ in: URL) -> [(url: URL, at: Date, bytes: Int)] {
-            ((try? fm.contentsOfDirectory(at: `in`, includingPropertiesForKeys: keys)) ?? []).map { url in
-                let values = try? url.resourceValues(forKeys: Set(keys))
-                return (url, values?.contentModificationDate ?? .distantPast, values?.fileSize ?? 0)
-            }
-        }
-        var held = files(transcripts).sorted { $0.at > $1.at }
-        var total = (held + files(machines)).reduce(0) { $0 + $1.bytes }
-        while let oldest = held.last, held.count > transcriptsKept || total > cap {
+        var held = Self.files(transcripts).sorted { $0.at > $1.at }
+        while held.count > transcriptsKept, let oldest = held.popLast() { try? fm.removeItem(at: oldest.url) }
+        var work = trimWork().sorted { $0.at > $1.at }
+        var total = (held + work + Self.files(machines)).reduce(0) { $0 + $1.bytes }
+        while total > cap, let oldest = work.popLast() ?? held.popLast() {
             try? fm.removeItem(at: oldest.url)
             total -= oldest.bytes
-            held.removeLast()
+        }
+    }
+
+    static func files(_ in: URL) -> [(url: URL, at: Date, bytes: Int)] {
+        let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey]
+        return ((try? FileManager.default.contentsOfDirectory(at: `in`, includingPropertiesForKeys: keys)) ?? []).map { url in
+            let values = try? url.resourceValues(forKeys: Set(keys))
+            return (url, values?.contentModificationDate ?? .distantPast, values?.fileSize ?? 0)
         }
     }
 
@@ -182,13 +185,13 @@ public actor LocalCopy {
 
     // MARK: Files
 
-    private func read<Value: Codable & Sendable>(_: Value.Type, at url: URL) -> Record<Value>? {
+    func read<Value: Codable & Sendable>(_: Value.Type, at url: URL) -> Record<Value>? {
         guard let data = try? Data(contentsOf: url) else { return nil }
         // A file that does not read (an older form, cut short) is only a copy missing.
         return try? JSONDecoder().decode(Record<Value>.self, from: data)
     }
 
-    private func write<Value: Codable & Sendable>(_ record: Record<Value>, to url: URL) {
+    func write<Value: Codable & Sendable>(_ record: Record<Value>, to url: URL) {
         guard let data = try? JSONEncoder().encode(record) else { return }
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         // Atomic, so a reader never finds half a file.

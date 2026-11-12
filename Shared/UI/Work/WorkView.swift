@@ -144,7 +144,7 @@ private struct WorkListPane: View {
         .toolbar {
             if !compact {
                 ToolbarItem(placement: .primaryAction) {
-                    WorkRefreshButton(running: list.lists == nil || list.loadingMore) { list.asked += 1 }
+                    WorkRefreshButton(running: list.reading || list.loadingMore) { list.asked += 1 }
                 }
             }
         }
@@ -299,6 +299,9 @@ private struct WorkListPane: View {
         let latest = kind == .release ? WorkReleaseLook.latest(list.all) : []
         return ScrollViewReader { reader in
             selectable {
+                if list.fromDevice {
+                    WorkFromDeviceStrip(on: true).listRowSeparator(.hidden).selectionDisabled()
+                }
                 if !lines.isEmpty {
                     WorkErrorStrip(lines: lines) { list.asked += 1 }.listRowSeparator(.hidden).selectionDisabled()
                 }

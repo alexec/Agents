@@ -64,11 +64,45 @@ protocol WorkModel: AnyObject, Sendable {
     /// Ask Settings to show Connectors (#4393), for a forge whose credential was refused; false
     /// where the app has no such pane, and the list offers only Try again.
     func askWorkConnectors() -> Bool
+    /// This device's copy (#4930): Work's last answers, drawn before the host answers; nil
+    /// where the app keeps none.
+    var workCopy: LocalCopy? { get }
 }
 
 extension WorkModel {
     var workProjects: [WorkList.Project] { [] }
     func askWorkConnectors() -> Bool { false }
+    var workCopy: LocalCopy? { nil }
+
+    /// The last answer this device kept for what was asked (#4930); nil with none.
+    func keptWork<Value: Codable & Sendable>(_: Value.Type, _ group: LocalCopy.WorkGroup, _ asked: String) async -> Value? {
+        guard let copy = workCopy else { return nil }
+        return await copy.work(Value.self, group, asked)
+    }
+
+    /// A host's answer, kept for the next open (#4930). Only a host's answers are kept, never what came from the copy.
+    func keepWork<Value: Codable & Sendable>(_ value: Value, _ group: LocalCopy.WorkGroup, _ asked: String) {
+        guard let copy = workCopy else { return }
+        Task { await copy.keepWork(value, group, asked) }
+    }
+
+    /// A forge's picture (`forge/image`, #4010): from this device's copy when it holds it, as a
+    /// picture does not change at its URL (#4930); else read by the machine, and kept.
+    func forgeImage(_ url: String, on host: MachineRef) async -> Data? {
+        if let kept = await keptWork(Data.self, .image, url) { return kept }
+        guard let got = try? await forge(DaemonAPI.Method.forgeImage, DaemonAPI.ForgeImageRequest(url: url),
+                                         returning: DaemonAPI.ForgeImage.self, on: host) else { return nil }
+        keepWork(got.data, .image, url)
+        return got.data
+    }
+
+    /// What the boards are kept under: the machines asked.
+    var boardsAsked: String { boardMachines.map(\.id.rawValue).joined(separator: ",") }
+
+    /// The boards this device kept from the last read of the same machines (#4930).
+    func keptBoards() async -> [DaemonAPI.ProjectBoard]? {
+        await keptWork([DaemonAPI.ProjectBoard].self, .boards, boardsAsked)
+    }
     var timelineMachines: [(id: MachineRef, name: String)] { [] }
     var featuresMachines: [(id: MachineRef, name: String)] { [] }
     func lineageSessionsOn(_ nodes: [DaemonAPI.LineageNode]) async -> DaemonAPI.LineageSessionsOn? { nil }
@@ -92,12 +126,24 @@ extension WorkModel {
         // The machines' own order, the home one first, so the same board keeps the same name.
         let order = machines.map(\.id)
         got.sort { (order.firstIndex(of: $0.host) ?? .max) < (order.firstIndex(of: $1.host) ?? .max) }
-        return WorkList.mergeBoards(got.map(\.boards))
+        let boards = WorkList.mergeBoards(got.map(\.boards))
+        if !boards.isEmpty { keepWork(boards, .boards, machines.map(\.id.rawValue).joined(separator: ",")) }
+        return boards
     }
 
     /// The machines a list asks: those that narrow to the board when one is chosen.
     func workMachines(board: String) -> [(id: MachineRef, name: String)] {
         board.isEmpty ? forgeMachines : boardMachines
+    }
+
+    /// The sidebar shows Work (#4930): the first page of the list the Work page opens on is read
+    /// now, from this device's copy and then its machines, so the page draws it at once.
+    func prefetchWork() async {
+        let kind = workPlace.kind
+        guard [.issue, .pr, .release].contains(kind), !kind.fromForge || !forgeMachines.isEmpty else { return }
+        let list = workLists[kind]
+        guard list.lists == nil, !list.reading else { return }
+        await list.load(model: self)
     }
 
     /// Where Work is: Issues until something else is opened.

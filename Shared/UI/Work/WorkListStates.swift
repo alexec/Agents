@@ -89,3 +89,19 @@ struct WorkErrorStrip: View {
         }
     }
 }
+
+/// A Work page drawn from this device's copy (#4930) while its machine is asked again: a
+/// neutral strip above it, with a spinner, that goes when the machine answers.
+struct WorkFromDeviceStrip: View {
+    var on: Bool
+
+    var body: some View {
+        if on {
+            PaneBanner(tone: .neutral, busy: true, announcement: WorkLook.fromDevice) {
+                PaneBannerWords(line: WorkLook.fromDevice, detail: nil)
+            } actions: {
+                EmptyView()
+            }
+        }
+    }
+}

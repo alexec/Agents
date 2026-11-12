@@ -217,6 +217,8 @@ struct FolderListView: View {
                         .activityIcon(kind.sidebarIcon)
                         .appText(.supporting).sidebarInk(.work(kind)).tag(SidebarItem.work(kind))
                 }
+                // Work shown: its first list read ahead, so the page draws at once (#4930).
+                .task(id: model.forgeMachines.map(\.id)) { await model.prefetchWork() }
             } header: {
                 Text("Work").appText(.supporting)
             }
