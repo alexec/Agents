@@ -10175,6 +10175,10 @@
         "prCostComment": {
           "$ref": "#/definitions/PRCostComment",
           "description": "Absent is off (#2352)."
+        },
+        "workingHours": {
+          "$ref": "#/definitions/WorkflowHours",
+          "description": "The project's working hours (#4821), for a workflow's hours: working and hours: not-working, from .agents/folder.json. Absent is 09:00-17:00, Mon-Fri. Never named."
         }
       },
       "required": [
@@ -29063,6 +29067,22 @@
       ],
       "additionalProperties": false
     },
+    "SetWorkingHoursRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "hours": {
+          "$ref": "#/definitions/WorkflowHours",
+          "description": "Absent, or hours that limit nothing, takes the setting out: 09:00-17:00, Mon-Fri. Never named."
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
     "SetYourPolicyRequest": {
       "type": "object",
       "description": "policy/setYours (#2957): the rules to save as your layer, at the revision this client last read. Refused conflict when revision is not the current one, notKeeper on a machine that is not the keeper, forbidden from the agent socket role, an MCP tool or a workflow (FR-010), and invalid when the rules fail policylayers.Validate.",
@@ -34819,9 +34839,21 @@
         "timeZone": {
           "type": "string",
           "description": "time-zone:, an IANA name. Absent is the person's timeZone setting, else the host's zone."
+        },
+        "named": {
+          "$ref": "#/definitions/WorkflowHoursName",
+          "description": "hours: working or hours: not-working (#4821): the project's working hours (Folder.workingHours), or every time outside them. With it, between, days and timeZone are absent."
         }
       },
       "additionalProperties": false
+    },
+    "WorkflowHoursName": {
+      "type": "string",
+      "enum": [
+        "working",
+        "not-working"
+      ],
+      "description": "A named window in a workflow's hours: (#4821)."
     },
     "WorkflowLimit": {
       "type": "string",

@@ -54,7 +54,7 @@ Check the build and say whether it is green.
 | `options:` | Any other option the runtime offers, by its id, such as `fast: true`, or Claude's `chrome: true` (Use Chrome, #1837) | Sets that option for the agent. |
 | `enabled:` | `true` or `false` | Its **Enabled** switch. `false` is turned off: none of its triggers run it, and **Run now** still does. Without it, or with `true`, it is on. The switch, **Turn Off** and **Turn On** write this line and nothing else: off adds `enabled: false`, on takes the line out. So the switch goes wherever the file goes, to another clone or another Mac or server, and shows in a commit. An agent cannot turn on a workflow whose file says `false` unless an agent turned it off, on this Mac or server, and the file has not changed since; only you can. Anything else stops the workflow running, and its page says what is wrong. |
 | `archived:` | `true` or `false` | Whether it is archived. **Archive** adds `archived: true` and **Unarchive** takes the line out, so it is archived wherever the file goes. See [Off and archived](#off-and-archived). Anything else stops the workflow running, and its page says what is wrong. |
-| `hours:` | `between:`, `days:` and `time-zone:` | When the workflow can start, for all its triggers. See [Hours](#hours). A value that is not correct stops the workflow running, and its page says what is wrong. |
+| `hours:` | `working`, `not-working`, or `between:`, `days:` and `time-zone:` | When the workflow can start, for all its triggers. See [Hours](#hours). A value that is not correct stops the workflow running, and its page says what is wrong. |
 | `cooldown:` | A length of time in minutes, hours or days, such as `15m`, `2h`, `1h30m` or `1d`; at least a minute | The least time from the start of one run to the start of the next. See [Cooldown](#cooldown). A value that is not a length of time stops the workflow running, and its page says what is wrong. |
 | `runs-on:` | A list of labels | Which machines run it (#1761; it replaced `hosts:`, which is no longer read). Without it, or with an empty list, every machine of yours that has the folder runs it and lists it, as before. With labels, only a machine that has every one of them runs it, on a schedule, on an event, or from **Run now**, except machine ids: a machine has one id, so with several ids each of those machines runs it (#2064). `runs-on: [<Studio's id>, <box-1's id>]` runs on Studio and on box-1; `runs-on: [<box-1's id>, linux]` runs on box-1 only while it is Linux. A machine's labels are its id (a Mac's hardware UUID, or on Linux the contents of `/etc/machine-id`), its os (`macos` or `linux`), its machine provider's id, and its user's or bot's name. The workflow's page offers the computers it knows by the names already on screen and writes the id, so renaming a computer does not unpin the workflow. Its **Runs on** section shows a label that is no computer (a bot's name, an os, a provider) as **Also needs**, and keeps it when the computers change. With a bot's name, such as `runs-on: [review-bot]`, the bot's machines run it, once per trigger. A server's event (such as `github`'s or a channel's) and a schedule go to the control plane, which sends each once, to one of the bot's machines that has the workflow (#2011). When none of the bot's machines is online, the control plane starts one of its stopped workspaces, from a provider of the bot's group with **Start when used** on, and sends the trigger when it joins (#2011). It starts one machine per bot at a time and makes none; at most 20 triggers wait for it, and it tries no other start for 15 minutes. A machine of a person in the bot's group sends the bot's schedules too, so a schedule reaches the control plane while the bot's machines are stopped. It can hear the bot's server events too (#2027): the workflow is listed there as heard for the bot and waits for that person's approval on that machine. Once it is approved, that machine's own servers hear its server triggers, and each match goes only to the control plane, never to a run on that machine. A server's event is one trigger by its server, event and id, so when several machines hear it, it still runs once. A machine event (`machine.*`, `dropbox.*`) runs on the machine that heard it. Any other event is claimed: the first of the bot's machines to claim it runs it. A value that is not a list stops the workflow running, and its page says what is wrong. |
 | `continue-when-back:` | `true` or `false` | A run's turn refused for a spent allowance waits for it, and carries on when it is back, as if you had chosen **Continue**. Without it, off: the run stops until somebody chooses. See [Keep going when a runtime runs out](../how-to/keep-going-when-a-runtime-runs-out.md). |
@@ -396,6 +396,31 @@ hours:
   Friday). Then set **From** and **to** (each half hour, or **All day**), the days, and
   the **Time zone** (**Your time zone** leaves `time-zone:` out). Each change writes
   `hours:` into the file. **Any time** removes `hours:`.
+
+### Working hours
+
+A project's working hours are one setting, so when a team's hours change, you change one
+setting and not every workflow (#4821):
+
+```markdown
+---
+name: Night checks
+on:
+  - agent.finished
+hours: not-working
+---
+```
+
+- **`hours: working`** is the project's working hours. **`hours: not-working`** is all the
+  time outside them: evenings, nights and the days that are not working days.
+- Set them in **Project Settings ▸ General ▸ Working hours**, on the Mac and the web page:
+  **From**, **to**, the **Time zone** and the days. They are kept in the project's
+  `.agents/folder.json` as `workingHours`, so commit `.agents` and every folder of the
+  project gets them. Without the setting, working hours are 09:00-17:00, Monday to Friday.
+- The time zone is the setting's own when it has one. Without it, your time zone, then the
+  machine's, as for the full form.
+- The status card says **Runs in working hours** or **Runs outside working hours**, and the
+  Hours menu on Configuration has **Working hours** and **Outside working hours**.
 
 ## Limits
 

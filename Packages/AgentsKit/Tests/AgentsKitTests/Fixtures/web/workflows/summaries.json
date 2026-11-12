@@ -1647,6 +1647,143 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : "Runs outside working hours",
+      "hoursOpen" : "Waits for its hours: opens Wed 16:26",
+      "needsAPerson" : false,
+      "summary" : "Every day at 2am, in a new agent"
+    },
+    "input" : {
+      "holdsAFire" : true,
+      "hoursOpenAt" : 812503600,
+      "isArchived" : false,
+      "isEnabled" : true,
+      "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
+      "queued" : 0,
+      "scope" : "folder",
+      "workflow" : {
+        "folder" : "file:///fixture/folder",
+        "hours" : {
+          "named" : "not-working"
+        },
+        "mode" : "new",
+        "name" : "Evening",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "evening"
+      }
+    },
+    "name" : "outside working hours, a trigger held"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "hours" : "Runs in working hours",
+      "hoursOpen" : null,
+      "needsAPerson" : false,
+      "summary" : "Every day at 2am, in a new agent"
+    },
+    "input" : {
+      "holdsAFire" : false,
+      "isArchived" : false,
+      "isEnabled" : true,
+      "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
+      "queued" : 0,
+      "scope" : "folder",
+      "workflow" : {
+        "folder" : "file:///fixture/folder",
+        "hours" : {
+          "named" : "working"
+        },
+        "mode" : "new",
+        "name" : "Daytime",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "daytime"
+      }
+    },
+    "name" : "in working hours"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
       "hours" : "Runs Wed, Sat, Sun",
       "hoursOpen" : null,
       "needsAPerson" : false,

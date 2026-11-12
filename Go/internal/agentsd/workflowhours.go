@@ -11,6 +11,7 @@ import (
 	// on every host (#4818).
 	_ "time/tzdata"
 
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/agentsd/yamlnode"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -26,6 +27,18 @@ import (
 // now always runs. A schedule fires only when its own `between:`/`days:` and `hours:` both
 // allow it. A window that goes past midnight belongs to the day it starts on: with
 // `days: [fri]`, Friday 18:00 to Saturday 09:00 is open, and Friday 02:00 is not.
+//
+// Named windows (#4821): `hours: working` is the project's working hours, a setting in
+// .agents/folder.json (`workingHours`, 09:00-17:00 Mon-Fri when it has none), so a change to a
+// team's hours is one setting and not every file; `hours: not-working` is every time outside
+// them.
+
+// defaultWorkingHours is the project's working hours when it sets none, as the window's
+// WorkflowHours.working is.
+func defaultWorkingHours() wire.WorkflowHours {
+	b := "09:00-17:00"
+	return wire.WorkflowHours{Between: &b, Days: []wire.Weekday{wire.WeekdayMon, wire.WeekdayTue, wire.WeekdayWed, wire.WeekdayThu, wire.WeekdayFri}}
+}
 
 var allWeekdays = []wire.Weekday{wire.WeekdaySun, wire.WeekdayMon, wire.WeekdayTue, wire.WeekdayWed, wire.WeekdayThu, wire.WeekdayFri, wire.WeekdaySat}
 
@@ -76,10 +89,14 @@ func parseDays(n yamlnode.Node) ([]wire.Weekday, error) {
 // parseHours is `hours:` as the file says it, checked.
 func parseHours(n yamlnode.Node) (*wire.WorkflowHours, error) {
 	if !n.IsMapping() {
-		if t, ok := n.Text(); ok && t == "" {
+		t, ok := n.Text()
+		switch name := wire.WorkflowHoursName(strings.TrimSpace(t)); {
+		case ok && name == "":
 			return nil, nil
+		case ok && (name == wire.WorkflowHoursNameWorking || name == wire.WorkflowHoursNameNotWorking):
+			return &wire.WorkflowHours{Named: &name}, nil
 		}
-		return nil, failure("`hours:` must say `between:`, `days:` or `time-zone:`, like `between: \"09:00-18:00\"`")
+		return nil, failure("`hours:` must be `working`, `not-working`, or say `between:`, `days:` or `time-zone:`, like `between: \"09:00-18:00\"`")
 	}
 	keys := make([]string, 0, len(n.Mapping))
 	for k := range n.Mapping {
@@ -146,17 +163,19 @@ func zoneNamed(name string) (*time.Location, error) {
 }
 
 // hoursWindow is `hours:` ready to ask: minutes of the day, from (inclusive) to (not),
-// and the days its window starts on.
+// and the days its window starts on. outside is `hours: not-working`: open when the window
+// is not.
 type hoursWindow struct {
 	from, to int
 	days     map[time.Weekday]bool
 	loc      *time.Location
+	outside  bool
 }
 
 // windowOf is a workflow's hours in its zone: the file's, else the person's, else this
 // host's. nil is no `hours:`, always open.
 func windowOf(h *wire.WorkflowHours, personZone string) *hoursWindow {
-	if h == nil || h.Between == nil && h.Days == nil {
+	if h == nil || h.Named != nil || h.Between == nil && h.Days == nil {
 		return nil
 	}
 	w := hoursWindow{from: 0, to: 24 * 60, days: map[time.Weekday]bool{}, loc: time.Local}
@@ -191,6 +210,11 @@ func (w *hoursWindow) open(t time.Time) bool {
 	if w == nil {
 		return true
 	}
+	return w.inside(t) != w.outside
+}
+
+// inside is whether t is in the window itself, outside or not.
+func (w *hoursWindow) inside(t time.Time) bool {
 	lt := t.In(w.loc)
 	x := lt.Hour()*60 + lt.Minute()
 	if w.from < w.to {
@@ -210,14 +234,26 @@ func (w *hoursWindow) opensAt(t time.Time) (time.Time, bool) {
 		return t, true
 	}
 	lt := t.In(w.loc)
-	for i := 0; i <= 8; i++ {
+	for i := 0; i <= 9; i++ {
 		day := time.Date(lt.Year(), lt.Month(), lt.Day()+i, 0, 0, 0, 0, w.loc)
-		if !w.days[day.Weekday()] {
+		if !w.outside {
+			if !w.days[day.Weekday()] {
+				continue
+			}
+			start := time.Date(day.Year(), day.Month(), day.Day(), w.from/60, w.from%60, 0, 0, w.loc)
+			if start.After(t) {
+				return start, true
+			}
 			continue
 		}
-		start := time.Date(day.Year(), day.Month(), day.Day(), w.from/60, w.from%60, 0, 0, w.loc)
-		if start.After(t) {
-			return start, true
+		// Outside the window opens where a day's window ends: on the next day for one past
+		// midnight, at midnight for one that runs to 24:00.
+		end := time.Date(day.Year(), day.Month(), day.Day(), w.to/60, w.to%60, 0, 0, w.loc)
+		if w.to <= w.from {
+			end = end.AddDate(0, 0, 1)
+		}
+		if end.After(t) && w.open(end) {
+			return end, true
 		}
 	}
 	return time.Time{}, false
@@ -254,7 +290,52 @@ func (d *Daemon) windowLocked(w wire.Workflow) *hoursWindow {
 	if w.Hours == nil {
 		return nil
 	}
+	if n := w.Hours.Named; n != nil {
+		h := d.workingHoursOf(store.FolderPath(w.Folder))
+		win := windowOf(&h, d.personZone())
+		if win != nil {
+			win.outside = *n == wire.WorkflowHoursNameNotWorking
+		}
+		return win
+	}
 	return windowOf(w.Hours, d.personZone())
+}
+
+// workingHoursOf is the project's working hours (#4821), from the folder's
+// .agents/folder.json as last approved, else 09:00-17:00 Mon-Fri. Hours that limit nothing
+// are the default, in their own zone when they name one.
+func (d *Daemon) workingHoursOf(folder string) wire.WorkflowHours {
+	h := defaultWorkingHours()
+	m, err := d.approvedConfig(folder)
+	if err != nil {
+		return h
+	}
+	got, ok := workingHoursIn(m)
+	if !ok {
+		return h
+	}
+	if got.Between == nil && got.Days == nil {
+		h.TimeZone = got.TimeZone
+		return h
+	}
+	return got
+}
+
+// workingHoursIn is the `workingHours` of a folder.json, when it is one: checked as a
+// file's `hours:` is, and never named.
+func workingHoursIn(m map[string]any) (wire.WorkflowHours, bool) {
+	v, ok := m["workingHours"]
+	if !ok {
+		return wire.WorkflowHours{}, false
+	}
+	var h wire.WorkflowHours
+	if b, _ := json.Marshal(v); json.Unmarshal(b, &h) != nil || h.Named != nil {
+		return wire.WorkflowHours{}, false
+	}
+	if _, err := hoursLines(h); err != nil {
+		return wire.WorkflowHours{}, false
+	}
+	return h, true
 }
 
 // heldStartLocked is when a fire held now can start: the first moment its hours are open
@@ -308,6 +389,12 @@ func nextDueOpen(s wire.WorkflowSchedule, win *hoursWindow, t time.Time) (time.T
 
 // hoursWords is `hours:` in words, for manage_workflows: "only 18:00-09:00 on Mon, Fri (Europe/London)".
 func hoursWords(h *wire.WorkflowHours) string {
+	if h != nil && h.Named != nil {
+		if *h.Named == wire.WorkflowHoursNameNotWorking {
+			return "only outside working hours"
+		}
+		return "only in working hours"
+	}
 	if h == nil || h.Between == nil && h.Days == nil {
 		return ""
 	}
@@ -332,6 +419,15 @@ func hoursWords(h *wire.WorkflowHours) string {
 // and time-zone:, each checked as the file's own would be. nil is hours that limit nothing
 // (no between: and no days:, or every day), which the write takes out.
 func hoursLines(h wire.WorkflowHours) ([]string, error) {
+	if n := h.Named; n != nil {
+		if *n != wire.WorkflowHoursNameWorking && *n != wire.WorkflowHoursNameNotWorking {
+			return nil, refuse("`hours:` is working or not-working, not \"" + string(*n) + "\"")
+		}
+		if h.Between != nil || h.Days != nil || h.TimeZone != nil {
+			return nil, refuse("named hours say no between, days or time zone: the project's working hours do")
+		}
+		return []string{"hours: " + string(*n)}, nil
+	}
 	between, zone := "", ""
 	if h.Between != nil {
 		between = strings.TrimSpace(*h.Between)

@@ -443,6 +443,39 @@ func (d *Daemon) setPRCostComment(r wire.SetPRCostCommentRequest) (wire.FolderSu
 	return d.sendFolder(folder)
 }
 
+// setWorkingHours is the project's working hours (#4821), for workflows' `hours: working`
+// and `hours: not-working`, in .agents/folder.json: none, or hours that limit nothing, is
+// no key at all (09:00-17:00 Mon-Fri).
+func (d *Daemon) setWorkingHours(r wire.SetWorkingHoursRequest) (wire.FolderSummary, error) {
+	folder := store.FolderPath(r.Folder)
+	if _, ok := d.summaryFor(folder); !ok || !isDir(folder) {
+		return wire.FolderSummary{}, noSuchFolder(folder + " is not a folder, or is not there.")
+	}
+	var v any
+	if h := r.Hours; h != nil {
+		if h.Named != nil {
+			return wire.FolderSummary{}, Invalid("Working hours are times and days, not %q.", *h.Named)
+		}
+		lines, err := hoursLines(*h)
+		if err != nil {
+			return wire.FolderSummary{}, Invalid("Working hours: %s.", err.Error())
+		}
+		if lines != nil {
+			// As the file would say it: every day is no days.
+			w := parseWorkflow("---\n"+strings.Join(lines, "\n")+"\n---\nGo\n", "x", "/p")
+			v = w.Hours
+		}
+	}
+	if !d.settled(folder, ".agents/folder.json") {
+		return wire.FolderSummary{}, guardedRefusal(".agents/folder.json", "The working hours were not changed: ")
+	}
+	defer d.approveWrite(folder, ".agents/folder.json")
+	if err := setFolderConfig(folder, "workingHours", v); err != nil {
+		return wire.FolderSummary{}, configWriteError(err)
+	}
+	return d.sendFolder(folder)
+}
+
 // MARK: finding folders (folders/find)
 
 func hasGit(dir string) bool {
@@ -731,6 +764,9 @@ func (d *Daemon) dress(s *wire.FolderSummary, agents []wire.Agent) {
 			c := wire.PRCostComment(v)
 			s.Folder.PrCostComment = &c
 		}
+		if h, ok := workingHoursIn(m); ok && (h.Between != nil || h.Days != nil || h.TimeZone != nil) {
+			s.Folder.WorkingHours = &h
+		}
 	}
 }
 
@@ -767,6 +803,10 @@ func (d *Daemon) registerFolders() {
 	On(d, wire.CallFoldersSetPRCostComment, func(ctx context.Context, c *Client, r wire.SetPRCostCommentRequest) (wire.FolderSummary, error) {
 		r.Folder = store.FolderURL(folderOf(r.Folder))
 		return d.setPRCostComment(r)
+	})
+	On(d, wire.CallFoldersSetWorkingHours, func(ctx context.Context, c *Client, r wire.SetWorkingHoursRequest) (wire.FolderSummary, error) {
+		r.Folder = store.FolderURL(folderOf(r.Folder))
+		return d.setWorkingHours(r)
 	})
 	On(d, wire.CallFoldersSetProject, func(ctx context.Context, c *Client, r wire.SetFolderProjectRequest) (wire.FolderSummary, error) {
 		r.Folder = store.FolderURL(folderOf(r.Folder))
