@@ -73,3 +73,89 @@ public struct WorkflowHours: Codable, Hashable, Sendable {
         return out
     }
 }
+
+// MARK: Said on the status card and the row (#4819)
+
+extension WorkflowHours {
+    /// The zone its times are in: the file's `time-zone:`, else the viewer's own (the
+    /// person's, which their Mac sets from its clock).
+    public func zone(viewer: TimeZone) -> TimeZone {
+        timeZone.flatMap(TimeZone.init(identifier:)) ?? viewer
+    }
+
+    /// The zone's name, only when the file names one that is not the viewer's own.
+    public func zoneNote(viewer: TimeZone) -> String? {
+        guard let timeZone, timeZone != viewer.identifier else { return nil }
+        return timeZone
+    }
+
+    /// The window in words: `Runs 09:00–18:00, Mon–Fri`, and `(Europe/London)` after it
+    /// when that is not the viewer's zone. nil for hours that limit nothing.
+    public func sentence(viewer: TimeZone) -> String? {
+        if let days, days.isEmpty { return "Never runs on its own: its hours name no day" }
+        let time = between.map { text -> String in
+            guard case .success(let range) = Self.parse(between: text) else { return text }
+            return "\(Self.clock(minutes: range.from))–\(Self.clock(minutes: range.to))"
+        }
+        let day = days.flatMap(Self.dayWords)
+        guard time != nil || day != nil else { return nil }
+        var out = "Runs " + [time, day].compactMap { $0 }.joined(separator: ", ")
+        if let note = zoneNote(viewer: viewer) { out += " (\(note))" }
+        return out
+    }
+
+    /// Mon to Sun, as a working week reads.
+    static let weekOrder: [Weekday] = [.mon, .tue, .wed, .thu, .fri, .sat, .sun]
+
+    /// `Mon–Fri`, `Mon, Wed, Fri`, `Sat, Sun`: three days or more in a row as a range.
+    /// nil for every day.
+    static func dayWords(_ days: [Weekday]) -> String? {
+        let set = Set(days)
+        guard set != Weekday.everyDay else { return nil }
+        var parts: [String] = []
+        var run: [Weekday] = []
+        func flush() {
+            if run.count >= 3, let first = run.first, let last = run.last {
+                parts.append("\(first.rawValue.capitalized)–\(last.rawValue.capitalized)")
+            } else {
+                parts += run.map(\.rawValue.capitalized)
+            }
+            run = []
+        }
+        for day in weekOrder {
+            if set.contains(day) { run.append(day) } else { flush() }
+        }
+        flush()
+        return parts.joined(separator: ", ")
+    }
+
+    /// `09:00`, from minutes of the day.
+    static func clock(minutes: Int) -> String {
+        String(format: "%02d:%02d", minutes / 60, minutes % 60)
+    }
+
+    /// `Mon 09:00`, in `zone`, on a 24-hour clock as the file writes its hours.
+    public static func dayAndClock(_ date: Date, in zone: TimeZone) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = zone
+        formatter.dateFormat = "EEE HH:mm"
+        return formatter.string(from: date)
+    }
+}
+
+extension WorkflowSummary {
+    /// When its hours open, while they are shut (#4819): `Waits for its hours: opens Mon
+    /// 09:00` with a trigger held, `Outside its hours: opens Mon 09:00` with none. In the
+    /// hours' zone, named when it is not the viewer's own.
+    public func hoursOpenSentence(viewer: TimeZone = .current) -> String? {
+        guard let at = hoursOpenAt else { return nil }
+        let hours = workflow.hours ?? WorkflowHours()
+        var when = WorkflowHours.dayAndClock(at, in: hours.zone(viewer: viewer))
+        if let note = hours.zoneNote(viewer: viewer) { when += " (\(note))" }
+        return (holdsAFire ? "Waits for its hours" : "Outside its hours") + ": opens \(when)"
+    }
+
+    /// Whether a trigger is held until its hours open: the row's hourglass (#4819).
+    public var waitsForItsHours: Bool { holdsAFire && hoursOpenAt != nil }
+}

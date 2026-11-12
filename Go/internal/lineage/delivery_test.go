@@ -15,7 +15,8 @@ func TestDeliveryOf(t *testing.T) {
 		d := wire.DateOf(now.Add(-time.Duration(days * float64(24*time.Hour))))
 		return &d
 	}
-	const repo = "github:alexec/agents"
+	// The full ref forms (#4824).
+	const repo, issue, pr = "github:repo:#alexec/agents", "github:issue:alexec/agents#", "github:pr:alexec/agents#"
 	str := func(s string) *string { return &s }
 	node := func(kind, ref string, change func(*wire.LineageCostNode)) wire.LineageCostNode {
 		r := repo
@@ -29,48 +30,48 @@ func TestDeliveryOf(t *testing.T) {
 			change(n)
 		})
 	}
-	release := func(tag string) string { return repo + "/release/" + tag }
+	release := func(tag string) string { return "github:release:alexec/agents#" + tag }
 	releases := map[string]wire.Date{
 		release("v1.0.0"): *ago(20), release("v1.1.0"): *ago(10), release("v1.2.0"): *ago(2),
-		"github:other/repo/release/v9.0.0": *ago(1),
+		"github:release:other/repo#v9.0.0": *ago(1),
 	}
 	nodes := []wire.LineageCostNode{
-		node(KindIssue, repo+"#1", func(n *wire.LineageCostNode) { n.StartedAt = ago(22) }),
-		merged(repo+"#10", 21, func(n *wire.LineageCostNode) {
-			n.Fixes, n.PartOf, n.Files = []string{repo + "#1"}, []string{release("v1.0.0")}, []string{"a.go"}
+		node(KindIssue, issue+"1", func(n *wire.LineageCostNode) { n.StartedAt = ago(22) }),
+		merged(pr+"10", 21, func(n *wire.LineageCostNode) {
+			n.Fixes, n.PartOf, n.Files = []string{issue + "1"}, []string{release("v1.0.0")}, []string{"a.go"}
 			n.Banked.WorkingSeconds = 6 * 3600
 		}),
-		node(KindIssue, repo+"#2", func(n *wire.LineageCostNode) { n.StartedAt = ago(12) }),
-		merged(repo+"#11", 11, func(n *wire.LineageCostNode) {
-			n.Fixes, n.PartOf, n.Files = []string{repo + "#2"}, []string{release("v1.1.0")}, []string{"c.go"}
+		node(KindIssue, issue+"2", func(n *wire.LineageCostNode) { n.StartedAt = ago(12) }),
+		merged(pr+"11", 11, func(n *wire.LineageCostNode) {
+			n.Fixes, n.PartOf, n.Files = []string{issue + "2"}, []string{release("v1.1.0")}, []string{"c.go"}
 			n.Banked.WorkingSeconds = 12 * 3600
 		}),
-		merged(repo+"#12", 5, func(n *wire.LineageCostNode) { n.Files = []string{"a.go"} }),
+		merged(pr+"12", 5, func(n *wire.LineageCostNode) { n.Files = []string{"a.go"} }),
 		// Rework: a.go changed 1 day before.
-		merged(repo+"#13", 4, func(n *wire.LineageCostNode) {
+		merged(pr+"13", 4, func(n *wire.LineageCostNode) {
 			n.Files = []string{"a.go", "b.go"}
 			n.Resolved = &wire.LineageResolved{Title: "Add x"}
 		}),
 		// A revert of #13, a day later.
-		merged(repo+"#14", 3, func(n *wire.LineageCostNode) {
+		merged(pr+"14", 3, func(n *wire.LineageCostNode) {
 			n.Outcome = str(OutcomeReverted)
-			n.Reverts = str(repo + "#13")
+			n.Reverts = str(pr + "13")
 		}),
 		// A priority:high bug filed a day after v1.1.0, fixed a day later.
-		node(KindIssue, repo+"#3", func(n *wire.LineageCostNode) {
+		node(KindIssue, issue+"3", func(n *wire.LineageCostNode) {
 			n.Level = str("bug")
 			n.Resolved = &wire.LineageResolved{Title: "Crash", Labels: []string{"bug", "priority:high"}, CreatedAt: ago(9)}
 		}),
-		merged(repo+"#15", 8, func(n *wire.LineageCostNode) { n.Fixes = []string{repo + "#3"} }),
+		merged(pr+"15", 8, func(n *wire.LineageCostNode) { n.Fixes = []string{issue + "3"} }),
 		// A priority:high bug filed 8 days after a release is no failure, nor its fix.
-		node(KindIssue, repo+"#4", func(n *wire.LineageCostNode) {
+		node(KindIssue, issue+"4", func(n *wire.LineageCostNode) {
 			n.Resolved = &wire.LineageResolved{Title: "Slow", Labels: []string{"bug", "priority:high"}, CreatedAt: ago(12)}
 		}),
-		merged(repo+"#16", 11.5, func(n *wire.LineageCostNode) { n.Fixes = []string{repo + "#4"} }),
+		merged(pr+"16", 11.5, func(n *wire.LineageCostNode) { n.Fixes = []string{issue + "4"} }),
 		// Before the window: no figure counts it, but its files are recent work for #11.
-		merged(repo+"#9", 30, func(n *wire.LineageCostNode) { n.Files = []string{"c.go"} }),
+		merged(pr+"9", 30, func(n *wire.LineageCostNode) { n.Files = []string{"c.go"} }),
 		// Another repo's.
-		{Node: wire.LineageNode{Kind: KindPR, Ref: "github:other/repo#1"}, Repo: str("github:other/repo"),
+		{Node: wire.LineageNode{Kind: KindPR, Ref: "github:pr:other/repo#1"}, Repo: str("github:repo:#other/repo"),
 			Outcome: str(OutcomeReverted), EndedAt: ago(1)},
 	}
 

@@ -323,13 +323,20 @@ Mac's own control plane.
 
 - **Publish.** About a second after an event is new, the machine sends its envelope
   (`bus/publish`, at most 100 at a time): the id, type, provider, topic, subject, source,
-  time and producer. Never `data` or the details: the control plane reads only refs, names
-  and times.
+  time and producer. Never the details, and never `data` in clear: the control plane reads
+  only refs, names and times.
+- **Sealed data (#4825).** The machine seals `data` (at most 256 KB) with HPKE to each other
+  machine of its person's lock, to the sealing key the lock names, with its own signature
+  inside (`sealed` on `BusEvent`). The control plane keeps the copies in the bus log, gives
+  each machine its own copy only, and opens none; it cannot make one up, as a machine takes
+  data only signed by a machine of its lock. A machine opens its copy and records it as the
+  event's `data`. A machine that joined after the event, a machine with no lock, and data
+  over 256 KB get the envelope only.
 - **Dedupe.** The control plane keeps the first copy of each `id` and drops a later one,
   from any machine, with a create-if-absent write in its store, so several copies of the
   control plane agree. It counts what it drops (`agents_control_bus_events_total`, by
   `result`: `kept`, `dropped`, `delivered`).
-- **The bus log** is the last 100,000 envelopes of each person's bus, for dedupe and the
+- **The bus log** is the last 100,000 envelopes (with their sealed data) of each person's bus, for dedupe and the
   Events page; the hourly sweep deletes the older ones.
 - **Deliver.** A machine says its subscriptions (`bus/subscribe`: `provider`, `type`, a name
   or `noun.*`, `topics` and `subject`) to the copy that holds it, again after each connect.

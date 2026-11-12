@@ -90,9 +90,12 @@ type sample struct {
 func DeliveryOf(nodes []wire.LineageCostNode, repo string, releases map[string]wire.Date, now time.Time) wire.LineageDelivery {
 	at := wire.DateOf(now)
 	since := wire.DateOf(now.Add(-DeliveryWindow))
+	// The repo, a node's repo and a release's are compared in the full form (#4800), so the
+	// old form of any of them still matches.
+	repo = FullRepoText(repo)
 	var mine []wire.LineageCostNode
 	for _, n := range nodes {
-		if n.Repo != nil && *n.Repo == repo {
+		if n.Repo != nil && FullRepoText(*n.Repo) == repo {
 			mine = append(mine, n)
 		}
 	}

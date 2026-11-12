@@ -11,6 +11,8 @@ import Foundation
 @MainActor
 public final class LocalCopyKeeper {
     public let copy: LocalCopy
+    /// Chats fetched before they are opened (#4795): drawn before the copy on disk.
+    public let prefetched = OpeningPrefetch()
     private weak var work: AgentsModel?
     private var pending: [MachineRef: Task<Void, Never>] = [:]
     /// How long after a host's last list its machine is written.
@@ -38,6 +40,14 @@ public final class LocalCopyKeeper {
         return work.takeCopiedOpening(kept, load: load)
     }
 
+    /// The chat being opened, drawn at once from what was fetched for it before it was
+    /// opened (#4795), with no wait on the disk. Whether there was one to draw.
+    @discardableResult
+    public func drawPrefetched(of session: UUID, load: Int) -> Bool {
+        guard let fetched = prefetched.take(session), let work else { return false }
+        return work.takeCopiedOpening(fetched, load: load)
+    }
+
     /// A host's opening page landed: its end is kept. A page whose turns did not load is
     /// not, so the copy never holds a chat without its turns.
     public func opened(_ session: UUID, _ loaded: ChatOpening.Loaded) {
@@ -49,6 +59,7 @@ public final class LocalCopyKeeper {
     public func forget() async {
         for task in pending.values { task.cancel() }
         pending = [:]
+        prefetched.forget()
         await copy.forget()
     }
 

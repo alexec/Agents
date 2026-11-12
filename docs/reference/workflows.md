@@ -381,8 +381,11 @@ hours:
   Without your time zone, the hours use the time zone of the machine.
 - A trigger that comes outside the hours is **held**, not dropped, as a cooldown holds
   one. When the hours open, the workflow runs **once**, for the latest held trigger. The
-  row says **Waiting — it is outside its hours until 18:00, and runs once then**. A held
-  trigger is not put on the log as `workflow.refused`.
+  status card says **Waits for its hours: opens Mon 09:00**, and the row shows an
+  hourglass. A held trigger is not put on the log as `workflow.refused`.
+- The status card always says the hours, such as **Runs 09:00–18:00, Mon–Fri**. When the
+  file's time zone is not yours, the card names it: **Runs 18:00–09:00, Mon–Fri
+  (Europe/London)**, and the time when the hours open is in that zone.
 - With `cooldown:` and `hours:`, a held trigger runs when both let it.
 - A schedule runs only at a time that its own `between:` and `days:` and the `hours:`
   both let it. A schedule time outside the hours is not held.

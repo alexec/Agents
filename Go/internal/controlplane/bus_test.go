@@ -1,6 +1,7 @@
 package controlplane
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -218,5 +219,56 @@ func TestSweepBusKeepsTheNewest(t *testing.T) {
 	got := busSay[wire.BusPublished](t, p, host, wire.CallBusPublish.Name, wire.BusPublish{Events: events})
 	if got != (wire.BusPublished{Kept: 2, Dropped: 2}) {
 		t.Fatalf("%+v", got)
+	}
+}
+
+// sealedCopy is a copy the control plane cannot open: bytes of the right size only.
+func sealedCopy(machine string, fill byte) wire.BusSealedData {
+	return wire.BusSealedData{Machine: machine, Sealed: wire.SealedEnvelope{
+		Encapsulated: bytes.Repeat([]byte{4}, busEncapsulatedBytes), Ciphertext: bytes.Repeat([]byte{fill}, 200)}}
+}
+
+// #4825: an event's sealed data is kept in the bus log, and each machine is given its own
+// copy only; a copy too large, or for no machine, is refused.
+func TestBusGivesEachMachineItsOwnSealedCopy(t *testing.T) {
+	t.Parallel()
+	mem := store.NewMemory()
+	p := startPlane(t, mem, controllink.NewPrivateKey())
+	var told busDeliveries
+	p.told = told.told
+	a, b, c := p.host("MAC-A").member.Host, p.host("LINUX-B").member.Host, p.host("MAC-C").member.Host
+	p.waitFor(func() bool { return p.s.router.Holds(a) && p.s.router.Holds(b) && p.s.router.Holds(c) }, "the machines held")
+	subscribeTo(t, p, b, wire.BusSubscription{ID: "all"})
+	subscribeTo(t, p, c, wire.BusSubscription{ID: "all"})
+	e := prMerged(9)
+	e.Sealed = []wire.BusSealedData{sealedCopy(b, 'b'), sealedCopy(c, 'c')}
+	busSay[wire.BusPublished](t, p, a, wire.CallBusPublish.Name, wire.BusPublish{Events: []wire.BusEvent{e}})
+	p.waitFor(func() bool { return len(told.of(b)) == 1 && len(told.of(c)) == 1 }, "B and C told")
+	for host, fill := range map[string]byte{b: 'b', c: 'c'} {
+		got := told.of(host)[0].Event.Sealed
+		if len(got) != 1 || got[0].Machine != host || got[0].Sealed.Ciphertext[0] != fill {
+			t.Fatalf("%s was given %+v", host, got)
+		}
+	}
+	keys, _ := mem.List(context.Background(), busPrefix+busOf(p.s.ownerOf(a))+"/log/")
+	if len(keys) != 1 {
+		t.Fatalf("the log has %v", keys)
+	}
+	body, _ := mem.Get(context.Background(), keys[0].Key)
+	var kept wire.BusEvent
+	if json.Unmarshal(body.Data, &kept) != nil || len(kept.Sealed) != 2 {
+		t.Fatalf("the log keeps %s", body.Data)
+	}
+
+	big := sealedCopy(b, 'b')
+	big.Sealed.Ciphertext = make([]byte, busSealedBytes+1)
+	twice := []wire.BusSealedData{sealedCopy(b, 'b'), sealedCopy(b, 'b')}
+	for name, sealed := range map[string][]wire.BusSealedData{"too large": {big}, "no machine": {sealedCopy("", 'x')}, "twice": twice} {
+		bad := prMerged(10)
+		bad.Sealed = sealed
+		raw, _ := json.Marshal(wire.BusPublish{Events: []wire.BusEvent{bad}})
+		if _, err := p.s.methods.HostSaid(a, wire.CallBusPublish.Name, raw); err == nil {
+			t.Fatalf("took a copy %s", name)
+		}
 	}
 }
