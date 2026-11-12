@@ -7,8 +7,10 @@ description: The look of the app, the docs site and the website — its principl
 
 The app has one look, **Paper**, and this page writes it down: the principles, every token
 with its light and dark value, the type steps, and the files where each surface reads them.
-The Mac window, the iPhone and iPad app and the web page draw it today. The docs site, the
-website (agentloops.dev) and the forge connector pages move onto it next (#4600).
+The Mac window, the iPhone and iPad app, the web page and the forge connector pages draw it
+today: the connector pages read `Go/internal/forgepages`, which maps their MCP Apps variables
+onto the tokens (#4607). The docs site and the website (agentloops.dev) move onto it next
+(#4600).
 
 The values come from one file, `design/tokens.json`. The tables on this page are made from
 that file by `scripts/design.sh gen`, and `scripts/design.sh check` fails when they do not

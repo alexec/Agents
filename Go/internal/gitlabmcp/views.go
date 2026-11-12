@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/forgepages"
 	"github.com/alexec/agents/Go/internal/richtext"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -46,7 +47,7 @@ func page(name string) string {
 		}
 		return string(b)
 	}
-	return strings.NewReplacer("/*common.css*/", read("common.css"), "/*mrpage.css*/", read("mrpage.css"),
+	return strings.NewReplacer("/*common.css*/", forgepages.Style+read("common.css"), "/*mrpage.css*/", read("mrpage.css"),
 		"/*bridge.js*/", read("bridge.js"), "/*lineage.js*/", read("lineage.js"), "/*mrpage.js*/", read("mrpage.js")).Replace(read(name))
 }
 

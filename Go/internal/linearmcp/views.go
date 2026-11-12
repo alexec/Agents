@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/forgepages"
 	"github.com/alexec/agents/Go/internal/richtext"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -36,7 +37,7 @@ func page(name string) string {
 		}
 		return string(b)
 	}
-	return strings.NewReplacer("/*common.css*/", read("common.css"), "/*bridge.js*/", read("bridge.js"), "/*lineage.js*/", read("lineage.js")).Replace(read(name))
+	return strings.NewReplacer("/*common.css*/", forgepages.Style+read("common.css"), "/*bridge.js*/", read("bridge.js"), "/*lineage.js*/", read("lineage.js")).Replace(read(name))
 }
 
 func uiMeta(uri string, visibility ...string) mcp.Meta {
