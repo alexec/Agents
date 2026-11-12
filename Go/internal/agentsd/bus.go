@@ -77,6 +77,9 @@ func (d *Daemon) publishSoon(e wire.Event) {
 	if !ok {
 		return
 	}
+	if poll := d.busPollOf(e); poll != "" {
+		b.Poll = &poll
+	}
 	d.busMu.Lock()
 	defer d.busMu.Unlock()
 	if len(d.busPending) >= busPublishHeld {
@@ -147,6 +150,10 @@ func (d *Daemon) toldBusDelivery(params json.RawMessage) {
 	}
 	e := del.Event
 	if e.ID == "" || e.Type == "" || d.hasEventID(e.ID) {
+		return
+	}
+	// The event of a poll this machine stands by on: its subscription's own (#4731).
+	if d.takeStandbyDelivery(e) || len(del.Subscriptions) == 0 {
 		return
 	}
 	details := map[string]string{"bus_producer": e.Producer, "bus_subscriptions": strings.Join(del.Subscriptions, ",")}

@@ -3449,6 +3449,10 @@
             "$ref": "#/definitions/BusSealedData"
           },
           "description": "The event's data (at most 256 KB), sealed by the machine that raised it to each machine of its person's lock (#4825). In bus/deliver, only the copy for the machine it goes to. None when the data is larger, or the machine has no lock."
+        },
+        "poll": {
+          "type": "string",
+          "description": "The producer lease of the poll that made it (#4731), when a machine polled a server for it: a hash of the folder's project, the server's name, the event and its filters, the same on every machine. The control plane delivers it to the machines that stand by on that poll. Not part of the event's identity."
         }
       },
       "required": [
@@ -3460,6 +3464,73 @@
         "source",
         "time",
         "producer"
+      ],
+      "additionalProperties": false
+    },
+    "BusLease": {
+      "type": "object",
+      "description": "bus/lease (#4731, spec 4724-event-bus, \"The bus\", step 6): the polls a machine is about to make, at most 100, each asking for its producer lease or renewing it, and the leases it lets go (its Mac goes to sleep, a subscription ended). The control plane gives each lease to one machine at a time, for 5 minutes from its last renewal.",
+      "properties": {
+        "polls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The polls' keys (BusEvent.poll), each 1 to 128 bytes."
+        },
+        "release": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The keys of the leases this machine lets go. One another machine holds is left as it is."
+        }
+      },
+      "required": [
+        "polls"
+      ],
+      "additionalProperties": false
+    },
+    "BusLeased": {
+      "type": "object",
+      "description": "bus/lease's answer (#4731): who holds each poll's lease now, in the order asked.",
+      "properties": {
+        "leases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BusProducerLease"
+          }
+        }
+      },
+      "required": [
+        "leases"
+      ],
+      "additionalProperties": false
+    },
+    "BusProducerLease": {
+      "type": "object",
+      "description": "One producer lease (#4731): the machine that polls, until when, and whether it is the one that asked. A machine that is not the holder stands by: it does not poll, and the control plane delivers it what the holder's poll makes.",
+      "properties": {
+        "poll": {
+          "type": "string"
+        },
+        "holder": {
+          "type": "string",
+          "description": "The holder's machine id on the control plane."
+        },
+        "mine": {
+          "type": "boolean"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "poll",
+        "holder",
+        "mine",
+        "until"
       ],
       "additionalProperties": false
     },
