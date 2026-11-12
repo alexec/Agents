@@ -50,9 +50,10 @@ func (d *Daemon) serverViews(folder string, f pinsFile) []wire.PinView {
 				host, hostRead = originHost(folder), true
 			}
 			// Work has the folder's own repo's issues and pull requests (#3119, #3131) and
-			// Linear's (#3311), so GitHub's, GitLab's, Forgejo's (#3753), Bitbucket's (#3786), Azure DevOps's (#3803) and Linear's rows for it go. A project's
+			// Linear's (#3311), so GitHub's, GitLab's, Forgejo's (#3753), Bitbucket's (#3786), Azure DevOps's (#3803) and Linear's rows for it go,
+			// and Jira's and Azure Boards' where the folder names their projects (#4911). A project's
 			// other repo keeps its row (#2669): Work lists only the folders' own.
-			fits = oursFits(ours, host) && !inWork(ours)
+			fits = oursFits(ours, host) && !d.inWork(ours, folder)
 		}
 		catalog := d.cachedViewCatalog(s)
 		if catalog == nil {
@@ -127,12 +128,21 @@ func oursFits(o mcpcatalog.Ours, host string) bool {
 	return true
 }
 
-// inWork says Work lists what ours's list views list, in every folder they fit: GitHub's
-// and GitLab's (#3131), Forgejo's (#3753), Bitbucket's (#3786), Azure DevOps's pull requests
-// (#3803), and Linear's, the whole workspace when no folder names linearTeams (#3311).
-func inWork(o mcpcatalog.Ours) bool {
-	return o.ID == "agents/github" || o.ID == "agents/gitlab" || o.ID == "agents/forgejo" || o.ID == "agents/bitbucket" ||
-		o.ID == "agents/azuredevops" || o.ID == "agents/linear"
+// inWork says Work lists what ours's list views list in folder: GitHub's and GitLab's
+// (#3131), Forgejo's (#3753), Bitbucket's (#3786), Azure DevOps's pull requests (#3803), and
+// Linear's, the whole workspace when no folder names linearTeams (#3311), in every folder they
+// fit; Jira's and Azure Boards' only in a folder that names their projects, jiraProjects or
+// azureBoardsProjects (#4358, #4359, #4911). Elsewhere Work does not list them, so the row stays.
+func (d *Daemon) inWork(o mcpcatalog.Ours, folder string) bool {
+	switch o.ID {
+	case "agents/github", "agents/gitlab", "agents/forgejo", "agents/bitbucket", "agents/azuredevops", "agents/linear":
+		return true
+	case "agents/jira":
+		return len(d.folderJiraProjects(folder)) > 0
+	case "agents/azureboards":
+		return len(d.folderBoardsProjects(folder)) > 0
+	}
+	return false
 }
 
 // serverTitle is the catalogue's title for one of ours, the server's own, or its name.
