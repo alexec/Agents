@@ -49,6 +49,11 @@ func (l *live) beginUnprompted() bool {
 // beginUnpromptedSaying is beginUnprompted; with late, the turn keeps the words the
 // runtime said after its prompt's answer (noteLate), for its report.
 func (l *live) beginUnpromptedSaying(late bool) bool {
+	// No turn starts once the host is going (closeAfterTurns): the runtime's last words
+	// after Shutdown stopped it are no turn to write down (#4744).
+	if l.d.going() {
+		return false
+	}
 	l.mu.Lock()
 	if l.inTurn || l.running || l.session == nil {
 		l.mu.Unlock()

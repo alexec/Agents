@@ -1895,7 +1895,9 @@ func (l *live) open(ctx context.Context, a *wire.Agent, quiet bool) bool {
 			a.Levels = d.matchLevels(a)
 		}
 	})
-	safe.Go("session watch", func() {
+	// Work Shutdown waits for, once stopAll has ended the runtime (#4744): what it clears
+	// writes into the root. Once the host is going it runs untracked, as before.
+	watch := func() {
 		<-s.Done()
 		l.mu.Lock()
 		ours := l.session == s
@@ -1918,7 +1920,10 @@ func (l *live) open(ctx context.Context, a *wire.Agent, quiet bool) bool {
 				d.sweepOrgAccountFolders()
 			}
 		}
-	})
+	}
+	if !d.goAfterTurn("session watch", watch) {
+		safe.Go("session watch", watch)
+	}
 	// The start options the window chose (model, mode) go first. What the runtime
 	// hands back replaces the handshake's own defaults above, so the mode pill shows
 	// the person's choice, not the runtime's; a push it refuses is a notice, not a

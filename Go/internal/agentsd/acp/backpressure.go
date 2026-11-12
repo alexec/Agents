@@ -19,6 +19,10 @@ const (
 	// comes down, and a handler that waits on the runtime must not hold its own output.
 	// Only four stalls in a row, with nothing handed on, fill the SDK's 1,024.
 	queuedUpdatesStall = 5 * time.Second
+	// drainLimit is how long Stop waits for the session/updates read before the runtime's
+	// output ended to be handed on (#4744): long enough for a turn's last words, short
+	// enough that a line counted wrongly cannot hang a stop.
+	drainLimit = 2 * time.Second
 )
 
 var sessionUpdateMarker = []byte(`"session/update"`)
@@ -30,10 +34,14 @@ type updateGate struct {
 	mu      sync.Mutex
 	queued  int
 	handled chan struct{}
+	// ended is set once the runtime's output has ended: no more updates are read.
+	ended bool
+	// drained is closed once the output has ended and every update read was handed on.
+	drained chan struct{}
 }
 
 func newUpdateGate() *updateGate {
-	return &updateGate{limit: queuedUpdatesLimit, stall: queuedUpdatesStall, handled: make(chan struct{}, 1)}
+	return &updateGate{limit: queuedUpdatesLimit, stall: queuedUpdatesStall, handled: make(chan struct{}, 1), drained: make(chan struct{})}
 }
 
 // wait holds the next read while the queue is at the limit.
@@ -80,9 +88,48 @@ func (g *updateGate) done() {
 	if g.queued > 0 {
 		g.queued--
 	}
+	g.closeIfDrainedLocked()
 	g.mu.Unlock()
 	select {
 	case g.handled <- struct{}{}:
 	default:
+	}
+}
+
+// end is the runtime's output ended: a read failed, so the SDK reads nothing more.
+func (g *updateGate) end() {
+	if g == nil {
+		return
+	}
+	g.mu.Lock()
+	g.ended = true
+	g.closeIfDrainedLocked()
+	g.mu.Unlock()
+}
+
+// closeIfDrainedLocked closes drained once nothing more comes and nothing waits. With mu held.
+func (g *updateGate) closeIfDrainedLocked() {
+	if !g.ended || g.queued > 0 {
+		return
+	}
+	select {
+	case <-g.drained:
+	default:
+		close(g.drained)
+	}
+}
+
+// drain waits, at most limit, until the output has ended and each update read from it was
+// handed on: then nothing the runtime said is still on its way to the sink (#4744). It is
+// false when the limit came first.
+func (g *updateGate) drain(limit time.Duration) bool {
+	if g == nil {
+		return true
+	}
+	select {
+	case <-g.drained:
+		return true
+	case <-time.After(limit):
+		return false
 	}
 }
