@@ -2,6 +2,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Every day at 2am, in a new agent"
     },
@@ -65,6 +67,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Every weekday on the hour and half hour between 9:30am and 5:30pm, in its own standing agent"
     },
@@ -127,6 +131,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Mon on the half hour, in a new agent"
     },
@@ -184,6 +190,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Every day at 2am, in a new agent, in plan mode, on Grok, using grok-4, at high effort, without beta, with fast, with voice calm"
     },
@@ -253,6 +261,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Every day at 2am, in the agent that triggered it"
     },
@@ -317,6 +327,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Every day at 2am, in a new agent, on mystery"
     },
@@ -381,6 +393,8 @@
   {
     "expected" : {
       "canFire" : false,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Waits for \"on-push\", which this version does not know about yet"
     },
@@ -428,6 +442,8 @@
   {
     "expected" : {
       "canFire" : false,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Waits for \"agent-finished\", which this version does not know about yet. Did you mean agent.finished?"
     },
@@ -480,6 +496,8 @@
   {
     "expected" : {
       "canFire" : false,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "By hand, with Run now, in a new agent"
     },
@@ -520,6 +538,8 @@
   {
     "expected" : {
       "canFire" : false,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : true,
       "summary" : "Line 3: no closing ---"
     },
@@ -565,6 +585,8 @@
   {
     "expected" : {
       "canFire" : false,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Runs \"swarm\", which this version does not know about yet"
     },
@@ -633,6 +655,8 @@
   {
     "expected" : {
       "canFire" : false,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "bad"
     },
@@ -678,6 +702,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : true,
       "summary" : "Every day at 2am, in a new agent"
     },
@@ -742,6 +768,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : true,
       "summary" : "Every day at 2am, in a new agent"
     },
@@ -809,6 +837,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Every day at 2am, in a new agent"
     },
@@ -883,6 +913,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Every day at 2am, in a new agent"
     },
@@ -957,6 +989,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Every day at 2am, in a new agent"
     },
@@ -1031,6 +1065,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : true,
       "summary" : "Every day at 2am, in a new agent"
     },
@@ -1105,6 +1141,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Every day at 2am, in a new agent"
     },
@@ -1168,6 +1206,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Every day at 2am, in a new agent"
     },
@@ -1242,6 +1282,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Every day at 2am, in a new agent, at most once every 1 hour 30 minutes, in plan mode"
     },
@@ -1307,6 +1349,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Every day at 2am, in the agent that triggered it, at most once every 1 day"
     },
@@ -1383,6 +1427,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "Fri on the hour between 10pm and 2am, in a new agent"
     },
@@ -1440,6 +1486,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : "Runs 18:00–09:00, Mon, Tue (Europe/London)",
+      "hoursOpen" : "Waits for its hours: opens Thu 00:26 (Europe/London)",
       "needsAPerson" : false,
       "summary" : "Every day at 2am, in a new agent"
     },
@@ -1523,6 +1571,157 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : "Runs 09:00–18:00, Mon–Fri",
+      "hoursOpen" : "Outside its hours: opens Wed 17:26",
+      "needsAPerson" : false,
+      "summary" : "Every day at 2am, in a new agent"
+    },
+    "input" : {
+      "holdsAFire" : false,
+      "hoursOpenAt" : 812507200,
+      "isArchived" : false,
+      "isEnabled" : true,
+      "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
+      "queued" : 0,
+      "scope" : "folder",
+      "workflow" : {
+        "folder" : "file:///fixture/folder",
+        "hours" : {
+          "between" : "9-18",
+          "days" : [
+            "fri",
+            "mon",
+            "thu",
+            "tue",
+            "wed"
+          ]
+        },
+        "mode" : "new",
+        "name" : "Office hours",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "office-hours"
+      }
+    },
+    "name" : "working hours, shut, none held"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "hours" : "Runs Wed, Sat, Sun",
+      "hoursOpen" : null,
+      "needsAPerson" : false,
+      "summary" : "Every day at 2am, in a new agent"
+    },
+    "input" : {
+      "holdsAFire" : false,
+      "isArchived" : false,
+      "isEnabled" : true,
+      "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
+      "queued" : 0,
+      "scope" : "folder",
+      "workflow" : {
+        "folder" : "file:///fixture/folder",
+        "hours" : {
+          "days" : [
+            "sat",
+            "sun",
+            "wed"
+          ],
+          "timeZone" : "America/Los_Angeles"
+        },
+        "mode" : "new",
+        "name" : "Weekend",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "weekend"
+      }
+    },
+    "name" : "weekends, every hour"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "When ci reports checks.failed (repo alexec/Agents), in a new agent"
     },
@@ -1571,6 +1770,8 @@
   {
     "expected" : {
       "canFire" : true,
+      "hours" : null,
+      "hoursOpen" : null,
       "needsAPerson" : false,
       "summary" : "When a server here reports pr.merged, and When github or gitlab reports pr.opened (draft false, labels bug), in a new agent"
     },
