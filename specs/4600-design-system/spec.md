@@ -73,7 +73,7 @@ differs; CI's `marks` job runs it on the macOS 27 image (#4615). The inventory i
 | `design/logo/blob/final/tile-1024.png`, `tile-asleep-1024.png`, `tile-quizzical-1024.png` | PNG RGBA | 1024 | `marks` | the tiles at full size, for reference |
 | `www/index.html` `og:image` → `www/assets/shots/mac.png` | PNG | 1440×900 | screenshot (`promo/shots/`) | the app, not a mark; out of scope |
 | `design/logo/colour/*`, `design/logo/blob/{blob,three-blobs,crowd,faces}` | SVG, PNG | various | `make.py` | archive: the old violet Blob, not shipped |
-| `Go/internal/agentsd/templates/iphone-app/…/AppIcon.png` | PNG | 1024 | template (#3707) | a starter app's placeholder, out of scope |
+| `alexec/iphone-app-starter`: `App/…/AppIcon.png` | PNG | 1024 | template (#3707, #4561) | a starter app's placeholder, out of scope |
 
 No `.icns` is in the repo; `actool` builds it from the icon set.
 

@@ -1341,18 +1341,14 @@
         },
         "starter": {
           "type": "string",
-          "enum": [
-            "iphone-app",
-            "web-service"
-          ],
-          "description": "The starter: iphone-app (TestFlight, then the App Store) or web-service (Cloud Run)."
+          "description": "The starter, a GitHub template repository: iphone-app (alexec/iphone-app-starter: TestFlight, then the App Store), web-service (alexec/web-service-starter: Cloud Run), or another template repository as owner/name, such as the person's fork. The app takes its default branch."
         },
         "values": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "The starter's placeholders. iphone-app takes APP_NAME and BUNDLE_ID; web-service takes APP_NAME, SERVICE, GCP_PROJECT and GCP_REGION. The app fills GITHUB_REPO itself."
+          "description": "The starter's placeholders. iphone-app takes APP_NAME and BUNDLE_ID; web-service takes APP_NAME, SERVICE, GCP_PROJECT and GCP_REGION; another starter says its own in its .github/README.md, and a missing one is refused with their names. The app fills GITHUB_REPO itself."
         },
         "owner": {
           "type": "string",

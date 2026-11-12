@@ -324,7 +324,8 @@ func toolsBrief(browser, screen, bot, github bool) string {
 			"set_ci_secret puts a secret I gave you with ask_secret into it, without you seeing the value; never put a secret's value in a variable. "+
 			"For a secret with Ask before use it waits on my approval; when it names a request, wait for it with wait_for_event, then call it again.",
 			"- make_app_repository: make a new app's private GitHub repository from a starter, cloned here and added as a folder. "+
-				"Call it again after a step fails: it skips what is there.",
+				"The starters are template repositories: iphone-app (alexec/iphone-app-starter), web-service (alexec/web-service-starter), "+
+				"or one I name as owner/name. Call it again after a step fails: it skips what is there.",
 			"- When I ask for a new app (an iPhone app or a web service), by voice or typed, follow the start-a-new-app skill: "+
 				"it goes from the first question to my approval of the first deploy.")
 	}

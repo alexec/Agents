@@ -1,12 +1,6 @@
 package agentsd
 
 import (
-	"bytes"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rand"
-	"crypto/x509"
-	"encoding/pem"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,33 +9,128 @@ import (
 	"testing"
 )
 
-var starterValues = map[string]map[string]string{
-	"iphone-app": {"APP_NAME": "Tide Log", "BUNDLE_ID": "com.example.tidelog"},
-	"web-service": {
-		"APP_NAME": "Tide Log", "SERVICE": "tidelog", "GCP_PROJECT": "tidelog-1234",
-		"GCP_REGION": "us-central1", "GITHUB_REPO": "someone/tidelog",
-	},
+// The starters' own checks (their workflows, the icon, asc-key.sh, setup-gcp.sh) are in their
+// template repositories' CI (#4561). These test fetching, ignoring and filling, with a
+// template repository of their own.
+
+// starterTemplate makes repo (owner/name) as a bare repository with files on its default
+// branch, under a folder that stands in for GitHub for the rest of the test.
+func starterTemplate(t *testing.T, repo string, files map[string]string) {
+	t.Helper()
+	base := t.TempDir()
+	work := t.TempDir()
+	for p, s := range files {
+		full := filepath.Join(work, filepath.FromSlash(p))
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(s), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bare := filepath.Join(base, filepath.FromSlash(repo)+".git")
+	for _, args := range [][]string{
+		{"-C", work, "init", "-q", "--initial-branch=main"},
+		{"-C", work, "add", "-A"},
+		{"-C", work, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "template"},
+		{"init", "-q", "--bare", "--initial-branch=main", bare},
+		{"-C", work, "push", "-q", bare, "main"},
+	} {
+		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	old := starterGitBase
+	starterGitBase = "file://" + base
+	t.Cleanup(func() { starterGitBase = old })
 }
 
-func TestStarterIDs(t *testing.T) {
-	if got, want := starterIDs(), []string{"iphone-app", "web-service"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("starterIDs() = %v, want %v", got, want)
+// A small web-service-like template: its own README and CI under .starterignore, a binary
+// file that is not filled.
+var webTemplate = map[string]string{
+	".starterignore":                 "# the template's own\n.github/README.md\n.github/template/\n.github/workflows/template.yml\n",
+	".github/README.md":              "A template; __UNFILLED__ is a placeholder.\n",
+	".github/template/fill.py":       "SAMPLE = {'__ALSO_UNFILLED__': 1}\n",
+	".github/workflows/template.yml": "name: template # __ALSO_UNFILLED__\n",
+	".github/workflows/deploy.yml":   "env:\n  SERVICE: __SERVICE__\n  PROJECT: __GCP_PROJECT__\n  REGION: __GCP_REGION__\n",
+	"README.md":                      "# __APP_NAME__\n",
+	"setup-gcp.sh":                   "#!/usr/bin/env bash\nrepo=__GITHUB_REPO__\n",
+	"icon.bin":                       "\x00__APP_NAME__\x00",
+}
+
+func TestStarterRepo(t *testing.T) {
+	for in, want := range map[string]string{
+		"iphone-app": "alexec/iphone-app-starter", "web-service": "alexec/web-service-starter",
+		"someone/my-starter": "someone/my-starter",
+	} {
+		if got, ok := starterRepo(in); !ok || got != want {
+			t.Errorf("starterRepo(%q) = %q %v, want %q", in, got, ok, want)
+		}
+	}
+	for _, bad := range []string{"", "android-app", "../x", "a/b/c", "a/../b", "../..", "a/.."} {
+		if _, ok := starterRepo(bad); ok {
+			t.Errorf("starterRepo(%q) took it", bad)
+		}
 	}
 }
 
-func TestStarterPlaceholders(t *testing.T) {
-	for id, values := range starterValues {
-		got, err := starterPlaceholders(id)
-		if err != nil {
-			t.Fatal(err)
+func TestFetchStarterLeavesOutTheTemplatesOwnFiles(t *testing.T) {
+	starterTemplate(t, "someone/web-starter", webTemplate)
+	files, err := fetchStarter("someone/web-starter", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paths []string
+	for p := range files {
+		paths = append(paths, p)
+	}
+	want := []string{".github/workflows/deploy.yml", "README.md", "icon.bin", "setup-gcp.sh"}
+	if !sameSet(paths, want) {
+		t.Fatalf("paths = %v, want %v", paths, want)
+	}
+	if got, want := starterPlaceholders(files), []string{"APP_NAME", "GCP_PROJECT", "GCP_REGION", "GITHUB_REPO", "SERVICE"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("placeholders = %v, want %v", got, want)
+	}
+
+	if _, err := fetchStarter("someone/no-such-starter", ""); err == nil || !strings.Contains(err.Error(), "could not fetch the starter someone/no-such-starter") {
+		t.Errorf("a missing template: %v", err)
+	}
+}
+
+func TestFillStarterFillsEveryPlaceholder(t *testing.T) {
+	starterTemplate(t, "someone/web-starter", webTemplate)
+	files, err := fetchStarter("someone/web-starter", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fillStarter(files, map[string]string{"APP_NAME": "Tide Log"}); err == nil || !strings.Contains(err.Error(), "GCP_PROJECT") {
+		t.Fatalf("missing values: %v", err)
+	}
+	filled, err := fillStarter(files, map[string]string{"APP_NAME": "Tide Log", "SERVICE": "tidelog", "GCP_PROJECT": "tidelog-1",
+		"GCP_REGION": "us-central1", "GITHUB_REPO": "someone/tidelog"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for p, b := range filled {
+		if m := starterPlaceholder.Find(b); m != nil && starterText(b) {
+			t.Errorf("%s still says %s", p, m)
 		}
-		var want []string
-		for k := range values {
-			want = append(want, k)
-		}
-		if !sameSet(got, want) {
-			t.Errorf("%s placeholders = %v, want %v", id, got, want)
-		}
+	}
+	if got := string(filled["setup-gcp.sh"]); !strings.Contains(got, "repo=someone/tidelog\n") {
+		t.Errorf("setup-gcp.sh = %q", got)
+	}
+	if got := string(filled["icon.bin"]); got != webTemplate["icon.bin"] {
+		t.Errorf("a binary file was filled: %q", got)
+	}
+	if string(files["README.md"]) != "# __APP_NAME__\n" {
+		t.Error("fillStarter changed the files it was given")
+	}
+}
+
+func TestWithoutStarterIgnoredWithNoIgnoreFile(t *testing.T) {
+	files := map[string][]byte{"a": nil, ".github/README.md": nil}
+	if got := withoutStarterIgnored(files); len(got) != 2 {
+		t.Errorf("got %v", got)
 	}
 }
 
@@ -59,153 +148,4 @@ func sameSet(a, b []string) bool {
 		}
 	}
 	return len(a) == len(b)
-}
-
-func TestStarterFilesFillsEveryPlaceholder(t *testing.T) {
-	for id, values := range starterValues {
-		files, err := starterFiles(id, values)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for p, b := range files {
-			if m := starterPlaceholder.Find(b); m != nil && starterText(b) {
-				t.Errorf("%s/%s still says %s", id, p, m)
-			}
-		}
-	}
-}
-
-func TestStarterFilesNeedsEveryValue(t *testing.T) {
-	_, err := starterFiles("iphone-app", map[string]string{"APP_NAME": "Tide Log"})
-	if err == nil || !strings.Contains(err.Error(), "BUNDLE_ID") {
-		t.Fatalf("err = %v, want one that names BUNDLE_ID", err)
-	}
-	if _, err := starterFiles("android-app", nil); err == nil {
-		t.Fatal("an unknown starter gave no error")
-	}
-}
-
-// The workflows say what they deployed with the notice that Lineage reads (#3584).
-func TestStartersSayTheirDeploys(t *testing.T) {
-	want := map[string][]string{
-		"iphone-app": {
-			".github/workflows/release.yml:::notice title=deploy::testflight:$BUNDLE_ID/${{ github.run_number }}",
-			".github/workflows/release.yml:BUNDLE_ID: com.example.tidelog",
-			".github/workflows/app-store.yml:::notice title=deploy::appstore:$BUNDLE_ID/${TAG#v}",
-			".github/workflows/app-store.yml:environment: app-store",
-			".github/workflows/release.yml:environment: testflight",
-			".github/workflows/release.yml:-allowProvisioningUpdates",
-			".github/workflows/setup.yml:swift scripts/asc.swift register",
-			"project.yml:SentryDSN: $(SENTRY_DSN)",
-			"App/StarterApp.swift:options.releaseName",
-			".github/workflows/release.yml:SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}",
-			".github/workflows/release.yml:SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}",
-			".github/workflows/release.yml:debug-files upload --project \"$SENTRY_PROJECT\" \"$RUNNER_TEMP/App.xcarchive/dSYMs\"",
-		},
-		"web-service": {
-			".github/workflows/deploy.yml:::notice title=deploy::cloudrun:$PROJECT/$REGION/$SERVICE/$SERVICE-${{ github.run_number }}",
-			".github/workflows/deploy.yml:environment: production",
-			".github/workflows/deploy.yml:SENTRY_RELEASE=$SERVICE@${TAG#v}",
-			"setup-gcp.sh:assertion.repository == '$repo'",
-			"setup-gcp.sh:echo \"GCP_WIF_PROVIDER=",
-			"setup-gcp.sh:echo \"GCP_DEPLOY_SA=",
-			"instrument.mjs:dsn: process.env.SENTRY_DSN",
-		},
-	}
-	for id, lines := range want {
-		files, err := starterFiles(id, starterValues[id])
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, l := range lines {
-			p, text, _ := strings.Cut(l, ":")
-			if !bytes.Contains(files[p], []byte(text)) {
-				t.Errorf("%s/%s does not say %q", id, p, text)
-			}
-		}
-	}
-}
-
-// setup-gcp.sh names the pool, the provider and the account the same every time, so an agent
-// that reads only the project's number builds the two variables (#3710,
-// specs/3656-new-app/google-cloud.md, step 5).
-func TestSetupGCPNamesAreFixed(t *testing.T) {
-	files, err := starterFiles("web-service", starterValues["web-service"])
-	if err != nil {
-		t.Fatal(err)
-	}
-	script := string(files["setup-gcp.sh"])
-	for _, l := range []string{"pool=github\n", "provider=github\n", "account=deploy\n", "repo=someone/tidelog\n",
-		"project=${1:-tidelog-1234}\n",
-		`echo "GCP_WIF_PROVIDER=projects/$number/locations/global/workloadIdentityPools/$pool/providers/$provider"`,
-		`sa="$account@$project.iam.gserviceaccount.com"`, `echo "GCP_DEPLOY_SA=$sa"`} {
-		if !strings.Contains(script, l) {
-			t.Errorf("setup-gcp.sh does not say %q", l)
-		}
-	}
-	// The two names are the script's last output, which the agent reads from the page.
-	lines := strings.Split(strings.TrimSpace(script), "\n")
-	if !strings.HasPrefix(lines[len(lines)-1], `echo "GCP_DEPLOY_SA=`) || !strings.HasPrefix(lines[len(lines)-2], `echo "GCP_WIF_PROVIDER=`) {
-		t.Errorf("setup-gcp.sh does not end with the two names: %q", lines[len(lines)-2:])
-	}
-}
-
-// The iPhone app's icon is an image, so it is not filled, and it is there: App Store Connect
-// refuses a build with no icon.
-func TestStarterKeepsTheIcon(t *testing.T) {
-	files, err := starterFiles("iphone-app", starterValues["iphone-app"])
-	if err != nil {
-		t.Fatal(err)
-	}
-	icon := files["App/Assets.xcassets/AppIcon.appiconset/AppIcon.png"]
-	if !bytes.HasPrefix(icon, []byte("\x89PNG\r\n\x1a\n")) {
-		t.Fatal("no AppIcon.png")
-	}
-}
-
-// A key pasted in ask_secret's one-line field loses its line breaks (#3709,
-// specs/3656-new-app/apple.md, step 5): every workflow writes the .p8 file with asc-key.sh,
-// which puts them back, so the file is the one Apple gave.
-func TestStarterRebuildsThePastedKey(t *testing.T) {
-	files, err := starterFiles("iphone-app", starterValues["iphone-app"])
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, w := range []string{"setup.yml", "release.yml", "app-store.yml"} {
-		y := string(files[".github/workflows/"+w])
-		if !strings.Contains(y, `bash scripts/asc-key.sh "$RUNNER_TEMP/asc.p8"`) || strings.Contains(y, `echo "$ASC_KEY_P8"`) {
-			t.Errorf("%s does not write the key with scripts/asc-key.sh", w)
-		}
-	}
-	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	der, err := x509.MarshalPKCS8PrivateKey(key)
-	if err != nil {
-		t.Fatal(err)
-	}
-	p8 := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
-	dir := t.TempDir()
-	script := filepath.Join(dir, "asc-key.sh")
-	if err := os.WriteFile(script, files["scripts/asc-key.sh"], 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for name, pasted := range map[string]string{"as downloaded": p8, "no line breaks": strings.ReplaceAll(p8, "\n", ""),
-		"spaces": strings.ReplaceAll(p8, "\n", " ")} {
-		out := filepath.Join(dir, "asc.p8")
-		cmd := exec.Command("bash", script, out)
-		cmd.Env = append(os.Environ(), "ASC_KEY_P8="+pasted)
-		if b, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("%s: %v: %s", name, err, b)
-		}
-		if got, _ := os.ReadFile(out); string(got) != p8 {
-			t.Errorf("%s: wrote\n%s\nwant\n%s", name, got, p8)
-		}
-	}
-	cmd := exec.Command("bash", script, filepath.Join(dir, "bad.p8"))
-	cmd.Env = append(os.Environ(), "ASC_KEY_P8=not a key!")
-	if err := cmd.Run(); err == nil {
-		t.Error("asc-key.sh took text that is not a key")
-	}
 }
