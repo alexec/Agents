@@ -215,7 +215,14 @@ func (s *Events) candidates(ctx context.Context, e event, a args, since string) 
 		if at == "" {
 			continue
 		}
-		list = append(list, candidate{EventID: e.Name + ":" + it.ID, Time: at, Data: mcpevents.Data(it.data())})
+		// The issue is the subject; all but opened can happen again to it, keyed by the
+		// comment's, label's or history entry's own id (#4728).
+		key := ""
+		if it.Kind != Opened {
+			key = it.ID
+		}
+		list = append(list, candidate{EventID: e.Name + ":" + it.ID, Time: at, Data: mcpevents.Data(it.data()),
+			Subject: mcpevents.Ref("linear", "issue", it.Issue.Team, it.Issue.Identifier), Key: key})
 	}
 	return list, truncated, nil
 }

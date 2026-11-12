@@ -344,3 +344,24 @@ func TestProjectIsOrganizationAndProject(t *testing.T) {
 		}
 	}
 }
+
+// Each event names its work item as its subject, and a comment by its own id (#4728).
+func TestAnEventSaysItsSubjectAndKey(t *testing.T) {
+	f := newFake(t)
+	opened := newPoller(t, f, "issue.opened", nil)
+	opened.poll(0)
+	f.item(8, "Bug", "Bug", "Active", alex, 1, nil)
+	_, result := opened.poll(0)
+	e := result["events"].([]any)[0].(map[string]any)
+	if e["subject"] != "azureboards:issue:acme/web app#8" || e["key"] != nil {
+		t.Fatalf("opened: subject %v, key %v", e["subject"], e["key"])
+	}
+	commented := newPoller(t, f, "issue.commented", nil)
+	commented.poll(0)
+	f.comment(8, 71, dev, 2, "hello")
+	_, result = commented.poll(0)
+	e = result["events"].([]any)[0].(map[string]any)
+	if e["subject"] != "azureboards:issue:acme/web app#8" || e["key"] != "8/71" {
+		t.Fatalf("commented: subject %v, key %v", e["subject"], e["key"])
+	}
+}

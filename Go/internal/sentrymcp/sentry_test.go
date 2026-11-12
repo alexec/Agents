@@ -181,6 +181,10 @@ func TestANewIssueIsRaisedOnce(t *testing.T) {
 	if got := events[0]["data"]; !reflect.DeepEqual(got, want) || events[0]["eventId"] != "health.issue_new:acme:2" {
 		t.Fatalf("event: %v", events[0])
 	}
+	// Its envelope (#4728): the issue, and no key, as it is new once.
+	if events[0]["subject"] != "sentry:issue:acme/web#2" || events[0]["key"] != nil {
+		t.Fatalf("envelope: subject %v, key %v", events[0]["subject"], events[0]["key"])
+	}
 	c.now = c.now.Add(time.Minute)
 	if events, _ = mustPoll(t, e, IssueNew, nil, cursor); len(events) != 0 {
 		t.Fatalf("raised again: %v", events)
@@ -254,6 +258,9 @@ func TestARegressionIsRaisedOncePerRegression(t *testing.T) {
 	if data["release"] != "web@1.0.1" || data["regressedAt"] != "2026-11-05T12:00:30Z" ||
 		events[0]["eventId"] != "health.issue_regressed:acme:7@2026-11-05T12:00:30Z" {
 		t.Fatalf("event: %v", events[0])
+	}
+	if events[0]["subject"] != "sentry:issue:acme/web#7" || events[0]["key"] != "2026-11-05T12:00:30Z" {
+		t.Fatalf("envelope: subject %v, key %v", events[0]["subject"], events[0]["key"])
 	}
 	c.now = c.now.Add(time.Minute)
 	if events, cursor = mustPoll(t, e, IssueRegressed, nil, cursor); len(events) != 0 {

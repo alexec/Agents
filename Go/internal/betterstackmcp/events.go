@@ -9,6 +9,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The MCP events (#3655), polled only: `events/list` and `events/poll` of the events draft
@@ -185,6 +188,9 @@ type candidate struct {
 	key  string
 	at   time.Time
 	data map[string]any
+	// subject is its envelope (#4728): the incident, betterstack:incident:<team>#<id>. Each
+	// incident starts and resolves once, so it has no key.
+	subject wire.Ref
 }
 
 // Poll answers events/poll's params.
@@ -238,8 +244,8 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 	raised := map[string]bool{}
 	for _, cand := range taken {
 		raised[cand.key] = true
-		out = append(out, map[string]any{"eventId": p.Name + ":" + cand.key, "name": p.Name,
-			"timestamp": cand.at.Format(time.RFC3339), "data": cand.data})
+		out = append(out, mcpevents.Enveloped(map[string]any{"eventId": p.Name + ":" + cand.key, "name": p.Name,
+			"timestamp": cand.at.Format(time.RFC3339), "data": cand.data}, cand.subject, ""))
 	}
 	more := !first && len(fresh) > len(taken)
 	next := now
@@ -293,7 +299,8 @@ func (s *Events) candidates(ctx context.Context, name, monitor string, since tim
 		if at.Before(since) {
 			continue
 		}
-		out = append(out, candidate{key: it.ID, at: at, data: data})
+		out = append(out, candidate{key: it.ID, at: at, data: data,
+			subject: mcpevents.Ref("betterstack", "incident", it.Attributes.TeamName, it.ID)})
 	}
 	return out, truncated, nil
 }

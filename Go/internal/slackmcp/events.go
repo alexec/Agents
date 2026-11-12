@@ -8,6 +8,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The MCP events (#1351), polled only: `events/list` and `events/poll` of the events draft
@@ -261,8 +264,26 @@ func (s *Events) Poll(_ context.Context, raw json.RawMessage) (map[string]any, *
 	found, read, lost, more := s.Inbox.since(c.Seq, limit, func(it item) bool { return a.match(p.Name, it) })
 	out := []any{}
 	for _, it := range found {
-		out = append(out, map[string]any{"eventId": it.id, "name": it.name, "timestamp": it.at.UTC().Format(time.RFC3339),
-			"data": it.data, "sender": it.sender})
+		out = append(out, mcpevents.Enveloped(map[string]any{"eventId": it.id, "name": it.name, "timestamp": it.at.UTC().Format(time.RFC3339),
+			"data": it.data, "sender": it.sender}, messageRef(it.data), ""))
 	}
 	return answer(out, cursor{Boot: c.Boot, Seq: read}, lost, more), nil
+}
+
+// messageRef is the ref of the message an event is about (#4728): the message that came, or
+// the question that was answered, as slack:message:<team>/<channel>#<ts>. Each happens once
+// to its message (a question takes only its first answer), so there is no key. A message with
+// no team is under its channel alone.
+func messageRef(data map[string]any) wire.Ref {
+	channel, _ := data["channel"].(string)
+	ts, _ := data["ts"].(string)
+	team, _ := data["team"].(string)
+	if channel == "" || ts == "" {
+		return wire.Ref{}
+	}
+	topic := channel
+	if team != "" {
+		topic = team + "/" + channel
+	}
+	return mcpevents.Ref("slack", "message", topic, ts)
 }

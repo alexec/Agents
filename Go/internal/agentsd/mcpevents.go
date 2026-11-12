@@ -1323,12 +1323,29 @@ func (d *Daemon) raiseMCPEvent(e mcpPolled, s *mcpSubscription, checks senderChe
 		}
 	}
 	d.mcpEvMu.Unlock()
-	raised := d.raise(wire.EventDraft{Name: s.event, At: now(), Scope: folderScope(s.folder),
-		Sentence: sentence, Details: details})
+	raised := d.raiseEnveloped(wire.EventDraft{Name: s.event, At: now(), Scope: folderScope(s.folder),
+		Sentence: sentence, Details: details}, nil, polledEnvelope(e, s.server))
 	d.lineageEvent(raised)
 	log.Printf("mcp events: %s %s evt %s raised (position %d, workflows: %s)", s.server, s.event, *e.EventID, raised.Position, strings.Join(s.workflows, ", "))
 	d.archiveMergedSessions(raised)
 	return raised
+}
+
+// polledEnvelope is what the server said of an event's envelope (#4728). A subject that is
+// not a ref in the full form is taken as none.
+func polledEnvelope(e mcpPolled, server string) *serverEnvelope {
+	env := &serverEnvelope{server: server, eventID: *e.EventID}
+	if e.Subject != nil {
+		if r, err := wire.ParseRef(*e.Subject); err == nil {
+			env.subject = &r
+			if e.Key != nil {
+				env.key = *e.Key
+			}
+		} else {
+			log.Printf("mcp events: %s evt %s: its subject is not a ref, so it has none", server, *e.EventID)
+		}
+	}
+	return env
 }
 
 // recoverMCPDelivering finishes what a host stopped with in `delivering`: the event log is

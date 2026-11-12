@@ -114,13 +114,19 @@ func TestMergedAndClosedSinceTheCursor(t *testing.T) {
 	})
 	ids, result := merged.poll()
 	same(t, ids, []string{"pr.merged:acme/Web App/app:2"})
+	if sub, key := envelopeOf(result, 0); sub != "azuredevops:pr:acme/web app/app#2" || key != "" {
+		t.Fatalf("merged: subject %q, key %q", sub, key)
+	}
 	same(t, data(t, result, 0)["mergeSha"], "m2")
-	ids, _ = closed.poll()
+	ids, result = closed.poll()
 	if len(ids) != 1 || !strings.HasPrefix(ids[0], "pr.closed:acme/Web App/app:3:") {
 		t.Fatalf("closed: %v", ids)
 	}
 	ids, _ = merged.poll()
 	same(t, ids, []string(nil))
+	if sub, key := envelopeOf(result, 0); !strings.HasSuffix(sub, "#3") || key == "" {
+		t.Fatalf("closed: subject %q, key %q (#4728: a PR closed again is a new event)", sub, key)
+	}
 }
 
 func TestChecksFailedForAPullRequestsHead(t *testing.T) {
@@ -592,4 +598,12 @@ func TestFixesAndMineNarrowMergedPullRequests(t *testing.T) {
 	same(t, ids, []string{id(1)})
 	ids, _ = all.poll()
 	same(t, ids, []string{id(1), id(2), id(3)})
+}
+
+// envelopeOf is a polled event's subject and key (#4728).
+func envelopeOf(result map[string]any, i int) (subject, key string) {
+	e := result["events"].([]any)[i].(map[string]any)
+	subject, _ = e["subject"].(string)
+	key, _ = e["key"].(string)
+	return subject, key
 }

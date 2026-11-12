@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The MCP events (#1629) of a GitLab project's merge requests, pipelines and issues, in the
@@ -336,10 +337,26 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 				continue
 			}
 			out = append(out, mcpevents.State{ID: fmt.Sprintf("%s:%s:%d", name, a.project, st.mr.Number), Number: st.mr.Number,
-				On: st.on, Data: map[string]any{root: st.json}})
+				On: st.on, Data: map[string]any{root: st.json}, Subject: diffRef(root, a.project, st.mr.Number)})
 		}
 		return out, err
 	})
+}
+
+// The refs of what gitlab's events happen to (#4728, spec 4724-event-bus, "A ref").
+func prRef(project string, n int) wire.Ref {
+	return mcpevents.Ref("gitlab", "mr", project, fmt.Sprint(n))
+}
+func issueRef(project string, n int) wire.Ref {
+	return mcpevents.Ref("gitlab", "issue", project, fmt.Sprint(n))
+}
+
+// diffRef is a state's subject: its issue for an issue's event, else its mr.
+func diffRef(root, project string, n int) wire.Ref {
+	if root == "issue" {
+		return issueRef(project, n)
+	}
+	return prRef(project, n)
 }
 
 // candidates finds what an event may raise at or after since.
@@ -368,7 +385,8 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 				continue
 			}
 			list = append(list, candidate{EventID: name + ":" + project + ":" + it.ID, Time: at,
-				Data: func() (map[string]any, error) { return it.data(), nil }})
+				Data:    func() (map[string]any, error) { return it.data(), nil },
+				Subject: issueRef(project, it.Issue.Number), Key: it.ID})
 		}
 		return list, listed, nil
 	}
@@ -385,7 +403,8 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 			if at := normalized(c.At); at != "" && (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) &&
 				a.closesOne(m) && a.byMe(m, yours) && (a.anyone || c.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d", project, c.ID), Time: at,
-					Data: func() (map[string]any, error) { return c.data(), nil }})
+					Data:    func() (map[string]any, error) { return c.data(), nil },
+					Subject: prRef(project, m.Number), Key: fmt.Sprint(c.ID)})
 			}
 		}
 		return list, listed, nil
@@ -404,6 +423,7 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 				continue
 			}
 			list = append(list, candidate{EventID: fmt.Sprintf("checks.failed:%s:%d:%s", project, pl.ID, at), Time: at,
+				Subject: mcpevents.Ref("gitlab", "pipeline", project, fmt.Sprint(pl.ID)), Key: at,
 				Data: func() (map[string]any, error) {
 					if a.pr != 0 && pl.MRNumber != 0 && pl.MRNumber != a.pr {
 						return nil, nil
@@ -429,6 +449,7 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 		for _, m := range merged {
 			if at := normalized(m.MergedAt); wanted(m.MR, m.Trusted) && at != "" {
 				list = append(list, candidate{EventID: fmt.Sprintf("pr.merged:%s:%d", project, m.MR.Number), Time: at,
+					Subject: prRef(project, m.MR.Number),
 					Data: func() (map[string]any, error) {
 						return map[string]any{"pr": m.MR.json(), "mergedAt": m.MergedAt, "mergeSha": m.MergeSHA}, nil
 					}})
@@ -440,6 +461,7 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 	for _, c := range closed {
 		if at := normalized(c.ClosedAt); wanted(c.MR, c.Trusted) && at != "" {
 			list = append(list, candidate{EventID: fmt.Sprintf("pr.closed:%s:%d:%s", project, c.MR.Number, at), Time: at,
+				Subject: prRef(project, c.MR.Number), Key: at,
 				Data: func() (map[string]any, error) {
 					return map[string]any{"pr": c.MR.json(), "closedAt": c.ClosedAt}, nil
 				}})
