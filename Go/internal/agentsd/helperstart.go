@@ -250,6 +250,13 @@ func (d *Daemon) helperLimitRefusal(folder string) string {
 	return strings.Join(full, " And ")
 }
 
+// helperHold is why an agent's helper start in folder waits now: full, the places its
+// limits have not got (helperLimitRefusal), and busy, the machine's level (capacityHold,
+// #4580). A person's start goes through neither: it is warned, never refused.
+func (d *Daemon) helperHold(folder string) (full, busy string) {
+	return d.helperLimitRefusal(folder), d.capacityHold()
+}
+
 // startSession is start_session.
 func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage) (string, error) {
 	me := d.Store.Agent(caller)
@@ -306,8 +313,8 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 		return "", &Error{Code: code, Message: "Nothing was started: " + msg}
 	}
 	d.countProject(folder)
-	if full := d.helperLimitRefusal(folder); full != "" || len(d.helperQueue(folder)) > 0 {
-		return d.queueHelper(me, prompt, runtimeID, model, mode, worktree, labels, full)
+	if full, busy := d.helperHold(folder); full != "" || busy != "" || len(d.helperQueue(folder)) > 0 {
+		return d.queueHelper(me, prompt, runtimeID, model, mode, worktree, labels, full, busy)
 	}
 	scope := limitScope(folder)
 	d.queueMu.Lock()
@@ -363,8 +370,16 @@ func helperRequest(runtimeID, folder, prompt, model string, mode *string, worktr
 
 // queueHelper is queueHelper: a queued record, started by itself when there is a place.
 func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string, mode *string, worktree *wire.WorktreeChoice,
-	labels []string, full string) (string, error) {
+	labels []string, full, busy string) (string, error) {
 	folder := folderPath(caller)
+	// why is the whole reason it waits: the machine first, then the places.
+	why := full
+	if busy != "" {
+		why = busy
+		if full != "" {
+			why += ", and " + full
+		}
+	}
 	queue := d.helperQueue(folder)
 	_, _, limit := d.helperLimitsIn(folder)
 	if waiting := d.queuedCount(folder); int64(waiting) >= limit {
@@ -377,8 +392,10 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 			names = " — " + strings.Join(each, ", ")
 		}
 		behind := scopeTitle(folder) + "'s"
-		if full != "" {
-			behind = full + " And its"
+		if busy != "" && full == "" {
+			behind = upperFirst(busy) + ". And " + scopeWords(folder) + "'s"
+		} else if why != "" {
+			behind = upperFirst(why) + " And its"
 		}
 		return "", &Error{Code: wire.FailureNotYours, Message: fmt.Sprintf("Nothing was started: %s queue is full too: %d of %d sessions queued%s. "+
 			"Stop one of yours that is queued with stop_session if it is no longer wanted, or wait for the queue to move. "+
@@ -413,7 +430,12 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 	d.tellChanged(a, nil)
 	d.noteLineage(nil, a)
 	d.folderChanged(folder)
-	d.record(a.ID, runtimeNote("Queued by "+d.holderName(caller.ID)+". It starts by itself when "+scopeWords(folder)+" has a place free."))
+	if busy != "" {
+		d.record(a.ID, runtimeNote("Queued by "+d.holderName(caller.ID)+": "+busy+". It starts by itself when the machine has room and "+
+			scopeWords(folder)+" has a place free."))
+	} else {
+		d.record(a.ID, runtimeNote("Queued by "+d.holderName(caller.ID)+". It starts by itself when "+scopeWords(folder)+" has a place free."))
+	}
 	position := len(queue) + 1
 	for i, q := range d.helperQueue(folder) {
 		if q.ID == a.ID {
@@ -421,11 +443,17 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 		}
 	}
 	ahead := "Others are queued ahead of it. "
-	if full != "" {
-		ahead = strings.ToUpper(full[:1]) + full[1:] + " "
+	switch {
+	case busy != "" && full == "":
+		ahead = upperFirst(busy) + ". "
+	case why != "":
+		ahead = upperFirst(why) + " "
 	}
-	note := fmt.Sprintf("Queued %s (id %s), %s in %s's queue: %sIt starts by itself, oldest first, once a running place and a "+
-		"not-archived place are both free. Wait for it with wait_for_event on agent.ended as for any session, or take it off the queue with stop_session. "+
+	when := "once a running place and a not-archived place are both free"
+	if busy != "" {
+		when = "once the machine has room and " + scopeWords(folder) + " has a place free"
+	}
+	note := fmt.Sprintf("Queued %s (id %s), %s in %s's queue: %sIt starts by itself, oldest first, "+when+". Wait for it with wait_for_event on agent.ended as for any session, or take it off the queue with stop_session. "+
 		"%s now has %s.", quotedTitle(a.Title), a.ID, ordinal(position), scopeWords(folder), ahead, scopeTitle(folder), d.helperPlaces(folder))
 	d.checkQueueSoon(folder)
 	return note, nil
@@ -450,7 +478,7 @@ func (d *Daemon) checkQueueSoon(folder string) {
 func (d *Daemon) startFromQueue(folder string) {
 	d.countProject(folder)
 	for {
-		next := d.nextFromQueue(folder)
+		next := d.nextFromQueue(folder, false)
 		if next == nil {
 			return
 		}
@@ -458,7 +486,37 @@ func (d *Daemon) startFromQueue(folder string) {
 	}
 }
 
-func (d *Daemon) nextFromQueue(folder string) *wire.Agent {
+// startQueuesAfterLook is each look at the machine while it is ok (#4580): every queue
+// starts what its places let it, and then one helper, in all, may start above its folder's
+// running limit, up to its total. The machine is the limit while it has room; the running
+// count is a guess about it, so one a look lets the load show each start before the next.
+func (d *Daemon) startQueuesAfterLook() {
+	var folders []string
+	seen := map[string]bool{}
+	for _, a := range d.Store.LiveAgents() {
+		if f := folderPath(&a); a.State == wire.AgentStateQueued && a.StartedByAgent != nil && !seen[f] {
+			seen[f] = true
+			folders = append(folders, f)
+		}
+	}
+	for _, f := range folders {
+		d.startFromQueue(f)
+	}
+	for _, f := range folders {
+		if next := d.nextFromQueue(f, true); next != nil {
+			d.startQueued(*next, f)
+			return
+		}
+	}
+}
+
+// nextFromQueue is the next queued helper to start in folder, with its place held, or nil:
+// none while the machine is near or full (#4580), nor past the total; past the running
+// limit only overRunning, which one look a time gives (startQueuesAfterLook).
+func (d *Daemon) nextFromQueue(folder string, overRunning bool) *wire.Agent {
+	if d.capacityHold() != "" {
+		return nil
+	}
 	running, notArchived, _ := d.helperLimitsIn(folder)
 	d.queueMu.Lock()
 	defer d.queueMu.Unlock()
@@ -468,7 +526,10 @@ func (d *Daemon) nextFromQueue(folder string) *wire.Agent {
 		if d.startingFromQueue[q.ID] {
 			continue
 		}
-		if int64(len(d.runningHelpers(folder))+reserved) >= running || int64(len(d.helpersIn(folder))+reserved) >= notArchived {
+		if int64(len(d.helpersIn(folder))+reserved) >= notArchived {
+			return nil
+		}
+		if int64(len(d.runningHelpers(folder))+reserved) >= running && !overRunning {
 			return nil
 		}
 		if d.startingFromQueue == nil {
@@ -671,13 +732,13 @@ func (d *Daemon) startAutoHelper(me *wire.Agent, args map[string]json.RawMessage
 		return "", &Error{Code: code, Message: "Nothing was started: " + msg}
 	}
 	d.countProject(folder)
-	if full := d.helperLimitRefusal(folder); full != "" || len(d.helperQueue(folder)) > 0 {
+	if full, busy := d.helperHold(folder); full != "" || busy != "" || len(d.helperQueue(folder)) > 0 {
 		w := permissionWord(*levels.Permission)
 		m := ""
 		if levels.Model != nil {
 			m = string(*levels.Model)
 		}
-		return d.queueHelper(me, prompt, autoRuntimeID, m, &w, worktree, labels, full)
+		return d.queueHelper(me, prompt, autoRuntimeID, m, &w, worktree, labels, full, busy)
 	}
 	r := helperRequest(autoRuntimeID, folder, prompt, "", nil, worktree, labels)
 	r.Levels = levels
@@ -713,4 +774,12 @@ func (d *Daemon) approvesEverything(a *wire.Agent) bool {
 		return l != nil && l.Permission != nil && *l.Permission == wire.PermissionLevelBypassPermissions
 	}
 	return bypass(a.Levels) || a.Auto != nil && bypass(&a.Auto.Levels) || d.agentAlwaysApproves(a)
+}
+
+// upperFirst is s with its first letter a capital, for the start of a sentence.
+func upperFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }
