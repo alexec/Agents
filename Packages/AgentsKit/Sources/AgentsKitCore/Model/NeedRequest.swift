@@ -150,6 +150,20 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
     /// Whether it is in Later (#4233).
     public var isDeferred: Bool { deferred != nil }
 
+    /// As it will read once its host has put it in Later (#4786): drawn before the answer.
+    public func deferring(_ params: DaemonAPI.RequestsDefer, at now: Date = .now) -> NeedRequest {
+        var request = self
+        request.deferred = Deferral(until: params.until, atMac: params.atMac, at: now)
+        return request
+    }
+
+    /// As it will read once Bring Back has taken it out of Later (#4786).
+    public var broughtBack: NeedRequest {
+        var request = self
+        request.deferred = nil
+        return request
+    }
+
     /// How many sessions wait on it: at least its asker.
     public var blocks: Int { max(waiters.count, askedBy == nil ? 0 : 1) }
 
