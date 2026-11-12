@@ -3871,6 +3871,23 @@ export interface EventPattern {
   name: string;
   filters: Record<string, string>;
   anyOf?: Record<string, string[]>;
+  /**
+   * Only events of this provider (#4730): github, jira, agents and so on. With provider, topics or
+   * subject the pattern also hears the person's other machines' events, on the bus.
+   */
+  provider?: string;
+  /**
+   * Only events about one of these topics (#4730), lower case: a repo's full name, a Jira project,
+   * a Slack channel.
+   */
+  topics?: string[];
+  /** Only events about this one thing (#4730). */
+  subject?: Ref;
+  /**
+   * Seconds (#4730): a burst of matches on one subject and type is held this long and delivered
+   * once, the last one, with how many came. Best effort.
+   */
+  debounce?: number;
 }
 
 export interface EventPublisher {
@@ -15754,7 +15771,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EntryNotification: { required: ["agentID", "entry"], optional: ["index", "oversized"] },
   Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message", "actor", "specversion", "id", "type", "provider", "topic", "subject", "source", "time", "producer", "data"] },
   EventDraft: { required: ["name", "at", "scope", "sentence", "details", "chainDepth"], optional: ["message"] },
-  EventPattern: { required: ["name", "filters"], optional: ["anyOf"] },
+  EventPattern: { required: ["name", "filters"], optional: ["anyOf", "provider", "topics", "subject", "debounce"] },
   EventPublisher: { required: ["agentID", "title"], optional: [] },
   EventRaiseRequest: { required: ["draft"], optional: ["consequences"] },
   EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID", "serverEvents", "forPerson"] },

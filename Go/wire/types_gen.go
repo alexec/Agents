@@ -4310,6 +4310,18 @@ type EventPattern struct {
 	Filters map[string]string `json:"filters"`
 
 	AnyOf map[string][]string `json:"anyOf,omitzero"`
+
+	// Only events of this provider (#4730): github, jira, agents and so on. With provider, topics or subject the pattern also hears the person's other machines' events, on the bus.
+	Provider *string `json:"provider,omitzero"`
+
+	// Only events about one of these topics (#4730), lower case: a repo's full name, a Jira project, a Slack channel.
+	Topics []string `json:"topics,omitzero"`
+
+	// Only events about this one thing (#4730).
+	Subject *Ref `json:"subject,omitzero"`
+
+	// Seconds (#4730): a burst of matches on one subject and type is held this long and delivered once, the last one, with how many came. Best effort.
+	Debounce *float64 `json:"debounce,omitzero"`
 }
 
 type EventPublisher struct {

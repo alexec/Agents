@@ -553,6 +553,25 @@ func parseTrigger(n yamlnode.Node) (wire.WorkflowTrigger, error) {
 	if name, ok := n.Text(); ok {
 		return triggerNamed(name, map[string]yamlnode.Node{})
 	}
+	// `- type: pr.merged` with its settings beside it (#4730); name is read the same way,
+	// for one release.
+	if n.IsMapping() {
+		for _, key := range []string{"type", "name"} {
+			if v, ok := n.Mapping[key]; ok {
+				name, isText := v.Text()
+				if !isText || name == "" {
+					return wire.WorkflowTrigger{}, failure("`" + key + ":` in a trigger is the event's type, such as pr.merged")
+				}
+				settings := map[string]yamlnode.Node{}
+				for k, s := range n.Mapping {
+					if k != "type" && k != "name" {
+						settings[k] = s
+					}
+				}
+				return triggerNamed(name, settings)
+			}
+		}
+	}
 	if !n.IsMapping() || len(n.Mapping) != 1 {
 		return wire.WorkflowTrigger{}, failure("A trigger must be a name, or a name with settings under it")
 	}
@@ -585,6 +604,39 @@ func triggerNamed(name string, keys map[string]yamlnode.Node) (wire.WorkflowTrig
 		}
 		return wire.WorkflowTrigger{Schedule: &wire.WorkflowTriggerStoredSchedule{Value: s}}, nil
 	}
+	// provider, topic, subject and debounce say what of the envelope it hears (#4730).
+	busRaw := map[string]any{}
+	busValues := map[string][]string{}
+	own := map[string]yamlnode.Node{}
+	for k, v := range keys {
+		if !busKeys[k] {
+			own[k] = v
+			continue
+		}
+		if t, ok := v.Text(); ok {
+			busValues[k], busRaw[k] = []string{t}, t
+		} else if vs, isList := v.Values(); isList && k == "topic" {
+			busValues[k], busRaw[k] = vs, vs
+		} else {
+			return wire.WorkflowTrigger{}, failure("The \"" + k + "\" under \"" + name + "\" should be one value (a topic can be a list)")
+		}
+	}
+	if _, problem := readBusFilter(busValues); problem != "" {
+		return wire.WorkflowTrigger{}, failure(name + ": " + strings.TrimSuffix(problem, "."))
+	}
+	t, err := triggerNamedOwn(name, own)
+	if err != nil || t.Unrecognised == nil {
+		return t, err
+	}
+	for k, v := range busRaw {
+		b, _ := json.Marshal(v)
+		t.Unrecognised.Keys[k] = b
+	}
+	return t, nil
+}
+
+// triggerNamedOwn is triggerNamed for the keys that are not the envelope's.
+func triggerNamedOwn(name string, keys map[string]yamlnode.Node) (wire.WorkflowTrigger, error) {
 	raw := map[string]any{}
 	for k, v := range keys {
 		raw[k] = v.JSON()
@@ -725,6 +777,9 @@ func triggerPattern(t wire.WorkflowTrigger) (waitPattern, bool) {
 	}
 	filters := map[string][]string{}
 	for k, raw := range u.Keys {
+		if busKeys[k] {
+			continue
+		}
 		var one string
 		var list []string
 		if json.Unmarshal(raw, &one) == nil {
@@ -736,7 +791,12 @@ func triggerPattern(t wire.WorkflowTrigger) (waitPattern, bool) {
 		}
 	}
 	p, problem := parsePattern(u.Name, filters)
-	return p, problem == ""
+	if problem != "" {
+		return p, false
+	}
+	bus, _, ok := triggerBus(t)
+	p.bus = bus
+	return p, ok
 }
 
 // triggerSupported is WorkflowTrigger.isSupported: a schedule or an event this host raises.

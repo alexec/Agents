@@ -763,6 +763,10 @@ func (d *Daemon) SetControl(tell func(method string, params any)) {
 // of offers dropped while it was down, so every live need is offered again, the stale ones
 // withdrawn, and the count said again.
 func (d *Daemon) ControlUplinkChanged(up bool) {
+	// The control plane holds this machine's bus subscriptions only while it is connected.
+	if up {
+		go d.sendBusSubscriptions(true)
+	}
 	if !up || d.tellControl.Load() == nil {
 		return
 	}

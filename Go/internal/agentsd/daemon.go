@@ -124,6 +124,9 @@ type Daemon struct {
 	lineageBook
 	// The events this machine publishes on the bus (#4729).
 	busBook
+	// Subscriptions on the bus, and the bursts debounce holds (#4730).
+	busSubBook
+	debounceBook
 	projectBook
 	projectToolsBook
 	achievementBook

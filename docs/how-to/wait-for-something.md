@@ -102,6 +102,17 @@ Stopping or archiving the agent also ends its wait.
 - **Its own folder and this Mac.** An agent can wait for its folder's events and the
   Mac's, not another folder's.
 - **Time limits** run from 1 minute to 24 hours.
+- **Other machines.** With `provider`, `topic` or `subject`, a wait also hears the
+  person's other machines, such as
+  `{"type": "pr.merged", "subject": "github:pr:alexec/agents#4702", "until_minutes": 60}`.
+  Use `subject` rather than `where` for that: `where` is checked only on this machine. See
+  [Subscribe by provider, topic and subject](../reference/events.md#subscribe-by-provider-topic-and-subject).
+- **A burst once.** `debounce` (such as `"30s"`) wakes the agent once for a burst of
+  events on one thing, with the last one and how many came.
+- **An event is a hint.** Delivery is best effort: usually once, sometimes never, rarely
+  twice. Before the agent acts, it reads the state of the event's subject now, by its ref;
+  when a wait times out, it checks the state now instead of taking no event as nothing
+  happened.
 
 ## Have one agent wait for another
 

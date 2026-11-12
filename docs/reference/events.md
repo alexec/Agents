@@ -339,8 +339,9 @@ Mac's own control plane.
 - **The bus log** is the last 100,000 envelopes (with their sealed data) of each person's bus, for dedupe and the
   Events page; the hourly sweep deletes the older ones.
 - **Deliver.** A machine says its subscriptions (`bus/subscribe`: `provider`, `type`, a name
-  or `noun.*`, `topics` and `subject`) to the copy that holds it, again after each connect.
-  `wait_for_event` and a workflow's `on:` make them from #4730.
+  or `noun.*`, `topics` and `subject`) to the copy that holds it, again after each connect
+  and a short time after each change. `wait_for_event` and a workflow's `on:` make them
+  ([Subscribe by provider, topic and subject](#subscribe-by-provider-topic-and-subject)).
   A new event goes at once (`bus/deliver`) to each other machine of the person with a
   subscription that matches it. That machine records it in its own log once (an id it
   already has is dropped) and never publishes it again.
@@ -348,6 +349,52 @@ Mac's own control plane.
   backfill: an event sent while the control link is down is not sent later, and a machine
   that is not connected misses what is delivered meanwhile. A consumer treats an event as
   a hint and reads the subject's state now.
+
+## Subscribe by provider, topic and subject
+
+`wait_for_event` and a workflow's `on:` take four keys beside the type (#4730):
+
+| Key | Value | What it does |
+| --- | --- | --- |
+| `provider` | One provider: `github`, `gitlab`, `jira`, `linear`, `slack`, `agents` and so on | Only events of that provider. |
+| `topic` | One topic, or a list (any of them) | Only events about that topic: a repo's full name, a Jira project, a Slack channel ([Topics](#the-envelope)). Lower case. |
+| `subject` | A ref, in the full form, such as `github:pr:alexec/agents#4702` | Only events about that one thing. The plain way to say "this pull request" on any machine. |
+| `debounce` | A time from `1s` to `1h`, such as `30s` or `2m`, or a number of seconds | A burst of matching events on one subject and type is held that long from the first, and delivered once: the last one, with how many came. |
+
+- **The bus.** A wait or a trigger with `provider`, `topic` or `subject` matches on the
+  event's envelope, and also hears the events of the person's other machines: the machine
+  sends it as a subscription on [the bus](#the-bus). An event made on machine B wakes a
+  session on machine A.
+- **A bare type means what it means now.** With none of the three, `pr.merged` hears this
+  folder's servers and the app, on this machine only. `server:` still names one MCP server
+  by its `mcp.json` name.
+- **`where` and the bus.** An event from another machine has its envelope only, so a wait
+  or a trigger that has `where` (a server's or the app's own keys, such as `pr: 4702`) is
+  not woken by one: name the thing in `subject` instead. On its own machine `where` works
+  as before.
+- **A forge's server here** is asked for what `subject` and `topic` name when `where` does
+  not: `subject: github:pr:alexec/agents#4702` subscribes this folder's GitHub server with
+  `repo: alexec/agents` and `pr: 4702`. A server here that cannot give the event is said
+  in the wait's answer, not refused: the wait then hears other machines only.
+- **Debounce is best effort.** It is done on the machine that has the wait or the workflow,
+  so it covers that machine's own events too. A restart drops what it holds.
+- **`type`** is the word in the tools and the workflow files. `name` is read the same way
+  for one release.
+- **Every event says its ref.** A woken agent's message and a workflow agent's prompt say
+  the event's ref (`id`) and its subject, and that it is a hint: read the subject's state
+  now before acting on it, and make doing it twice harmless. A wait that times out says to
+  check the state now rather than take no event as nothing happened.
+
+```yaml
+on:
+  - type: pr.merged
+    provider: github
+    topic: alexec/agents
+  - type: issue.created
+    provider: jira
+    topic: abc
+    debounce: 30s
+```
 
 ## No custom events
 

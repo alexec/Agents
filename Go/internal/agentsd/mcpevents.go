@@ -256,6 +256,8 @@ func (d *Daemon) mcpEventsClock(ctx context.Context) {
 
 // kickMCPEvents asks for a look soon: a workflow file moved.
 func (d *Daemon) kickMCPEvents() {
+	// A wait or a trigger on the bus may have come or gone (#4730).
+	d.busSubscribeSoon()
 	d.mcpEvMu.Lock()
 	kick := d.mcpKick
 	d.mcpEvMu.Unlock()
