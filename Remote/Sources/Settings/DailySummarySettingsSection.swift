@@ -21,9 +21,8 @@ struct DailySummarySettingsSection: View {
             Text("Daily summary")
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
-                if let problem {
-                    Text(problem).tinted(.failure)
-                }
+                // The choice's note (#4737), on a line that is kept.
+                FieldNote(text: problem)
                 Text(DailySummaryControls.footer(for: model.dailySummarySettings?.mode ?? .off))
             }
             .appText(.fine)

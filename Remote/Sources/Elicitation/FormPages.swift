@@ -136,10 +136,8 @@ struct FormPages: View {
         default:
             field(property)
         }
-        if let problem = property.problem(with: values[property.name]),
-           values[property.name] != nil {
-            Text(problem).appText(.fine).tinted(.failure)
-        }
+        // The field's note (#4737), on a line that is kept, so nothing moves as it comes.
+        FieldNote(text: values[property.name] == nil ? nil : property.problem(with: values[property.name]))
     }
 
     /// The question in its own words, above its answers.

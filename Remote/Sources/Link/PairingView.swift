@@ -107,10 +107,8 @@ struct PairingView: View {
             Label("Paired", systemImage: "checkmark.circle")
                 .appText(.fine)
         case .failed(let why):
-            Text(why)
-                .appText(.fine)
-                .tinted(.failure)
-                .multilineTextAlignment(.center)
+            // The pairing's note (#4737), in place of its spinner.
+            SheetNote(text: why, reservesSpace: false)
         }
     }
 }
