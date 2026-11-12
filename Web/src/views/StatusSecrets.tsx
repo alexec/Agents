@@ -4,7 +4,7 @@
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import { go } from "../route";
-import { accountLines, newestAt, recentRead, secretLines, shortAgo, statusSecretsWords as w, summary, type StatusLine } from "../model/statusSecrets";
+import { accountLines, newestAt, recentOperation, secretLines, shortAgo, statusSecretsWords as w, summary, type StatusLine } from "../model/statusSecrets";
 
 type List = "secrets" | "accounts";
 
@@ -27,12 +27,12 @@ export function StatusListMark({ store, list }: { store: Store; list: List }) {
   return at !== null ? <span class="quiet small" title={new Date(at).toLocaleString()}>{shortAgo(at)}</span> : null;
 }
 
-/** Under the sidebar row, in grey, as the window's: the secret or account read last and the session that read it,
- * when that read is the newest operation and less than 4 hours old. */
-export function StatusListReadLine({ store, list }: { store: Store; list: List }) {
+/** Under the sidebar row, in grey, as the window's (#4931): the secret or account the newest operation was on, the
+ * operation when it is not a read, and the session that did it, when it is less than 4 hours old. */
+export function StatusListLastLine({ store, list }: { store: Store; list: List }) {
   const title = (id: string) => Object.values(store.agents.value).flat().find((a) => a.id === id)?.title;
-  const read = recentRead(statusLines(store, list), Date.now(), title);
-  return read ? <p class="page-need quiet small" aria-label={`${w.readLabel} ${read}`}>{read}</p> : null;
+  const last = recentOperation(statusLines(store, list), Date.now(), title);
+  return last ? <p class="page-need quiet small" aria-label={`${w.lastLabel} ${last}`}>{last}</p> : null;
 }
 
 export function StatusSecretsPage({ store, list }: { store: Store; list: List }) {

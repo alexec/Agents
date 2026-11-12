@@ -34,7 +34,7 @@ import { addMachineWords } from "../model/addMachine";
 import { SettingsPage } from "./Settings";
 import { SecretsSection } from "./UserScope";
 import { AccountsSection } from "./Accounts";
-import { StatusListMark, StatusListReadLine, StatusSecretsPage, useUserScopeStatus } from "./StatusSecrets";
+import { StatusListMark, StatusListLastLine, StatusSecretsPage, useUserScopeStatus } from "./StatusSecrets";
 import { SessionSecretsSection } from "./settings/SessionSecrets";
 import { WorkflowRow } from "./WorkflowRow";
 import { BackToList } from "./BackToList";
@@ -220,7 +220,7 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
                     <PageMark store={store} page={p} />
                   </button>
                   {isRuntimesPage(p) && <RuntimesLowLine store={store} />}
-                  {p.draw.kind === "statusList" && <StatusListReadLine store={store} list={p.draw.list} />}
+                  {p.draw.kind === "statusList" && <StatusListLastLine store={store} list={p.draw.list} />}
                 </Fragment>
               ))}
               {machinesHead(group) && makingRows(store.machinesMaking.value, store.providers.list.value, store.hosts.value)
