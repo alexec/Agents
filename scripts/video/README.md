@@ -110,7 +110,12 @@ changes, the same scene makes it again.
   Google sign-in; start it without `--incognito`), never the app's browser, which Google
   refuses. The app is not verified by Google, so the consent first shows "Google hasn't
   verified this app": Advanced ▸ Go to Loops videos. Without a sign-in the video
-  stays in `out/` and the log says why.
+  stays in `out/` and the log says why. A revoked or expired refresh token (`invalid_grant`)
+  is the same as no sign-in: `--preflight` and the upload say so, and how to sign in again.
+  An agent does the whole sign-in (#4840); only a new Google sign-in in that Chrome (the
+  account's password, `GOOGLE_PASSWORD`, Ask before use) needs Alex. Google has no API for the
+  OAuth app's branding or its publishing status (the IAP brands API made only Internal apps,
+  and is shut down), so those stay console pages, done once in #4837.
 - **Its walk hand-off.** A walk's Connect Linear sheet opens no authentication session (that
   is Safari's sheet, on the person's screen): it writes the flow and its address to
   `sign-in.json` in the walk's folder. The scene approves in the video Chrome, reads the code

@@ -5,7 +5,7 @@
                                                 account of the channel
     scripts/video/upload.py --sign-in --no-browser
                                                 the same, but only print the consent address,
-                                                so an agent opens it in the Safari MCP (#1856)
+                                                so an agent opens it in the agents' Chrome (#4840)
     scripts/video/upload.py <scene id> [mp4]    upload ~/Movies/agents-video/out/<id>.mp4
     scripts/video/make.sh u1 --upload           make it, check it, then upload it
     scripts/video/upload.py --self-test         prove each API call against a fake YouTube
@@ -70,7 +70,21 @@ SCIENCE_AND_TECHNOLOGY = "28"
 
 
 class NotSignedIn(RuntimeError):
-    """The person's steps on #1793 are not done yet: the video stays in out/."""
+    """There is no working sign-in yet: the video stays in out/."""
+
+
+# How a sign-in is done again, by an agent (#4840): only a new Google sign-in in that Chrome
+# (the account's password) needs Alex.
+SIGN_IN_AGAIN = ("an agent runs `scripts/video/upload.py --sign-in --no-browser` and approves in the "
+                 "agents' Chrome (scripts/video/README.md, #4840)")
+
+
+class GoogleError(RuntimeError):
+    """Google's OAuth error answer: `error` is its code, such as invalid_grant."""
+
+    def __init__(self, code, error, description):
+        super().__init__(f"Google answered {code}: {error} {description}".strip())
+        self.error = error
 
 
 def log(*parts):
@@ -94,7 +108,7 @@ def post_form(url, form):
     except urllib.error.HTTPError as error:
         # Google's error answer names the error, never the token sent.
         body = json.loads(error.read() or b"{}")
-        raise RuntimeError(f"Google answered {error.code}: {body.get('error', '')} {body.get('error_description', '')}".strip()) from None
+        raise GoogleError(error.code, body.get("error", ""), body.get("error_description", "")) from None
 
 
 def sign_in(browser=True):
@@ -157,15 +171,22 @@ def sign_in(browser=True):
 def access_token():
     """An access token, and the scopes the sign-in gave."""
     if not TOKEN.exists():
-        raise NotSignedIn("not signed in to YouTube: Alex runs `scripts/video/upload.py --sign-in` (#1793, What Alex does)")
+        raise NotSignedIn(f"not signed in to YouTube: {SIGN_IN_AGAIN}")
     c = client()
     refresh = json.loads(TOKEN.read_text()).get("refresh_token")
     if not refresh:
         # A copy of the client file in its place (seen 2026-10-21) is not a sign-in.
-        raise NotSignedIn(f"{TOKEN} has no refresh token: Alex runs `scripts/video/upload.py --sign-in` (#1856, What Alex does)")
-    answer = post_form(c.get("token_uri", "https://oauth2.googleapis.com/token"), {
-        "refresh_token": refresh, "client_id": c["client_id"], "client_secret": c.get("client_secret", ""),
-        "grant_type": "refresh_token"})
+        raise NotSignedIn(f"{TOKEN} has no refresh token: {SIGN_IN_AGAIN}")
+    try:
+        answer = post_form(c.get("token_uri", "https://oauth2.googleapis.com/token"), {
+            "refresh_token": refresh, "client_id": c["client_id"], "client_secret": c.get("client_secret", ""),
+            "grant_type": "refresh_token"})
+    except GoogleError as error:
+        if error.error != "invalid_grant":
+            raise
+        # The account took its access back, its password changed, or the app went back to
+        # Testing (a token then lasts 7 days): a new consent is the fix (#4840).
+        raise NotSignedIn(f"the YouTube refresh token was revoked or has expired (invalid_grant): {SIGN_IN_AGAIN}") from None
     return answer["access_token"], set(answer.get("scope", "").split())
 
 
@@ -575,6 +596,36 @@ def self_test():
         assert "no channel" in check_channel(FakeYouTube(channel=None))
         assert "lacks" in check_channel(FakeYouTube(scopes=("https://www.googleapis.com/auth/youtube",)))
         print("ok: --preflight takes only the Loops channel's sign-in, with the captions scope")
+
+        global CLIENT, TOKEN, post_form
+        kept = CLIENT, TOKEN, post_form
+        try:
+            CLIENT, TOKEN = work / "client.json", work / "token.json"
+            CLIENT.write_text(json.dumps({"installed": {"client_id": "id", "client_secret": "s"}}))
+            TOKEN.write_text(json.dumps({"refresh_token": "r"}))
+
+            def revoked(url, form):
+                raise GoogleError(400, "invalid_grant", "Token has been expired or revoked.")
+            post_form = revoked
+            try:
+                access_token()
+                raise AssertionError("a revoked token was taken")
+            except NotSignedIn as why:
+                assert "revoked" in str(why) and "--sign-in --no-browser" in str(why), why
+
+            def down(url, form):
+                raise GoogleError(500, "internal_failure", "")
+            post_form = down
+            try:
+                access_token()
+                raise AssertionError("an error was taken for a token")
+            except NotSignedIn:
+                raise AssertionError("an outage was taken for a revoked token") from None
+            except GoogleError:
+                pass
+        finally:
+            CLIENT, TOKEN, post_form = kept
+        print("ok: a revoked refresh token is a missing sign-in, and says how to sign in again")
         assert not [r for r in yt.requests if r[0] == "DELETE" and "/videos" in r[1]], "a video was deleted"
         print("self-test passed")
     finally:
