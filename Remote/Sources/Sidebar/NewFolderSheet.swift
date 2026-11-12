@@ -90,7 +90,7 @@ private struct AddFolderForm: View {
                     .accessibilityLabel("Folder")
             } footer: {
                 if let problem {
-                    Text(problem).tinted(.failure)
+                    FieldNote(text: problem)
                 } else {
                     Text("Type a path or tap into a folder. Files are shown but can’t be added.")
                 }
@@ -222,7 +222,7 @@ private struct CloneFolderForm: View {
 
     @ViewBuilder private var note: some View {
         if let problem {
-            Text(problem).tinted(.failure)
+            SheetNote(text: problem, reservesSpace: false)
         } else if isCloning {
             Text("Cloning… The folder appears in the sidebar when it is done, also if you close this.")
         } else if let remote {
@@ -231,7 +231,7 @@ private struct CloneFolderForm: View {
         } else if text.trimmingCharacters(in: .whitespaces).isEmpty {
             Text("Paste an HTTPS or SSH address.")
         } else {
-            Text("That is not a Git URL this app can clone. Paste an HTTPS or SSH address.").tinted(.failure)
+            FieldNote(text: "That is not a Git URL this app can clone. Paste an HTTPS or SSH address.")
         }
     }
 

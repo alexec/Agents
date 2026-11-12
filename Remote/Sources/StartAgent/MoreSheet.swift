@@ -62,7 +62,7 @@ struct MoreSheet: View {
                     .foregroundStyle(.secondary)
             case .failed(let reason):
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(reason).appText(.supporting).tinted(.failure)
+                    SheetNote(text: reason, reservesSpace: false)
                     Button("Try again") { Task { await model.retryStartChoices() } }
                         .appText(.supporting)
                         .accessibilityHint("Asks \(runtimeName) again what it offers")

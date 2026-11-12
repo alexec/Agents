@@ -1109,7 +1109,6 @@ private extension View {
 private struct ForgetThisDeviceRow: View {
     @Environment(RemoteModel.self) private var model
     @State private var confirming = false
-    @State private var problem: String?
 
     private var device: String { UIDevice.current.model }
 
@@ -1117,14 +1116,14 @@ private struct ForgetThisDeviceRow: View {
         Button("Forget This \(device)…") { confirming = true }
             .appText(.supporting)
             .confirmationDialog("Forget this \(device)?", isPresented: $confirming, titleVisibility: .visible) {
-                Button("Forget", role: .destructive) { Task { problem = await model.forgetThisDevice() } }
+                // Not forgotten: the scene's failure toast (#4737).
+                Button("Forget", role: .destructive) {
+                    Task { if let why = await model.forgetThisDevice() { model.report(why) } }
+                }
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This \(device) is cut off at once, at home and away, until it is paired again.")
             }
-        if let problem {
-            Text(problem).appText(.fine).tinted(.failure)
-        }
     }
 }
 

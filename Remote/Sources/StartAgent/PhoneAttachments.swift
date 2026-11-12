@@ -167,8 +167,7 @@ struct AttachmentStrip: View {
                         }
                         .appText(.supporting)
                         if let refusal = PhoneAttachment.refusal(for: attachment, from: capabilities, runtime: runtime) {
-                            Text(refusal).appText(.fine).tinted(.failure)
-                                .fixedSize(horizontal: false, vertical: true)
+                            FieldNote(text: refusal)
                                 .frame(maxWidth: 220, alignment: .leading)
                         }
                     }

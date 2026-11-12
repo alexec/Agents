@@ -230,6 +230,11 @@ On the web, the kinds are components in `Web/src/views/MessageKinds.tsx` (#4740)
 the one toast (`Toasts`), and `ask`, which asks a choice in the page's own `<dialog>` in place of
 `window.confirm`. Their tones, times and button words are in `Web/src/model/messageKinds.ts`.
 
+On the Mac and the Remote, the kinds are `PaneBanner`, `FieldNote`, `SheetNote` and `Toast` in
+`Shared/UI/Messages.swift` (#4738). Each has one toast host: the window's `WindowToasts`
+(`App/Sources/WindowToast.swift`) and the Remote scene's `RemoteToasts`
+(`Remote/Sources/RemoteToast.swift`, #4739), whose prompt bar says how high to float it.
+
 ## Where each surface reads it
 
 | Surface | Reads | How it stays the same as `design/tokens.json` |

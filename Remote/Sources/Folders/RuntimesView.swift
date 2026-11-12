@@ -70,7 +70,8 @@ struct RuntimesView: View {
             TextField("Name, such as Work", text: $newName)
             Button("Add") {
                 guard let runtime = addingTo else { return }
-                Task { addProblem = await model.addAccount(runtimeID: runtime.id, name: newName) }
+                // Not added: the scene's failure toast (#4737).
+                Task { if let why = await model.addAccount(runtimeID: runtime.id, name: newName) { model.report(why) } }
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -106,17 +107,11 @@ struct RuntimesView: View {
             await model.refreshAccountProfiles()
             await model.refreshPassThrough()
         }
-        .alert("Not added", isPresented: Binding(get: { addProblem != nil }, set: { if !$0 { addProblem = nil } })) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(addProblem ?? "")
-        }
     }
 
     @State private var addingTo: Runtime?
     @State private var newName = ""
     @State private var removing: AccountProfile?
-    @State private var addProblem: String?
 
     /// The Mac's runtimes that keep their sign-in in a folder, so take more than one account,
     /// and are on the Mac.
@@ -147,7 +142,6 @@ struct RuntimesView: View {
 private struct ReachesTheModelByMenu: View {
     @Environment(RemoteModel.self) private var model
     let choices: AccountChoices
-    @State private var problem: String?
 
     var body: some View {
         let current = choices.defaultAccount
@@ -174,11 +168,6 @@ private struct ReachesTheModelByMenu: View {
             .appText(.fine)
         }
         .accessibilityLabel("\(OrgAccountWords.reachesTheModelBy), \(current?.name ?? AccountProfile.defaultName)")
-        .alert("Not changed", isPresented: Binding(get: { problem != nil }, set: { if !$0 { problem = nil } })) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(problem ?? "")
-        }
     }
 
     @ViewBuilder private func label(_ title: String, chosen: Bool) -> some View {
@@ -186,7 +175,8 @@ private struct ReachesTheModelByMenu: View {
     }
 
     private func set(_ accountID: String?) {
-        Task { problem = await model.setDefaultAccount(runtimeID: choices.runtimeID, accountID: accountID) }
+        // Not changed: the scene's failure toast (#4737).
+        Task { if let why = await model.setDefaultAccount(runtimeID: choices.runtimeID, accountID: accountID) { model.report(why) } }
     }
 }
 
