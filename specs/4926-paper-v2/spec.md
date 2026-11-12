@@ -16,6 +16,7 @@ Alex's words on the earlier rounds (2026-11-12):
 5. On the second: **rather than dark backgrounds, use lighter backgrounds and gradients.**
 6. On the third: **only use the gradient on paper (greyscale) backgrounds. It is used as a way to avoid low contrast.**
 7. On the fourth: **only use a gradient on what were large grey backgrounds. Never on coloured backgrounds, nor on small areas like buttons or notices.**
+8. On the fifth: **none of these gradients work. Undo them. Just use a lighter grey for the background.**
 
 ## The contact sheet
 
@@ -32,7 +33,7 @@ Alex's words on the earlier rounds (2026-11-12):
 1. **Clear and crisp.** High contrast: deep charcoal ink (17:1) on near-white paper. Every text colour is 4.5:1 or more on every surface, the selection included.
 2. **Few colours, each with one job.** Colour means something: a link, a state or a label. It is never decoration.
 3. **Lines, not shading.** A line (1.5:1) sets things apart. Nothing on the page casts a shadow and there are few grey fills. Only what floats over the page (a menu, a toast, a sheet) has a short shadow. A control's edge is 3:1 or more (WCAG 1.4.11).
-4. **One gradient, on the large grey only.** The sidebar column, the one large grey background, goes from paper to a slightly deeper grey, top to bottom. Nothing else has a gradient: not a coloured background, and not a small thing such as a button, a chip, a badge, a notice or a card. Those are flat paper with a line. Colour never fills. It is only in text, icons, lines (a state's edge, the selection's bar) and a switch that is on.
+4. **Flat, with light greys.** There are no gradients. The large greys (the sidebar, a well, hover, the selection) are light, one small step from the page, and a line sets them apart. Colour never fills: it is only in text, icons, lines (a state's edge, the selection's bar) and a switch that is on.
 5. **One face, one icon set, on all three clients.** Today the Mac and the Remote draw SF Symbols, and the web page draws Unicode glyphs (`✎ ▤ ◉ ▦ ✓`). One set makes the three clients look like one product.
 
 ## Token changes (`design/tokens.json`)
@@ -42,11 +43,11 @@ Alex's words on the earlier rounds (2026-11-12):
 | Token | Today light / dark | v2 light | v2 dark | Used for |
 |---|---|---|---|---|
 | `color.ground` | `#f7f8f9` / `#1c1d20` | `#fcfbf9` | `#1a1a19` | the page |
-| `color.sidebar` | `#f0f1f3` / `#161719` | `#f5f4f0` | `#141413` | the folders column |
+| `color.sidebar` | `#f0f1f3` / `#161719` | `#f8f7f4` | `#171716` | the folders column |
 | `color.raised` | `#ffffff` / `#26282c` | `#ffffff` | `#212120` | cards, the prompt bar, menus, sheets |
-| `color.well` | `#f0f2f4` / `#2a2d31` | `#f3f2ee` | `#262625` | code, your own message, a filled field |
-| `color.wash` | `#e7eaee` / `#33363b` | `#eeece7` | `#2e2e2c` | hover; a pressed quiet button |
-| `color.selection` | `#d8dee6` / `#3a3e44` | `#e6e3dc` | `#363633` | the picked row, with a 3px accent bar |
+| `color.well` | `#f0f2f4` / `#2a2d31` | `#f6f5f2` | `#262625` | code, your own message, a filled field |
+| `color.wash` | `#e7eaee` / `#33363b` | `#f1f0ec` | `#2e2e2c` | hover; a pressed quiet button |
+| `color.selection` | `#d8dee6` / `#3a3e44` | `#ebe9e4` | `#363633` | the picked row, with a 3px accent bar |
 | `color.ink` | `#1c1d20` / `#e8eaed` | `#1a1918` | `#f4f2ed` | text, icons |
 | `color.secondary` (new) | system `.secondary` | `#4a4741` | `#bdb9b0` | second lines, speakers, section headings |
 | `color.tertiary` (new) | system `.tertiary` | `#625e57` | `#a29e95` | timestamps, counts, placeholders |
@@ -61,13 +62,18 @@ Alex's words on the earlier rounds (2026-11-12):
 
 The code inks and the forge colours keep their values.
 
-### Gradient (new: `gradient.sidebar`): the large grey only
+### State lines (new: `line.*`)
 
-| Token | Light | Dark | Used for |
-|---|---|---|---|
-| `gradient.sidebar` | `#f7f6f3` → `#ecebe6`, top to bottom | `#181817` → `#111110` | the sidebar column (`color.sidebar` stays as its flat value where a gradient cannot be drawn) |
+A state shows its colour in its text, its icon and a line. There is no fill and no gradient:
 
-There are no other gradients. Buttons, chips, badges, notices, cards and a picked choice are flat `raised` with a `rule` or `edge` line. A state shows its colour in its text, its icon and a line: `line.accent` `#a9c2ee` / `#3d5687`, `line.attention` `#ebbf9f` / `#6b4a33`, `line.vouched` `#a9d3bb` / `#36614d` and `line.failure` `#eeb0b3` / `#6b3a3d`. A notice also has a 3px bar. A switch or checkbox that is on is a flat `accent`. Every text colour is 5.3:1 or more on the deeper end of the sidebar gradient. SwiftUI draws it as a `LinearGradient`.
+| Token | Light | Dark |
+|---|---|---|
+| `line.accent` | `#a9c2ee` | `#3d5687` |
+| `line.attention` | `#ebbf9f` | `#6b4a33` |
+| `line.vouched` | `#a9d3bb` | `#36614d` |
+| `line.failure` | `#eeb0b3` | `#6b3a3d` |
+
+A notice also has a 3px bar in its colour. A switch or checkbox that is on is a flat `accent`.
 
 ### Depth (new: `shadow.*`, replacing the one `color.shadow`)
 
@@ -107,7 +113,6 @@ The contact sheet prints each colour's ratio on the ground, light and dark.
 - **Text:** every text colour is 4.5:1 or more on every surface: ground, sidebar, raised, well, wash and selection.
 - **Ink:** 17:1 in the light and 15.6:1 in the dark.
 - **Control edges:** 3:1 or more on every surface where a control is drawn.
-- **The sidebar gradient:** every text colour is 5.3:1 or more on its deeper end.
 
 The first story adds these pairs to `DesignTokensTests`.
 
@@ -148,7 +153,7 @@ The web page must not clip when a person sets 0.12em letter spacing and 0.16em w
 ## Decisions
 
 - Decided: no handwriting, because Alex wants a clean, simple look (2026-11-12).
-- Decided: higher contrast (ink 17:1), lines (1.5:1) in place of shadows on the page, few grey fills, short shadows only on what floats, and one gradient, on the sidebar (the one large grey), with colour only in text, icons, lines and a switch that is on, because Alex asked for more contrast, less shading, light backgrounds, and a gradient only on large grey backgrounds (2026-11-12). Alex can overrule.
+- Decided: higher contrast (ink 17:1), lines (1.5:1) in place of shadows on the page, few grey fills, short shadows only on what floats, no gradients, and light greys one small step from the page, with colour only in text, icons, lines and a switch that is on, because Alex asked for more contrast, less shading, and a lighter grey in place of any gradient (2026-11-12). Alex can overrule.
 - Decided: one icon set, Lucide at a 1.5 stroke, on all three clients, because the clients draw different icons today and Lucide is the one set that meets the library rule. Alex can overrule.
 - Decided: the colour, gradient, depth, radius and spacing tokens above, because each passes WCAG AA and follows the principles. Alex can overrule.
 - Decided: no setting to turn the face off, because one clear look is simpler. Alex can overrule.
@@ -158,7 +163,7 @@ The web page must not clip when a person sets 0.12em letter spacing and 0.16em w
 
 These are filed as sub-issues of #4925 after Alex approves the sheet. Each is blocked by #4926. Story 1 goes first; stories 2, 3 and 4 follow it and can run at the same time.
 
-1. **Paper v2 tokens:** colour, the sidebar gradient, depth, radius and reading spacing (`design/tokens.json`, `Paper.swift`, `StateTint.swift`, `paper.css`, contrast pairs in `DesignTokensTests`).
+1. **Paper v2 tokens:** colour, state lines, depth, radius and reading spacing (`design/tokens.json`, `Paper.swift`, `StateTint.swift`, `paper.css`, contrast pairs in `DesignTokensTests`).
 2. **The face:** Atkinson Hyperlegible Next and Mono on the three clients (`design/fonts/`, `TypeScale.swift`, `Web/assets/fonts`, acknowledgements).
 3. **One icon set:** Lucide on the three clients (`design/icons.json`, `scripts/design.sh icons`, an asset catalogue, the web's glyphs replaced).
 4. **The components to the sheet:** buttons, fields, badges, notices, menus, the session row, the question card and the prompt bar drawn as the contact sheet shows, on the three clients.
