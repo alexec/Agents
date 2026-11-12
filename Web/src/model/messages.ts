@@ -62,7 +62,6 @@ export function messagesProblems(lists: HostConversations[]): string[] {
 export const noConnectorIn = (lists: HostConversations[]): boolean =>
   lists.every((l) => l.conversations.length === 0 && l.errors.length === 0 && !l.problem);
 
-export const messagesTitle = "Messages";
 export const noMachine = "No machine reads messages yet. Update Agents on a machine to read its messaging connectors.";
 export const noConnector = "No messaging connector yet. Add Slack, Email, Google Chat or WhatsApp in a folder's Connectors ▸ Messaging.";
 export const setUp = "Open Connectors";

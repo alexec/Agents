@@ -71,12 +71,6 @@ export function treeRows(list: readonly Agent[], starter: (id: string) => string
   return tops.flatMap((agent) => rows(agent, 0));
 }
 
-/** Who started each of a host's sessions, by id: the `starter` for `nest`. */
-export function startersOf(all: readonly Agent[]): (id: string) => string | undefined {
-  const by = new Map<string, string | undefined>(all.map((a) => [a.id, a.startedByAgent]));
-  return (id) => by.get(id);
-}
-
 /** AgentsModel.liveDescendants: the sessions it started, and theirs, at every level, not archived; oldest first. */
 export function liveDescendants(all: readonly Agent[], id: string): Agent[] {
   const started = new Map<string, Agent[]>();

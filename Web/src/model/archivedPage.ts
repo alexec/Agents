@@ -27,7 +27,6 @@ export function archivedState(held: number, filtering: boolean, answered: boolea
 
 /** The strip over what was last read, and alone when nothing was. */
 export const staleStrip = "Its machine isn’t answering. Showing what was last read.";
-export const loadingWords = "Loading…";
 export const loadingMore = "Loading more…";
 
 export const sessionsWords = {
