@@ -156,6 +156,25 @@ the server that the event came from. Open one and turn on its **Enabled** switch
   gets a comment. GitLab has no event for a whole review, so a 10-minute cooldown gathers
   a reviewer's comments into one run.
 
+### Pipelines and deploys
+
+Two events are about pipelines that no merge request owns, as the github connector's:
+
+- `run.completed`: a pipeline of any trigger finished (a push, a tag, a schedule, a person),
+  whatever its status (`success`, `failed`, `canceled`, `skipped`). `pipeline` (its
+  `workflow:name`), `branch` (a branch or tag, as `main` or `v0.16.0`) and `run` (a
+  pipeline's id) narrow it. A pipeline retried is a new event. `deploys` lists what it
+  deployed: each job with an `environment:` that deployed, as
+  `gitlab:<project>/<environment>/<deployment iid>`. A job needs nothing more.
+- `deploy.waiting`: a job is held by a protected environment's deployment approvals
+  (GitLab Premium). Each of `environments` is one blocked deployment, with the job's page.
+  `reviewers` are the approval rules still open, and `canApprove` says whether you, the
+  connection's owner, may answer every one: not for a deployment you started or answered.
+  Answer it on GitLab.
+
+Both are only for pipelines started by the project's members with Reporter access or more,
+never a bot, unless `anyone` is true.
+
 On GitLab, a merge request is `pr` in an event's data, and its number is its iid (`!12`).
 See [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md).
 

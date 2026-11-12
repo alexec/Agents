@@ -516,22 +516,29 @@ func (g *RealGitLab) trusted(ctx context.Context, project string, u *user) (bool
 	if u == nil || u.ID == 0 || isBot(u.Username, u.Bot) {
 		return false, nil
 	}
-	key := project + "\x00" + strconv.Itoa(u.ID)
+	level, err := g.level(ctx, project, u.ID)
+	return level >= reporterAccess, err
+}
+
+// level is a person's access to the project, directly or through a group: 0 when they are no
+// member. GitLab is asked once per person per memberFor.
+func (g *RealGitLab) level(ctx context.Context, project string, id int) (int, error) {
+	key := project + "\x00" + strconv.Itoa(id)
 	g.mu.Lock()
 	kept, ok := g.members[key]
 	g.mu.Unlock()
 	if ok && time.Since(kept.at) < memberFor {
-		return kept.level >= reporterAccess, nil
+		return kept.level, nil
 	}
 	var m struct {
 		AccessLevel int `json:"access_level"`
 	}
-	err := g.get(ctx, fmt.Sprintf("projects/%s/members/all/%d", pid(project), u.ID), false, &m)
+	err := g.get(ctx, fmt.Sprintf("projects/%s/members/all/%d", pid(project), id), false, &m)
 	if gl, ok := err.(*GitLabError); ok && gl.Kind == NotFound {
 		m.AccessLevel, err = 0, nil
 	}
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 	g.mu.Lock()
 	if len(g.members) >= maxMembers {
@@ -539,7 +546,7 @@ func (g *RealGitLab) trusted(ctx context.Context, project string, u *user) (bool
 	}
 	g.members[key] = member{time.Now(), m.AccessLevel}
 	g.mu.Unlock()
-	return m.AccessLevel >= reporterAccess, nil
+	return m.AccessLevel, nil
 }
 
 // trustedMR says whether a merge request is the project's own: its branch in the project, not
@@ -694,16 +701,18 @@ func (g *RealGitLab) ClosedMRs(ctx context.Context, project, since string) ([]Me
 var mrRef = regexp.MustCompile(`^refs/merge-requests/([0-9]+)/`)
 
 type pipelineJSON struct {
-	ID        int    `json:"id"`
-	IID       int    `json:"iid"`
-	Name      string `json:"name"`
-	Status    string `json:"status"`
-	Source    string `json:"source"`
-	Ref       string `json:"ref"`
-	SHA       string `json:"sha"`
-	WebURL    string `json:"web_url"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID         int    `json:"id"`
+	User       *user  `json:"user"`
+	FinishedAt string `json:"finished_at"`
+	IID        int    `json:"iid"`
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Source     string `json:"source"`
+	Ref        string `json:"ref"`
+	SHA        string `json:"sha"`
+	WebURL     string `json:"web_url"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
 }
 
 func (p pipelineJSON) pipeline() Pipeline {
@@ -711,7 +720,7 @@ func (p pipelineJSON) pipeline() Pipeline {
 	if name == "" {
 		name = fmt.Sprintf("Pipeline #%d", p.ID)
 	}
-	out := Pipeline{ID: p.ID, Name: name, URL: p.WebURL, SHA: p.SHA, Ref: p.Ref, UpdatedAt: p.UpdatedAt}
+	out := Pipeline{ID: p.ID, Name: name, URL: p.WebURL, SHA: p.SHA, Ref: p.Ref, UpdatedAt: p.UpdatedAt, Listed: p.Name}
 	if m := mrRef.FindStringSubmatch(p.Ref); m != nil {
 		out.MRNumber, _ = strconv.Atoi(m[1])
 	}
