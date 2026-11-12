@@ -119,9 +119,11 @@ func (d *Daemon) syncFolderWatches() {
 		d.pwWatches = map[string]*folderWatch{}
 	}
 	var gone []*folderWatch
+	var goneFolders []string
 	for folder, w := range d.pwWatches {
 		if !live[folder] {
 			gone = append(gone, w)
+			goneFolders = append(goneFolders, folder)
 			delete(d.pwWatches, folder)
 			d.forgetFolderLocked(folder)
 		}
@@ -136,17 +138,33 @@ func (d *Daemon) syncFolderWatches() {
 	for _, w := range gone {
 		w.stop()
 	}
+	if len(goneFolders) > 0 {
+		d.forgetWorkflowsTold(goneFolders)
+	}
 	sort.Strings(fresh)
+	started := map[string]*folderWatch{}
+	var seeded []string
 	for _, folder := range fresh {
 		w, err := newFolderWatch(folder, func(paths []string) { d.folderFilesChanged(folder, paths) })
 		if err != nil {
 			log.Printf("folder watch: %s: %v", folder, err)
 			continue
 		}
+		started[folder] = w
+		seeded = append(seeded, folder)
+	}
+	// After each watch hears: a workflow there before the seed is not news.
+	if len(seeded) > 0 {
+		d.seedWorkflowsTold(seeded)
+	}
+	for i, folder := range seeded {
+		w := started[folder]
 		d.pwMu.Lock()
 		if d.pwStopped {
 			d.pwMu.Unlock()
-			w.stop()
+			for _, rest := range seeded[i:] {
+				started[rest].stop()
+			}
 			return
 		}
 		d.pwWatches[folder] = w
@@ -253,18 +271,13 @@ func (d *Daemon) folderFilesChanged(folder string, paths []string) {
 }
 
 // rescanWorkflows reads a folder's workflows again and tells each one that came, changed
-// or went (scheduleWorkflowRescan).
+// or went since it was last told (scheduleWorkflowRescan). What it was last told is
+// workflowTold, which only telling moves: a reader's scan in between leaves it (#4750).
 func (d *Daemon) rescanWorkflows(folder string) {
 	d.workflowMu.Lock()
-	before := map[string]string{}
-	for id, f := range d.workflowFiles[folder] {
-		before[id] = f.digest
-	}
 	d.scanLocked()
-	after := map[string]string{}
-	for id, f := range d.workflowFiles[folder] {
-		after[id] = f.digest
-	}
+	before := d.workflowTold[folder]
+	after := workflowDigests(d.workflowFiles[folder])
 	d.workflowMu.Unlock()
 	var told []string
 	for id, digest := range after {
@@ -280,6 +293,39 @@ func (d *Daemon) rescanWorkflows(folder string) {
 	sort.Strings(told)
 	for _, id := range told {
 		d.tellWorkflow(folder, id)
+	}
+}
+
+// workflowDigests is each workflow's digest, by id.
+func workflowDigests(files map[string]*workflowFile) map[string]string {
+	out := make(map[string]string, len(files))
+	for id, f := range files {
+		out[id] = f.digest
+	}
+	return out
+}
+
+// seedWorkflowsTold takes what newly watched folders' workflows are now as told: a file
+// there before the watch is not news, one that comes after it is. Never holds pwMu, as
+// scanLocked takes it.
+func (d *Daemon) seedWorkflowsTold(folders []string) {
+	d.workflowMu.Lock()
+	defer d.workflowMu.Unlock()
+	d.scanLocked()
+	if d.workflowTold == nil {
+		d.workflowTold = map[string]map[string]string{}
+	}
+	for _, folder := range folders {
+		d.workflowTold[folder] = workflowDigests(d.workflowFiles[folder])
+	}
+}
+
+// forgetWorkflowsTold drops what folders no longer watched were told. Never holds pwMu.
+func (d *Daemon) forgetWorkflowsTold(folders []string) {
+	d.workflowMu.Lock()
+	defer d.workflowMu.Unlock()
+	for _, folder := range folders {
+		delete(d.workflowTold, folder)
 	}
 }
 
