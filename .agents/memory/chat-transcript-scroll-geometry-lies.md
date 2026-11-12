@@ -3,8 +3,11 @@ name: chat-transcript-scroll-geometry-lies
 description: "ChatTranscript's LazyVStack re-measures every frame, so geometry can't tell a reader's scroll from the stack; a .scrollPosition binding re-anchors the pane by itself"
 metadata:
   type: project
-  modified: 2026-10-08T01:33:45.251Z
+  modified: 2026-11-11T20:00:00Z
 ---
+
+**Since #4108 the transcript is no longer a LazyVStack:** it is `TranscriptStack`, a custom `Layout` (`Shared/UI/Chat/TranscriptStack.swift`) that draws only the rows near the view, with measured or estimated heights. The lesson below (do not read intent from geometry) still holds; the jitter numbers are from the old stack.
+
 
 Found walking #378 (merged eb9aab4f, 2026-10-07): in `Shared/UI/Chat/ChatTranscript.swift` the lazy stack's content height jitters frame to frame (3252 → 3095 → 3421 …) and the offset moves with it, so "offset went up with the height unchanged" is as often the stack as the reader. Reading back is now told by input (`TranscriptInput.swift`: wheel over the transcript, finger distance via scroll phase, keys).
 
