@@ -8,6 +8,7 @@ package controlplane
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
@@ -134,6 +135,9 @@ type Config struct {
 	// Posts this copy's own pushes through APNs (#1460). Nil, with no key on the machine,
 	// sends none.
 	Push Pusher
+	// The least time between two updates of one Live Activity (#4997); an end goes at once.
+	// Zero is liveActivityEvery.
+	ActivityEvery time.Duration
 	// Posts this copy's own Web Push to a browser (#1486). Nil, with no VAPID key on the
 	// machine, sends none.
 	WebPush WebPusher
@@ -294,7 +298,7 @@ func New(cfg Config) (*Service, error) {
 	s.auditWriter = audit.NewWriter(s.auditLog(), s.log)
 	s.downloads, s.socketsMost, s.refusals = newAddressRates(), socketsMost, newRefusalLog(s.log)
 	if cfg.Push != nil {
-		s.pushes = newPushes(s, cfg.Push)
+		s.pushes = newPushes(s, cfg.Push, cmp.Or(cfg.ActivityEvery, liveActivityEvery))
 	}
 	if cfg.WebPush != nil {
 		s.webPush = newWebPushes(s, cfg.WebPush)
