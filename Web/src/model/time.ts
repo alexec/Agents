@@ -1,7 +1,7 @@
 // The bars of the Time page (#852), as AgentsKitCore's TimeChart works them out, so the page says
 // what the window's and the Remote's say. Each bar is stacked by kind of time. Every stamp is the
 // host's, counted back from history.now; nothing asks the browser's clock what today is.
-import type { TimeBucket, TimeHistory } from "../protocol/generated";
+import type { LineageDeliveryFigure, TimeBucket, TimeHistory } from "../protocol/generated";
 import { mergeTiers, usageSlots, type UsageRange } from "./usage";
 
 export type TimeKind = "agent" | "tools" | "others" | "person";
@@ -95,4 +95,12 @@ export function timeWords(seconds: number): string {
   if (hours >= 100) return `${hours}h`;
   const rest = minutes % 60;
   return rest === 0 ? `${hours}h` : `${hours}h ${rest}m`;
+}
+
+/** Reports ▸ Time's line on how long PRs waited for the person (#4553), from a host's time/history: the median
+ * over its 4 weeks. Null when no PR had an answer, or the host is too old to say. */
+export function approvalWaitWords(wait: LineageDeliveryFigure | undefined): string | null {
+  if (!wait || wait.value === undefined || wait.count === 0) return null;
+  const prs = wait.count === 1 ? "1 PR" : `${wait.count} PRs`;
+  return `PRs waited a median of ${timeWords(wait.value)} for a person's answer (${prs}, last ${wait.weeks.length || 4} weeks).`;
 }

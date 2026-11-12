@@ -235,10 +235,13 @@ func schemaProblem(values map[string]string, s jsonSchema, name string) string {
 type waitPattern struct {
 	name    string
 	filters map[string][]string
+	// bus is what it says of the envelope (#4730).
+	bus busFilter
 }
 
 func (p waitPattern) wire() wire.EventPattern {
 	w := wire.EventPattern{Name: p.name, Filters: map[string]string{}}
+	p.bus.setOn(&w)
 	for k, vs := range p.filters {
 		w.Filters[k] = strings.Join(vs, "|")
 		if len(vs) > 1 {
@@ -252,7 +255,7 @@ func (p waitPattern) wire() wire.EventPattern {
 }
 
 func patternOf(w wire.EventPattern) waitPattern {
-	p := waitPattern{name: w.Name, filters: map[string][]string{}}
+	p := waitPattern{name: w.Name, filters: map[string][]string{}, bus: filterOfPattern(w)}
 	for k, v := range w.Filters {
 		p.filters[k] = []string{v}
 	}
@@ -275,6 +278,15 @@ func (p waitPattern) label() string {
 	for _, k := range keys {
 		parts = append(parts, k+" "+strings.Join(p.filters[k], "|"))
 	}
+	if p.bus.provider != "" {
+		parts = append(parts, "provider "+p.bus.provider)
+	}
+	if len(p.bus.topics) > 0 {
+		parts = append(parts, "topic "+strings.Join(p.bus.topics, "|"))
+	}
+	if p.bus.subject != nil {
+		parts = append(parts, "subject "+p.bus.subject.String())
+	}
 	return strings.Join(parts, " ")
 }
 
@@ -289,6 +301,14 @@ func (p waitPattern) matches(e wire.Event) bool {
 		}
 	} else if e.Name != p.name {
 		return false
+	}
+	if !p.bus.envelopeMatches(e) {
+		return false
+	}
+	// From another machine an event has its envelope only (#4730): a pattern that names
+	// the envelope and nothing of its own hears it.
+	if fromBus(e) {
+		return p.bus.wide() && len(p.filters) == 0
 	}
 	for k, vs := range p.filters {
 		// A file event's paths are globs, and it matches when one of its files does (#3795).
@@ -538,17 +558,37 @@ func waitMatches(w *wire.EventWait, e wire.Event) bool {
 	if e.Position <= w.From {
 		return false
 	}
+	patterns := waitPatterns(w)
 	for _, se := range w.ServerEvents {
-		if mcpTriggerOfWire(se.Trigger).matches(e) {
+		if mcpTriggerOfWire(se.Trigger).matches(e) && waitBus(patterns, se.Trigger.Event).envelopeMatches(e) {
 			return true
 		}
 	}
-	for _, p := range waitPatterns(w) {
-		if (len(w.ServerEvents) == 0 || !isServerPattern(p.name)) && p.matches(e) {
+	for _, p := range patterns {
+		if (len(w.ServerEvents) == 0 || !isServerPattern(p.name) || fromBus(e)) && p.matches(e) {
 			return true
 		}
 	}
 	return false
+}
+
+// waitBus is the filter of the wait's pattern for name.
+func waitBus(patterns []waitPattern, name string) busFilter {
+	for _, p := range patterns {
+		if p.name == name {
+			return p.bus
+		}
+	}
+	return busFilter{}
+}
+
+// waitDebounce is how long the wait holds a burst (#4730); 0 for none.
+func waitDebounce(w *wire.EventWait) time.Duration {
+	var most time.Duration
+	for _, p := range waitPatterns(w) {
+		most = max(most, p.bus.debounce)
+	}
+	return most
 }
 
 func detailsLine(e wire.Event) string {
@@ -599,10 +639,14 @@ func matchedWords(e wire.Event, waited *int) string {
 	}
 	said := fmt.Sprintf("%s happened at %s (position %d)%s: %s%s%s.", e.Name, clock(e.At), e.Position, after,
 		e.Sentence, details, message)
-	if blocks := structuredDetails(e); blocks != "" {
-		return said + "\n" + blocks + "\nYou can carry on."
+	hint := ""
+	if h := hintWords(e); h != "" {
+		hint = " " + h
 	}
-	return said + " You can carry on."
+	if blocks := structuredDetails(e); blocks != "" {
+		return said + "\n" + blocks + "\nYou can carry on." + hint
+	}
+	return said + " You can carry on." + hint
 }
 
 func stillWaitingWords(w *wire.EventWait) string {
@@ -666,11 +710,15 @@ func wakeWords(e wire.Event, extra int) string {
 		}
 		lines = append(lines, "", more+" before you resumed; they are in this folder's events.")
 	}
+	if hint := hintWords(e); hint != "" {
+		lines = append(lines, "", hint)
+	}
 	return strings.Join(lines, "\n")
 }
 
 func timedOutWords(w *wire.EventWait, at wire.Date) string {
-	return "Your wait for " + waitLabel(w) + " timed out at " + clock(at) + " with no match."
+	return "Your wait for " + waitLabel(w) + " timed out at " + clock(at) + " with no match. No event is not proof that nothing " +
+		"happened (the bus is best effort): check the state now, by its ref, before you go on."
 }
 
 func endedWords(w *wire.EventWait, by wire.EventWaitEndingCanceller) string {
@@ -859,10 +907,13 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	}
 
 	var names []string
-	if s, err := stringList(args, "events"); err == nil {
-		for _, n := range s {
-			if n = strings.TrimSpace(n); n != "" {
-				names = append(names, n)
+	// type is the word for it everywhere (#4730), and name is read for one release.
+	for _, key := range []string{"events", "type", "name"} {
+		if s, err := stringList(args, key); err == nil {
+			for _, n := range s {
+				if n = strings.TrimSpace(n); n != "" && !contains(names, n) {
+					names = append(names, n)
+				}
 			}
 		}
 	}
@@ -880,12 +931,17 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	if problem != "" {
 		return "", eventRefused(problem)
 	}
+	bus, problem := waitBusFilter(args)
+	if problem != "" {
+		return "", eventRefused(problem + " Nothing is waiting.")
+	}
 	wakeOn := strings.ToLower(strings.TrimSpace(argString(args, "wake_on")))
 	if words := endedWaitWords(names, filters, wakeOn); words != "" {
 		return "", eventRefused(words)
 	}
 	var patterns []waitPattern
 	var serverNames []string
+	warning0 := ""
 	for _, n := range names {
 		p, problem := parsePattern(n, filters)
 		if problem != "" {
@@ -894,14 +950,27 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 		if words := unnamedBranchWords(p, filters); words != "" {
 			return "", eventRefused(words)
 		}
+		p.bus = bus
 		if isServerPattern(p.name) {
 			// A server's event is matched by its subscription, not its details: `where`
-			// goes to the server (#577).
-			patterns = append(patterns, waitPattern{name: p.name, filters: map[string][]string{}})
+			// goes to the server (#577). One that names the envelope keeps its where, so
+			// the bus, which cannot check it, does not wake it (#4730).
+			kept := map[string][]string{}
+			if bus.wide() {
+				for k, v := range filters {
+					if k != mcpServerKey {
+						kept[k] = v
+					}
+				}
+			}
+			patterns = append(patterns, waitPattern{name: p.name, filters: kept, bus: bus})
 			serverNames = append(serverNames, p.name)
 			continue
 		}
 		patterns = append(patterns, p)
+	}
+	if bus.wide() && len(filters) > 0 {
+		warning0 = "From the person's other machines, where is not checked, so their events do not wake this wait: name the thing in subject to hear them. "
 	}
 	// agent.ended on named sessions is a block on them (#3799), as a wait on sessions was:
 	// it reaches every session of the project, on every machine, and wakes on all or any.
@@ -936,13 +1005,24 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	if len(neverHere) > 0 && len(neverHere) == len(patterns) {
 		return "", eventRefused(neverHereWords(neverHere) + " Nothing is waiting.")
 	}
-	warning := ""
+	warning := warning0
 	if len(neverHere) > 0 {
-		warning = neverHereWords(neverHere) + " "
+		warning += neverHereWords(neverHere) + " "
 	}
 	// A server's event is a subscription the wait holds, as a trigger's is (#577):
-	// checked against what the folder's servers offer, `where` as its arguments.
-	servers, err := d.checkMCPWait(serverNames, filters, folderPath(a))
+	// checked against what the folder's servers offer, `where` as its arguments. One that
+	// names the envelope also hears the bus (#4730), so a server here that cannot give it
+	// is said, not refused.
+	servers, err := d.checkMCPWait(serverNames, bus.localWhere(filters), folderPath(a))
+	if err != nil && bus.wide() {
+		words := err.Error()
+		if e, ok := err.(*Error); ok {
+			words = e.Message
+		}
+		warning += "This folder's servers do not give it (" + strings.TrimSuffix(strings.TrimSpace(strings.TrimSuffix(words, "Nothing is waiting.")), ".") +
+			"), so it is heard from the person's other machines only. "
+		servers, err = mcpWaitCheck{}, nil
+	}
 	if err != nil {
 		return "", err
 	}
@@ -1041,6 +1121,28 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	case <-d.ctx.Done():
 		return prefix + stillWaitingWords(&wait), nil
 	}
+}
+
+// waitBusFilter is wait_for_event's provider, topic, subject and debounce (#4730).
+func waitBusFilter(args map[string]json.RawMessage) (busFilter, string) {
+	values := map[string][]string{}
+	for k := range busKeys {
+		raw, ok := args[k]
+		if !ok || string(raw) == "null" {
+			continue
+		}
+		var n float64
+		if k == "debounce" && json.Unmarshal(raw, &n) == nil {
+			values[k] = []string{strconv.FormatFloat(n, 'f', -1, 64)}
+			continue
+		}
+		vs, err := stringList(args, k)
+		if err != nil {
+			return busFilter{}, "`" + k + "` is text, or for topic a list of text."
+		}
+		values[k] = vs
+	}
+	return readBusFilter(values)
 }
 
 func argBool(args map[string]json.RawMessage, key string) bool {
@@ -1174,32 +1276,15 @@ func (d *Daemon) matchWaits(e wire.Event) {
 			!own && e.Name == backgroundEndedEvent {
 			continue
 		}
-		title := "Untitled"
-		if a.Title != nil {
-			title = *a.Title
-		}
 		if w.Ending == nil {
-			d.woke(a.ID, e.Position)
-			if c := d.takeOpenWait(a.ID); c != nil {
-				waited := int(time.Since(c.started).Round(time.Second).Seconds())
-				d.change(a.ID, func(a *wire.Agent) { a.EventWait = nil })
-				c.answer <- matchedWords(e, &waited) + d.restartNotice(w)
-			} else {
-				prompt := wire.QueuedPrompt{ID: store.NewUUID(), Text: wakeWords(e, 0) + d.restartNotice(w), QueuedAt: now(), From: wire.PromptOriginApp,
-					Attachments: []wire.Attachment{}}
-				ended := *w
-				ended.Ending = &wire.EventWaitEnding{Matched: &wire.EventWaitEndingMatched{Position: e.Position}}
-				ended.ResumePromptID = &prompt.ID
-				d.change(a.ID, func(a *wire.Agent) {
-					a.EventWait = &ended
-					a.QueuedPrompts = append(append([]wire.QueuedPrompt{}, a.QueuedPrompts...), prompt)
-				})
-				id, pos := a.ID, e.Position
-				safe.Go("event wake", func() { d.sendEventResume(id, prompt.ID, &pos) })
+			// A burst on one subject and type is held, and wakes it once (#4730).
+			if hold := waitDebounce(w); hold > 0 {
+				id, waitID := a.ID, w.ID
+				if d.holdBurst("wait:"+string(waitID), hold, e, func(last wire.Event, n int) { d.wakeHeld(id, waitID, last, n, hold) }) {
+					continue
+				}
 			}
-			d.addConsequence(wire.Consequence{Woke: &wire.ConsequenceWoke{AgentID: a.ID, Title: title}}, e.Position)
-			d.tellEvents(nil)
-			d.armWaitTimer()
+			d.wakeWait(a, w, e, "")
 		} else if m := w.Ending.Matched; m != nil && w.ResumePromptID != nil && e.Position != m.Position {
 			// Woken, and not running yet: counted in the prompt it will read.
 			first := d.event(m.Position)
@@ -1228,6 +1313,48 @@ func (d *Daemon) matchWaits(e wire.Event) {
 			})
 		}
 	}
+}
+
+// wakeWait ends the wait on e: the call answered when it is still open, else the wake
+// queued. burst says what a debounce held, or "".
+func (d *Daemon) wakeWait(a wire.Agent, w *wire.EventWait, e wire.Event, burst string) {
+	title := "Untitled"
+	if a.Title != nil {
+		title = *a.Title
+	}
+	if burst != "" {
+		burst = " " + burst
+	}
+	d.woke(a.ID, e.Position)
+	if c := d.takeOpenWait(a.ID); c != nil {
+		waited := int(time.Since(c.started).Round(time.Second).Seconds())
+		d.change(a.ID, func(a *wire.Agent) { a.EventWait = nil })
+		c.answer <- matchedWords(e, &waited) + burst + d.restartNotice(w)
+	} else {
+		prompt := wire.QueuedPrompt{ID: store.NewUUID(), Text: wakeWords(e, 0) + burst + d.restartNotice(w), QueuedAt: now(), From: wire.PromptOriginApp,
+			Attachments: []wire.Attachment{}}
+		ended := *w
+		ended.Ending = &wire.EventWaitEnding{Matched: &wire.EventWaitEndingMatched{Position: e.Position}}
+		ended.ResumePromptID = &prompt.ID
+		d.change(a.ID, func(a *wire.Agent) {
+			a.EventWait = &ended
+			a.QueuedPrompts = append(append([]wire.QueuedPrompt{}, a.QueuedPrompts...), prompt)
+		})
+		id, pos := a.ID, e.Position
+		safe.Go("event wake", func() { d.sendEventResume(id, prompt.ID, &pos) })
+	}
+	d.addConsequence(wire.Consequence{Woke: &wire.ConsequenceWoke{AgentID: a.ID, Title: title}}, e.Position)
+	d.tellEvents(nil)
+	d.armWaitTimer()
+}
+
+// wakeHeld wakes the wait on the last of a burst, when it is still the open wait.
+func (d *Daemon) wakeHeld(id, waitID wire.UUID, last wire.Event, n int, held time.Duration) {
+	a := d.Store.Agent(id)
+	if a == nil || a.EventWait == nil || a.EventWait.ID != waitID || a.EventWait.Ending != nil {
+		return
+	}
+	d.wakeWait(*a, a.EventWait, last, burstWords(n, held))
 }
 
 // sendEventResume sends a queued wake; one that cannot go drops the wait, records that the

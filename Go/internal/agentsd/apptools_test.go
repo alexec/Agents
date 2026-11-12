@@ -71,6 +71,10 @@ func appClient(t *testing.T, d *Daemon, id wire.UUID) *mcpClient {
 func TestTheAppsToolsAreServedToEachRuntime(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
+	d.SettingsDir = t.TempDir()
+	if _, err := d.saveDesktopControl(wire.DriveApprovalOff); err != nil {
+		t.Fatal(err)
+	}
 	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) {
 		a.Labels = []wire.SessionLabel{{Value: "Mine", Owner: wire.SessionLabelOwnerPerson, AddedAt: now()}}
 	})
@@ -95,10 +99,10 @@ func TestTheAppsToolsAreServedToEachRuntime(t *testing.T) {
 	json.Unmarshal(list["result"], &tools)
 	// drive_screen is the one tool this host may not offer at all: on a host with no
 	// agents-drive beside it (#3004, host.desktop-control/1), and on every host while desktop
-	// control is Off, as it is until the person turns it on (FR-004). Nor is
+	// control is Off (FR-004), as it is here. Nor is
 	// write_daily_summary and check_folders, but in the person's home folder (#3192, #3355).
 	if d.desktopControlOn() || d.offersDriveScreen() {
-		t.Fatal("desktop control is on before anyone turned it on")
+		t.Fatal("desktop control is on while it is Off")
 	}
 	want := len(appToolCalls()) - 3
 	// After them, Playwright's browser tools, where this host can install the browser (#3534).

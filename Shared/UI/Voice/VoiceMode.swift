@@ -725,7 +725,12 @@ final class VoiceMode {
         armTick()
         defer { askIfWaiting() }
         if !words.isEmpty { heardChanged(words) }
-        guard !isWalked else { return }
+        guard !isWalked else {
+            // A walk hears nothing: a tape's listening sound comes when a real one would at
+            // the latest (#4854).
+            if chime, isTaped { chimeWhenListening() }
+            return
+        }
         startDictation(after: words)
         // The sound once the microphone really hears, so words said on it are not lost.
         if chime { chimeWhenListening() }
@@ -1045,7 +1050,7 @@ final class VoiceMode {
     /// running counts: the microphone is open, and that long silence is when the tick
     /// says it is still on (#2520). "Still working" stays the spoken line (#2358).
     private var ticksInSilence: Bool {
-        phase == .listening && heard.isEmpty && confirmLine == nil && !isWalked
+        phase == .listening && heard.isEmpty && confirmLine == nil && (!isWalked || isTaped)
     }
 
     /// Starts the tick, or stops it. A tick already waiting is left, so an empty update
@@ -1073,7 +1078,7 @@ final class VoiceMode {
     /// voice's player, so the echo cancellation leaves it out of the microphone. Not for words
     /// said over the voice: the voice stopped for them at once, so it does not speak again.
     private func sent(overTheVoice: Bool) {
-        guard !isWalked else { return }
+        guard !isWalked || isTaped else { return }
         guard VoiceSound.sent.saysLetMeThink, !overTheVoice else {
             VoiceSound.sent.play()
             return
@@ -1095,10 +1100,26 @@ final class VoiceMode {
     /// How long after "Let me think." its words heard back are dropped (#3565).
     private static let letMeThinkHeardFor: Duration = .seconds(2)
 
-    /// A sound, but none in a walk.
+    /// A sound, but none in a walk, unless the walk has a tape (#4854): it takes the sound.
     private func sound(_ sound: VoiceSound) {
-        if !isWalked { sound.play() }
+        if !isWalked || isTaped { sound.play() }
     }
+
+    /// Whether a walk's tape takes the voice and the sounds (#4854).
+    private var isTaped: Bool {
+        #if DEBUG
+        VoiceTape.current != nil
+        #else
+        false
+        #endif
+    }
+
+    #if DEBUG
+    /// A walk started or ended its tape: the tick goes on it, or stops.
+    func walkTapeChanged() {
+        armTick()
+    }
+    #endif
 
     private func fail(_ message: String, permission: Dictation.Permission? = nil) {
         sound(.problem)

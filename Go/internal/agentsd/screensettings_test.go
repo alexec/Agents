@@ -10,9 +10,9 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Desktop control is Off until the person turns it on (#3004, US2, FR-004, T019): while it
+// Desktop control is Ask, Always Approve or Off (#3004, US2, FR-004, T019, #4264): while it
 // is Off, drive_screen is refused before it takes the screen lease or starts agents-drive,
-// and it is not offered at all. Only the person's own clients can turn it on.
+// and it is not offered at all. Only the person's own clients change it.
 
 func TestDriveScreenIsRefusedWhileDesktopControlIsOff(t *testing.T) {
 	prepareDrive(t)
@@ -23,8 +23,11 @@ func TestDriveScreenIsRefusedWhileDesktopControlIsOff(t *testing.T) {
 	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateRunning, nil })
 	m := appClient(t, d, a.ID)
 	m.post("initialize", map[string]any{}, 1)
+	if _, err := d.setDesktopControl(&Client{Role: RoleControl, d: d}, wire.DesktopControlSettings{Enabled: false}); err != nil {
+		t.Fatal(err)
+	}
 
-	// Off by default: not offered, even on a host with agents-drive beside it (only a Mac
+	// Off: not offered, even on a host with agents-drive beside it (only a Mac
 	// is one; offeredTools' own case is in apptools_test.go).
 	_, list := m.post("tools/list", nil, 2)
 	if strings.Contains(string(list["result"]), `"drive_screen"`) {
@@ -60,16 +63,18 @@ func TestDriveScreenIsRefusedWhileDesktopControlIsOff(t *testing.T) {
 }
 
 func TestDesktopControlIsSavedAndReadBack(t *testing.T) {
+	askDrive(t)
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
 	d.SettingsDir = t.TempDir()
 	var st wire.DesktopControlSettings
 	json.Unmarshal(c.call(t, 1, "desktopControl/state", nil), &st)
-	if st.Enabled {
-		t.Fatalf("%+v, wanted Off by default", st)
+	if !st.Enabled || st.Mode == nil || *st.Mode != wire.DriveApprovalAsk {
+		t.Fatalf("%+v, wanted Ask by default on a machine a person uses (#4264)", st)
 	}
+	// A client from before #4264 sends only enabled: On is Always Approve, as it was.
 	json.Unmarshal(c.call(t, 2, "desktopControl/set", wire.DesktopControlSettings{Enabled: true}), &st)
-	if !st.Enabled || !d.desktopControlOn() {
+	if !st.Enabled || !d.desktopControlOn() || d.desktopControlMode() != wire.DriveApprovalAlways {
 		t.Fatalf("%+v", st)
 	}
 	b, err := os.ReadFile(filepath.Join(d.SettingsDir, "desktop-control.json"))
@@ -82,6 +87,27 @@ func TestDesktopControlIsSavedAndReadBack(t *testing.T) {
 	json.Unmarshal(c.call(t, 3, "desktopControl/set", wire.DesktopControlSettings{Enabled: false}), &st)
 	if st.Enabled || d.desktopControlOn() {
 		t.Fatalf("%+v", st)
+	}
+	ask := wire.DriveApprovalAsk
+	json.Unmarshal(c.call(t, 4, "desktopControl/set", wire.DesktopControlSettings{Mode: &ask}), &st)
+	if !st.Enabled || d.desktopControlMode() != wire.DriveApprovalAsk {
+		t.Fatalf("%+v", st)
+	}
+}
+
+// A file from before #4264, {enabled: true}, is Always Approve: nothing changes for a Mac that
+// turned it on. {enabled: false} stays Off.
+func TestDesktopControlFromBeforeAskKeepsItsMeaning(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	d.SettingsDir = t.TempDir()
+	for body, want := range map[string]wire.DriveApproval{`{"enabled":true}`: wire.DriveApprovalAlways, `{"enabled":false}`: wire.DriveApprovalOff} {
+		if err := os.WriteFile(filepath.Join(d.SettingsDir, "desktop-control.json"), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if got := d.desktopControlMode(); got != want {
+			t.Fatalf("%s: %s, wanted %s", body, got, want)
+		}
 	}
 }
 
@@ -102,8 +128,8 @@ func TestDesktopControlSetRefusesTheAgentSocketRole(t *testing.T) {
 			t.Fatalf("the %s role may call desktopControl/set", role)
 		}
 	}
-	if d.desktopControlOn() {
-		t.Fatal("turned on by a refused caller")
+	if _, err := os.Stat(filepath.Join(d.SettingsDir, "desktop-control.json")); err == nil {
+		t.Fatal("changed by a refused caller")
 	}
 	for _, tc := range appToolCalls() {
 		if strings.Contains(strings.ToLower(tc.name), "desktop") {

@@ -66,6 +66,9 @@ func grantPlace(use wire.SecretUse, place string) string { return string(use) + 
 
 // secretUseWords are what an agent reads when its use of a secret waits, or was refused.
 func secretUseWords(r wire.RequestSecretUse, id wire.UUID) string {
+	if r.Use == wire.SecretUseBrowser || r.Use == wire.SecretUseScreen {
+		return driveWaitWords(r, id)
+	}
 	if r.Use == wire.SecretUseAccount {
 		return "Nothing was read yet: the account " + r.Name + " has Ask before use, and a person has not yet approved your " + accountCall(r) + " of it. " +
 			"Wait with wait_for_event, where: {\"request\": \"" + string(id) + "\"}, then call manage_accounts again."
@@ -162,6 +165,9 @@ func (d *Daemon) afterSecretUse(agent wire.UUID, ask wire.RequestSecretUse, id w
 	if ask.Use == wire.SecretUseAccount {
 		return "", errAccountUseDenied{ask.Name}
 	}
+	if ask.Use == wire.SecretUseBrowser || ask.Use == wire.SecretUseScreen {
+		return "", &Error{Code: CodeNotPermitted, Message: driveDeniedWords(ask.Use)}
+	}
 	return "", errSecretUseDenied{ask.Name, ask.Place}
 }
 
@@ -173,6 +179,13 @@ func (d *Daemon) secretUseAllowed(agent wire.UUID, name string, use wire.SecretU
 	}
 	key := secretUseKey(agent, name, use, place)
 	d.secretUseMu.Lock()
+	if use == wire.SecretUseBrowser || use == wire.SecretUseScreen {
+		// The browser and the screen have no grants (driveapproval.go, #4264): their Always
+		// Approve is the setting, which a person may also change while a call is held.
+		ok := d.driveAllowed(key)
+		d.secretUseMu.Unlock()
+		return ok || d.driveMode(use) != wire.DriveApprovalAsk
+	}
 	if d.secretUseSessions[key] {
 		d.secretUseMu.Unlock()
 		return true
@@ -233,7 +246,12 @@ func (d *Daemon) openSecretUseRequest(agent wire.UUID, ask wire.RequestSecretUse
 	title := map[wire.SecretUse]string{wire.SecretUseFill: "Fill " + ask.Name + " on " + ask.Place,
 		wire.SecretUseCi:      "Set " + ask.Name + " as a CI secret in " + ask.Place,
 		wire.SecretUseMCP:     "Send " + ask.Name + " to the MCP server " + ask.Place,
-		wire.SecretUseAccount: "Read the account " + ask.Name}[ask.Use]
+		wire.SecretUseAccount: "Read the account " + ask.Name,
+		wire.SecretUseBrowser: "Use the browser on " + ask.Place,
+		wire.SecretUseScreen:  "Use the screen on " + ask.Place}[ask.Use]
+	if ask.App != nil && ask.Use == wire.SecretUseScreen {
+		title = "Use " + *ask.App + " through the screen on " + ask.Place
+	}
 	r := &wire.Request{ID: store.NewUUID(), Kind: wire.RequestKindApprove, Source: wire.RequestSourceSecretUse,
 		State: wire.RequestStateOpen, Title: title, Detail: wire.RequestDetail{SecretUse: &ask},
 		Folder: string(store.FolderURL(folderPath(a))), AskedBy: &asker,
@@ -264,6 +282,9 @@ func (d *Daemon) answerSecretUse(rec wire.Request, a *wire.RequestSecretUseAnswe
 	}
 	if ask.Use == wire.SecretUseAccount {
 		return d.answerAccountUse(rec, a, by)
+	}
+	if ask.Use == wire.SecretUseBrowser || ask.Use == wire.SecretUseScreen {
+		return d.answerDriveUse(rec, a, by)
 	}
 	if a.Action == secretUseHour {
 		return wire.RequestUpdate{}, Invalid("Approve for 1 Hour is for a terminal's request; this one takes once, session, always or deny.")
@@ -340,6 +361,7 @@ func (d *Daemon) secretUseEnded(id wire.UUID) {
 // forgetSessionSecretUses drops what a person allowed an archived session.
 func (d *Daemon) forgetSessionSecretUses(agent wire.UUID) {
 	d.forgetSecretProxy(agent)
+	d.forgetSessionDrives(agent)
 	prefix := string(sessionKey(agent)) + "|"
 	d.secretUseMu.Lock()
 	defer d.secretUseMu.Unlock()

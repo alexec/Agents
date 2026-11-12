@@ -42,3 +42,13 @@ test("times read at a glance", () => {
   assert.equal(time.timeWords(2 * 3600), "2h");
   assert.equal(time.timeWords(140 * 3600 + 59), "140h");
 });
+
+// #4553: Reports ▸ Time's approval wait line.
+test("approval wait words", () => {
+  assert.equal(time.approvalWaitWords(undefined), null);
+  assert.equal(time.approvalWaitWords({ count: 0, weeks: [] }), null);
+  assert.equal(time.approvalWaitWords({ value: 12000, count: 7, weeks: [{}, {}, {}, {}] }),
+    "PRs waited a median of 3h 20m for a person's answer (7 PRs, last 4 weeks).");
+  assert.equal(time.approvalWaitWords({ value: 600, count: 1, weeks: [{}, {}, {}, {}] }),
+    "PRs waited a median of 10m for a person's answer (1 PR, last 4 weeks).");
+});

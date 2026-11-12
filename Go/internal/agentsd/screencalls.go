@@ -203,6 +203,7 @@ func (d *Daemon) stopScreenDrives() {
 // other app tool's state on an ending (turns.go's end). A pause ends with the turn, and so
 // does the person's Take Over: the next turn may drive again.
 func (d *Daemon) endScreenDrive(agent wire.UUID) {
+	d.forgetDriveDenial(agent, wire.SecretUseScreen)
 	// The screen first: a call the pause's end lets go on finds it let go (#3295).
 	d.letGoOfScreen(agent)
 	d.endScreenPause(agent, "ended")
@@ -283,6 +284,12 @@ func (d *Daemon) driveScreen(agent wire.UUID, args map[string]json.RawMessage) (
 	// agents-drive starts for real driving.
 	if err := d.desktopControlGate(agent); err != nil {
 		return "", err
+	}
+	// On a machine a person uses, the lease waits on their Approve first (#4264).
+	if !d.holdsScreen(agent) {
+		if words, err := d.approveDrive(agent, wire.SecretUseScreen, app); err != nil || words != "" {
+			return words, err
+		}
 	}
 	reply, err := d.leaseResource(agent, screenLeaseName)
 	if err != nil {

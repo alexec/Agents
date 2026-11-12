@@ -39,6 +39,7 @@ type fireRequest struct {
 	fromQueue       bool
 	event           *wire.Event // the event that fired it, for a bot's claim (#1761)
 	fromControl     bool        // sent by the control plane, which took it once (#2011)
+	burst           string      // what a debounce held, said in the prompt (#4730)
 }
 
 // refusalWords is WorkflowRefusal.message.
@@ -180,13 +181,20 @@ func (d *Daemon) fireWorkflows(e wire.Event) {
 				continue
 			}
 			for _, t := range w.Triggers {
-				p, isPattern := triggerPattern(t)
-				mt, isServer := serverTrigger(t)
-				if isPattern && p.matches(e) || isServer && mt.matches(e) {
+				if triggerMatches(t, e) {
 					pos := e.Position
 					ev := e
-					fires = append(fires, fireRequest{folder: folder, id: id, trigger: t, triggeringAgent: triggering, depth: e.ChainDepth,
-						causingEvent: &pos, event: &ev})
+					fr := fireRequest{folder: folder, id: id, trigger: t, triggeringAgent: triggering, depth: e.ChainDepth,
+						causingEvent: &pos, event: &ev}
+					// A burst on one subject and type is held, and runs it once (#4730).
+					if hold := triggerDebounce(t); hold > 0 && d.holdBurst("workflow:"+folder+"\n"+id, hold, e, func(last wire.Event, n int) {
+						pos := last.Position
+						fr.causingEvent, fr.event, fr.burst = &pos, &last, burstWords(n, hold)
+						d.goAfterTurn("workflow fire", func() { d.fire(fr) })
+					}) {
+						break
+					}
+					fires = append(fires, fr)
 					break
 				}
 			}
@@ -681,10 +689,13 @@ func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
 			text += " The event was " + e.Name + ": " + e.Sentence + eventDetails(*e)
 		}
 		text += ")"
+		if e != nil {
+			text += eventHintLines(*e, fr.burst)
+		}
 	case e != nil && e.Details["subscription"] != "" && e.Details["server"] != "":
-		return serverEventPrompt(w, *e, e.Details["server"])
+		return serverEventPrompt(w, *e, e.Details["server"]) + eventHintLines(*e, fr.burst)
 	case e != nil:
-		text += started + "of the event " + e.Name + ": " + e.Sentence + eventDetails(*e) + ")"
+		text += started + "of the event " + e.Name + ": " + e.Sentence + eventDetails(*e) + ")" + eventHintLines(*e, fr.burst)
 	case fr.byAgent != nil:
 		text += started + "the agent " + d.agentWords(*fr.byAgent) + " (id " + string(*fr.byAgent) + ") ran it.)"
 	case fr.byHand:
@@ -698,6 +709,19 @@ func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
 		return w.Prompt
 	}
 	return text + "\n\n" + w.Prompt
+}
+
+// eventHintLines is the event's ref and subject, that it is a hint, and what a debounce
+// held (#4730), as a paragraph; "" when it has no ref.
+func eventHintLines(e wire.Event, burst string) string {
+	hint := hintWords(e)
+	if burst != "" {
+		hint = strings.TrimSpace(hint + " " + burst)
+	}
+	if hint == "" {
+		return ""
+	}
+	return "\n\n" + hint
 }
 
 // agentWords is an agent's title in quotes, or "an untitled agent".

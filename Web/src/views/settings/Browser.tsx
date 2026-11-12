@@ -3,15 +3,18 @@
 // Chromium on the machine when it is downloaded and not running.
 import { signal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import type { BrowserState } from "../../protocol/generated";
+import type { BrowserControlSettings, BrowserState, DriveApproval } from "../../protocol/generated";
 import type { Store } from "../../model/store";
 import { describe } from "../../model/errors";
 import { browserWords, clearSiteWords, cookiesWords, downloadWords, sitesNote } from "../../model/browserSettings";
+import { browserFooter, browserLabel, driveApprovals } from "../../model/driveApproval";
 import { useSettingsMachine } from "./SettingsMachine";
 import { ask } from "../MessageKinds";
 
 const states = signal<Record<string, BrowserState | null>>({});
 const clearing = signal(false);
+// Ask, Always Approve or Off (#4264), by host; null from a host too old to know it.
+const controls = signal<Record<string, BrowserControlSettings | null>>({});
 
 export function BrowserSection({ store, down }: { store: Store; down: boolean }) {
   const { host, picker } = useSettingsMachine(store);
@@ -22,8 +25,22 @@ export function BrowserSection({ store, down }: { store: Store; down: boolean })
       // A host too old to know the method: the section stays out.
       () => { states.value = { ...states.value, [host]: null }; },
     );
+    void store.link.call("browserControl/state", {}, host).then(
+      (control) => { controls.value = { ...controls.value, [host]: control }; },
+      () => { controls.value = { ...controls.value, [host]: null }; },
+    );
   }, [store, host]);
   const state = host ? states.value[host] : undefined;
+  const control = host ? controls.value[host] : undefined;
+  const setControl = async (mode: DriveApproval) => {
+    if (!host) return;
+    try {
+      const saved = await store.link.call("browserControl/set", { mode }, host);
+      controls.value = { ...controls.value, [host]: saved };
+    } catch (error) {
+      store.say(describe(error));
+    }
+  };
   if (state === null) return null;
   const clear = async (site?: string) => {
     if (!host) return;
@@ -44,6 +61,17 @@ export function BrowserSection({ store, down }: { store: Store; down: boolean })
     <section aria-labelledby="settings-browser">
       <h3 class="section-head" id="settings-browser">{browserWords.title}</h3>
       {picker}
+      {control && (
+        <>
+          <label class="setting">
+            <span>{browserLabel}</span>
+            <select value={control.mode} disabled={down} onChange={(e) => void setControl(e.currentTarget.value as DriveApproval)}>
+              {driveApprovals.map((m) => <option key={m.mode} value={m.mode}>{m.label}</option>)}
+            </select>
+          </label>
+          <p class="hint">{browserFooter(control.mode)}</p>
+        </>
+      )}
       <h4 class="small">{browserWords.sitesHeader}</h4>
       {!state ? <p class="hint">Loading…</p> : note ? <p class="hint">{note}</p> : null}
       {state?.installed && state.sites.map((s) => (

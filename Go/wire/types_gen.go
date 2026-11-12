@@ -1495,6 +1495,11 @@ type BrowserClearRequest struct {
 	Site *string `json:"site,omitzero"`
 }
 
+// Whether agents on this machine may use the app's browser tools (browser_navigate and the rest, fill_secret, hand_to_person), and whether each lease of the browser asks a person first (#4264). Kept in <settings>/browser-control.json. Only the person's own clients may change it.
+type BrowserControlSettings struct {
+	Mode DriveApproval `json:"mode"`
+}
+
 // browser/frame: a JPEG of the machine's browser's page (#3528, spike #3527), from CDP Page.startScreencast, sent only to the clients that watch it. Never recorded.
 type BrowserFrame struct {
 	Image Data `json:"image"`
@@ -1732,6 +1737,35 @@ type BusEvent struct {
 
 	// The event's data (at most 256 KB), sealed by the machine that raised it to each machine of its person's lock (#4825). In bus/deliver, only the copy for the machine it goes to. None when the data is larger, or the machine has no lock.
 	Sealed []BusSealedData `json:"sealed,omitzero"`
+
+	// The producer lease of the poll that made it (#4731), when a machine polled a server for it: a hash of the folder's project, the server's name, the event and its filters, the same on every machine. The control plane delivers it to the machines that stand by on that poll. Not part of the event's identity.
+	Poll *string `json:"poll,omitzero"`
+}
+
+// bus/lease (#4731, spec 4724-event-bus, "The bus", step 6): the polls a machine is about to make, at most 100, each asking for its producer lease or renewing it, and the leases it lets go (its Mac goes to sleep, a subscription ended). The control plane gives each lease to one machine at a time, for 5 minutes from its last renewal.
+type BusLease struct {
+	// The polls' keys (BusEvent.poll), each 1 to 128 bytes.
+	Polls []string `json:"polls"`
+
+	// The keys of the leases this machine lets go. One another machine holds is left as it is.
+	Release []string `json:"release,omitzero"`
+}
+
+// bus/lease's answer (#4731): who holds each poll's lease now, in the order asked.
+type BusLeased struct {
+	Leases []BusProducerLease `json:"leases"`
+}
+
+// One producer lease (#4731): the machine that polls, until when, and whether it is the one that asked. A machine that is not the holder stands by: it does not poll, and the control plane delivers it what the holder's poll makes.
+type BusProducerLease struct {
+	Poll string `json:"poll"`
+
+	// The holder's machine id on the control plane.
+	Holder string `json:"holder"`
+
+	Mine bool `json:"mine"`
+
+	Until string `json:"until"`
 }
 
 // bus/publish (#4729): events a machine recorded, at most 100 at a time, oldest first. Best effort: one not sent when it happened is never sent later.
@@ -3507,9 +3541,12 @@ type DesktopControlPause struct {
 	PausedAt Date `json:"pausedAt"`
 }
 
-// Whether agents on this Mac may drive its apps through drive_screen (#3004, FR-004). Kept in <settings>/desktop-control.json; Off when unset. Only the person's own clients may change it.
+// Whether agents on this Mac may drive its apps through drive_screen (#3004, FR-004), and whether each lease of the screen asks a person first (#4264). Kept in <settings>/desktop-control.json. Only the person's own clients may change it.
 type DesktopControlSettings struct {
+	// Whether drive_screen is offered: mode is ask or always. A client that sends only enabled sets always (true) or off (false).
 	Enabled bool `json:"enabled"`
+
+	Mode *DriveApproval `json:"mode,omitzero"`
 }
 
 type DestinationState struct {
@@ -3908,6 +3945,13 @@ type DraftStep struct {
 
 	Text string `json:"text"`
 }
+
+// Whether an agent's lease of the browser or the screen waits on a person (#4264). ask: each lease opens a Needs you request of kind approve (secretUse, use browser or screen), the default on a machine that a person uses; always: it never asks, the default on a machine that only agents use (a bot's machine, a Codespace), where ask counts as always, as nobody answers there; off: the tools are not offered, and are refused.
+type DriveApproval string
+
+const DriveApprovalAsk DriveApproval = "ask"
+const DriveApprovalAlways DriveApproval = "always"
+const DriveApprovalOff DriveApproval = "off"
 
 type DropboxPutRequest struct {
 	Folder URL `json:"folder"`
@@ -4310,6 +4354,18 @@ type EventPattern struct {
 	Filters map[string]string `json:"filters"`
 
 	AnyOf map[string][]string `json:"anyOf,omitzero"`
+
+	// Only events of this provider (#4730): github, jira, agents and so on. With provider, topics or subject the pattern also hears the person's other machines' events, on the bus.
+	Provider *string `json:"provider,omitzero"`
+
+	// Only events about one of these topics (#4730), lower case: a repo's full name, a Jira project, a Slack channel.
+	Topics []string `json:"topics,omitzero"`
+
+	// Only events about this one thing (#4730).
+	Subject *Ref `json:"subject,omitzero"`
+
+	// Seconds (#4730): a burst of matches on one subject and type is held this long and delivered once, the last one, with how many came. Best effort.
+	Debounce *float64 `json:"debounce,omitzero"`
 }
 
 type EventPublisher struct {
@@ -6081,6 +6137,15 @@ type LineageCostNode struct {
 
 	// The PR a merged revert reverts, by ref, from its body's "Reverts owner/repo#n" (#4552), for the recovery time.
 	Reverts *string `json:"reverts,omitzero"`
+
+	// When a PR was opened (#4553): pr.opened's openedAt, the earliest kept. The approval wait's start when askedAt is unknown.
+	OpenedAt *Date `json:"openedAt,omitzero"`
+
+	// When a PR was labelled needs-approval (#4553), from pr.labelled: the approval wait's start.
+	AskedAt *Date `json:"askedAt,omitzero"`
+
+	// A PR's first answer by a person (#4553): the first pr.reviewed or pr.commented at or after the wait's start, while it was open, not by a bot and not a comment that starts with <!-- agent -->. The approval wait is this less askedAt, else openedAt.
+	AnsweredAt *Date `json:"answeredAt,omitzero"`
 }
 
 // lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a repo's every node (kind repo, ref github:repo:#alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
@@ -6133,6 +6198,12 @@ type LineageDelivery struct {
 
 	// The agents' working time on a closed issue and its PRs over its cycle time, at most 1, the median. Counted by its last merge.
 	FlowEfficiency LineageDeliveryFigure `json:"flowEfficiency"`
+
+	// The approval wait (#4553), in seconds: from a PR's needs-approval label (its opening when the label is unknown) to its first answer by a person; the median, and p90. Counted by the answer's time.
+	ApprovalWait LineageDeliveryFigure `json:"approvalWait"`
+
+	// The share of merged PRs, 0 to 1, that waited for a person's answer before their merge (#4553), by merge time. count is the merged PRs.
+	ApprovalShare LineageDeliveryFigure `json:"approvalShare"`
 }
 
 // One delivery figure (#4552): value over the window, absent when made from none; p90 for lead time; count is what it is made from; weeks is the 4 weeks, oldest first; band is DORA 2024's.
@@ -11810,6 +11881,9 @@ type RequestSecretUse struct {
 	// For account (#4163): the manage_accounts call that waits, such as get. name is then the account's service and address.
 	Call *string `json:"call,omitzero"`
 
+	// For screen (#4264): the app drive_screen names in the call that asks.
+	App *string `json:"app,omitzero"`
+
 	// The secret is the session's own (#3548): Always Approve is the same as Approve for This Session.
 	SessionOnly *bool `json:"sessionOnly,omitzero"`
 
@@ -12682,7 +12756,7 @@ type SecretTerminalValue struct {
 	Words *string `json:"words,omitzero"`
 }
 
-// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120). terminal (#4179) prints a secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163) is not a secret's use: manage_accounts reads an account with Ask before use; the request names the account, and Always Approve turns its Ask before use off.
+// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120). terminal (#4179) prints a secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163) is not a secret's use: manage_accounts reads an account with Ask before use; the request names the account, and Always Approve turns its Ask before use off. browser and screen (#4264) are not a secret's use either: an agent's lease of the browser or the screen on a machine whose Browser or Desktop control is ask; name is the browser or the screen, place the machine, app the app drive_screen names, and Always Approve sets the setting to always.
 type SecretUse string
 
 const SecretUseFill SecretUse = "fill"
@@ -12690,6 +12764,8 @@ const SecretUseCi SecretUse = "ci"
 const SecretUseMCP SecretUse = "mcp"
 const SecretUseTerminal SecretUse = "terminal"
 const SecretUseAccount SecretUse = "account"
+const SecretUseBrowser SecretUse = "browser"
+const SecretUseScreen SecretUse = "screen"
 
 // control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
 type SecretsLeft struct {
@@ -14219,6 +14295,9 @@ type TimeHistory struct {
 	Recap map[string]DayRecap `json:"recap"`
 
 	Records TimeRecords `json:"records"`
+
+	// How long this machine's PRs waited for a person's answer (#4553), over every repo it has: the approvalWait of LineageDelivery. Reports ▸ Time's line on the web page. Absent from a host too old to say.
+	ApprovalWait *LineageDeliveryFigure `json:"approvalWait,omitzero"`
 }
 
 type TimeRecord struct {
