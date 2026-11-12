@@ -1152,6 +1152,8 @@ export class Work {
       // Earlier pages wait for the host's answer.
       this.hasMoreBefore.value = false;
       this.transcriptSource.value = "device";
+      // A load that failed before the copy was read said nothing was on show; now something is.
+      if (this.transcriptLoadFailure.value?.nothingLoaded) this.transcriptLoadFailure.value = null;
       this.refold(keepingLatestByID([...copy.page.entries, ...this.entries.value]));
     });
   }

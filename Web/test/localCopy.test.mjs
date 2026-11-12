@@ -86,8 +86,11 @@ test("a chat draws its copy until its host's page comes, which replaces it, and 
   const copy = new LocalCopy(held);
   const stop = startLocalCopy(store, copy);
   store.watch("mac", "s");
+  // Its host's load fails before the copy is read: the copy still draws, and the failure goes.
+  store.transcriptLoadFailure.value = { nothingLoaded: true, reason: "down" };
   await new Promise((r) => setTimeout(r, 10));
   assert.equal(store.transcriptSource.value, "device");
+  assert.equal(store.transcriptLoadFailure.value, null);
   assert.deepEqual(store.entries.value.map((e) => e.id), ["copy"]);
 
   // Its host does not answer yet: the copy stays, with no failure said.
