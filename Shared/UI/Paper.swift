@@ -351,26 +351,24 @@ extension ButtonStyle where Self == PaperButtonStyle<RoundedRectangle> {
     static var paperCard: Self { PaperButtonStyle(outline: RoundedRectangle(cornerRadius: Paper.Radius.card)) }
 }
 
-/// The one control on a card that is the answer: the accent, with the ground as its text
-/// (5.6:1 light, 7.7:1 dark; white on the dark cobalt would be 2.2:1). Replaces
-/// `.buttonStyle(.glassProminent)`.
+/// The one control on a card that is the answer, and the picked choice in a question
+/// card: raised paper, the accent in its text and a 1.5 pt edge, bold (Paper v2, #4977).
+/// Colour never fills it: the old accent fill under the ground's colour read as white on
+/// a light blue in the dark. Replaces `.buttonStyle(.glassProminent)`.
 struct PaperProminentButtonStyle<Outline: InsettableShape>: ButtonStyle {
     let outline: Outline
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(Paper.ground)
+            .foregroundStyle(Paper.accent)
+            .fontWeight(.semibold)
             // `.paper`'s padding, so a prominent button beside plain ones — send next
             // to attach and dictate — is the same size as they are.
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
-            // Inside `.paper`'s hairline rather than out to where it is drawn. The same
-            // outer size filled edge to edge reads a size larger than a button whose
-            // edge is a line, and send sat beside two of those looking wider than them.
-            .background(Paper.accent.opacity(configuration.isPressed ? 0.8 : 1),
-                        in: outline.inset(by: 1))
-            .overlay(outline.strokeBorder(Paper.rule, lineWidth: 1))
+            .background(configuration.isPressed ? Paper.wash : Paper.raised, in: outline)
+            .overlay(outline.strokeBorder(Paper.accent, lineWidth: 1.5))
             .opacity(isEnabled ? 1 : 0.4)
             .contentShape(outline)
             .paperTapTarget()
