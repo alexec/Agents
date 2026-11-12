@@ -39,9 +39,7 @@ struct HostFoldersPicker: View {
                     .buttonStyle(.paper)
                     .disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty || adding)
             }
-            if let problem {
-                Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
-            }
+            SheetNote(text: problem)
             HStack {
                 Spacer()
                 Button(leaveTitle) { done() }.buttonStyle(.paper).disabled(adding)

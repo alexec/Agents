@@ -44,10 +44,7 @@ struct ConnectAnotherSheet: View {
                     Text(words).appText(.reading).foregroundStyle(.secondary)
                 }
             }
-            if let problem {
-                Text(problem).appText(.supporting).tinted(.attention)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            SheetNote(text: problem)
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }

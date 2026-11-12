@@ -591,7 +591,7 @@ struct AddProviderSheet: View {
         }
         if let problem {
             VStack(alignment: .leading, spacing: 6) {
-                Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+                SheetNote(text: problem, reservesSpace: false)
                 // A refusal a map would fix (L10f, US1 AS7).
                 if kind == .mcp, Self.mapWouldFix(problem) {
                     HStack {
@@ -1145,9 +1145,7 @@ struct EditProviderSheet: View {
                  : moving ? "\(ProviderCarrier.movedNote) \(ProviderCarrier.secretsFoot(to)) Its machines stay linked."
                  : "Leave a field empty to keep the one it has. \(ProviderCarrier.secretsFoot(to)) Its machines stay linked.")
                 .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            if let problem {
-                Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
-            }
+            SheetNote(text: problem)
             HStack {
                 Spacer()
                 if working { ProgressView().controlSize(.small) }

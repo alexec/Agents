@@ -191,7 +191,7 @@ struct AddMCPSheet: View {
             }
             if let addError {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(addError).appText(.fine).tinted(.failure)
+                    SheetNote(text: addError, reservesSpace: false)
                     Spacer()
                     if GovernanceWords.refusedByPolicy(addError) {
                         AskAdminButton(kind: .mcp, name: preview.result.title, source: preview.result.id)

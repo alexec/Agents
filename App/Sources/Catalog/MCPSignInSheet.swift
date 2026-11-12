@@ -48,7 +48,7 @@ struct MCPSignInSheet: View {
                 Button("Open the page again") { NSWorkspace.shared.open(page) }
                     .buttonStyle(.paper).appText(.fine)
             case .failed(let why):
-                Text(why).appText(.fine).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+                SheetNote(text: why, reservesSpace: false)
             }
             HStack {
                 Spacer()

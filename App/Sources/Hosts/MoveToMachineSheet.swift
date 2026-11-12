@@ -90,13 +90,9 @@ struct MoveToMachineSheet: View {
                     .appText(.fine).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if let problem {
-                Text(problem)
-                    .appText(.fine).tinted(.failure)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else if moving {
-                Text(MoveToMachineWords.moving).appText(.fine).foregroundStyle(.secondary)
-            }
+            // The sheet's note (#4737): it failed, or it is moving.
+            SheetNote(tone: problem == nil ? .neutral : .failure,
+                      text: problem ?? (moving ? MoveToMachineWords.moving : nil))
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }

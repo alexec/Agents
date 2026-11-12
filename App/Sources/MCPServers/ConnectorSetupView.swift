@@ -71,7 +71,7 @@ struct ConnectorSetupView: View {
                     .textSelection(.enabled)
             }
             if let problem {
-                Text(problem).appText(.fine).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+                SheetNote(text: problem, reservesSpace: false)
             }
             if let setup {
                 connection(setup)
@@ -180,7 +180,7 @@ struct ConnectorSetupView: View {
                 }
                 if setup.installed == false, let repository = setup.repository {
                     HStack(spacing: 6) {
-                        Text(ConnectorSetupWords.notInstalled(repository)).appText(.fine).tinted(.attention)
+                        FieldNote(tone: .attention, text: ConnectorSetupWords.notInstalled(repository)).fixedSize()
                         Button("Install on github.com") { open(setup.installURL ?? ConnectorSetupWords.installURL) }
                             .buttonStyle(.link).appText(.fine)
                     }
@@ -745,7 +745,7 @@ private struct CodespacesSheet: View {
             Text("GitHub CLI must be signed in as the connected GitHub account.")
                 .appText(.fine).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             if let problem {
-                Text(problem).appText(.fine).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+                SheetNote(text: problem, reservesSpace: false)
             }
             if codespaces.isEmpty {
                 Text("No Codespaces for this repository yet.").appText(.supporting).foregroundStyle(.secondary)

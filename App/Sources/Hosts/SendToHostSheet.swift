@@ -131,9 +131,7 @@ struct SendingRow: View {
                     Text(name)
                         .lineLimit(1)
                         .foregroundStyle(.secondary)
-                    Text(problem)
-                        .appText(.fine).tinted(.failure)
-                        .lineLimit(3)
+                    SheetNote(text: problem, reservesSpace: false)
                         .help(problem)
                 }
                 Spacer(minLength: 4)
@@ -223,13 +221,8 @@ struct SendToHostSheet: View {
             } else if problem == nil {
                 ProgressView().controlSize(.small)
             }
-            if let problem {
-                Text(problem)
-                    .appText(.fine).tinted(.failure)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else if let progress {
-                Text(progress).appText(.fine).foregroundStyle(.secondary)
-            }
+            // The sheet's note (#4737): it failed, or it is under way.
+            SheetNote(tone: problem == nil ? .neutral : .failure, text: problem ?? progress)
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }

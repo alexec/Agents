@@ -167,7 +167,7 @@ struct AddMCPByHandPane: View {
         if let answer {
             VStack(alignment: .leading, spacing: 6) {
                 if let error = answer.error {
-                    Text(MCPCatalogWords.sentence(error)).appText(.fine).tinted(.failure)
+                    SheetNote(text: MCPCatalogWords.sentence(error), reservesSpace: false)
                 }
                 switch answer.outcome {
                 case .answered(let serverName, let version, let tools):
@@ -178,18 +178,15 @@ struct AddMCPByHandPane: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if verified != current {
-                        Text("Changed since it was verified. Verify again to add it.")
-                            .appText(.fine).tinted(.attention)
+                        FieldNote(tone: .neutral, text: "Changed since it was verified. Verify again to add it.")
                     }
                 case .authRequired:
-                    Text("This connector asks you to sign in before it answers. Once you have, it is verified again. Nothing was written.")
-                        .appText(.fine).tinted(.attention)
-                        .fixedSize(horizontal: false, vertical: true)
+                    // A person is needed: attention, on the icon only (#4737).
+                    FieldNote(tone: .attention, text: "This connector asks you to sign in before it answers. Once you have, it is verified again. Nothing was written.")
                     Button("Sign in…") { signingIn = .url(name: current.name, url: current.url) }
                         .buttonStyle(.paper).appText(.fine)
                 case .failed(let why):
-                    Text("It did not answer: \(why) Nothing was written.").appText(.fine).tinted(.failure)
-                        .fixedSize(horizontal: false, vertical: true)
+                    SheetNote(text: "It did not answer: \(why) Nothing was written.", reservesSpace: false)
                 case nil:
                     EmptyView()
                 }
@@ -205,9 +202,8 @@ struct AddMCPByHandPane: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Paper.raised.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
         }
-        if let addError {
-            Text(addError).appText(.fine).tinted(.failure)
-        }
+        // The sheet's note (#4737): its two lines are kept, so nothing moves when Add fails.
+        SheetNote(text: addError)
     }
 
     private func answeredLine(_ serverName: String?, _ version: String?, _ count: Int) -> String {

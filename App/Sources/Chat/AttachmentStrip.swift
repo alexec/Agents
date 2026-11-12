@@ -20,7 +20,7 @@ struct AttachmentStrip: View {
                                 .lineLimit(1)
                             if let refusal = refusal(attachment) {
                                 // Said before it is sent, not after.
-                                Text(refusal).appText(.fine).tinted(.failure)
+                                FieldNote(text: refusal)
                             }
                         }
                         Button {

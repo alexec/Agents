@@ -86,11 +86,7 @@ struct PersonSettingsSection: View {
                     Text("GitHub, GitLab, Linear, Jira, Forgejo, Bitbucket and Azure DevOps")
                 } footer: {
                     VStack(alignment: .leading, spacing: 4) {
-                        if loginsNotSaved {
-                            Text("Your logins were not saved.")
-                                .appText(.fine)
-                                .tinted(.failure)
-                        }
+                        FieldNote(text: loginsNotSaved ? "Your logins were not saved." : nil)
                         Text("Named on the Pull requests, Merge requests and Issues pages’ Team section, and used to say an agent is on one of your own. Filled in from this Mac’s own connection (Activity ▸ Connectors) when it is signed in; given here only when it is not. A Jira login is your Atlassian account’s email, account id or display name. A Forgejo login is your user name on the connected Forgejo. A Bitbucket login is your Bitbucket nickname. An Azure DevOps login is your sign-in email or display name in the organization.")
                             .appText(.fine)
                             .foregroundStyle(.secondary)

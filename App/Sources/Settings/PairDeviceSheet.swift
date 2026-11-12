@@ -47,10 +47,8 @@ struct PairDeviceSheet: View {
                         .monospacedDigit()
                 }
             } else if let problem {
-                Text(problem)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                // The pairing's note (#4737), in place of its code.
+                SheetNote(text: problem, reservesSpace: false)
             } else {
                 ProgressView()
             }

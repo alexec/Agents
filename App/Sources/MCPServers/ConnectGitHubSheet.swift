@@ -109,7 +109,7 @@ struct ConnectGitHubSheet: View {
     private var tokenFields: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(Tokens.tokenIntro).appText(.fine).fixedSize(horizontal: false, vertical: true)
-            Text(Tokens.tokenCost).appText(.fine).tinted(.attention).fixedSize(horizontal: false, vertical: true)
+            FieldNote(tone: .neutral, text: Tokens.tokenCost)
             LabeledContent(Tokens.tokenLabel) {
                 SecureField(Tokens.tokenLabel, text: $token, prompt: Text(Tokens.tokenPrompt))
                     .labelsHidden().textFieldStyle(.roundedBorder)
@@ -165,7 +165,7 @@ struct ConnectGitHubSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Paper.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
         case .failed(let why):
-            Text(why).appText(.fine).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+            SheetNote(text: why, reservesSpace: false)
         }
     }
 

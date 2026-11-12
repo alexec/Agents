@@ -35,9 +35,9 @@ struct ControlSettingsView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityAddTraits(.isHeader)
                 if !control.isReachable {
-                    Text("Can’t reach the control plane at \(control.whereItIs). What it last said is shown.")
-                        .appText(.supporting).tinted(.attention)
-                        .fixedSize(horizontal: false, vertical: true)
+                    // A condition of the pane: a banner, neutral (#4737).
+                    PaneBanner(tone: .neutral, symbol: "wifi.slash",
+                               "Can’t reach the control plane at \(control.whereItIs). What it last said is shown.")
                 }
                 switch page {
                 case .overview: ControlOverviewPage(control: control)
@@ -45,10 +45,7 @@ struct ControlSettingsView: View {
                 case .providers: ControlProvidersPage(control: control)
                 case .clients: ControlClientsPage(control: control)
                 }
-                if let problem = control.problem {
-                    Text(problem).appText(.supporting).tinted(.failure)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                SheetNote(text: control.problem)
             }
             .frame(maxWidth: 640, alignment: .leading)
             .padding(20)
