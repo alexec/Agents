@@ -3,15 +3,18 @@
 **Approved by Alex, 2026-09-26: frame A (the list over the prompt) with subagents opted in and
 their steps in a Background sidebar pane (frame C); frame E on the phone.** Frame D is not taken.
 
-**Frame B does not happen, by decision (Alex, 2026-09-26): background work ends with the turn.**
-The app lets a runtime go when its turn ends, and a second capture
-([probe/claude-0.81.2-shell-after-turn.jsonl](../probe/claude-0.81.2-shell-after-turn.jsonl))
+**Frame B was not taken (Alex, 2026-09-26), and what it was for has changed since.** Then,
+the app let a runtime go when its turn ended, so background work ended with the turn. A second
+capture ([probe/claude-0.81.2-shell-after-turn.jsonl](../probe/claude-0.81.2-shell-after-turn.jsonl))
 showed what keeping one would take: the shell runs on, and when it finishes Claude wakes itself
-and replies with no prompt (`_claude/origin: task-notification`). The runtime is not kept, so
-the list shows what runs while the turn does: a server started and then tested, or a subagent,
-which Claude holds the turn open for. Whatever is still running when the turn ends is marked
-"ended with the turn", on the row and once in the chat. Keeping runtimes alive for
-background work is a possible follow-up.
+and replies with no prompt (`_claude/origin: task-notification`).
+
+That is no longer true. The warm pool keeps a runtime with background processes for up to
+`backgroundHours` after its last turn (4 h by default; `Go/internal/agentsd/warmpool.go`), and
+Claude's own cycle is a turn of its own (#4323, `unprompted.go`). A runtime that does not wake
+itself, such as Codex, raises `agent.background_ended` when its background commands have all
+ended, and its session waits for that with `wait_for_event` (#4577). Over an Agents restart,
+the processes that outlive their runtime are adopted and raise the same event.
 
 The goal is for a person to see the shells and subagents an agent has running in the background as
 a list, each shell with a Stop button, instead of reading about them in prose.

@@ -33,6 +33,19 @@ const eventsBrief = "Wait for an event (checks passing, this Mac waking) with wa
 	"with wait_for_event on agent.ended naming them in agent, and to resume at a time with check_again, not repeated checks. " +
 	"If told you are still waiting, you may end your turn; you will be started again when it happens."
 
+// backgroundBrief is for a runtime that does not start itself again when a background
+// command ends (#4577): its session waits for agent.background_ended.
+const backgroundBrief = "Before you end a turn on a command still running in the background, wait for it with " +
+	"wait_for_event on agent.background_ended: it starts you again when your background commands have ended."
+
+// eventsBriefFor is eventsBrief, with backgroundBrief for a runtime that does not wake itself.
+func eventsBriefFor(runtimeID string) string {
+	if wakesItself(runtimeID) {
+		return eventsBrief
+	}
+	return eventsBrief + " " + backgroundBrief
+}
+
 // leasesBrief is LeaseWords.briefing (036 FR-015).
 const leasesBrief = "Lease a shared resource with lease_resource before using it and release_resource " +
 	"the moment you are done. Keep leases short and extend them, and take several in the " +
@@ -126,7 +139,7 @@ func briefOutOfPrompt(runtimeID string) bool {
 // of #1801; then the rest of Briefing.lines(for:), the ones that depend on the runtime
 // last; then the persona the agent was started as (#760), standing context like the rest.
 func (d *Daemon) brief(a *wire.Agent) string {
-	parts := []string{d.namingBrief(a), leasesWithDeclared(d.declaredResources()), eventsBrief,
+	parts := []string{d.namingBrief(a), leasesWithDeclared(d.declaredResources()), eventsBriefFor(a.RuntimeID),
 		endingBrief(a.RuntimeID), liveDocumentBrief, escalationBrief(a.RuntimeID),
 		workflowsBrief(a.RuntimeID), helpersBrief, sessionsBrief, memoryBrief,
 		toolsBrief(d.offersBrowser(), d.offersDriveScreen(), d.isBot(), d.hasGitHub())}
