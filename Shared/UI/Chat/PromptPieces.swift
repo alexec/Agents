@@ -26,9 +26,7 @@ enum PromptWords {
     }
 
     /// Whether what is typed now will wait rather than go.
-    static func willQueue(_ agent: Agent) -> Bool {
-        agent.state.hasTurnInFlight || agent.state == .queued || !agent.queuedPrompts.isEmpty
-    }
+    static func willQueue(_ agent: Agent) -> Bool { AgentsModel.willQueue(agent) }
 
     /// The prompt's own words when nothing better is on offer.
     static let askPlaceholder = "What do you want to do?"

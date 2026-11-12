@@ -2037,20 +2037,28 @@ final class RemoteModel {
                         for key: FolderKey) async -> String? {
         var answer = ApprovalAnswer(approval, in: key.folder, action: action, note: note)
         answer.digest = digest ?? approval.digest
-        do {
-            var summary: DaemonAPI.FolderSummary = try await client(for: answer).call(
-                DaemonAPI.Method.approvalsAnswer, answer, returning: DaemonAPI.FolderSummary.self)
-            summary.host = key.host
-            work.upsert(summary)
-            return nil
-        } catch {
-            return sentence(for: error)
+        var why: String?
+        // Out of its list at once, and back if the answer did not go (#4814).
+        await work.answering(approval, in: key) {
+            do {
+                var summary: DaemonAPI.FolderSummary = try await client(for: answer).call(
+                    DaemonAPI.Method.approvalsAnswer, answer, returning: DaemonAPI.FolderSummary.self)
+                summary.host = key.host
+                work.upsert(summary)
+                return true
+            } catch {
+                why = sentence(for: error)
+                return false
+            }
         }
+        return why
     }
 
     /// Approve or Deny from a row's long press, of the version the row shows.
     func settleApproval(_ approval: Approval, _ action: Approval.Action, for key: FolderKey) async {
-        if let why = await answerApproval(approval, action, digest: approval.digest, note: nil, for: key) { problem = why }
+        if let why = await answerApproval(approval, action, digest: approval.digest, note: nil, for: key) {
+            problem = approval.failure(action, why)
+        }
     }
 
     /// A person's answer to a secret's use (#4017), from its Needs you row or its banner: to
@@ -4679,13 +4687,17 @@ final class RemoteModel {
     /// on each runtime's own current mode.
     /// The person's display choices (#1033), kept on the Mac. This device's defaults mirror
     /// them, so every view reads them where it always did.
-    @ObservationIgnored lazy var displayMirror = DisplayPreferenceMirror(defaults: .standard) { [weak self] changes in
-        self?.sendDisplayPreferences(changes)
-    }
+    /// A change shows at once; one the Mac did not take goes back, and says so (#4814).
+    @ObservationIgnored lazy var displayMirror = makeDisplayMirror()
 
-    private func sendDisplayPreferences(_ changes: DaemonAPI.DisplayPreferences) {
-        Task { _ = try? await client.call(DaemonAPI.Method.preferencesSet, changes,
-                                         returning: DaemonAPI.DisplayPreferences.self) }
+    private func makeDisplayMirror() -> DisplayPreferenceMirror {
+        DisplayPreferenceMirror(defaults: .standard) { [weak self] changes in
+            guard let self else { throw CancellationError() }
+            return try await client.call(DaemonAPI.Method.preferencesSet, changes, returning: DaemonAPI.DisplayPreferences.self)
+        } failed: { [weak self] error in
+            guard let self else { return }
+            problem = DisplayPreferenceMirror.failure(sentence(for: error))
+        }
     }
 
     /// A Mac too old to know the method leaves this device's own choices as they are.
@@ -5239,6 +5251,14 @@ final class RemoteModel {
     /// the phone (029): nothing the runtime cannot take, and nothing too big for the link.
     /// `voice`: sent from voice mode (#2322), so the reply is short and fit to be heard.
     func send(_ what: String, attachments: [Attachment] = [], to agentID: UUID, voice: Bool = false) async -> Bool {
+        // In the chat at once, as the person's bubble, until the host's entry lands (#4814).
+        let drawn = work.beginSending(what, to: agentID)
+        let sent = await deliver(what, attachments: attachments, to: agentID, voice: voice)
+        work.endSending(drawn, to: agentID, sent: sent)
+        return sent
+    }
+
+    private func deliver(_ what: String, attachments: [Attachment], to agentID: UUID, voice: Bool) async -> Bool {
         let host = work.agent(agentID)?.host ?? .mac
         // A stopped workspace that starts when used: kept by the control plane (#691 US3).
         if host != .mac, isStale(on: host), startsWhenUsed(host) {

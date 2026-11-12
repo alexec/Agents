@@ -28,8 +28,13 @@ export function writeVerb(write: AgentWrite): string {
 
 /** The one line the page shows when the call failed: what failed, then why. */
 export function writeFailure(write: AgentWrite, reason: string): string {
+  return failureLine(writeVerb(write), reason);
+}
+
+/** "Could not <verb> — <why>", for any change drawn before its host answered (#4786, #4814). */
+export function failureLine(verb: string, reason: string): string {
   const why = reason.trim();
-  const head = `Could not ${writeVerb(write)}`;
+  const head = `Could not ${verb}`;
   return why ? `${head} — ${why.charAt(0).toLowerCase()}${why.slice(1)}` : `${head}.`;
 }
 
