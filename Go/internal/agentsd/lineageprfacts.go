@@ -76,7 +76,11 @@ func (d *Daemon) askPRFacts(repo forgeRepo, n int, pr wire.LineageNode) {
 // notePRFacts keeps a merged PR's files and the PR it reverts on its node.
 func (d *Daemon) notePRFacts(pr wire.LineageNode, repo forgeRepo, facts prFacts) {
 	files := facts.files[:min(len(facts.files), lineage.FilesKept)]
+	// In the full form, as the PR nodes are (#4824), so the figures find the PR it reverts.
 	reverts := lineage.RevertsIn(repo.forge+":"+repo.path, facts.body)
+	if reverts != "" {
+		reverts = lineage.FullRefText(lineage.KindPR, reverts, "")
+	}
 	d.workMu.Lock()
 	defer d.workMu.Unlock()
 	d.noteCostLocked(pr, nowFunc(), func(c *wire.LineageCostNode) {
