@@ -27,7 +27,7 @@ func TestStandingOfReadsTheBlock(t *testing.T) {
 		t.Fatalf("parent: none: %+v", q)
 	}
 	for body, want := range map[string]string{
-		"no block here\n```go\nlabels: bug\n```":                 "no standing block",
+		"no block here\n```go\nlabels: bug\n```":                  "no standing block",
 		"```standing\nlabels: bug\n```\n```standing\nany: x\n```": "2 standing blocks",
 		"```standing\nlabel: bug\n```":                            `unknown field "label"`,
 		"```standing\nlanes: 0\n```":                              "lanes",

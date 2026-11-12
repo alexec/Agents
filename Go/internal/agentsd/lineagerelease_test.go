@@ -101,7 +101,7 @@ type fakeReleases struct {
 	commitTime map[string]time.Time
 	compares   map[string][]compareCommit // key: base+".."+head
 	commitPRs  map[string]int             // by sha, for a commit with no number in its title
-	asked      map[string]int // by kind: "compare", "commitPR"
+	asked      map[string]int             // by kind: "compare", "commitPR"
 }
 
 func (f *fakeReleases) tagsOf(string) ([]string, error) {
@@ -148,8 +148,8 @@ func TestLinksReleasesFromTags(t *testing.T) {
 				{SHA: "s2", Message: "A merge commit with no number"},
 			},
 		},
-		commitPRs:  map[string]int{"s2": 3024},
-		asked:      map[string]int{},
+		commitPRs: map[string]int{"s2": 3024},
+		asked:     map[string]int{},
 	}
 	d.releaseTags, d.releaseCommitTime, d.releaseCompare, d.releaseCommitPR =
 		forge.tagsOf, forge.time, forge.compare, forge.commitPR

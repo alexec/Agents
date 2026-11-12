@@ -536,6 +536,9 @@ func (d *Daemon) registerCost() {
 	On(d, wire.CallTimeHistory, func(ctx context.Context, c *Client, _ wire.Empty) (wire.TimeHistory, error) {
 		return d.timeHistory(), nil
 	})
+	On(d, wire.CallVelocityHistory, func(ctx context.Context, c *Client, _ wire.Empty) (wire.VelocityHistory, error) {
+		return d.velocityHistory(nowFunc()), nil
+	})
 	On(d, wire.CallAchievementsState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.Achievements, error) {
 		return d.achievements(), nil
 	})

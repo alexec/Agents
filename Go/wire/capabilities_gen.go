@@ -199,6 +199,7 @@ const CapUsage1 = "usage/1"
 const CapUser1 = "user/1"
 const CapUser2 = "user/2"
 const CapUser3 = "user/3"
+const CapVelocity1 = "velocity/1"
 const CapViews1 = "views/1"
 const CapWake1 = "wake/1"
 const CapWorkFeatures1 = "work.features/1"
@@ -569,6 +570,7 @@ var HostCapabilities = pairs([][2]string{
 	{"surface/identify", "surface/1"},
 	{"time/history", "time/1"},
 	{"usage/history", "usage/1"},
+	{"velocity/history", "velocity/1"},
 	{"views/call", "views/1"},
 	{"views/context", "views/1"},
 	{"views/log", "views/1"},

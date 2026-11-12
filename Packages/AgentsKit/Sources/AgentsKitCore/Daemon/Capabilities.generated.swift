@@ -200,6 +200,7 @@ public enum Capability {
     public static let user1 = "user/1"
     public static let user2 = "user/2"
     public static let user3 = "user/3"
+    public static let velocity1 = "velocity/1"
     public static let views1 = "views/1"
     public static let wake1 = "wake/1"
     public static let workFeatures1 = "work.features/1"
@@ -570,6 +571,7 @@ public enum Capability {
         "surface/identify": "surface/1",
         "time/history": "time/1",
         "usage/history": "usage/1",
+        "velocity/history": "velocity/1",
         "views/call": "views/1",
         "views/context": "views/1",
         "views/log": "views/1",

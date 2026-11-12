@@ -14737,6 +14737,25 @@ type UserSuspended struct {
 	At Date `json:"at"`
 }
 
+// The PRs that landed in an hour or a day in one repository (#4596): merged is every PR the agents worked on that merged, merged reverts included; reverted is the merged reverts among them.
+type VelocityBucket struct {
+	Merged int64 `json:"merged"`
+
+	Reverted int64 `json:"reverted"`
+}
+
+// velocity/history's answer (#4596): the PRs that landed, by the hour (168 hours) and by the day (90 days), then by repository (github:alexec/agents), from this machine's lineage store. Shaped as usage/history is.
+type VelocityHistory struct {
+	Hours map[string]map[string]VelocityBucket `json:"hours"`
+
+	Days map[string]map[string]VelocityBucket `json:"days"`
+
+	Now string `json:"now"`
+
+	// The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day stamps are in (#1267). Absent from a host too old to say: read as the viewer's own.
+	TimeZone *string `json:"timeZone,omitzero"`
+}
+
 // What a third-party server's view waits on before it is drawn: the person's Show (#191). The data of a viewNeedsShow failure.
 type ViewAsk struct {
 	Server string `json:"server"`

@@ -16,8 +16,8 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
+	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
 )
 

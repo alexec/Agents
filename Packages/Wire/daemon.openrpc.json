@@ -9643,6 +9643,32 @@
       }
     },
     {
+      "name": "velocity/history",
+      "x-capability": "velocity/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The PRs the agents worked on that landed, by the hour and the day and by repository (#4596), counted from this machine's lineage store on each ask: the same PRs the Multiplier counts.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/VelocityHistory"
+        }
+      }
+    },
+    {
       "name": "views/call",
       "x-capability": "views/1",
       "tags": [

@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-
 )
 
 // generate_secret (#4000): agentsd makes a strong password, saves it in Settings ▸ Secrets

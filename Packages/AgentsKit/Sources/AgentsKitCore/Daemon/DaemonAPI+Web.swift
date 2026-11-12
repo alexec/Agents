@@ -160,6 +160,8 @@ public extension DaemonAPI {
                 Row(Method.usageHistory, params: Empty.self, result: UsageHistory.self, kind: .hostRequest),
                 // The Time page (#852).
                 Row(Method.timeHistory, params: Empty.self, result: TimeHistory.self, kind: .hostRequest),
+                // Velocity (#4596).
+                Row(Method.velocityHistory, params: Empty.self, result: VelocityHistory.self, kind: .hostRequest),
                 // Reports ▸ Features (#2165).
                 Row(Method.reportsFeatures, params: Empty.self, result: FeatureUsage.self, kind: .hostRequest),
                 Row(Method.reportsProblem, params: ProblemReportRequest.self, result: ProblemReport.self, kind: .hostRequest),
