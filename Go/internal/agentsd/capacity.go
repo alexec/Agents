@@ -151,6 +151,8 @@ func (d *Daemon) checkCapacity(ctx context.Context) {
 	d.capLevel, d.capLastBelow, d.capBelow = level, lastBelow, below
 	d.capSample, d.capSampled = s, true
 	d.capMu.Unlock()
+	// The compute line is served one grant a look while the level is ok (#4579).
+	d.serveCapacityLine()
 	if level == was {
 		return
 	}

@@ -160,6 +160,9 @@ func (d *Daemon) resolveResource(given string) (wire.ResourceName, wire.Resource
 	if name == browser.Resource {
 		return name, "browser", browser.DisplayName, true
 	}
+	if name == capacityResource {
+		return name, "named", capacityDisplay(), true
+	}
 	if isPersonLease(name) {
 		p, display := d.personLease()
 		return p, "named", display, true
@@ -215,6 +218,9 @@ func (d *Daemon) leaseResource(agent wire.UUID, args map[string]json.RawMessage)
 	e := d.book.Entries[name]
 	if e == nil {
 		e = &leaseEntry{Kind: kind, DisplayName: display, Rules: standardRules, Line: []waiter{}, Leases: []wire.Lease{}}
+		if name == capacityResource {
+			e.Rules = capacityRules
+		}
 		for _, r := range d.declared {
 			if r.Name == name {
 				e.Rules = rulesOf(r)
@@ -241,7 +247,7 @@ func (d *Daemon) leaseResource(agent wire.UUID, args map[string]json.RawMessage)
 		e.Leases[i] = l
 		events = append(events, leaseEvent{extended: true, lease: l})
 		reply = extendedWords(l, capped || wanted.After(ceiling))
-	case !e.full() && len(e.Line) == 0:
+	case !e.full() && len(e.Line) == 0 && !d.heldByCapacity(name, e):
 		l := wire.Lease{Resource: name, DisplayName: e.DisplayName, Holder: agent, GrantedAt: t, ExpiresAt: wire.DateOf(t.Time().Add(length))}
 		l.Warned = toldWhenItEnds(l, t)
 		e.Leases = append(e.Leases, l)
@@ -258,6 +264,14 @@ func (d *Daemon) leaseResource(agent wire.UUID, args map[string]json.RawMessage)
 	}
 	d.store(name, e)
 	held := d.heldWords(name, e.DisplayName)
+	// A free place held back by the machine's level says why (#4579), and a line now waits
+	// for the machine.
+	if why := d.computeHeld(); reply == "" && isCompute(name) && !e.full() && why != "" {
+		held = why
+		if queued {
+			d.capDraining = true
+		}
+	}
 	switch {
 	case reply != "":
 	case queued:
@@ -459,6 +473,10 @@ func (d *Daemon) listResources(agent wire.UUID, _ map[string]json.RawMessage) (s
 			continue
 		}
 		label := string(s.Name) + " — " + s.DisplayName
+		if s.Name == capacityResource {
+			lines = append(lines, "- "+label+": "+d.capacityStateWords(s, agent))
+			continue
+		}
 		if s.Kind == "named" && !isPersonLease(s.Name) {
 			label = s.DisplayName + " (named by an agent)"
 		}

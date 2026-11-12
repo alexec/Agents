@@ -20,9 +20,11 @@ func TestDeclaringAResource(t *testing.T) {
 	defer d.Shutdown()
 	var snap wire.LeaseSnapshot
 	json.Unmarshal(c.call(t, 1, "resources/snapshot", nil), &snap)
-	if len(snap.Resources) != 3 || snap.Resources[0].Name != "screen" || snap.Resources[0].DisplayName != "Screen, mouse and keyboard" ||
+	// The machine's own: the screen, the browser, the person's booking and capacity (#4579).
+	if len(snap.Resources) != 4 || snap.Resources[0].Name != "screen" || snap.Resources[0].DisplayName != "Screen, mouse and keyboard" ||
 		snap.Resources[1].Name != "browser:agents" || snap.Resources[1].Kind != "browser" ||
-		!strings.HasPrefix(string(snap.Resources[2].Name), "person:") {
+		!strings.HasPrefix(string(snap.Resources[2].Name), "person:") ||
+		snap.Resources[3].Name != "capacity" || snap.Resources[3].DisplayName != "Capacity of this Mac" {
 		t.Fatalf("%+v", snap)
 	}
 	two := int64(2)
@@ -40,6 +42,7 @@ func TestDeclaringAResource(t *testing.T) {
 		want     string
 	}{
 		{map[string]any{"name": "screen", "displayName": "Screen", "description": "x", "holders": 1}, "Screen is found on the Mac by itself; choose another name."},
+		{map[string]any{"name": "capacity", "displayName": "Capacity", "description": "x", "holders": 1}, "Capacity is found on the Mac by itself; choose another name."},
 		{map[string]any{"name": "x", "displayName": "x", "description": " ", "holders": 1}, "Say what it is for, so agents know when to take it."},
 		{map[string]any{"name": "x", "displayName": "x", "description": "d", "holders": 21}, "Between 1 and 20 agents may hold it at once."},
 		{map[string]any{"name": "x", "displayName": "x", "description": "d", "holders": 1, "maximumMinutes": 300}, "The longest a lease can run is between 1 and 240 minutes."},
