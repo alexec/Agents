@@ -1701,7 +1701,7 @@ type BusDelivery struct {
 	Subscriptions []string `json:"subscriptions"`
 }
 
-// An event on the bus (#4729, spec 4724-event-bus, "The bus"): its envelope only. It carries no data and no details, so the control plane reads only refs, names and times (principle 7, #4726); a consumer reads the subject's state now, by its ref.
+// An event on the bus (#4729, spec 4724-event-bus, "The bus"): its envelope, and its data sealed to the person's machines (#4825). The control plane reads only refs, names and times (principle 7, #4726) and opens no sealed copy; a machine with no copy of its own reads the subject's state now, by its ref.
 type BusEvent struct {
 	// The CloudEvents version of the envelope (#4728, spec 4724-event-bus, "An event"): always "1.0".
 	Specversion string `json:"specversion"`
@@ -1729,6 +1729,9 @@ type BusEvent struct {
 
 	// The machine that raised it (#4728), as agents:machine:#<machine>. Not part of the event's identity.
 	Producer string `json:"producer"`
+
+	// The event's data (at most 256 KB), sealed by the machine that raised it to each machine of its person's lock (#4825). In bus/deliver, only the copy for the machine it goes to. None when the data is larger, or the machine has no lock.
+	Sealed []BusSealedData `json:"sealed,omitzero"`
 }
 
 // bus/publish (#4729): events a machine recorded, at most 100 at a time, oldest first. Best effort: one not sent when it happened is never sent later.
@@ -1741,6 +1744,14 @@ type BusPublished struct {
 	Kept int64 `json:"kept"`
 
 	Dropped int64 `json:"dropped"`
+}
+
+// An event's data sealed to one machine (#4825): HPKE to the sealing key the lock's addMachine names, with the associated data busdata.v1|<person>|m:<machine>|<event id>. Inside is the data and the raising machine's signature of it, so a control plane can neither read it nor make one up.
+type BusSealedData struct {
+	// The machine it is sealed to, by its id.
+	Machine string `json:"machine"`
+
+	Sealed SealedEnvelope `json:"sealed"`
 }
 
 // bus/subscribe (#4729): every subscription of a machine, at most 1,000. It replaces the ones the machine sent before; an empty list ends them all. A machine sends it again after each connect, as the control plane keeps none across a restart.
