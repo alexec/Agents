@@ -298,7 +298,17 @@ struct AgentMenuItems: View {
         if agent.state != .archived {
             // No push or banner for it, and still in Needs You (#2003).
             MuteAgentButton(agent: agent)
+            // Each with the list's key (#4796), which works while the list has an iPad's keyboard.
             RenameAgentButton(agent: agent)
+                .keyboardShortcut(ListKey.rename.shortcut)
+            // A question it asked, out of Needs you for an hour, as l does (#4796).
+            if let request = model.work.laterRequest(askedBy: agent.id) {
+                Button(ListKey.laterWord, systemImage: "clock") {
+                    Task { await model.deferRequest(request, ListKey.laterTime) }
+                }
+                .keyboardShortcut(ListKey.later.shortcut)
+                .disabled(model.isStale(agent))
+            }
             PinAgentButton(agent: agent)
             if model.isPinned(agent) {
                 let ids = model.pinnedSessions(in: agent.folderPath)
@@ -311,6 +321,7 @@ struct AgentMenuItems: View {
             // To another of the person's machines, with its unpushed work (#4037).
             MoveToMachineButton(agent: agent)
             ArchiveAgentButton(agent: agent)
+                .keyboardShortcut(ListKey.archive.shortcut)
             // Deny an agent's ask to be archived (#773): the session stays.
             if agent.asksToArchive {
                 Button(ArchiveRequestWords.keep, systemImage: "tray.and.arrow.up") {

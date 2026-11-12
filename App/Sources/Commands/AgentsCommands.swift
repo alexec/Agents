@@ -367,12 +367,12 @@ struct AgentsCommands: Commands {
             Button(item == nil ? "Next Session" : "Next Item") {
                 if item == nil { step(by: 1) } else { Task { await model.stepWork(forward: true) } }
             }
-            .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+            .keyboardShortcut(MenuKeys.nextSession)
             .disabled(item == nil ? sessionsHere.isEmpty : !model.workHasNext)
             Button(item == nil ? "Previous Session" : "Previous Item") {
                 if item == nil { step(by: -1) } else { Task { await model.stepWork(forward: false) } }
             }
-            .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+            .keyboardShortcut(MenuKeys.previousSession)
             .disabled(item == nil ? sessionsHere.isEmpty : item?.previous == nil)
             Button("Next Needing Attention") { nextNeedingAttention() }
                 .keyboardShortcut(MenuKeys.nextNeedingAttention)
@@ -532,9 +532,11 @@ struct AgentsCommands: Commands {
         let acting = agent.flatMap { model.acting($0.id) } != nil
         let live = agent.map { $0.state != .archived } ?? false
         var actions: [CommandMenuAction] = []
-        func add(_ title: String, _ key: KeyboardShortcut? = nil, keywords: [String] = [], when: Bool = true,
-                 _ perform: @escaping @MainActor () -> Void) {
-            if when { actions.append(CommandMenuAction(title, key: key, keywords: keywords, perform: perform)) }
+        func add(_ title: String, _ key: KeyboardShortcut? = nil, list listKey: ListKey? = nil, keywords: [String] = [],
+                 when: Bool = true, _ perform: @escaping @MainActor () -> Void) {
+            if when {
+                actions.append(CommandMenuAction(title, key: key, listKey: listKey, keywords: keywords, perform: perform))
+            }
         }
         let folder = keyFolder
         add("New Session", MenuKeys.newSession, when: folder != nil) { newSession() }
@@ -548,12 +550,20 @@ struct AgentsCommands: Commands {
                 requests.focusPrompt()
             }
         }
-        add("Archive Session", MenuKeys.archive, when: live && !acting) { archive() }
+        add("Archive Session", MenuKeys.archive, list: .archive, when: live && !acting) { archive() }
         add("Unarchive Session", when: agent?.state == .archived) { act { await model.unarchive($0.id) } }
         add("Stop Session", MenuKeys.stop, when: agent.map { model.canStop($0) } ?? false && !acting) {
             act { await model.stop($0.id) }
         }
-        add("Rename Session…", when: live) { rename() }
+        add("Rename Session…", list: .rename, when: live) { rename() }
+        // A question it asked, out of Needs you for an hour, as the list's l does (#4796).
+        if let agent, let request = model.work.laterRequest(askedBy: agent.id) {
+            add(ListKey.laterWord, list: .later, keywords: ["Needs you"]) {
+                Task { await model.deferRequest(request, ListKey.laterTime.params(id: request.id)) }
+            }
+        }
+        add("Next Session", MenuKeys.nextSession, list: .next, when: !sessionsHere.isEmpty) { step(by: 1) }
+        add("Previous Session", MenuKeys.previousSession, list: .previous, when: !sessionsHere.isEmpty) { step(by: -1) }
         add("Branch Session", MenuKeys.branch, when: live) { act { await model.fork($0.id) } }
         let pinned = agent.map(model.isPinned) ?? false
         add(pinned ? "Unpin Session" : "Pin Session", when: live) {

@@ -303,6 +303,7 @@ struct RemoteSidebar: View {
                 }
             }
         }
+        .modifier(RemoteListKeys())
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)

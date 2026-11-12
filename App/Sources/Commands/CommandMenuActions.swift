@@ -24,6 +24,8 @@ enum MenuKeys {
     static let branch = KeyboardShortcut("b", modifiers: [.command, .option])
     static let openFile = KeyboardShortcut("p")
     static let nextNeedingAttention = KeyboardShortcut("j")
+    static let nextSession = KeyboardShortcut(.downArrow, modifiers: [.command, .option])
+    static let previousSession = KeyboardShortcut(.upArrow, modifiers: [.command, .option])
 
     /// A folder's key in Go, ⌃⌘1 to ⌃⌘9, by its place in the list; nil after the ninth.
     static func folder(at index: Int) -> KeyboardShortcut? {
