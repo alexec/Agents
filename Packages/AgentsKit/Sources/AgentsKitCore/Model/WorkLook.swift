@@ -402,6 +402,8 @@ public enum WorkLook {
 
     public static let clearFilters = "Clear filters"
     public static let tryAgain = "Try again"
+    /// A page drawn from this device's copy (#4930) while its machine is asked again; the web page says the same.
+    public static let fromDevice = "From this device. Reading it again."
 
     /// One item of a kind, or many: "1 issue", "128 issues", "2 pull requests".
     public static func count(_ kind: WorkList.Kind, _ n: Int, more: Bool = false) -> String {

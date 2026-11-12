@@ -46,6 +46,18 @@ final class WorkTimelineState {
 
     var ask: Ask { Ask(asked: asked, project: project, board: board, range: range, anchor: anchor) }
 
+    /// The plot on screen came from this device's copy (#4930), until the machines answer.
+    var fromDevice = false
+
+    /// Work ▸ Timeline as this device keeps it (#4930): the plot around now, and the boards.
+    struct Kept: Codable, Sendable {
+        var timeline: DaemonAPI.WorkTimeline
+        var boards: [DaemonAPI.ProjectBoard]
+    }
+
+    /// What the plot is kept under: the project, board and range.
+    private func copyAsk(_ project: String) -> String { [project, board, range.rawValue].joined(separator: "|") }
+
     /// What the plot holds: the window, and a range's width on each side of it to scroll through.
     var content: DateInterval {
         let window = range.window(now: anchor)
@@ -74,6 +86,13 @@ final class WorkTimelineState {
             return
         }
         if self.project != project.id { self.project = project.id }
+        // Seen before: this device's copy at once, until the machines answer (#4930).
+        let kept = copyAsk(project.id)
+        if timeline == nil, let copy = await model.keptWork(Kept.self, .timeline, kept), ask == mine, timeline == nil {
+            timeline = copy.timeline
+            boards = copy.boards
+            fromDevice = true
+        }
         let found = await model.workBoards()
         guard ask == mine else { return }
         boards = found
@@ -130,7 +149,13 @@ final class WorkTimelineState {
         fromMachines = merged
         sessions = await model.lineageSessionsOn(WorkTimeline.sessionNodes(merged))?.sessions ?? []
         guard ask == mine, fromMachines == merged else { return }
-        timeline = WorkTimeline.started(merged, by: sessions)
+        let drawn = WorkTimeline.started(merged, by: sessions)
+        timeline = drawn
+        fromDevice = false
+        // Kept for the window around now, read by every machine: a plot scrolled away is not the one a person opens on.
+        if failed.isEmpty, abs(anchor.timeIntervalSinceNow) < 3600 {
+            model.keepWork(Kept(timeline: drawn, boards: boards), .timeline, kept)
+        }
     }
 
     /// The sessions again, on `control/lineageChanged` (#4276): a session that starts on a child on
@@ -272,6 +297,7 @@ struct WorkTimelinePane: View {
             let timeline = state.timeline ?? .init()
             VStack(spacing: 0) {
                 let lines = problems(timeline)
+                WorkFromDeviceStrip(on: state.fromDevice && lines.isEmpty).padding(.horizontal, 16).padding(.vertical, 8)
                 if !lines.isEmpty {
                     WorkErrorStrip(lines: lines) { state.asked += 1 }
                         .padding(.horizontal, 16).padding(.vertical, 8)

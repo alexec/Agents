@@ -105,9 +105,9 @@ struct WorkPictures: Equatable {
     static func == (a: Self, b: Self) -> Bool { a.model === b.model && a.host == b.host }
 
     func read(_ url: String) async -> PlatformImage? {
-        guard let got = try? await model.forge(DaemonAPI.Method.forgeImage, DaemonAPI.ForgeImageRequest(url: url),
-                                               returning: DaemonAPI.ForgeImage.self, on: host) else { return nil }
-        return PlatformImage(data: got.data)
+        // From this device's copy when it holds it (#4930): a picture does not change at its URL.
+        guard let data = await model.forgeImage(url, on: host) else { return nil }
+        return PlatformImage(data: data)
     }
 }
 

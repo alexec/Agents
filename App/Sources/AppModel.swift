@@ -7051,6 +7051,9 @@ final class AppModel {
     }
 
     /// The machines that read their forges (#3119), This Mac first: Work's issues and PRs come from each.
+    /// Work's part of this device's copy (#4930).
+    var workCopy: LocalCopy? { localCopy?.copy }
+
     var forgeMachines: [(id: MachineRef, name: String)] {
         let mine = thisMacHostID
         return (controlPlaneHosts ?? [])

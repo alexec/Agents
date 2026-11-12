@@ -361,7 +361,7 @@ public enum WorkFeatures {
     /// An open epic as its line needs it, from `work/features` or, from an older daemon, from
     /// `forge/plan` and `lineage/forecast` (note 16): its children, the first step with an open
     /// child of all its steps, that step's open blockers outside the plan, and its forecast.
-    public struct Place: Sendable, Equatable {
+    public struct Place: Codable, Sendable, Equatable {
         public var children: [DaemonAPI.ForgeItem]
         public var step: Int?
         public var steps: Int
