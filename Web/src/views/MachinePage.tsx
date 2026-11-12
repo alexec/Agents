@@ -8,7 +8,7 @@ import type { Store } from "../model/store";
 import { hostAnswers, hostHas } from "../model/capabilities";
 import { diskLine, freeWords, headline, levelWords, summaryWords } from "../model/disk";
 import { cpuWords, machineCPUWords, machineMemoryWords } from "../model/processes";
-import { detailWords, levelClass as capacityClass, levelWords as capacityWords, loadWords, queuedWords, warningWords } from "../model/capacity";
+import { detailWords, leasesInLine, leasesInLineWords, levelClass as capacityClass, levelWords as capacityWords, loadWords, queuedWords, warningWords } from "../model/capacity";
 import { Capability } from "../protocol/capabilities.generated";
 import type { DiskAlarm, MachineUsageState } from "../protocol/generated";
 import { go } from "../route";
@@ -56,7 +56,9 @@ export function MachinePage({ store, host }: { store: Store; host: string }) {
   // The level and why at near and full, and the starts that wait for a place (#4582, #4377).
   const warning = usage ? warningWords(usage.machine, name) : null;
   const level = usage ? capacityWords(usage.machine.capacity) : null;
-  const queued = queuedWords((store.agents.value[host] ?? []).filter((a) => a.state === "queued").length);
+  // And the leases that wait in line for the machine, not for a holder (#4748).
+  const queued = [queuedWords((store.agents.value[host] ?? []).filter((a) => a.state === "queued").length),
+    leasesInLineWords(leasesInLine(store.leases.value[host]?.resources ?? []))].filter((w) => w !== null).join(" · ") || null;
   const diskRow = (disk: DiskAlarm) => (
     <div class="setting" key={disk.reading.mount} title={disk.level === "ok" ? disk.reading.mount : `${disk.reading.mount}: ${diskLine(disk)}`}>
       <span>{disk.reading.volume}</span>

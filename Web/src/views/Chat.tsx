@@ -65,6 +65,7 @@ import { runningTool } from "../model/sidebar";
 import { composerReason } from "../model/orgPolicy";
 import { autoHeader, cellOf } from "../model/levels";
 import { PageTitle, chatCrumbs } from "./TopBar";
+import { startLineWords } from "../model/capacity";
 
 /** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
 interface HeldTurn {
@@ -875,11 +876,15 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
 function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
   // A place in line that the wait card says is left to the card (#2361).
   const leases = leaseMark(agent.id, store.leases.value[host], (id) => store.agent(host, id)?.title, lineResource(agent));
-  if (!leases) return null;
+  // A queued start the machine holds says why, as a lease's wait does (#4748).
+  const words = agent.state === "queued" ? store.capacity.value[host]?.words : undefined;
+  const start = words ? startLineWords(words) : null;
+  if (!leases && !start) return null;
   return (
-    <div class="lease-line" role="status" aria-label={leases.full}>
-      {leases.lines.map((text) => (
-        <button key={text} class="link" title={leases.full}
+    <div class="lease-line" role="status" aria-label={[leases?.full, start].filter(Boolean).join(" ")}>
+      {start && <span class="words">{start}</span>}
+      {(leases?.lines ?? []).map((text) => (
+        <button key={text} class="link" title={leases?.full}
           onClick={() => { resourcesAsked.value = true; location.hash = routeHash({ nav: "machines", section: `machine-${host}` }); }}>
           <span class="words">{text}</span><span class="chevron" aria-hidden="true">›</span>
         </button>

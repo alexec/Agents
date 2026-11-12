@@ -273,7 +273,7 @@ struct FolderAgentsView: View {
                     }
                     .disabled(model.isStarting)
                     .help("Start a kind of session: a persona sets what it names")
-                    // What Auto picked and the word, so the person sees what to change (#4559).
+                    // What the live pick picked and the word, so the person sees what to change (#4559).
                     if model.draftPersonaAuto {
                         Text(Persona.autoLine(model.draftAutoPick))
                             .appText(.fine)
@@ -295,30 +295,26 @@ struct FolderAgentsView: View {
     }
 
     static let noPersona = "No persona"
-    static let auto = "Auto"
 
     /// Segments, or a menu: the picked one's name and a chevron, where they do not fit (#2795).
-    /// Auto first (#4559): it picks from the prompt's words until a segment is picked by hand.
+    /// No Auto segment (#4721): the prompt's words pick one live until one is picked by hand.
     @ViewBuilder
     private func personaPicker(_ usable: [Persona], picked: Persona?, menu: Bool = false) -> some View {
         let picker = Picker("Persona", selection: Binding<Persona.Segment>(
-            get: { Persona.Segment(auto: model.draftPersonaAuto, picked: model.draftPersona) },
+            get: { Persona.Segment(picked: model.draftPersona) },
             set: { segment in
                 switch segment {
-                case .auto: model.chooseAutoPersona()
                 case .none: model.choosePersona(nil)
                 case .persona(let id): model.choosePersona(usable.first { $0.id == id })
                 }
             }
         )) {
-            Text(Self.auto).tag(Persona.Segment.auto)
             Text(Self.noPersona).tag(Persona.Segment.none)
             ForEach(usable) { persona in
                 Text(persona.name).tag(Persona.Segment.persona(persona.id))
             }
         }
-        let shown = model.draftPersonaAuto ? Self.auto + (picked.map { ": \($0.name)" } ?? "")
-            : picked?.name ?? Self.noPersona
+        let shown = picked?.name ?? Self.noPersona
         if menu {
             picker
                 .pickerStyle(.menu)

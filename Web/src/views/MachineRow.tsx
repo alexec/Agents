@@ -59,8 +59,10 @@ export function MachineRow({ store, host, on, open, children }: {
   const sheets = machineSheets(row, store.macHostID.value, store.hostIsOnline(host));
   const dot = machineDot(row, store.hostIsOnline(host), store.hostsBeingStarted.value.includes(host));
   const diskLow = (store.disk.value[host]?.alarms ?? []).some((a) => a.level !== "ok");
-  const tone = machineIcon(dot, diskLow);
-  const stateWords = tone === "failure" && dot !== "offline" ? "A disk is low" : toneWords[tone];
+  const capacity = store.hostIsOnline(host) ? store.capacity.value[host]?.level : undefined;
+  const tone = machineIcon(dot, diskLow, capacity);
+  const stateWords = tone === "failure" && dot !== "offline" ? (diskLow ? "A disk is low" : "At capacity")
+    : tone === "attention" && capacity === "near" ? "Near capacity" : toneWords[tone];
 
   const stop = async () => {
     const asked = await store.providers.stop(host);

@@ -44,7 +44,12 @@ export interface LeaseMark {
 }
 
 /** LeaseStatus.Waiting: a place in a resource's line. */
-interface Place { short: string; display: string; holder: string; until?: Date; place: number }
+interface Place { short: string; display: string; holder: string; until?: Date; place: number; capacityWait?: string }
+
+/** LeaseStatus.Waiting.reason: "held by “Fix login” until 14:12", or the machine's "this Mac is near capacity" (#4748). */
+function reason(w: Place): string {
+  return w.capacityWait ?? `held by ${w.holder}${w.until ? ` until ${clock(w.until)}` : ""}`;
+}
 
 /** The agent's place in one resource's line, if it has one. */
 function placeIn(state: LeaseSnapshot["resources"][number], agentID: string,
@@ -55,7 +60,8 @@ function placeIn(state: LeaseSnapshot["resources"][number], agentID: string,
   const next = [...holds].sort((a, b) => a.expiresAt - b.expiresAt)[0];
   return { short: shortName(state.displayName, state.kind), display: state.displayName,
     holder: agentName(next ? title(next.holder) : undefined),
-    ...(next ? { until: fromWireDate(next.expiresAt) } : {}), place: index + 1 };
+    ...(next ? { until: fromWireDate(next.expiresAt) } : {}), place: index + 1,
+    ...(state.capacityWait ? { capacityWait: state.capacityWait } : {}) };
 }
 
 /**
@@ -106,12 +112,12 @@ export function leaseMark(agentID: string, snapshot: LeaseSnapshot | undefined,
   const mark = first ? `▣ Holds ${first.short} · ${first.minutes} min${first.soon ? " left" : ""}`
     : `◷ Waiting for ${waiting[0]!.short} · ${ordinal(waiting[0]!.place)} in line`;
   const held = holding.map((h) => `Holding ${h.display}, ${h.minutes} min left, until ${clock(h.expires)}`);
-  const waitingFull = waiting.map((w) => `Waiting for ${w.display}, held by ${w.holder}${w.until ? ` until ${clock(w.until)}` : ""}, ${ordinal(w.place)} in line`);
+  const waitingFull = waiting.map((w) => `Waiting for ${w.display}, ${reason(w)}, ${ordinal(w.place)} in line`);
   const full = [...held, ...waitingFull].join(". ") + ".";
   // LeaseStatus.lines: holdings first, for the chat's foot with the working line (#2344).
   const lines = [
     ...holding.map((h) => `\u25A3 ${h.short} \u00B7 ${h.minutes} min${h.soon ? " left" : ""}`),
-    ...waiting.map((w) => `\u25F7 Waiting for ${w.short} \u00B7 held by ${w.holder}${w.until ? ` until ${clock(w.until)}` : ""} \u00B7 ${ordinal(w.place)}`),
+    ...waiting.map((w) => `\u25F7 Waiting for ${w.short} \u00B7 ${reason(w)} \u00B7 ${ordinal(w.place)}`),
   ];
   return { mark, more: holding.length + waiting.length - 1, full, lines,
     holds: first ? { mark, more: holding.length - 1, full: held.join(". ") + "." } : null,
@@ -149,7 +155,7 @@ export function eventWaitLine(agent: Agent, title: (id: string) => string | unde
   if (resource !== undefined) {
     const place = linePlace(agent, resource, snapshot, title);
     return place
-      ? `◷ Waiting for ${place.display} \u00B7 held by ${place.holder}${place.until ? ` until ${clock(place.until)}` : ""} \u00B7 ${ordinal(place.place)} in line`
+      ? `◷ Waiting for ${place.display} \u00B7 ${reason(place)} \u00B7 ${ordinal(place.place)} in line`
       : `◷ Waiting for your turn with ${resource}`;
   }
   const wait = agent.eventWait;

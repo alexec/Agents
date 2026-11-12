@@ -1,7 +1,7 @@
 import Foundation
 
-/// Auto on the start form (#4559): the persona the first prompt's words name, as it is
-/// typed. Ported by hand to the web as `autoPersona` (`Web/src/model/personas.ts`).
+/// The start form's live pick (#4559, #4721): the persona the first prompt's words name,
+/// as it is typed. It is always on, until a segment is picked by hand. Ported by hand to the web as `autoPersona` (`Web/src/model/personas.ts`).
 ///
 /// A keyword counts once it is a whole word: the word and then a space or punctuation, so
 /// a half-typed word never matches and the pick does not flicker. Case does not matter.
@@ -19,18 +19,17 @@ extension Persona {
         }
     }
 
-    /// A segment of the persona control: Auto, no persona, or one by id.
+    /// A segment of the persona control: no persona, or one by id (#4721: no Auto segment).
     public enum Segment: Hashable, Sendable {
-        case auto
         case none
         case persona(String)
 
-        public init(auto: Bool, picked: String?) {
-            self = auto ? .auto : picked.map(Segment.persona) ?? Segment.none
+        public init(picked: String?) {
+            self = picked.map(Segment.persona) ?? Segment.none
         }
     }
 
-    /// The grey line under the control while Auto is on: what it picked, and the word.
+    /// The grey line under the control while the pick is live: what it picked, and the word.
     public static func autoLine(_ pick: AutoPick?) -> String {
         guard let pick else { return "Auto picks a persona from the words you type" }
         return "Auto picked \(pick.persona.name): \"\(pick.word)\""

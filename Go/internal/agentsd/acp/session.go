@@ -333,6 +333,11 @@ func (s *Session) Stop() {
 		_ = syscall.Kill(-pgid, syscall.SIGKILL)
 	}
 	s.client.closeTerminals()
+	// The SDK hands on what it read before the output ended after the process is gone:
+	// wait for that, so nothing the runtime said reaches the sink after Stop (#4744).
+	if !s.client.updates.drain(drainLimit) {
+		log.Printf("acp: %s stopped with session/updates not handed on after %v", s.client.runtime, drainLimit)
+	}
 }
 
 func (s *Session) Done() <-chan struct{} { return s.done }
@@ -563,6 +568,9 @@ func (e *rawElicitations) Read(b []byte) (int, error) {
 		e.c.updates.wait()
 		line, err := e.r.ReadBytes('\n')
 		if len(line) == 0 {
+			if err != nil {
+				e.c.updates.end()
+			}
 			return 0, err
 		}
 		e.c.updates.read(line)

@@ -211,6 +211,12 @@ private struct ResourceRow: View {
     /// (#2361): either way, its turn starts it again.
     private var line: some View {
         VStack(alignment: .leading, spacing: 4) {
+            // A line that waits for the machine, not for a holder, says so (#4748).
+            if let why = state.capacityWait {
+                Text(CapacityWords.heldForCapacity(why))
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+            }
             ForEach(Array(state.line.enumerated()), id: \.element.agentID) { index, member in
                 HStack(spacing: 0) {
                     Text("\(index + 1)  ").monospacedDigit()

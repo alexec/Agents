@@ -49,4 +49,35 @@ struct CapacityWordsTests {
         #expect(CapacityWords.queued(1) == "1 start queued")
         #expect(CapacityWords.queued(2) == "2 starts queued")
     }
+
+    /// The waits for the machine (#4748): the leases in its lines, a queued start's line, and the
+    /// Resources line.
+    @Test func theWaitsForTheMachineSayWhy() {
+        #expect(CapacityWords.leasesInLine(0) == nil)
+        #expect(CapacityWords.leasesInLine(1) == "1 lease in line for the machine")
+        #expect(CapacityWords.leasesInLine(3) == "3 leases in line for the machine")
+        let member = DaemonAPI.LineMember(agentID: UUID(), askedAt: Date(), isCallOpen: true)
+        let resources = [
+            DaemonAPI.ResourceState(name: ResourceName("build")!, kind: .named, displayName: "build",
+                                    line: [member, member], capacityWait: "this Mac is near capacity"),
+            DaemonAPI.ResourceState(name: .screen, kind: .screen, displayName: "Screen", line: [member]),
+        ]
+        #expect(CapacityWords.leasesInLine(resources) == 2)
+        #expect(CapacityWords.startLine("this Mac is near capacity") == "\u{25F7} In line to start \u{00B7} this Mac is near capacity")
+        #expect(CapacityWords.heldForCapacity("this Mac is at capacity") == "Held for capacity: this Mac is at capacity")
+    }
+
+    /// A queued start says so at its chat's foot only while its machine is near or full.
+    @MainActor @Test func aQueuedStartSaysTheMachineHoldsIt() {
+        let model = AgentsModel()
+        var agent = Agent(runtimeID: "claude", cwd: URL(fileURLWithPath: "/tmp/f"), state: .queued)
+        #expect(model.capacityStartLine(agent) == nil)
+        model.apply(.capacityChanged(.init(level: .near, words: "this Mac is near capacity"), host: .mac))
+        #expect(model.capacityStartLine(agent) == "\u{25F7} In line to start \u{00B7} this Mac is near capacity")
+        agent.state = .running
+        #expect(model.capacityStartLine(agent) == nil)
+        agent.state = .queued
+        model.replaceCapacity(.init(level: .ok), from: .mac)
+        #expect(model.capacityStartLine(agent) == nil)
+    }
 }

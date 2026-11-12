@@ -469,6 +469,13 @@ struct ChatTranscript: View {
                 if let leases = actions.leaseStatus(agent.id)?.without(agent.eventWait) {
                     LeaseLine(status: leases, open: actions.openLease)
                 }
+                // A queued start the machine holds says why, as a lease's wait does (#4748).
+                if let start = actions.capacityStart(agent) {
+                    Text(start)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             .inColumn(column)
             // Last, after everything the agent said and everything waiting to be sent

@@ -3435,6 +3435,23 @@
         "full"
       ]
     },
+    "CapacityState": {
+      "type": "object",
+      "description": "capacity/state and capacity/changed (#4748): the machine's level, pushed when it moves, so a machine's row says it with no page open.",
+      "properties": {
+        "level": {
+          "$ref": "#/definitions/CapacityLevel"
+        },
+        "words": {
+          "type": "string",
+          "description": "The level as a sentence's subject and verb: \"this Mac is near capacity\" or \"this Mac is at capacity\". Absent at ok."
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "additionalProperties": false
+    },
     "CatalogApproval": {
       "type": "object",
       "description": "An approval of an MCP server or skill (#2019, M5): for a group, or for one person.",
@@ -25603,6 +25620,10 @@
         },
         "endingSoon": {
           "type": "boolean"
+        },
+        "capacityWait": {
+          "type": "string",
+          "description": "Why its line waits for the machine, not for a holder (#4579, #4748): \"this Mac is near capacity\", \"this Mac is at capacity\", or \"this Mac has capacity again\" while the line is served one a look. Only on a compute resource (capacity, build) with a free place and a line; absent otherwise and from a host from before #4748."
         }
       },
       "required": [

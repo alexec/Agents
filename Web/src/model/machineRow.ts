@@ -1,7 +1,7 @@
 // A machine's row in the Machines section (#3974), as the window's MachineRow (#3973): its dot, what
 // its menu and swipes do, and what Delete and Remove ask first. A machine a provider made can start,
 // stop and be deleted; a registered one can only be removed; This Mac has neither.
-import type { ControlMachine, ProviderSummary, StartedMachinePreview } from "../protocol/generated";
+import type { CapacityLevel, ControlMachine, ProviderSummary, StartedMachinePreview } from "../protocol/generated";
 import { addMachineWords } from "./addMachine";
 import { makers } from "./machineFromRepository";
 import { unpushedWords } from "./people";
@@ -21,10 +21,12 @@ export function machineDot(host: ControlMachine, online: boolean, starting: bool
 export type MachineIconTone = "accent" | "busy" | "failure" | "attention" | "stopped";
 export type MachineKind = "mac" | "cloud" | "rack";
 
-/** The most urgent wins: busy, then red (offline, failed or a low disk), then amber, then grey, then the accent. */
-export function machineIcon(dot: MachineDot, diskLow: boolean): MachineIconTone {
+/** The most urgent wins: busy, then red (offline, failed, a low disk or at capacity), then amber (near capacity or an
+ * update, #4748), then grey, then the accent. */
+export function machineIcon(dot: MachineDot, diskLow: boolean, capacity?: CapacityLevel): MachineIconTone {
   if (dot === "busy") return "busy";
-  if (dot === "offline" || diskLow) return "failure";
+  if (dot === "offline" || diskLow || capacity === "full") return "failure";
+  if (capacity === "near") return "attention";
   if (dot === "attention") return "attention";
   if (dot === "stopped") return "stopped";
   return "accent";

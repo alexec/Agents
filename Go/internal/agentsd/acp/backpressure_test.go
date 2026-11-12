@@ -87,3 +87,39 @@ func TestAStalledCountReadsOn(t *testing.T) {
 		t.Fatalf("waited %s with nothing queued", waited)
 	}
 }
+
+// Once the runtime's output ends, drain waits until each session/update read from it was
+// handed on: the SDK hands them on after the connection closed, and a stop must not
+// return while they still write to the sink (#4744).
+func TestDrainWaitsForTheUpdatesReadBeforeTheOutputEnded(t *testing.T) {
+	sink := &slowSink{}
+	c := &client{sink: sink, updates: newUpdateGate()}
+	r, w := io.Pipe()
+	sdk.NewClientSideConnection(c, io.Discard, &rawElicitations{r: bufio.NewReader(r), c: c})
+	const count = 200
+	for i := range count {
+		line := fmt.Sprintf(`{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s","update":{"sessionUpdate":"tool_call_update","toolCallId":"t%d"}}}`+"\n", i)
+		if _, err := w.Write([]byte(line)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = w.Close()
+	if !c.updates.drain(10 * time.Second) {
+		t.Fatal("not drained")
+	}
+	if n := sink.updates.Load(); n != count {
+		t.Fatalf("%d of %d updates handed on when drained", n, count)
+	}
+}
+
+// An output that has not ended is not drained, however few updates wait.
+func TestDrainIsFalseWhileTheOutputGoesOn(t *testing.T) {
+	g := newUpdateGate()
+	if g.drain(20 * time.Millisecond) {
+		t.Fatal("drained with the output still open")
+	}
+	g.end()
+	if !g.drain(time.Second) {
+		t.Fatal("not drained once it ended")
+	}
+}

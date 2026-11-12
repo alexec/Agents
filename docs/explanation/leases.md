@@ -59,6 +59,11 @@ the same way, as well as its count. So an agent that leases `build` needs nothin
   at once.
 - The person's booking, the browser, the screen and the simulators are not compute.
   They do not wait for the machine.
+- The clients say when a wait is for the machine, not for a holder (#4748). The chat's
+  lease line says "◷ Waiting for build · this Mac is near capacity · 1st", and a queued
+  start says "◷ In line to start · this Mac is near capacity". In Resources, the line says
+  "Held for capacity". The machine's row under Machines says "Near capacity" or "At
+  capacity", and its page says "1 lease in line for the machine".
 
 The screen lease is now actually acquired by a shipped tool (#3004): `drive_screen` takes
 it the first time an agent drives an app through its own screen, mouse and keyboard, and

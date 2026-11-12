@@ -12,7 +12,7 @@ public enum MachineDot: Equatable, Sendable {
     case stopped
     /// Red: offline, or its set-up failed.
     case offline
-    /// Amber: it needs an update.
+    /// Amber: it needs an update, or it is near capacity.
     case attention
 
     /// The machine's own state only: its sessions do not roll up into it (#3971).
@@ -72,17 +72,19 @@ public enum MachineIcon: Equatable, Sendable {
     case accent
     /// Amber and pulsing: starting, stopping or being made.
     case busy
-    /// Red: offline, its set-up failed, or a disk is low.
+    /// Red: offline, its set-up failed, a disk is low, or it is at capacity.
     case failure
-    /// Amber: it needs an update.
+    /// Amber: it needs an update, or it is near capacity.
     case attention
     /// Grey: stopped.
     case stopped
 
-    /// The most urgent wins: busy, then red, then amber, then grey, then the accent.
-    public static func of(_ dot: MachineDot, diskLow: Bool) -> MachineIcon {
+    /// The most urgent wins: busy, then red, then amber, then grey, then the accent. At
+    /// capacity is red and near capacity amber (#4748), as the machine's page tints them.
+    public static func of(_ dot: MachineDot, diskLow: Bool, capacity: DaemonAPI.CapacityLevel? = nil) -> MachineIcon {
         if dot == .busy { return .busy }
-        if dot == .offline || diskLow { return .failure }
+        if dot == .offline || diskLow || capacity == .full { return .failure }
+        if capacity == .near { return .attention }
         switch dot {
         case .attention: return .attention
         case .stopped: return .stopped

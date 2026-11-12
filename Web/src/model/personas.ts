@@ -45,7 +45,7 @@ export function withPersonaLabels(labels: readonly string[], last: Persona | und
   return [...left, ...(persona?.settings.labels ?? []).filter((l) => !have.has(l.toLowerCase()) && have.add(l.toLowerCase()))];
 }
 
-/** Auto on the New Agent page (#4559): the persona the first prompt's words name, and the word.
+/** The live pick on the New Agent page (#4559, #4721), always on until a hand pick: the persona the first prompt's words name, and the word.
  *  Persona.autoPick (Model/PersonaAutoPick.swift) ported by hand: a keyword counts once it is a
  *  whole word, followed by a space or punctuation; most matches wins, the earliest breaks a tie. */
 export interface AutoPick { persona: Persona; word: string }
@@ -110,6 +110,6 @@ export function autoPersona(prompt: string, personas: readonly Persona[]): AutoP
   return best?.pick;
 }
 
-/** The grey line under the control: what Auto picked, and the word. */
+/** The grey line under the control while the pick is live: what it picked, and the word. */
 export const autoLine = (pick: AutoPick | undefined) =>
   pick ? `Auto picked ${pick.persona.name}: "${pick.word}"` : "Auto picks a persona from the words you type";
