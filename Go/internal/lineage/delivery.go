@@ -31,6 +31,9 @@ import (
 //     commit) to the last of that commit's runs passing. Median and P90. The ci-speed skill's
 //     figure, and the lane-count rule's (more than 15 minutes means fewer lanes).
 //   - Failed rounds: a merged PR's failed CI runs and attempts. Mean.
+//   - Approval wait (#4553): from a PR's needs-approval label (its opening when the label is
+//     unknown) to its first answer by a person. Median and P90; and the share of merged PRs
+//     that had one before their merge.
 //
 // Each is over the DeliveryWindow before now, with a series of its weeks, 7 days each back
 // from now. The band is DORA 2024's cluster, as a reference: those clusters are teams of
@@ -290,7 +293,58 @@ func DeliveryOf(nodes []wire.LineageCostNode, repo string, releases map[string]w
 		out.CiTimeToGreen.P90 = &p
 	}
 	out.FailedRounds = figureOf(rounds, since, at, mean)
+
+	// The approval wait (#4553), and the share of merged PRs that waited.
+	out.ApprovalWait = approvalWaitIn(mine, since, at)
+	var waited []sample
+	for _, n := range merged {
+		v := 0.0
+		if _, ok := ApprovalWait(n); ok && *n.AnsweredAt <= *n.EndedAt {
+			v = 1
+		}
+		waited = append(waited, sample{*n.EndedAt, v})
+	}
+	out.ApprovalShare = figureOf(waited, since, at, mean)
 	return out
+}
+
+// ApprovalWait is the seconds a PR waited for a person's answer (#4553): from its
+// needs-approval label, else its opening, to its first answer. Not ok with no answer, no
+// start, or an answer before the start.
+func ApprovalWait(n wire.LineageCostNode) (float64, bool) {
+	if n.Node.Kind != KindPR || n.AnsweredAt == nil {
+		return 0, false
+	}
+	start := n.AskedAt
+	if start == nil {
+		start = n.OpenedAt
+	}
+	if start == nil || *n.AnsweredAt < *start {
+		return 0, false
+	}
+	return float64(*n.AnsweredAt - *start), true
+}
+
+// ApprovalWaitOf is the approval wait over every node, of any repo, in the DeliveryWindow
+// before now: Reports ▸ Time's line (#4553).
+func ApprovalWaitOf(nodes []wire.LineageCostNode, now time.Time) wire.LineageDeliveryFigure {
+	return approvalWaitIn(nodes, wire.DateOf(now.Add(-DeliveryWindow)), wire.DateOf(now))
+}
+
+// approvalWaitIn is the approval wait's figure, the median and P90, by the answer's time.
+func approvalWaitIn(nodes []wire.LineageCostNode, since, at wire.Date) wire.LineageDeliveryFigure {
+	var waits []sample
+	for _, n := range nodes {
+		if w, ok := ApprovalWait(n); ok {
+			waits = append(waits, sample{*n.AnsweredAt, w})
+		}
+	}
+	f := figureOf(waits, since, at, median)
+	if v := valuesIn(waits, since, at+1); len(v) > 0 {
+		p := percentile(v, 0.9)
+		f.P90 = &p
+	}
+	return f
 }
 
 // mergedPR says a PR merged: a merge, or a merged revert.

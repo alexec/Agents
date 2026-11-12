@@ -341,6 +341,27 @@
       ]
     },
     {
+      "name": "bus/lease",
+      "x-capability": "events.leases/1",
+      "description": "A machine, on its channel 0, before each poll of a server's events (#4731, spec 4724-event-bus, \"The bus\", step 6): asks for the poll's producer lease or renews it, and lets go of the ones it no longer polls. One machine of the person holds each lease and polls; the others stand by, and the control plane delivers them the events of that poll (bus/deliver). A lease not renewed for 5 minutes goes to the next machine that asks, which polls from now.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BusLease"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BusLeased"
+        }
+      }
+    },
+    {
       "name": "bus/publish",
       "x-capability": "events.bus/1",
       "description": "A machine, on its channel 0 (#4729, spec 4724-event-bus): events it recorded, envelope only. The control plane keeps the first copy of each id in the bus log (the last 100,000 of each person's bus), drops and counts a later copy, and delivers it to each machine with a matching subscription (bus/deliver).",

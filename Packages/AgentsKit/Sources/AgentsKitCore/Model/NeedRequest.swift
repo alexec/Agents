@@ -217,8 +217,9 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
     /// puts the value.
     public struct SecretUse: Codable, Sendable, Hashable {
         /// fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's header, #4120),
-        /// terminal (`agents-secret NAME` with no session's grant, #4179) or account (a
-        /// manage_accounts read of an account with Ask before use, #4163).
+        /// terminal (`agents-secret NAME` with no session's grant, #4179), account (a
+        /// manage_accounts read of an account with Ask before use, #4163), or browser and screen
+        /// (an agent's lease of the browser or the screen on a machine that asks, #4264).
         public var use: String
         public var name: String
         /// The page's domain for a fill, owner/repo for CI, the server's name for MCP, the
@@ -232,14 +233,18 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         /// For account (#4163): the manage_accounts call that waits, such as get. `name` is then
         /// the account's service and address, and `place` its id.
         public var call: String?
+        /// For screen (#4264): the app drive_screen names. `name` is then "the screen", and
+        /// `place` the machine.
+        public var app: String?
 
-        public init(name: String, use: String, place: String, sessionOnly: Bool? = nil, needsSignature: Bool? = nil, call: String? = nil) {
+        public init(name: String, use: String, place: String, sessionOnly: Bool? = nil, needsSignature: Bool? = nil, call: String? = nil, app: String? = nil) {
             self.name = name
             self.use = use
             self.place = place
             self.sessionOnly = sessionOnly
             self.needsSignature = needsSignature
             self.call = call
+            self.app = app
         }
 
         /// Whether `action` goes signed: it allows the use, on a machine that asks for a signature.
@@ -257,6 +262,8 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
             case "mcp": "MCP server \(place)"
             case "terminal": "Terminal: \(place) · \(Self.terminalCaveat)"
             case "account": "Account: manage_accounts \(call ?? "get")"
+            case "browser": "Browser on \(place)"
+            case "screen": app.map { "Screen: \($0) on \(place)" } ?? "Screen on \(place)"
             default: "Fill on \(place)"
             }
         }

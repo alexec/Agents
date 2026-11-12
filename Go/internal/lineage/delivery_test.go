@@ -236,3 +236,53 @@ func TestDeliveryCITimeToGreen(t *testing.T) {
 		t.Errorf("empty %+v", empty)
 	}
 }
+
+// #4553: the approval wait is from the label, else the opening, to the first answer; the
+// share is of merged PRs answered before their merge.
+func TestDeliveryApprovalWait(t *testing.T) {
+	now := time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
+	at := func(hours float64) *wire.Date {
+		d := wire.DateOf(now.Add(-time.Duration(hours * float64(time.Hour))))
+		return &d
+	}
+	repo := FullRepoText("github:alexec/agents")
+	pr := func(ref string, change func(*wire.LineageCostNode)) wire.LineageCostNode {
+		r := repo
+		n := wire.LineageCostNode{Node: wire.LineageNode{Kind: KindPR, Ref: repo + ref}, Repo: &r, Banked: blankCost()}
+		change(&n)
+		return n
+	}
+	merged := func(n *wire.LineageCostNode, hours float64) {
+		o := OutcomeMerged
+		n.Outcome, n.EndedAt = &o, at(hours)
+	}
+	nodes := []wire.LineageCostNode{
+		// Asked at 10 h, answered at 8 h: 2 h, though it opened at 12 h.
+		pr("#1", func(n *wire.LineageCostNode) {
+			n.OpenedAt, n.AskedAt, n.AnsweredAt = at(12), at(10), at(8)
+			merged(n, 7)
+		}),
+		// No label: from its opening, 4 h.
+		pr("#2", func(n *wire.LineageCostNode) { n.OpenedAt, n.AnsweredAt = at(30), at(26); merged(n, 25) }),
+		// Merged with no answer: it did not wait.
+		pr("#3", func(n *wire.LineageCostNode) { n.OpenedAt = at(5); merged(n, 4) }),
+		// Answered with no start known: no wait.
+		pr("#4", func(n *wire.LineageCostNode) { n.AnsweredAt = at(3); merged(n, 2) }),
+		// Open, answered: a wait, not a merge.
+		pr("#5", func(n *wire.LineageCostNode) { n.OpenedAt, n.AnsweredAt = at(2), at(1) }),
+	}
+	f := DeliveryOf(nodes, repo, nil, now)
+	w := f.ApprovalWait
+	if w.Count != 3 || w.Value == nil || *w.Value != 2*3600 || w.P90 == nil || *w.P90 <= 2*3600 {
+		t.Errorf("approval wait %+v", w)
+	}
+	if s := f.ApprovalShare; s.Count != 4 || s.Value == nil || *s.Value != 0.5 {
+		t.Errorf("approval share %+v", s)
+	}
+	if all := ApprovalWaitOf(nodes, now); all.Count != 3 {
+		t.Errorf("every repo's %+v", all)
+	}
+	if _, ok := ApprovalWait(pr("#6", func(n *wire.LineageCostNode) { n.OpenedAt, n.AnsweredAt = at(1), at(2) })); ok {
+		t.Error("an answer before the start is no wait")
+	}
+}

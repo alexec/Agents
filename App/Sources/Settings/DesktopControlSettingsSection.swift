@@ -1,9 +1,9 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Settings ▸ Machines ▸ This Mac ▸ Desktop control (#3004, US2): the off-by-default
-/// switch for `drive_screen`, an agent driving another app's own screen, mouse and
-/// keyboard.
+/// Settings ▸ Machines ▸ This Mac ▸ Desktop control (#3004, US2, #4264): Ask, Always
+/// Approve or Off for `drive_screen`, an agent driving another app's own screen, mouse and
+/// keyboard. Ask is the default: each lease of the screen waits on the person in Needs you.
 ///
 /// What the daemon holds, not what was last clicked. Nil until it has answered, so a
 /// daemon too old to know the method draws nothing here (WakeSettingsSection's own shape).
@@ -13,15 +13,15 @@ struct DesktopControlSettingsSection: View {
     var body: some View {
         if let settings = model.desktopControlSettings {
             Section {
-                Toggle("Let an agent drive apps on this Mac", isOn: Binding(
-                    get: { settings.enabled },
-                    set: { on in Task { await model.setDesktopControlEnabled(on) } }))
+                Picker(DriveApprovalWords.screenLabel, selection: Binding(
+                    get: { settings.shownMode },
+                    set: { mode in Task { await model.setDesktopControl(mode) } })) {
+                    ForEach(DriveApproval.allCases) { Text($0.word).tag($0) }
+                }
             } header: {
                 Text("Desktop control")
             } footer: {
-                Text(settings.enabled
-                     ? "An agent can click, type and read the screen of any app on this Mac, not only the sandboxed browser. macOS will ask you to grant Agents the Accessibility permission the first time an agent tries."
-                     : "Off by default. An agent cannot click, type or read the screen of any other app until you turn this on.")
+                Text(DriveApprovalWords.screenFooter(settings.shownMode))
                     .appText(.fine)
                     .foregroundStyle(.secondary)
             }

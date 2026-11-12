@@ -534,7 +534,10 @@ func (d *Daemon) registerCost() {
 		return d.usageHistory(), nil
 	})
 	On(d, wire.CallTimeHistory, func(ctx context.Context, c *Client, _ wire.Empty) (wire.TimeHistory, error) {
-		return d.timeHistory(), nil
+		h := d.timeHistory()
+		// How long PRs waited for the person (#4553), for Reports ▸ Time.
+		h.ApprovalWait = d.approvalWait()
+		return h, nil
 	})
 	On(d, wire.CallVelocityHistory, func(ctx context.Context, c *Client, _ wire.Empty) (wire.VelocityHistory, error) {
 		return d.velocityHistory(nowFunc()), nil

@@ -1335,6 +1335,15 @@ export interface BrowserClearRequest {
 }
 
 /**
+ * Whether agents on this machine may use the app's browser tools (browser_navigate and the rest,
+ * fill_secret, hand_to_person), and whether each lease of the browser asks a person first (#4264).
+ * Kept in <settings>/browser-control.json. Only the person's own clients may change it.
+ */
+export interface BrowserControlSettings {
+  mode: DriveApproval;
+}
+
+/**
  * browser/frame: a JPEG of the machine's browser's page (#3528, spike #3527), from CDP
  * Page.startScreencast, sent only to the clients that watch it. Never recorded.
  */
@@ -1589,6 +1598,44 @@ export interface BusEvent {
    * data is larger, or the machine has no lock.
    */
   sealed?: BusSealedData[];
+  /**
+   * The producer lease of the poll that made it (#4731), when a machine polled a server for it: a
+   * hash of the folder's project, the server's name, the event and its filters, the same on every
+   * machine. The control plane delivers it to the machines that stand by on that poll. Not part of
+   * the event's identity.
+   */
+  poll?: string;
+}
+
+/**
+ * bus/lease (#4731, spec 4724-event-bus, "The bus", step 6): the polls a machine is about to make,
+ * at most 100, each asking for its producer lease or renewing it, and the leases it lets go (its
+ * Mac goes to sleep, a subscription ended). The control plane gives each lease to one machine at a
+ * time, for 5 minutes from its last renewal.
+ */
+export interface BusLease {
+  /** The polls' keys (BusEvent.poll), each 1 to 128 bytes. */
+  polls: string[];
+  /** The keys of the leases this machine lets go. One another machine holds is left as it is. */
+  release?: string[];
+}
+
+/** bus/lease's answer (#4731): who holds each poll's lease now, in the order asked. */
+export interface BusLeased {
+  leases: BusProducerLease[];
+}
+
+/**
+ * One producer lease (#4731): the machine that polls, until when, and whether it is the one that
+ * asked. A machine that is not the holder stands by: it does not poll, and the control plane
+ * delivers it what the holder's poll makes.
+ */
+export interface BusProducerLease {
+  poll: string;
+  /** The holder's machine id on the control plane. */
+  holder: string;
+  mine: boolean;
+  until: string;
 }
 
 /**
@@ -3220,11 +3267,17 @@ export interface DesktopControlPause {
 }
 
 /**
- * Whether agents on this Mac may drive its apps through drive_screen (#3004, FR-004). Kept in
- * <settings>/desktop-control.json; Off when unset. Only the person's own clients may change it.
+ * Whether agents on this Mac may drive its apps through drive_screen (#3004, FR-004), and whether
+ * each lease of the screen asks a person first (#4264). Kept in <settings>/desktop-control.json.
+ * Only the person's own clients may change it.
  */
 export interface DesktopControlSettings {
+  /**
+   * Whether drive_screen is offered: mode is ask or always. A client that sends only enabled sets
+   * always (true) or off (false).
+   */
   enabled: boolean;
+  mode?: DriveApproval;
 }
 
 export type DestinationState =
@@ -3566,6 +3619,18 @@ export interface DraftStep {
   text: string;
 }
 
+/**
+ * Whether an agent's lease of the browser or the screen waits on a person (#4264). ask: each lease
+ * opens a Needs you request of kind approve (secretUse, use browser or screen), the default on a
+ * machine that a person uses; always: it never asks, the default on a machine that only agents use
+ * (a bot's machine, a Codespace), where ask counts as always, as nobody answers there; off: the
+ * tools are not offered, and are refused.
+ */
+export type DriveApproval =
+  | "ask"
+  | "always"
+  | "off";
+
 export interface DropboxPutRequest {
   folder: URLString;
   subfolder?: string;
@@ -3871,6 +3936,23 @@ export interface EventPattern {
   name: string;
   filters: Record<string, string>;
   anyOf?: Record<string, string[]>;
+  /**
+   * Only events of this provider (#4730): github, jira, agents and so on. With provider, topics or
+   * subject the pattern also hears the person's other machines' events, on the bus.
+   */
+  provider?: string;
+  /**
+   * Only events about one of these topics (#4730), lower case: a repo's full name, a Jira project,
+   * a Slack channel.
+   */
+  topics?: string[];
+  /** Only events about this one thing (#4730). */
+  subject?: Ref;
+  /**
+   * Seconds (#4730): a burst of matches on one subject and type is held this long and delivered
+   * once, the last one, with how many came. Best effort.
+   */
+  debounce?: number;
 }
 
 export interface EventPublisher {
@@ -5512,6 +5594,19 @@ export interface LineageCostNode {
    */
   reverts?: string;
   /**
+   * When a PR was opened (#4553): pr.opened's openedAt, the earliest kept. The approval wait's
+   * start when askedAt is unknown.
+   */
+  openedAt?: WireDate;
+  /** When a PR was labelled needs-approval (#4553), from pr.labelled: the approval wait's start. */
+  askedAt?: WireDate;
+  /**
+   * A PR's first answer by a person (#4553): the first pr.reviewed or pr.commented at or after the
+   * wait's start, while it was open, not by a bot and not a comment that starts with <!-- agent
+   * -->. The approval wait is this less askedAt, else openedAt.
+   */
+  answeredAt?: WireDate;
+  /**
    * A PR's CI on its last head commit, from checks.passed and checks.failed (#4554), for CI time to
    * green.
    */
@@ -5581,6 +5676,17 @@ export interface LineageDelivery {
    */
   flowEfficiency: LineageDeliveryFigure;
   /**
+   * The approval wait (#4553), in seconds: from a PR's needs-approval label (its opening when the
+   * label is unknown) to its first answer by a person; the median, and p90. Counted by the answer's
+   * time.
+   */
+  approvalWait: LineageDeliveryFigure;
+  /**
+   * The share of merged PRs, 0 to 1, that waited for a person's answer before their merge (#4553),
+   * by merge time. count is the merged PRs.
+   */
+  approvalShare: LineageDeliveryFigure;
+  /**
    * CI time to green, in seconds (#4554): a merged PR's last push (the first run made on its last
    * head commit) to the last of that commit's runs passing; the median, and p90. Counted by its
    * merge. No band.
@@ -5594,9 +5700,9 @@ export interface LineageDelivery {
 }
 
 /**
- * One delivery figure (#4552): value over the window, absent when made from none; p90 for lead time
- * and CI time to green; count is what it is made from; weeks is the 4 weeks, oldest first; band is
- * DORA 2024's.
+ * One delivery figure (#4552): value over the window, absent when made from none; p90 for lead
+ * time, the approval wait and CI time to green; count is what it is made from; weeks is the 4
+ * weeks, oldest first; band is DORA 2024's.
  */
 export interface LineageDeliveryFigure {
   value?: number;
@@ -10939,6 +11045,8 @@ export interface RequestSecretUse {
    * account's service and address.
    */
   call?: string;
+  /** For screen (#4264): the app drive_screen names in the call that asks. */
+  app?: string;
   /**
    * The secret is the session's own (#3548): Always Approve is the same as Approve for This
    * Session.
@@ -11751,14 +11859,19 @@ export interface SecretTerminalValue {
  * secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a
  * terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163)
  * is not a secret's use: manage_accounts reads an account with Ask before use; the request names
- * the account, and Always Approve turns its Ask before use off.
+ * the account, and Always Approve turns its Ask before use off. browser and screen (#4264) are not
+ * a secret's use either: an agent's lease of the browser or the screen on a machine whose Browser
+ * or Desktop control is ask; name is the browser or the screen, place the machine, app the app
+ * drive_screen names, and Always Approve sets the setting to always.
  */
 export type SecretUse =
   | "fill"
   | "ci"
   | "mcp"
   | "terminal"
-  | "account";
+  | "account"
+  | "browser"
+  | "screen";
 
 /**
  * control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was
@@ -13145,6 +13258,12 @@ export interface TimeHistory {
   timeZone?: string;
   recap: Record<string, DayRecap>;
   records: TimeRecords;
+  /**
+   * How long this machine's PRs waited for a person's answer (#4553), over every repo it has: the
+   * approvalWait of LineageDelivery. Reports ▸ Time's line on the web page. Absent from a host too
+   * old to say.
+   */
+  approvalWait?: LineageDeliveryFigure;
 }
 
 export interface TimeRecord {
@@ -14617,6 +14736,8 @@ export interface Methods {
   "browser/state": { params: Empty; result: BrowserState };
   "browser/unwatch": { params: Empty; result: Empty };
   "browser/watch": { params: BrowserWatchRequest; result: BrowserPageState };
+  "browserControl/set": { params: BrowserControlSettings; result: BrowserControlSettings };
+  "browserControl/state": { params: Empty; result: BrowserControlSettings };
   "capacity/state": { params: Empty; result: CapacityState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
@@ -15051,6 +15172,8 @@ export const MethodTarget = {
   "browser/state": "host",
   "browser/unwatch": "host",
   "browser/watch": "host",
+  "browserControl/set": "host",
+  "browserControl/state": "host",
   "capacity/state": "host",
   "changes/file": "host",
   "changes/list": "host",
@@ -15591,6 +15714,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BringBackSummary: { required: ["id", "folder", "machine", "machineName", "source", "startedAt"], optional: [] },
   BrowserAckRequest: { required: ["ack"], optional: [] },
   BrowserClearRequest: { required: [], optional: ["site"] },
+  BrowserControlSettings: { required: ["mode"], optional: [] },
   BrowserFrame: { required: ["image", "ack", "width", "height"], optional: [] },
   BrowserInputRequest: { required: ["kind"], optional: ["type", "x", "y", "button", "clickCount", "deltaX", "deltaY", "key", "code", "keyCode", "text", "modifiers"] },
   BrowserInputResult: { required: [], optional: ["editing"] },
@@ -15604,7 +15728,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BudgetRequestList: { required: ["requests"], optional: [] },
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   BusDelivery: { required: ["event", "subscriptions"], optional: [] },
-  BusEvent: { required: ["specversion", "id", "type", "provider", "topic", "source", "time", "producer"], optional: ["subject", "sealed"] },
+  BusEvent: { required: ["specversion", "id", "type", "provider", "topic", "source", "time", "producer"], optional: ["subject", "sealed", "poll"] },
+  BusLease: { required: ["polls"], optional: ["release"] },
+  BusLeased: { required: ["leases"], optional: [] },
+  BusProducerLease: { required: ["poll", "holder", "mine", "until"], optional: [] },
   BusPublish: { required: ["events"], optional: [] },
   BusPublished: { required: ["kept", "dropped"], optional: [] },
   BusSealedData: { required: ["machine", "sealed"], optional: [] },
@@ -15727,7 +15854,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeliveredRoute: { required: ["id", "name", "kind", "runtimes", "defaultFor", "secretFields", "version", "sealed", "sealVersion"], optional: ["vendor", "settings", "models", "waiting"] },
   DesktopControlLiveFrame: { required: ["agentID", "capturedAt"], optional: ["image", "locked", "narration"] },
   DesktopControlPause: { required: ["app", "pausedAt"], optional: [] },
-  DesktopControlSettings: { required: ["enabled"], optional: [] },
+  DesktopControlSettings: { required: ["enabled"], optional: ["mode"] },
   DestinationStateAnswer: { required: ["destinationState"], optional: [] },
   DestinationStateRequest: { required: ["previewID", "destination"], optional: [] },
   DetectedServer: { required: ["alias", "resolved", "outcome"], optional: ["detail"] },
@@ -15782,7 +15909,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EntryNotification: { required: ["agentID", "entry"], optional: ["index", "oversized"] },
   Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message", "actor", "specversion", "id", "type", "provider", "topic", "subject", "source", "time", "producer", "data"] },
   EventDraft: { required: ["name", "at", "scope", "sentence", "details", "chainDepth"], optional: ["message"] },
-  EventPattern: { required: ["name", "filters"], optional: ["anyOf"] },
+  EventPattern: { required: ["name", "filters"], optional: ["anyOf", "provider", "topics", "subject", "debounce"] },
   EventPublisher: { required: ["agentID", "title"], optional: [] },
   EventRaiseRequest: { required: ["draft"], optional: ["consequences"] },
   EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID", "serverEvents", "forPerson"] },
@@ -15925,9 +16052,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageChanged: { required: ["host", "states"], optional: ["links"] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "milestone", "endedAt", "resolved", "sessions", "estimate", "forecast", "files", "reverts", "ci"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "milestone", "endedAt", "resolved", "sessions", "estimate", "forecast", "files", "reverts", "openedAt", "askedAt", "answeredAt", "ci"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
-  LineageDelivery: { required: ["since", "at", "windowDays", "leadTime", "deploymentFrequency", "changeFailureRate", "recoveryTime", "reworkRate", "flowEfficiency", "ciTimeToGreen", "failedRounds"], optional: [] },
+  LineageDelivery: { required: ["since", "at", "windowDays", "leadTime", "deploymentFrequency", "changeFailureRate", "recoveryTime", "reworkRate", "flowEfficiency", "approvalWait", "approvalShare", "ciTimeToGreen", "failedRounds"], optional: [] },
   LineageDeliveryFigure: { required: ["count", "weeks"], optional: ["value", "p90", "band"] },
   LineageDeliveryWeek: { required: ["since", "count"], optional: ["value"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
@@ -16354,7 +16481,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RequestDetail: { required: [], optional: ["elicitation", "secretUse"] },
   RequestForge: { required: ["provider", "repo", "item", "number", "url", "label", "checklist", "seenAt"], optional: ["screenshots", "author", "updatedAt"] },
   RequestFormAnswer: { required: ["action"], optional: ["content"] },
-  RequestSecretUse: { required: ["name", "use", "place"], optional: ["call", "sessionOnly", "needsSignature"] },
+  RequestSecretUse: { required: ["name", "use", "place"], optional: ["call", "app", "sessionOnly", "needsSignature"] },
   RequestSecretUseAnswer: { required: ["action"], optional: ["approval"] },
   RequestUpdate: { required: ["request"], optional: [] },
   RequestWaiter: { required: ["agent", "since"], optional: [] },
@@ -16567,7 +16694,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TeamWorkflowRuns: { required: ["workflow", "runs"], optional: ["lastRunAt"] },
   TeamWorkflows: { required: ["bots"], optional: [] },
   TimeBucket: { required: ["agent", "tools", "others", "person", "turns"], optional: [] },
-  TimeHistory: { required: ["hours", "days", "now", "recap", "records"], optional: ["timeZone"] },
+  TimeHistory: { required: ["hours", "days", "now", "recap", "records"], optional: ["timeZone", "approvalWait"] },
   TimeRecord: { required: ["value", "day"], optional: [] },
   TimeRecords: { required: [], optional: ["mostAgents", "mostPRs", "longestClear"] },
   ToolCall: { required: ["title", "content", "locations"], optional: ["toolCallID", "name", "kind", "status", "rawInput", "rawOutput", "raw"] },
