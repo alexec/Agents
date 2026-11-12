@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alexec/agents/Go/internal/mcpevents"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -196,7 +197,7 @@ func (f *RealAzureDevOps) Board(ctx context.Context, repo string, meta mcp.Meta)
 		return nil, err
 	}
 	pulls := list.Value
-	sort.SliceStable(pulls, func(i, j int) bool { return before(pulls[j].CreationDate, pulls[i].CreationDate) })
+	sort.SliceStable(pulls, func(i, j int) bool { return mcpevents.Before(pulls[j].CreationDate, pulls[i].CreationDate) })
 	me, err := f.viewer(ctx, repo)
 	if err != nil {
 		return nil, err
@@ -223,7 +224,7 @@ func (f *RealAzureDevOps) Board(ctx context.Context, repo string, meta mcp.Meta)
 		}
 		checks := combinedChecks(runs[i])
 		j := map[string]any{"number": p.ID, "title": p.Title, "url": f.prURL(repo, p.ID), "branch": branch(p.SourceRefName),
-			"base": branch(p.TargetRefName), "author": p.CreatedBy.name(), "updatedAt": normalized(p.CreationDate), "draft": p.IsDraft,
+			"base": branch(p.TargetRefName), "author": p.CreatedBy.name(), "updatedAt": mcpevents.Normalized(p.CreationDate), "draft": p.IsDraft,
 			"checks": checks, "conflicts": p.MergeStatus == "conflicts", "autoMerge": p.AutoCompleteSetBy != nil, "mine": me.is(p.CreatedBy)}
 		if id := failedBuild(runs[i]); id != 0 {
 			j["failedRunId"] = id
@@ -252,7 +253,7 @@ func (f *RealAzureDevOps) Board(ctx context.Context, repo string, meta mcp.Meta)
 
 // noteOf is a comment as the page draws it.
 func noteOf(c threadCommentJSON, url string) map[string]any {
-	return map[string]any{"author": c.Author.name(), "bot": isBot(c.Author), "body": c.Content, "at": normalized(c.PublishedDate),
+	return map[string]any{"author": c.Author.name(), "bot": isBot(c.Author), "body": c.Content, "at": mcpevents.Normalized(c.PublishedDate),
 		"url": url, "id": c.ID}
 }
 
@@ -299,7 +300,7 @@ func (f *RealAzureDevOps) PRPage(ctx context.Context, repo string, number int) (
 		}
 	}
 	sort.SliceStable(conversation, func(i, j int) bool {
-		return before(conversation[i].(map[string]any)["at"].(string), conversation[j].(map[string]any)["at"].(string))
+		return mcpevents.Before(conversation[i].(map[string]any)["at"].(string), conversation[j].(map[string]any)["at"].(string))
 	})
 	checkRuns, err := f.checkRuns(ctx, repo, number)
 	if err != nil {
@@ -342,7 +343,7 @@ func (f *RealAzureDevOps) PRPage(ctx context.Context, repo string, number int) (
 	page := map[string]any{
 		"repo": repo, "number": p.ID, "title": p.Title, "url": f.prURL(repo, p.ID), "branch": branch(p.SourceRefName),
 		"base": branch(p.TargetRefName), "author": p.CreatedBy.name(), "state": st, "draft": p.IsDraft, "body": p.Description,
-		"createdAt": normalized(p.CreationDate), "checks": checks, "squash": squash, "autoMerge": p.AutoCompleteSetBy != nil,
+		"createdAt": mcpevents.Normalized(p.CreationDate), "checks": checks, "squash": squash, "autoMerge": p.AutoCompleteSetBy != nil,
 		"checkRuns": runs, "files": files, "filesTotal": len(files), "filesCut": cut, "comments": conversation, "threads": lines,
 		"viewer": me.name, "mine": me.is(p.CreatedBy), "fromFork": p.fork(), "headSha": p.head(),
 	}

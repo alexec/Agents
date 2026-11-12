@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/alexec/agents/Go/internal/forgepages"
+	"github.com/alexec/agents/Go/internal/mcpevents"
 	"github.com/alexec/agents/Go/internal/richtext"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -189,7 +190,7 @@ func AddViews(server *mcp.Server, b *RealBoards) {
 			for i, w := range list {
 				j := w.json()
 				j["key"] = "AB#" + itoa(w.ID)
-				j["statusCategory"], j["updatedAt"] = w.Category, normalized(w.UpdatedAt)
+				j["statusCategory"], j["updatedAt"] = w.Category, mcpevents.Normalized(w.UpdatedAt)
 				if w.Creator != nil && w.Creator.Bot {
 					j["authorBot"] = true
 				}

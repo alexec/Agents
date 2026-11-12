@@ -16,6 +16,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // A fake Bitbucket Cloud over HTTP (no account, #2828): the REST API 2.0 paths the server
@@ -353,7 +355,7 @@ func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
 			if kind != nil && i["kind"] != kind[1] && (i["component"] == nil || i["component"].(obj)["name"] != kind[1]) {
 				continue
 			}
-			if since != nil && before(i["updated_on"].(string), since[1]) {
+			if since != nil && mcpevents.Before(i["updated_on"].(string), since[1]) {
 				continue
 			}
 			if assignee != nil && (i["assignee"] == nil || i["assignee"].(obj)["uuid"] != assignee[1] || closedStates[i["state"].(string)]) {

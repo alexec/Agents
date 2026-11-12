@@ -2,10 +2,8 @@ package sentrymcp
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -22,17 +20,11 @@ import (
 // back. Each names its project, the issue, its level and the release that saw it, which is
 // the health node's `seen-in` link in Lineage (#3585).
 
-// rpcError is a JSON-RPC error answer.
-type rpcError struct {
-	Code    int            `json:"code"`
-	Message string         `json:"message"`
-	Data    map[string]any `json:"data,omitempty"`
-}
-
-func (e *rpcError) Error() string { return e.Message }
+// rpcError is a JSON-RPC error answer: its code, message and optional data.
+type rpcError = mcpevents.Error
 
 func invalidParams(format string, args ...any) *rpcError {
-	return &rpcError{Code: -32602, Message: fmt.Sprintf(format, args...)}
+	return mcpevents.InvalidParams(format, args...)
 }
 
 // The events.
@@ -172,31 +164,12 @@ func (a args) match(it Issue) bool {
 // cursor is the time the last poll read up to, and the issues it raised from Lag before it
 // on, which a later poll leaves out. A client keeps it as an opaque string (base64url of its
 // JSON).
-type cursor struct {
-	Since string   `json:"since"`
-	IDs   []string `json:"ids"`
-}
-
-func (c cursor) encoded() string {
-	if c.IDs == nil {
-		c.IDs = []string{}
-	}
-	data, _ := json.Marshal(c)
-	return base64.RawURLEncoding.EncodeToString(data)
-}
+type cursor = mcpevents.Cursor
 
 func decodeCursor(raw json.RawMessage) (cursor, time.Time, *rpcError) {
-	refused := invalidParams("cursor is not one this server gave")
-	var text string
-	if err := json.Unmarshal(raw, &text); err != nil {
-		return cursor{}, time.Time{}, refused
-	}
-	data, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(text, "="))
-	if err != nil {
-		return cursor{}, time.Time{}, refused
-	}
+	refused := mcpevents.RefusedCursor()
 	var c cursor
-	if json.Unmarshal(data, &c) != nil {
+	if !mcpevents.DecodeCursor(raw, &c) {
 		return cursor{}, time.Time{}, refused
 	}
 	since, ok := parseTime(c.Since)
@@ -209,7 +182,6 @@ func decodeCursor(raw json.RawMessage) (cursor, time.Time, *rpcError) {
 // MARK: Polling
 
 const (
-	maxEvents = 100
 	// nextPollMs is the pace: two searches a minute per wait, well under Sentry's limits.
 	nextPollMs = 30000
 	// Lag is how far back each poll looks again: Sentry dates an issue by its first event's
@@ -219,12 +191,7 @@ const (
 	maxLookups = 25
 )
 
-type pollParams struct {
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments"`
-	Cursor    json.RawMessage `json:"cursor"`
-	MaxEvents *int            `json:"maxEvents"`
-}
+type pollParams = mcpevents.Params
 
 // Events answers events/poll from Sentry's issues.
 type Events struct {
@@ -258,7 +225,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 		return nil, invalidParams("params must be an object")
 	}
 	if !contains(EventNames(), p.Name) {
-		return nil, &rpcError{Code: -32011, Message: fmt.Sprintf("no event %s; this server offers %s", p.Name, strings.Join(EventNames(), ", "))}
+		return nil, mcpevents.NoEvent(p.Name, EventNames())
 	}
 	a, bad := checkArgs(p.Name, p.Arguments)
 	if bad != nil {
@@ -267,13 +234,9 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 	if !s.Account.Connected() {
 		return nil, &rpcError{Code: -32012, Message: ErrNotConnected.Error(), Data: map[string]any{"reason": "not connected"}}
 	}
-	limit := 50
-	if p.MaxEvents != nil {
-		limit = *p.MaxEvents
-	}
-	limit = min(maxEvents, max(1, limit))
+	limit := p.Limit()
 	now := s.now().Truncate(time.Second)
-	first := len(p.Cursor) == 0 || string(p.Cursor) == "null"
+	first := p.FirstPoll()
 	c, since := cursor{}, now
 	if !first {
 		var bad *rpcError
@@ -320,7 +283,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			ids = append(ids, cand.key)
 		}
 	}
-	return map[string]any{"events": out, "cursor": cursor{Since: next.Format(time.RFC3339), IDs: ids}.encoded(),
+	return map[string]any{"events": out, "cursor": cursor{Since: next.Format(time.RFC3339), IDs: ids}.Encoded(),
 		"truncated": truncated, "hasMore": more, "nextPollMs": nextPollMs}, nil
 }
 

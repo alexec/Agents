@@ -14,6 +14,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // A fake Azure DevOps over HTTP (no account, #3804): the work item paths the server reads and
@@ -281,7 +283,7 @@ func (f *fakeBoards) serve(w http.ResponseWriter, r *http.Request) {
 func (f *fakeBoards) wiql(query string, top int) []obj {
 	var ids []int
 	for id, it := range f.items {
-		if m := sinceWIQL.FindStringSubmatch(query); m != nil && normalized(it.fields[m[1]].(string)) < m[2] {
+		if m := sinceWIQL.FindStringSubmatch(query); m != nil && mcpevents.Normalized(it.fields[m[1]].(string)) < m[2] {
 			continue
 		}
 		kept := true

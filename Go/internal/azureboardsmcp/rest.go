@@ -17,6 +17,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
 	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // RealBoards reads Azure Boards over Azure DevOps's REST API (7.1) as the person, with the
@@ -650,7 +651,7 @@ func (f *RealBoards) Activity(ctx context.Context, kind Kind, since string) ([]A
 				return nil, false, err
 			}
 			for _, c := range comments {
-				if normalized(c.CreatedDate) < since {
+				if mcpevents.Normalized(c.CreatedDate) < since {
 					break // newest first: the rest are older
 				}
 				out = append(out, Activity{ID: itoa(item.ID) + "/" + itoa(c.ID), At: c.CreatedDate, WorkItem: item, Kind: Commented,
@@ -663,7 +664,7 @@ func (f *RealBoards) Activity(ctx context.Context, kind Kind, since string) ([]A
 			}
 			truncated = truncated || more
 			for _, u := range updates {
-				if at := u.at(); normalized(at) >= since {
+				if at := u.at(); mcpevents.Normalized(at) >= since {
 					out = append(out, fromUpdate(kind, item, u, at, me, states)...)
 				}
 			}

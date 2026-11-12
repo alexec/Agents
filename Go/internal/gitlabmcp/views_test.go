@@ -530,4 +530,16 @@ func TestATraceTailIsTheEndOfTheCleanedLog(t *testing.T) {
 			t.Fatalf("%q: got %q, want %q", log, got, want)
 		}
 	}
+	// On mcpevents.LogTail (#4187): a \r is a control, so plain drops it already, and a
+	// trailing line of only spaces or tabs is blank, as on the other forges, so it goes too.
+	for log, want := range map[string]string{
+		"one\r\ntwo\r\n":            "one\ntwo",
+		"one\ntwo\n  \n\t\n":        "one\ntwo",
+		"one\n \ntwo\n":             "one\n \ntwo",
+		"a\nsection_end:1:x\r\n \n": "a",
+	} {
+		if got, err := traceTail(strings.NewReader(log), 3); err != nil || got != want {
+			t.Fatalf("%q: got %q, want %q", log, got, want)
+		}
+	}
 }

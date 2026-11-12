@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alexec/agents/Go/internal/mcpevents"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -177,7 +178,7 @@ func (f *RealForgejo) Board(ctx context.Context, repo string, meta mcp.Meta) (ma
 	if err := f.get(ctx, fmt.Sprintf("%s/pulls?state=open&limit=%d", repoPath(repo), perPage), false, &pulls); err != nil {
 		return nil, err
 	}
-	sort.SliceStable(pulls, func(i, j int) bool { return before(pulls[j].CreatedAt, pulls[i].CreatedAt) })
+	sort.SliceStable(pulls, func(i, j int) bool { return mcpevents.Before(pulls[j].CreatedAt, pulls[i].CreatedAt) })
 	viewer, err := f.viewer(ctx)
 	if err != nil {
 		return nil, err
@@ -244,7 +245,7 @@ func (f *RealForgejo) OpenIssues(ctx context.Context, repo, label string, meta m
 	if err := f.get(ctx, path, false, &list); err != nil {
 		return nil, err
 	}
-	sort.SliceStable(list, func(i, j int) bool { return before(list[j].CreatedAt, list[i].CreatedAt) })
+	sort.SliceStable(list, func(i, j int) bool { return mcpevents.Before(list[j].CreatedAt, list[i].CreatedAt) })
 	// Without the viewer the list still shows, as Team and Others only.
 	viewer, _ := f.viewer(ctx)
 	people := teamMetaOf(meta)
@@ -348,7 +349,7 @@ func (f *RealForgejo) PRPage(ctx context.Context, repo string, number int) (map[
 		}
 	}
 	sort.SliceStable(conversation, func(i, j int) bool {
-		return before(conversation[i].(map[string]any)["at"].(string), conversation[j].(map[string]any)["at"].(string))
+		return mcpevents.Before(conversation[i].(map[string]any)["at"].(string), conversation[j].(map[string]any)["at"].(string))
 	})
 	lines, err := f.reviewComments(ctx, repo, p, "")
 	if err != nil {
@@ -413,7 +414,7 @@ func (f *RealForgejo) PRPage(ctx context.Context, repo string, number int) (map[
 // lineThreads are a pull request's line comments as threads: Forgejo keeps a thread by its
 // file and line, so the comments on one file and line, oldest first, are one.
 func lineThreads(lines []reviewCommentJSON) []any {
-	sort.SliceStable(lines, func(i, j int) bool { return before(lines[i].CreatedAt, lines[j].CreatedAt) })
+	sort.SliceStable(lines, func(i, j int) bool { return mcpevents.Before(lines[i].CreatedAt, lines[j].CreatedAt) })
 	type key struct {
 		path string
 		line int

@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The forge reads and writes (#3815) against the fake Azure DevOps: the organization's WIQL and
@@ -182,7 +184,7 @@ func TestForgeSearch(t *testing.T) {
 	if i.Project != "acme/web app" || i.State != "open" || i.Status != "Active" || i.Type != "Bug" || i.Parent != 1 ||
 		!slices.Equal(i.Assignees, []string{"alex@acme.test"}) || i.Author != "dev@acme.test" ||
 		i.AuthorAvatar != "https://dev.azure.com/acme/_apis/GraphProfile/MemberAvatars/aad.ZGV2" ||
-		i.URL != f.server.URL+"/acme/web%20app/_workitems/edit/3" || i.UpdatedAt != normalized(at(3)) {
+		i.URL != f.server.URL+"/acme/web%20app/_workitems/edit/3" || i.UpdatedAt != mcpevents.Normalized(at(3)) {
 		t.Fatalf("item: %+v", i)
 	}
 	if !strings.Contains(f.lastQuery(), "[System.TeamProject] IN ('web app')") || !strings.Contains(f.lastQuery(), "[System.State] NOT IN ('Closed', 'Removed')") {

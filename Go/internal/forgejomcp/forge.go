@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The daemon's forge reads (#3753, after GitLab's in #3209): the issues or pull requests of
@@ -214,7 +216,7 @@ func cursorOf(s string) (listCursor, error) {
 	if err != nil || json.Unmarshal(b, &c) != nil {
 		return c, &ForgejoError{Kind: Failed, Message: "Forgejo: the cursor is not one a list gave"}
 	}
-	if _, ok := parseTime(c.Before); !ok {
+	if _, ok := mcpevents.ParseTime(c.Before); !ok {
 		return c, &ForgejoError{Kind: Failed, Message: "Forgejo: the cursor is not one a list gave"}
 	}
 	return c, nil
@@ -224,7 +226,7 @@ func cursorOf(s string) (listCursor, error) {
 func (i Item) key() string { return i.Repo + "#" + strconv.Itoa(i.Number) }
 
 func updated(i Item) time.Time {
-	t, _ := parseTime(i.UpdatedAt)
+	t, _ := mcpevents.ParseTime(i.UpdatedAt)
 	return t.Truncate(time.Second)
 }
 
@@ -232,7 +234,7 @@ func updated(i Item) time.Time {
 func (c listCursor) after(i Item, page []Item) listCursor {
 	t := updated(i)
 	next := listCursor{Before: t.UTC().Format(time.RFC3339)}
-	if old, ok := parseTime(c.Before); ok && old.Equal(t) {
+	if old, ok := mcpevents.ParseTime(c.Before); ok && old.Equal(t) {
 		next.Seen = append(next.Seen, c.Seen...)
 	}
 	for _, p := range page {

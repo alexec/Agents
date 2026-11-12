@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // PRReview is a person's review of a pull request (#3860): Approve, Request changes, or a
@@ -116,7 +118,7 @@ func (g *RealGitHub) PRReviews(ctx context.Context, repo, since string, pr int) 
 		p := PR{Number: n.Number, Title: n.Title, Branch: n.HeadRefName, URL: n.URL, Fixes: closingRefs(n.Body), Author: n.Author.login()}
 		for _, v := range n.Reviews.Nodes {
 			state := reviewState(v.State, v.Body)
-			if state == "" || v.SubmittedAt == "" || before(v.SubmittedAt, since) {
+			if state == "" || v.SubmittedAt == "" || mcpevents.Before(v.SubmittedAt, since) {
 				continue
 			}
 			r := PRReview{ID: v.DatabaseID, PR: p, Author: v.Author.login(), State: state, Body: clip(v.Body), URL: v.URL, At: v.SubmittedAt}
