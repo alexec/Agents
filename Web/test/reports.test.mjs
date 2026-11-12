@@ -171,3 +171,12 @@ test("each range has a spoken name and each page says what its bars measure, as 
   assert.equal(new Set(captions).size, 5);
   for (const c of captions) assert.match(c, /^Each bar is/);
 });
+
+// #4938: Cost's Open Reports on the Mac names the range in the address.
+test("the address's range opens the page on it, and an unknown one is left out", () => {
+  assert.equal(r.rangeAsked("range=month"), "month");
+  assert.equal(r.rangeAsked("range=threeMonths"), "threeMonths");
+  assert.equal(r.rangeAsked("range=year"), undefined);
+  assert.equal(r.rangeAsked(""), undefined);
+  assert.equal(r.rangeAsked(undefined), undefined);
+});

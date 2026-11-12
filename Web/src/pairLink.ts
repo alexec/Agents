@@ -21,9 +21,10 @@ function takeOIDC(): OIDCReturn | null {
 }
 
 function take(): string | null {
-  const match = /^#code=([^&#]+)$/.exec(location.hash);
+  // A link of the Web + Mac link tier (#4937) adds the place to go once paired: #code=<code>&to=<place>.
+  const match = /^#code=([^&#]+)(?:&to=([^&#]+))?$/.exec(location.hash);
   if (!match) return null;
-  history.replaceState(null, "", location.pathname + location.search);
+  history.replaceState(null, "", location.pathname + location.search + place(match[2]));
   const raw = match[1]!;
   let decoded: string | null = null;
   try {
@@ -33,4 +34,17 @@ function take(): string | null {
   // their own escapes, so decoding it once more breaks it into too many fields. Take it as it is.
   if (decoded !== null && !parseCode(decoded) && parseCode(raw)) return raw;
   return decoded;
+}
+
+/** The place a link asked for, as the address's fragment: a route of this page only (`/reports/spend?range=week`),
+ * never another code. Empty, for the Overview, when there is none or it is not a route. */
+function place(to: string | undefined): string {
+  if (!to) return "";
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(to);
+  } catch {
+    return "";
+  }
+  return /^\/[^#\s]*$/.test(decoded) && !/(^|[?&/])code=/.test(decoded) ? "#" + decoded : "";
 }
