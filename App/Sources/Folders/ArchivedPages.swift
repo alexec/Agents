@@ -186,18 +186,9 @@ private struct ArchivedFooter: View {
 /// Its machine is not answering: over the rows last read, or alone with none.
 private struct ArchivedStaleStrip: View {
     var body: some View {
-        HStack(spacing: 10) {
-            Circle().tinted(.attention).frame(width: 7, height: 7)
-            Text(ArchivedPage.staleStrip)
-                .appText(.supporting)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 9)
-        .paperWell(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
-        .padding(.horizontal, 20)
-        .padding(.top, 8)
+        PaneBanner(tone: .neutral, symbol: MessageTone.offlineSymbol, ArchivedPage.staleStrip)
+            .padding(.horizontal, 20)
+            .padding(.top, 8)
     }
 }
 

@@ -308,6 +308,8 @@ struct ContentView: View {
                         VStack(spacing: 0) {
                             detail(inPaneOf: pane.size.width)
                                 .frame(maxHeight: .infinity)
+                                // The window's toast, above the prompt bar (#4737).
+                                .modifier(WindowToasts())
                             if let folder = folderForTerminal {
                                 FolderTerminalPanel(folder: folder, pageHeight: pane.size.height)
                             }
@@ -382,13 +384,6 @@ struct ContentView: View {
             case .lendGit(let ask):
                 Button("Allow") { model.answerGitLend(ask, allowed: true) }
                 Button("Don’t Allow", role: .cancel) { model.answerGitLend(ask, allowed: false) }
-            case .problem:
-                Button("OK") {}
-                    .keyboardShortcut(.defaultAction)
-            case .makeFailed(let failure):
-                Button("Try Again") { Task { await model.newMachine(on: failure.provider) } }
-                    .keyboardShortcut(.defaultAction)
-                Button("OK", role: .cancel) {}
             case .folderGone(let ask):
                 // The ways on (#119). What was typed goes with Continue; Cancel leaves it
                 // in the bar.
@@ -432,23 +427,19 @@ struct ContentView: View {
     }
 }
 
-/// What the window's one alert is about (#101): a server asking to borrow a sign-in, or
-/// something that could not be finished. One at a time, the ask first, since a server is
-/// waiting on it.
+/// What the window's one alert is about (#101): a choice that blocks the work, such as a
+/// server asking to borrow a sign-in. One at a time, the ask first, since a server is
+/// waiting on it. Something that could not be finished is a toast (`WindowToast`, #4737).
 enum WindowAlert: Identifiable {
     case lend(SignInLendAsk)
     case lendGit(GitLendAsk)
-    case problem(AlertWords)
     case folderGone(FolderGoneAsk)
-    case makeFailed(MachineMakeFailure)
 
     var id: String {
         switch self {
         case .lend(let ask): "lend-\(ask.id)"
         case .lendGit(let ask): "lend-git-\(ask.id)"
-        case .problem(let words): "problem-\(words.id)"
         case .folderGone(let ask): "folder-gone-\(ask.id)"
-        case .makeFailed(let failure): "make-failed-\(failure.id)"
         }
     }
 
@@ -456,9 +447,7 @@ enum WindowAlert: Identifiable {
         switch self {
         case .lend(let ask): "Let \(ask.label) use this Mac’s \(ask.runtimeName) sign-in?"
         case .lendGit(let ask): ask.title
-        case .problem: "Could not finish that"
         case .folderGone: "This agent’s folder isn’t there"
-        case .makeFailed: "Could not make the machine"
         }
     }
 
@@ -467,9 +456,7 @@ enum WindowAlert: Identifiable {
         case .lend(let ask):
             "Its agents will use \(ask.runtimeName) as you, through this Mac, whenever this Mac is awake. The sign-in itself stays on this Mac. You can stop it in Settings ▸ Machines."
         case .lendGit(let ask): ask.message
-        case .problem(let words): words.text
         case .folderGone(let ask): ask.message + " What you typed is still in the prompt."
-        case .makeFailed(let failure): failure.reason
         }
     }
 
@@ -478,12 +465,11 @@ enum WindowAlert: Identifiable {
         if let ask = model.signInLendAsk { return .lend(ask) }
         if let ask = model.gitLendAsk { return .lendGit(ask) }
         if let ask = model.folderGone { return .folderGone(ask) }
-        if let failure = model.makeFailed { return .makeFailed(failure) }
-        return model.problem.map { .problem(AlertWords(text: $0)) }
+        return nil
     }
 
-    /// Closed, by its button or by Escape (its cancel button). A problem the model has
-    /// moved on from is not the model's to forget again.
+    /// Closed, by its button or by Escape (its cancel button). An ask the model has moved
+    /// on from is not the model's to forget again.
     @MainActor
     func closed(in model: AppModel) {
         switch self {
@@ -492,9 +478,7 @@ enum WindowAlert: Identifiable {
         case .lend: break
         // Escape is Don’t Allow, which its cancel button has said.
         case .lendGit: break
-        case .problem(let words): if model.problem == words.text { model.dismissProblem() }
         case .folderGone(let ask): if model.folderGone == ask { model.folderGone = nil }
-        case .makeFailed(let failure): if model.makeFailed == failure { model.makeFailed = nil }
         }
     }
 }

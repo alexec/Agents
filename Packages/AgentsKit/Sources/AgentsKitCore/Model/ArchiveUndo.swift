@@ -30,7 +30,7 @@ public struct ArchiveUndo: Equatable, Sendable, Identifiable {
     }
 
     /// How long Undo is offered.
-    public static let seconds: Double = 5
+    public static let seconds: Double = ToastTime.undo
     public static let undoLabel = "Undo"
 
     /// What VoiceOver says when the strip comes (#1676): the line, then that Undo is there.

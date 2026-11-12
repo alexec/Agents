@@ -409,16 +409,7 @@ struct FolderListView: View {
         // What this Mac and its hosts are doing, pinned at the foot: status lines rather
         // than somewhere to go, so not rows of the list. Each is absent when there is
         // nothing to say, which is most of the time (024 FR-015).
-        // Undo after Archive (#1534), for a few seconds, just over the foot. An overlay, not
-        // part of the inset: the list's rows draw over what is in the inset.
-        .overlay(alignment: .bottom) {
-            if let undo = model.archiveUndo {
-                ArchiveUndoStrip(undo: undo,
-                                 perform: { Task { await model.undoArchive() } },
-                                 dismiss: { model.dismissArchiveUndo(undo) })
-            }
-        }
-        .animation(.easeOut(duration: 0.2), value: model.archiveUndo?.id)
+        // Undo after Archive (#1534) is the window's toast (#4737), in ContentView.
         .safeAreaInset(edge: .bottom, spacing: 0) {
             SidebarFoot()
         }
@@ -1377,23 +1368,13 @@ private struct MacHostDownNotice: View {
 
     var body: some View {
         let notice = model.macHostNotice ?? .notAnswering
-        VStack(alignment: .leading, spacing: 6) {
-            // A sidebar row is one line unless told otherwise, and cut off this said
-            // nothing (the walk on 2026-10-01 saw "Not connected to the daemon. Tr…").
-            Label(notice.title, systemImage: "exclamationmark.triangle")
-                .appText(.supporting).fontWeight(.semibold)
-                .tinted(.attention)
-                .lineLimit(3)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(notice.detail)
-                .appText(.fine).foregroundStyle(.secondary)
-                .lineLimit(8)
-                .fixedSize(horizontal: false, vertical: true)
+        // A neutral banner (#4737). A sidebar row is one line unless told otherwise, and cut
+        // off this said nothing (the walk on 2026-10-01 saw "Not connected to the daemon.
+        // Tr…"): the banner's words wrap.
+        PaneBanner(tone: .neutral, symbol: MessageTone.offlineSymbol, notice.title, detail: notice.detail) {
             Button("Try Again") { model.tryMacHostAgain() }
-                .controlSize(.small)
         }
         .padding(.vertical, 8)
-        .accessibilityElement(children: .contain)
     }
 }
 
