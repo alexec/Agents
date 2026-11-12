@@ -136,7 +136,7 @@ In the review worktree:
   `priority:high` (critical and high) or `priority:medium`, `bug` and `dependencies`. The
   release (its step 3)
   collects these issues with its other high and medium ones, so a high alert blocks the
-  release as any high finding does, and the Scrum Master's lanes fix it: they bump the
+  release as any high finding does, and the bug lane's lanes (#4207) fix it: they bump the
   dependency, or land Dependabot's own pull request when it is green. A low alert is only
   recorded. The run file says each alert's issue (`filed #NNN`).
 
@@ -144,9 +144,9 @@ In the review worktree:
 
 Only **critical** and **high** findings are fixed during the security audit. A medium
 security finding stays private as a draft advisory for one release. If it is still open
-in the next release, the release gives its advisory URL to the Scrum Master as priority
+in the next release, the release gives its advisory URL to the bug lane's lead (#4207) as priority
 work; the release does not wait for the fix. Low findings stay recorded and are not
-worked. A dependency alert is not given a helper: its issue goes to the Scrum Master's
+worked. A dependency alert is not given a helper: its issue goes to the bug lane's
 lanes through the release (step 3).
 
 - At most **2 helpers per run**. Call `list_sessions` with `started_by: me` first and start no more than
