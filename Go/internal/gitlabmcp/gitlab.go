@@ -94,6 +94,8 @@ type Pipeline struct {
 	SHA       string
 	Ref       string
 	UpdatedAt string
+	// Listed is its name as the listing gave it: "" when GitLab did not say (an older GitLab).
+	Listed string
 	// MRNumber is the merge request its ref names (refs/merge-requests/12/head); 0 for a
 	// branch pipeline, whose merge request is found by its commit.
 	MRNumber int
@@ -220,6 +222,17 @@ type GitLab interface {
 	FailedPipelines(ctx context.Context, project, since string) (pipelines []Pipeline, listed Listed, err error)
 	// PipelineDetails is the pipeline's merge request and failed jobs, or nil when it belongs to none.
 	PipelineDetails(ctx context.Context, project string, p Pipeline) (*FailedPipelineData, error)
+	// FinishedPipelines are the finished pipelines updated at or after since, of branch (or a
+	// tag) and run (a pipeline's id) when each is set, in any order (#4217).
+	FinishedPipelines(ctx context.Context, project, branch string, run int, since string) (pipelines []Pipeline, listed Listed, err error)
+	// CompletedPipeline is a finished pipeline with who started it and when it finished.
+	CompletedPipeline(ctx context.Context, project string, id int) (*CompletedPipeline, error)
+	// PipelineDeploys are what a finished pipeline deployed, as deploy refs.
+	PipelineDeploys(ctx context.Context, project string, c CompletedPipeline) ([]string, error)
+	// WaitingDeploys are the pipelines whose deployments wait for an approval, of branch when set.
+	WaitingDeploys(ctx context.Context, project, branch string) ([]WaitingDeploy, error)
+	// Approvers is who may answer a waiting pipeline, and whether the connection's owner may.
+	Approvers(ctx context.Context, project string, w WaitingDeploy) (reviewers []string, canApprove bool, err error)
 	// IssueActivity is what happened to the project's issues at or after since, of one kind.
 	IssueActivity(ctx context.Context, project string, kind IssueKind, since string) (items []IssueActivity, listed Listed, err error)
 	// ReviewComments are the comments on merge requests' diffs made at or after since.
