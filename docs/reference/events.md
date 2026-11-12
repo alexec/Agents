@@ -69,7 +69,11 @@ client could subscribe to them, would be possible in this shape; it is not done.
 An agent can wait for its own folder's events and for this Mac's. It cannot wait for
 another folder's events. To wait for particular sessions, it waits on `agent.ended` with `agent`, which reaches every
 session of the project, on every machine. To
-resume at a time, it calls `check_again`.
+resume at a time, it waits on `time.reached` alone, with `until_minutes` (#4843). It is a
+marker, not an event: nothing raises it on the bus, so the wait ends at its deadline and
+the agent is told the time has come. A list with `time.reached` and other events is
+refused, since every wait already ends at its deadline, and a workflow trigger refuses it:
+a schedule runs at a time.
 
 ## Agents
 

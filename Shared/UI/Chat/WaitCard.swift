@@ -124,7 +124,7 @@ struct WaitCard: View {
                 } else {
                     // The waiting mark's beacon, breathing as it does everywhere else (#2657).
                     WaitingBeacon(size: 14)
-                    Text("Waiting for event").fontWeight(.semibold)
+                    Text(wait.cardTitle).fontWeight(.semibold)
                 }
                 Spacer(minLength: 6)
                 Text(WaitStatus.cardTime(elapsed: elapsed, total: total))
@@ -167,7 +167,7 @@ struct WaitCard: View {
     }
 }
 
-/// A wait on sessions or on a time (`wait_for_event` on `agent.ended`, `check_again`), drawn as the wait on
+/// A wait on sessions (`wait_for_event` on `agent.ended`), drawn as the wait on
 /// events is (#2750): the same card at the foot of the chat, with what it waits on, when it
 /// checks again as its deadline, and one way to stop it. It was a strip under the chat's
 /// head with Carry on. Carry On carries the agent on now, as Carry On does on the wait on

@@ -7,7 +7,7 @@ description: Find out where this folder's recent agent sessions spent their time
 
 Lanes spend their time in five places: the model's own work (reading, thinking,
 writing), tools (builds, tests, lint, walks, `gh`, `git`), waits (from the
-`wait_for_event`, `check_again` or question call to the wake; not running time), the
+`wait_for_event` or question call to the wake; not running time), the
 line for the `build` lease, and the time between turns (CI, merges, reviews, timers). This skill measures each from the app's own records and removes the
 largest cost that a change in this repo can remove.
 
@@ -71,7 +71,7 @@ to `ci-speed`; do not change `ci.yml` here.
      and failures;
    - **between turns, by what woke the session:** `event: checks.passed`,
      `event: lease.granted (build)` (the line for the lease), `wait timed out`,
-     `check_again timer`, `person or agent message`, and the rest;
+     `time reached` (`check_again timer` in older records), `person or agent message`, and the rest;
    - **the slowest calls, the commands run 3 or more times in one session,** and the
      longest-running sessions, with tokens and cost.
 
@@ -109,7 +109,7 @@ Look first for these causes, in this order. Each names the place a fix goes.
    notes). A lease held while reading, editing or waiting, held for a whole walk, or
    taken for work that needs no lease (`gh`, `git`, reading a log) makes the line.
 4. **Polling instead of an event.** `sleep` loops, `gh pr checks` or `gh run view`
-   again and again, `check_again` with no event that would do: each poll is a turn of
+   again and again, `time.reached` with no event that would do: each poll is a turn of
    model time. The fix is the event (`checks.passed`, `pr.merged`, `agent.ended`) in the
    skill or persona that polls.
 5. **Retries.** The "run 3 or more times" table and the failed counts: a flaky test run

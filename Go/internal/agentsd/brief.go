@@ -30,7 +30,7 @@ import (
 
 // eventsBrief is EventWords.briefing (042): wait rather than poll.
 const eventsBrief = "Wait for an event (checks passing, this Mac waking) with wait_for_event, for sessions " +
-	"with wait_for_event on agent.ended naming them in agent, and to resume at a time with check_again, not repeated checks. " +
+	"with wait_for_event on agent.ended naming them in agent, and to resume at a time with wait_for_event on time.reached, not repeated checks. " +
 	"If told you are still waiting, you may end your turn; you will be started again when it happens. " +
 	"An event is a hint: before you act on it, read the state of what it is about now, by its ref; after a time-out, check the state now."
 

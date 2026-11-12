@@ -469,7 +469,7 @@ func (d *Daemon) warmPass() {
 	}
 }
 
-// waitOf is the agent's open wait (wait_for_event, check_again, a place in a lease's line),
+// waitOf is the agent's open wait (wait_for_event, a place in a lease's line),
 // or nil.
 func waitOf(a *wire.Agent) *wire.EventWait {
 	if a == nil || a.EventWait == nil || a.EventWait.Ending != nil {

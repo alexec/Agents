@@ -53,7 +53,7 @@ import { DesktopControlPauseCard } from "./DesktopControlPauseCard";
 import { LiveTile } from "./LiveTile";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
-import { eventCarryOnPrompt, eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, eventWaitTime, leaseMark, lineCarryOnPrompt, lineResource, triggerURL } from "../model/rowLines";
+import { eventCarryOnPrompt, eventWaitCardTitle, eventWaitLine, eventWaitMinutes, eventWaitSummaryLines, eventWaitTime, leaseMark, lineCarryOnPrompt, lineResource, triggerURL } from "../model/rowLines";
 import { routeHash } from "../route";
 import { sessionRuntimeName } from "../model/runtimes";
 import { GuardedChangeCard } from "./GuardedChange";
@@ -935,7 +935,7 @@ function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent;
           <div class="wait-card-heading">
             {asks
               ? <span class="wait-card-title tinted"><span class="wait-card-mark" aria-hidden="true">!</span>{asks}</span>
-              : <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon /></span>Waiting for event</span>}
+              : <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon /></span>{eventWaitCardTitle(wait)}</span>}
             <span class="wait-card-time">{eventWaitTime(elapsed, total)}</span>
           </div>
           <div class="wait-card-events">

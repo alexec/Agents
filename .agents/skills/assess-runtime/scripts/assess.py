@@ -9,7 +9,7 @@ For each runtime, one at a time: `runtimes/assess` starts the assessing agent in
 that agent and the helpers it starts only — the form (a choice gets its first option, text
 gets PHRASE), the runtime's own question (its first option), and every permission card
 (allow once, except the write outside the project, which is rejected) — and follows it
-until it ends a turn that waits on nothing (no event, agent or check-again time). Then it prints
+until it ends a turn that waits on nothing (no event, time or agent). Then it prints
 the daemon's own score (`runtimes/assessment`) and where the agent's report is.
 
 The cheapest model can be a free one whose provider is down: an assessment that stops
@@ -120,8 +120,8 @@ def follow(client, runtime, agent, model, report_path, minutes):
         # A turn that ends on a wait still open is not the last: it is started again (#1432).
         wait = (record or {}).get("eventWait")
         waiting = wait and (not wait.get("ending") or record.get("queuedPrompts"))
-        # Nor is one that ends on check_again or a wait on agent.ended: `waiting`, with a time to
-        # start again or agents to wait on (#3698).
+        # Nor is one that ends on a wait on agent.ended: `waiting`, with a time to start again
+        # or agents to wait on (#3698). A wait on time.reached is an eventWait (#4843).
         block = report.get("block") or {}
         checking = (record or {}).get("state") != "archived" and report.get("outcome") == "waiting" \
             and (block.get("checkAgainAt") or block.get("waits"))

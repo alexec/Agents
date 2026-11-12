@@ -169,7 +169,9 @@ public extension Block {
     /// (#2750): what it waits for, in a few words.
     func cardTitle() -> String {
         switch waits.count {
-        case 0: "Waiting to check again"
+        // A wait on a time alone is an event wait on time.reached (#4843); only a block
+        // recorded before it has none.
+        case 0: "Waiting until a set time"
         case 1: "Waiting for a session"
         default: "Waiting for sessions"
         }

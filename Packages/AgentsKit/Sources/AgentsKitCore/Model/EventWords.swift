@@ -154,7 +154,8 @@ public enum EventWords {
     }
 
     public static func timedOut(_ wait: EventWait, at: Date) -> String {
-        "Your wait for \(wait.label) timed out at \(clock(at)) with no match."
+        if wait.isTimeWait { return "The time you asked for has come (\(clock(at)))." }
+        return "Your wait for \(wait.label) timed out at \(clock(at)) with no match."
     }
 
     /// Put before the person's own words, in what the runtime receives, when their

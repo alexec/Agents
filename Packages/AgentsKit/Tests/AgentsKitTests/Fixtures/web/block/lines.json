@@ -470,7 +470,7 @@
   },
   {
     "expected" : {
-      "cardTitle" : "Waiting to check again",
+      "cardTitle" : "Waiting until a set time",
       "carryOnHelp" : "Stop waiting and carry on now",
       "checksAgain" : true,
       "isBlocked" : true,

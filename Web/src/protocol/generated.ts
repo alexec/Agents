@@ -14136,10 +14136,10 @@ export interface WakeSettings {
   /**
    * How long a finished runtime with no background processes is kept, counted from its last turn's
    * end, before the host ends it (#4044, #4513): 0 to 1440 minutes, default 10. An agent that waits
-   * for an event (wait_for_event, check_again, a lease) is then continued with session/load when
-   * the event comes. 0 releases none for being idle; warmRuntimes still holds. Missing, from a
-   * client that does not know it, keeps the value the host has. A runtime that can neither load nor
-   * resume a conversation is kept while its agent waits.
+   * for an event (wait_for_event, a lease) is then continued with session/load when the event
+   * comes. 0 releases none for being idle; warmRuntimes still holds. Missing, from a client that
+   * does not know it, keeps the value the host has. A runtime that can neither load nor resume a
+   * conversation is kept while its agent waits.
    */
   releaseAfterMinutes?: number;
 }

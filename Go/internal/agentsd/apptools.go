@@ -73,7 +73,6 @@ func appToolCalls() []appTool {
 		{"release_resource", (*Daemon).releaseResource},
 		{"list_resources", (*Daemon).listResources},
 		{"wait_for_event", (*Daemon).waitForEvent},
-		{"check_again", (*Daemon).checkAgain},
 		{"cancel_wait", (*Daemon).cancelWait},
 		{"show_file", (*Daemon).showFile},
 		{"suggest_next_prompt", (*Daemon).suggestNextPrompt},
