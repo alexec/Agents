@@ -102,6 +102,8 @@
             "tools": true,
             "events": [
               "checks.failed",
+              "run.completed",
+              "deploy.waiting",
               "pr.opened",
               "pr.merged",
               "pr.closed",
