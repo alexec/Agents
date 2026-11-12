@@ -339,7 +339,6 @@ func valuesIn(samples []sample, from, to wire.Date) []float64 {
 	return v
 }
 
-
 func mean(v []float64) float64 {
 	var sum float64
 	for _, x := range v {
