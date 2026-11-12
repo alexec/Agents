@@ -240,6 +240,10 @@ anyway. Alex can overrule.
 - *Cost:* one Claude turn per take in a scratch folder (a few cents each, on the
   subscription). YouTube: no money; three uploads of the 10,000 daily quota units (an
   upload is about 1,600, a caption 400, a playlist call 50).
+- *Alex's watch (2026-11-12):* "Great start! The cadence of the audio is off." Alex wants
+  the narration written as a script for the voice, as for film or TV, with directions for
+  pauses and tone (#4964, a spike: the A/V script and SSML-style marks, carried out with
+  Chatterbox), and a title card on each video as well as a closing card (#4965).
 - *What the next video needs:* nothing more for a private upload. `make.sh <id> --upload`
   is one step now. A public video still waits on open question 2 (the API audit) and on
   Alex's watch of this one.
