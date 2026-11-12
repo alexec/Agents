@@ -482,11 +482,3 @@ enum WindowAlert: Identifiable {
         }
     }
 }
-
-/// A New Machine the provider refused (#3979): its reason, and the provider Try Again asks
-/// again (nil for the default one).
-struct MachineMakeFailure: Identifiable, Equatable {
-    let id = UUID()
-    let reason: String
-    let provider: ProviderID?
-}

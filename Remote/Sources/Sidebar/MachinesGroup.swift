@@ -1,15 +1,8 @@
 import AgentsKitCore
 import SwiftUI
 
-/// A New Machine the provider could not make (#3973): its reason, with Try Again.
-struct MachineMakeFailure: Identifiable, Equatable {
-    let id = UUID()
-    let reason: String
-    let provider: ProviderID?
-}
-
 /// New Machine, the Machines group's last row (#4034), as the window's header `+` (#3973): a
-/// tap makes a machine on the default provider with no questions; a long press offers New
+/// tap opens New Machine's sheet on the default provider (#4634); a long press offers New
 /// Machine on ▸ when there are two or more providers (#3979). A row rather than a `+` in
 /// the header, which iOS makes one button that folds the group. Adding a provider needs its
 /// token, so that stays on the Mac and the web page: with none, there is no row.
@@ -20,7 +13,7 @@ struct NewMachineRow: View {
         let providers = model.machineProviders
         Group {
             if let chosen = providers.first(where: { $0.default == true }) ?? providers.first {
-                Button { Task { await model.newMachine() } } label: {
+                Button { model.newMachine() } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "plus")
                             .sidebarMark(Paper.accent)
@@ -33,16 +26,16 @@ struct NewMachineRow: View {
                 }
                 .buttonStyle(.plain)
                 .appText(.supporting)
-                .accessibilityHint("Makes a machine on \(chosen.name), with the options used last")
+                .accessibilityHint("Opens New Machine on \(chosen.name), with the options used last")
                 .contextMenu {
-                    Button("New Machine (\(chosen.name))", systemImage: "plus") { Task { await model.newMachine() } }
+                    Button("New Machine (\(chosen.name))…", systemImage: "plus") { model.newMachine() }
                     if providers.count > 1 {
                         Menu("New Machine on") {
                             ForEach(providers) { provider in
                                 if provider.id == chosen.id {
-                                    Button(provider.name, systemImage: "checkmark") { Task { await model.newMachine(on: provider.id) } }
+                                    Button(provider.name, systemImage: "checkmark") { model.newMachine(on: provider.id) }
                                 } else {
-                                    Button(provider.name) { Task { await model.newMachine(on: provider.id) } }
+                                    Button(provider.name) { model.newMachine(on: provider.id) }
                                 }
                             }
                         }

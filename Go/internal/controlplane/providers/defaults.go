@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // New Machine with no questions (#3972): a make with no provider, name or options takes
@@ -206,6 +207,91 @@ func (p *Providers) defaultOptions(id string) map[string]any {
 // nextName is the person's next machine-N that neither the provider nor a host has yet,
 // with the counter moved past it.
 func (p *Providers) nextName(person, provider string) (string, error) {
+	taken := p.takenNames(provider)
+	name := ""
+	err := p.changeChoices(person, func(c *machineNames) {
+		n := freeNumber(taken, c.Next)
+		c.Next = n + 1
+		name = fmt.Sprintf("machine-%d", n)
+	})
+	if err != nil {
+		return "", err
+	}
+	return name, nil
+}
+
+// peekName is the name nextName would give, without keeping it: what the New Machine
+// sheet fills in (#4634).
+func (p *Providers) peekName(person, provider string) string {
+	return fmt.Sprintf("machine-%d", freeNumber(p.takenNames(provider), p.choices(person).Next))
+}
+
+// freeNumber is the first n, from next, whose machine-n is not taken.
+func freeNumber(taken map[string]bool, next int) int {
+	n := max(next, 1)
+	for taken[fmt.Sprintf("machine-%d", n)] {
+		n++
+	}
+	return n
+}
+
+// usedName keeps a machine-N that a make was given by name, as the New Machine sheet
+// gives the one peekName filled in, so the counter never gives that number again.
+func (p *Providers) usedName(person, name string) {
+	var n int
+	if _, err := fmt.Sscanf(name, "machine-%d", &n); err != nil || fmt.Sprintf("machine-%d", n) != name {
+		return
+	}
+	if p.choices(person).Next > n {
+		return
+	}
+	err := p.changeChoices(person, func(c *machineNames) { c.Next = max(c.Next, n+1) })
+	if err != nil {
+		p.log("workspace: could not keep the name " + name + ": " + errorWords(err))
+	}
+}
+
+// newMachineForm is providers/options (#4634): the provider's New Machine form, with the
+// values and the name New Machine would make it with. With no id, the default provider.
+func (p *Providers) newMachineForm(person, id string) (any, error) {
+	if id == "" {
+		if id = p.defaultProvider(person); id == "" {
+			return nil, invalid("There is no machine provider you may make machines with. Add one in Settings ▸ Machine Providers.")
+		}
+	}
+	schema, err := p.providerCall(id, func(c Provider) (any, error) { return c.Options() })
+	if err != nil {
+		return nil, err
+	}
+	name := p.peekName(person, id)
+	provider := wire.ProviderID(id)
+	return ProviderOptions{Schema: rawOf(schema), ID: &provider, Values: jsonValue(p.formValues(person, id)), Name: &name}, nil
+}
+
+// formValues is what New Machine makes with on the provider: the options the person made a
+// machine with last, over the form's defaults, keeping only the fields the form still has.
+func (p *Providers) formValues(person, id string) map[string]any {
+	values := p.defaultOptions(id)
+	last, _ := p.lastOptions(person, id).(map[string]any)
+	if len(last) == 0 {
+		return values
+	}
+	schema, err := p.providerCall(id, func(c Provider) (any, error) { return c.Options() })
+	if err != nil {
+		return values
+	}
+	form, _ := valueOf(rawOf(schema)).(map[string]any)
+	properties, _ := form["properties"].(map[string]any)
+	for key, v := range last {
+		if _, ok := properties[key]; ok {
+			values[key] = v
+		}
+	}
+	return values
+}
+
+// takenNames is every host's name and every workspace's name on the provider, in lower case.
+func (p *Providers) takenNames(provider string) map[string]bool {
 	taken := map[string]bool{}
 	for _, h := range p.records.Hosts() {
 		taken[strings.ToLower(h.Name)] = true
@@ -217,19 +303,7 @@ func (p *Providers) nextName(person, provider string) (string, error) {
 		}
 	}
 	p.mu.Unlock()
-	name := ""
-	err := p.changeChoices(person, func(c *machineNames) {
-		n := max(c.Next, 1)
-		for taken[fmt.Sprintf("machine-%d", n)] {
-			n++
-		}
-		c.Next = n + 1
-		name = fmt.Sprintf("machine-%d", n)
-	})
-	if err != nil {
-		return "", err
-	}
-	return name, nil
+	return taken
 }
 
 // failed keeps a make that failed as a row of the provider's, the oldest gone past

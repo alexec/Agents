@@ -284,6 +284,18 @@ struct RemoteView: View {
             await model.openFromLaunchArguments()
 #endif
         }
+        // New Machine (#4634): the defaults chosen, Make to confirm; a refused make opens it again.
+        .sheet(item: Binding(get: { model.newMachineAsk }, set: { model.newMachineAsk = $0 })) { ask in
+            NavigationStack {
+                NewMachineSheet(providers: model.machineProviders, provider: ask.provider, again: ask.again,
+                                problem: ask.problem, load: { await model.newMachineForm($0) }) { draft in
+                    model.makeMachine(draft)
+                    return nil
+                }
+            }
+            // A refused make's ask is new: a sheet of its own, with its reason and choices.
+            .id(ask.id)
+        }
         // Delete from a session's menu (#398), asked here: the menu is gone by now.
         .confirmationDialog(DeletionWords.confirmTitle(model.askingToDelete?.title),
                             isPresented: Binding(get: { model.askingToDelete != nil },

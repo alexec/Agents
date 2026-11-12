@@ -9714,12 +9714,26 @@ export interface ProviderList {
   providers: ProviderSummary[];
 }
 
-/** providers/options: the New Machine form, a JSON Schema. */
+/**
+ * providers/options: the New Machine form, a JSON Schema, with what New Machine would make (#4634).
+ * With no `id`, the person's default provider.
+ */
 export interface ProviderOptions {
   schema: JSONValue;
+  /** The provider the form is for: the one asked for, or else the person's default. */
+  id?: ProviderID;
+  /**
+   * The values the form starts with: the options the person made a machine with last on this
+   * provider, over each field's `default` or else the first of its `enum`.
+   */
+  values?: JSONValue;
+  /**
+   * The name New Machine would give: the person's next `machine-N`. Not kept until a make uses it.
+   */
+  name?: string;
 }
 
-/** providers/remove, providers/refresh, providers/options. */
+/** providers/remove, providers/refresh, providers/options (with no `id`, the default provider). */
 export interface ProviderRequest {
   id?: ProviderID;
 }
@@ -15836,7 +15850,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderForget: { required: ["provider"], optional: [] },
   ProviderGroup: { required: ["provider"], optional: ["group"] },
   ProviderList: { required: ["providers"], optional: [] },
-  ProviderOptions: { required: ["schema"], optional: [] },
+  ProviderOptions: { required: ["schema"], optional: ["id", "values", "name"] },
   ProviderRequest: { required: [], optional: ["id"] },
   ProviderRuntime: { required: ["id", "name", "isDefault"], optional: [] },
   ProviderRuntimes: { required: ["runtimes"], optional: ["host", "why"] },

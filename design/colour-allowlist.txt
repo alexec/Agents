@@ -1,0 +1,16 @@
+// The colours that stay outside a token file (#4609; scripts/check-colour-tokens.py).
+// One per line: the path, the colour as found (or * for the whole file), and why.
+// A line that matches nothing fails the check, so remove it when its colour goes.
+Web/src/app.css hsl( an engineer's avatar: a hue of its own from --hue, set per person
+Web/src/model/multiplier.ts rgb( Crowd.fill: a blue a little different for each engineer, worked out as the window's
+Web/src/model/work.ts #1f2328 labelInk: the text on a forge label's own colour, which no token can know
+Web/src/model/work.ts #ffffff labelInk: the text on a forge label's own colour, which no token can know
+Web/src/views/Huddle.tsx #CFE3FF the Blob's own fill (design/logo/blob), the same in light and dark
+Web/src/views/Huddle.tsx #fff the Blob's own fill (design/logo/blob), the same in light and dark
+Web/src/views/Huddle.tsx #3A78E6 the Blob's own outline (design/logo/blob)
+Web/src/views/Huddle.tsx #0E1A3A the Blob's own eyes and mouth (design/logo/blob)
+Web/src/views/Multiplier.tsx #fff the Blob's own fill (design/logo/blob)
+Web/src/views/Multiplier.tsx #3A78E6 the Blob's own outline (design/logo/blob)
+Web/src/views/Multiplier.tsx #0E1A3A the Blob's own eyes and mouth (design/logo/blob)
+Web/src/views/WorkTimeline.tsx * the features' palette: the window's system colours, one per feature
+www/assets/icon.svg * the Blob mark, made by scripts/design.sh marks

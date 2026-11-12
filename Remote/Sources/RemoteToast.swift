@@ -2,21 +2,19 @@ import AgentsKitCore
 import SwiftUI
 
 /// The scene's one toast (#4737), as the window's `WindowToast`: the result of something the
-/// person did outside a sheet. A failure ("Could not finish that", a machine the provider
-/// would not make) stays until it is closed; Undo after Archive (#1534) goes after
+/// person did outside a sheet. A failure ("Could not finish that") stays until it is closed; Undo after Archive (#1534) goes after
 /// `ToastTime.undo`. One at a time: a new one replaces the last.
 ///
-/// These were the "That did not work" and "Could not make a machine" alerts before. An alert
-/// is now only for a choice that blocks the work (a host's git asking, a folder that has gone).
+/// It was the "That did not work" alert before. An alert is now only for a choice that blocks
+/// the work (a host's git asking, a folder that has gone). A machine the provider would not
+/// make opens New Machine again with its reason (#4634), so it is not a toast.
 enum RemoteToast: Identifiable, Equatable {
     case problem(String, UUID)
-    case makeFailed(MachineMakeFailure)
     case archived(ArchiveUndo)
 
     var id: String {
         switch self {
         case .problem(_, let id): "problem-\(id)"
-        case .makeFailed(let failure): "make-failed-\(failure.id)"
         case .archived(let undo): "archived-\(undo.id)"
         }
     }
@@ -25,7 +23,6 @@ enum RemoteToast: Identifiable, Equatable {
     var text: String {
         switch self {
         case .problem(let text, _): "Could not finish that. \(text)"
-        case .makeFailed(let failure): "Could not make the machine. \(failure.reason)"
         case .archived(let undo): undo.line
         }
     }
@@ -36,7 +33,6 @@ enum RemoteToast: Identifiable, Equatable {
     func closed(in model: RemoteModel) {
         switch self {
         case .problem(let text, _): if model.problem == text { model.dismissProblem() }
-        case .makeFailed(let failure): if model.makeFailed == failure { model.makeFailed = nil }
         case .archived(let undo): model.dismissArchiveUndo(undo)
         }
     }
@@ -77,9 +73,6 @@ struct RemoteToasts: ViewModifier {
             .onChange(of: model.problem, initial: true) { _, problem in
                 if let problem { show(.problem(problem, UUID())) }
             }
-            .onChange(of: model.makeFailed, initial: true) { _, failure in
-                if let failure { show(.makeFailed(failure)) }
-            }
             .onChange(of: model.archiveUndo?.id, initial: true) {
                 if let undo = model.archiveUndo {
                     show(.archived(undo))
@@ -110,13 +103,6 @@ struct RemoteToasts: ViewModifier {
             ArchiveUndoStrip(undo: undo,
                              perform: { Task { await model.undoArchive() } },
                              dismiss: { close(shown) })
-        case .makeFailed(let failure):
-            Toast(tone: .failure, text: shown.text, id: shown.id, dismiss: { close(shown) }) {
-                Button("Try Again") {
-                    close(shown)
-                    Task { await model.newMachine(on: failure.provider) }
-                }
-            }
         case .problem:
             Toast(tone: .failure, text: shown.text, id: shown.id, dismiss: { close(shown) })
         }

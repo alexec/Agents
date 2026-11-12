@@ -294,8 +294,11 @@ deletes build output (the folders `.gitignore` ignores and git tracks nothing in
 Done or Archived and hold no lease. It also removes archived agents' worktrees that have
 nothing uncommitted, keeping the branch, bounds the shared build cache (Swift and Go), ends
 headless walk Chromes left running over 6 hours, and removes older Xcode device support
-(`scripts/free-disk.sh`, #1796). It goes on until 25% of the disk is free or the steps run
-out. It never touches the folder, a worktree no session names, or a busy agent's.
+and CoreDevice's install deltas (`scripts/free-disk.sh`, #1796). It also removes any
+worktree nobody has changed for 4 hours with all its work committed, or for 8 hours with
+uncommitted work, which is lost; the branch stays (#4699). It goes on until 20% of the
+disk is free or the steps run out. It never touches the folder, or a worktree a process
+works in.
 It too arrives turned off.
 
 **Crash reports** (`.agents/workflows/crash-reports.md`, #392) runs once a day at 07:00. It

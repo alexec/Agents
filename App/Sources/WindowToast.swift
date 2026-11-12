@@ -2,21 +2,19 @@ import AgentsKitCore
 import SwiftUI
 
 /// The window's one toast (#4737): the result of something the person did outside a sheet.
-/// A failure ("Could not finish that", a machine the provider would not make) stays until it
-/// is closed; Undo after Archive (#1534) goes after `ToastTime.undo`. One at a time: a new
+/// A failure ("Could not finish that") stays until it is closed; a machine the provider would
+/// not make opens New Machine's sheet again with the reason instead (#4634); Undo after Archive (#1534) goes after `ToastTime.undo`. One at a time: a new
 /// one replaces the last.
 ///
 /// These were the window's alert (#101) before. An alert is now only for a choice that blocks
 /// the work (`WindowAlert`).
 enum WindowToast: Identifiable, Equatable {
     case problem(AlertWords)
-    case makeFailed(MachineMakeFailure)
     case archived(ArchiveUndo)
 
     var id: String {
         switch self {
         case .problem(let words): "problem-\(words.id)"
-        case .makeFailed(let failure): "make-failed-\(failure.id)"
         case .archived(let undo): "archived-\(undo.id)"
         }
     }
@@ -25,7 +23,6 @@ enum WindowToast: Identifiable, Equatable {
     var text: String {
         switch self {
         case .problem(let words): "Could not finish that. \(words.text)"
-        case .makeFailed(let failure): "Could not make the machine. \(failure.reason)"
         case .archived(let undo): undo.line
         }
     }
@@ -36,7 +33,6 @@ enum WindowToast: Identifiable, Equatable {
     func closed(in model: AppModel) {
         switch self {
         case .problem(let words): if model.problem == words.text { model.dismissProblem() }
-        case .makeFailed(let failure): if model.makeFailed == failure { model.makeFailed = nil }
         case .archived(let undo): model.dismissArchiveUndo(undo)
         }
     }
@@ -64,9 +60,6 @@ struct WindowToasts: ViewModifier {
             .animation(.easeOut(duration: 0.2), value: toast?.id)
             .onChange(of: model.problem, initial: true) { _, problem in
                 if let problem { show(.problem(AlertWords(text: problem))) }
-            }
-            .onChange(of: model.makeFailed, initial: true) { _, failure in
-                if let failure { show(.makeFailed(failure)) }
             }
             .onChange(of: model.archiveUndo?.id, initial: true) {
                 if let undo = model.archiveUndo {
@@ -99,13 +92,6 @@ struct WindowToasts: ViewModifier {
             ArchiveUndoStrip(undo: undo,
                              perform: { Task { await model.undoArchive() } },
                              dismiss: { close(shown) })
-        case .makeFailed(let failure):
-            Toast(tone: .failure, text: shown.text, id: shown.id, dismiss: { close(shown) }) {
-                Button("Try Again") {
-                    close(shown)
-                    Task { await model.newMachine(on: failure.provider) }
-                }
-            }
         case .problem:
             Toast(tone: .failure, text: shown.text, id: shown.id, dismiss: { close(shown) })
         }

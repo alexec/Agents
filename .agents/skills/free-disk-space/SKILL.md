@@ -1,6 +1,6 @@
 ---
 name: free-disk-space
-description: Free disk space on this Mac (#199, #1796) until 25% of the disk is free. Bound the shared build cache (Swift and Go), delete the build output that finished agents left in their worktrees, remove the worktrees of archived agents whose work is all on their branch, end leaked headless Chromes and their clones, remove old Xcode device support and unavailable simulators, and remove the Xcode DerivedData of removed worktrees. Nothing else. Use when the Free disk space workflow runs on machine.disk_low, or when Alex asks to free disk space.
+description: Free disk space on this Mac (#199, #1796) until 20% of the disk is free. Bound the shared build cache (Swift and Go), delete the build output that finished agents left in their worktrees, remove the worktrees of archived agents whose work is all on their branch and the worktrees nobody has changed for hours, end leaked headless Chromes and their clones, remove old Xcode device support, unavailable simulators and CoreDevice's install deltas, and remove the Xcode DerivedData of removed worktrees. Nothing else. Use when the Free disk space workflow runs on machine.disk_low, or when Alex asks to free disk space.
 ---
 
 # Free disk space
@@ -10,15 +10,15 @@ This is the method of the Free disk space workflow
 starts it. A person or an agent can also follow it by hand. Where it says that nobody is
 at the keyboard, that is true only of a run of the workflow.
 
-**Work to the target, not to the threshold (#1796).** The target is 25% of the disk free
-(about 123 GB on a 494 GB disk), above the 20% line `machine.disk_low` fires at, so a run
-ends past the line and not on it. After each of steps 3 to 6, run:
+**Work to the target, not to the threshold (#1796, #4699).** The target is 20% of the
+disk free (about 99 GB on a 494 GB disk), twice the 10% line `machine.disk_low` fires at,
+so a run ends well past the line and not on it. After each of steps 3 to 7, run:
 
 ```sh
 scripts/free-disk.sh status   # exits 0 at the target, 1 under it
 ```
 
-When it says `reached`, go to step 7. Otherwise go on to the next step, until the steps
+When it says `reached`, go to step 8. Otherwise go on to the next step, until the steps
 run out. Stopping at the threshold brings the next low event a few hours later.
 
 ## Rules for the whole run
@@ -27,14 +27,16 @@ run out. Stopping at the threshold brings the next low event a few hours later.
   of `main`: never delete, edit, commit, check out, merge, rebase, stash or push anything
   in it. No builds or tests. The shell is zsh: never name a variable `path`, which is
   `$PATH` there and loses every command.
-- **Only a folder `list_sessions` names** as a session's `Worktree:` is ever looked at.
-  A worktree no session names (a review's, a merge's, the person's own) is left alone.
+- **Only a folder `list_sessions` names** as a session's `Worktree:` is looked at in steps
+  2 to 5. A worktree no session names (a review's, a merge's, the person's own) is left to
+  step 6, which goes by age alone.
 - **Never a worktree any session is busy in.** Every session naming it must be `Done`,
   `Archived`, and none may say `Holding:`. `Working`, `Waiting`, `Blocked`,
   `Needs you` and `Paused` all leave it alone.
-- **Never source, and never uncommitted work.** `rm` only a folder that passes the check in
-  step 4. Never `git worktree remove --force`, `git clean`, `git reset`, `git checkout`,
-  `git branch -d` or `-D`.
+- **Never source.** `rm` only a folder that passes the check in step 4. Uncommitted work
+  goes only with a worktree that step 6 removes, after 8 hours with no change. Never run
+  `git worktree remove --force` yourself (step 6's script does it), nor `git clean`,
+  `git reset`, `git checkout`, `git branch -d` or `-D`.
 - **End a process only with `scripts/free-disk.sh chromes`.** It ends only headless
   Chromes with a profile under `/tmp` that started more than 6 hours ago. Never `kill`,
   `pkill` or `killall` anything yourself: not the person's own Chrome, not the sign-up
@@ -133,13 +135,35 @@ and its worktree stays. A detached HEAD is kept: its commits are on no
 branch. The branch stays, with every commit: never delete it. Git itself refuses to remove
 a worktree with changes or untracked files, or one that is locked.
 
-## 6. Leaked Chromes and Xcode leftovers
+## 6. Remove worktrees nobody has changed for hours
+
+At both levels, also when `list_sessions` is not there (Alex, 2026-11-11, #4699):
+
+```sh
+scripts/free-disk.sh worktrees --dry-run   # what it would remove, and why it keeps the rest
+scripts/free-disk.sh worktrees
+```
+
+It looks at every worktree under `$P/.agents/worktrees`, by the newest file in it (leaving
+out `.git` and build output). It removes one with `git worktree remove --force` when all
+its work is committed and nothing changed for 4 hours, or when it has uncommitted work and
+nothing changed for 8 hours; that work is lost. It keeps a worktree any process has as its
+working folder, a locked one, a detached HEAD with commits on no branch, and anything that
+is not a linked worktree of `$P`. The branch stays, with every commit. Put each line it
+prints in the report.
+
+## 7. Leaked Chromes, Xcode and CoreDevice leftovers
 
 ```sh
 scripts/free-disk.sh chromes       # ends leaked headless walk Chromes, then removes clones no process uses
 scripts/free-disk.sh xcode         # older iOS DeviceSupport builds per device, unavailable simulators
 scripts/free-disk.sh deriveddata   # Xcode DerivedData of worktrees that are gone (--dry-run to look first)
+scripts/free-disk.sh coredevice    # the app install deltas CoreDevice keeps (15 GB on 2026-11-11)
 ```
+
+CoreDevice keeps a delta of each app it installs on a device, so the next install sends
+only what changed. `coredevice` removes them when no `devicectl` runs; the next install
+sends the whole app.
 
 A walk's headless Chrome that was left running keeps an APFS clone of the Chrome app (up
 to 3 GB) until it ends. Walks end theirs now (`Web/test/walk/cdp.mjs`), but one stopped
@@ -148,14 +172,14 @@ OS build a device has run; only the newest per device model is kept, and Xcode m
 again when a device needs it.
 
 Xcode builds each worktree into `~/Library/Developer/Xcode/DerivedData/Agents-<hash>`
-(3 to 4 GB), not into the worktree, so step 4 does not find it and step 5 leaves it
+(3 to 4 GB), not into the worktree, so step 4 does not find it and steps 5 and 6 leave it
 (#2683). `deriveddata` removes an `Agents-*` folder only when its `info.plist` names a
 `WorkspacePath` under `$P/.agents/worktrees/` that is gone, and no running `xcodebuild`
 names the folder or that worktree. It keeps a folder with no `info.plist`, a folder of
 any other project, and Xcode's shared caches (`ModuleCache.noindex`, `SDK*`). It prints
 each folder it removes and its size.
 
-## 7. Report
+## 8. Report
 
 ```sh
 df -k "$P" | tail -1
@@ -173,6 +197,6 @@ du -sk "$P"/.agents/worktrees/* 2>/dev/null | sort -rn | head -5
 
 End with one line per worktree touched (`freed <GB> from <name>` or `removed <name>,
 branch <branch> kept`), then the build cache before and after, the Chromes ended and
-clones removed, the Xcode folders and DerivedData folders removed, then the free space before and after and how
+clones removed, the Xcode folders, DerivedData folders and CoreDevice deltas removed, then the free space before and after and how
 far from the target, then what was kept and why (busy, holding, not named by a session,
-not clean). Then call `archive_session` with no id.
+not clean, changed too recently, a process works in it). Then call `archive_session` with no id.
