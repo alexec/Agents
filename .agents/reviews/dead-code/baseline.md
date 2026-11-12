@@ -45,6 +45,12 @@ Added 2026-10-29 (`2026-10-29.md`, the first complete `GOOS=darwin -test` scan):
   `contains(where:)`. A function reference has no `(` after the name, so a label test
   misses it; look for `.name` and `where: name` too (added 2026-10-31).
 
+- `Shared/UI/Paper.swift` `forgeWaitingWash` and `forgeWaitingRule`: Periphery lists them
+  as unused, but they are design tokens. `design/tokens.json` names each one in its
+  `dev.agentloops.swift` extension, and `DesignTokensTests` reads them by that name. A
+  Paper colour with a `dev.agentloops.swift` entry is live until the token goes
+  (added 2026-11-12).
+
 - `Agents.xcodeproj` is not checked in. Run `xcodegen generate` in the review worktree
   after merging `main` and before the index build, or files added since the project was
   made are missing from the build and from the index (added 2026-10-30).
@@ -86,3 +92,14 @@ Added 2026-10-29 (`2026-10-29.md`, the first complete `GOOS=darwin -test` scan):
   away without a word would make the rules looser. Live while a v0.14 machine can still
   start v0.15 for the first time; propose its removal once v0.15 is the oldest supported
   release (added 2026-10-31).
+- The organisation policy's `modeCeiling` move (#2957 T035):
+  `Go/internal/controlplane/policy.go` `migrateModeCeiling`. It reads a stored
+  organisation policy's old `modeCeiling` into `permissionMode` once and signs a new
+  version, by the same decision as the first-start move above (a limit that went away
+  without a word would make the rules looser). Live while the control plane can hold a
+  policy written before it; propose its removal with the first-start move
+  (added 2026-11-12).
+- `Packages/AgentsKit/Sources/AgentsKitCore/Files/Leftovers.swift` and
+  `Shared/UI/Voice/KokoroVoice.swift` `link(from:)` (#3747): they delete files that an
+  older copy of the app left on the device (TextEdit copies, old voice-model links). A
+  clean-up of the device, as `retiredFileKey`; not migration code (added 2026-11-12).
