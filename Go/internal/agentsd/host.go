@@ -128,6 +128,12 @@ func (d *Daemon) catchUp(r wire.CatchUpRequest) wire.CatchUpSnapshot {
 	if r.Agents != nil {
 		list = *r.Agents
 	}
+	// Where the list is in the order of changes (#4785), read before the records so no
+	// change is passed: a point the store cannot vouch for gets the whole list.
+	if list.ChangedSince != nil && !d.Store.Vouches(*list.ChangedSince) {
+		list.ChangedSince = nil
+	}
+	at := d.Store.Revision()
 	disk := d.diskState()
 	notes := wire.StoreNotes{Notes: []string{}}
 	achievements := d.achievements()
@@ -135,6 +141,7 @@ func (d *Daemon) catchUp(r wire.CatchUpRequest) wire.CatchUpSnapshot {
 		Elicitations: d.pendingElicitations(),
 		Attention:    d.attentionPending(),
 		Resuming:     []wire.UUID{}, Disk: &disk, StoreNotes: &notes, Achievements: &achievements}
+	s.AgentChanges = d.agentChanges(list, s.Agents, at)
 	for _, part := range r.Parts {
 		if part == "pins" {
 			s.Pins = []wire.FolderPins{}
@@ -704,4 +711,24 @@ func (d *Daemon) putInDropbox(r wire.DropboxPutRequest) (wire.DropboxPutResponse
 func textDigest(text string) string {
 	sum := sha256.Sum256([]byte(text))
 	return hex.EncodeToString(sum[:])
+}
+
+// agentChanges is the catch-up's place in the order of changes (#4785): the records removed
+// since the point asked from, less any in the answer (made again since), or all when there
+// was no point.
+func (d *Daemon) agentChanges(list wire.ListRequest, agents []wire.Agent, at wire.ListRevision) *wire.AgentChanges {
+	c := &wire.AgentChanges{Epoch: at.Epoch, Revision: at.Revision, Removed: []wire.UUID{}, All: list.ChangedSince == nil}
+	if c.All {
+		return c
+	}
+	listed := map[wire.UUID]bool{}
+	for _, a := range agents {
+		listed[a.ID] = true
+	}
+	for _, id := range d.Store.RemovedSince(list.ChangedSince.Revision) {
+		if !listed[id] {
+			c.Removed = append(c.Removed, id)
+		}
+	}
+	return c
 }

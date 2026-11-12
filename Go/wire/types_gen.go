@@ -177,6 +177,9 @@ const AfterTurnArchive AfterTurn = "archive"
 type Agent struct {
 	ID UUID `json:"id"`
 
+	// Where this record's last change is in its host's order of changes (#4785): a number per host that goes up with each change to any of its records, kept on disk. Ask for the records changed since with ListRequest.changedSince.
+	Revision *int64 `json:"revision,omitzero"`
+
 	RuntimeID string `json:"runtimeID"`
 
 	Cwd URL `json:"cwd"`
@@ -336,6 +339,20 @@ type AgentArchivedReason string
 
 const AgentArchivedReasonByUser AgentArchivedReason = "byUser"
 const AgentArchivedReasonByAgent AgentArchivedReason = "byAgent"
+
+// Where a client/catchUp's agents are in the host's order of changes (#4785). The client asks next time with ListRequest.changedSince set to this epoch and revision.
+type AgentChanges struct {
+	Epoch string `json:"epoch"`
+
+	// Every change up to here is in this answer or an earlier one.
+	Revision int64 `json:"revision"`
+
+	// The records removed since changedSince.
+	Removed []UUID `json:"removed"`
+
+	// True when agents is the list as without changedSince: none was given, or it was too old or of another epoch. The client then drops each record it holds that is not in it.
+	All bool `json:"all"`
+}
 
 // A Markdown file under skills, personas or workflows in Agent Configuration.
 type AgentConfigEditorFile struct {
@@ -2127,6 +2144,8 @@ type CatchUpRequest struct {
 
 type CatchUpSnapshot struct {
 	Agents []Agent `json:"agents"`
+
+	AgentChanges *AgentChanges `json:"agentChanges,omitzero"`
 
 	Permissions []PermissionRequest `json:"permissions"`
 
@@ -6851,6 +6870,16 @@ type ListRequest struct {
 
 	// Only the sessions whose folder is in this project (#3276), as .agents/folder.json names it: the project's sessions on this machine.
 	Project *string `json:"project,omitzero"`
+
+	// Only the records changed since this point (#4785), every one, archived ones too: limit, after, includeArchived and archivedOnly do not apply, so a client sees a session archived or brought back. The records removed come in client/catchUp's agentChanges. When the point is too old or of another epoch, agents/list fails with revisionGone and client/catchUp answers as without it, with agentChanges.all. A host that predates it answers the whole list.
+	ChangedSince *ListRevision `json:"changedSince,omitzero"`
+}
+
+// A point in a host's order of changes to its session records (#4785). The epoch names the order: the host makes a new one when it cannot vouch for the old one.
+type ListRevision struct {
+	Epoch string `json:"epoch"`
+
+	Revision int64 `json:"revision"`
 }
 
 type ListedSkill struct {

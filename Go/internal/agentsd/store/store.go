@@ -52,13 +52,15 @@ type Store struct {
 	stamps       map[wire.UUID]stamp
 	summaryTimer *time.Timer
 	summaryWrite sync.Mutex
-	folders  []wire.Folder
+	folders      []wire.Folder
 	// lines is each transcript's count of lines, once counted, for an entry's index.
 	lines map[wire.UUID]int
 	// ib is where the lines of the transcripts read most recently end (lineindex.go).
 	ib indexBook
 	// held is each agent's lines the disk refused, waiting for space (held.go, #3245).
 	held map[wire.UUID]*heldLines
+	// rev is the order of changes to the records (revisions.go, #4785). Under mu.
+	rev revisions
 	// OnGap is told the notice written where lines a full hold let go would have been, so
 	// the clients showing the agent see it.
 	OnGap func(id wire.UUID, e wire.TranscriptEntry, index int)
@@ -122,6 +124,7 @@ func Open(root string) (*Store, error) {
 			archived++
 		}
 	}
+	s.revisionsAtOpen()
 	// A summary of no record there now (deleted by another build) is gone too.
 	gone := 0
 	for id := range summaries {
@@ -263,6 +266,9 @@ const setAsidePrefix = ".deleting-"
 func (s *Store) Delete(id wire.UUID) error {
 	id = wire.UUID(strings.ToUpper(string(id)))
 	s.mu.Lock()
+	if s.agents[id] != nil {
+		s.noteRemoved(id, time.Now())
+	}
 	s.drop(id)
 	delete(s.lines, id)
 	delete(s.held, id)
@@ -308,11 +314,19 @@ func (s *Store) Save(a wire.Agent) error {
 	// A summary copied out of the store (Agents) has no commands: they stay those on disk.
 	s.mu.Lock()
 	held := s.agents[a.ID]
+	// The record's place in the order of changes (#4785), held back from the current
+	// revision until the record is put.
+	rev := s.nextRevision()
+	s.rev.pending[rev] = struct{}{}
 	s.mu.Unlock()
+	a.Revision = &rev
 	if held != nil && held.State == wire.AgentStateArchived && len(a.AvailableCommands) == 0 {
 		a.AvailableCommands = s.commandsOnDisk(a.ID)
 	}
 	if err := s.write(&a); err != nil {
+		s.mu.Lock()
+		delete(s.rev.pending, rev)
+		s.mu.Unlock()
 		return err
 	}
 	var st stamp
@@ -324,6 +338,7 @@ func (s *Store) Save(a wire.Agent) error {
 	s.mu.Lock()
 	s.put(&a)
 	s.stampSummary(&a, st)
+	delete(s.rev.pending, rev)
 	s.mu.Unlock()
 	return nil
 }

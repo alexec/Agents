@@ -86,6 +86,7 @@ export const Failure = {
   policyRefused: -32076,
   providerFailed: -32066,
   providersNeedOneCopy: -32064,
+  revisionGone: -32105,
   runtimeNotFound: -32001,
   runtimeWillNotStart: -32002,
   sandboxWillNotStart: -32061,
@@ -259,6 +260,12 @@ export type AfterTurn =
 
 export interface Agent {
   id: UUID;
+  /**
+   * Where this record's last change is in its host's order of changes (#4785): a number per host
+   * that goes up with each change to any of its records, kept on disk. Ask for the records changed
+   * since with ListRequest.changedSince.
+   */
+  revision?: number;
   runtimeID: string;
   cwd: URLString;
   title?: string;
@@ -394,6 +401,23 @@ export interface Agent {
 export type AgentArchivedReason =
   | "byUser"
   | "byAgent";
+
+/**
+ * Where a client/catchUp's agents are in the host's order of changes (#4785). The client asks next
+ * time with ListRequest.changedSince set to this epoch and revision.
+ */
+export interface AgentChanges {
+  epoch: string;
+  /** Every change up to here is in this answer or an earlier one. */
+  revision: number;
+  /** The records removed since changedSince. */
+  removed: UUID[];
+  /**
+   * True when agents is the list as without changedSince: none was given, or it was too old or of
+   * another epoch. The client then drops each record it holds that is not in it.
+   */
+  all: boolean;
+}
 
 /** A Markdown file under skills, personas or workflows in Agent Configuration. */
 export interface AgentConfigEditorFile {
@@ -1936,6 +1960,7 @@ export interface CatchUpRequest {
 
 export interface CatchUpSnapshot {
   agents: Agent[];
+  agentChanges?: AgentChanges;
   permissions: PermissionRequest[];
   elicitations: ElicitationRequest[];
   attention: AttentionPending;
@@ -6396,6 +6421,23 @@ export interface ListRequest {
    * project's sessions on this machine.
    */
   project?: string;
+  /**
+   * Only the records changed since this point (#4785), every one, archived ones too: limit, after,
+   * includeArchived and archivedOnly do not apply, so a client sees a session archived or brought
+   * back. The records removed come in client/catchUp's agentChanges. When the point is too old or
+   * of another epoch, agents/list fails with revisionGone and client/catchUp answers as without it,
+   * with agentChanges.all. A host that predates it answers the whole list.
+   */
+  changedSince?: ListRevision;
+}
+
+/**
+ * A point in a host's order of changes to its session records (#4785). The epoch names the order:
+ * the host makes a new one when it cannot vouch for the old one.
+ */
+export interface ListRevision {
+  epoch: string;
+  revision: number;
 }
 
 export interface ListedSkill {
@@ -15637,7 +15679,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
   Admitted: { required: [], optional: ["client", "host"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "runtimeKeepsCopy", "browserUsedAt", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "movedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["revision", "title", "labels", "runtimeSessionID", "runtimeKeepsCopy", "browserUsedAt", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "movedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
+  AgentChanges: { required: ["epoch", "revision", "removed", "all"], optional: [] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
   AgentConfigEditorRequest: { required: ["kind"], optional: ["folder"] },
   AgentConfigEditorSaveRequest: { required: ["kind", "path", "content"], optional: ["folder", "delete"] },
@@ -15771,7 +15814,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CatalogUseRow: { required: ["kind", "name", "version", "machines", "people"], optional: ["source"] },
   CatchUpLeases: { required: ["leases", "hosted", "health"], optional: [] },
   CatchUpRequest: { required: [], optional: ["agents", "parts"] },
-  CatchUpSnapshot: { required: ["agents", "permissions", "elicitations", "attention", "resuming", "folders"], optional: ["disk", "storeNotes", "achievements", "workflows", "pins", "leases"] },
+  CatchUpSnapshot: { required: ["agents", "permissions", "elicitations", "attention", "resuming", "folders"], optional: ["agentChanges", "disk", "storeNotes", "achievements", "workflows", "pins", "leases"] },
   ChangedFile: { required: ["path", "source", "state", "editCount", "beyondReported", "inProgress", "outsideFolder"], optional: ["relativePath", "added", "removed", "firstLine", "oldPath"] },
   ChangedFileDetail: { required: ["file", "edits"], optional: ["hunks", "whole"] },
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
@@ -16111,7 +16154,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageSyncAnswer: { required: [], optional: ["full"] },
   LineageWalkAllRequest: { required: ["node"], optional: ["depth", "scope"] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
-  ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project"] },
+  ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project", "changedSince"] },
+  ListRevision: { required: ["epoch", "revision"], optional: [] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
   LiveAgent: { required: ["host", "hostName", "owner", "ownerName", "bot", "agent", "runtime", "state"], optional: ["waitsOnOthers", "workflow", "since", "costToDate", "heardAt"] },
   LiveBoard: { required: ["agents"], optional: [] },

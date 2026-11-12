@@ -520,6 +520,7 @@ const FailurePinRefused = -32061
 const FailurePolicyRefused = -32076
 const FailureProviderFailed = -32066
 const FailureProvidersNeedOneCopy = -32064
+const FailureRevisionGone = -32105
 const FailureRuntimeNotFound = -32001
 const FailureRuntimeWillNotStart = -32002
 const FailureSandboxWillNotStart = -32061
