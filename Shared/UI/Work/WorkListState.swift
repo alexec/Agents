@@ -193,7 +193,18 @@ final class WorkListState {
             for await (host, list) in group { got.append((host, list)) }
         }
         guard ask == mine else { return }
-        if kind == .issue { boards = readBoards }
+        if kind == .issue, !readBoards.isEmpty || !fromDevice { boards = readBoards }
+        // Every machine failed over this device's copy: its rows stay, dimmed under what the forges said, with no
+        // next page (#4392, #4930), as the web page keeps them.
+        let failed = got.allSatisfy { $0.list.items.isEmpty && !($0.list.errors ?? []).isEmpty }
+        if failed, fromDevice, let kept = lists, kept.contains(where: { !$0.list.items.isEmpty }) {
+            let said = got.flatMap { $0.list.errors ?? [] }
+            lists = kept.enumerated().map { i, entry in
+                (entry.host, DaemonAPI.ForgeList(items: entry.list.items, errors: i == 0 ? said : nil, total: entry.list.total))
+            }
+            answered(wanted)
+            return
+        }
         lineage = known.nodes
         lineageCursor = known.cursor
         lists = got
