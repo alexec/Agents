@@ -356,13 +356,17 @@ A tag that already exists for this version means another release ran: end with
 5. **Deploy the control plane** (#2100). When steps 2 and 3 found the GitHub release and
    both TestFlight builds, put the version on the live control plane,
    control.agentloops.dev. Alex approved its restart for every release's deploy (2026-10-22).
-   In the scratch worktree of step 2 (`~/.agents/scratch/release-v<version>`), lease "build" (30 minutes), run
+   Lease "build" (30 minutes), run the scratch worktree's own deploy script, by that path and
+   with no `cd` or variable before it:
 
    ```sh
-   AGENTS_VERSION=<version> deploy/gcp/up.sh
+   ~/.agents/scratch/release-v<version>/.agents/skills/release/scripts/deploy-control-plane.sh <version>
    ```
 
-   and release "build" the moment it ends. It acts as `~/.agents/secrets/gcp-agents-control.json`
+   and release "build" the moment it ends. It runs `AGENTS_VERSION=<version> deploy/gcp/up.sh`
+   in that worktree, only when the worktree is at the tag `v<version>` and the tag is on origin.
+   `.claude/settings.json` allows that one command, so Claude Code's auto-mode check does not
+   refuse it as a production deploy (#3934); never run `up.sh` by hand here. It acts as `~/.agents/secrets/gcp-agents-control.json`
    and keeps the store and the APNs key. Then check, from this Mac:
    - `curl -fsS https://control.agentloops.dev/healthz` says `ok`;
    - the version it serves, the one Settings ▸ Control plane shows, is `<version>`. `up.sh`

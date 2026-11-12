@@ -3,7 +3,9 @@
     "allow": [
       "Bash(python3 .agents/skills/release/scripts/advisory.py create*)",
       "Bash(python3 .agents/skills/release/scripts/advisory.py fork GHSA-*)",
-      "Bash(python3 .agents/skills/release/scripts/advisory.py fixed GHSA-*)"
+      "Bash(python3 .agents/skills/release/scripts/advisory.py fixed GHSA-*)",
+      "Bash(~/.agents/scratch/release-v*/.agents/skills/release/scripts/deploy-control-plane.sh *)",
+      "Bash(/Users/*/.agents/scratch/release-v*/.agents/skills/release/scripts/deploy-control-plane.sh *)"
     ]
   }
 }
