@@ -209,6 +209,12 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         }
     }
 
+    /// Held outside its hours (#4818); the status card's hours line says it with the day (#4819).
+    public var isOutsideHours: Bool {
+        if case .outsideHours = self { return true }
+        return false
+    }
+
     /// Whether somebody has to do something, or whether this sorts itself out.
     ///
     /// Only the first kind earns colour on the folder page. Colouring every refusal

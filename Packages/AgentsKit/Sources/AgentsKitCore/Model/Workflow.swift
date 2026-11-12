@@ -481,10 +481,19 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public static let keepEditedHelp = "Keep your copy as it is, and say no more of this version"
 
     /// A row's tooltip: what it does, led by Turned off when it is, then where it is
-    /// (#2759) and a ready-made update (#4071). The Remote's row says where it is to VoiceOver.
+    /// (#2759), its hours (#4819) and a ready-made update (#4071). The Remote's row says
+    /// where it is and its hours to VoiceOver.
     public var rowHelp: String {
         let what = !isEnabled && !isArchived ? "Turned off. \(workflow.summary)" : workflow.summary
-        return ([what, scopeSentence, readyMadeUpdatedSentence] as [String?]).compactMap { $0 }.joined(separator: "\n")
+        return ([what, scopeSentence, hoursRowSentence(), readyMadeUpdatedSentence] as [String?])
+            .compactMap { $0 }.joined(separator: "\n")
+    }
+
+    /// Its hours as a row says them (#4819): when they open while they are shut, else the
+    /// window. nil with no `hours:`, or archived.
+    public func hoursRowSentence(viewer: TimeZone = .current) -> String? {
+        guard !isArchived, let hours = workflow.hours else { return nil }
+        return hoursOpenSentence(viewer: viewer) ?? hours.sentence(viewer: viewer)
     }
 
     /// Read leniently: a daemon from before #100 sends no `isEnabled`, and an outcome

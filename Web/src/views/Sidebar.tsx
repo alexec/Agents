@@ -49,6 +49,7 @@ import { CloningRows, EmptyFolders, NewFolderMenu } from "./NewFolder";
 import { putFilesInDropbox, useDropboxDrop } from "./DropboxDialog";
 import { exportFromMenu, importFromMenu } from "../model/exports";
 import { rowExtras, SessionRow } from "./SessionRow";
+import { prefetchOnHover } from "./hoverPrefetch";
 import { canMoveOn, openInNewTab, RenameInput, runSessionAction, sessionActions, startedBy } from "./SessionMenu";
 import { markAgentOf, treeRows, type TreeRow } from "../model/tree";
 import { WorkflowRow } from "./WorkflowRow";
@@ -1084,6 +1085,8 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
     <div class={`nav-item${treeClass}${drop.targeted ? " drop-target" : ""}`}
       style={tree?.isChild ? { "--indent": tree.indent } : undefined} onContextMenu={(e) => openContextMenu(e, menu())}
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)} {...drop.props}
+      // Its chat fetched while the pointer rests on it, so a click draws it at once (#4795).
+      {...(down ? {} : prefetchOnHover(() => { void store.prefetch(host, agent.id); }))}
       // A double-click edits its title in the row, as the window's does (#1518).
       onDblClick={(e) => {
         if (agent.state === "archived" || (e.target as HTMLElement).closest(".fold-count, .renaming")) return;
