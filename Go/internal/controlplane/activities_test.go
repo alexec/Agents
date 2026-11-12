@@ -35,7 +35,7 @@ func activityState(t *testing.T, push apns.Push) turnActivityState {
 func TestATurnUpdatesItsLiveActivityByPush(t *testing.T) {
 	t.Parallel()
 	pusher := &fakePusher{}
-	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = pusher })
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push, c.ActivityEvery = pusher, time.Nanosecond })
 	box := p.host("MACHINE-2")
 	m, phone := p.phoneWithToken()
 	call(t, phone, "", "clients/setActivityToken", map[string]any{"agentID": strings.ToLower(activityAgent),
@@ -72,7 +72,7 @@ func TestATurnUpdatesItsLiveActivityByPush(t *testing.T) {
 	}
 	end := sent[2].Activity
 	if s := activityState(t, sent[2]); s.Phase != "done" || s.EndedAt == nil || *s.EndedAt != 800000300 || !end.End ||
-		end.Dismiss.Sub(end.Timestamp) != keptAfterEnd {
+		end.Dismiss.Sub(end.Timestamp) != keptAfterEnd || end.Urgent {
 		t.Fatal(s, end)
 	}
 	if tokens := p.s.Records().Client(m.Client).ActivityTokens; len(tokens) != 0 {
@@ -92,7 +92,7 @@ func TestATurnUpdatesItsLiveActivityByPush(t *testing.T) {
 func TestLiveActivityTokensComeAndGo(t *testing.T) {
 	t.Parallel()
 	pusher := &fakePusher{answer: apns.ErrGone}
-	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = pusher })
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push, c.ActivityEvery = pusher, time.Nanosecond })
 	_, window := p.client("window")
 	set := map[string]any{"agentID": activityAgent, "token": activityToken, "environment": "production", "startedAt": 800000000}
 	if e := callError(t, window, "", "clients/setActivityToken", set); !strings.Contains(e, "iPhone") {
@@ -139,7 +139,7 @@ func TestOneLiveActivitySpeaksForEveryTurn(t *testing.T) {
 	t.Parallel()
 	const other = "A0000000-0000-4000-8000-000000000002"
 	pusher := &fakePusher{}
-	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push = pusher })
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) { c.Push, c.ActivityEvery = pusher, time.Nanosecond })
 	box := p.host("MACHINE-2")
 	m, phone := p.phoneWithToken()
 	for agent, started := range map[string]int{activityAgent: 800000000, other: 800000100} {
@@ -193,5 +193,66 @@ func TestOneLiveActivitySpeaksForEveryTurn(t *testing.T) {
 	}
 	if tokens := p.s.Records().Client(m.Client).ActivityTokens; len(tokens) != 0 {
 		t.Fatal("kept after the end:", tokens)
+	}
+}
+
+// Many moves of a turn in a short time make one push (#4997): the first goes at once, the
+// next ones are held, and the newest goes when the interval ends. Only a turn that asks is
+// urgent. An end goes at once, and what was held goes with nothing.
+func TestALiveActivityGetsOneUpdateInEachInterval(t *testing.T) {
+	t.Parallel()
+	const every = 400 * time.Millisecond
+	pusher := &fakePusher{}
+	p := startPlaneWith(t, store.NewMemory(), controllink.NewPrivateKey(), func(c *Config) {
+		c.Push, c.ActivityEvery = pusher, every
+	})
+	box := p.host("MACHINE-2")
+	_, phone := p.phoneWithToken()
+	set := map[string]any{"agentID": activityAgent, "token": activityToken, "environment": "development", "startedAt": 800000000}
+	call(t, phone, "", "clients/setActivityToken", set)
+	say := func(phase string) {
+		turn := `{"agentID":"` + activityAgent + `","phase":"` + phase + `"}`
+		if _, err := p.s.methods.HostSaid(box.member.Host, "attention/turn", json.RawMessage(turn)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	start := time.Now()
+	for _, phase := range []string{"working", "question", "working", "approval", "working", "question"} {
+		say(phase)
+	}
+	p.waitFor(func() bool { return len(pusher.sent()) == 2 }, "the first push and the newest")
+	if waited := time.Since(start); waited < every-50*time.Millisecond {
+		t.Fatal("the newest went before the interval ended:", waited)
+	}
+	time.Sleep(every + 100*time.Millisecond)
+	sent := pusher.sent()
+	if len(sent) != 2 {
+		t.Fatal("six moves made", len(sent), "pushes, not two")
+	}
+	if s := activityState(t, sent[0]); s.Phase != "working" || sent[0].Activity.Urgent {
+		t.Fatal(s, sent[0].Activity)
+	}
+	if s := activityState(t, sent[1]); s.Phase != "question" || !sent[1].Activity.Urgent {
+		t.Fatal(s, sent[1].Activity)
+	}
+
+	// The interval is over: the next goes at once. One held behind it goes with the end,
+	// which is not urgent.
+	say("working")
+	p.waitFor(func() bool { return len(pusher.sent()) == 3 }, "the next push at once")
+	say("approval")
+	say("done")
+	p.waitFor(func() bool { return len(pusher.sent()) == 4 }, "the end")
+	time.Sleep(every + 100*time.Millisecond)
+	sent = pusher.sent()
+	if len(sent) != 4 {
+		t.Fatal("an update went after the end:", len(sent))
+	}
+	if s := activityState(t, sent[2]); s.Phase != "working" || sent[2].Activity.Urgent {
+		t.Fatal(s, sent[2].Activity)
+	}
+	if end := sent[3].Activity; !end.End || end.Urgent || activityState(t, sent[3]).Phase != "done" {
+		t.Fatal(end)
 	}
 }

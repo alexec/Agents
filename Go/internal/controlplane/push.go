@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/apns"
@@ -25,12 +26,32 @@ type pushes struct {
 	s      *Service
 	sender Pusher
 	queue  chan apns.Push
+	// A Live Activity gets at most one update in each interval of this length (#4997).
+	activityEvery time.Duration
+	mu            sync.Mutex
+	// By activity token: the updates held back.
+	activities map[string]*activityThrottle
 }
 
 const pushQueue = 256
 
-func newPushes(s *Service, sender Pusher) *pushes {
-	p := &pushes{s: s, sender: sender, queue: make(chan apns.Push, pushQueue)}
+// liveActivityEvery is the least time between two updates of one Live Activity (#4997).
+// With several lanes at work, a turn moves many times a minute, and each update wakes the
+// Lock Screen.
+const liveActivityEvery = time.Minute
+
+// activityThrottle is one Live Activity's last update, and the newest one held back until
+// its interval ends.
+type activityThrottle struct {
+	last   time.Time
+	held   *apns.Push
+	device string
+	timer  *time.Timer
+}
+
+func newPushes(s *Service, sender Pusher, activityEvery time.Duration) *pushes {
+	p := &pushes{s: s, sender: sender, queue: make(chan apns.Push, pushQueue), activityEvery: activityEvery,
+		activities: map[string]*activityThrottle{}}
 	go p.run()
 	return p
 }
@@ -56,8 +77,57 @@ func (p *pushes) deliver(d notices.RelayDelivery) {
 }
 
 // queueActivity queues a Live Activity's push (#1744) in the same line as the notices, so
-// it goes in the order it was said.
+// it goes in the order it was said. An activity gets at most one update in each interval
+// (#4997): an update that comes sooner is held, a newer one takes its place, and the
+// newest goes when the interval ends. An end goes at once, and the update held goes with
+// nothing.
 func (p *pushes) queueActivity(push apns.Push, device string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	now := time.Now()
+	for token, t := range p.activities {
+		// Bound the map: an activity with nothing held and its interval ended is new again.
+		if t.timer == nil && now.Sub(t.last) >= p.activityEvery {
+			delete(p.activities, token)
+		}
+	}
+	t := p.activities[push.Token]
+	if push.Activity.End {
+		if t != nil {
+			if t.timer != nil {
+				t.timer.Stop()
+			}
+			delete(p.activities, push.Token)
+		}
+		p.queueLocked(push, device)
+		return
+	}
+	if t == nil {
+		p.activities[push.Token] = &activityThrottle{last: now}
+		p.queueLocked(push, device)
+		return
+	}
+	t.held, t.device = &push, device
+	if t.timer == nil {
+		t.timer = time.AfterFunc(t.last.Add(p.activityEvery).Sub(now), func() { p.releaseHeld(push.Token, t) })
+	}
+}
+
+// releaseHeld queues the newest update held for an activity, when its interval ends.
+func (p *pushes) releaseHeld(token string, t *activityThrottle) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.activities[token] != t || t.held == nil {
+		return // It ended.
+	}
+	push := *t.held
+	t.held, t.timer, t.last = nil, nil, time.Now()
+	p.queueLocked(push, t.device)
+}
+
+// queueLocked puts a Live Activity's push in the line; p.mu is held, so pushes for one
+// activity go in the order they were let through.
+func (p *pushes) queueLocked(push apns.Push, device string) {
 	select {
 	case p.queue <- push:
 	default:
@@ -117,6 +187,11 @@ func (p *pushes) send(push apns.Push) {
 		switch {
 		case push.Activity != nil:
 			what = "a Live Activity update"
+			if push.Activity.End {
+				what = "a Live Activity end"
+			}
+			// The priority, so a day's log counts the urgent ones (#4997).
+			what += map[bool]string{true: " (priority 10)", false: " (priority 5)"}[push.Activity.Urgent]
 		case !push.Alert:
 			what = "a background push"
 		}

@@ -184,7 +184,8 @@ type Activity struct {
 	// (at once when zero).
 	End     bool
 	Dismiss time.Time
-	// Urgent: priority 10, which Apple's budget for an activity counts. A working update is 5.
+	// Urgent: priority 10, which Apple's budget for an activity counts: only a turn that asks
+	// the person (#4997). Every other update, and an end, is 5.
 	Urgent bool
 }
 

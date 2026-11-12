@@ -142,7 +142,7 @@ func activitySummary(list []records.ActivityToken, token, agent string, turn wir
 		}
 		ended = max(ended, this.StartedAt)
 		state.EndedAt = &ended
-		a.End, a.Dismiss, a.Urgent = true, now.Add(keptAfterEnd), true
+		a.End, a.Dismiss = true, now.Add(keptAfterEnd)
 		if phase == wire.TurnPhaseGone {
 			// Archived or deleted: it goes at once, as the Remote's own does.
 			state.Phase, a.Dismiss = string(wire.TurnPhaseDone), now
@@ -178,7 +178,10 @@ func activitySummary(list []records.ActivityToken, token, agent string, turn wir
 			state.OthersWorking++
 		}
 	}
-	a.Urgent = shownPhase != wire.TurnPhaseWorking
+	// Only a turn that asks the person is urgent (#4997): priority 10 lights the Lock
+	// Screen, and Apple counts it against the activity's budget. An end, done or failed,
+	// goes at 5.
+	a.Urgent = turnAsks(shownPhase)
 	a.State, _ = json.Marshal(state)
 	return out, push
 }
