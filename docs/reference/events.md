@@ -555,6 +555,7 @@ it, so two machines can make two ids for one change.
 | `gitlab` | `run.completed`, `deploy.waiting` | `gitlab:pipeline:<group/project>#<pipeline id>` | the update time, or the blocked deployments |
 | `forgejo`, `bitbucket` | `issue.*`, `review.comment`, `pr.merged`, `pr.closed`, states | `<server>:issue:` or `<server>:pr:<owner/repo>#<n>` | as `github` |
 | `forgejo`, `bitbucket` | `checks.failed` | the PR | the head commit and the time |
+| `forgejo` | `run.completed` | `forgejo:run:<owner/repo>#<run number>` | the finish time |
 | `azuredevops` | PR events, `checks.*` | `azuredevops:pr:<org/project/repo>#<n>` | the thread and comment, or the head commit and the time |
 | `azuredevops` | `run.completed`, `deploy.waiting` | `azuredevops:run:<org/project/repo>#<build id>` | the finish time, or the environments |
 | `azureboards` | `issue.*` | `azureboards:issue:<org/project>#<id>` | none for `issue.opened`; else the activity's id |

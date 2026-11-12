@@ -91,6 +91,20 @@ var events = append([]event{
 			"run":        object(map[string]any{"id": integer, "name": str, "url": str}),
 			"failedJobs": map[string]any{"type": "array", "items": object(map[string]any{"name": str, "url": str})},
 		})},
+	// A run no pull request owns, as main's or a tag's, as the github server's (#3810, #4217).
+	{Name: "run.completed", Title: "Actions run finished",
+		Description: "A Forgejo Actions run of the repository finished, whatever started it (a push, a tag, workflow_dispatch, a schedule) and whatever its result (success, failure, cancelled, skipped): one event per run and finish time, so a run again is a new one. For a run no pull request owns, such as a tag's release.yml or a dry run started by hand; a pull request's failed checks are checks.failed. run.id is its number (failed_log and retry_pipeline take it), run.workflow its file. Only runs started by a collaborator with write access, never a bot, and never a fork's pull request's, unless anyone is true. deploys is always empty: Forgejo has no deployments. Forgejo has no approval API, so there is no deploy.waiting here.",
+		Input: schema{repoProperty,
+			property{Name: "workflow", Kind: "string", Description: "Only runs of this workflow, by its file name, as release.yml.",
+				Pattern: regexp.MustCompile(`^[A-Za-z0-9_.-]+\.ya?ml$`), LooksLike: "release.yml"},
+			branchProperty("Only runs on this branch or tag, as main or v0.16.0."),
+			property{Name: "run", Kind: "integer", Description: "Only this run, by its number."}, anyoneProperty, anyProperty},
+		Payload: object(map[string]any{
+			"run": object(map[string]any{"id": integer, "name": str, "workflow": str, "event": str, "branch": str, "headSha": str,
+				"url": str, "conclusion": str, "actor": str}),
+			"completedAt": str,
+			"deploys":     map[string]any{"type": "array", "items": str},
+		})},
 	{Name: "pr.opened", Title: "Pull request opened",
 		Description: "A pull request was opened, or a draft (a title that starts WIP:) was marked ready: a pull request open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownPRs,
 		Input:       prInput(),
@@ -340,7 +354,8 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 }
 
 // The refs of what forgejo's events happen to (#4728, spec 4724-event-bus, "A ref").
-func prRef(repo string, n int) wire.Ref { return mcpevents.Ref("forgejo", "pr", repo, fmt.Sprint(n)) }
+func prRef(repo string, n int) wire.Ref  { return mcpevents.Ref("forgejo", "pr", repo, fmt.Sprint(n)) }
+func runRef(repo string, n int) wire.Ref { return mcpevents.Ref("forgejo", "run", repo, fmt.Sprint(n)) }
 func issueRef(repo string, n int) wire.Ref {
 	return mcpevents.Ref("forgejo", "issue", repo, fmt.Sprint(n))
 }
@@ -398,6 +413,20 @@ func candidates(ctx context.Context, f Forgejo, name string, a args, yours *Your
 				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d", repo, c.ID), Time: at,
 					Data:    func() (map[string]any, error) { return c.data(), nil },
 					Subject: prRef(repo, c.PR.Number), Key: fmt.Sprint(c.ID)})
+			}
+		}
+		return list, listed, nil
+	case "run.completed":
+		runs, listed, err := f.CompletedRuns(ctx, repo, a.workflow, a.branch, a.run, since)
+		if err != nil {
+			return nil, Listed{}, err
+		}
+		// Its finish time in the id: a run again (its failed jobs) is a new event.
+		var list []candidate
+		for _, c := range runs {
+			if a.anyone || c.Trusted {
+				list = append(list, candidate{EventID: fmt.Sprintf("run.completed:%s:%d:%s", repo, c.Number, c.At), Time: c.At,
+					Data: mcpevents.Data(c.data()), Subject: runRef(repo, c.Number), Key: c.At})
 			}
 		}
 		return list, listed, nil

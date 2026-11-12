@@ -340,7 +340,7 @@ func TestEventsListSchemas(t *testing.T) {
 		}
 		has("mine", named[name])
 		has("fixes", named[name])
-		has("any", named[name] || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled")
+		has("any", named[name] || name == "run.completed" || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled")
 		if issue, ok := props["issue"].(map[string]any); ok && name != "issue.assigned" && !reflect.DeepEqual(issue["type"], []string{"integer", "array"}) {
 			t.Errorf("%s: issue is %v", name, issue["type"])
 		}

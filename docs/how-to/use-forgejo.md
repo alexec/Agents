@@ -209,6 +209,11 @@ here too:
 - `checks.failed`: an open pull request's head commit failed its checks. Forgejo Actions,
   Woodpecker and any CI that sets a commit status count. `run.id` is the Forgejo Actions
   run, or 0 for another CI.
+- `run.completed`: a Forgejo Actions run of any trigger finished (a push, a tag,
+  `workflow_dispatch`, a schedule), whatever its result (`success`, `failure`, `cancelled`,
+  `skipped`), as the github connector's. `workflow` (its file, as `release.yml`), `branch` (a
+  branch or tag, as `main` or `v0.16.0`) and `run` (its number) narrow it. A run again is a
+  new event. `deploys` is always empty: Forgejo has no deployments.
 - `pr.opened`, `pr.merged`, `pr.closed`, `pr.conflicted`: a draft is a pull request whose
   title starts `WIP:` or `[WIP]`.
 - `review.requested` and `issue.assigned`: for you, the token's owner.
@@ -221,6 +226,9 @@ never a bot. A pull request from a fork never counts.
 
 ## What to know
 
+- **No `deploy.waiting`.** Forgejo has no environments or deployment approvals.
+- **`run.completed` reads the runs created in the 12 hours before a poll**, newest first, at
+  most 500: Forgejo and Gitea list runs by when they were made, not when they finished.
 - **A conflict takes a minute.** Forgejo says a pull request "cannot merge" while it checks
   it too, so `pr.conflicted` waits until it has said so for a minute at the same commit.
   After the host starts again, a conflict that was already there is raised once more.
