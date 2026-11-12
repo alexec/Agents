@@ -51,23 +51,32 @@ struct PaneBanner<Words: View, Actions: View>: View {
     @ViewBuilder let words: () -> Words
     @ViewBuilder let actions: () -> Actions
 
+    /// The banner's width, which picks one row or two.
+    @State var width: CGFloat = .infinity
+    /// Under this, the buttons go under the words.
+    private static var oneRowWidth: CGFloat { 480 }
+
     var body: some View {
-        // One row when it fits; on a narrow pane the buttons go under the words, so a row
-        // of two sentences and two buttons is not a row of truncations.
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: 10) {
-                icon
-                text.frame(maxWidth: .infinity, alignment: .leading)
-                HStack(spacing: 8) { actions() }.fixedSize()
-            }
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
+        // One row; on a narrow pane (the sidebar, a phone) the buttons go under the words,
+        // so a row of two sentences and two buttons is not a row of truncations.
+        Group {
+            if width >= Self.oneRowWidth {
+                HStack(alignment: .center, spacing: 10) {
                     icon
                     text.frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 8) { actions() }.fixedSize()
                 }
-                HStack(spacing: 8) { actions() }
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        icon
+                        text.frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    HStack(spacing: 8) { actions() }
+                }
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .buttonStyle(.paper)
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
