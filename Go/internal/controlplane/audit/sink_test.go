@@ -176,7 +176,10 @@ func TestASinkThatAnswers413GetsSmallerBatches(t *testing.T) {
 		defer mu.Unlock()
 		return got == 1000
 	})
-	if st := sinks.State(); st[0].Queued != 0 || st[0].LastError != nil {
+	// The server counts a batch before it answers, and the sink lets the batch go only
+	// when the answer comes, so the last batch can still be queued here (#4683).
+	waitUntil(t, "an empty queue", func() bool { return sinks.State()[0].Queued == 0 })
+	if st := sinks.State(); st[0].LastError != nil {
 		t.Fatalf("%+v", st)
 	}
 }
