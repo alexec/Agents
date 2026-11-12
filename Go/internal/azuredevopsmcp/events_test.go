@@ -18,7 +18,8 @@ import (
 func TestTheEventsAreTheGitLabServersPullRequestEventsChecksPassedRunCompletedAndDeployWaiting(t *testing.T) {
 	var want []string
 	for _, name := range gitlabmcp.EventNames() {
-		if !strings.HasPrefix(name, "issue.") {
+		// The gitlab server's own run.completed and deploy.waiting are here after checks.passed (#4217).
+		if !strings.HasPrefix(name, "issue.") && name != "run.completed" && name != "deploy.waiting" {
 			want = append(want, name)
 		}
 		if name == "checks.failed" {
