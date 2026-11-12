@@ -1335,6 +1335,15 @@ export interface BrowserClearRequest {
 }
 
 /**
+ * Whether agents on this machine may use the app's browser tools (browser_navigate and the rest,
+ * fill_secret, hand_to_person), and whether each lease of the browser asks a person first (#4264).
+ * Kept in <settings>/browser-control.json. Only the person's own clients may change it.
+ */
+export interface BrowserControlSettings {
+  mode: DriveApproval;
+}
+
+/**
  * browser/frame: a JPEG of the machine's browser's page (#3528, spike #3527), from CDP
  * Page.startScreencast, sent only to the clients that watch it. Never recorded.
  */
@@ -3095,11 +3104,17 @@ export interface DesktopControlPause {
 }
 
 /**
- * Whether agents on this Mac may drive its apps through drive_screen (#3004, FR-004). Kept in
- * <settings>/desktop-control.json; Off when unset. Only the person's own clients may change it.
+ * Whether agents on this Mac may drive its apps through drive_screen (#3004, FR-004), and whether
+ * each lease of the screen asks a person first (#4264). Kept in <settings>/desktop-control.json.
+ * Only the person's own clients may change it.
  */
 export interface DesktopControlSettings {
+  /**
+   * Whether drive_screen is offered: mode is ask or always. A client that sends only enabled sets
+   * always (true) or off (false).
+   */
   enabled: boolean;
+  mode?: DriveApproval;
 }
 
 export type DestinationState =
@@ -3440,6 +3455,18 @@ export interface DraftStep {
   kind: "read" | "help" | "check" | "ask" | "prove" | "note";
   text: string;
 }
+
+/**
+ * Whether an agent's lease of the browser or the screen waits on a person (#4264). ask: each lease
+ * opens a Needs you request of kind approve (secretUse, use browser or screen), the default on a
+ * machine that a person uses; always: it never asks, the default on a machine that only agents use
+ * (a bot's machine, a Codespace), where ask counts as always, as nobody answers there; off: the
+ * tools are not offered, and are refused.
+ */
+export type DriveApproval =
+  | "ask"
+  | "always"
+  | "off";
 
 export interface DropboxPutRequest {
   folder: URLString;
@@ -10699,6 +10726,8 @@ export interface RequestSecretUse {
    * account's service and address.
    */
   call?: string;
+  /** For screen (#4264): the app drive_screen names in the call that asks. */
+  app?: string;
   /**
    * The secret is the session's own (#3548): Always Approve is the same as Approve for This
    * Session.
@@ -11511,14 +11540,19 @@ export interface SecretTerminalValue {
  * secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a
  * terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163)
  * is not a secret's use: manage_accounts reads an account with Ask before use; the request names
- * the account, and Always Approve turns its Ask before use off.
+ * the account, and Always Approve turns its Ask before use off. browser and screen (#4264) are not
+ * a secret's use either: an agent's lease of the browser or the screen on a machine whose Browser
+ * or Desktop control is ask; name is the browser or the screen, place the machine, app the app
+ * drive_screen names, and Always Approve sets the setting to always.
  */
 export type SecretUse =
   | "fill"
   | "ci"
   | "mcp"
   | "terminal"
-  | "account";
+  | "account"
+  | "browser"
+  | "screen";
 
 /**
  * control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was
@@ -14338,6 +14372,8 @@ export interface Methods {
   "browser/state": { params: Empty; result: BrowserState };
   "browser/unwatch": { params: Empty; result: Empty };
   "browser/watch": { params: BrowserWatchRequest; result: BrowserPageState };
+  "browserControl/set": { params: BrowserControlSettings; result: BrowserControlSettings };
+  "browserControl/state": { params: Empty; result: BrowserControlSettings };
   "capacity/state": { params: Empty; result: CapacityState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
@@ -14772,6 +14808,8 @@ export const MethodTarget = {
   "browser/state": "host",
   "browser/unwatch": "host",
   "browser/watch": "host",
+  "browserControl/set": "host",
+  "browserControl/state": "host",
   "capacity/state": "host",
   "changes/file": "host",
   "changes/list": "host",
@@ -15312,6 +15350,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BringBackSummary: { required: ["id", "folder", "machine", "machineName", "source", "startedAt"], optional: [] },
   BrowserAckRequest: { required: ["ack"], optional: [] },
   BrowserClearRequest: { required: [], optional: ["site"] },
+  BrowserControlSettings: { required: ["mode"], optional: [] },
   BrowserFrame: { required: ["image", "ack", "width", "height"], optional: [] },
   BrowserInputRequest: { required: ["kind"], optional: ["type", "x", "y", "button", "clickCount", "deltaX", "deltaY", "key", "code", "keyCode", "text", "modifiers"] },
   BrowserInputResult: { required: [], optional: ["editing"] },
@@ -15440,7 +15479,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeliveredRoute: { required: ["id", "name", "kind", "runtimes", "defaultFor", "secretFields", "version", "sealed", "sealVersion"], optional: ["vendor", "settings", "models", "waiting"] },
   DesktopControlLiveFrame: { required: ["agentID", "capturedAt"], optional: ["image", "locked", "narration"] },
   DesktopControlPause: { required: ["app", "pausedAt"], optional: [] },
-  DesktopControlSettings: { required: ["enabled"], optional: [] },
+  DesktopControlSettings: { required: ["enabled"], optional: ["mode"] },
   DestinationStateAnswer: { required: ["destinationState"], optional: [] },
   DestinationStateRequest: { required: ["previewID", "destination"], optional: [] },
   DetectedServer: { required: ["alias", "resolved", "outcome"], optional: ["detail"] },
@@ -16063,7 +16102,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RequestDetail: { required: [], optional: ["elicitation", "secretUse"] },
   RequestForge: { required: ["provider", "repo", "item", "number", "url", "label", "checklist", "seenAt"], optional: ["screenshots", "author", "updatedAt"] },
   RequestFormAnswer: { required: ["action"], optional: ["content"] },
-  RequestSecretUse: { required: ["name", "use", "place"], optional: ["call", "sessionOnly", "needsSignature"] },
+  RequestSecretUse: { required: ["name", "use", "place"], optional: ["call", "app", "sessionOnly", "needsSignature"] },
   RequestSecretUseAnswer: { required: ["action"], optional: ["approval"] },
   RequestUpdate: { required: ["request"], optional: [] },
   RequestWaiter: { required: ["agent", "since"], optional: [] },

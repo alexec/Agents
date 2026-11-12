@@ -16,6 +16,12 @@ test("a secret's use says which secret and where it goes, never its value (#4017
   assert.equal(words.secretUseTitle(account), "Wants to read gitlab.com (a@example.com)");
   assert.equal(words.secretUseWhere(account), "Account: manage_accounts get");
   assert.deepEqual(words.secretUseActions(account), ["once", "session", "always", "deny"]);
+  // #4264: an agent's lease of the browser or the screen on a machine that asks.
+  const browser = { name: "the browser", use: "browser", place: "Studio" };
+  assert.equal(words.secretUseTitle(browser), "Wants to use the browser");
+  assert.equal(words.secretUseWhere(browser), "Browser on Studio");
+  assert.deepEqual(words.secretUseActions(browser), ["once", "session", "always", "deny"]);
+  assert.equal(words.secretUseWhere({ name: "the screen", use: "screen", place: "Studio", app: "TextEdit" }), "Screen: TextEdit on Studio");
 });
 
 test("a secret's use has four answers, and a session's own secret no Always Approve", () => {

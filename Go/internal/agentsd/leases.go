@@ -343,6 +343,8 @@ func (d *Daemon) settle(events []leaseEvent) {
 		case e.granted:
 			d.record(l.Holder, runtimeNote("Leased "+l.DisplayName+" until "+clock(l.ExpiresAt)+"."))
 		case e.released:
+			// A lease's Approve lasts until it is let go (#4264).
+			d.forgetDriveLease(l.Holder, l.Resource)
 			var note string
 			switch e.ending {
 			case "released":

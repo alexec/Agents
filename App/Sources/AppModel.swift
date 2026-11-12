@@ -2318,13 +2318,28 @@ final class AppModel {
                                                         returning: DesktopControlSettings.self)
     }
 
-    /// The person turned desktop control on or off (#3004, US2, FR-004).
-    func setDesktopControlEnabled(_ on: Bool) async {
+    /// The person set desktop control: Ask, Always Approve or Off (#3004, US2, FR-004, #4264).
+    func setDesktopControl(_ mode: DriveApproval) async {
         await attempt {
             self.desktopControlSettings = try await self.macClient.call(DaemonAPI.Method.desktopControlSet,
-                                                                     DesktopControlSettings(enabled: on),
+                                                                     DesktopControlSettings(mode: mode),
                                                                      returning: DesktopControlSettings.self)
         }
+    }
+
+    /// Settings ▸ Browser's Ask, Always Approve or Off (#4264). Nil from a daemon too old to know it.
+    func browserControl() async -> BrowserControlSettings? {
+        try? await macClient.call(DaemonAPI.Method.browserControlState, DaemonAPI.Empty(), returning: BrowserControlSettings.self)
+    }
+
+    /// The person set the browser: Ask, Always Approve or Off (#4264).
+    func setBrowserControl(_ mode: DriveApproval) async -> BrowserControlSettings? {
+        var saved: BrowserControlSettings?
+        await attempt {
+            saved = try await self.macClient.call(DaemonAPI.Method.browserControlSet, BrowserControlSettings(mode: mode),
+                                                  returning: BrowserControlSettings.self)
+        }
+        return saved
     }
 
     /// Settings ▸ Browser (#3535): this Mac's browser, its sites with sign-ins and its

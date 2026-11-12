@@ -69,7 +69,7 @@ type appTool struct {
 func appToolCalls() []appTool {
 	return []appTool{
 		{"set_session_labels", (*Daemon).setSessionLabels},
-		{"lease_resource", (*Daemon).leaseResource},
+		{"lease_resource", (*Daemon).leaseResourceTool},
 		{"release_resource", (*Daemon).releaseResource},
 		{"list_resources", (*Daemon).listResources},
 		{"wait_for_event", (*Daemon).waitForEvent},
@@ -468,7 +468,7 @@ func (d *Daemon) appToolsHandle(ctx context.Context, g *appGrant, method string,
 			Arguments map[string]json.RawMessage `json:"arguments"`
 		}
 		json.Unmarshal(params, &p)
-		if name, ok := browserToolNamed(p.Name); ok && d.offersBrowser() {
+		if name, ok := browserToolNamed(p.Name); ok && d.browserAvailable() {
 			return d.callBrowserTool(ctx, g.agent, name, p.Arguments), nil
 		}
 		// Matched by the end of the name: a runtime is free to put its own prefix on it.

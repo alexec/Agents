@@ -18,7 +18,7 @@ import type {
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, VelocityHistory, Achievements, Multiplier,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
-  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ConnectAnotherRequest, ConnectReport, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, WakeSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
+  BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ConnectAnotherRequest, ConnectReport, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, DriveApproval, WakeSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
   Connection, LineageNode, LineageSessionIssue, MoveNotification, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestSecretUse, LockDelivery, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder,
   OutsideAccount, OutsideAccounts, PlaneMoveAsk, PlaneMoveReport, UserSecretRow, WebRemoteStatus, WireDate } from "../protocol/generated";
@@ -2648,12 +2648,12 @@ export class Store extends Work {
     await this.link.call("control/connectAnother", request);
   }
 
-  /** The person turned desktop control on or off (#3004, US2, FR-004). */
-  async setDesktopControlEnabled(enabled: boolean): Promise<void> {
+  /** The person set desktop control: Ask, Always Approve or Off (#3004, US2, FR-004, #4264). */
+  async setDesktopControl(mode: DriveApproval): Promise<void> {
     const before = this.desktopControl.value;
-    this.desktopControl.value = { enabled };
+    this.desktopControl.value = { enabled: mode !== "off", mode };
     try {
-      this.desktopControl.value = await this.link.call("desktopControl/set", { enabled }, this.macHostID.value);
+      this.desktopControl.value = await this.link.call("desktopControl/set", { enabled: mode !== "off", mode }, this.macHostID.value);
     } catch (error) {
       this.desktopControl.value = before;
       this.say(describe(error));

@@ -69,6 +69,7 @@ func (d *Daemon) register() {
 	d.registerInstall()
 	d.registerSandbox()
 	d.registerDesktopControl()
+	d.registerBrowserControl()
 	d.registerBrowserSettings()
 	d.registerSessionSecrets()
 	d.registerSealedSecrets()

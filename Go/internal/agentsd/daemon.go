@@ -74,6 +74,7 @@ type Daemon struct {
 	sessionSecretsState
 	sealedSecretsState
 	secretUseState
+	driveApprovalState
 	terminalState
 	secretProxyState
 	lockState
