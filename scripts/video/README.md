@@ -184,6 +184,13 @@ A failed test keeps the video as `failed-<id>.mp4` in the take's folder
 `sound-test.json`, for a person to look at. `make.sh --sound-self-test` makes a track with each
 fault and shows that the test finds it.
 
+## A PR's silent clip (#4094)
+
+`clip.sh ROOT OUT.webp [-- walk steps… | --seconds N]` uses the same recorder for a PR walk:
+the scratch window's frames, as an animated WebP of at most 20 s and 5 MB, for a motion
+that a screenshot cannot show. It needs only Pillow (the venv above, else `uv`'s own). The
+run-app skill's "A silent clip" says when and how to put it on a PR.
+
 ## What it needs
 
 - `ffmpeg` (Homebrew), `uv`, Node and Chrome. The first run makes
