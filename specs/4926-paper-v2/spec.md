@@ -13,6 +13,7 @@ Alex's words on the earlier rounds (2026-11-12):
 2. On the font mocks: show **a high-fidelity mock**.
 3. On the high-fidelity shots of the product: **get the font, the colour and the iconography right together.** Show **a contact sheet of the design system**: every component, the colours and how they are used, the icons and what they mean, the common components. **Borders and shading must be right, and very subtle.**
 4. On the first contact sheet: **a bit more high-contrast; too much shading; gradients are fine.**
+5. On the second: **rather than dark backgrounds, use lighter backgrounds and gradients.**
 
 ## The contact sheet
 
@@ -29,7 +30,7 @@ Alex's words on the earlier rounds (2026-11-12):
 1. **Clear and crisp.** High contrast: deep charcoal ink (17:1) on near-white paper. Every text colour is 4.5:1 or more on every surface, the selection included.
 2. **Few colours, each with one job.** Colour means something: a link, a state or a label. It is never decoration.
 3. **Lines, not shading.** A line (1.5:1) sets things apart. Nothing on the page casts a shadow and there are few grey fills. Only what floats over the page (a menu, a toast, a sheet) has a short shadow. A control's edge is 3:1 or more (WCAG 1.4.11).
-4. **A gradient marks what to press or a state.** The prominent button (ink), the accent button, a picked choice, a toggle, the send button (the app icon's cobalt) and the state badges get a short vertical gradient. White text on each one is 4.7:1 or more.
+4. **No dark fills: light gradients tinted by meaning.** A button, a state badge, a notice, a picked choice and the selected row are light, top-to-bottom gradients tinted by what they mean. Each has a line in the same hue, and its colour is in its text, 5:1 or more. Only a switch that is on is a strong cobalt.
 5. **One face, one icon set, on all three clients.** Today the Mac and the Remote draw SF Symbols, and the web page draws Unicode glyphs (`✎ ▤ ◉ ▦ ✓`). One set makes the three clients look like one product.
 
 ## Token changes (`design/tokens.json`)
@@ -58,19 +59,21 @@ Alex's words on the earlier rounds (2026-11-12):
 
 The code inks and the forge colours keep their values.
 
-### Gradients (new: `gradient.*`)
+### Gradients (new: `gradient.*`, with a `line.*` beside each)
 
-Each one is vertical, top to bottom:
+Light, vertical gradients, tinted by meaning. The text on each one is in its colour:
 
-| Token | Light | Dark | Used for |
-|---|---|---|---|
-| `gradient.ink` | `#3a3835` → `#1a1918` | `#ffffff` → `#dedad2` | the prominent button, a tooltip |
-| `gradient.accent` | `#2f6ee0` → `#1a52c0` | `#a9cbff` → `#5b9bff` | the accent button, send, a picked choice, a toggle or checkbox that is on |
-| `gradient.attention` | `#b8501a` → `#a3400e` | `#f8c39c` → `#f3a672` | the "Needs you" badge, a warning's bar |
-| `gradient.vouched` | `#2f7d5f` → `#25684f` | `#b5e0c8` → `#92ccad` | the "Merged" and "Done" badges |
-| `gradient.failure` | `#c4343b` → `#b0222a` | `#f9b0b4` → `#f4878d` | the "Failed" badge, an error's bar |
+| Token | Light | Dark | Line (light / dark) | Used for |
+|---|---|---|---|---|
+| `gradient.plain` | `#ffffff` → `#efede8` | `#2e2e2c` → `#262625` | `rule`, or `edge` for the prominent button | buttons, a tooltip |
+| `gradient.accent` | `#f3f7ff` → `#dde8fc` | `#22314d` → `#1b2740` | `#a9c2ee` / `#3d5687` | the accent button, send, a picked choice, an info notice |
+| `gradient.attention` | `#fff6ef` → `#fbe2cf` | `#3a2a1f` → `#2f2219` | `#ebbf9f` / `#6b4a33` | the Needs you badge, a warning |
+| `gradient.vouched` | `#f1faf5` → `#d6eee0` | `#1f3a2e` → `#1a2f26` | `#a9d3bb` / `#36614d` | the Merged and Done badges |
+| `gradient.failure` | `#fff3f3` → `#fadadb` | `#3d2224` → `#321c1e` | `#eeb0b3` / `#6b3a3d` | the Failed badge, an error |
+| `gradient.selection` | `#e3ecfc` → `#f3f7ff`, left to right | `#22314d` → `#212120` | a 3px accent bar | the selected row |
+| `gradient.switch` | `#5b9bff` → `#2f6ee0` | `#86b4ff` → `#5b9bff` | none | a toggle or checkbox that is on |
 
-In the light, the text on each gradient is white, and on its lighter top it is 4.7:1 or more. In the dark, the text is `#141413`, and it is 6.2:1 or more. SwiftUI draws each gradient as a `LinearGradient`.
+Each colour's text is 5.1:1 or more on its gradient, in light and dark. SwiftUI draws each one as a `LinearGradient`.
 
 ### Depth (new: `shadow.*`, replacing the one `color.shadow`)
 
@@ -110,7 +113,7 @@ The contact sheet prints each colour's ratio on the ground, light and dark.
 - **Text:** every text colour is 4.5:1 or more on every surface: ground, sidebar, raised, well, wash and selection.
 - **Ink:** 17:1 in the light and 15.6:1 in the dark.
 - **Control edges:** 3:1 or more on every surface where a control is drawn.
-- **Gradients:** the text on each gradient is 4.7:1 or more at its lightest point.
+- **Gradients:** the text on each gradient is 5.1:1 or more at both ends.
 
 The first story adds these pairs to `DesignTokensTests`.
 
@@ -151,7 +154,7 @@ The web page must not clip when a person sets 0.12em letter spacing and 0.16em w
 ## Decisions
 
 - Decided: no handwriting, because Alex wants a clean, simple look (2026-11-12).
-- Decided: higher contrast (ink 17:1), lines (1.5:1) in place of shadows on the page, few grey fills, short shadows only on what floats, and gradients only on what you press or what tells a state, because Alex asked for more contrast, less shading and allowed gradients (2026-11-12). Alex can overrule.
+- Decided: higher contrast (ink 17:1), lines (1.5:1) in place of shadows on the page, few grey fills, short shadows only on what floats, and no dark fills: light gradients tinted by meaning, with the colour in the text, because Alex asked for more contrast, less shading, and lighter backgrounds and gradients (2026-11-12). Alex can overrule.
 - Decided: one icon set, Lucide at a 1.5 stroke, on all three clients, because the clients draw different icons today and Lucide is the one set that meets the library rule. Alex can overrule.
 - Decided: the colour, gradient, depth, radius and spacing tokens above, because each passes WCAG AA and follows the principles. Alex can overrule.
 - Decided: no setting to turn the face off, because one clear look is simpler. Alex can overrule.
