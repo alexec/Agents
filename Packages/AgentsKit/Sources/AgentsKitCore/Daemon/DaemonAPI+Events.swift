@@ -110,11 +110,14 @@ public extension DaemonAPI {
         public var events: [Event]
         public var waiting: [WaitingAgent]
         public var hasMore: Bool
+        /// This machine's producer ref (#4732), as its own events say it.
+        public var producer: String?
 
-        public init(events: [Event], waiting: [WaitingAgent], hasMore: Bool) {
+        public init(events: [Event], waiting: [WaitingAgent], hasMore: Bool, producer: String? = nil) {
             self.events = events
             self.waiting = waiting
             self.hasMore = hasMore
+            self.producer = producer
         }
     }
 

@@ -68,6 +68,7 @@ var own = methodSet(
 	"bots/make",
 	"bots/setCaps",
 	"bots/stopRun",
+	"bus/log",
 	"clients/connections",
 	"clients/forget",
 	"clients/forgetSelf",
@@ -404,6 +405,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.orgRoutesMethod(ctx, method, params, from)
 	case "sealing/work", "sealing/add":
 		return m.sealingMethod(ctx, method, params, from)
+	case wire.CallBusLog.Name:
+		return m.busLogMethod(ctx, params, from)
 	case "lineage/walkAll", "lineage/sessionsOn":
 		return m.lineageReadMethod(ctx, method, params, from)
 	case "links/list", "links/requests", "links/approve", "links/deny", "links/remove":

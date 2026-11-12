@@ -398,6 +398,16 @@ public final class AgentsModel {
                                                 shown: ShownEvents)?
     /// Whether the daemon has older events than `recentEvents` reaches.
     public private(set) var moreEvents = false
+    /// The bus log's events (#4732), every machine's, newest first, as far back as has been
+    /// paged in, each with a position below zero; the Events page shows the ones this
+    /// machine's log does not have.
+    public private(set) var busEvents: [Event] = [] {
+        didSet { eventsRevision &+= 1 }
+    }
+    /// Where the bus log's next page back starts; nil when there is none.
+    public private(set) var busNext: String?
+    /// This machine's producer ref, as `events/list` last said it (#4732).
+    public private(set) var eventsProducer: String?
     /// What `recentEvents` is narrowed to. Set by whoever asks for a page, before it
     /// asks, so a page that comes back for a filter since left is dropped.
     public var eventsFilter = EventFilter()
@@ -412,6 +422,8 @@ public final class AgentsModel {
     public func clearEvents() {
         recentEvents = []
         moreEvents = false
+        busEvents = []
+        busNext = nil
         lastEventAt = nil
         eventsLoaded = false
     }
@@ -1388,8 +1400,31 @@ public final class AgentsModel {
             moreEvents = false
         }
         waitingAgents = page.waiting
+        if let producer = page.producer { eventsProducer = producer }
         eventsLoaded = true
     }
+
+    /// A page of the bus log (#4732), asked for with `filter`. The first page replaces what
+    /// was there; one from further back (`appending`) goes on the end. A page for a filter
+    /// other than the current one is too late, and dropped.
+    public func takeBusLog(_ page: DaemonAPI.BusLogPage, for filter: EventFilter = EventFilter(),
+                           appending: Bool = false) {
+        guard filter == eventsFilter else { return }
+        let kept = appending ? busEvents : []
+        let known = Set(kept.compactMap(\.ref))
+        var next = (kept.map(\.position).min() ?? 0) - 1
+        var events = kept
+        for bus in page.events where !known.contains(bus.id) {
+            events.append(Event(bus: bus, position: next))
+            next -= 1
+        }
+        if events.count > Self.eventsPagedMost { events.removeLast(events.count - Self.eventsPagedMost) }
+        busEvents = events
+        busNext = page.hasMore && events.count < Self.eventsPagedMost ? page.next : nil
+    }
+
+    /// Whether the Events page has older events to page in, from this machine's log or the bus's.
+    public var moreEventsAnywhere: Bool { moreEvents || busNext != nil }
 
     /// `recentEvents` narrowed to `filter` and cut into days, as an Events page draws
     /// them. Worked out again only when the events, the filter or the calendar change,
@@ -1397,10 +1432,24 @@ public final class AgentsModel {
     /// asking is redrawn when they change.
     public func shownEvents(_ filter: EventFilter, calendar: Calendar = .current) -> ShownEvents {
         let events = recentEvents
+        let bus = busEvents
         if let memo = shownMemo, memo.revision == eventsRevision, memo.filter == filter, memo.calendar == calendar {
             return memo.shown
         }
-        let shown = ShownEvents(events.filter(filter.matches), calendar: calendar)
+        var shownEvents = events.filter(filter.matches)
+        // The bus's events this machine's log does not have (#4732): another machine's. They
+        // have no folder here, so a folder's page leaves them out.
+        if filter.scope == nil, !bus.isEmpty {
+            let here = Set(events.compactMap(\.ref))
+            let others = bus.filter { !($0.ref.map(here.contains) ?? false) && filter.matches($0) }
+            if !others.isEmpty {
+                // By when each happened, as the days cut them; stable, so this machine's keep their order.
+                shownEvents = (shownEvents + others).enumerated()
+                    .sorted { $0.element.at != $1.element.at ? $0.element.at > $1.element.at : $0.offset < $1.offset }
+                    .map(\.element)
+            }
+        }
+        let shown = ShownEvents(shownEvents, calendar: calendar)
         shownMemo = (eventsRevision, filter, calendar, shown)
         return shown
     }

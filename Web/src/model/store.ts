@@ -14,7 +14,7 @@ import type {
   PermissionNotification, PermissionRequest, FolderSummary, HelperLimits, DiskThresholds, NotCommittedResponse, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, MCPToolsAnswer, ConnectorToolLevel, DiskState, CapacityState, StoreNotes,
-  CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
+  BusEvent, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, VelocityHistory, Achievements, Multiplier,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
@@ -43,6 +43,7 @@ import { folderKey, folderPath as agentFolderPath, folderView, type FolderView }
 import { decideMacHostNotice, steadyNotice, type MacHostNotice } from "./macHostNotice";
 import { DisplayBuilder, isPersonsAsk, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
 import { sortedRuntimes } from "./runtimes";
+import { busLogQuery, type EnvelopeFilter } from "./eventBus";
 import { personPrompts } from "./sessionPrompts";
 import { shownItems } from "./thoughts";
 import { blockLines, openBlock } from "./block";
@@ -4213,6 +4214,26 @@ export class Store extends Work {
       const hasMore = page.hasMore || merged.length > eventsKept;
       this.events.value = { ...this.events.value, [host]: { ...page, events: merged.slice(0, eventsKept), hasMore } };
     }
+  }
+
+  /**
+   * The person's bus log (#4732): every machine's events, newest first, for the rows no host here
+   * has. Null until read, and on a control plane too old for it. `filter` is what it was read for.
+   */
+  readonly busLog = signal<{ events: BusEvent[]; next?: string; filter: EnvelopeFilter } | null>(null);
+
+  /** The newest page of the bus log, narrowed by the envelope's fields; an older page with `older`. */
+  async loadBusLog(filter: EnvelopeFilter, older = false): Promise<void> {
+    const held = this.busLog.value;
+    if (older && !held?.next) return;
+    const page = await this.link.call("bus/log", busLogQuery(filter, older ? held?.next : undefined)).catch(() => null);
+    if (!page) return;
+    const now = this.busLog.value;
+    // A page for a filter since left is too late.
+    if (older && (!now || JSON.stringify(now.filter) !== JSON.stringify(filter))) return;
+    const events = older && now ? [...now.events, ...page.events.filter((e: BusEvent) => !now.events.some((n) => n.id === e.id))] : page.events;
+    const kept = events.slice(0, eventsPagedMost);
+    this.busLog.value = { events: kept, filter, ...(page.hasMore && page.next !== undefined && kept.length < eventsPagedMost && { next: page.next }) };
   }
 
   /** Events ▸ Waiting now's ✕ (#541): the wait ends and nothing starts the agent again for it. */

@@ -1592,6 +1592,35 @@ export interface BusEvent {
 }
 
 /**
+ * bus/log's answer (#4732): envelopes of the caller's bus, newest first. Envelope only, as the bus
+ * keeps it: no data.
+ */
+export interface BusLogPage {
+  events: BusEvent[];
+  /** Where the next page back starts, as before; none when nothing older was read. */
+  next?: string;
+  /** Whether older envelopes are on the bus log. */
+  hasMore: boolean;
+}
+
+/**
+ * bus/log (#4732, spec 4724-event-bus, "The bus log"): a page of the caller's bus log, newest
+ * first, narrowed by the envelope's fields.
+ */
+export interface BusLogQuery {
+  /** The next of the page before: only envelopes older than it. */
+  before?: string;
+  /** At most this many; 100 when absent, never more than 500. */
+  limit?: number;
+  /** Only events of this provider (#4732): github, jira, agents and so on. */
+  provider?: string;
+  /** Only events of this type (#4732), noun.verbed, or noun.* for every type of that noun. */
+  type?: string;
+  /** Only events on this topic (#4732), such as a repo's full name; lower case. */
+  topic?: string;
+}
+
+/**
  * bus/publish (#4729): events a machine recorded, at most 100 at a time, oldest first. Best effort:
  * one not sent when it happened is never sent later.
  */
@@ -3932,6 +3961,11 @@ export interface EventsListRequest {
 export interface EventsPage {
   events: Event[];
   waiting: WaitingAgent[];
+  /**
+   * This machine's producer ref (#4732), agents:machine:#<machine>, as its own events say it: an
+   * event whose producer is another says which machine raised it.
+   */
+  producer?: string;
   hasMore: boolean;
 }
 
@@ -14589,6 +14623,7 @@ export interface Methods {
   "browser/state": { params: Empty; result: BrowserState };
   "browser/unwatch": { params: Empty; result: Empty };
   "browser/watch": { params: BrowserWatchRequest; result: BrowserPageState };
+  "bus/log": { params: BusLogQuery; result: BusLogPage };
   "capacity/state": { params: Empty; result: CapacityState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
@@ -15023,6 +15058,7 @@ export const MethodTarget = {
   "browser/state": "host",
   "browser/unwatch": "host",
   "browser/watch": "host",
+  "bus/log": "control",
   "capacity/state": "host",
   "changes/file": "host",
   "changes/list": "host",
@@ -15577,6 +15613,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   BusDelivery: { required: ["event", "subscriptions"], optional: [] },
   BusEvent: { required: ["specversion", "id", "type", "provider", "topic", "source", "time", "producer"], optional: ["subject", "sealed"] },
+  BusLogPage: { required: ["events", "hasMore"], optional: ["next"] },
+  BusLogQuery: { required: [], optional: ["before", "limit", "provider", "type", "topic"] },
   BusPublish: { required: ["events"], optional: [] },
   BusPublished: { required: ["kept", "dropped"], optional: [] },
   BusSealedData: { required: ["machine", "sealed"], optional: [] },
@@ -15760,7 +15798,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID", "serverEvents", "forPerson"] },
   EventsChange: { required: ["waiting"], optional: ["event"] },
   EventsListRequest: { required: ["limit"], optional: ["before", "scope", "groups"] },
-  EventsPage: { required: ["events", "waiting", "hasMore"], optional: [] },
+  EventsPage: { required: ["events", "waiting", "hasMore"], optional: ["producer"] },
   FeatureUsage: { required: ["days", "features"], optional: ["since"] },
   FeatureUse: { required: ["method", "week", "quarter", "clients"], optional: ["lastUsed"] },
   FileCompletion: { required: ["label"], optional: ["insert", "detail"] },

@@ -782,3 +782,30 @@ test("a search for an epic groups what it found under each issue, the epic's own
   assert.deepEqual(folderSessions([lead], [], query).map((a) => a.id), ["lead"], "its folder lists it, working or not");
   assert.equal(groupsByIssue({ ...query, issueHeadings: [{ node: node(40) }] }), false, "an issue with no sub-issues keeps one list");
 });
+
+test("Events: the bus log's other events join the list, and the envelope narrows it (#4732)", async () => {
+  const { joinBus, envelopeMatches, busLogQuery, producerMachine, envelopeChoices } = await load("src/model/eventBus.ts");
+  const { eventDetailRows, eventFrom } = await load("src/views/Activity.tsx");
+  const bus = (n, time, producer = "agents:machine:#linux-b", type = "pr.merged", provider = "github") => ({
+    specversion: "1.0", id: `${provider}:pr:alexec/agents#${n}@${type}`, type, provider, topic: "alexec/agents",
+    subject: `${provider}:pr:alexec/agents#${n}`, source: `${provider}:alexec/agents`, time, producer });
+  const mine = { position: 4, name: "pr.merged", at: 1_000_000_000, count: 1, scope: { mac: {} }, sentence: "PR 1 merged.",
+    details: {}, chainDepth: 0, consequences: [], id: "github:pr:alexec/agents#1@pr.merged", type: "pr.merged",
+    provider: "github", topic: "alexec/agents", producer: "agents:machine:#mac-mini" };
+  // 1_000_000_000 seconds after 2001-01-01 is 2032-09-09.
+  const rows = joinBus([{ host: "mac", event: mine }],
+    [bus(2, "2033-01-01T00:00:00Z"), bus(1, "2032-09-09T01:46:40Z", "agents:machine:#mac-mini"), bus(3, "2030-01-01T00:00:00Z")]);
+  assert.deepEqual(rows.map(({ host, event }) => `${host ?? "bus"}:${event.position}`), ["bus:-1", "mac:4", "bus:-2"],
+    "one on both is the host's, once; the rest by time");
+  assert.equal(rows[0].event.sentence, "pr.merged on github:pr:alexec/agents#2");
+  assert.equal(producerMachine(rows[0].event.producer), "linux-b");
+  assert.equal(eventFrom(rows[0].event, "agents:machine:#mac-mini"), "linux-b");
+  assert.equal(eventFrom(mine, "agents:machine:#mac-mini"), undefined, "this machine's own says nothing");
+  assert.equal(envelopeMatches({ provider: "jira" }, mine), false);
+  assert.equal(envelopeMatches({ provider: "github", type: "pr.merged", topic: "alexec/agents" }, mine), true);
+  assert.equal(envelopeMatches({ type: "agent.finished" }, { ...mine, type: undefined, name: "agent.finished" }), true, "an old event matches by name");
+  assert.deepEqual(busLogQuery({ provider: "jira" }, "n"), { limit: 100, before: "n", provider: "jira" });
+  assert.deepEqual(envelopeChoices([mine, rows[0].event], (e) => e.provider, "slack"), ["github", "slack"]);
+  const detail = eventDetailRows(rows[0].event, "From linux-b").map(([name]) => name);
+  assert.deepEqual(detail, ["When", "Where", "Ref", "Provider", "Topic", "Subject"], "a bus row has no position");
+});

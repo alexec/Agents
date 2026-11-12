@@ -75,4 +75,57 @@ struct EventsPageModelTests {
         #expect(model.recentEvents.count == AgentsModel.eventsKept)
         #expect(model.moreEvents)
     }
+
+    // MARK: The bus log (#4732)
+
+    private func bus(_ n: Int, at seconds: TimeInterval, from machine: String = "linux-b",
+                     type: String = "pr.merged", provider: String = "github") -> DaemonAPI.BusEvent {
+        let subject = WireRef(provider: provider, type: "pr", topic: "alexec/agents", id: "\(n)")
+        let time = ISO8601DateFormatter().string(from: t0.addingTimeInterval(seconds))
+        return DaemonAPI.BusEvent(id: "\(subject)@\(type)", type: type, provider: provider, topic: "alexec/agents",
+                                  subject: subject, time: time, producer: "agents:machine:#\(machine)")
+    }
+
+    /// The page shows this machine's events and the bus's that it does not have, by time;
+    /// one that is on both is shown once, as this machine's.
+    @Test func theBusLogsOtherEventsJoinTheList() {
+        let model = AgentsModel()
+        var mine = event(10, "pr.merged", .mac)
+        mine.ref = bus(1, at: 10).id
+        mine.provider = "github"
+        mine.topic = "alexec/agents"
+        model.takeEvents(DaemonAPI.EventsPage(events: [mine, event(5)], waiting: [], hasMore: false,
+                                              producer: "agents:machine:#mac-mini"))
+        model.takeBusLog(DaemonAPI.BusLogPage(events: [bus(2, at: 20), bus(1, at: 10, from: "mac-mini"), bus(3, at: 7)],
+                                              next: "x", hasMore: true))
+        let shown = model.shownEvents(EventFilter())
+        #expect(shown.events.map(\.position) == [-1, 10, -3, 5])
+        #expect(shown.events.first?.sentence == "pr.merged on github:pr:alexec/agents#2")
+        #expect(shown.events.first?.producerMachine == "linux-b")
+        #expect(model.eventsProducer == "agents:machine:#mac-mini")
+        #expect(model.moreEventsAnywhere)
+        // A folder's page has none of another machine's.
+        #expect(model.shownEvents(EventFilter(scope: api)).events.map(\.position) == [5])
+        // Paging back goes on below the positions it gave.
+        model.takeBusLog(DaemonAPI.BusLogPage(events: [bus(4, at: 1)], hasMore: false), appending: true)
+        #expect(model.busEvents.map(\.position) == [-1, -2, -3, -4])
+        #expect(!model.moreEventsAnywhere)
+    }
+
+    @Test func theEnvelopesFieldsNarrowTheList() {
+        let model = AgentsModel()
+        model.takeBusLog(DaemonAPI.BusLogPage(events: [bus(1, at: 3), bus(2, at: 2, type: "issue.created", provider: "jira")],
+                                              hasMore: false))
+        let jira = EventFilter(provider: "jira")
+        model.eventsFilter = jira
+        model.takeBusLog(DaemonAPI.BusLogPage(events: [bus(2, at: 2, type: "issue.created", provider: "jira")], hasMore: false),
+                         for: jira)
+        #expect(model.shownEvents(jira).events.map(\.type) == ["issue.created"])
+        #expect(model.shownEvents(EventFilter(type: "pr.merged")).events.isEmpty)
+        #expect(EventFilter(provider: "jira", type: "issue.*", topic: "abc").busLogQuery(before: "n", limit: 5)
+            == DaemonAPI.BusLogQuery(before: "n", limit: 5, provider: "jira", type: "issue.*", topic: "abc"))
+        // An event from before the envelope matches by its name.
+        #expect(EventFilter(type: "agent.finished").matches(event(1)))
+        #expect(!EventFilter(provider: "github").matches(event(1)))
+    }
 }

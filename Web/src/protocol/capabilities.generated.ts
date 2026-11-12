@@ -691,6 +691,7 @@ export const ControlCapabilities: Readonly<Record<string, Capability>> = {
   "bots/make": "bots/1",
   "bots/setCaps": "bots/1",
   "bots/stopRun": "bots/1",
+  "bus/log": "events.bus/1",
   "bus/publish": "events.bus/1",
   "bus/subscribe": "events.bus/1",
   "clients/announce": "clients/1",

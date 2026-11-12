@@ -360,3 +360,68 @@ func sweepBus(ctx context.Context, st store.Store, kept, most int) (int, error) 
 	}
 	return n, nil
 }
+
+const (
+	// busLogPage and busLogPageMost are bus/log's page, as the wire says.
+	busLogPage     = 100
+	busLogPageMost = 500
+	// busLogReadMost bounds the envelopes one bus/log call reads; a narrow filter that
+	// finds too few in them says next, and the client reads on from there.
+	busLogReadMost = 2_000
+)
+
+// busLogMethod is bus/log (#4732): a page of the caller's bus log, newest first, narrowed
+// by the envelope's provider, type (a name or noun.*) and topic, for the Events page.
+func (m *Methods) busLogMethod(ctx context.Context, params json.RawMessage, from Caller) (any, error) {
+	q, err := require[wire.BusLogQuery](params, "BusLogQuery")
+	if err != nil {
+		return nil, err
+	}
+	return m.s.busLog(ctx, m.callerPerson(from), q)
+}
+
+func (s *Service) busLog(ctx context.Context, person string, q wire.BusLogQuery) (wire.BusLogPage, error) {
+	limit := busLogPage
+	if q.Limit != nil {
+		limit = max(1, min(int(*q.Limit), busLogPageMost))
+	}
+	match := wire.BusSubscription{ID: "bus/log", Provider: q.Provider, Type: q.Type}
+	if q.Topic != nil && *q.Topic != "" {
+		match.Topics = []string{strings.ToLower(*q.Topic)}
+	}
+	prefix := busPrefix + busOf(person) + "/log/"
+	keys, err := s.cfg.Store.List(ctx, prefix)
+	if err != nil {
+		return wire.BusLogPage{}, fail(storeUnavailable, "The bus log could not be read: %v", err)
+	}
+	out := wire.BusLogPage{Events: []wire.BusEvent{}}
+	i := len(keys) - 1
+	if q.Before != nil && *q.Before != "" {
+		before := prefix + *q.Before
+		for i >= 0 && keys[i].Key >= before {
+			i--
+		}
+	}
+	read := 0
+	for ; i >= 0 && len(out.Events) < limit && read < busLogReadMost; i-- {
+		read++
+		name := strings.TrimPrefix(keys[i].Key, prefix)
+		out.Next = &name
+		obj, err := s.cfg.Store.Get(ctx, keys[i].Key)
+		if err != nil {
+			return wire.BusLogPage{}, fail(storeUnavailable, "The bus log could not be read: %v", err)
+		}
+		var e wire.BusEvent
+		if obj == nil || json.Unmarshal(obj.Data, &e) != nil || !busMatches(match, e) {
+			continue
+		}
+		// The envelope only: the sealed data is each machine's to open, not the page's.
+		e.Sealed = nil
+		out.Events = append(out.Events, e)
+	}
+	out.HasMore = i >= 0
+	if !out.HasMore {
+		out.Next = nil
+	}
+	return out, nil
+}

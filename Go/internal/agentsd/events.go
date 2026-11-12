@@ -579,7 +579,9 @@ func (d *Daemon) eventsPage(r wire.EventsListRequest) wire.EventsPage {
 		page = append(page, copyEvent(e))
 	}
 	d.eventMu.Unlock()
-	return wire.EventsPage{Events: page, Waiting: d.waitingAgents(), HasMore: more}
+	// This machine's producer ref (#4732): the Events page says which other machine raised an event.
+	producer := "agents:machine:#" + d.envelopeMachine()
+	return wire.EventsPage{Events: page, Waiting: d.waitingAgents(), HasMore: more, Producer: &producer}
 }
 
 var eventNameShape = regexp.MustCompile(`^[a-z][a-z_]*\.[a-z][a-z0-9_]*$`)

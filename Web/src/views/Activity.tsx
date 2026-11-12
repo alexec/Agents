@@ -39,6 +39,7 @@ import { OrgBudget, OrgPolicyLine, PassThroughList } from "./OrgPolicyLine";
 import { PageTitle } from "./TopBar";
 import { pageCrumbs, sectionOfActivity } from "../model/crumbs";
 import { ask } from "./MessageKinds";
+import { busRow, envelopeChoices, envelopeMatches, joinBus, producerMachine, type EnvelopeFilter, type EventItem } from "../model/eventBus";
 
 function navigate(destination: { host: string; folder: string; session?: string; workflow?: string }): void {
   const parts = ["h", destination.host, "p", destination.folder];
@@ -458,18 +459,45 @@ export function eventDetailRows(event: Event, scopeName: string): [string, strin
     ["When", fromWireDate(event.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "medium" })],
     ["Where", scopeName],
   ];
+  // The envelope (#4728, #4732): its ref, provider, topic and subject.
+  if (event.id) rows.push(["Ref", event.id]);
+  if (event.provider) rows.push(["Provider", event.provider]);
+  if (event.topic) rows.push(["Topic", event.topic]);
+  if (event.subject) rows.push(["Subject", event.subject]);
   if (event.count > 1 && event.lastAt !== undefined) rows.push(["Repeats", `${event.count} times, last at ${clock(fromWireDate(event.lastAt))}`]);
   if (event.actor) rows.push(["By", who(event.actor)]);
   if (event.publisher) rows.push(["Published by", event.publisher.title]);
   if (event.message) rows.push(["Message", event.message]);
   for (const key of Object.keys(event.details).sort()) rows.push([key, event.details[key]!]);
-  rows.push(["Position", String(event.position)]);
+  // A row from the bus log has no place in a host's log (#4732).
+  if (event.position >= 0) rows.push(["Position", String(event.position)]);
   return rows;
+}
+
+/** The machine that raised an event, when that is not the host whose log it is in (#4732). */
+export function eventFrom(event: Event, ownProducer: string | undefined): string | undefined {
+  if (!event.producer || event.producer === ownProducer) return undefined;
+  return ownProducer === undefined && event.position >= 0 ? undefined : producerMachine(event.producer);
 }
 
 function EventsList({ store, hostName }: { store: Store; hostName: (host: string) => string }) {
   const where = useSignal("all");
-  const picked = useSignal<{ host: string; event: Event; scope: string } | null>(null);
+  const picked = useSignal<{ host?: string; event: Event; scope: string } | null>(null);
+  // The envelope's provider, type and topic (#4732).
+  const envelope = useSignal<EnvelopeFilter>({});
+  const filter = envelope.value;
+  const filterKey = JSON.stringify(filter);
+  useEffect(() => {
+    void store.loadBusLog(filter);
+    // Other machines' events come from the bus log, which tells no one when it grows.
+    const every = setInterval(() => { if (document.visibilityState === "visible") void store.loadBusLog(filter); }, 30_000);
+    return () => clearInterval(every);
+  }, [filterKey]);
+  const setEnvelope = (key: keyof EnvelopeFilter, value: string) => {
+    const next = { ...envelope.value };
+    if (value) next[key] = value; else delete next[key];
+    envelope.value = next;
+  };
   const several = store.hosts.value.length > 1;
   const scopeName = (host: string, event: Event) => {
     if ("mac" in event.scope) return "This Mac";
@@ -481,11 +509,27 @@ function EventsList({ store, hostName }: { store: Store; hostName: (host: string
     .filter((folder) => !folder.folder.archivedAt)
     .map((folder) => ({ value: `${host.id}|${folderKey(folder.folder.folder)}`, name: several ? `${hostName(host.id)}: ${folder.name}` : folder.name })))
     .sort((a, b) => a.name.localeCompare(b.name));
-  const events: { host: string; event: Event }[] = Object.entries(store.events.value)
-    .flatMap(([host, page]) => page.events.filter((event) => eventIsIn(where.value, host, event)).map((event) => ({ host, event })))
-    .sort((a, b) => (b.event.lastAt ?? b.event.at) - (a.event.lastAt ?? a.event.at));
+  const hostItems: EventItem[] = Object.entries(store.events.value)
+    .flatMap(([host, page]) => page.events.filter((event) => eventIsIn(where.value, host, event) && envelopeMatches(filter, event))
+      .map((event) => ({ host, event })));
+  // The bus's events that no host here has: another machine's, with no folder here (#4732).
+  const bus = where.value === "all" ? (store.busLog.value?.events ?? []) : [];
+  const events = joinBus(hostItems, bus).filter(({ host, event }) => host !== undefined || envelopeMatches(filter, event));
+  const held = [...Object.values(store.events.value).flatMap((page) => page.events), ...(store.busLog.value?.events ?? []).map((one, index) => busRow(one, -1 - index))];
+  const producers = new Map(Object.entries(store.events.value).flatMap(([host, page]) => page.producer ? [[page.producer, host] as const] : []));
+  /** Where it happened, or, for another machine's, which machine raised it. */
+  const placeOf = (host: string | undefined, event: Event): string => {
+    if (host === undefined) {
+      const listed = event.producer ? producers.get(event.producer) : undefined;
+      return `From ${listed ? hostName(listed) : producerMachine(event.producer) ?? "another machine"}`;
+    }
+    const scope = scopeName(host, event);
+    const from = eventFrom(event, store.events.value[host]?.producer);
+    if (from) return `${scope} · from ${from}`;
+    return hostName(host) !== scope && several ? `${scope} · ${hostName(host)}` : scope;
+  };
   const waiting = Object.entries(store.events.value).flatMap(([host, page]) => page.waiting.map((w) => ({ host, w })));
-  const days = new Map<string, { title: string; items: { host: string; event: Event }[] }>();
+  const days = new Map<string, { title: string; items: EventItem[] }>();
   for (const item of events) {
     const date = fromWireDate(item.event.lastAt ?? item.event.at);
     const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
@@ -503,8 +547,17 @@ function EventsList({ store, hostName }: { store: Store; hostName: (host: string
     const agent = await store.loadEventAgent(host, id);
     if (agent) navigate({ host, folder: folderPath(agent), session: id });
   };
-  const showOlder = () => { for (const [host, page] of Object.entries(store.events.value)) if (page.hasMore) void store.loadOlderEvents(host); };
-  const hasOlder = Object.values(store.events.value).some((page) => page.hasMore);
+  const showOlder = () => {
+    for (const [host, page] of Object.entries(store.events.value)) if (page.hasMore) void store.loadOlderEvents(host);
+    if (store.busLog.value?.next) void store.loadBusLog(filter, true);
+  };
+  const hasOlder = Object.values(store.events.value).some((page) => page.hasMore) || !!store.busLog.value?.next;
+  const envelopeMenu = (key: keyof EnvelopeFilter, all: string, value: (event: Event) => string | undefined) => (
+    <select aria-label={all} value={filter[key] ?? ""} onChange={(e) => setEnvelope(key, (e.currentTarget as HTMLSelectElement).value)}>
+      <option value="">{all}</option>
+      {envelopeChoices(held, value, filter[key]).map((choice) => <option key={choice} value={choice}>{choice}</option>)}
+    </select>
+  );
   const shown = picked.value;
   return (
     <>
@@ -530,43 +583,52 @@ function EventsList({ store, hostName }: { store: Store; hostName: (host: string
           <option value="mac">This Mac</option>
           {places.map((place) => <option key={place.value} value={place.value}>{place.name}</option>)}
         </select>
+        {envelopeMenu("provider", "All providers", (event) => event.provider)}
+        {envelopeMenu("type", "All types", (event) => event.type ?? event.name)}
+        {envelopeMenu("topic", "All topics", (event) => event.topic)}
       </div>
-      {events.length === 0 && <p class="hint">{where.value === "all" ? "Nothing yet." : "Nothing has happened there yet."}</p>}
+      {events.length === 0 && <p class="hint">{where.value === "all" && filterKey === "{}" ? "Nothing yet." : "Nothing has happened there yet."}</p>}
       {[...days.entries()].map(([key, day]) => <section key={key}>
         <h3 class="event-day">{day.title}</h3>
         <ul class="event-list">{day.items.map(({ host, event }) => {
           const at = fromWireDate(event.at);
-          const scope = scopeName(host, event);
-          const open = () => (picked.value = { host, event, scope: hostName(host) !== scope && several ? `${scope} · ${hostName(host)}` : scope });
-          return <li key={`${host}|${event.position}`}>
+          const place = placeOf(host, event);
+          const open = () => (picked.value = { ...(host !== undefined && { host }), event, scope: place });
+          return <li key={`${host ?? "bus"}|${event.position}`}>
             <time class="when" dateTime={at.toISOString()} title={at.toLocaleString()}>{clock(at)}</time>
             <span class="body">
               <button class="event-open" title="Everything this event carries" onClick={open}>
                 {event.sentence}{event.count > 1 && <span class="quiet"> ×{event.count}</span>}
               </button>
-              <span class="quiet small event-name">{event.name} · {scope}{hostName(host) !== scope && ` · ${hostName(host)}`}</span>
+              <span class="quiet small event-name">{[event.type ?? event.name, event.provider, event.topic, place].filter(Boolean).join(" · ")}</span>
+              {event.id && <code class="quiet small event-ref" title="This event's ref">{event.id}</code>}
               {event.publisher && <span class="quiet small">by “{event.publisher.title}”</span>}
               {event.message && <span class="quiet small">“{event.message}”</span>}
-              {event.consequences.map((consequence, index) => <ConsequenceLine key={index} consequence={consequence} host={host} store={store} openAgent={openAgent} />)}
+              {host !== undefined && event.consequences.map((consequence, index) => <ConsequenceLine key={index} consequence={consequence} host={host} store={store} openAgent={openAgent} />)}
             </span>
           </li>;
         })}</ul>
       </section>)}
       {hasOlder && <button class="link event-older" onClick={showOlder}>Show older</button>}
-      {shown && <EventDetail key={`${shown.host}|${shown.event.position}`} event={shown.event} scope={shown.scope} close={() => (picked.value = null)} />}
+      {shown && <EventDetail key={`${shown.host ?? "bus"}|${shown.event.position}`} event={shown.event} scope={shown.scope} close={() => (picked.value = null)} />}
     </>
   );
 }
 
 /** One event, read-only: the window's detail and the Remote's sheet. Copy as trigger stays the Mac's. */
 function EventDetail({ event, scope, close }: { event: Event; scope: string; close: () => void }) {
+  const copied = useSignal(false);
+  const copyRef = () => { if (event.id) void navigator.clipboard?.writeText(event.id).then(() => { copied.value = true; }); };
   return (
     <Modal label="Event" close={close}>
       <form method="dialog" class="sheet-body event-detail">
         <h2>{event.sentence}</h2>
         <p class="quiet small event-name">{event.name}</p>
         <dl>{eventDetailRows(event, scope).map(([name, value], index) => <div key={index}><dt>{name}</dt><dd>{value}</dd></div>)}</dl>
-        <div class="sheet-actions"><button value="close">Done</button></div>
+        <div class="sheet-actions">
+          {event.id && <button type="button" title="Copies this event's ref, which a wait, a workflow or an agent can name" onClick={copyRef}>{copied.value ? "Copied" : "Copy ref"}</button>}
+          <button value="close">Done</button>
+        </div>
       </form>
     </Modal>
   );

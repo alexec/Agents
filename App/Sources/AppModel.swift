@@ -2549,14 +2549,32 @@ final class AppModel {
     func refreshEvents(_ filter: EventFilter? = nil) async {
         let filter = filter ?? work.eventsFilter
         work.eventsFilter = filter
-        guard let page = try? await macClient.call(DaemonAPI.Method.eventsList, DaemonAPI.EventsListRequest(filter),
-                                                returning: DaemonAPI.EventsPage.self) else { return }
-        work.takeEvents(page, for: filter)
+        async let bus: Void = refreshBusLog(filter)
+        if let page = try? await macClient.call(DaemonAPI.Method.eventsList, DaemonAPI.EventsListRequest(filter),
+                                                returning: DaemonAPI.EventsPage.self) {
+            work.takeEvents(page, for: filter)
+        }
+        await bus
+    }
+
+    /// The newest page of the person's bus log (#4732): every machine's events, for the rows
+    /// this Mac's log does not have. None with no control plane, or one too old for it.
+    func refreshBusLog(_ filter: EventFilter? = nil) async {
+        let filter = filter ?? work.eventsFilter
+        guard let control = controlRequests,
+              let page = try? await control.call(DaemonAPI.Method.busLog, filter.busLogQuery(),
+                                                 returning: DaemonAPI.BusLogPage.self) else { return }
+        work.takeBusLog(page, for: filter)
     }
 
     /// The page before the oldest event the window has, for scrolling back.
     func loadOlderEvents() async {
         let filter = work.eventsFilter
+        if let next = work.busNext, let control = controlRequests,
+           let page = try? await control.call(DaemonAPI.Method.busLog, filter.busLogQuery(before: next),
+                                              returning: DaemonAPI.BusLogPage.self) {
+            work.takeBusLog(page, for: filter, appending: true)
+        }
         guard work.moreEvents, let oldest = work.recentEvents.last?.position else { return }
         guard let page = try? await macClient.call(DaemonAPI.Method.eventsList,
                                                 DaemonAPI.EventsListRequest(before: oldest, filter),

@@ -341,6 +341,32 @@
       ]
     },
     {
+      "name": "bus/log",
+      "x-capability": "events.bus/1",
+      "description": "A person's client (#4732, spec 4724-event-bus, \"The bus log\"): a page of their bus log, newest first, for the Events page. Envelope only.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BusLogQuery"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BusLogPage"
+        }
+      }
+    },
+    {
       "name": "bus/publish",
       "x-capability": "events.bus/1",
       "description": "A machine, on its channel 0 (#4729, spec 4724-event-bus): events it recorded, envelope only. The control plane keeps the first copy of each id in the bus log (the last 100,000 of each person's bus), drops and counts a later copy, and delivers it to each machine with a matching subscription (bus/deliver).",

@@ -1734,6 +1734,35 @@ type BusEvent struct {
 	Sealed []BusSealedData `json:"sealed,omitzero"`
 }
 
+// bus/log's answer (#4732): envelopes of the caller's bus, newest first. Envelope only, as the bus keeps it: no data.
+type BusLogPage struct {
+	Events []BusEvent `json:"events"`
+
+	// Where the next page back starts, as before; none when nothing older was read.
+	Next *string `json:"next,omitzero"`
+
+	// Whether older envelopes are on the bus log.
+	HasMore bool `json:"hasMore"`
+}
+
+// bus/log (#4732, spec 4724-event-bus, "The bus log"): a page of the caller's bus log, newest first, narrowed by the envelope's fields.
+type BusLogQuery struct {
+	// The next of the page before: only envelopes older than it.
+	Before *string `json:"before,omitzero"`
+
+	// At most this many; 100 when absent, never more than 500.
+	Limit *int64 `json:"limit,omitzero"`
+
+	// Only events of this provider (#4732): github, jira, agents and so on.
+	Provider *string `json:"provider,omitzero"`
+
+	// Only events of this type (#4732), noun.verbed, or noun.* for every type of that noun.
+	Type *string `json:"type,omitzero"`
+
+	// Only events on this topic (#4732), such as a repo's full name; lower case.
+	Topic *string `json:"topic,omitzero"`
+}
+
 // bus/publish (#4729): events a machine recorded, at most 100 at a time, oldest first. Best effort: one not sent when it happened is never sent later.
 type BusPublish struct {
 	Events []BusEvent `json:"events"`
@@ -4408,6 +4437,9 @@ type EventsPage struct {
 	Events []Event `json:"events"`
 
 	Waiting []WaitingAgent `json:"waiting"`
+
+	// This machine's producer ref (#4732), agents:machine:#<machine>, as its own events say it: an event whose producer is another says which machine raised it.
+	Producer *string `json:"producer,omitzero"`
 
 	HasMore bool `json:"hasMore"`
 }
