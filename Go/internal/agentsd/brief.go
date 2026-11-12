@@ -39,6 +39,10 @@ const leasesBrief = "Lease a shared resource with lease_resource before using it
 	"same order every time. A simulator, a browser and the screen (mouse, keyboard, front " +
 	"window) are for one agent at a time; lease a simulator by its UDID. If told " +
 	"you are in line, end your turn: a lease.granted event starts you again when it is yours. " +
+	// The machine's capacity (#4579).
+	"A lease or a start can wait for the machine, not only for a holder: before heavy work " +
+	"that no declared resource names (a long test suite, a Chromium, a simulator, a script that " +
+	"builds), lease capacity, which goes in line while the machine is near or at capacity. " +
 	// The person's booking (#4268).
 	"Before a step that gives me a short time to act (a code sent by text or email, a " +
 	"sign-in to approve on my phone), book me with lease_resource on person: minutes is how " +

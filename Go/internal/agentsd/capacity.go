@@ -150,6 +150,8 @@ func (d *Daemon) checkCapacity(ctx context.Context) {
 	d.capLevel, d.capLastBelow, d.capBelow = level, lastBelow, below
 	d.capSample, d.capSampled = s, true
 	d.capMu.Unlock()
+	// The compute line is served one grant a look while the level is ok (#4579).
+	d.serveCapacityLine()
 	// While the machine is ok, each look lets the helper queues move (#4580).
 	if level == wire.CapacityLevelOk {
 		d.goAfterTurn("helper queue", d.startQueuesAfterLook)
