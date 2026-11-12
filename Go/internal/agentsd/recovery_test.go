@@ -211,6 +211,61 @@ func TestAnAgentASignalCutOffIsPickedBackUp(t *testing.T) {
 	}
 }
 
+// A start that dies after it found the agents to pick up, and before it picked them up,
+// leaves them on alive.json for the next start, which picks them up with nothing said
+// again (#4917). New without PickUpAfterRestart is that start: the host died as it began.
+func TestAStartThatDiesBeforeThePickUpLeavesItToTheNext(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		left func(t *testing.T, root string) wire.UUID
+	}{
+		{"a crash", func(t *testing.T, root string) wire.UUID {
+			return leftWorking(t, root, wire.AgentStateRunning, "fake-session", nil)
+		}},
+		{"a clean stop", func(t *testing.T, root string) wire.UUID {
+			first, c := start(t, root)
+			var id wire.UUID
+			json.Unmarshal(c.call(t, 1, "agents/start", map[string]any{"runtimeID": "claude", "cwd": "file://" + t.TempDir(),
+				"prompt": "wait for me"}), &id)
+			c.until(t, "running", ended(id, wire.AgentStateRunning))
+			first.Shutdown()
+			return id
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeRuntimes(t)
+			root := t.TempDir()
+			id := tc.left(t, root)
+			for range 3 {
+				died, _ := start(t, root)
+				if alive := died.readAlive(); alive == nil || alive.PickUp[id] != wire.AgentStateRunning {
+					t.Fatalf("alive.json after a start: %+v", alive)
+				}
+			}
+			d, _ := start(t, root)
+			defer d.Shutdown()
+			d.PickUpAfterRestart()
+			waitFor(t, "finished", func() bool { return d.Store.Agent(id).State == wire.AgentStateFinished })
+			said := 0
+			for _, n := range notes(d, id) {
+				if n == "This agent was working when the daemon stopped, so it stopped too." {
+					said++
+				}
+			}
+			if said != 1 {
+				t.Fatalf("told it stopped %d times, want once: %q", said, notes(d, id))
+			}
+			if m := userMessages(d, id); len(m) == 0 || !strings.HasPrefix(m[len(m)-1], "(The app restarted while you were working") {
+				t.Fatalf("%q", m)
+			}
+			waitFor(t, "alive.json lists nothing to pick up", func() bool {
+				alive := d.readAlive()
+				return alive != nil && len(alive.PickUp) == 0 && len(alive.CutOff) == 0
+			})
+		})
+	}
+}
+
 // endedAs is an ending reason for a failure's message, or "none".
 func endedAs(r *wire.EndedReason) string {
 	if r == nil {

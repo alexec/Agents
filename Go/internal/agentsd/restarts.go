@@ -43,6 +43,27 @@ type daemonAlive struct {
 	StoppedAt *wire.Date `json:"stoppedAt,omitempty"`
 	// CutOff is the agents a clean stop cut off in a turn, with their state before (#1605).
 	CutOff map[wire.UUID]wire.AgentState `json:"cutOff,omitempty"`
+	// PickUp is the agents a start found, told why they stopped, and has not picked up yet,
+	// with their state before: a start that dies first leaves them to the next (#4917).
+	PickUp map[wire.UUID]wire.AgentState `json:"pickUp,omitempty"`
+}
+
+// aliveNow is what alive.json says at a time, with the agents still to pick up (#4917).
+func (d *Daemon) aliveNow(at wire.Date, stoppedAt *wire.Date) daemonAlive {
+	d.resumeMu.Lock()
+	defer d.resumeMu.Unlock()
+	return daemonAlive{LastAlive: at, StoppedAt: stoppedAt, CutOff: copyStates(d.cutOff), PickUp: copyStates(d.interrupted)}
+}
+
+func copyStates(m map[wire.UUID]wire.AgentState) map[wire.UUID]wire.AgentState {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make(map[wire.UUID]wire.AgentState, len(m))
+	for id, was := range m {
+		out[id] = was
+	}
+	return out
 }
 
 type restartBook struct {
@@ -232,7 +253,7 @@ func (d *Daemon) noteRestart() restartGap {
 	d.eventStateNow.WaitRestarts = restarts
 	d.saveEventStateLocked()
 	d.eventMu.Unlock()
-	d.writeAlive(daemonAlive{LastAlive: at})
+	d.writeAlive(d.aliveNow(at, nil))
 	log.Printf("restart: %s, down for %s", gap.Reason, gap.downForWords())
 	return gap
 }
@@ -256,7 +277,7 @@ func (d *Daemon) SayRestarted() {
 				case <-d.ctx.Done():
 					return
 				case <-t.C:
-					d.writeAlive(daemonAlive{LastAlive: now()})
+					d.writeAlive(d.aliveNow(now(), nil))
 				}
 			}
 		})
@@ -276,23 +297,17 @@ func (d *Daemon) noteCleanStop() wire.Date {
 	}
 	d.restartMu.Unlock()
 	at := now()
-	d.writeAlive(daemonAlive{LastAlive: at, StoppedAt: &at})
+	d.writeAlive(d.aliveNow(at, &at))
 	return at
 }
 
 // noteCutOffAgents writes again, after the turns the stop cut off have ended, the stop's
-// time with those agents, so the next start picks them up (#1605).
+// time with those agents and the ones not picked up yet, so the next start picks them up
+// (#1605, #4917).
 func (d *Daemon) noteCutOffAgents(at wire.Date) {
-	d.resumeMu.Lock()
-	cut := make(map[wire.UUID]wire.AgentState, len(d.cutOff))
-	for id, was := range d.cutOff {
-		cut[id] = was
+	if a := d.aliveNow(at, &at); len(a.CutOff)+len(a.PickUp) > 0 {
+		d.writeAlive(a)
 	}
-	d.resumeMu.Unlock()
-	if len(cut) == 0 {
-		return
-	}
-	d.writeAlive(daemonAlive{LastAlive: at, StoppedAt: &at, CutOff: cut})
 }
 
 // noticedAfterRestart is the details a crossing found at the first disk look after a
