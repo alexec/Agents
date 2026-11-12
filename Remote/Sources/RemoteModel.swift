@@ -486,6 +486,9 @@ final class RemoteModel {
         liveActivities.endAll()
         notifier.forgetAll()
         AttentionSnapshotStore.clear()
+        // What was shared for New session is not for the next pairing (#4915).
+        SharedInbox.clear()
+        sharedFor = nil
         lastPublished = nil
         notifier.setBadgeCount(0)
         WidgetCenter.shared.reloadTimelines(ofKind: AttentionSnapshot.widgetKind)
@@ -949,6 +952,35 @@ final class RemoteModel {
     func recipient(of message: AppViewAgentMessage, in key: FolderKey) -> AppViewRecipient? {
         message.recipient(among: work.agents, host: key.host, folder: key.folder)
             .map { AppViewRecipient(id: $0.id, name: AppViewAgentMessage.name(of: $0)) }
+    }
+
+    // MARK: Share ▸ Agents (#4915)
+
+    /// The folder whose New session is to take what the share sheet left, until its page
+    /// takes it.
+    private(set) var sharedFor: FolderKey?
+    /// Counts each time something shared is offered, for a page already on screen to hear.
+    private(set) var sharedArrivals = 0
+
+    /// What the share extension left in the app group, if anything, offered to New session in
+    /// the folder last used there (`newSessionFolder`), which the person can change with the
+    /// folder chip before Send. Asked when the Remote comes to the front, when the extension
+    /// opens `agents://start`, and when a machine lists its folders: until then there is no
+    /// folder to offer it in, and it waits in the app group.
+    func lookForShared() {
+        guard SharedInbox.hasItems(), !isStarting, let key = newSessionFolder else { return }
+        note("share: offered to New session in \(key.folder.lastPathComponent)")
+        sharedFor = key
+        sharedArrivals += 1
+        sidebarItem = .folder(key)
+    }
+
+    /// What was shared, for the page in `folder`, taken once. Read from the app group now, so
+    /// a share that landed since it was offered comes too.
+    func takeShared(in folder: FolderKey) -> SharedItems? {
+        guard sharedFor == folder else { return nil }
+        sharedFor = nil
+        return SharedInbox.take()
     }
 
     /// The offer for the page in `folder`, taken once.
@@ -3112,6 +3144,7 @@ final class RemoteModel {
                 work.replaceFolders(folders, from: id)
                 pruneFolderDefaults(of: id, listed: folders)
                 startHostMoved()
+                lookForShared()
             }
             // Its folders' MCP servers, for their rows in the sidebar (#753).
             if let health = try? await other.call(DaemonAPI.Method.mcpHealth, Optional<String>.none,
@@ -3544,6 +3577,7 @@ final class RemoteModel {
         work.replaceFolders(snapshot.folders, from: .mac)
         pruneFolderDefaults(of: .mac, listed: snapshot.folders)
         startHostMoved()
+        lookForShared()
         if let changes = snapshot.agentChanges, !changes.all {
             work.takeChanges(snapshot.agents, changes, from: .mac)
             // A first page's worth held means there may be more, a folder at a time.
@@ -3615,6 +3649,8 @@ final class RemoteModel {
         let phase: ScenePhase = isActive ? .active : phase
         presence?.scenePhase(phase)
         if phase == .active {
+            // Share ▸ Agents may have left something while this was away (#4915).
+            lookForShared()
             attentionRefreshTask?.cancel()
             attentionRefreshTask = Task { [weak self] in
                 while !Task.isCancelled {
@@ -3956,6 +3992,8 @@ final class RemoteModel {
             open(needToken: token)
         case .attention:
             showTheFirstFolderNeedingYou()
+        case .start:
+            lookForShared()
         case nil:
             break
         }

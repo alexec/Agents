@@ -13,7 +13,7 @@
 # Apart from a dry run it needs, on this Mac or the runner:
 #   - the "Apple Distribution" identity in a keychain;
 #   - the three App Store profiles installed: "Agents Remote App Store", "Agents Remote Notify
-#     App Store", "Agents Remote Widget App Store";
+#     App Store", "Agents Remote Widget App Store", "Agents Remote Share App Store";
 #   - for the upload, ASC_KEY_ID and ASC_ISSUER_ID, with the key's AuthKey_<id>.p8 where altool
 #     looks (~/.private_keys or ~/.appstoreconnect/private_keys), or ASC_KEY_PATH naming it.
 set -euo pipefail
@@ -92,7 +92,8 @@ EOF
 export_archive ios \
     '<key>com.alexecollins.agents.remote</key><string>Agents Remote App Store</string>
      <key>com.alexecollins.agents.remote.notify</key><string>Agents Remote Notify App Store</string>
-     <key>com.alexecollins.agents.remote.widget</key><string>Agents Remote Widget App Store</string>'
+     <key>com.alexecollins.agents.remote.widget</key><string>Agents Remote Widget App Store</string>
+     <key>com.alexecollins.agents.remote.share</key><string>Agents Remote Share App Store</string>'
 
 ipa=( $out/ios/*.ipa(N) )
 (( ${#ipa} == 1 )) || { print -u2 "expected one .ipa under $out"; exit 1 }

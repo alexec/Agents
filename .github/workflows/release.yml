@@ -30,6 +30,7 @@
 #   PROFILE_REMOTE          "Agents Remote App Store"
 #   PROFILE_REMOTE_NOTIFY   "Agents Remote Notify App Store"
 #   PROFILE_REMOTE_WIDGET   "Agents Remote Widget App Store"
+#   PROFILE_REMOTE_SHARE    "Agents Remote Share App Store"
 name: release
 
 on:
@@ -264,13 +265,14 @@ jobs:
           PROFILE_REMOTE: ${{ secrets.PROFILE_REMOTE }}
           PROFILE_REMOTE_NOTIFY: ${{ secrets.PROFILE_REMOTE_NOTIFY }}
           PROFILE_REMOTE_WIDGET: ${{ secrets.PROFILE_REMOTE_WIDGET }}
+          PROFILE_REMOTE_SHARE: ${{ secrets.PROFILE_REMOTE_SHARE }}
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
           missing=()
           for name in APPLE_DISTRIBUTION_P12 APPLE_DISTRIBUTION_P12_PASSWORD PROFILE_REMOTE \
-            PROFILE_REMOTE_NOTIFY PROFILE_REMOTE_WIDGET ASC_KEY_P8 ASC_KEY_ID ASC_ISSUER_ID; do
+            PROFILE_REMOTE_NOTIFY PROFILE_REMOTE_WIDGET PROFILE_REMOTE_SHARE ASC_KEY_P8 ASC_KEY_ID ASC_ISSUER_ID; do
             [[ -n "${!name}" ]] || missing+=("$name")
           done
           if (( ${#missing[@]} )); then
@@ -302,6 +304,7 @@ jobs:
           PROFILE_REMOTE: ${{ secrets.PROFILE_REMOTE }}
           PROFILE_REMOTE_NOTIFY: ${{ secrets.PROFILE_REMOTE_NOTIFY }}
           PROFILE_REMOTE_WIDGET: ${{ secrets.PROFILE_REMOTE_WIDGET }}
+          PROFILE_REMOTE_SHARE: ${{ secrets.PROFILE_REMOTE_SHARE }}
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
         run: |
           keychain="$RUNNER_TEMP/store.keychain-db"
@@ -320,6 +323,7 @@ jobs:
           echo "$PROFILE_REMOTE" | base64 --decode > "$profiles/agents-remote.mobileprovision"
           echo "$PROFILE_REMOTE_NOTIFY" | base64 --decode > "$profiles/agents-remote-notify.mobileprovision"
           echo "$PROFILE_REMOTE_WIDGET" | base64 --decode > "$profiles/agents-remote-widget.mobileprovision"
+          echo "$PROFILE_REMOTE_SHARE" | base64 --decode > "$profiles/agents-remote-share.mobileprovision"
           echo "$ASC_KEY_P8" > "$RUNNER_TEMP/asc.p8"
           security find-identity -v "$keychain" | grep -q "Apple Distribution" || {
             echo "::error::APPLE_DISTRIBUTION_P12 holds no Apple Distribution identity, or its password is wrong"; exit 1; }
@@ -332,7 +336,8 @@ jobs:
           python3 scripts/check-store-profiles.py \
             "PROFILE_REMOTE=$profiles/agents-remote.mobileprovision" \
             "PROFILE_REMOTE_NOTIFY=$profiles/agents-remote-notify.mobileprovision" \
-            "PROFILE_REMOTE_WIDGET=$profiles/agents-remote-widget.mobileprovision"
+            "PROFILE_REMOTE_WIDGET=$profiles/agents-remote-widget.mobileprovision" \
+            "PROFILE_REMOTE_SHARE=$profiles/agents-remote-share.mobileprovision"
 
       - name: Archive, check, export and upload
         env:

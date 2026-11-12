@@ -122,6 +122,9 @@ targets:
       # The Home-screen widget (068). Same reason: it is not installed on its own, so it
       # ships inside this bundle and is versioned with it.
       - target: RemoteWidget
+      # Share ▸ Agents (#4915): another app's screenshot, picture, text or link, handed to
+      # New session through the app group. Shipped inside this bundle, as the widget is.
+      - target: RemoteShare
     # The voice's models, copied into the bundle's Voice folder (#2322).
     postBuildScripts:
       - name: Carry the voice
@@ -317,6 +320,66 @@ targets:
           CODE_SIGN_STYLE: Manual
           CODE_SIGN_IDENTITY: Apple Distribution
           PROVISIONING_PROFILE_SPECIFIER: Agents Remote Widget App Store
+
+  # Share ▸ Agents (#4915): in another app's share sheet, it turns a screenshot, picture,
+  # file, text or link into what the paperclip would attach, leaves it in the app group, and
+  # opens the Remote on New session. AgentsKitCore only, for `PhoneAttachment`'s rules: no
+  # link to the Mac, no sign-in and no folder list in a share extension's small memory.
+  RemoteShare:
+    type: app-extension
+    supportedDestinations: [iOS]
+    sources:
+      - path: RemoteShare/Sources
+      # Listed, not owned. See the note on the AgentsHost target's entitlements.
+      - path: RemoteShare/RemoteShare.entitlements
+        buildPhase: none
+      # The privacy manifest (#729): the required-reason APIs it uses, no data collected, no
+      # tracking.
+      - path: RemoteShare/PrivacyInfo.xcprivacy
+        buildPhase: resources
+    dependencies:
+      - package: AgentsKit
+        product: AgentsKitCore
+    info:
+      path: RemoteShare/Info.plist
+      properties:
+        # What the share sheet shows under the icon.
+        CFBundleDisplayName: Agents
+        CFBundleName: AgentsShare
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        ITSAppUsesNonExemptEncryption: false
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: ShareViewController
+          # What the paperclip takes: pictures (about ten, which the 900 KB of a prompt
+          # holds once shrunk), files (refused in its words when it would refuse them),
+          # text, and a page's link.
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsImageWithMaxCount: 10
+              NSExtensionActivationSupportsFileWithMaxCount: 10
+              NSExtensionActivationSupportsText: true
+              NSExtensionActivationSupportsWebURLWithMaxCount: 1
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.remote.share
+        # The extension's own name has to differ from the app it lives in.
+        PRODUCT_NAME: AgentsShare
+        CODE_SIGN_ENTITLEMENTS: RemoteShare/RemoteShare.entitlements
+        SDKROOT: iphoneos
+        SUPPORTED_PLATFORMS: iphoneos iphonesimulator
+        TARGETED_DEVICE_FAMILY: "1,2"
+        GENERATE_INFOPLIST_FILE: NO
+        SKIP_INSTALL: YES
+        # Not APPLICATION_EXTENSION_API_ONLY, unlike the widget: the open of the Remote goes
+        # through the hosting UIApplication on the responder chain, which that flag refuses.
+        # If App Review refuses the open, it goes and the save stays (#4915).
+      configs:
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: Apple Distribution
+          PROVISIONING_PROFILE_SPECIFIER: Agents Remote Share App Store
 
   # Agents Host (058, US2, T054): the download of its own that runs this Mac's host and,
   # when chosen, the control plane's single copy, as launch agents. Not sandboxed and not
