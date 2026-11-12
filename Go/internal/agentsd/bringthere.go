@@ -138,51 +138,75 @@ func (d *Daemon) branchToBring(me *wire.Agent, args map[string]json.RawMessage) 
 // bringFromThere has machine pack b, less the commits here, reads it here in parts and
 // brings it into b.path.
 func (d *Daemon) bringFromThere(me *wire.Agent, b bringingBranch) (wire.BringBack, error) {
+	return d.bringPack(me, b.machine, b.folder, b.path, []string{b.branch}, b.changes, b.branch, nil)
+}
+
+// bringPack has machine pack branches of its repository at folder, less the commits here,
+// with its uncommitted changes (on patchOn, the branch checked out there) when changes,
+// reads it here in parts and brings it into the repository at path; me asks. read, when
+// not nil, hears the bytes read and the total after each part (#4640).
+func (d *Daemon) bringPack(me *wire.Agent, machine, folder, path string, branches []string, changes bool, patchOn string,
+	read func(done, total int64)) (wire.BringBack, error) {
 	var heads []string
-	if out, err := git(b.path, "for-each-ref", "--format=%(objectname)", "refs/heads"); err == nil && out != "" {
+	if out, err := git(path, "for-each-ref", "--format=%(objectname)", "refs/heads"); err == nil && out != "" {
 		heads = strings.Split(out, "\n")
 	}
 	var sent wire.MachineFolderSent
-	pack := wire.SendPackRequest{Folder: store.PathURL(b.folder), Branches: []string{b.branch}, LeavingOut: heads, IncludeChanges: b.changes}
+	pack := wire.SendPackRequest{Folder: store.PathURL(folder), Branches: branches, LeavingOut: heads, IncludeChanges: changes}
 	if heads == nil {
 		pack.LeavingOut = []string{}
 	}
-	if err := d.askSend(me, wire.MachineFolderSend{Host: b.machine, Pack: &pack}, &sent); err != nil {
+	if err := d.askSend(me, wire.MachineFolderSend{Host: machine, Pack: &pack}, &sent); err != nil {
 		return wire.BringBack{}, err
 	}
 	if sent.Pack == nil {
 		return wire.BringBack{}, &Error{Code: wire.FailureNotSupported, Message: "the control plane's answer could not be read."}
 	}
-	r := wire.BringBackRequest{Folder: store.PathURL(b.path), Branches: sent.Pack.Commits}
+	r := wire.BringBackRequest{Folder: store.PathURL(path), Branches: sent.Pack.Commits}
 	// What was read here goes whatever the answer; bringBack removes what it is given.
-	var read []wire.UUID
+	var ids []wire.UUID
 	defer func() {
-		for _, id := range read {
+		for _, id := range ids {
 			if file, err := d.incomingFile(id); err == nil {
 				os.Remove(file)
 			}
 		}
 	}()
+	var total, done int64
+	for _, f := range []*wire.SendFile{sent.Pack.Bundle, sent.Pack.Patch} {
+		if f != nil {
+			total += f.Size
+		}
+	}
+	part := func(n int64) {
+		done += n
+		if read != nil {
+			read(done, total)
+		}
+	}
+	part(0)
 	for _, f := range []*wire.SendFile{sent.Pack.Bundle, sent.Pack.Patch} {
 		if f == nil {
 			continue
 		}
 		id := store.NewUUID()
-		read = append(read, id)
-		if err := d.readThere(me, b.machine, f.ID, id); err != nil {
+		ids = append(ids, id)
+		if err := d.readThere(me, machine, f.ID, id, part); err != nil {
 			return wire.BringBack{}, err
 		}
 		if f == sent.Pack.Bundle {
 			r.Bundle = &id
 		} else {
-			r.Patch, r.PatchOn = &id, &b.branch
+			on := patchOn
+			r.Patch, r.PatchOn = &id, &on
 		}
 	}
 	return d.bringBack(r)
 }
 
-// readThere reads machine's outgoing file id, in parts, into the upload here.
-func (d *Daemon) readThere(me *wire.Agent, machine string, id, upload wire.UUID) error {
+// readThere reads machine's outgoing file id, in parts, into the upload here. read, when
+// not nil, hears the size of each part once it is here.
+func (d *Daemon) readThere(me *wire.Agent, machine string, id, upload wire.UUID, read func(int64)) error {
 	for offset := int64(0); ; {
 		var sent wire.MachineFolderSent
 		if err := d.askSend(me, wire.MachineFolderSend{Host: machine, Read: &wire.SendReadRequest{ID: id, Offset: offset}}, &sent); err != nil {
@@ -196,6 +220,9 @@ func (d *Daemon) readThere(me *wire.Agent, machine string, id, upload wire.UUID)
 				return err
 			}
 			offset += int64(len(sent.Read.Data))
+			if read != nil {
+				read(int64(len(sent.Read.Data)))
+			}
 		}
 		if sent.Read.End {
 			return nil

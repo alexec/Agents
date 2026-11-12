@@ -2895,6 +2895,72 @@
       ],
       "additionalProperties": false
     },
+    "BringBackFromRequest": {
+      "type": "object",
+      "description": "folders/bringBackFrom (#4640): Bring Back from ‹machine›… from a client. This host brings `branches` of the repository at `source` on `machine` (the control plane's id or name for it; `machineName` is the name the person knows it by, for the words), less the commits it has, and with `includeChanges` the uncommitted changes there, into the repository at `folder` here, through the control plane, as bring_back does (#2947). Branches move forward only.",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "includeChanges": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "machine",
+        "source",
+        "branches",
+        "includeChanges"
+      ],
+      "additionalProperties": false
+    },
+    "BringBackNotification": {
+      "type": "object",
+      "description": "bringBack/changed (#4640): how a bring-back that folders/bringBackFrom started goes. `read` of `total` bytes are here (0 of 0 while the bundle is made there); `finished` once it ended, whichever way: `result` is what it did, or `problem` says why it stopped, in the person's words.",
+      "properties": {
+        "bringBack": {
+          "$ref": "#/definitions/BringBackSummary"
+        },
+        "read": {
+          "type": "integer"
+        },
+        "total": {
+          "type": "integer"
+        },
+        "finished": {
+          "type": "boolean"
+        },
+        "problem": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/definitions/BringBack"
+        }
+      },
+      "required": [
+        "bringBack",
+        "read",
+        "total",
+        "finished"
+      ],
+      "additionalProperties": false
+    },
     "BringBackRequest": {
       "type": "object",
       "description": "Brings a host's branches back into this Mac's repository at `folder` (Bring back from ‹host›…, #1473): fetches the `bundle` upload, moves `branches` forward only, also where a worktree has one checked out, and applies the `patch` upload (the host's uncommitted changes) in `folder`, whose checked-out branch must be `patchOn`. It stops, and changes nothing, when a branch here has commits of its own or a worktree with a branch that moves has uncommitted changes.",
@@ -2921,6 +2987,39 @@
       "required": [
         "folder",
         "branches"
+      ],
+      "additionalProperties": false
+    },
+    "BringBackSummary": {
+      "type": "object",
+      "description": "One bring-back folders/bringBackFrom started (#4640): the folder here, and the folder on the machine it comes from.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "startedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "id",
+        "folder",
+        "machine",
+        "machineName",
+        "source",
+        "startedAt"
       ],
       "additionalProperties": false
     },

@@ -20,6 +20,7 @@ const CapAuto1 = "auto/1"
 const CapBackupsStore1 = "backups.store/1"
 const CapBackups1 = "backups/1"
 const CapBots1 = "bots/1"
+const CapBringBack1 = "bring.back/1"
 const CapBrowser1 = "browser/1"
 const CapCatalog1 = "catalog/1"
 const CapChangesUndo1 = "changes.undo/1"
@@ -348,6 +349,8 @@ var HostCapabilities = pairs([][2]string{
 	{"folders/add", "folders/1"},
 	{"folders/archive", "folders/1"},
 	{"folders/bringBack", "folders/1"},
+	{"folders/bringBackFrom", "bring.back/1"},
+	{"folders/bringingBack", "bring.back/1"},
 	{"folders/clone", "folders/1"},
 	{"folders/clones", "folders/1"},
 	{"folders/delete", "folders/1"},
@@ -612,6 +615,7 @@ var HostCapabilities = pairs([][2]string{
 	{"attention/changed", "attention/1"},
 	{"auto/changed", "auto/1"},
 	{"backups/changed", "backups/1"},
+	{"bringBack/changed", "bring.back/1"},
 	{"browser/frame", "browser/1"},
 	{"browser/pageChanged", "browser/1"},
 	{"clientPermissions/changed", "client-permissions/1"},
@@ -672,6 +676,7 @@ var HostNotifications = set([]string{
 	"attention/changed",
 	"auto/changed",
 	"backups/changed",
+	"bringBack/changed",
 	"browser/frame",
 	"browser/pageChanged",
 	"clientPermissions/changed",

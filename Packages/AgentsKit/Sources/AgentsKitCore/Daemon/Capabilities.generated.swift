@@ -21,6 +21,7 @@ public enum Capability {
     public static let backupsStore1 = "backups.store/1"
     public static let backups1 = "backups/1"
     public static let bots1 = "bots/1"
+    public static let bringBack1 = "bring.back/1"
     public static let browser1 = "browser/1"
     public static let catalog1 = "catalog/1"
     public static let changesUndo1 = "changes.undo/1"
@@ -349,6 +350,8 @@ public enum Capability {
         "folders/add": "folders/1",
         "folders/archive": "folders/1",
         "folders/bringBack": "folders/1",
+        "folders/bringBackFrom": "bring.back/1",
+        "folders/bringingBack": "bring.back/1",
         "folders/clone": "folders/1",
         "folders/clones": "folders/1",
         "folders/delete": "folders/1",
@@ -613,6 +616,7 @@ public enum Capability {
         "attention/changed": "attention/1",
         "auto/changed": "auto/1",
         "backups/changed": "backups/1",
+        "bringBack/changed": "bring.back/1",
         "browser/frame": "browser/1",
         "browser/pageChanged": "browser/1",
         "clientPermissions/changed": "client-permissions/1",

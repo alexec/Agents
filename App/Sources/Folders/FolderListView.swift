@@ -321,7 +321,11 @@ struct FolderListView: View {
                 ForEach(model.sends) { send in
                     SendingRow(send: send).appText(.supporting)
                 }
-                if model.folders.isEmpty, model.clones.isEmpty, model.sends.isEmpty, model.hasLoadedFolders, model.isConnected {
+                // Branches on their way back from another machine, and what came (#4640).
+                ForEach(model.bringBacks) { bringBack in
+                    BringingBackRow(bringBack: bringBack).appText(.supporting)
+                }
+                if model.folders.isEmpty, model.clones.isEmpty, model.sends.isEmpty, model.bringBacks.isEmpty, model.hasLoadedFolders, model.isConnected {
                     EmptyFolderList(isChoosingFolder: $isChoosingFolder, isCloning: $isCloning)
                         .appText(.supporting)
                 }
