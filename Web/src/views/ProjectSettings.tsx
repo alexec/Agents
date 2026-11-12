@@ -6,11 +6,13 @@
 import { useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
-import type { FolderSummary, HelperLimits, NotCommittedResponse, PRCostComment, Project } from "../protocol/generated";
+import type { FolderSummary, HelperLimits, NotCommittedResponse, PRCostComment, Project, WorkflowHours } from "../protocol/generated";
 import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
 import { go } from "../route";
 import { policyItem } from "../model/policyLayers";
+import { limits as hoursLimit, workingHours, workingSentence } from "../model/workflowHours";
+import { HoursDays, HoursWindowMenus } from "./WorkflowSettings";
 import { prCostCommentChoices, prCostCommentHelp, prCostCommentTitle, prCostCommentWords } from "../model/prCostComment";
 import {
   diskChoices, diskDefaults, folderPanes, folderPathOf, helperDefaults, projectPanes, projectSettingsWords, helpersNow, helpersNote,
@@ -138,6 +140,14 @@ export function ProjectSettingsModal({ store, host, folder, summary, down, close
             ))}
           </select>
           <p class="sheet-note">{prCostCommentHelp} Saved in .agents/folder.json.</p>
+        </dd>
+      </>}
+      {store.has(host, Capability.foldersWorkingHours1) && <>
+        <dt>Working hours</dt>
+        <dd>
+          <WorkingHoursSetting current={summary.folder.workingHours} disabled={off}
+            write={(h) => void save(() => store.setFolderWorkingHours(host, folder, hoursLimit(h) ? h : undefined))} />
+          <p class="sheet-note">{workingSentence(summary.folder.workingHours)}</p>
         </dd>
       </>}
     </dl>
@@ -326,5 +336,21 @@ function Switch({ label, on, set, disabled }: { label: string; on: boolean; set:
         onChange={(e) => set((e.currentTarget as HTMLInputElement).checked)} />
       {label}
     </label>
+  );
+}
+
+/** The project's working hours (#4821): From, To, the time zone and the days, as the window's Working hours row. */
+function WorkingHoursSetting({ current, disabled, write }: {
+  current: WorkflowHours | undefined; disabled: boolean; write: (h: WorkflowHours) => void;
+}) {
+  const shown = current ?? workingHours;
+  const put = (h: WorkflowHours | null) => { if (h) write(h); };
+  return (
+    <>
+      <div class="menus" role="group" aria-label="Working hours">
+        <HoursWindowMenus current={shown} disabled={disabled} write={put} />
+      </div>
+      <HoursDays current={shown} disabled={disabled} whose="the working" write={put} />
+    </>
   );
 }

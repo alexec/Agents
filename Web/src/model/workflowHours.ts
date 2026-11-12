@@ -2,6 +2,7 @@
 // what each control writes. Every change is a whole `hours:`, and one that limits nothing (no
 // `between:`, no `days:`) is Any time, which takes the key out.
 import type { Weekday, WorkflowHours } from "../protocol/generated";
+import { hoursSentence as runsSentence } from "./workflows";
 
 /** What Some hours writes first: working hours. */
 export const workingHours: WorkflowHours = { between: "09:00-17:00", days: ["mon", "tue", "wed", "thu", "fri"] };
@@ -26,7 +27,34 @@ export function dayName(d: Weekday): string {
 
 /** Whether it limits when the workflow starts; false is Any time. */
 export function limits(h: WorkflowHours | undefined): boolean {
-  return h?.between !== undefined || h?.days !== undefined;
+  return h?.named !== undefined || h?.between !== undefined || h?.days !== undefined;
+}
+
+/** The Hours menu's choices (#4821), as WorkflowHours.Choice: Any time, the project's working hours, outside them, or hours of its own. */
+export type HoursChoice = "anyTime" | "working" | "notWorking" | "some";
+export const hoursChoiceTitles: Record<HoursChoice, string> = {
+  anyTime: "Any time", working: "Working hours", notWorking: "Outside working hours", some: "Some hours",
+};
+
+/** What the Hours menu shows. */
+export function hoursChoice(h: WorkflowHours | undefined): HoursChoice {
+  if (h?.named === "working") return "working";
+  if (h?.named === "not-working") return "notWorking";
+  return limits(h) ? "some" : "anyTime";
+}
+
+/** What a choice writes: Some hours first writes working hours' times, or the project's. */
+export function chosenHours(choice: HoursChoice, project?: WorkflowHours): WorkflowHours {
+  switch (choice) {
+    case "anyTime": return {};
+    case "working": return { named: "working" };
+    case "notWorking": return { named: "not-working" };
+    case "some": {
+      if (!project) return workingHours;
+      const { named: _named, ...rest } = project;
+      return rest;
+    }
+  }
 }
 
 function clock(part: string): number | null {
@@ -90,6 +118,8 @@ export function inZone(h: WorkflowHours, zone: string | undefined): WorkflowHour
 
 /** WorkflowHours.words: `only 18:00-09:00 on Mon, Tue (Europe/London)`; null limits nothing. */
 export function hoursWords(h: WorkflowHours | undefined): string | null {
+  if (h?.named === "working") return "only in working hours";
+  if (h?.named === "not-working") return "only outside working hours";
   if (!h || !limits(h)) return null;
   let out = "only";
   if (h.between !== undefined) out += ` ${h.between}`;
@@ -101,8 +131,16 @@ export function hoursWords(h: WorkflowHours | undefined): string | null {
 /** The sentence beside the control. */
 export function hoursSentence(h: WorkflowHours | undefined): string {
   const words = hoursWords(h);
-  return words === null ? "Any time: a trigger starts it at any hour."
-    : `Starts ${words}. A trigger outside them waits, and starts it once they open.`;
+  if (words === null) return "Any time: a trigger starts it at any hour.";
+  if (h?.named !== undefined) return `Starts ${words}, as Project Settings sets them. A trigger outside them waits, and starts it once they open.`;
+  return `Starts ${words}. A trigger outside them waits, and starts it once they open.`;
+}
+
+/** Project Settings ▸ General's Working hours line (#4821), as WorkflowHours.workingSentence. */
+export function workingSentence(h: WorkflowHours | undefined): string {
+  const words = runsSentence(h ?? workingHours)?.replace("Runs ", "") ?? "all day";
+  return `Working hours are ${words}${h === undefined ? " (the default)" : ""}. A workflow with \`hours: working\` `
+    + "starts only in them, and one with `hours: not-working` only outside them. Saved in .agents/folder.json.";
 }
 
 /** The time zones the menu offers, after Your time zone: the file's own too, when unknown here. */

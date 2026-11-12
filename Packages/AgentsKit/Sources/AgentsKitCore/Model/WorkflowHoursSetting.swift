@@ -22,7 +22,49 @@ extension WorkflowHours {
     public static func dayName(_ day: Weekday) -> String { day.rawValue.capitalized }
 
     /// Whether it limits when the workflow starts; false is Any time.
-    public var limits: Bool { between != nil || days != nil }
+    public var limits: Bool { named != nil || between != nil || days != nil }
+
+    /// The Hours menu's choices (#4821): Any time, the project's working hours, outside
+    /// them, or hours of its own.
+    public enum Choice: String, CaseIterable, Hashable, Sendable {
+        case anyTime, working, notWorking, some
+
+        public var title: String {
+            switch self {
+            case .anyTime: "Any time"
+            case .working: "Working hours"
+            case .notWorking: "Outside working hours"
+            case .some: "Some hours"
+            }
+        }
+    }
+
+    /// What the Hours menu shows.
+    public var choice: Choice {
+        switch named {
+        case .working: .working
+        case .notWorking: .notWorking
+        case nil: limits ? .some : .anyTime
+        }
+    }
+
+    /// What a choice writes: Some hours first writes working hours' times, or the project's.
+    public static func chosen(_ choice: Choice, project: WorkflowHours? = nil) -> WorkflowHours {
+        switch choice {
+        case .anyTime: WorkflowHours()
+        case .working: WorkflowHours(named: .working)
+        case .notWorking: WorkflowHours(named: .notWorking)
+        case .some: project.map { WorkflowHours(between: $0.between, days: $0.days, timeZone: $0.timeZone) } ?? .working
+        }
+    }
+
+    /// Project Settings ▸ General's Working hours line (#4821).
+    public static func workingSentence(_ hours: WorkflowHours?) -> String {
+        let shown = hours ?? .working
+        let words = shown.sentence(viewer: .current).map { $0.replacingOccurrences(of: "Runs ", with: "") } ?? "all day"
+        return "Working hours are \(words)\(hours == nil ? " (the default)" : ""). A workflow with `hours: working` "
+            + "starts only in them, and one with `hours: not-working` only outside them. Saved in .agents/folder.json."
+    }
 
     /// `between:` as minutes of the day; nil is the whole day (or text the daemon refuses).
     public var window: (from: Int, to: Int)? {
@@ -76,6 +118,9 @@ extension WorkflowHours {
     public static func sentence(_ hours: WorkflowHours?) -> String {
         guard let hours, let words = hours.words else {
             return "Any time: a trigger starts it at any hour."
+        }
+        if hours.named != nil {
+            return "Starts \(words), as Project Settings sets them. A trigger outside them waits, and starts it once they open."
         }
         return "Starts \(words). A trigger outside them waits, and starts it once they open."
     }

@@ -3422,6 +3422,12 @@ export class Store extends Work {
     this.upsertFolder(summary, host);
   }
 
+  /** A project's working hours (#4821), for workflows' `hours: working`; undefined takes them out. Throws a refusal. */
+  async setFolderWorkingHours(host: string, folder: string, hours: WorkflowHours | undefined): Promise<void> {
+    const summary = await this.link.call("folders/setWorkingHours", { folder: folder as never, ...(hours ? { hours } : {}) }, host);
+    this.upsertFolder(summary, host);
+  }
+
   /** A folder's helper limits and switches in `.agents/folder.json` (#64), from Project Settings (#3280). Throws a refusal. */
   async setFolderHelperLimits(host: string, folder: string, limits: HelperLimits): Promise<void> {
     const summary = await this.link.call("folders/setHelperLimits", { folder: folder as never, limits }, host);

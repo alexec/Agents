@@ -69,6 +69,7 @@ public enum Capability {
     public static let folder1 = "folder/1"
     public static let foldersNotCommitted1 = "folders.not-committed/1"
     public static let foldersToMachine1 = "folders.to-machine/1"
+    public static let foldersWorkingHours1 = "folders.working-hours/1"
     public static let folders1 = "folders/1"
     public static let forgeWrite1 = "forge-write/1"
     public static let forgeAssign1 = "forge.assign/1"
@@ -384,6 +385,7 @@ public enum Capability {
         "folders/setPRCostComment": "lineage.comment/1",
         "folders/setPinned": "folders/1",
         "folders/setProject": "projects/1",
+        "folders/setWorkingHours": "folders.working-hours/1",
         "folders/unarchive": "folders/1",
         "folders/undoGuardedChange": "folders/1",
         "forge/add-child": "forge-write/1",

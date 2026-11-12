@@ -123,4 +123,25 @@ struct WorkflowHoursSettingTests {
         #expect(WorkflowHours.halfHours.count == 48)
         #expect(WorkflowHours.halfHours.map(WorkflowHours.clockText).last == "23:30")
     }
+
+    /// Named windows (#4821): `hours: working` and `hours: not-working` read, say and choose.
+    @Test func namedWindows() throws {
+        let json = Data(#"{"named":"not-working"}"#.utf8)
+        let outside = try JSONDecoder().decode(WorkflowHours.self, from: json)
+        #expect(outside.named == .notWorking && outside.limits && outside.choice == .notWorking)
+        #expect(String(decoding: try JSONEncoder().encode(WorkflowHours(named: .working)), as: UTF8.self) == #"{"named":"working"}"#)
+        #expect(outside.words == "only outside working hours")
+        #expect(WorkflowHours(named: .working).sentence(viewer: .current) == "Runs in working hours")
+        #expect(WorkflowHours.sentence(WorkflowHours(named: .working)).hasPrefix("Starts only in working hours, as Project Settings"))
+        #expect(WorkflowHours().choice == .anyTime && WorkflowHours.working.choice == .some)
+        #expect(WorkflowHours.chosen(.working) == WorkflowHours(named: .working))
+        #expect(WorkflowHours.chosen(.some) == .working)
+        let team = WorkflowHours(between: "08:00-16:00", days: [.mon], timeZone: "Asia/Tokyo")
+        #expect(WorkflowHours.chosen(.some, project: team) == team)
+        #expect(WorkflowHours.chosen(.anyTime).limits == false)
+        #expect(WorkflowHours.workingSentence(nil).hasPrefix("Working hours are 09:00–17:00, Mon–Fri (the default)."))
+        let folder = try StoreCoding.decoder.decode(Folder.self, from: Data(
+            #"{"folder":"file:///tmp/x","addedAt":"2026-11-12T00:00:00.000Z","workingHours":{"between":"08:00-16:00"}}"#.utf8))
+        #expect(folder.workingHours?.between == "08:00-16:00")
+    }
 }

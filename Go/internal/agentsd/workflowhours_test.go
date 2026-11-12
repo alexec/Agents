@@ -41,7 +41,7 @@ func TestReadingHours(t *testing.T) {
 		t.Fatalf("%+v", w)
 	}
 	for front, want := range map[string]string{
-		"hours: 9-17\n":                         "`hours:` must say `between:`, `days:` or `time-zone:`",
+		"hours: 9-17\n":                         "`hours:` must be `working`, `not-working`, or say `between:`",
 		"hours:\n  between: 9-25\n":             `"9-25" is not a range of times, like "09:00-18:00"`,
 		"hours:\n  between: \"09:00-09:00\"\n":  `"09:00-09:00" starts and ends at the same time`,
 		"hours:\n  days: [mon, someday]\n":      `"someday" is not a day of the week`,
@@ -365,5 +365,119 @@ func TestTheSettingsWriteHours(t *testing.T) {
 	if e := c.callError(t, 4, "workflows/settings", map[string]any{"folder": folder, "workflowID": "nightly", "settings": map[string]any{"options": map[string]any{}},
 		"hours": map[string]any{"between": "9-25"}}); e == nil || !strings.Contains(e.Message, "is not a range of times") {
 		t.Fatalf("%+v", e)
+	}
+}
+
+// Named windows (#4821): `hours: working` is the project's working hours, and
+// `hours: not-working` every time outside them.
+func TestNamedHours(t *testing.T) {
+	for front, want := range map[string]wire.WorkflowHoursName{
+		"hours: working\n": wire.WorkflowHoursNameWorking, "hours: not-working\n": wire.WorkflowHoursNameNotWorking,
+	} {
+		if h := hoursOf(t, front); h == nil || h.Named == nil || *h.Named != want || h.Between != nil || h.Days != nil {
+			t.Fatalf("%q: %+v", front, h)
+		}
+	}
+	if w := parseWorkflow("---\nhours: evenings\n---\nGo\n", "x", "/p"); w.Problem == nil || !strings.HasPrefix(w.Problem.Unreadable.Value, "`hours:` must be `working`") {
+		t.Fatalf("%+v", w.Problem)
+	}
+	working, outside := wire.WorkflowHoursNameWorking, wire.WorkflowHoursNameNotWorking
+	if hoursWords(&wire.WorkflowHours{Named: &working}) != "only in working hours" || hoursWords(&wire.WorkflowHours{Named: &outside}) != "only outside working hours" {
+		t.Fatal(hoursWords(&wire.WorkflowHours{Named: &working}))
+	}
+	if l, err := hoursLines(wire.WorkflowHours{Named: &outside}); err != nil || len(l) != 1 || l[0] != "hours: not-working" {
+		t.Fatal(l, err)
+	}
+	b := "9-17"
+	if _, err := hoursLines(wire.WorkflowHours{Named: &working, Between: &b}); err == nil {
+		t.Fatal("a named window with times was written")
+	}
+}
+
+// Outside the window: open where the window is shut, and it opens where a day's window ends.
+func TestTheNotWorkingWindow(t *testing.T) {
+	london, _ := time.LoadLocation("Europe/London")
+	in := func(day, h, m int) time.Time { return time.Date(2026, 11, day, h, m, 0, 0, london) } // the 13th is a Friday
+	h := defaultWorkingHours()
+	zone := "Europe/London"
+	h.TimeZone = &zone
+	win := windowOf(&h, "")
+	win.outside = true
+	for _, c := range []struct {
+		t    time.Time
+		want bool
+	}{
+		{in(13, 8, 59), true}, {in(13, 9, 0), false}, {in(13, 16, 59), false}, {in(13, 17, 0), true},
+		{in(14, 12, 0), true}, {in(16, 10, 0), false},
+	} {
+		if got := win.open(c.t); got != c.want {
+			t.Errorf("%v: %v", c.t, got)
+		}
+	}
+	if at, ok := win.opensAt(in(13, 10, 0)); !ok || !at.Equal(in(13, 17, 0)) {
+		t.Fatal(at)
+	}
+	// Past midnight: working 22:00-06:00 every day, so outside opens at 06:00 the next day.
+	night := "22:00-06:00"
+	win = windowOf(&wire.WorkflowHours{Between: &night, TimeZone: &zone}, "")
+	win.outside = true
+	if at, ok := win.opensAt(in(13, 23, 0)); !ok || !at.Equal(in(14, 6, 0)) {
+		t.Fatal(at)
+	}
+	// All day on weekdays: outside opens on Saturday at midnight.
+	win = windowOf(&wire.WorkflowHours{Days: h.Days, TimeZone: &zone}, "")
+	win.outside = true
+	if at, ok := win.opensAt(in(12, 10, 0)); !ok || !at.Equal(in(14, 0, 0)) {
+		t.Fatal(at)
+	}
+}
+
+// The project's working hours are a setting in .agents/folder.json, and a named window
+// follows them.
+func TestTheProjectsWorkingHours(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := folder(t, c, 1)
+	folder := store.FolderURL(dir)
+	if h := d.workingHoursOf(dir); *h.Between != "09:00-17:00" || len(h.Days) != 5 {
+		t.Fatalf("%+v", h)
+	}
+	var s wire.FolderSummary
+	json.Unmarshal(c.call(t, 2, "folders/setWorkingHours", map[string]any{"folder": folder,
+		"hours": map[string]any{"between": "08:00-16:00", "days": []string{"sun", "mon", "tue", "wed", "thu", "fri", "sat"}, "timeZone": "Asia/Tokyo"}}), &s)
+	if h := s.Folder.WorkingHours; h == nil || *h.Between != "08:00-16:00" || h.Days != nil || *h.TimeZone != "Asia/Tokyo" {
+		t.Fatalf("%+v", s.Folder.WorkingHours)
+	}
+	if b, _ := os.ReadFile(filepath.Join(dir, ".agents", "folder.json")); !strings.Contains(string(b), "workingHours") {
+		t.Fatalf("%s", b)
+	}
+	tokyo, _ := time.LoadLocation("Asia/Tokyo")
+	working, outside := wire.WorkflowHoursNameWorking, wire.WorkflowHoursNameNotWorking
+	at := time.Date(2026, 11, 14, 9, 0, 0, 0, tokyo)
+	in := d.windowLocked(wire.Workflow{Folder: folder, Hours: &wire.WorkflowHours{Named: &working}})
+	out := d.windowLocked(wire.Workflow{Folder: folder, Hours: &wire.WorkflowHours{Named: &outside}})
+	if !in.open(at) || out.open(at) || in.open(at.Add(8*time.Hour)) || !out.open(at.Add(8*time.Hour)) {
+		t.Fatal("the named windows do not follow the setting")
+	}
+	for _, bad := range []map[string]any{{"named": "working"}, {"between": "9-25"}} {
+		if e := c.callError(t, 3, "folders/setWorkingHours", map[string]any{"folder": folder, "hours": bad}); e == nil {
+			t.Fatalf("%v was taken", bad)
+		}
+	}
+	// None takes it out: the default again.
+	s = wire.FolderSummary{}
+	json.Unmarshal(c.call(t, 4, "folders/setWorkingHours", map[string]any{"folder": folder}), &s)
+	if s.Folder.WorkingHours != nil || *d.workingHoursOf(dir).Between != "09:00-17:00" {
+		t.Fatalf("%+v", s.Folder.WorkingHours)
+	}
+	// Configuration's Hours writes the name.
+	os.MkdirAll(workflowsFolder(dir), 0o755)
+	path := filepath.Join(workflowsFolder(dir), "nightly.md")
+	os.WriteFile(path, []byte("---\non: agent.finished\n---\nLook.\n"), 0o644)
+	var w wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 5, "workflows/settings", map[string]any{"folder": folder, "workflowID": "nightly", "settings": map[string]any{"options": map[string]any{}},
+		"hours": map[string]any{"named": "not-working"}}), &w)
+	if b, _ := os.ReadFile(path); !strings.Contains(string(b), "\nhours: not-working\n") || w.Workflow.Hours == nil || w.Workflow.Hours.Named == nil {
+		t.Fatalf("%s %+v", b, w.Workflow.Hours)
 	}
 }

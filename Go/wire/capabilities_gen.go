@@ -68,6 +68,7 @@ const CapFiles1 = "files/1"
 const CapFolder1 = "folder/1"
 const CapFoldersNotCommitted1 = "folders.not-committed/1"
 const CapFoldersToMachine1 = "folders.to-machine/1"
+const CapFoldersWorkingHours1 = "folders.working-hours/1"
 const CapFolders1 = "folders/1"
 const CapForgeWrite1 = "forge-write/1"
 const CapForgeAssign1 = "forge.assign/1"
@@ -383,6 +384,7 @@ var HostCapabilities = pairs([][2]string{
 	{"folders/setPRCostComment", "lineage.comment/1"},
 	{"folders/setPinned", "folders/1"},
 	{"folders/setProject", "projects/1"},
+	{"folders/setWorkingHours", "folders.working-hours/1"},
 	{"folders/unarchive", "folders/1"},
 	{"folders/undoGuardedChange", "folders/1"},
 	{"forge/add-child", "forge-write/1"},

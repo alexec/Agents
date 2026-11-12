@@ -20,14 +20,24 @@ public struct WorkflowHours: Codable, Hashable, Sendable {
     public var days: [Weekday]?
     /// `time-zone:`, an IANA name; nil is the person's time zone, else the host's.
     public var timeZone: String?
+    /// `hours: working` or `hours: not-working` (#4821): the project's working hours, or
+    /// every time outside them. With it, the other three are nil.
+    public var named: Name?
+
+    /// A named window (#4821).
+    public enum Name: String, Codable, Hashable, Sendable {
+        case working
+        case notWorking = "not-working"
+    }
 
     /// The key, as the file spells it.
     public static let key = "hours"
 
-    public init(between: String? = nil, days: [Weekday]? = nil, timeZone: String? = nil) {
+    public init(between: String? = nil, days: [Weekday]? = nil, timeZone: String? = nil, named: Name? = nil) {
         self.between = between
         self.days = days
         self.timeZone = timeZone
+        self.named = named
     }
 
     /// A `between:` range as minutes of the day, from and to, as the daemon's parseBetween
@@ -63,6 +73,11 @@ public struct WorkflowHours: Codable, Hashable, Sendable {
     /// The hours in words: `only 18:00-09:00 on Mon, Tue (Europe/London)`, as manage_workflows
     /// says them. nil for hours that limit nothing.
     public var words: String? {
+        switch named {
+        case .working: return "only in working hours"
+        case .notWorking: return "only outside working hours"
+        case nil: break
+        }
         guard between != nil || days != nil else { return nil }
         var out = "only"
         if let between { out += " \(between)" }
@@ -92,6 +107,11 @@ extension WorkflowHours {
     /// The window in words: `Runs 09:00–18:00, Mon–Fri`, and `(Europe/London)` after it
     /// when that is not the viewer's zone. nil for hours that limit nothing.
     public func sentence(viewer: TimeZone) -> String? {
+        switch named {
+        case .working: return "Runs in working hours"
+        case .notWorking: return "Runs outside working hours"
+        case nil: break
+        }
         if let days, days.isEmpty { return "Never runs on its own: its hours name no day" }
         let time = between.map { text -> String in
             guard case .success(let range) = Self.parse(between: text) else { return text }

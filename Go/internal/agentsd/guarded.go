@@ -22,7 +22,7 @@ import (
 // agent works there, or by a pull, waits for the person to keep or undo it, and the app
 // goes on using the copy last approved, kept in <root>/guarded-files.json.
 
-var guardedFiles = map[string]string{".agents/folder.json": "the helper limits, disk space lines and cost on pull requests",
+var guardedFiles = map[string]string{".agents/folder.json": "the helper limits, disk space lines, cost on pull requests and working hours",
 	".agents/pins.json": "the pins", folderPolicyFile: "the folder's own policy layer"}
 
 // folderPolicyFile is .agents/policy.json (#2957, FR-014, policyfolder.go): a folder's own

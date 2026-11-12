@@ -3432,6 +3432,20 @@ final class AppModel {
             returning: DaemonAPI.NotCommittedResponse.self)
     }
 
+    /// The project's working hours (#4821); nil takes them out, back to 09:00-17:00 Mon-Fri.
+    func setWorkingHours(_ hours: WorkflowHours?, for key: FolderKey) async {
+        do {
+            var summary = try await client(for: key.host).call(
+                DaemonAPI.Method.foldersSetWorkingHours,
+                DaemonAPI.SetWorkingHoursRequest(folder: key.folder, hours: hours),
+                returning: DaemonAPI.FolderSummary.self)
+            summary.host = key.host
+            upsert(summary)
+        } catch {
+            problem = describe(error)
+        }
+    }
+
     func setPRCostComment(_ choice: PRCostComment, for key: FolderKey) async {
         do {
             var summary = try await client(for: key.host).call(
