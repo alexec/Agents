@@ -20,7 +20,7 @@ import subprocess
 import sys
 import tempfile
 
-REPO = "repos/alexec/Agents/security-advisories"
+REPO = "repos/{owner}/{repo}/security-advisories"  # gh fills these from the checkout (#4929)
 GHSA = re.compile(r"^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$")
 SHA = re.compile(r"^[0-9a-f]{7,40}$")
 SEVERITIES = {"critical", "high", "medium", "low"}
