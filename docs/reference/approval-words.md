@@ -1,3 +1,9 @@
+---
+diataxis: reference
+devices: [mac, iphone, ipad, server]
+description: The words on every approval a person gives an agent, on every client, and the rule for a new card.
+---
+
 # Approval words
 
 Every approval that a person gives an agent uses the same words (#4263): on the Mac window,
