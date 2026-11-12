@@ -56,6 +56,10 @@ func (s *Service) valueReport(ctx context.Context, r wire.ReportRange, scope *wi
 	// The overhead over the 14 days to now, whatever the range (#4524).
 	overhead := lineage.Overhead(nodes, now)
 	out.Overhead = &overhead
+	// The delivery figures over the 4 weeks to now, whatever the range (#4555).
+	if out.Delivery, err = s.keptDelivery(ctx, keep, nodes, now); err != nil {
+		return wire.ReportValue{}, err
+	}
 	return out, nil
 }
 

@@ -10560,6 +10560,17 @@ export interface ReportCounts {
 }
 
 /**
+ * A repo's delivery figures on Reports ▸ Planning (#4555): lineage.DeliveryOf over the scope's
+ * machines' nodes, each node once, with each release tag's time from its earliest link. Of a scope,
+ * never of a person.
+ */
+export interface ReportDelivery {
+  /** As LineageCostNode.repo, in the full form (#4800). */
+  repo: string;
+  figures: LineageDelivery;
+}
+
+/**
  * How far the estimates were from the actual figures (#3561), over the issues closed in the range
  * that had an estimate when their work started: the median of max(estimate/actual,
  * actual/estimate), so 1.5 means 1.5 times too high or too low. A figure is absent when no issue
@@ -10843,6 +10854,12 @@ export interface ReportValue {
    * Planning can ask lineage/forecast when each lands.
    */
   openEpics?: LineageNode[];
+  /**
+   * The scope's delivery figures (#4555, epic #4551), a repo each: the repos with the most PRs
+   * merged in the 28 days to now, at most 3, the most first, whatever the range. Absent from a
+   * control plane before it; empty when no repo had a merge.
+   */
+  delivery?: ReportDelivery[];
   issues: ReportValueRow[];
   /** One row per release (#3023): the PRs part-of it and the issues those PRs fix. */
   releases: ReportValueRow[];
@@ -16465,6 +16482,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RemoveResourceRequest: { required: ["name"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportCounts: { required: ["sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets", "workflowRuns", "workflowFailures"], optional: [] },
+  ReportDelivery: { required: ["repo", "figures"], optional: [] },
   ReportEstimateError: { required: ["issues"], optional: ["cost", "workingSeconds", "coverage", "landsAtErrorDays"] },
   ReportExport: { required: ["text", "count", "format"], optional: [] },
   ReportForecastScore: { required: ["epics", "p50Held", "p85Held"], optional: ["errorDays"] },
@@ -16478,7 +16496,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },
-  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "releases"], optional: ["loaded", "overhead", "leadTimeSeconds", "cycleTimeSeconds", "estimateError", "forecastScore", "openEpics", "limited"] },
+  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "releases"], optional: ["loaded", "overhead", "leadTimeSeconds", "cycleTimeSeconds", "estimateError", "forecastScore", "openEpics", "delivery", "limited"] },
   ReportValueRow: { required: ["node", "total", "waste", "prsMerged", "prsClosed", "prsReverted", "failedChecks"], optional: ["leadTimeSeconds", "cycleTimeSeconds", "level"] },
   ReportView: { required: ["id", "name", "page", "scope", "range"], optional: ["by"] },
   ReportViewID: { required: ["id"], optional: [] },

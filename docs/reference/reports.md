@@ -101,6 +101,17 @@ machines' copies of one node add up, as each banked its own turns.
 - **All in** (#4524): the work and the turns with no issue or PR together, with the overhead
   ratio of the last 14 days.
 - **Unlinked:** the turns with no issue or PR.
+- **Delivery** (#4555, epic #4551): a row of cards for each repo the scope merged most in (at
+  most 3, the most merges first), over the 4 weeks to now, whatever the range: lead time for
+  changes, deployment frequency, change failure rate, failed deployment recovery time, rework
+  rate, flow efficiency, the approval wait (with the share of PRs that waited) and CI time to
+  green (with the failed rounds a PR). Each card has the 4-week figure, what it is made from,
+  a line of the 4 weeks and, for the four DORA keys, DORA 2024's band. The bands come from
+  teams of people, and agents merge many small PRs, so they are a reference, not a grade.
+  The control plane works them out with `lineage.DeliveryOf` (the definitions are in
+  `LineageDelivery` in `Packages/Wire/daemon.schema.json`) over the scope's nodes, with each
+  release tag's time from its links (`v1/lineage-graph/<host>/links.json`). They follow the
+  scope and the Report Policy, and are never a person's.
 - **What comes next** (#4528), from `lineage/forecast` (#4526) on the person's own machines,
   whatever the scope: each weekly allowance's burn (when it runs out at this pace, or that it
   lasts to the reset; the newest reading from any machine), what a week and a month cost at the
@@ -218,7 +229,7 @@ machines' copies of one node add up, as each banked its own turns.
   `groups`.
 
 - `reports/value` (#2351) with a range and a scope: Reports ▸ Planning (`ReportValue`), with
-  `forecastScore` and `openEpics` (#4528).
+  `forecastScore` and `openEpics` (#4528), and `delivery` (#4555): a `ReportDelivery` a repo.
 - `reports/views`, `reports/saveView` (a view with no `id` is new) and `reports/deleteView`
   (#2019): the caller's saved views.
 
@@ -238,6 +249,8 @@ curl -H "Authorization: Bearer agread_…" \
 - `format` is `json` (the default, the same answer as `reports/usage`), `csv` or `jsonl`
   (the same as `reports/export`).
 - `group=<id>` reads one group's rows instead of the organisation's.
+- `report=delivery` (#4555) reads Reports ▸ Planning's delivery figures instead, in JSON only:
+  `{"delivery": [ReportDelivery, …]}`, a repo each.
 - **A token reads these reports and nothing else.** It opens no socket and calls no
   method.
 - **The control plane keeps only the token's SHA-256.** The value is shown once.
@@ -262,7 +275,12 @@ Each metric is a cumulative sum that starts at midnight UTC, by runtime:
 `agents.cost` (by currency), `agents.tokens` (by kind), `agents.turns`,
 `agents.sessions` (ended or failed), `agents.pull_requests` (opened, merged, reverted),
 `agents.workflow.runs` (succeeded or failed) and `agents.time` (working or waiting, in
-seconds). No person, folder or machine is named. Console ▸ Read API shows where the
+seconds). The delivery figures (#4555) are gauges, the organisation's over the 4 weeks to now,
+by `repo`: `agents.delivery.lead_time`, `agents.delivery.recovery_time`,
+`agents.delivery.approval_wait` and `agents.delivery.ci_time_to_green` (the median, in
+seconds), `agents.delivery.deployment_frequency` (releases a week),
+`agents.delivery.change_failure_rate`, `agents.delivery.rework_rate` and
+`agents.delivery.flow_efficiency` (0 to 1). A figure made from none sends no point. No person, folder or machine is named. Console ▸ Read API shows where the
 exporter sends and how its last send went. For the control plane's own health, use the
 Prometheus metrics (`AGENTS_CONTROL_METRICS`, #2176).
 
