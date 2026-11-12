@@ -11,11 +11,14 @@ import SwiftUI
 enum WindowToast: Identifiable, Equatable {
     case problem(AlertWords)
     case archived(ArchiveUndo)
+    /// Undo after Unarchive, Rename, the labels, Mute or Later (#4793).
+    case changed(SessionUndo)
 
     var id: String {
         switch self {
         case .problem(let words): "problem-\(words.id)"
         case .archived(let undo): "archived-\(undo.id)"
+        case .changed(let undo): "changed-\(undo.id)"
         }
     }
 
@@ -24,6 +27,7 @@ enum WindowToast: Identifiable, Equatable {
         switch self {
         case .problem(let words): "Could not finish that. \(words.text)"
         case .archived(let undo): undo.line
+        case .changed(let undo): undo.line
         }
     }
 
@@ -34,6 +38,7 @@ enum WindowToast: Identifiable, Equatable {
         switch self {
         case .problem(let words): if model.problem == words.text { model.dismissProblem() }
         case .archived(let undo): model.dismissArchiveUndo(undo)
+        case .changed(let undo): model.dismissSessionUndo(undo)
         }
     }
 }
@@ -69,6 +74,14 @@ struct WindowToasts: ViewModifier {
                     toast = nil
                 }
             }
+            .onChange(of: model.sessionUndo?.id, initial: true) {
+                if let undo = model.sessionUndo {
+                    show(.changed(undo))
+                } else if case .changed = toast {
+                    // Undone, from the toast or ⌘Z.
+                    toast = nil
+                }
+            }
     }
 
     /// A new toast replaces the last, and the model forgets the one it replaced, so the same
@@ -91,6 +104,10 @@ struct WindowToasts: ViewModifier {
         case .archived(let undo):
             ArchiveUndoStrip(undo: undo,
                              perform: { Task { await model.undoArchive() } },
+                             dismiss: { close(shown) })
+        case .changed(let undo):
+            SessionUndoStrip(undo: undo,
+                             perform: { Task { await model.undoSessionChange() } },
                              dismiss: { close(shown) })
         case .problem:
             Toast(tone: .failure, text: shown.text, id: shown.id, dismiss: { close(shown) })

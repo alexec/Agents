@@ -1,0 +1,150 @@
+[
+  {
+    "expected" : {
+      "line" : "Unarchived “Fix the parser”",
+      "menu" : "Undo Unarchive"
+    },
+    "input" : {
+      "case" : "unarchived",
+      "change" : {
+        "kind" : "unarchived"
+      },
+      "title" : "Fix the parser"
+    },
+    "name" : "unarchived"
+  },
+  {
+    "expected" : {
+      "line" : "Renamed “Fix the parser” to “Parser”",
+      "menu" : "Undo Rename"
+    },
+    "input" : {
+      "case" : "renamed",
+      "change" : {
+        "kind" : "renamed",
+        "to" : "Parser"
+      },
+      "title" : "Fix the parser"
+    },
+    "name" : "renamed"
+  },
+  {
+    "expected" : {
+      "line" : "Gave “Parser” its runtime’s title",
+      "menu" : "Undo Rename"
+    },
+    "input" : {
+      "case" : "renamed back",
+      "change" : {
+        "kind" : "renamed",
+        "to" : " "
+      },
+      "title" : "Parser"
+    },
+    "name" : "renamed back"
+  },
+  {
+    "expected" : {
+      "line" : "Added the label “ui” to “Fix the parser”",
+      "menu" : "Undo Labels"
+    },
+    "input" : {
+      "case" : "one label added",
+      "change" : {
+        "add" : [
+          "ui"
+        ],
+        "kind" : "labels",
+        "remove" : [
+
+        ]
+      },
+      "title" : "Fix the parser"
+    },
+    "name" : "one label added"
+  },
+  {
+    "expected" : {
+      "line" : "Removed the label “ui” from “Untitled”",
+      "menu" : "Undo Labels"
+    },
+    "input" : {
+      "case" : "one label removed",
+      "change" : {
+        "add" : [
+
+        ],
+        "kind" : "labels",
+        "remove" : [
+          "ui"
+        ]
+      },
+      "title" : null
+    },
+    "name" : "one label removed"
+  },
+  {
+    "expected" : {
+      "line" : "Changed the labels of “Fix the parser”",
+      "menu" : "Undo Labels"
+    },
+    "input" : {
+      "case" : "labels changed",
+      "change" : {
+        "add" : [
+          "a"
+        ],
+        "kind" : "labels",
+        "remove" : [
+          "b"
+        ]
+      },
+      "title" : "Fix the parser"
+    },
+    "name" : "labels changed"
+  },
+  {
+    "expected" : {
+      "line" : "Muted “Fix the parser”",
+      "menu" : "Undo Mute"
+    },
+    "input" : {
+      "case" : "muted",
+      "change" : {
+        "kind" : "muted",
+        "muted" : true
+      },
+      "title" : "Fix the parser"
+    },
+    "name" : "muted"
+  },
+  {
+    "expected" : {
+      "line" : "Unmuted “Untitled”",
+      "menu" : "Undo Unmute"
+    },
+    "input" : {
+      "case" : "unmuted",
+      "change" : {
+        "kind" : "muted",
+        "muted" : false
+      },
+      "title" : "  "
+    },
+    "name" : "unmuted"
+  },
+  {
+    "expected" : {
+      "line" : "Moved “Approve the push” to Later",
+      "menu" : "Undo Later"
+    },
+    "input" : {
+      "case" : "later",
+      "change" : {
+        "kind" : "later"
+      },
+      "title" : "Approve the push"
+    },
+    "name" : "later"
+  }
+]

@@ -69,6 +69,8 @@ import { Providers } from "./providers";
 import { MachineLock } from "./machineLock";
 import { isLead, leadEpic, leadProgressWords } from "./leadProgress";
 import { type AgentWrite, PendingWrites, omitting, writeFailure } from "./pendingWrites";
+import { type ChangeUndo, type Inverse, changeUndoLine, changeUndoMenu, labelsUndo, laterUndo, mutedUndo, renamedUndo,
+  unarchivedUndo } from "./changeUndo";
 import type { MachineCopy, TranscriptCopy } from "./localCopy";
 import { sessionRef } from "../protocol/ref";
 
@@ -601,6 +603,9 @@ export class Work {
 
   /** The last Archive, while Undo is offered for it (ArchiveUndo, #1534). */
   readonly archiveUndo = signal<{ key: number; host: string; agentIDs: string[]; line: string } | null>(null);
+  /** The last Unarchive, Rename, label change, Mute or Later, while Undo is offered for it (SessionUndo, #4793).
+   *  One toast at a time: it and Archive's replace each other. */
+  readonly changeUndo = signal<{ key: number; host: string; line: string; menu: string; inverse: Inverse } | null>(null);
 
   private problemsWaiting: string[] = [];
 
@@ -3551,6 +3556,37 @@ export class Store extends Work {
     for (const id of undo.agentIDs) await this.perform(undo.host, id, "agents/unarchive");
   }
 
+  /** Offer Undo for an action that went (#4793). */
+  offerUndo(host: string, undo: ChangeUndo | null): void {
+    if (!undo) return;
+    this.archiveUndo.value = null;
+    this.changeUndo.value = { key: Date.now(), host, line: changeUndoLine(undo.change, undo.title),
+      menu: changeUndoMenu(undo.change), inverse: undo.inverse };
+  }
+
+  /** Undo (⌘Z) after Unarchive, Rename, the labels, Mute or Later (#4793): the inverse, with no Undo of its own. */
+  async undoChange(): Promise<void> {
+    const undo = this.changeUndo.value;
+    if (!undo) return;
+    this.changeUndo.value = null;
+    const { host, inverse } = undo;
+    switch (inverse.kind) {
+      case "archive": await this.perform(host, inverse.agentID, "agents/archive"); break;
+      case "rename": await this.rename(host, inverse.agentID, inverse.title, false); break;
+      case "labels": await this.setLabels(host, inverse.agentID, inverse.add, inverse.remove, false); break;
+      case "mute": await this.setMuted(host, inverse.agentID, inverse.muted, false); break;
+      case "bringBack": await this.undeferRequest(host, inverse.request); break;
+    }
+  }
+
+  /** Unarchive from a menu (#4793): with Undo, which archives it again. */
+  async unarchive(host: string, agentID: string): Promise<boolean> {
+    const before = this.agent(host, agentID);
+    const done = await this.perform(host, agentID, "agents/unarchive");
+    if (done && before) this.offerUndo(host, unarchivedUndo(before));
+    return done;
+  }
+
   /** Whether the host took it, so a caller can leave the chat only when it did (#586). */
   async perform(host: string, agentID: string,
                 action: "agents/stop" | "agents/archive" | "agents/unarchive"): Promise<boolean> {
@@ -3748,7 +3784,10 @@ export class Store extends Work {
     const params = deferParams(request, later);
     const at = toWireDate(new Date());
     const deferred = params.atMac ? { atMac: true, at } : params.until === undefined ? { at } : { until: params.until, at };
-    await this.changingRequest(host, request, (r) => ({ ...r, deferred }), () => this.act("requests/defer", params, host));
+    const before = (this.personRequests.peek()[host] ?? []).find((r) => r.id === request);
+    const done = await this.changingRequest(host, request, (r) => ({ ...r, deferred }), () => this.act("requests/defer", params, host));
+    // Undo is Bring Back Now (#4793).
+    if (done && before) this.offerUndo(host, laterUndo(before));
   }
 
   /**
@@ -3756,13 +3795,14 @@ export class Store extends Work {
    * request put back as it was when the call did not go, unless the host changed it meanwhile.
    */
   private async changingRequest(host: string, id: string, draw: (r: PersonRequest) => PersonRequest,
-                                send: () => Promise<RequestUpdate | null>): Promise<void> {
+                                send: () => Promise<RequestUpdate | null>): Promise<boolean> {
     const held = (this.personRequests.peek()[host] ?? []).find((r) => r.id === id);
     const shown = held ? draw(held) : null;
     if (shown) this.placeRequest(host, shown);
     const changed = await send();
     if (changed) this.placeRequest(host, changed.request);
     else if (held && (this.personRequests.peek()[host] ?? []).find((r) => r.id === id) === shown) this.placeRequest(host, held);
+    return changed !== null;
   }
 
   /** Bring Back Now (#4236): a deferred request back into Needs You at once. */
@@ -4021,17 +4061,21 @@ export class Store extends Work {
   readonly renaming = signal<{ id: string; inChat: boolean } | null>(null);
 
   /** The person's title for a session (#751); empty, the runtime names it again. */
-  async rename(host: string, agentID: string, title: string): Promise<void> {
+  async rename(host: string, agentID: string, title: string, offeringUndo = true): Promise<void> {
     const write: AgentWrite = { kind: "rename", title };
-    await this.optimistic(host, agentID, write, async () =>
+    const before = offeringUndo ? this.agent(host, agentID) : undefined;
+    const done = await this.optimistic(host, agentID, write, async () =>
       await this.act("agents/rename", { agentID: agentID as UUID, title }, host, write) !== null);
+    if (done && before) this.offerUndo(host, renamedUndo(before, title));
   }
 
   /** Mute Notifications / Unmute Notifications (#2003): kept by the session's host. */
-  async setMuted(host: string, agentID: string, muted: boolean): Promise<void> {
+  async setMuted(host: string, agentID: string, muted: boolean, offeringUndo = true): Promise<void> {
     const write: AgentWrite = { kind: "mute", muted };
-    await this.optimistic(host, agentID, write, async () =>
+    const before = offeringUndo ? this.agent(host, agentID) : undefined;
+    const done = await this.optimistic(host, agentID, write, async () =>
       await this.act("agents/setMuted", { agentID: agentID as UUID, muted }, host, write) !== null);
+    if (done && before) this.offerUndo(host, mutedUndo(before, muted));
   }
 
   /** Mute Notifications for a workflow's runs, or Unmute (#2003): `muted: true` in its file. */
@@ -4056,13 +4100,16 @@ export class Store extends Work {
     this.pendingOptions.value = { ...this.pendingOptions.value, [agentID]: mine };
   }
 
-  async setLabels(host: string, agentID: string, add: string[], remove: string[]): Promise<boolean> {
+  async setLabels(host: string, agentID: string, add: string[], remove: string[], offeringUndo = true): Promise<boolean> {
     const write: AgentWrite = { kind: "labels", add, remove };
-    return this.optimistic(host, agentID, write, async () => {
+    const before = offeringUndo ? this.agent(host, agentID) : undefined;
+    const done = await this.optimistic(host, agentID, write, async () => {
       const agent = await this.act("agents/setLabels", { agentID: agentID as UUID, add, remove }, host, write);
       if (agent) this.upsertAgent(agent, host);
       return agent !== null;
     });
+    if (done && before) this.offerUndo(host, labelsUndo(before, add, remove));
+    return done;
   }
 
   async labelVocabulary(host: string, folder: string): Promise<string[]> {

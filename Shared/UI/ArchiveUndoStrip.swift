@@ -23,3 +23,24 @@ struct ArchiveUndoStrip: View {
         .accessibilityAction(named: ArchiveUndo.undoLabel, perform)
     }
 }
+
+/// Undo after Unarchive, Rename, the labels, Mute or Later (#4793): the same toast as
+/// Archive's, with the line `SessionUndo` says. Undo sends the inverse.
+struct SessionUndoStrip: View {
+    let undo: SessionUndo
+    let perform: () -> Void
+    let dismiss: () -> Void
+
+    var body: some View {
+        Toast(tone: .success, text: undo.line, id: undo.id, undo: true,
+              announcement: undo.announcement, dismiss: dismiss) {
+            Button(ArchiveUndo.undoLabel, action: perform)
+                #if os(iOS)
+                // ⌘Z from an iPad's keyboard while the toast shows. The Mac has the
+                // Session menu's Undo item for it.
+                .keyboardShortcut("z")
+                #endif
+        }
+        .accessibilityAction(named: ArchiveUndo.undoLabel, perform)
+    }
+}

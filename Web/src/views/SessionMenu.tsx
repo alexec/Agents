@@ -151,6 +151,7 @@ export async function archiveWithChildren(store: Store, host: string, agent: Age
     if (store.agent(host, id)?.state !== "archived" && await store.perform(host, id, "agents/archive")) put.push(id);
   }
   // Undo for a few seconds, at the foot of the list (#1534).
+  store.changeUndo.value = null;
   store.archiveUndo.value = { key: Date.now(), host, agentIDs: put, line: undoLine(agent.title, stops) };
   return true;
 }
@@ -273,6 +274,7 @@ export function runSessionAction(store: Store, host: string, agent: Agent, actio
   else if (action === "agents/archive") void archiveWithChildren(store, host, agent);
   else if (action === "stopAll") void stopAll(store, host, agent);
   else if (action === "delete") void ask(`${deleteTitle(agent.title)}\n\n${deleteMessageFor(agent)}`).then((yes) => { if (yes) void remove(store, host, agent); });
+  else if (action === "agents/unarchive") void store.unarchive(host, agent.id);
   else void store.perform(host, agent.id, action);
 }
 
