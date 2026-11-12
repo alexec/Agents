@@ -34,8 +34,11 @@ import (
 // envelope, and v1/bus/<bus>/ids/<id hash>.json says it is on the bus. The sweep keeps
 // the newest busLogKept and deletes both files of the rest.
 //
-// The envelope is routing data only: refs, names and times (principle 7). It carries no
-// data and no details, so the control plane reads none of a customer's words.
+// The envelope is routing data only: refs, names and times (principle 7). Its data, which
+// can be a customer's words, comes only sealed by the machine that raised it to each machine
+// of its person's lock (#4825): the control plane checks the copies' sizes, keeps them in
+// the bus log, and gives each machine its own copy only. It opens none, and cannot make one
+// up: inside each is the raising machine's signature.
 
 const (
 	busPrefix = "v1/bus/"
@@ -47,6 +50,12 @@ const (
 	// busTopicsMost bounds one subscription's topics; busTextMost each text in it.
 	busTopicsMost = 100
 	busTextMost   = 1_024
+	// busSealedMost bounds an event's sealed copies: one per machine of the person.
+	busSealedMost = 64
+	// busSealedBytes bounds one copy: 256 KB of data, the raising machine's key and
+	// signature, and the seal's tag; busEncapsulatedBytes its encapsulated key (P-256).
+	busSealedBytes       = 256<<10 + 65 + 64 + 16
+	busEncapsulatedBytes = 65
 	// busLogStamp sorts a log file by when the control plane took it.
 	busLogStamp = "20060102T150405.000000000Z"
 )
@@ -99,8 +108,33 @@ func checkBusEvent(e wire.BusEvent) error {
 		return fmt.Errorf("the source, the producer or the time is too long")
 	case e.Subject != nil && e.Subject.Check() != nil:
 		return fmt.Errorf("the subject is not a ref: %v", e.Subject.Check())
+	case len(e.Sealed) > busSealedMost:
+		return fmt.Errorf("at most %d sealed copies", busSealedMost)
+	}
+	to := make(map[string]bool, len(e.Sealed))
+	for _, c := range e.Sealed {
+		switch {
+		case c.Machine == "" || len(c.Machine) > busTextMost || to[c.Machine]:
+			return fmt.Errorf("a sealed copy names no machine, or one named before")
+		case len(c.Sealed.Encapsulated) != busEncapsulatedBytes || len(c.Sealed.Ciphertext) > busSealedBytes:
+			return fmt.Errorf("a sealed copy is more than 256 KB of data")
+		}
+		to[c.Machine] = true
 	}
 	return nil
+}
+
+// busFor is e as it goes to host: with that machine's own sealed copy only, or none.
+func busFor(e wire.BusEvent, host string) wire.BusEvent {
+	sealed := e.Sealed
+	e.Sealed = nil
+	for _, c := range sealed {
+		if c.Machine == host {
+			e.Sealed = []wire.BusSealedData{c}
+			break
+		}
+	}
+	return e
 }
 
 // busPublish is bus/publish: each new id goes on the machine's person's bus, into the
@@ -274,7 +308,7 @@ func (s *Service) busDeliver(person, publisher string, e wire.BusEvent) {
 	}
 	s.bus.mu.Unlock()
 	for _, d := range out {
-		if s.router.Tell(d.host, wire.NotifyBusDeliver.Name, wire.BusDelivery{Event: e, Subscriptions: d.subs}) {
+		if s.router.Tell(d.host, wire.NotifyBusDeliver.Name, wire.BusDelivery{Event: busFor(e, d.host), Subscriptions: d.subs}) {
 			s.bus.delivered.Add(1)
 			s.metrics.Bus("delivered")
 		}

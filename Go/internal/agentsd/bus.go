@@ -12,14 +12,16 @@ import (
 )
 
 // The event bus (#4729, spec 4724-event-bus, "The bus"). This machine publishes each new
-// event it records, envelope only (bus/publish), a short time after it, to a control plane
+// event it records, its envelope and its data sealed to the person's other machines
+// (bus/publish, busdata.go, #4825), a short time after it, to a control plane
 // that takes it (events.bus/1). Best effort: an event that cannot be sent then (no control
 // link, a failed send, too many waiting) is not sent later; it stays in events.jsonl, the
 // machine's own log.
 //
 // An event the control plane delivers (bus/deliver) for a subscription of this machine is
-// recorded here as for any event, once: one whose id this machine already has (it made it
-// too) is dropped. A delivered event is never published again.
+// recorded here as for any event, once, with its data when it carries a copy sealed to this
+// machine: one whose id this machine already has (it made it too) is dropped. A delivered
+// event is never published again.
 
 const (
 	busPublishAfter = time.Second
@@ -27,16 +29,28 @@ const (
 	busPublishBatch = 100
 	// busPublishHeld bounds what waits for a send; past it, the newest are dropped.
 	busPublishHeld = 1_000
+	// busPublishHeldData bounds the data that waits; past it, the newest go envelope only.
+	busPublishHeldData = 16 << 20
+	// busPublishBatchBytes bounds the sealed data of one send, well under a message's limit.
+	busPublishBatchBytes = 8 << 20
 	// busSeenScan is how far back a delivered event's id is looked for in this machine's log.
 	busSeenScan = 2_000
 )
 
 type busBook struct {
 	busMu      sync.Mutex
-	busPending []wire.BusEvent
-	busTimer   *time.Timer
+	busPending []busPending
+	// busPendingData is the bytes of data in busPending.
+	busPendingData int
+	busTimer       *time.Timer
 	// busSending keeps one send at a time.
 	busSending sync.Mutex
+}
+
+// busPending is an event that waits for a send: its envelope, and the data to seal.
+type busPending struct {
+	event wire.BusEvent
+	data  json.RawMessage
 }
 
 // busEventOf is an event's envelope as the bus takes it; false for one with none.
@@ -68,7 +82,12 @@ func (d *Daemon) publishSoon(e wire.Event) {
 	if len(d.busPending) >= busPublishHeld {
 		return
 	}
-	d.busPending = append(d.busPending, b)
+	data := e.Data
+	if len(data) > busDataMost || d.busPendingData+len(data) > busPublishHeldData {
+		data = nil
+	}
+	d.busPendingData += len(data)
+	d.busPending = append(d.busPending, busPending{event: b, data: data})
 	if d.busTimer == nil {
 		d.busTimer = time.AfterFunc(busPublishAfter, func() {
 			d.busMu.Lock()
@@ -86,12 +105,29 @@ func (d *Daemon) publishBus() {
 	defer d.busSending.Unlock()
 	d.busMu.Lock()
 	pending := d.busPending
-	d.busPending = nil
+	d.busPending, d.busPendingData = nil, 0
 	d.busMu.Unlock()
 	ask := d.askControl.Load()
-	for len(pending) > 0 && ask != nil && d.ctx.Err() == nil {
-		batch := pending[:min(len(pending), busPublishBatch)]
-		pending = pending[len(batch):]
+	if len(pending) == 0 || ask == nil {
+		return
+	}
+	person, signer, to := d.busDataTo()
+	for len(pending) > 0 && d.ctx.Err() == nil {
+		var batch []wire.BusEvent
+		bytes := 0
+		for len(pending) > 0 && len(batch) < busPublishBatch && (len(batch) == 0 || bytes+len(pending[0].data)*len(to) <= busPublishBatchBytes) {
+			p := pending[0]
+			pending = pending[1:]
+			if signer != nil && len(p.data) > 0 {
+				sealed, err := sealBusData(signer, person, p.event.ID, p.data, to)
+				if err != nil {
+					log.Printf("bus/publish: the data of %s not sealed: %v", p.event.ID, err)
+				}
+				p.event.Sealed = sealed
+				bytes += len(p.data) * len(sealed)
+			}
+			batch = append(batch, p.event)
+		}
 		ctx, cancel := context.WithTimeout(d.ctx, reportPatience)
 		_, err := (*ask)(ctx, wire.CallBusPublish.Name, wire.BusPublish{Events: batch})
 		cancel()
@@ -126,8 +162,10 @@ func (d *Daemon) toldBusDelivery(params json.RawMessage) {
 	if t, err := time.Parse(time.RFC3339Nano, e.Time); err == nil {
 		at = wire.DateOf(t)
 	}
+	data := d.openBusDelivery(e)
+	e.Sealed = nil
 	d.raiseEnveloped(wire.EventDraft{Name: e.Type, At: at, Scope: macScope(), Sentence: sentence, Details: details},
-		nil, &serverEnvelope{bus: &e})
+		nil, &serverEnvelope{bus: &e, busData: data})
 }
 
 // hasEventID says this machine's log has an event with that id among its newest.

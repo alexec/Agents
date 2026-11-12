@@ -36,6 +36,8 @@ type serverEnvelope struct {
 	key             string
 	// bus is the envelope of an event the bus delivered (#4729): it keeps it as it came.
 	bus *wire.BusEvent
+	// busData is its data, opened from the copy sealed to this machine (#4825), if any.
+	busData json.RawMessage
 }
 
 // envelope gives an event its envelope: from what its server said for a server's
@@ -43,7 +45,7 @@ type serverEnvelope struct {
 func (d *Daemon) envelope(e *wire.Event, server *serverEnvelope) {
 	if server != nil && server.bus != nil {
 		b := server.bus
-		setEnvelope(e, b.ID, b.Provider, b.Topic, b.Subject, b.Time, b.Producer, nil)
+		setEnvelope(e, b.ID, b.Provider, b.Topic, b.Subject, b.Time, b.Producer, server.busData)
 		return
 	}
 	provider, topic, key := "agents", "", strconv.FormatInt(e.Position, 10)

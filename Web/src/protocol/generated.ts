@@ -1539,9 +1539,10 @@ export interface BusDelivery {
 }
 
 /**
- * An event on the bus (#4729, spec 4724-event-bus, "The bus"): its envelope only. It carries no
- * data and no details, so the control plane reads only refs, names and times (principle 7, #4726);
- * a consumer reads the subject's state now, by its ref.
+ * An event on the bus (#4729, spec 4724-event-bus, "The bus"): its envelope, and its data sealed to
+ * the person's machines (#4825). The control plane reads only refs, names and times (principle 7,
+ * #4726) and opens no sealed copy; a machine with no copy of its own reads the subject's state now,
+ * by its ref.
  */
 export interface BusEvent {
   /**
@@ -1582,6 +1583,12 @@ export interface BusEvent {
    * identity.
    */
   producer: string;
+  /**
+   * The event's data (at most 256 KB), sealed by the machine that raised it to each machine of its
+   * person's lock (#4825). In bus/deliver, only the copy for the machine it goes to. None when the
+   * data is larger, or the machine has no lock.
+   */
+  sealed?: BusSealedData[];
 }
 
 /**
@@ -1599,6 +1606,18 @@ export interface BusPublish {
 export interface BusPublished {
   kept: number;
   dropped: number;
+}
+
+/**
+ * An event's data sealed to one machine (#4825): HPKE to the sealing key the lock's addMachine
+ * names, with the associated data busdata.v1|<person>|m:<machine>|<event id>. Inside is the data
+ * and the raising machine's signature of it, so a control plane can neither read it nor make one
+ * up.
+ */
+export interface BusSealedData {
+  /** The machine it is sealed to, by its id. */
+  machine: string;
+  sealed: SealedEnvelope;
 }
 
 /**
@@ -15557,9 +15576,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BudgetRequestList: { required: ["requests"], optional: [] },
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   BusDelivery: { required: ["event", "subscriptions"], optional: [] },
-  BusEvent: { required: ["specversion", "id", "type", "provider", "topic", "source", "time", "producer"], optional: ["subject"] },
+  BusEvent: { required: ["specversion", "id", "type", "provider", "topic", "source", "time", "producer"], optional: ["subject", "sealed"] },
   BusPublish: { required: ["events"], optional: [] },
   BusPublished: { required: ["kept", "dropped"], optional: [] },
+  BusSealedData: { required: ["machine", "sealed"], optional: [] },
   BusSubscribe: { required: ["subscriptions"], optional: [] },
   BusSubscribed: { required: ["count"], optional: [] },
   BusSubscription: { required: ["id"], optional: ["provider", "type", "topics", "subject"] },
