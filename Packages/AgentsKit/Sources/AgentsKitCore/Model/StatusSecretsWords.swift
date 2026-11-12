@@ -15,6 +15,8 @@ public enum StatusSecretsWords {
     public static let editAccounts = "Edit in Settings ▸ You ▸ Accounts"
     public static let noSecrets = "No secrets yet."
     public static let noAccounts = "No accounts yet."
+    /// Before the grey line's name, for VoiceOver.
+    public static let readLabel = "Last read:"
     public static let notBackedUp = "Not backed up: only on one machine."
     public static let secretsHelp = "When something last happened to one of your secrets"
     public static let accountsHelp = "When something last happened to one of your outside accounts"
@@ -32,7 +34,14 @@ public enum StatusSecretsWords {
         public var operation: String?
         public var at: Date?
         public var backedUp: Bool
+        /// Whether the last operation was a read: of the secret, or of the secret or card the account names.
+        public var isRead: Bool = false
+        /// The session that did the last operation, when one did.
+        public var agent: UUID?
     }
+
+    /// How long a read stays recent for the sidebar row's grey line.
+    public static let recentReadWindow: TimeInterval = 86_400
 
     /// `••••` and the last 4 when a machine sent them (#4158).
     public static func masked(_ hint: String?) -> String {
@@ -68,7 +77,8 @@ public enum StatusSecretsWords {
             let added = row.created.flatMap(parseDate)
             return Line(id: row.name, title: row.name, detail: nil, hint: masked(row.hint),
                         operation: row.lastOp.map { secretOperation($0.what) } ?? (added == nil ? nil : "Added"),
-                        at: row.lastOp?.at ?? added, backedUp: row.backedUp != false)
+                        at: row.lastOp?.at ?? added, backedUp: row.backedUp != false,
+                        isRead: row.lastOp?.what == "read", agent: row.lastOp?.agent)
         }
         .sorted(by: newestFirst)
     }
@@ -79,23 +89,24 @@ public enum StatusSecretsWords {
     public static func accountLines(_ accounts: [DaemonAPI.OutsideAccount], secrets: [DaemonAPI.UserSecretRow]) -> [Line] {
         let byName = Dictionary(secrets.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
         return accounts.map { account in
-            var newest: (words: String, at: Date)?
-            func consider(_ words: String, _ at: Date?) {
+            var newest: (words: String, at: Date, read: Bool, agent: UUID?)?
+            func consider(_ words: String, _ at: Date?, read: Bool = false, agent: UUID? = nil) {
                 guard let at, newest.map({ at > $0.at }) ?? true else { return }
-                newest = (words, at)
+                newest = (words, at, read, agent)
             }
             consider("Added", account.made.flatMap(parseDate))
             consider("Edited", account.edited)
-            if let op = account.lastOp { consider(accountOperation(op.what), op.at) }
+            if let op = account.lastOp { consider(accountOperation(op.what), op.at, read: op.what == "read", agent: op.agent) }
             let named = [account.secret, account.card].compactMap { $0 }.filter { !$0.isEmpty }
             for name in named {
-                if let op = byName[name]?.lastOp { consider("\(name) \(secretOperation(op.what).lowercased())", op.at) }
+                if let op = byName[name]?.lastOp { consider("\(name) \(secretOperation(op.what).lowercased())", op.at, read: op.what == "read", agent: op.agent) }
             }
             let secret = account.secret.flatMap { $0.isEmpty ? nil : $0 }
             let hint = secret.map { byName[$0].map { masked($0.hint) } ?? "not in Secrets" } ?? "no secret"
             let backedUp = named.allSatisfy { byName[$0]?.backedUp != false }
             return Line(id: account.id, title: account.service, detail: account.address, hint: hint,
-                        operation: newest?.words, at: newest?.at, backedUp: backedUp)
+                        operation: newest?.words, at: newest?.at, backedUp: backedUp, isRead: newest?.read ?? false,
+                        agent: newest?.agent)
         }
         .sorted(by: newestFirst)
     }
@@ -105,9 +116,14 @@ public enum StatusSecretsWords {
         lines.compactMap(\.at).max()
     }
 
-    /// Whether the sidebar row's mark warns: any line not backed up.
-    public static func warns(_ lines: [Line]) -> Bool {
-        lines.contains { !$0.backedUp }
+    /// The sidebar row's grey line: the name of the item read last (an account's address too) and the session that
+    /// read it, by `agentTitle`, only when the newest operation on any line is a read in the last day. Nil otherwise.
+    /// A session the client does not know, or one with no title, is left out.
+    public static func recentRead(_ lines: [Line], now: Date = Date(), agentTitle: (UUID) -> String? = { _ in nil }) -> String? {
+        guard let newest = lines.filter({ $0.at != nil }).max(by: { $0.at! < $1.at! }),
+              newest.isRead, let at = newest.at, now.timeIntervalSince(at) < recentReadWindow else { return nil }
+        let agent = newest.agent.flatMap(agentTitle)
+        return [newest.title, newest.detail, agent].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     /// "5 min ago", "2 h ago", "3 d ago", as the wireframe's rows.

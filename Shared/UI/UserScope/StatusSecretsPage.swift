@@ -27,23 +27,34 @@ extension UserScopeState {
 }
 
 /// The sidebar's Status ▸ Secrets and Status ▸ Accounts rows (#4161): the title, and at its end the
-/// age of the newest operation on any of them. The mark's warning tint, when one is not backed up, is
-/// the caller's `activityIcon(_:warns:)`.
+/// age of the newest operation on any of them. Under it, in grey, the secret or account read last and the
+/// session that read it, when that read is the newest operation and is less than a day old. The icon keeps
+/// its plain tint: a read is not a warning.
 struct StatusSecretsRow: View {
     let kind: StatusSecretsKind
     let state: UserScopeState
+    /// A session's title by its id, or nil when this client does not know it.
+    var agentTitle: (UUID) -> String? = { _ in nil }
 
     var body: some View {
-        let newest = StatusSecretsWords.newest(state.statusLines(kind))
-        HStack(alignment: .firstTextBaseline) {
-            Text(kind.title).foregroundStyle(.primary)
-            Spacer()
-            if let newest {
-                TimelineView(.periodic(from: .now, by: 60)) { context in
-                    Text(StatusSecretsWords.ago(newest, now: context.date))
-                        .foregroundStyle(.secondary).monospacedDigit()
+        let lines = state.statusLines(kind)
+        let newest = StatusSecretsWords.newest(lines)
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            let read = StatusSecretsWords.recentRead(lines, now: context.date, agentTitle: agentTitle)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(kind.title).foregroundStyle(.primary)
+                    Spacer()
+                    if let newest {
+                        Text(StatusSecretsWords.ago(newest, now: context.date))
+                            .foregroundStyle(.secondary).monospacedDigit()
+                    }
+                }
+                if let read {
+                    Text(read).appText(.fine).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 }
             }
+            .accessibilityValue(read.map { "\(StatusSecretsWords.readLabel) \($0)" } ?? "")
         }
         .help(kind.help)
     }

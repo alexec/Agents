@@ -34,7 +34,7 @@ import { addMachineWords } from "../model/addMachine";
 import { SettingsPage } from "./Settings";
 import { SecretsSection } from "./UserScope";
 import { AccountsSection } from "./Accounts";
-import { StatusListMark, StatusSecretsPage, useUserScopeStatus } from "./StatusSecrets";
+import { StatusListMark, StatusListReadLine, StatusSecretsPage, useUserScopeStatus } from "./StatusSecrets";
 import { SessionSecretsSection } from "./settings/SessionSecrets";
 import { WorkflowRow } from "./WorkflowRow";
 import { BackToList } from "./BackToList";
@@ -136,7 +136,7 @@ const isRuntimesPage = (page: NavPage) => page.draw.kind === "activity" && page.
 
 /** A page's mark beside its row in the list: a count, or that it is not saved. */
 function PageMark({ store, page }: { store: Store; page: NavPage }) {
-  // Status ▸ Secrets and Accounts (#4161): the newest operation's age, and a dot when one is not backed up.
+  // Status ▸ Secrets and Accounts (#4161): the newest operation's age.
   if (page.draw.kind === "statusList") return <StatusListMark store={store} list={page.draw.list} />;
   // Status ▸ Runtimes (#3956): an allowance below 10% left, in the warning tint, as the window's orange Runtimes icon.
   if (isRuntimesPage(page)) {
@@ -218,6 +218,7 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
                     <PageMark store={store} page={p} />
                   </button>
                   {isRuntimesPage(p) && <RuntimesLowLine store={store} />}
+                  {p.draw.kind === "statusList" && <StatusListReadLine store={store} list={p.draw.list} />}
                 </Fragment>
               ))}
               {machinesHead(group) && makingRows(store.machinesMaking.value, store.providers.list.value, store.hosts.value)

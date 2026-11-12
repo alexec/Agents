@@ -26,7 +26,6 @@ test("status secrets: newest operation first, with the hint and the not-backed-u
   assert.equal(lines[2].operation, "Added");
   assert.equal(lines[3].at, null);
   assert.equal(s.newestAt(lines), now - 5 * 60_000);
-  assert.equal(s.warns(lines), true);
   assert.equal(s.summary(lines[1]), "••••ab12 · Read");
 });
 
@@ -56,4 +55,29 @@ test("status secrets: short ages, as the window's", () => {
 
 test("status secrets: two pages under Status, after Events", () => {
   assert.deepEqual(nav.navPages.status.map((p) => p.id), ["runtimes", "events", "secrets", "accounts"]);
+});
+
+test("status sidebar: the grey line names a recent read only", () => {
+  const read = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(5) } }),
+    row("OLD", { lastOp: { what: "replaced", at: wire(60) } })]);
+  assert.equal(s.recentRead(read, now), "GITHUB_TOKEN");
+  const stale = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(25 * 60) } })]);
+  assert.equal(s.recentRead(stale, now), null);
+  const replaced = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(60) } }),
+    row("NEW", { lastOp: { what: "replaced", at: wire(5) } })]);
+  assert.equal(s.recentRead(replaced, now), null);
+  const accounts = s.accountLines([{ service: "gitlab.com", address: "agentstest@example.com", secret: "GITLAB_TOKEN" }],
+    [row("GITLAB_TOKEN", { lastOp: { what: "read", at: wire(10) } })]);
+  assert.equal(s.recentRead(accounts, now), "gitlab.com · agentstest@example.com");
+});
+
+test("status sidebar: the grey line names the session that read it, when the page knows it", () => {
+  const titles = { fixer: "Fix the login" };
+  const read = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(5), agent: "fixer" } })]);
+  assert.equal(s.recentRead(read, now, (id) => titles[id]), "GITHUB_TOKEN · Fix the login");
+  const unknown = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(5), agent: "gone" } })]);
+  assert.equal(s.recentRead(unknown, now, (id) => titles[id]), "GITHUB_TOKEN");
+  const accounts = s.accountLines([{ service: "gitlab.com", secret: "GITLAB_TOKEN" }],
+    [row("GITLAB_TOKEN", { lastOp: { what: "read", at: wire(10), agent: "fixer" } })]);
+  assert.equal(s.recentRead(accounts, now, (id) => titles[id]), "gitlab.com · Fix the login");
 });

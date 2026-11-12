@@ -233,12 +233,12 @@ struct FolderListView: View {
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
                 EventsRow().activityIcon("list.bullet.rectangle")
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
-                // What happened last to the person's secrets and accounts (#4161): the newest's age,
-                // and the mark in the warning tint when one is not backed up.
+                // What happened last to the person's secrets and accounts (#4161): the newest's age, and
+                // the one read last in grey. The mark keeps its plain tint; "not backed up" is on the page.
                 ForEach([StatusSecretsKind.secrets, .accounts], id: \.self) { kind in
                     let item: SidebarItem = kind == .secrets ? .secretsStatus : .accountsStatus
-                    StatusSecretsRow(kind: kind, state: model.userScope)
-                        .activityIcon(kind.systemImage, warns: StatusSecretsWords.warns(model.userScope.statusLines(kind)), tint: .attention)
+                    StatusSecretsRow(kind: kind, state: model.userScope) { model.work.agent($0)?.title }
+                        .activityIcon(kind.systemImage)
                         .appText(.supporting).sidebarInk(item).tag(item)
                 }
             } header: {

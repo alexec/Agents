@@ -348,7 +348,7 @@ func (d *Daemon) sessionSecretList() wire.SessionSecrets {
 				row.Hint = new(v.Hint)
 			}
 			if op, ok := d.secretLastOp(n); ok {
-				row.LastOp = &wire.SecretLastOp{What: op.What, At: op.At}
+				row.LastOp = &wire.SecretLastOp{What: op.What, At: op.At, Agent: op.Agent}
 			}
 			if v.Description != "" {
 				row.Description = new(v.Description)

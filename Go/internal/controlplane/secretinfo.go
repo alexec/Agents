@@ -61,7 +61,7 @@ func (s *Service) noteSecretInfo(host, user string, ops []wire.SecretOperation, 
 	}
 	for _, op := range ops {
 		if name := strings.TrimSpace(op.Name); name != "" {
-			newer(name, wire.SecretLastOp{What: op.What, At: op.At})
+			newer(name, wire.SecretLastOp{What: op.What, At: op.At, Agent: op.Agent})
 		}
 	}
 	if !all {
@@ -144,7 +144,7 @@ func (s *Service) noteAccountOps(user string, ops []wire.AccountOperation, at wi
 		if _, ok := last[key]; !ok && len(last) >= secretInfoMost {
 			continue
 		}
-		last[key] = wire.AccountLastOp{What: op.What, At: at}
+		last[key] = wire.AccountLastOp{What: op.What, At: at, Agent: op.Agent}
 	}
 }
 
@@ -169,7 +169,7 @@ func (s *Service) addAccountInfo(user string, settings *wire.UserSettings) {
 			}
 			op, ok := b.secretLast[user][strings.TrimSpace(*name)]
 			if ok && op.What == wire.SecretOperationWhatRead && (a.LastOp == nil || op.At > a.LastOp.At) {
-				a.LastOp = &wire.AccountLastOp{What: wire.AccountOperationWhatRead, At: op.At}
+				a.LastOp = &wire.AccountLastOp{What: wire.AccountOperationWhatRead, At: op.At, Agent: op.Agent}
 			}
 		}
 	}

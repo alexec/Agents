@@ -12,6 +12,7 @@ export const statusSecretsWords = {
   noSecrets: "No secrets yet.",
   noAccounts: "No accounts yet.",
   notBackedUp: "Not backed up: only on one machine.",
+  readLabel: "Last read:",
 };
 
 /** One line of a Status list. */
@@ -28,7 +29,14 @@ export interface StatusLine {
   /** Milliseconds, or null. */
   at: number | null;
   backedUp: boolean;
+  /** Whether the last operation was a read: of the secret, or of the secret or card the account names. */
+  isRead: boolean;
+  /** The session that did the last operation, when one did. */
+  agent: string | null;
 }
+
+/** How long a read stays recent for the sidebar row's grey line, in milliseconds. */
+export const recentReadWindow = 86_400_000;
 
 export function masked(hint: string | undefined): string {
   return "••••" + (hint ?? "");
@@ -64,6 +72,8 @@ export function secretLines(rows: readonly UserSecretRow[]): StatusLine[] {
       operation: row.lastOp ? operationWords(row.lastOp.what) : added !== null ? "Added" : null,
       at: row.lastOp ? fromWireDate(row.lastOp.at).getTime() : added,
       backedUp: row.backedUp !== false,
+      isRead: row.lastOp?.what === "read",
+      agent: row.lastOp?.agent ?? null,
     };
   }).sort(newestFirst);
 }
@@ -73,26 +83,28 @@ export function secretLines(rows: readonly UserSecretRow[]): StatusLine[] {
 export function accountLines(accounts: readonly OutsideAccount[], secrets: readonly UserSecretRow[]): StatusLine[] {
   const byName = new Map(secrets.map((s) => [s.name as string, s]));
   return accounts.map((a): StatusLine => {
-    let newest: { words: string; at: number } | null = null;
-    const consider = (words: string, at: number | null) => {
-      if (at !== null && (newest === null || at > newest.at)) newest = { words, at };
+    let newest: { words: string; at: number; read: boolean; agent: string | null } | null = null;
+    const consider = (words: string, at: number | null, read = false, agent: string | null = null) => {
+      if (at !== null && (newest === null || at > newest.at)) newest = { words, at, read, agent };
     };
     consider("Added", parsed(a.made));
     if (a.edited !== undefined) consider("Edited", fromWireDate(a.edited).getTime());
-    if (a.lastOp) consider(operationWords(a.lastOp.what), fromWireDate(a.lastOp.at).getTime());
+    if (a.lastOp) consider(operationWords(a.lastOp.what), fromWireDate(a.lastOp.at).getTime(), a.lastOp.what === "read", a.lastOp.agent ?? null);
     const named = [a.secret, a.card].filter((n): n is string => !!n);
     for (const name of named) {
       const op = byName.get(name)?.lastOp;
-      if (op) consider(`${name} ${op.what}`, fromWireDate(op.at).getTime());
+      if (op) consider(`${name} ${op.what}`, fromWireDate(op.at).getTime(), op.what === "read", op.agent ?? null);
     }
     const secret = a.secret || null;
     const row = secret ? byName.get(secret) : undefined;
     const hint = secret === null ? "no secret" : row ? masked(row.hint) : "not in Secrets";
-    const found = newest as { words: string; at: number } | null;
+    const found = newest as { words: string; at: number; read: boolean; agent: string | null } | null;
     return {
       id: `${a.service.toLowerCase()}#${(a.address ?? "").toLowerCase()}`, title: a.service, detail: a.address ?? null, hint,
       operation: found?.words ?? null, at: found?.at ?? null,
       backedUp: named.every((n) => byName.get(n)?.backedUp !== false),
+      isRead: found?.read ?? false,
+      agent: found?.agent ?? null,
     };
   }).sort(newestFirst);
 }
@@ -103,9 +115,17 @@ export function newestAt(lines: readonly StatusLine[]): number | null {
   return times.length ? Math.max(...times) : null;
 }
 
-/** Whether the sidebar row warns: any line not backed up. */
-export function warns(lines: readonly StatusLine[]): boolean {
-  return lines.some((l) => !l.backedUp);
+/** The sidebar row's grey line: the name of the item read last (an account's address too) and the session that read
+ * it, by agentTitle, only when the newest operation on any line is a read in the last day. Null otherwise. A session
+ * the page does not know, or one with no title, is left out. */
+export function recentRead(lines: readonly StatusLine[], now: number = Date.now(),
+  agentTitle: (id: string) => string | undefined = () => undefined): string | null {
+  const timed = lines.filter((l) => l.at !== null);
+  if (!timed.length) return null;
+  const newest = timed.reduce((a, b) => ((b.at as number) > (a.at as number) ? b : a));
+  if (!newest.isRead || now - (newest.at as number) >= recentReadWindow) return null;
+  const agent = newest.agent ? agentTitle(newest.agent) : undefined;
+  return [newest.title, newest.detail, agent].filter((p): p is string => !!p).join(" · ");
 }
 
 /** "5 min ago", "2 h ago", "3 d ago", as the window's. */

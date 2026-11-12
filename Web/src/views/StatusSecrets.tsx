@@ -4,7 +4,7 @@
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import { go } from "../route";
-import { accountLines, newestAt, secretLines, shortAgo, statusSecretsWords as w, summary, warns, type StatusLine } from "../model/statusSecrets";
+import { accountLines, newestAt, recentRead, secretLines, shortAgo, statusSecretsWords as w, summary, type StatusLine } from "../model/statusSecrets";
 
 type List = "secrets" | "accounts";
 
@@ -21,16 +21,18 @@ export function useUserScopeStatus(store: Store, on: boolean) {
   useEffect(() => { if (on) void store.loadUserScopeStatus(); }, [changes, on]);
 }
 
-/** The sidebar row's end: the newest operation's age, and an orange dot when one is not backed up. */
+/** The sidebar row's end: the newest operation's age. No warning tint: "not backed up" is on the page. */
 export function StatusListMark({ store, list }: { store: Store; list: List }) {
-  const lines = statusLines(store, list);
-  const at = newestAt(lines);
-  return (
-    <>
-      {warns(lines) && <span class="small status-mark" title={w.notBackedUp} aria-label={w.notBackedUp}>●</span>}
-      {at !== null && <span class="quiet small" title={new Date(at).toLocaleString()}>{shortAgo(at)}</span>}
-    </>
-  );
+  const at = newestAt(statusLines(store, list));
+  return at !== null ? <span class="quiet small" title={new Date(at).toLocaleString()}>{shortAgo(at)}</span> : null;
+}
+
+/** Under the sidebar row, in grey, as the window's: the secret or account read last and the session that read it,
+ * when that read is the newest operation and less than a day old. */
+export function StatusListReadLine({ store, list }: { store: Store; list: List }) {
+  const title = (id: string) => Object.values(store.agents.value).flat().find((a) => a.id === id)?.title;
+  const read = recentRead(statusLines(store, list), Date.now(), title);
+  return read ? <p class="page-need quiet small" aria-label={`${w.readLabel} ${read}`}>{read}</p> : null;
 }
 
 export function StatusSecretsPage({ store, list }: { store: Store; list: List }) {

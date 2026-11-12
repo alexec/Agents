@@ -133,6 +133,11 @@ export interface ACPProviderInfo {
 export interface AccountLastOp {
   what: AccountOperationWhat;
   at: WireDate;
+  /**
+   * The session that did it: by manage_accounts, or by reading the secret or card the account
+   * names. Left out when no session did.
+   */
+  agent?: UUID;
 }
 
 /**
@@ -143,6 +148,8 @@ export interface AccountOperation {
   what: AccountOperationWhat;
   service: string;
   address?: string;
+  /** The session whose manage_accounts call it was. */
+  agent?: UUID;
 }
 
 /**
@@ -11286,12 +11293,17 @@ export interface SecretGrants {
 }
 
 /**
- * A secret's last operation (#4158): what it was and when, the newest any machine reported. No
- * session, no place, no value.
+ * A secret's last operation (#4158): what it was, when, and the session that did it, the newest any
+ * machine reported. No place, no value.
  */
 export interface SecretLastOp {
   what: SecretOperationWhat;
   at: WireDate;
+  /**
+   * The session that did it, so the person's own clients can name it beside a recent read. Left out
+   * for a change no session made.
+   */
+  agent?: UUID;
 }
 
 /**
@@ -15123,8 +15135,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
-  AccountLastOp: { required: ["what", "at"], optional: [] },
-  AccountOperation: { required: ["what", "service"], optional: ["address"] },
+  AccountLastOp: { required: ["what", "at"], optional: ["agent"] },
+  AccountOperation: { required: ["what", "service"], optional: ["address", "agent"] },
   AccountProfile: { required: ["id", "runtimeID", "name", "reach", "addedAt", "signedIn"], optional: ["signedInAs", "signInCommand", "source", "isDefault", "setBy"] },
   AccountRequest: { required: ["runtimeID", "accountID"], optional: [] },
   Achievements: { required: ["earned"], optional: [] },
@@ -16034,7 +16046,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SecretGrant: { required: ["name", "use", "place"], optional: [] },
   SecretGrantChange: { required: ["grant"], optional: [] },
   SecretGrants: { required: ["grants"], optional: [] },
-  SecretLastOp: { required: ["what", "at"], optional: [] },
+  SecretLastOp: { required: ["what", "at"], optional: ["agent"] },
   SecretLeftOn: { required: ["host", "name", "at"], optional: [] },
   SecretNeedsApprovalRequest: { required: ["name", "needsApproval"], optional: ["agentID"] },
   SecretOperation: { required: ["name", "what", "at"], optional: ["use", "place", "agent", "count"] },
