@@ -213,6 +213,44 @@ As a result, when a forge's Work pages are complete, its list pages (`issues.htm
 `pulls.html`) show the same thing twice in the app. The lead files one follow-up task, not
 in this epic, to decide whether the app opens Work in place of a forge's list page.
 
+### Work in place of the list pages (#4366)
+
+Decided: **Work replaces a forge's list rows in the sidebar, and only those. The pages
+stay, and the agents keep all of them.** Alex can overrule. The rule is the same one that
+#3131, #3311, #3753, #3786 and #3803 used: when Work lists what a list page lists, in a
+folder, the sidebar does not show that page's row (`inWork` in
+`Go/internal/agentsd/serverviews.go`). The daemon makes the rows, so the Mac window, the
+Remote and the web page all change together.
+
+| What | Now | After #4366 |
+|---|---|---|
+| GitHub, GitLab, Forgejo, Bitbucket, Azure Repos, Linear: the folder's own repo or workspace | no row; Work | the same |
+| Jira, when the folder names `jiraProjects` | a row *and* Work (twice) | no row; Work |
+| Azure Boards, when the folder names `azureBoardsProjects` | a row *and* Work (twice) | no row; Work |
+| Jira or Azure Boards with no projects named | a row; not in Work | the same: the row stays, because Work does not list it |
+| A project's other repo (#2669) | a row | the same: Work lists only the folders' own repos |
+| A list page that a person pinned | the pin | the same: a pin is the person's own choice |
+| A page that an agent shows or pins in a chat | the page | the same |
+| A pull request's page (`pr.html`) | the page | the same: it is not a list |
+
+What the agents keep: every tool and every page of each connector, unchanged. Work is a
+person's view in the daemon, and it is not offered to an agent. A page is the connector's
+view, and it runs where the connector runs, with its own sign-in (above). So an agent on a
+server or in a container still has its pages when the daemon's Work is not there.
+
+The reasons:
+
+- **One place for a person.** The same list in two rows in the sidebar is the "twice" that
+  this section names. Work has the plan, the filters and the actions of every forge, from
+  one model.
+- **Nothing is lost.** A row goes only where Work lists the same items. Where Work does
+  not list them (no projects named, a project's other repo), the row stays.
+- **No new navigation.** No control, screen or link changes. Two rows go from a list that
+  already removes six, and a person can still pin a page. It is easy to undo: one line in
+  `inWork`.
+
+Build: #4911.
+
 ## The order of the move
 
 Each step is one PR. The moves after the first touch the same files (`forge.go`,
@@ -253,7 +291,7 @@ in their commits.
 | 12 | Field: author avatar. `ForgeItem.authorAvatar` and `ForgeComment.avatar` in each forge, and each forge's avatar hosts in `forge/image` | 10 |
 | 13 | Field: comment count. The count in each forge's list where its API gives it, and `commentCount` (`exact`, `capped`, `detail`) for each one | 10 |
 | 14 | Field: state reason. `ForgeItem.stateReason` (`completed`, `not_planned`, `duplicate`) from GitHub, Bitbucket, Linear, Jira and Azure Boards | 10 |
-| 15 | Follow-up, not in this epic: when Work covers a forge, decide whether the app opens Work in place of that forge's MCP list page | — |
+| 15 | Follow-up, not in this epic: when Work covers a forge, decide whether the app opens Work in place of that forge's MCP list page (#4366: decided above) | — |
 
 The lead can merge 2 to 8 into fewer PRs if the moves are small. The order stays the same.
 
@@ -265,3 +303,4 @@ The lead can merge 2 to 8 into fewer PRs if the moves are small. The order stays
 - Decided: the comment count stays required, and `commentCount` says how to read it, because making it optional breaks an earlier client's decoder.
 - Decided: the MCP Apps pages stay as they are, because they run in the connector with its own sign-in and are for agents as well; the `*mcp` clients are the shared layer.
 - Decided: lineage's forge methods stay off this interface, because the epic is about the Work pages.
+- Decided (#4366): Work replaces a forge's list rows in the sidebar where Work lists the same items, Jira and Azure Boards too when the folder names their projects; the pages, pins and agents' views stay, because a person then sees each list once and an agent keeps every page.
