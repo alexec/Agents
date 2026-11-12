@@ -44,8 +44,10 @@ SWIFT
 fi
 RUNS=${RUNS:-3}
 
-# Budgets in ms, for a Debug build on this Mac.
-B_WINDOW=1500; B_LIST=2000; B_SWITCH=150; B_CHAT=500
+# Budgets in ms, for a Debug build on this Mac, from scripts/perf-budgets.json (#4784).
+budget() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["night"]["mac"][sys.argv[2]])' "$REPO/scripts/perf-budgets.json" "$1"; }
+B_WINDOW=$(budget "cold start: first frame"); B_LIST=$(budget "cold start: first list")
+B_SWITCH=$(budget "project switch"); B_CHAT=$(budget "chat open")
 
 pid_of() { pgrep -f "Agents.app/Contents/MacOS/Agents( Host)? --walk run-$SLUG( |$)" | head -1 || true; }
 perf_lines() { /usr/bin/log show --last "${2:-2m}" --style compact \
@@ -75,13 +77,13 @@ if [ $# -ge 5 ]; then
   sleep 2
   "$WORK/ui" press "$pid" "Not now" >/dev/null 2>&1 || true
   for _ in $(seq 1 5); do
-    "$WORK/ui" select "$pid" "$2" >/dev/null; sleep 1.2
-    "$WORK/ui" select "$pid" "$3" >/dev/null; sleep 1.2
+    "$WORK/ui" select "$pid" "$2" >/dev/null 2>&1 || true; sleep 1.2
+    "$WORK/ui" select "$pid" "$3" >/dev/null 2>&1 || true; sleep 1.2
   done
-  "$WORK/ui" select "$pid" "$2" >/dev/null; sleep 1.2
+  "$WORK/ui" select "$pid" "$2" >/dev/null 2>&1 || true; sleep 1.2
   for _ in $(seq 1 3); do
-    "$WORK/ui" select "$pid" "$4" >/dev/null; sleep 2.5
-    "$WORK/ui" select "$pid" "$5" >/dev/null; sleep 2.5
+    "$WORK/ui" select "$pid" "$4" >/dev/null 2>&1 || true; sleep 2.5
+    "$WORK/ui" select "$pid" "$5" >/dev/null 2>&1 || true; sleep 2.5
   done
   switches=$(perf_lines "$pid" 2m | awk '/project-switch/ {print $3}')
   chats=$(perf_lines "$pid" 2m | awk '/chat-open/ {print $3}')
@@ -95,6 +97,9 @@ row() { # name, values, budget
 }
 row "cold start: first frame" "${windows[*]}" $B_WINDOW
 row "cold start: first list" "${lists[*]}" $B_LIST
-[ -n "$switches" ] && row "project switch" "$switches" $B_SWITCH
-[ -n "$chats" ] && row "chat open" "$chats" $B_CHAT
+# A row the window's accessibility did not reach is said, not left out (#4784).
+if [ -n "$switches" ]; then row "project switch" "$switches" $B_SWITCH
+elif [ $# -ge 5 ]; then echo "SKIP project switch: not measured (no sidebar row reached by accessibility)"; fi
+if [ -n "$chats" ]; then row "chat open" "$chats" $B_CHAT
+elif [ $# -ge 5 ]; then echo "SKIP chat open: not measured (no sidebar row reached by accessibility)"; fi
 exit $over

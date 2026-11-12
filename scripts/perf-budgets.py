@@ -25,23 +25,14 @@ import json
 import os
 import socket
 import statistics
-import subprocess
 import sys
 import time
 
 # The budgets, in milliseconds, for the host's answer (the window adds its own drawing).
-# 100 ms is "a click responds"; 1 s is "a list is there" (#73).
-BUDGETS = {
-    "daemon/ping": 20,
-    "agents/list": 250,
-    "agents/list, lean": 100,
-    "folders/list": 100,
-    "open a long chat (turns + open turn)": 500,
-    "a long chat, Remote's last 500": 500,
-    "files/list, big repo root": 250,
-    "files/list, big repo deep folder": 100,
-    "changes/list, big repo": 1000,
-}
+# 100 ms is "a click responds"; 1 s is "a list is there" (#73). They are kept with the
+# others in scripts/perf-budgets.json (#4784).
+with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "perf-budgets.json")) as f:
+    BUDGETS = json.load(f)["night"]["host"]
 
 
 class Socket:

@@ -76,6 +76,7 @@ import { type ChangeUndo, type Inverse, changeUndoLine, changeUndoMenu, labelsUn
   unarchivedUndo } from "./changeUndo";
 import { sessionRef as copyRef, type MachineCopy, type TranscriptCopy } from "./localCopy";
 import { sessionRef } from "../protocol/ref";
+import { mark, markOnce } from "./marks";
 
 /** What this page keeps by folder on a host, kept to the folders it lists (#3750). */
 function pruneFolderKeys(host: string, folders: readonly string[]): void {
@@ -670,6 +671,8 @@ export class Work {
   protected transcriptEnd: number | null = null;
   /** Each host's point in its order of changes, as its last catch-up said (#4794). */
   protected readonly listPoints = new Map<string, ListRevision>();
+  /** A prompt was sent and its echo is not heard yet: the next entry marks `agents:echo` (#4784). */
+  protected echoAwaited = false;
 
   /** One notification from one host. Returns false for one this does not know. */
   apply(method: string, params: unknown, host: string): boolean {
@@ -1201,6 +1204,11 @@ export class Work {
     const going = this.sending.peek()[`${host}|${note.agentID}`];
     if (going?.length) this.setSending(host, note.agentID, landed(going, note.entry));
     if (note.oversized !== undefined) this.oversized(host, note.agentID, note.entry.id, note.index);
+    // The first entry after a send is its echo: the night's walk times send to echo (#4784).
+    if (this.echoAwaited) {
+      this.echoAwaited = false;
+      mark("echo", "send");
+    }
     const heard = this.heardSincePage;
     if (heard) {
       const prior = heard.findIndex((entry) => entry.id === note.entry.id);
@@ -1842,7 +1850,10 @@ export class Store extends Work {
       }
     });
     link.onState((state) => {
-      if (state.kind === "open") void this.load().then(() => this.sealWaiting());
+      if (state.kind === "open") {
+        markOnce("connected");
+        void this.load().then(() => this.sealWaiting());
+      }
     });
   }
 
@@ -2205,7 +2216,7 @@ export class Store extends Work {
     };
     // Lean: the columns read none of the option and command lists, 4 MB of 200 agents (#107).
     // The open session's come with loadWhole.
-    await this.listSessions(host).catch(failed("client/catchUp"));
+    if (await this.listSessions(host).then(() => true, failed("client/catchUp"))) markOnce("first-list", "connected");
     // The Archived folds that were open are listed again rather than left empty by the live list,
     // and the workflows on screen asked again: they may have changed meanwhile.
     const prefix = `${host}|`;
@@ -2682,7 +2693,11 @@ export class Store extends Work {
    * with Try Again instead of calling the session deleted (#2743). Only the history is waited for.
    */
   private async loadTranscript(host: string, session: string): Promise<void> {
-    const page = this.loadPage(host, session);
+    mark("open-session");
+    const page = this.loadPage(host, session).then((shown) => {
+      if (shown) mark("session-open", "open-session");
+      return shown;
+    });
     void Promise.all([this.loadWhole(host, session), page]).then(([listed, paged]) => {
       const now = this.watching.value;
       if (listed && paged && now?.host === host && now.session === session) this.lookedFor.value = { host, session };
@@ -3738,6 +3753,8 @@ export class Store extends Work {
         : going.filter((s) => s.id !== bubble.id));
     };
     try {
+      mark("send");
+      this.echoAwaited = true;
       await this.link.call("agents/prompt", { agentID: agentID as UUID, text, attachments, from: "person" }, host);
       settle(true);
       return true;
