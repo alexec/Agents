@@ -313,6 +313,21 @@ no code, and writes a note a day under `.agents/reviews/crashes/` on the local b
 ./scripts/crash-reports.py --days 14 --github --out /tmp/crashes
 ```
 
+**Used Mac mini watch** (`.agents/workflows/mac-mini-watch.md`, #4500) runs every three
+hours from 07:00 to 23:00. Through eBay's official Browse API, it looks for used M1 Mac
+minis in the US at or under the budget in #4499. Then it sends Alex a `notify` for each new
+listing, once, with the total, the end time, the seller's rating and the link. It only
+reads: it buys nothing, bids on nothing and contacts no seller. It does not read eBay's
+search pages, which `robots.txt` disallows, or Craigslist, Facebook Marketplace or Swappa,
+which do not let robots read them. It keeps what it has seen in
+`~/.agents/listing-watch/mac-mini-m1.json`, and it stops when #4499 closes. It needs the
+keys of a free eBay developer account, as the secrets `EBAY_CLIENT_ID` and
+`EBAY_CLIENT_SECRET`. It arrives turned off. To try the filter on a saved search response:
+
+```sh
+./scripts/listing-watch.py --fixture search.json --budget 300
+```
+
 ## Scoping an agent's tools
 
 Every runtime arrives holding its own version of nearly everything this app owns: a way to
