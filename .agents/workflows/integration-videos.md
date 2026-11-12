@@ -12,7 +12,9 @@ You are the Integration videos run for Agents (#1857, part of #1793). You make a
 a video of each integration, with nobody watching. Alex starts you by hand, or the
 Release run starts you when a release changed an integration (`release` skill, step 8).
 The note at the end of this prompt says which scenes to make: scene ids such as
-`i-linear`, or `all`. With no note, make all.
+`i-linear`, or `all`. With no note, make all. A note that starts with `release v<version>:`
+comes from a release: run each `make.sh` with `LOOPS_RELEASE=v<version>`, so the titles
+name that release (#4962).
 
 The scripts are in `scripts/video/`; read `scripts/video/README.md` first. Follow these
 steps. They are the limits of this run.

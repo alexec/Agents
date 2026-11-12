@@ -13,8 +13,9 @@
 Every video is **private** (an API project that Google has not audited can upload only
 private videos anyway; a flag for public comes later) and goes on the Loops channel, in the
 playlist of its scene's GROUP: "Loops usage", "Loops marketing" or "Loops integrations",
-each made private the first time. The title is `<TITLE> — Loops <version>` (`git describe`);
-the description gives the commit, the date, the scene file and the docs page, so a video
+each made private the first time. The title is `<TITLE> — Loops <x.y>`: the release being
+made (LOOPS_RELEASE=v<version>, from the release skill), else the last tag (#4962). The
+description gives the full `git describe`, the commit, the date, the scene file and the docs page, so a video
 always says which build it shows. The captions are the take's `<id>.vtt` (English), and the
 thumbnail is a frame of the take, at one of the contact sheet's moments. A new take of a
 video replaces the old one in its playlist: the old video is made private and taken out of
@@ -29,6 +30,7 @@ import hashlib
 import http.server
 import json
 import os
+import re
 import secrets
 import subprocess
 import sys
@@ -303,8 +305,20 @@ def docs_page(scene):
     return DOCS + getattr(scene, "DOCS", "").lstrip("/")
 
 
+def release(given=None, last_tag=None):
+    """The release a video's title names (#4962): `<x>.<y>` of the release being made
+    (LOOPS_RELEASE, which the release skill passes, such as `v0.19.0`), else of the last
+    `v*` tag, with no count and hash, else "unreleased". A viewer sees a version, not a
+    build id; the description keeps the full `git describe`."""
+    given = os.environ.get("LOOPS_RELEASE", "") if given is None else given
+    tag = given.strip() or (git("describe", "--tags", "--match", "v*", "--abbrev=0") if last_tag is None else last_tag)
+    match = re.match(r"v?(\d+)\.(\d+)", tag or "")
+    return f"{match[1]}.{match[2]}" if match else "unreleased"
+
+
 def describe(scene):
-    version = git("describe", "--tags", "--match", "v*") or "unreleased"
+    version = release()
+    build = git("describe", "--tags", "--match", "v*") or "no tag"
     commit = git("rev-parse", "HEAD")
     changed = " (with changes not committed)" if git("status", "--porcelain", "--untracked-files=no") else ""
     name = getattr(scene, "TITLE", scene.ID)
@@ -315,6 +329,7 @@ def describe(scene):
         "",
         f"Docs: {docs_page(scene)}",
         "",
+        f"Build: {build}",
         f"Commit: {commit}{changed}",
         f"Made: {time.strftime('%Y-%m-%d %H:%M %Z')}",
         marker(scene.ID),
@@ -491,6 +506,12 @@ def self_test():
         return types.SimpleNamespace(ID=scene_id, GROUP=group, TITLE=f"Scene {scene_id}",
                                      LINES={"a": "This is Loops."}, **more)
 
+    for given, last_tag, want in (("v0.19.0", "v0.18.0", "0.19"), ("0.19", None, "0.19"),
+                                  ("", "v0.18.0", "0.18"), ("", "", "unreleased")):
+        got = release(given, last_tag)
+        assert got == want and "-g" not in got, (given, last_tag, got)
+    print("ok: a title names the release (LOOPS_RELEASE, else the last tag), never a -g<hash>")
+
     try:
         yt = FakeYouTube()
         u1 = scene("u1", "usage", DOCS="tutorials/first-agent/")
@@ -499,9 +520,9 @@ def self_test():
         assert made["snippet"]["title"] == "Loops usage" and made["status"]["privacyStatus"] == "private", made
         video = yt.videos[first]
         assert video["status"]["privacyStatus"] == "private", video
-        assert video["snippet"]["title"].startswith("Scene u1 — Loops "), video["snippet"]["title"]
+        assert re.fullmatch(r"Scene u1 — Loops (\d+\.\d+|unreleased)", video["snippet"]["title"]), video["snippet"]["title"]
         about = video["snippet"]["description"]
-        for want in ("Commit: ", "Made: ", marker("u1"), "Docs: https://docs.agentloops.dev/tutorials/first-agent/"):
+        for want in ("Build: ", "Commit: ", "Made: ", marker("u1"), "Docs: https://docs.agentloops.dev/tutorials/first-agent/"):
             assert want in about, (want, about)
         assert video["bytes"] and video["bytes"][4:8] == b"ftyp", "the mp4 was not sent"
         (item,) = yt.items.values()
