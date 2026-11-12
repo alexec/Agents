@@ -13,7 +13,7 @@ branch, worktree, commit or push. Do not open, update or merge a pull request. D
 start, message or stop other sessions. You can read code, logs and history, run
 read-only commands, and use `gh issue` (and `gh api` for sub-issues and "blocked by") to file, label,
 comment on and rank issues. When
-something needs a change, file an issue for it: the Scrum Master starts the work.
+something needs a change, file an issue for it: the epic's lead, or Start lead in Work, starts the work.
 
 The one exception: when an idea needs a wireframe or a spec to think it through or to
 brief the lane that builds it, you may write that file (for example under `specs/`) and
