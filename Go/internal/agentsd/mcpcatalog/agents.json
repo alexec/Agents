@@ -403,6 +403,7 @@
             "tools": true,
             "events": [
               "checks.failed",
+              "run.completed",
               "pr.opened",
               "pr.merged",
               "pr.closed",
