@@ -28,7 +28,7 @@ export function StatusListMark({ store, list }: { store: Store; list: List }) {
 }
 
 /** Under the sidebar row, in grey, as the window's: the secret or account read last and the session that read it,
- * when that read is the newest operation and less than a day old. */
+ * when that read is the newest operation and less than 4 hours old. */
 export function StatusListReadLine({ store, list }: { store: Store; list: List }) {
   const title = (id: string) => Object.values(store.agents.value).flat().find((a) => a.id === id)?.title;
   const read = recentRead(statusLines(store, list), Date.now(), title);

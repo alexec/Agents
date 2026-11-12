@@ -61,7 +61,9 @@ test("status sidebar: the grey line names a recent read only", () => {
   const read = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(5) } }),
     row("OLD", { lastOp: { what: "replaced", at: wire(60) } })]);
   assert.equal(s.recentRead(read, now), "GITHUB_TOKEN");
-  const stale = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(25 * 60) } })]);
+  const within = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(3 * 60) } })]);
+  assert.equal(s.recentRead(within, now), "GITHUB_TOKEN");
+  const stale = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(5 * 60) } })]);
   assert.equal(s.recentRead(stale, now), null);
   const replaced = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(60) } }),
     row("NEW", { lastOp: { what: "replaced", at: wire(5) } })]);

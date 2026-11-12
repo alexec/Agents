@@ -218,7 +218,7 @@ the session that did it, but no place and no value. The full history is the audi
 
 The sidebar's Status ▸ Secrets and Status ▸ Accounts rows show, in grey under the title, the item read last and
 the session that read it (its title, from the sessions the client knows), only when the newest operation is a read
-less than a day old (Alex, 2026-11-11). The row's icon has no warning tint; "Not backed up" is on the page.
+less than 4 hours old (Alex, 2026-11-11). The row's icon has no warning tint; "Not backed up" is on the page.
 
 ## Decided
 

@@ -36,7 +36,7 @@ export interface StatusLine {
 }
 
 /** How long a read stays recent for the sidebar row's grey line, in milliseconds. */
-export const recentReadWindow = 86_400_000;
+export const recentReadWindow = 4 * 3_600_000;
 
 export function masked(hint: string | undefined): string {
   return "••••" + (hint ?? "");
@@ -116,7 +116,7 @@ export function newestAt(lines: readonly StatusLine[]): number | null {
 }
 
 /** The sidebar row's grey line: the name of the item read last (an account's address too) and the session that read
- * it, by agentTitle, only when the newest operation on any line is a read in the last day. Null otherwise. A session
+ * it, by agentTitle, only when the newest operation on any line is a read in the last 4 hours. Null otherwise. A session
  * the page does not know, or one with no title, is left out. */
 export function recentRead(lines: readonly StatusLine[], now: number = Date.now(),
   agentTitle: (id: string) => string | undefined = () => undefined): string | null {

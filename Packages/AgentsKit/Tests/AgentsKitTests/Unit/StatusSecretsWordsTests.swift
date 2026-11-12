@@ -52,7 +52,9 @@ struct StatusSecretsWordsTests {
         let read = StatusSecretsWords.secretLines([secret("GITHUB_TOKEN", op: "read", minutesAgo: 5),
                                                    secret("OLD", op: "replaced", minutesAgo: 60)])
         #expect(StatusSecretsWords.recentRead(read, now: now) == "GITHUB_TOKEN")
-        let stale = StatusSecretsWords.secretLines([secret("GITHUB_TOKEN", op: "read", minutesAgo: 25 * 60)])
+        let within = StatusSecretsWords.secretLines([secret("GITHUB_TOKEN", op: "read", minutesAgo: 3 * 60)])
+        #expect(StatusSecretsWords.recentRead(within, now: now) == "GITHUB_TOKEN")
+        let stale = StatusSecretsWords.secretLines([secret("GITHUB_TOKEN", op: "read", minutesAgo: 5 * 60)])
         #expect(StatusSecretsWords.recentRead(stale, now: now) == nil)
         let replaced = StatusSecretsWords.secretLines([secret("GITHUB_TOKEN", op: "read", minutesAgo: 60),
                                                        secret("NEW", op: "replaced", minutesAgo: 5)])

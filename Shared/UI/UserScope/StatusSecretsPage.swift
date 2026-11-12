@@ -28,7 +28,7 @@ extension UserScopeState {
 
 /// The sidebar's Status ▸ Secrets and Status ▸ Accounts rows (#4161): the title, and at its end the
 /// age of the newest operation on any of them. Under it, in grey, the secret or account read last and the
-/// session that read it, when that read is the newest operation and is less than a day old. The icon keeps
+/// session that read it, when that read is the newest operation and is less than 4 hours old. The icon keeps
 /// its plain tint: a read is not a warning.
 struct StatusSecretsRow: View {
     let kind: StatusSecretsKind

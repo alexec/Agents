@@ -41,7 +41,7 @@ public enum StatusSecretsWords {
     }
 
     /// How long a read stays recent for the sidebar row's grey line.
-    public static let recentReadWindow: TimeInterval = 86_400
+    public static let recentReadWindow: TimeInterval = 4 * 3600
 
     /// `••••` and the last 4 when a machine sent them (#4158).
     public static func masked(_ hint: String?) -> String {
@@ -117,7 +117,7 @@ public enum StatusSecretsWords {
     }
 
     /// The sidebar row's grey line: the name of the item read last (an account's address too) and the session that
-    /// read it, by `agentTitle`, only when the newest operation on any line is a read in the last day. Nil otherwise.
+    /// read it, by `agentTitle`, only when the newest operation on any line is a read in the last 4 hours. Nil otherwise.
     /// A session the client does not know, or one with no title, is left out.
     public static func recentRead(_ lines: [Line], now: Date = Date(), agentTitle: (UUID) -> String? = { _ in nil }) -> String? {
         guard let newest = lines.filter({ $0.at != nil }).max(by: { $0.at! < $1.at! }),
