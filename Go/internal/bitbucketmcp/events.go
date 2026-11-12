@@ -82,7 +82,8 @@ func namedInput() schema {
 // "workspace/name#12" (#2349).
 var fixesSchema = map[string]any{"type": "array", "items": str}
 
-// events are the events this server offers, in the gitlab server's order.
+// events are the events this server offers, in the gitlab server's order, with run.completed
+// after checks.failed as there (#4217).
 var events = append([]event{
 	{Name: "checks.failed", Title: "Checks failed",
 		Description: "An open pull request's head commit failed its checks: one of its commit statuses (Bitbucket Pipelines or any CI that sets one) is FAILED. One event per commit and failure, so a check run again that fails again is a new one. failedJobs are the failed statuses; run is the Pipelines run the first one links to, by its build number (id 0 for another CI)." + ownPRs,
@@ -91,6 +92,20 @@ var events = append([]event{
 			"pr": prSchema(nil), "headSha": str,
 			"run":        object(map[string]any{"id": integer, "name": str, "url": str}),
 			"failedJobs": map[string]any{"type": "array", "items": object(map[string]any{"name": str, "url": str})},
+		})},
+	// A run no pull request owns, as main's or a tag's, as the github server's (#3810, #4217).
+	{Name: "run.completed", Title: "Pipeline finished",
+		Description: "A Bitbucket Pipelines run of the repository finished, whatever started it (a push, a tag, a person, a schedule) and whatever its result (successful, failed, error, stopped, expired): one event per run and finish time, so a run again is a new one. For a run no pull request owns, such as main's or a tag's release, or a custom pipeline run by hand; a pull request's failed checks are checks.failed. run.id is its build number (failed_log and retry_pipeline take it), run.name the pipeline it ran (a custom pipeline's name, a branch or tag pattern, or default), run.event its trigger (push, manual, schedule). Only runs started by a person with write access, never an app or a bot, unless anyone is true. deploys is what it deployed: each of its steps with deployment: that deployed, as bitbucket:<workspace/name>/<environment>/<build number>. Bitbucket has no API for a deploy that waits, so there is no deploy.waiting here.",
+		Input: schema{repoProperty,
+			property{Name: "pipeline", Kind: "string", Description: "Only runs of this pipeline, as a custom pipeline's name (release) or a branch pattern (main)."},
+			branchProperty("Only runs of this branch or tag, as main or v0.16.0."),
+			property{Name: "run", Kind: "integer", Description: "Only this run, by its build number."}, anyoneProperty, anyProperty},
+		Payload: object(map[string]any{
+			"run": object(map[string]any{"id": integer, "name": str, "number": integer, "event": str, "branch": str, "headSha": str,
+				"url": str, "conclusion": str, "actor": str}),
+			"completedAt": str,
+			// What the run deployed: its successful deployments (#4217).
+			"deploys": map[string]any{"type": "array", "items": str},
 		})},
 	{Name: "pr.opened", Title: "Pull request opened",
 		Description: "A pull request was opened, or a draft was marked ready: a pull request open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownPRs,
@@ -335,6 +350,9 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 
 // The refs of what bitbucket's events happen to (#4728, spec 4724-event-bus, "A ref").
 func prRef(repo string, n int) wire.Ref { return mcpevents.Ref("bitbucket", "pr", repo, fmt.Sprint(n)) }
+func runRef(repo string, n int) wire.Ref {
+	return mcpevents.Ref("bitbucket", "run", repo, fmt.Sprint(n))
+}
 func issueRef(repo string, n int) wire.Ref {
 	return mcpevents.Ref("bitbucket", "issue", repo, fmt.Sprint(n))
 }
@@ -393,6 +411,27 @@ func candidates(ctx context.Context, f Bitbucket, name string, a args, yours *Yo
 				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d", repo, c.ID), Time: at,
 					Data:    func() (map[string]any, error) { return c.data(), nil },
 					Subject: prRef(repo, m.Number), Key: fmt.Sprint(c.ID)})
+			}
+		}
+		return list, listed, nil
+	case "run.completed":
+		runs, listed, err := f.CompletedPipelines(ctx, repo, a.pipeline, a.branch, a.run, since)
+		if err != nil {
+			return nil, Listed{}, err
+		}
+		// Its finish time in the id: a run again (its failed steps) is a new event.
+		var list []candidate
+		for _, c := range runs {
+			if c.At != "" && (a.anyone || c.Trusted) {
+				list = append(list, candidate{EventID: fmt.Sprintf("run.completed:%s:%d:%s", repo, c.ID, c.At), Time: c.At,
+					Subject: runRef(repo, c.ID), Key: c.At,
+					Data: func() (map[string]any, error) {
+						deploys, err := f.PipelineDeploys(ctx, repo, c)
+						if err != nil {
+							return nil, err
+						}
+						return c.data(deploys), nil
+					}})
 			}
 		}
 		return list, listed, nil

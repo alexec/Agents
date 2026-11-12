@@ -37,8 +37,10 @@ type fakeBitbucket struct {
 	activity      map[int][]obj // pull request → its activity, newest first
 	diffstat      map[int][]obj
 	prComments    map[int][]obj
-	statuses      map[string][]obj  // commit → its statuses
-	pipelines     map[int]obj       // Pipelines build number → its run
+	statuses      map[string][]obj // commit → its statuses
+	pipelines     map[int]obj      // Pipelines build number → its run
+	deployments   []obj            // the repository's deployments, newest first (#4217)
+	environments  []obj
 	steps         map[int][]obj     // Pipelines build number → its steps
 	logs          map[string]string // step uuid → its log, served from storage
 	ranges        []string          // the Range of each log read from storage
@@ -171,6 +173,8 @@ var (
 	issueCommentsPath = regexp.MustCompile(`^` + root + `/issues/([0-9]+)/comments$`)
 	changesPath       = regexp.MustCompile(`^` + root + `/issues/([0-9]+)/changes$`)
 	pipelinesPath     = regexp.MustCompile(`^` + root + `/pipelines/$`)
+	deploymentsPath   = regexp.MustCompile(`^` + root + `/deployments/$`)
+	environmentsPath  = regexp.MustCompile(`^` + root + `/environments/$`)
 	pipelinePath      = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)$`)
 	stepsPath         = regexp.MustCompile(`^` + root + `/pipelines/([0-9]+)/steps$`)
 	branchPath        = regexp.MustCompile(`^` + root + `/refs/branches/([^/]+)$`)
@@ -377,6 +381,20 @@ func (f *fakeBitbucket) serve(w http.ResponseWriter, r *http.Request) {
 		page(newestFirst(f.issueComments[n(issueCommentsPath.FindStringSubmatch(p))]))
 	case changesPath.MatchString(p):
 		page(newestFirst(f.changes[n(changesPath.FindStringSubmatch(p))]))
+	case pipelinesPath.MatchString(p):
+		// COMPLETED runs, newest created first, as status and sort=-created_on ask.
+		var list []obj
+		for _, run := range f.pipelines {
+			if q.Get("status") == "" || run["state"].(obj)["name"] == q.Get("status") {
+				list = append(list, run)
+			}
+		}
+		sort.Slice(list, func(i, j int) bool { return list[i]["created_on"].(string) > list[j]["created_on"].(string) })
+		page(list)
+	case deploymentsPath.MatchString(p):
+		page(f.deployments)
+	case environmentsPath.MatchString(p):
+		page(f.environments)
 	case pipelinePath.MatchString(p):
 		if run, ok := f.pipelines[n(pipelinePath.FindStringSubmatch(p))]; ok {
 			reply(run)

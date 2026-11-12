@@ -15,7 +15,19 @@ import (
 // each one raised once from what Bitbucket says.
 
 func TestTheEventsAreTheGitLabServersNames(t *testing.T) {
-	same(t, EventNames(), gitlabmcp.EventNames())
+	// The gitlab server's, with run.completed after checks.failed as there; Bitbucket has no
+	// deploy.waiting (#4217).
+	without := func(names []string) []string {
+		var out []string
+		for _, n := range names {
+			if n != "run.completed" && n != "deploy.waiting" {
+				out = append(out, n)
+			}
+		}
+		return out
+	}
+	same(t, without(EventNames()), without(gitlabmcp.EventNames()))
+	same(t, EventNames()[:2], []string{"checks.failed", "run.completed"})
 }
 
 func TestOpenedIsRaisedWhenReadyAndOnlyForTheReposOwn(t *testing.T) {
@@ -360,7 +372,7 @@ func TestEventsListGivesWhichArgumentsNameOne(t *testing.T) {
 		if hasMine != named[name] || hasFixes != named[name] {
 			t.Fatalf("%s: mine %v, fixes %v", name, hasMine, hasFixes)
 		}
-		if want := named[name] || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled"; hasAny != want {
+		if want := named[name] || name == "run.completed" || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled"; hasAny != want {
 			t.Fatalf("%s: any %v", name, hasAny)
 		}
 		if issue, ok := props["issue"].(map[string]any); ok {
