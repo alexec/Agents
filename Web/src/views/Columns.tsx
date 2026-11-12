@@ -42,7 +42,9 @@ import { OrgPolicyStrip } from "./OrgPolicyLine";
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
-  const down = session.state.value.kind === "down";
+  // Connecting with this device's copy on show (#4790) is drawn as down: greyed, sending off.
+  const kind = session.state.value.kind;
+  const down = kind === "down" || kind === "connecting" || kind === "loading";
   // What a narrow window shows: the list, or what the route opens in the chat's place.
   const section = sectionOf(r);
   const agentsPage = section === "agents" && !r.host ? navPages.agents.find((p) => p.id === r.section) : undefined;

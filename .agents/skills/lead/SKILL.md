@@ -1,6 +1,6 @@
 ---
 name: lead
-description: Lead one epic from start to end (#3265) - read its plan (the sub-issues and their "blocked by" links), start a lane for each child whose blockers are closed, wait on events, file the new children that the lanes find, and close the epic with a summary when all its children are closed. A standing epic (#3659) has a query as its plan and never closes. Writes no code. Use when a session is started on an issue labelled `epic` (Start lead, or the Scrum Master), or when Alex asks for a lead on an epic.
+description: Lead one epic from start to end (#3265) - read its plan (the sub-issues and their "blocked by" links), start a lane for each child whose blockers are closed, wait on events, file the new children that the lanes find, and close the epic with a summary when all its children are closed. A standing epic (#3659) has a query as its plan and never closes. Writes no code. Use when a session is started on an issue labelled `epic` (Start lead in Work, the Lead persona, or Alex), or when Alex asks for a lead on an epic.
 ---
 
 # Lead
@@ -17,9 +17,10 @@ and it never closes. Do steps 1 to 4 as "Standing epics", below, says. Never do 
 
 ## Starting a lead
 
-The Scrum Master, Start lead in Work, or Alex starts the lead with one session in the
-epic's folder. Its title is `#<epic>: <epic title> lead`, its labels `#<epic>` and
-`lead`, no worktree, and its prompt is this one:
+Start lead in Work, Alex, or the release (for the bug lane) starts the lead with one
+session in the epic's folder, with the Lead persona (`.agents/personas/lead.md`). Its
+title is `#<epic>: <epic title> lead`, its labels `#<epic>` and `lead`, no worktree, and
+its prompt is this one:
 
 > #<epic>: <epic title>
 >
@@ -35,9 +36,13 @@ not start a second one.
 - **Change only the plan.** You can file, label and comment on issues, add sub-issues,
   and set "blocked by". Do not change the epic's goal or a child's scope: when that
   must change, ask Alex.
-- **Follow AGENTS.md** for the order of work, the area limit (#873), "Questions that
-  already have an answer" and "Decide and tell". The lead does not count as a lane; its
-  lanes count towards the folder's lane and open-PR limits.
+- **Follow AGENTS.md** for the order of work, "Questions that already have an answer"
+  and "Decide and tell". The lead does not count as a lane; its lanes count towards the
+  folder's lane and open-PR limits.
+- **Places:** the folder's limits give places, not another agent. Start no new lane
+  while more than the folder's open-PR limit of pull requests are open: land first. A PR
+  labelled `needs-approval` does not count: it waits for Alex, and its lane holds no
+  running place.
 - **Wait with `wait_for_event`, never by polling.** To wait on lanes themselves, wait on
   `agent.ended` alone, with `agent` their ids and `wake_on: any`.
 - **Name people in questions:** "Claude (the epic's lead) will…", "Alex, do you want…?".
@@ -71,11 +76,11 @@ then UI changes, bugs before features, then the rest):
 
 1. Assign it: `gh issue edit <child> --add-assignee alexec`.
 2. Start its lane with `start_session`, with the prompt and labels from
-   `.agents/personas/software-engineer.md`, as the Scrum Master does
-   (`.agents/personas/scrum-master.md`, "Starting a lane"): the first line of the prompt
-   is `#<child>: <title>`, then a blank line and the persona's instructions. Title
-   `#<child>: <title>`, worktree `fix-github-issue-<child>` (a bug) or
-   `work-github-issue-<child>` (anything else), no runtime.
+   `.agents/personas/software-engineer.md`. The first line of the prompt is
+   `#<child>: <title>`, then a blank line and the persona's instructions; put nothing
+   before the issue number and title. Title `#<child>: <title>`, worktree
+   `fix-github-issue-<child>` (a bug) or `work-github-issue-<child>` (anything else), no
+   runtime.
 3. If `start_session` refuses (the folder's limits are full), unassign the child and
    start no more until a lane ends.
 4. After the epic's first lane starts, ask `estimate_issue` for the epic once. This keeps
@@ -182,9 +187,10 @@ gh issue list --limit 100 --json number,title,labels,assignees \
 else 1), and never more than the folder's lane limit. Count the lanes you started that
 have not ended. Take the ready issues from the top of the order that are not taken, as
 step 2 says, until that count is `lanes`. Take an issue only in the AGENTS.md order: a
-`priority:high` issue or a UI change before the rest. When places run short, the
-Scrum Master pauses a standing epic's lane before a milestone epic's lane: do not start
-it again until a lane ends.
+`priority:high` issue or a UI change before the rest. When places run short,
+a standing epic's lane waits before a milestone epic's lane (AGENTS.md): start no new
+lane while a milestone epic's lane is queued, and start a paused one again only when a
+lane ends.
 
 **Wait (step 3).** Also wake when new work comes into the query. One `where` serves all
 the events of a wait, and each event takes only the keys it has. So name the lanes'
@@ -217,8 +223,7 @@ epic that it serves. Do not add sub-issues to a standing epic. Do not change its
 the query is the Product Owner's and Alex's.
 
 **Never close it.** Do not close a standing epic, also when its query is empty and no
-lane runs. Do not post a closing summary. Stay until Alex or the Scrum Master stops
-you. When you are stopped, archive the lanes you started whose work is merged or closed.
+lane runs. Do not post a closing summary. Stay until Alex stops you. When you are stopped, archive the lanes you started whose work is merged or closed.
 
 ## Reports
 

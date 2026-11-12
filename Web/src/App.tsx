@@ -11,6 +11,8 @@ export function App({ session, store }: { session: Session; store: Store }) {
   switch (state.kind) {
     case "loading":
     case "connecting":
+      // This device's copy, greyed, while the control plane is asked (#4790).
+      if (store.hosts.value.length > 0) return <Columns session={session} store={store} />;
       // Said rather than blank (#114): a page waiting on its connection looked like one that
       // never loaded. The words wait a moment, so an ordinary connect doesn't flash them.
       return <main class="pairing" aria-busy="true"><p class="connecting" role="status">Connecting…</p></main>;

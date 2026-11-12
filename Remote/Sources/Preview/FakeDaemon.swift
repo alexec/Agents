@@ -165,6 +165,10 @@ private actor FakeState {
             case DaemonAPI.Method.achievementsState:
                 return .success(try JSONValue.encoding(Canned.achievements))
 
+            // Velocity (#4758): 13 weeks of scratch PRs, or none with `-fakeMultiplier none`.
+            case DaemonAPI.Method.velocityHistory:
+                return .success(try JSONValue.encoding(Canned.velocity))
+
             default:
                 return .failure(JSONRPCError(code: -32601, message: "Not in the fake: \(method)"))
             }
@@ -246,6 +250,40 @@ private extension Canned {
                                     baseline: baseline,
                                     changedBy: merged ? DaemonAPI.LineageNode(kind: "pr", ref: "github:example/shop#1234") : nil,
                                     bestWeek: 4.1, mostAtOnce: 9)
+    }
+
+    /// Velocity's PRs (#4758): a steady 13 weeks in two scratch repositories, quieter at the
+    /// weekend, with a revert now and then; today's by the hour.
+    static var velocity: VelocityHistory {
+        if noMultiplier { return VelocityHistory(now: stamp(Date(), "yyyy-MM-dd'T'HH")) }
+        let calendar = Calendar.current
+        let now = Date()
+        var days: [String: [String: VelocityBucket]] = [:]
+        for back in 0 ..< 91 {
+            guard let day = calendar.date(byAdding: .day, value: -back, to: now) else { continue }
+            let weekend = calendar.isDateInWeekend(day)
+            let shop = weekend ? back % 2 : 3 + (back * 7) % 5
+            let docs = weekend ? 0 : back % 3
+            days[stamp(day, "yyyy-MM-dd")] = [
+                "github:example/shop": VelocityBucket(merged: shop, reverted: back % 17 == 3 ? 1 : 0),
+                "github:example/docs": VelocityBucket(merged: docs),
+            ]
+        }
+        var hours: [String: [String: VelocityBucket]] = [:]
+        let hour = calendar.component(.hour, from: now)
+        for back in 0 ... min(hour, 8) where back % 2 == 0 {
+            guard let at = calendar.date(byAdding: .hour, value: -back, to: now) else { continue }
+            hours[stamp(at, "yyyy-MM-dd'T'HH")] = ["github:example/shop": VelocityBucket(merged: 1 + back % 3)]
+        }
+        return VelocityHistory(hours: hours, days: days, now: stamp(now, "yyyy-MM-dd'T'HH"),
+                               timeZone: TimeZone.current.identifier)
+    }
+
+    private static func stamp(_ date: Date, _ format: String) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = format
+        return formatter.string(from: date)
     }
 
     static var achievements: Achievements {
