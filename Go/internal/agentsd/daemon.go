@@ -194,6 +194,7 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	d.register()
 	d.startBrowser()
 	d.loadAttention()
+	d.loadRepoAliases()
 	d.loadEvents()
 	d.loadRequests()
 	d.beginMCPApprovals()

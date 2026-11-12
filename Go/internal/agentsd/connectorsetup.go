@@ -281,6 +281,8 @@ type setupBook struct {
 	newAzureDevOpsSetupReader func(root, token string) azureDevOpsSetupReader
 	// newCodespacesClient reads and changes Codespaces as the GitHub connection owner.
 	newCodespacesClient func(token string) codespacesClient
+	// repoAliasAPI is GitHub's API for the repo aliases (#4957); "" is api.github.com.
+	repoAliasAPI string
 }
 
 // setupRecord is what this host last read for one folder.

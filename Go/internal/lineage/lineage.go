@@ -24,6 +24,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/repoalias"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -248,10 +249,12 @@ func Open(path string, now func() time.Time) *Files { return OpenWith(path, now,
 func OpenWith(path string, now func() time.Time, topics Topics) *Files {
 	f := &Files{path: path, now: now, agentsTopic: map[string]string{}}
 	converted := false
+	// A node named again only by a repo's move (#4957) does not write the file again.
 	full := func(n *wire.LineageNode) {
 		if _, ok := ParseNode(*n); ok {
 			if m := f.canonLocked(*n); m != *n {
-				*n, converted = m, true
+				converted = converted || f.unaliasedLocked(*n) != *n
+				*n = m
 			}
 			f.noteTopic(*n)
 			return
@@ -379,17 +382,62 @@ func (f *Files) Canon(n wire.LineageNode) wire.LineageNode {
 // canonLocked is Canon, under mu: a ref in the old form is read in the full form, and an
 // agents node takes the topic the store has for its id, so it is one node whatever topic it
 // is named with.
-func (f *Files) canonLocked(n wire.LineageNode) wire.LineageNode {
+//
+// A repo whose owner moved (#4957) is named by its name now, so a node stored before the
+// move and one named after it are one node.
+func (f *Files) canonLocked(n wire.LineageNode) wire.LineageNode { return f.canonWith(n, true) }
+
+// unaliasedLocked is canonLocked with no repo's move: what the file would say.
+func (f *Files) unaliasedLocked(n wire.LineageNode) wire.LineageNode { return f.canonWith(n, false) }
+
+func (f *Files) canonWith(n wire.LineageNode, alias bool) wire.LineageNode {
 	n = Full(n, "")
 	r, ok := ParseNode(n)
-	if !ok || r.Provider != "agents" {
+	if !ok {
+		return n
+	}
+	if moved := repoalias.Ref(r); alias && moved != r && moved.Check() == nil {
+		r = moved
+		n.Ref = r.String()
+	}
+	if r.Provider != "agents" {
 		return n
 	}
 	if topic, known := f.agentsTopic[agentsKey(r)]; known && topic != r.Topic {
+		if alias {
+			topic = repoalias.Topic(r.Provider, topic)
+		} else if topic == repoalias.Topic(r.Provider, r.Topic) {
+			return n // only the move names it apart
+		}
 		r.Topic = topic
 		n.Ref = r.String()
 	}
 	return n
+}
+
+// Realias names every node again by its repo's name now, in memory only, after the book of
+// moved repos changed (#4957): links that are then the same link are one.
+func (f *Files) Realias() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.agentsTopic = map[string]string{}
+	for i := range f.states {
+		f.states[i].node = f.canonLocked(f.states[i].node)
+	}
+	seen := map[key]bool{}
+	links := f.links[:0]
+	for _, l := range f.links {
+		l.From, l.To = f.canonLocked(l.From), f.canonLocked(l.To)
+		if l.EndedAt == nil {
+			if seen[keyOf(l)] {
+				continue
+			}
+			seen[keyOf(l)] = true
+		}
+		links = append(links, l)
+	}
+	f.links = links
+	f.index()
 }
 
 // removedKindMilestone is the kind of a forge milestone's node, which #3878 removed: prune

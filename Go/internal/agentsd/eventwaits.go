@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	goruntime "runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/repoalias"
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -335,11 +337,25 @@ func (p waitPattern) matches(e wire.Event) bool {
 			continue
 		}
 		v, ok := e.Details[k]
-		if !ok || !contains(vs, v) {
+		if !ok || !contains(vs, v) && !(repoKeys[k] && sameRepoDetail(e, vs, v)) {
 			return false
 		}
 	}
 	return true
+}
+
+// repoKeys are the details that name a forge's repo, which an owner's move renames (#4957).
+var repoKeys = map[string]bool{"repo": true, "project": true, "repository": true}
+
+// sameRepoDetail is whether v names one of vs's repos, by the repo's name now (#4957).
+func sameRepoDetail(e wire.Event, vs []string, v string) bool {
+	provider := "github"
+	if e.Provider != nil {
+		provider = *e.Provider
+	} else if p := e.Details["provider"]; p != "" {
+		provider = p
+	}
+	return slices.ContainsFunc(vs, func(w string) bool { return repoalias.SameRepo(provider, w, v) })
 }
 
 func contains(vs []string, v string) bool {

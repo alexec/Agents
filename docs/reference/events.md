@@ -318,6 +318,14 @@ Every event, the app's own and every MCP server's, has the same envelope: the
 - **The details stay for one release.** `name`, `details`, `position`, `scope` and the rest
   are still there, so a reader of the old shape works. An event recorded before the
   envelope gets one when the log is read, with no subject for a server's event.
+- **A repo that moved has one name (#4957).** When a repo's owner moves (such as
+  `alexec/agents` to `agentloops-dev/agents`), a wait, a trigger or a lineage node that
+  names the old owner matches an event that names the new one, and the other way. A
+  minute or two after it starts and then once a day, the daemon asks GitHub
+  `GET /repos/<repo>` for each GitHub repo its folders and its lineage name. When the
+  `full_name` in the answer is another name, it keeps the alias in `repo-aliases.json` in
+  its root. The subject, the topic, a `repo` or `project` in `where`, and lineage's nodes
+  are then read by the new name. No file is written again for the move.
 
 ## The bus
 
