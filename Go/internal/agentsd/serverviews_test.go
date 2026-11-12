@@ -166,7 +166,37 @@ func TestOurViewsShowWhereTheRepoFits(t *testing.T) {
 	// #3131, #3311: Work lists GitHub's and GitLab's issues and pull requests and Linear's
 	// issues, so their rows go where they fit.
 	azuredevops, _ := mcpcatalog.OursByID("agents/azuredevops")
-	if !inWork(github) || !inWork(gitlab) || !inWork(forgejo) || !inWork(bitbucket) || !inWork(azuredevops) || !inWork(linear) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	if !d.inWork(github, dir) || !d.inWork(gitlab, dir) || !d.inWork(forgejo, dir) || !d.inWork(bitbucket, dir) ||
+		!d.inWork(azuredevops, dir) || !d.inWork(linear, dir) {
 		t.Fatal("in Work")
+	}
+}
+
+// #4911: Work lists Jira's issues and Azure Boards' work items only in a folder that names
+// their projects, so only there does the sidebar drop their list rows.
+func TestJiraAndAzureBoardsRowsGoOnlyWhereTheFolderNamesTheirProjects(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	jira, _ := mcpcatalog.OursByID("agents/jira")
+	boards, _ := mcpcatalog.OursByID("agents/azureboards")
+	named := t.TempDir()
+	os.MkdirAll(filepath.Join(named, ".agents"), 0o755)
+	os.WriteFile(filepath.Join(named, ".agents", "folder.json"),
+		[]byte(`{"jiraProjects": ["PROJ"], "azureBoardsProjects": ["acme/Web App"]}`), 0o644)
+	jiraOnly := t.TempDir()
+	os.MkdirAll(filepath.Join(jiraOnly, ".agents"), 0o755)
+	os.WriteFile(filepath.Join(jiraOnly, ".agents", "folder.json"), []byte(`{"jiraProjects": ["PROJ"]}`), 0o644)
+	none := t.TempDir()
+
+	if !d.inWork(jira, named) || !d.inWork(boards, named) {
+		t.Fatal("a folder that names the projects keeps the rows")
+	}
+	if !d.inWork(jira, jiraOnly) || d.inWork(boards, jiraOnly) {
+		t.Fatal("a folder that names only Jira's projects keeps the Azure Boards row only")
+	}
+	if d.inWork(jira, none) || d.inWork(boards, none) {
+		t.Fatal("a folder that names no projects lost the rows")
 	}
 }
