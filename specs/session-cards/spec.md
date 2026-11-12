@@ -1,6 +1,6 @@
 # A simpler set of session cards (#5026)
 
-**Status:** spike; the open choices wait for Alex. Epic #4925. No product code: this spec, two pages and the stories.
+**Status:** spike; Alex answered the open choices on 2026-11-12. Epic #4925. No product code: this spec, two pages and the stories.
 **Clients:** none in the spike. The build is Core: the Mac window, the Remote and the web page.
 
 ## What Alex asked for
@@ -31,7 +31,7 @@ Messages (bubbles) are not cards. Sheets and overlays (8, 38–40) are controls,
 1. **One colour, one meaning (#5016).** Yellow (`tint.attention`) is only on an Ask's left edge and the "Waiting for you" label. Orange (`tint.warning`) is a Strip's glyph. Red (`tint.failure`) is a failed Line's glyph and words. The accent is for links, bars and the primary button. Colour never fills a card (Paper v2): it is in the text, the icon and a line.
 2. **Buttons.** The primary button is filled, on the right. One more button is next to it. All other actions are in ⋯. Every Ask has the same two links: "No thanks" and "No, because…".
 3. **An answer becomes a Line.** An answered Ask leaves "Waiting for you". The transcript gets one Line: "You chose ‹option›", or "Answered on another device".
-4. **Keys.** Return presses the primary button of the first Ask. ⌘1–9 picks an option on the Mac (the web: see the open choices).
+4. **Keys.** Return presses the primary button of the first Ask. ⌘1–9 picks an option on the Mac and the Remote with a keyboard; ⌥1–9 on the web.
 5. **One look on all three clients.** The same tokens, the same order of parts, the same words from the shared word files. The phone changes only the width. Under 480 pt, the buttons go under the words.
 6. **Icons.** Each glyph on the pages is a stand-in for its Lucide icon (#4976, `design/icons.json`).
 
@@ -43,14 +43,12 @@ Messages (bubbles) are not cards. Sheets and overlays (8, 38–40) are controls,
 - Decided: the secret-use card of #4918 (Ask before use) is an Ask, with the secret's name as the title and Allow / Deny as the foot. Alex can overrule.
 - Decided: messages (bubbles) are not a family. They keep the dashed edge for "not sent yet". Alex can overrule.
 
-## Open choices (Alex)
+## Alex's answers (2026-11-12)
 
-Asked of Alex on 2026-11-12. The answers go here.
-
-1. **The cost limit's place:** the top Strip (recommended), or next to the prompt bar as today. *Waiting for Alex.*
-2. **The three asks in the transcript** (sandbox failure, policy stop, app view): move them to "Waiting for you" (recommended; a new layout, so those PRs wait for Alex's approval, #3474), or keep them. *Waiting for Alex.*
-3. **Keys on the web:** keep ⌥1–9 (recommended; the browser takes ⌘1–9), or ⌘1–9 where the browser lets it. *Waiting for Alex.*
-4. **Order of the build:** the two bugs, then Ask, Now, Strip, Object, Line (recommended); or Now first; or the small families first. *Waiting for Alex.*
+1. **The cost limit's place:** it moves to the top Strip.
+2. **The three asks in the transcript** (sandbox failure, policy stop, app view): they move to "Waiting for you". The PRs that move them wait for Alex's approval with screenshots (#3474).
+3. **Keys on the web:** the web keeps ⌥1–9, because the browser takes ⌘1–9.
+4. **Order of the build:** the two bugs first, then Ask, Now, Strip, Object, Line.
 
 ## How this fits the work in flight
 
@@ -70,14 +68,14 @@ Each family is one story for all three clients (Core), a child of #4925, blocked
 |---|---|---|
 | #5028 Web: the confirm card shows no question (28g) | bug | — |
 | #5029 Web: the account move strip has no style (4) | bug | — |
-| Ask: one card for every ask | story | #5026, #5016 |
-| Now: goal and plan at the top, one card at the foot | story | #5026, #5016, #5022 |
-| Strip: one strip at the top | story | #5026, #5016 |
-| Object: one card for what the agent made | story | #5026 |
-| Line: one shape for the record | story | #5026, #5016 |
+| #5031 Ask: one card for every ask | story | #5026, #5016, #5028, #5029 |
+| #5033 Now: goal and plan at the top, one card at the foot | story | #5026, #5016, #5022, #5031 |
+| #5034 Strip: one strip at the top | story | #5026, #5016, #5033 |
+| #5035 Object: one card for what the agent made | story | #5026, #5034 |
+| #5036 Line: one shape for the record | story | #5026, #5016, #5035 |
 
-The order between the stories follows Alex's answer to choice 4.
+Each story is also blocked by the one before it, in Alex's order: the bugs, Ask, Now, Strip, Object, Line.
 
 ## Approval
 
-A story that adds a screen, control or layout waits for Alex (#3474). The Ask story waits when the three asks move (choice 2). The Strip story waits when the cost limit moves (choice 1). The Now story waits, because it joins five cards into one at the foot. Line and Object change only the look of what is there; they say `Approval: not needed` unless the lane finds otherwise.
+A story that adds a screen, control or layout waits for Alex (#3474). The Ask story waits, because the three asks move (answer 2). The Strip story waits, because the cost limit moves (answer 1). The Now story waits, because it joins five cards into one at the foot. Line and Object change only the look of what is there; they say `Approval: not needed` unless the lane finds otherwise.
