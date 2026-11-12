@@ -162,8 +162,23 @@ func Has(path, label, destination string) bool {
 // plane is never signed in to gh (#3347).
 func Token(token string) string { return "GH_TOKEN=" + token }
 
-// GH is the gh to run.
+// GH is the gh to run when Find is nil or finds none.
 var GH = "gh"
+
+// Find, when set, is where gh is: a daemon started by launchd has only
+// /usr/bin:/bin:/usr/sbin:/sbin on its PATH, so a gh in /usr/local/bin or Homebrew's
+// folder is not found by name. It says "" when it finds none.
+var Find func() string
+
+// gh is the gh to run: what Find says, else GH.
+func gh() string {
+	if Find != nil {
+		if path := Find(); path != "" {
+			return path
+		}
+	}
+	return GH
+}
 
 // prepareTimeout bounds `gh codespace ssh --config`, which connects to the codespace to
 // learn its user.
@@ -179,7 +194,7 @@ func Prepare(ctx context.Context, path, name, destination, token string, env []s
 	}
 	ctx, cancel := context.WithTimeout(ctx, prepareTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, GH, "codespace", "ssh", "--config", "-c", name)
+	cmd := exec.CommandContext(ctx, gh(), "codespace", "ssh", "--config", "-c", name)
 	cmd.Env = append(withoutTokens(env), Token(token))
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
@@ -223,7 +238,7 @@ func KeepAwake(ctx context.Context, name, token string, env []string) error {
 	if every < 1 {
 		every = 1
 	}
-	cmd := exec.CommandContext(ctx, GH, "codespace", "ssh", "-c", name, "--",
+	cmd := exec.CommandContext(ctx, gh(), "codespace", "ssh", "-c", name, "--",
 		fmt.Sprintf("while :; do echo keepalive; sleep %d; done", every))
 	cmd.Env = append(withoutTokens(env), Token(token))
 	cmd.Stdout = io.Discard
