@@ -26,10 +26,10 @@ struct HostSettings: Codable, Sendable, Equatable {
     var receiving: Bool?
     var returnedFrom: String?
     var returnForwardingUntil: Date?
-    /// Serve Agents to browsers on this Mac (071 FR-002). Absent in settings saved before it,
-    /// which is on, as it is by default.
+    /// Serve Agents to browsers on this Mac (071 FR-002). Off by default (#4923): absent,
+    /// as in settings saved before it, is off.
     var serveWebRemote: Bool?
-    var servesWebRemote: Bool { serveWebRemote ?? true }
+    var servesWebRemote: Bool { serveWebRemote ?? false }
 
     /// This Mac's entry in `host.json`: its Bonjour name, which the person sees in Sharing.
     private static func key(_ paths: HostPaths) -> String {

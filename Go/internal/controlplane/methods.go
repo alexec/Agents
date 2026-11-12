@@ -1737,7 +1737,7 @@ func (m *Methods) pairWebPage(ctx context.Context, host string) (*wire.WebPagePa
 	}
 	port := m.s.WebPort()
 	if port == 0 {
-		return nil, fail(notSupported, "This control plane serves no web page.")
+		return nil, fail(notSupported, "This control plane serves no web page: turn on Serve Agents to browsers on this Mac in Settings ▸ Control plane.")
 	}
 	shown, err := m.s.codes.Issue(withCodeOwner(ctx, m.s.ownerOf(host)), false, true, webPageCodeLifetime)
 	if err != nil {
