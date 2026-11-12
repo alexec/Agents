@@ -399,6 +399,26 @@ for f in bb:$BITBUCKET_REMOTE fj:$FORGEJO_REMOTE; do
 done
 ```
 
+## A fixture GitHub (#4092)
+
+A walk of a Work page on GitHub starts one of the fixture GitHubs in `Web/test/walk/*-github.py`
+(each one's top comment says what it holds) and points the host at it with `--env
+AGENTS_TEST_GITHUB_URL=http://127.0.0.1:<port>`. With that set, `connections/sign-in/token`
+checks a GitHub token at the fixture's `/api/user`, never at api.github.com, and each fixture
+takes any token as `sam`'s: connect it with a token, with no Keychain item by hand. Give the
+folder the fixture's origin (most of them `https://github.com/example/shop`). Stop the fixture
+when you are done, as `stop.sh` does not know it.
+
+```sh
+python3 -I Web/test/walk/forge3268-github.py 8931 & FIXTURE=$!
+eval "$($S/launch.sh --slug work --env AGENTS_TEST_GITHUB_URL=http://127.0.0.1:8931)"
+$S/rpc.py $ROOT call connections/sign-in/token '{"provider":"github","token":"walk"}'
+git init -q $ROOT/shop && git -C $ROOT/shop remote add origin https://github.com/example/shop
+$S/rpc.py $ROOT call folders/add "{\"folder\":\"file://$ROOT/shop\"}"
+# … walk …
+kill $FIXTURE
+```
+
 ## The Remote
 
 The Remote is built for the generic simulator:

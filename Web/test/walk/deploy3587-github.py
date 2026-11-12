@@ -40,6 +40,9 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
+        # The token check of connections/sign-in/token (AGENTS_TEST_GITHUB_URL): any token is sam's (#4092).
+        if self.path.split("?")[0] == "/api/user":
+            return self.answer({"login": "sam"})
         path = self.path.split("?")[0]
         if path == f"/api/repos/{REPO}/actions/runs":
             return self.answer({"workflow_runs": [] if STATE["answered"] else [RUN_JSON]})
