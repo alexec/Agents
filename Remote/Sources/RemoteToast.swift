@@ -48,7 +48,10 @@ enum RemoteToast: Identifiable, Equatable {
 /// (`liftsRemoteToasts()`).
 @MainActor @Observable
 final class RemoteToastLift {
-    var height: CGFloat = 0
+    /// Each bar's height, by the bar: a split view can keep a bar that is not in view, and
+    /// one that goes must not take the other's lift with it.
+    var heights: [UUID: CGFloat] = [:]
+    var height: CGFloat { heights.values.max() ?? 0 }
 }
 
 /// Floats the scene's toast at the bottom centre, above the prompt bar. The toast is held
@@ -130,10 +133,11 @@ extension View {
 private struct LiftsRemoteToasts: ViewModifier {
     /// None in a scene of its own, which has no toast.
     @Environment(RemoteToastLift.self) private var lift: RemoteToastLift?
+    @State private var id = UUID()
 
     func body(content: Content) -> some View {
         content
-            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { lift?.height = $0 }
-            .onDisappear { lift?.height = 0 }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { lift?.heights[id] = $0 }
+            .onDisappear { lift?.heights[id] = nil }
     }
 }

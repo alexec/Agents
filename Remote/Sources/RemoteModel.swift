@@ -5694,6 +5694,12 @@ final class RemoteModel {
                 movingToMachine = work.agent(agent.id)
             }
         }
+        // `-problem WORDS`: a failure, as an action that failed reports it, for a walk of the
+        // scene's failure toast (#4739).
+        if let words = value("-problem") {
+            try? await Task.sleep(for: .seconds(1))
+            report(words)
+        }
         // `-workflow` opens a workflow's page on the chosen folder, by its name.
         if let name = value("-workflow"),
            let workflow = work.workflows.first(where: { $0.workflow.name == name }) {
