@@ -536,6 +536,22 @@ class Video:
     def mark(self, name):
         self.marks.append((name, time.time()))
 
+    def tape(self):
+        """Voice mode's speech and sounds go on a tape from here (#4854, `VoiceTape`), and the
+        video mixes them under the frames. The tape ends with the take."""
+        reply = self.walk.call("voice", walk=True, tape=str(self.work / "voice"))
+        if not reply.get("ok"):
+            raise RuntimeError(f"voice tape: {reply.get('error')}")
+        self.taped = True
+
+    def end_tape(self):
+        """Ends the tape, if one is on: the window writes speech.wav."""
+        if getattr(self, "taped", False):
+            self.taped = False
+            reply = self.walk.call("voice", tape="")
+            if not reply.get("ok"):
+                raise RuntimeError(f"voice tape: {reply.get('error')}")
+
     def say(self, key, wait=True, after=0.4):
         """Speaks line `key` here. With wait, the scene waits until the line has been said."""
         self.mark(f"say:{key}")
@@ -611,6 +627,7 @@ def record_scene(scene, takes, work, build, keep):
         v.mark("begin")
         scene.run(v)
         v.mark("end")
+        v.end_tape()
         private_words(v)
         time.sleep(0.5)
         if v.web:
@@ -667,7 +684,11 @@ def revoke(scene, v):
 def check(scene, mp4, work):
     """Whisper hears the finished video, which must say the script in order (a line cut
     off or two lines over each other shows here), and a sheet of it is made to look at."""
-    script = " ".join(scene.LINES.values())
+    # The narration and what voice mode said on its tape (#4854), in the order heard.
+    marks = json.loads((work / "marks.json").read_text())["marks"]
+    heard_in_order = [(at, scene.LINES[name[4:]]) for name, at in marks if name.startswith("say:")]
+    heard_in_order += [(at, mark["said"]) for at, mark in frame.tape_marks(work) if mark.get("said")]
+    script = " ".join(text for _, text in sorted(heard_in_order)) if frame.tape_marks(work) else " ".join(scene.LINES.values())
     heard = voice.hear(mp4)
     off = voice.wrong(script, heard)
     log(f"{scene.ID}: Whisper hears {off:.0%} of the script wrong: {heard}")
