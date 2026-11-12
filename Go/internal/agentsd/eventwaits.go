@@ -905,6 +905,12 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 			return d.waitForEnded(agent, who, wakeOn, minutes, argString(args, "message"))
 		}
 	}
+	// A wait for its own background commands that nothing would end (#4577).
+	if onlyBackgroundEnded(patterns) {
+		if words := d.backgroundWaitWords(a); words != "" {
+			return "", eventRefused(words)
+		}
+	}
 	if branches, ok := filters["branch"]; ok {
 		for _, p := range patterns {
 			if p.name == "branch.moved" {
@@ -1156,8 +1162,11 @@ func (d *Daemon) matchWaits(e wire.Event) {
 	for _, a := range d.Store.LiveAgents() {
 		w := a.EventWait
 		// An agent's own events do not wake it, but for its own grant, which is the one
-		// thing its place in a line waits for (#2361).
-		if w == nil || !d.inScope(e, &a) || !waitMatches(w, e) || e.Details["agent"] == string(a.ID) && e.Name != "lease.granted" {
+		// thing its place in a line waits for (#2361), and the end of its own background
+		// commands, which wakes only it (#4577).
+		own := e.Details["agent"] == string(a.ID)
+		if w == nil || !d.inScope(e, &a) || !waitMatches(w, e) || own && e.Name != "lease.granted" && e.Name != backgroundEndedEvent ||
+			!own && e.Name == backgroundEndedEvent {
 			continue
 		}
 		title := "Untitled"
