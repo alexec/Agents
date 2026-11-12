@@ -230,6 +230,11 @@ func TestResolvedOf(t *testing.T) {
 			t.Errorf("%s: got %+v", c.body, got)
 		}
 	}
+	// #4552: when it was made, a bug's filing.
+	filed, err := resolvedOf("issue", []byte(`{"title":"Crash","state":"open","created_at":"2026-11-02T10:00:00Z"}`))
+	if want := wire.DateOf(time.Date(2026, 11, 2, 10, 0, 0, 0, time.UTC)); err != nil || filed.CreatedAt == nil || *filed.CreatedAt != want {
+		t.Errorf("created_at: got %+v, %v", filed, err)
+	}
 	if _, err := resolvedOf("issue", []byte(`{"state":"open"}`)); err == nil {
 		t.Error("no title: want an error")
 	}

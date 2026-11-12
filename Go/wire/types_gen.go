@@ -6064,6 +6064,12 @@ type LineageCostNode struct {
 
 	// An epic's first landing forecast (#4526), kept once made, for the forecast against when it lands.
 	Forecast *LineageForecastKept `json:"forecast,omitzero"`
+
+	// A merged PR's files, by path, at most 100, as the forge said them when it merged (#4552), for the rework rate. Dropped 60 days after its merge.
+	Files []string `json:"files,omitzero"`
+
+	// The PR a merged revert reverts, by ref, from its body's "Reverts owner/repo#n" (#4552), for the recovery time.
+	Reverts *string `json:"reverts,omitzero"`
 }
 
 // lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a repo's every node (kind repo, ref github:repo:#alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
@@ -6089,6 +6095,56 @@ type LineageCostRollup struct {
 	Parts []LineageCostNode `json:"parts"`
 
 	Limited *bool `json:"limited,omitzero"`
+}
+
+// A repo's delivery figures (#4552, epic #4551), from this machine's totals: the four DORA keys, DORA 2025's rework rate and flow efficiency, over the windowDays (28) before at, each with a weekly series. A week is 7 days back from at, not a calendar week. A figure says how many it is made from; one made from none has no value. band is where a value falls among DORA 2024's clusters, a reference from teams of people, not a grade; rework rate and flow efficiency have none.
+type LineageDelivery struct {
+	Since Date `json:"since"`
+
+	At Date `json:"at"`
+
+	WindowDays int64 `json:"windowDays"`
+
+	// Lead time for changes, in seconds: from the first work on an issue to the first release tag that carries a merged PR that fixes it; the median, and p90. Counted by the tag's time.
+	LeadTime LineageDeliveryFigure `json:"leadTime"`
+
+	// Release tags a week (#3023), 0 for none, as is each week's; count is the tags.
+	DeploymentFrequency LineageDeliveryFigure `json:"deploymentFrequency"`
+
+	// Failures over merged PRs, 0 to 1, by merge time. A failure is a merged revert (a PR whose title starts with Revert), or a merged PR that fixes, by any lineage link, a priority:high bug filed within 7 days after a release tag in its repo. count is the merged PRs.
+	ChangeFailureRate LineageDeliveryFigure `json:"changeFailureRate"`
+
+	// Failed deployment recovery time, in seconds, the median: a revert's merge less the merge of the PR it reverts, or a fix's merge less its bug's filing. Counted by the recovery's merge.
+	RecoveryTime LineageDeliveryFigure `json:"recoveryTime"`
+
+	// DORA 2025's rework rate, 0 to 1: the share of merged PRs, of those with their files known, that change a file another PR merged in the 21 days before changed. count is the PRs with their files known.
+	ReworkRate LineageDeliveryFigure `json:"reworkRate"`
+
+	// The agents' working time on a closed issue and its PRs over its cycle time, at most 1, the median. Counted by its last merge.
+	FlowEfficiency LineageDeliveryFigure `json:"flowEfficiency"`
+}
+
+// One delivery figure (#4552): value over the window, absent when made from none; p90 for lead time; count is what it is made from; weeks is the 4 weeks, oldest first; band is DORA 2024's.
+type LineageDeliveryFigure struct {
+	Value *float64 `json:"value,omitzero"`
+
+	P90 *float64 `json:"p90,omitzero"`
+
+	Count int64 `json:"count"`
+
+	Weeks []LineageDeliveryWeek `json:"weeks"`
+
+	// elite, high, medium or low. The list is open.
+	Band *string `json:"band,omitzero"`
+}
+
+// A week of a delivery figure (#4552): the 7 days from since; value as the figure's, absent when made from none.
+type LineageDeliveryWeek struct {
+	Since Date `json:"since"`
+
+	Value *float64 `json:"value,omitzero"`
+
+	Count int64 `json:"count"`
 }
 
 // lineage/end (#2348): the link from one node to another by this relationship stops being active now. Nothing is removed: the link keeps its start and gets an end.
@@ -6235,7 +6291,7 @@ type LineageEstimateRequest struct {
 	StartAt *Date `json:"startAt,omitzero"`
 }
 
-// lineage/figures (#4427): a release's Lineage panel on its Work page, from this machine's totals. cost is its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its parts, each once; running is how many of them run now (starting, running or waiting on the person). runtimes is the runtimes of the sessions this machine has, the most sessions first. leadTimeSeconds is from the first work on its parts to its tag (#3878 removed the milestone figures). limited says the rollup had more parts than it counts. Another kind of node is refused.
+// lineage/figures (#4427): a release's Lineage panel on its Work page, from this machine's totals; or (#4552) a repo's (kind repo, ref as LineageCostNode.repo), with its delivery figures. cost is its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its parts, each once; running is how many of them run now (starting, running or waiting on the person). runtimes is the runtimes of the sessions this machine has, the most sessions first. leadTimeSeconds is from the first work on its parts to its tag (#3878 removed the milestone figures). limited says the rollup had more parts than it counts. delivery is a repo's only. Another kind of node is refused.
 type LineageFigures struct {
 	Node LineageNode `json:"node"`
 
@@ -6250,6 +6306,8 @@ type LineageFigures struct {
 	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
 
 	Limited *bool `json:"limited,omitzero"`
+
+	Delivery *LineageDelivery `json:"delivery,omitzero"`
 }
 
 // lineage/forecast (#4526; the method is specs/4533-forecasting/spec.md): what comes next, from this machine's totals. landings is the issues (not epics) that landed with a merged PR in the window of windowDays (14) before at, in the epic's repo when a node is asked for, else in every repo. milestone is the milestone asked for (#4620), whose landings are its repo's. lands is when the epic or the milestone lands; noForecast says why there is none (too little history, too few closed epics, nothing open). toComplete is the epic's estimate to complete, once three of its children closed with an estimate kept at their start. kept is the forecast kept on the epic's node, the first one made, so it can be scored when the epic lands. spend is what a week and a month cost at the window's pace, burn is each weekly allowance's pace, and serviceLevels is how long each level's issues took. Every figure says its window; a range is a probability, not a promise.
@@ -6521,6 +6579,9 @@ type LineageResolved struct {
 	State *string `json:"state,omitzero"`
 
 	Labels []string `json:"labels,omitzero"`
+
+	// When the forge says the issue or PR was made (#4552): a bug's filing, for the change failure rate.
+	CreatedAt *Date `json:"createdAt,omitzero"`
 }
 
 // A runtime of lineage/figures' sessions, and how many of them it ran (#4427).
