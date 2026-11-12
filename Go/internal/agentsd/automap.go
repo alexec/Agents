@@ -10,7 +10,7 @@ import (
 )
 
 // The shared words (#2658): Fast, Balanced and Smart; Plan, Ask and Approve for me; Request
-// cards and Yes to all; Default sandbox, Runtime sandbox and No sandbox. Each is a cell of a
+// cards and Always Approve; Default sandbox, Runtime sandbox and No sandbox. Each is a cell of a
 // table per field, one row a runtime: the runtime's own setting for that value. The table
 // ships here; the person's own cells are in auto.json (autosettings.go). A cell is checked
 // against what its runtime last offered (runtimeOffers): a value it no longer offers is
@@ -52,7 +52,7 @@ var levelRank = map[wire.AutoField]map[string]int{
 var levelWords = map[string]string{
 	"fast": "Fast", "balanced": "Balanced", "smart": "Smart",
 	"plan": "Plan", "ask": "Ask", "approveForMe": "Approve for me", "bypassPermissions": "Bypass Permissions",
-	"default": "Request cards", "alwaysApprove": "Yes to all",
+	"default": "Request cards", "alwaysApprove": "Always Approve",
 	"runtime": "Default sandbox", "on": "Runtime sandbox", "off": "No sandbox",
 }
 
@@ -135,17 +135,17 @@ var autoPermissions = map[string]map[string]autoCell{
 	"grok": {
 		"plan":         {client: requestCards, words: "Default, Request cards", mark: wire.AutoMarkNearestSafer, note: "nearest safer: no plan mode", rank: 1},
 		"ask":          {client: requestCards, words: "Default, Request cards", rank: 1},
-		"approveForMe": {client: yesToAll, words: "Default, Yes to all", rank: 2},
+		"approveForMe": {client: yesToAll, words: "Default, Always Approve", rank: 2},
 	},
 	"cursor": {
 		"plan":         {options: map[string]string{"mode": "plan"}, client: requestCards, words: "Plan", rank: 0},
 		"ask":          {options: map[string]string{"mode": "agent"}, client: requestCards, words: "Agent, Request cards", rank: 1},
-		"approveForMe": {options: map[string]string{"mode": "agent"}, client: yesToAll, words: "Agent, Yes to all", rank: 2},
+		"approveForMe": {options: map[string]string{"mode": "agent"}, client: yesToAll, words: "Agent, Always Approve", rank: 2},
 	},
 	"opencode": {
 		"plan":         {options: map[string]string{"mode": "plan"}, client: requestCards, words: "plan", rank: 0},
 		"ask":          {options: map[string]string{"mode": "build"}, client: requestCards, words: "build, Request cards", rank: 1},
-		"approveForMe": {options: map[string]string{"mode": "build"}, client: yesToAll, words: "build, Yes to all", rank: 2},
+		"approveForMe": {options: map[string]string{"mode": "build"}, client: yesToAll, words: "build, Always Approve", rank: 2},
 	},
 	"copilot": {
 		"plan": {options: map[string]string{"mode": copilotModes + "plan"}, words: "Plan", rank: 0},
@@ -166,7 +166,7 @@ var autoPermissions = map[string]map[string]autoCell{
 func requestCell(runtimeID, level string) autoCell {
 	if clientAnswered[runtimeID] {
 		if level == string(wire.ClientPermissionModeAlwaysApprove) {
-			return autoCell{client: yesToAll, words: "Yes to all", rank: 2}
+			return autoCell{client: yesToAll, words: "Always Approve", rank: 2}
 		}
 		return autoCell{client: requestCards, words: "Request cards", rank: 1}
 	}

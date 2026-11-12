@@ -127,7 +127,7 @@ struct MoreSheet: View {
                 }
                 .accessibilityLabel("\(ClientPermissionWords.name(runtimeName: name)), \(ClientPermissionWords.title(mode))")
                 .accessibilityHint(ClientPermissionWords.scope(runtimeName: name))
-                // Yes to all answers every request: one more tap, as the capsule asks (#2746).
+                // Always Approve answers every request: one more tap, as the capsule asks (#2746).
                 .confirmationDialog(ClientPermissionWords.confirmTitle(runtimeName: name),
                                     isPresented: $confirmingAlwaysApprove, titleVisibility: .visible) {
                     Button(ClientPermissionWords.confirmButton, role: .destructive) {

@@ -35,7 +35,7 @@ public enum LevelWords {
     public static func requests(_ mode: ClientPermissionMode) -> String {
         switch mode {
         case .default: "Request cards"
-        case .alwaysApprove: "Yes to all"
+        case .alwaysApprove: "Always Approve"
         }
     }
 
@@ -85,7 +85,7 @@ public enum LevelWords {
     /// The mark on the value that Settings gives, when the agent has no choice of its own.
     public static let followsSettings = "follows Settings"
 
-    /// Bypass Permissions asks once more before it is set, as Yes to all does (#2892, #2746):
+    /// Bypass Permissions asks once more before it is set, as Always Approve does (#2892, #2746):
     /// it lets the agent change things outside its folder.
     public static func asksFirst(_ field: AutoField, _ level: String) -> Bool {
         field == .permission && level == PermissionLevel.bypassPermissions.rawValue

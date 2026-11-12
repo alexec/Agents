@@ -400,11 +400,11 @@ struct ContentView: View {
         .heldAlert(\.title, item: { WindowAlert.wanted(by: model) }, dismiss: { $0.closed(in: model) }) { alert in
             switch alert {
             case .lend(let ask):
-                Button("Allow") { model.finishSignInLendAsk(ask, allowed: true) }
-                Button("Don’t Allow", role: .cancel) { model.finishSignInLendAsk(ask, allowed: false) }
+                Button("Approve") { model.finishSignInLendAsk(ask, allowed: true) }
+                Button("Deny", role: .cancel) { model.finishSignInLendAsk(ask, allowed: false) }
             case .lendGit(let ask):
-                Button("Allow") { model.answerGitLend(ask, allowed: true) }
-                Button("Don’t Allow", role: .cancel) { model.answerGitLend(ask, allowed: false) }
+                Button("Approve") { model.answerGitLend(ask, allowed: true) }
+                Button("Deny", role: .cancel) { model.answerGitLend(ask, allowed: false) }
             case .folderGone(let ask):
                 // The ways on (#119). What was typed goes with Continue; Cancel leaves it
                 // in the bar.
@@ -494,10 +494,10 @@ enum WindowAlert: Identifiable {
     @MainActor
     func closed(in model: AppModel) {
         switch self {
-        // Its buttons answer it, Escape as Don’t Allow, and only once: its answer is a
+        // Its buttons answer it, Escape as Deny, and only once: its answer is a
         // continuation, so nothing here answers it again.
         case .lend: break
-        // Escape is Don’t Allow, which its cancel button has said.
+        // Escape is Deny, which its cancel button has said.
         case .lendGit: break
         case .folderGone(let ask): if model.folderGone == ask { model.folderGone = nil }
         }

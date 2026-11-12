@@ -3,12 +3,12 @@
 // what is asked; its grey line, the kind, who asked it and how many sessions it blocks; its time,
 // how long it has waited. A press opens the session that asked it, where its card takes the answer.
 // A secret's use (#4017) has no card: its title says which secret, its grey line the asker and
-// where the value goes, and its menu (a right click, a long press or the menu key) has Allow Once, Allow
-// for This Session, Allow Always and Deny, as the window's and the Remote's menus have.
+// where the value goes, and its menu (a right click, a long press or the menu key) has Approve, Allow
+// for This Session, Always Approve and Deny, as the window's and the Remote's menus have.
 // A Linux machine's (#4149) opens the value only for an answer the page signs with its lock key;
 // a page with none offers only Deny, and its grey line says to answer on the Mac or the Remote.
-// A terminal's agents-secret (#4179) has no session to open: a press opens its menu, with Allow Once,
-// Allow for 1 Hour and Deny, and its grey line says that Agents cannot tell a terminal from an agent.
+// A terminal's agents-secret (#4179) has no session to open: a press opens its menu, with Approve,
+// Approve for 1 Hour and Deny, and its grey line says that Agents cannot tell a terminal from an agent.
 // Its mark is one for each kind (#4026), as NeedRequest.symbol is: unlike an approval's one shield,
 // it says what is asked. The step's hand taps: the raised hand is a session that needs the person.
 // Its menu also has Later (#4236): In 1 Hour, 4 Hours, 8 Hours, 1 Day and At My Mac, as the window's

@@ -345,7 +345,7 @@ public enum ToolPolicyCatalog {
     ///   which OpenCode reports as the plan.
     /// - `permission`: OpenCode's own default is `"*": "allow"`, so left alone it edits,
     ///   runs commands and fetches without asking. These make it ask, as every other runtime
-    ///   does; **Always approve** (061) answers for the person.
+    ///   does; **Always Approve** (061) answers for the person.
     /// - `autoupdate` and `share` off: the app's pinned copy is never replaced under a running
     ///   agent (D5), and no conversation is published to a web page (FR-017).
     ///

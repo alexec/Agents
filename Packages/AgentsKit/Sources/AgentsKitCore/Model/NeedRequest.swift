@@ -224,7 +224,7 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         /// The page's domain for a fill, owner/repo for CI, the server's name for MCP, the
         /// command that ran agents-secret for a terminal, as it says it.
         public var place: String
-        /// The session's own secret (#3548): Allow always is the same as Allow for this session.
+        /// The session's own secret (#3548): Always Approve is the same as Approve for This Session.
         public var sessionOnly: Bool?
         /// A Linux machine (#4058): an answer that allows the use goes signed with this
         /// device's lock key (`LockChannel.secretUseApproval`), or the machine refuses it.
@@ -279,10 +279,10 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         /// The words on the row's menu, its swipes and the banner's buttons.
         public var word: String {
             switch self {
-            case .once: "Allow Once"
-            case .session: "Allow for This Session"
-            case .always: "Allow Always"
-            case .hour: "Allow for 1 Hour"
+            case .once: "Approve"
+            case .session: "Approve for This Session"
+            case .always: "Always Approve"
+            case .hour: "Approve for 1 Hour"
             case .deny: "Deny"
             }
         }

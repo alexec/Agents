@@ -14,8 +14,8 @@ export function GitLendDialog({ store }: { store: Store }) {
         <h2>{gitLendWords.title(ask)}</h2>
         <p class="sheet-note">{gitLendWords.message(ask)}</p>
         <div class="sheet-actions">
-          <button type="button" onClick={no}>Don’t Allow</button>
-          <button type="submit" class="prominent" autofocus>Allow</button>
+          <button type="button" onClick={no}>Deny</button>
+          <button type="submit" class="prominent" autofocus>Approve</button>
         </div>
       </form>
     </Modal>

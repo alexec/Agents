@@ -2342,7 +2342,7 @@ type ClientPermissionSettings struct {
 
 	Opencode ClientPermissionMode `json:"opencode"`
 
-	// Set when the organisation's mode ceiling is below approving every request: Always-approve is refused, and no agent's requests are answered for the person.
+	// Set when the organisation's mode ceiling is below approving every request: Always Approve is refused, and no agent's requests are answered for the person.
 	SetBy *PolicySetBy `json:"setBy,omitzero"`
 }
 
@@ -9140,7 +9140,7 @@ type OutsideAccount struct {
 	// The projects that use it, by name. Absent or empty: all of them.
 	Projects []string `json:"projects,omitzero"`
 
-	// Ask before use (#4163): an agent's manage_accounts get of it waits on a person's approval, as a secret's use does (#4015). Absent is on, also for an account an agent adds; false is off, which a person sets, or Allow Always on its request does. Not sealed: kept with the account, and agentsd enforces it.
+	// Ask before use (#4163): an agent's manage_accounts get of it waits on a person's approval, as a secret's use does (#4015). Absent is on, also for an account an agent adds; false is off, which a person sets, or Always Approve on its request does. Not sealed: kept with the account, and agentsd enforces it.
 	AskBeforeUse *bool `json:"askBeforeUse,omitzero"`
 }
 
@@ -11655,7 +11655,7 @@ type RequestSecretUse struct {
 	// For account (#4163): the manage_accounts call that waits, such as get. name is then the account's service and address.
 	Call *string `json:"call,omitzero"`
 
-	// The secret is the session's own (#3548): Allow always is the same as Allow for this session.
+	// The secret is the session's own (#3548): Always Approve is the same as Approve for This Session.
 	SessionOnly *bool `json:"sessionOnly,omitzero"`
 
 	// The machine is Linux (#4058): the value opens only with the release key its control plane keeps, which the control plane gives only for an approval the person's client signed. An answer that allows the use carries approval; one without it is refused.
@@ -12527,7 +12527,7 @@ type SecretTerminalValue struct {
 	Words *string `json:"words,omitzero"`
 }
 
-// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120). terminal (#4179) prints a secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163) is not a secret's use: manage_accounts reads an account with Ask before use; the request names the account, and Allow Always turns its Ask before use off.
+// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120). terminal (#4179) prints a secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163) is not a secret's use: manage_accounts reads an account with Ask before use; the request names the account, and Always Approve turns its Ask before use off.
 type SecretUse string
 
 const SecretUseFill SecretUse = "fill"

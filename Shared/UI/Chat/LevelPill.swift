@@ -7,7 +7,7 @@ import SwiftUI
 /// The menu's header names the field; each value says what it is on the runtime ("Sonnet 5
 /// on Claude"). The runtime's own choices stay behind **⋯ <runtime>'s own**, which is not
 /// there on Auto: Auto has no runtime yet. Bypass Permissions asks once more before it is
-/// set, as Yes to all does (#2892): it lets the agent change things outside its folder.
+/// set, as Always Approve does (#2892): it lets the agent change things outside its folder.
 struct LevelPill: View {
     let field: AutoField
     /// The value in force, by its wire name; nil is Custom.

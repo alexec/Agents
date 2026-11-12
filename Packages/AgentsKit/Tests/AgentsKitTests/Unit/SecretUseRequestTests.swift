@@ -28,7 +28,7 @@ struct SecretUseRequestTests {
         #expect(account.title(asker: "Sign up") == "Wants to read gitlab.com (a@example.com)")
         #expect(account.line(asker: "Sign up") == "Sign up · Account: manage_accounts get")
         #expect(account.secretUse?.actions == [.once, .session, .always, .deny])
-        #expect(NeedRequest.Action.allCases.map(\.word) == ["Allow Once", "Allow for This Session", "Allow Always", "Allow for 1 Hour", "Deny"])
+        #expect(NeedRequest.Action.allCases.map(\.word) == ["Approve", "Approve for This Session", "Always Approve", "Approve for 1 Hour", "Deny"])
     }
 
     /// #4179: a terminal's agents-secret has no session; its answers are once, for 1 hour and
