@@ -211,7 +211,7 @@ The client stories (#4600) move each pattern to its kind. Inline error text in a
 | `ContinueWhenBackStrip`, `RemoteContinueWhenBackStrip` | Mac, Remote | Banner | Neutral |
 | `CostLimitBanner` | Mac, Remote | Banner | Failure |
 | `OrgPolicyStrip`, `.policy-banner` | All | Banner | Neutral |
-| `WorkErrorStrip` (raw yellow), `ErrorStrip` in `.work-problem` | All | Banner | Failure |
+| `WorkErrorStrip` (amber, the `forge.waiting` wash), `ErrorStrip` in `.work-problem` | All | Banner | Failure |
 | `ArchiveUndoStrip` (a card at the foot of the list) | Mac, Remote | Toast with Undo | Success |
 | `.archive-undo` foot line (`Sidebar.tsx`) | Web | Toast with Undo | Success |
 | A turn's Undo These Changes result ("↩︎ undone", its failure) | All | Sheet note in the card (no change) | Success, failure |
