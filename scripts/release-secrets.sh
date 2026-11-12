@@ -23,7 +23,8 @@
 # ~/.private_keys. Without a required reviewer app-store.yml submits nothing.
 set -euo pipefail
 
-repo=${RELEASE_REPO:-alexec/Agents}
+# The repo is this checkout's, so it follows a transfer (#4929).
+repo=${RELEASE_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}
 keys=~/.private_keys
 profiles=~/Library/Developer/Xcode/UserData/Provisioning\ Profiles
 
