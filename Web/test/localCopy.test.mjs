@@ -133,3 +133,37 @@ test("signed out, nothing is written", async () => {
   await copy.put([{ kind: "machine", ref: machineRef("mac"), host: host("mac"), agents: [], at: 1 }]);
   assert.equal(held.held.size, 0);
 });
+
+// Work's part of the copy (#4930): kept by what was asked, each group to its count, the pictures to their own cap,
+// and the oldest Work entry first when over the cap.
+const { workRef, workKept } = await load("test/localCopy-entry.ts");
+
+test("work: an answer is read back for what was asked only", async () => {
+  const copy = new LocalCopy(new MemoryCopyStore());
+  copy.writing = true;
+  await copy.keepWork("list", "issue|open|newest|", { lists: [], lineage: [] });
+  assert.deepEqual(await copy.work("list", "issue|open|newest|"), { lists: [], lineage: [] });
+  assert.equal(await copy.work("list", "issue|closed|newest|"), undefined);
+  assert.equal(await copy.work("plan", "issue|open|newest|"), undefined);
+  assert.equal(workRef("item", "github:alexec/Agents#1"), "agents:work:item#github:alexec/Agents#1");
+});
+
+test("work: nothing is kept signed out", async () => {
+  const store = new MemoryCopyStore();
+  const copy = new LocalCopy(store);
+  await copy.keepWork("item", "x", { a: 1 });
+  assert.equal(store.held.size, 0);
+});
+
+test("caps: each Work group to its count, pictures to their cap, then the oldest Work entry before a transcript", () => {
+  const items = Array.from({ length: workKept.item + 2 }, (_, i) => ({ ref: `i${i}`, kind: "work", group: "item", at: i, bytes: 1 }));
+  assert.deepEqual(overCaps(items).sort(), ["i0", "i1"]);
+  const images = [1, 2, 3].map((i) => ({ ref: `p${i}`, kind: "work", group: "image", at: i, bytes: 40 }));
+  assert.deepEqual(overCaps(images, 400), ["p1"]);
+  const mixed = [
+    { ref: "t", kind: "transcript", at: 0, bytes: 50 },
+    { ref: "old", kind: "work", group: "list", at: 1, bytes: 50 },
+    { ref: "new", kind: "work", group: "plan", at: 2, bytes: 50 },
+  ];
+  assert.deepEqual(overCaps(mixed, 120), ["old"]);
+});

@@ -43,9 +43,11 @@ and measures against the `night` budgets:
 - the host's answers, with `scripts/perf-budgets.py`;
 - the Mac window's cold start, first list, project switch and chat open, with
   `scripts/perf-window.sh`;
-- the web page's first list, session open, long transcript and send to echo, from the
-  page's own `performance` marks (`agents:first-list`, `agents:session-open`,
-  `agents:send` to `agents:echo`), with `Web/test/walk/budgets.mjs`. The send goes to a
+- the web page's first list, session open, long transcript, send to echo and Work list,
+  second open, from the page's own `performance` marks (`agents:first-list`,
+  `agents:session-open`, `agents:send` to `agents:echo`, `agents:work-list-read` to
+  `agents:work-list-copy`: Work ▸ Issues after a reload, drawn from this device's copy,
+  #4930; skipped when the scratch forge kept no copy), with `Web/test/walk/budgets.mjs`. The send goes to a
   session of the stand-in runtime (`scripts/fake-acp-runtime.py`, as `grok`), first on the
   PATH of a scratch login shell that the host is given. The run checks `runtimes/list`
   first and stops when the host's `grok` is another one: it never prompts a real runtime;

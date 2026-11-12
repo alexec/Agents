@@ -11,7 +11,7 @@ import { forgetPins } from "./model/machineLock";
 import { effect } from "@preact/signals";
 import { startAgentLinks } from "./model/agentLink";
 import { startSpinnerClock } from "./spinnerClock";
-import { LocalCopy, startLocalCopy } from "./model/localCopy";
+import { LocalCopy, setWorkCopy, startLocalCopy } from "./model/localCopy";
 
 const session = new Session();
 const store = new Store(session.link);
@@ -22,6 +22,7 @@ startSpinnerClock();
 // This device's copy of the sessions (#4790): drawn at once, written only while signed in.
 const copy = new LocalCopy();
 startLocalCopy(store, copy);
+setWorkCopy(copy);
 effect(() => {
   const kind = session.state.value.kind;
   if (kind === "open" || kind === "down") copy.writing = true;
