@@ -16,6 +16,7 @@ import type { ReachChoice } from "../model/orgPolicy";
 import { routeRuntimes } from "../model/orgAccounts";
 import type { ModeName, PolicyForm } from "../model/orgPolicy";
 import { KillSwitch, StoppedStrip } from "./settings/Policy";
+import { MessageBanner, ask } from "./MessageKinds";
 
 interface Draft {
   store: Store;
@@ -76,7 +77,7 @@ export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) 
     if (!made) return;
     if ("problem" in made) { problem.value = made.problem; return; }
     const warned = warnings(made.policy, machines.value, routes.value?.map((r) => r.route));
-    if (warned.some((w) => w.includes("nobody can start an agent")) && !window.confirm(`${warned.join("\n")}\n\nSave the policy anyway?`)) return;
+    if (warned.some((w) => w.includes("nobody can start an agent")) && !await ask(`Save the policy anyway?\n\n${warned.join("\n")}`)) return;
     busy.value = true;
     try {
       const rev = kept.value?.rev;
@@ -91,7 +92,7 @@ export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) 
       busy.value = false;
     }
   };
-  if (!form) return problem.value ? <p class="hint" role="alert">{problem.value}</p> : <p class="hint">Loading…</p>;
+  if (!form) return problem.value ? <MessageBanner tone="failure">{problem.value}</MessageBanner> : <p class="hint">Loading…</p>;
   const preview = edits && next ? changes(loaded, next) : [];
   const warned = next ? warnings(next, machines.value, routes.value?.map((r) => r.route)) : [];
   const text = (key: keyof PolicyForm) => (e: Event) => edit({ [key]: (e.currentTarget as HTMLInputElement).value });
@@ -99,7 +100,7 @@ export function OrgPolicyPage({ store, down }: { store: Store; down: boolean }) 
   const budgetSet = [form.daily, form.dailyTokens, form.perAgent, form.perAgentTokens].some((t) => t.trim() !== "");
   return (
     <form class="org-policy" onSubmit={(e) => { e.preventDefault(); void save(); }}>
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       <StoppedStrip policy={loaded} />
       {loaded ? <p class="quiet small">{changed(loaded, fromWireDate(loaded.issued), new Date())}</p>
         : <p class="quiet small">No policy yet. Nothing is capped until you save one.</p>}

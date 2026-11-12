@@ -16,6 +16,7 @@ import { SecretDescriptionField } from "../SecretDescription";
 import { SecretInfoLine } from "../SecretInfoLine";
 import { hint, sessionLine, sessionNotBackedUp } from "../../model/secretInfo";
 import { useSettingsMachine } from "./SettingsMachine";
+import { ask } from "../MessageKinds";
 
 const lists = signal<Record<string, SessionSecrets | null>>({});
 const adding = signal(false);
@@ -44,7 +45,7 @@ export function SessionSecretsSection({ store, down }: { store: Store; down: boo
     }
   };
   const remove = async (secret: SessionSecret) => {
-    if (!host || !window.confirm(`${removeQuestion(secret)} ${sessionSecretWords.removeMessage}`)) return;
+    if (!host || !await ask(`${removeQuestion(secret)} ${sessionSecretWords.removeMessage}`)) return;
     try {
       const after = await store.link.call("secrets/sessionRemove", { agentID: secret.agentID, name: secret.name }, host);
       lists.value = { ...lists.value, [host]: after };

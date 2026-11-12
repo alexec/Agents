@@ -26,6 +26,7 @@ import { assumesLine, burnLine, burnRuntime, forecastScoreLine, landsLine, laneO
 import { Capability } from "../protocol/capabilities.generated";
 import type { Section } from "../model/console";
 import { Choice } from "./Choice";
+import { ask } from "./MessageKinds";
 
 function sentence(error: unknown): string {
   if (error instanceof CallFailed) {
@@ -239,7 +240,7 @@ function SavedPage({ store, scopes }: { store: Store; scopes: readonly ReportSco
     }
   };
   const remove = async (v: ReportView) => {
-    if (!window.confirm(deleteViewWords(v.name))) return;
+    if (!await ask(deleteViewWords(v.name))) return;
     try {
       views.value = (await store.link.call("reports/deleteView", { id: v.id })).views;
     } catch (error) {

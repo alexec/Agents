@@ -10,6 +10,7 @@ import { signal, useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { Group, ReportPolicy } from "../protocol/generated";
 import { budgetInput, budgetValue, failedWords, leadCandidates, notSaved, orgKey, policyFoot, totalsOnlyFoot } from "../model/console";
+import { MessageBanner } from "./MessageKinds";
 
 /** The edits not saved yet, of a store's control plane: kept while the page is closed. */
 interface Draft {
@@ -101,7 +102,7 @@ export function ReportPolicyPage({ store, down }: { store: Store; down: boolean 
   );
   return (
     <form class="report-policy" onSubmit={(e) => { e.preventDefault(); void save(); }}>
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       {!shown && !problem.value && <p class="hint">Loading…</p>}
       {shown && (
         <>

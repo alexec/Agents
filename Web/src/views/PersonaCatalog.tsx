@@ -17,6 +17,7 @@ import { hunkRows } from "../model/fileDiff";
 import { fromWireDate } from "../protocol/dates";
 import { Modal } from "./Modal";
 import { FileDiff } from "./FileDiff";
+import { ask } from "./MessageKinds";
 
 /** The marketplace last searched for personas, kept across sheets, as the Mac's `catalog.personas.marketplace`. */
 const chosenKey = "catalog.personas.marketplace";
@@ -46,7 +47,7 @@ export function MarketplacePersonasSection({ store, host, destination, down, cha
   async function reload() { await load(); changed(); }
 
   async function remove(persona: ManagedPersona) {
-    if (!confirm(`Move ${persona.id}.md to the Trash?\n\n${destination.kind === "personal"
+    if (!await ask(`Move ${persona.id}.md to the Trash?\n\n${destination.kind === "personal"
       ? "New sessions can't pick it after that. You can take it back out of the Trash."
       : "New sessions in this folder can't pick it after that. The removal shows in the folder's changes, uncommitted."}`)) return;
     try {
@@ -199,7 +200,7 @@ function PersonaPreviewPane({ store, host, preview, destination, back, close, ad
   const blocked = busy || preview.persona.problem !== undefined;
 
   async function add(replace: boolean) {
-    if (replace && !confirm(`Replace ${preview.persona.id}?\n\nThe copy there now goes to the Trash.`)) return;
+    if (replace && !await ask(`Replace ${preview.persona.id}?\n\nThe copy there now goes to the Trash.`)) return;
     setBusy(true);
     try {
       const answer = await store.link.call("personas/add", { previewID: preview.previewID, destination, replace }, host);
@@ -264,7 +265,7 @@ export function UpdatePersonaModal({ store, host, destination, id, onUpdated, cl
   useEffect(() => { void load(); }, [host, id]);
 
   async function update(fresh: PersonaUpdatePreviewAnswer) {
-    if (fresh.edited && !confirm(`Your edits to ${id} will be lost.\n\n`
+    if (fresh.edited && !await ask(`Your edits to ${id} will be lost.\n\n`
       + "The file there was changed since it was added. Updating puts it in the Trash and takes the new one.")) return;
     setBusy(true);
     try {

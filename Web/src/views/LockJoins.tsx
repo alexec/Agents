@@ -8,6 +8,7 @@ import type { Store } from "../model/store";
 import { brokenWords, newLockWords, type RecoveryCard, type SignerCard, type ThisDevice } from "../model/machineLock";
 import { spaced } from "../wire/machineLock";
 import { ApprovalMark } from "./Approval";
+import { ask } from "./MessageKinds";
 
 /**
  * Use Recovery Key on a browser not in its lock (#3493, D4): the person types the key; with none,
@@ -23,7 +24,7 @@ function RecoveryForm({ store, down, close }: { store: Store; down: boolean; clo
     setBusy(false);
   };
   const startOver = async () => {
-    if (!window.confirm(newLockWords)) return;
+    if (!await ask(newLockWords)) return;
     setBusy(true);
     await store.machineLock.startNewLock();
     setBusy(false);

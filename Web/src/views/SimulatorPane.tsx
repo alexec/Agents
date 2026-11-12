@@ -6,6 +6,7 @@ import { useEffect, useRef } from "preact/hooks";
 import type { Store } from "../model/store";
 import type { SimulatorList, SimulatorScreen } from "../protocol/generated";
 import { describe } from "../model/errors";
+import { ask } from "./MessageKinds";
 
 export function SimulatorPane({ store, host }: { store: Store; host: string }) {
   const list = useSignal<SimulatorList | null>(null);
@@ -79,7 +80,7 @@ export function SimulatorPane({ store, host }: { store: Store; host: string }) {
   const toggle = async () => {
     if (!simulator) return;
     // Shut Down stops what runs on it: asked first (#1689).
-    if (simulator.booted && !confirm(`Shut down ${simulator.name}?\n\nThe apps that run on it stop.`)) return;
+    if (simulator.booted && !await ask(`Shut down ${simulator.name}?\n\nThe apps that run on it stop.`)) return;
     pending.value = { udid: simulator.udid, booting: !simulator.booted };
     try {
       await store.link.call(simulator.booted ? "simulators/shutdown" : "simulators/boot", { udid: simulator.udid }, host);

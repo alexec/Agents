@@ -9,6 +9,7 @@ import { folderKey } from "../model/groups";
 import {
   cleanUpDraft, folderLine, forCleanup, freedWords, isIdle, measuring, removalMessage, sizeWords, worktreeDetail,
 } from "../model/worktrees";
+import { ask } from "./MessageKinds";
 
 /** One host's worktrees, a row per folder with its count, closed until the person opens it (#3743). */
 export function WorktreesList({ store, host }: { store: Store; host: string }) {
@@ -63,7 +64,7 @@ function WorktreeItem({ store, host, folder, worktree }: {
     if (check && check.blockedBy.length === 0) {
       const loses = check.uncommitted > 0 || check.unmerged;
       if (!loses) await store.removeWorktree(host, folder, worktree.root, false);
-      else if (confirm(`Remove ${worktree.name}?\n\n${removalMessage(check, worktree.branch)}`)) {
+      else if (await ask(`Remove ${worktree.name}?\n\n${removalMessage(check, worktree.branch)}`)) {
         await store.removeWorktree(host, folder, worktree.root, true);
       }
     } else if (check) {

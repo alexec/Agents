@@ -24,6 +24,7 @@ import { go, route } from "../../route";
 import { PolicySource } from "./PolicySource";
 import { GuardedChangeCard } from "../GuardedChange";
 import { useSettingsMachine } from "./SettingsMachine";
+import { MessageBanner } from "../MessageKinds";
 
 export function AgentsPolicySection({ store, down }: { store: Store; down: boolean }) {
   const item = route.value.nav === "settings" ? route.value.item : undefined;
@@ -108,11 +109,11 @@ function Layer({ store, host, down, folder }: { store: Store; host: string; down
   return (
     <>
       {!eff && !problem.value && <p class="hint">Loading…</p>}
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       {eff && (
         <>
           {folder === undefined ? (
-            <div class="policy-banner">
+            <MessageBanner tone="neutral" name="policy-banner">
               <p class="strong">{banner(eff)}</p>
               {eff.organisation && (
                 // The Organisation Policy section of this page, below in Control plane.
@@ -120,14 +121,14 @@ function Layer({ store, host, down, folder }: { store: Store; host: string; down
               )}
               <FolderList store={store} host={host} folders={eff.foldersWithRules} />
               {behindLine(eff.behind) && <p class="hint" role="status">{behindLine(eff.behind)}</p>}
-            </div>
+            </MessageBanner>
           ) : (
-            <div class="policy-banner">
+            <MessageBanner tone="neutral" name="policy-banner">
               <button type="button" class="link" onClick={() => go({ nav: "settings", section: "settings", item: policyItem() })}>{backToYours}</button>
               <p class="strong">{layerLine({ kind: "folder", name: folderName(folder), folder })}</p>
               <p class="hint">{folderFile}</p>
               {pending && <p class="hint" role="status">{invalid ?? folderWaits}</p>}
-            </div>
+            </MessageBanner>
           )}
           {folder === undefined && yours.value?.untrusted && (
             <Untrusted copy={yours.value.untrusted} busy={down || saving.value} settle={(sign) => void settle(sign)} />
@@ -161,8 +162,9 @@ function Layer({ store, host, down, folder }: { store: Store; host: string; down
  * person key, or set the copy aside. Nothing signs them without it. */
 function Untrusted({ copy, busy, settle }: { copy: UntrustedYourPolicy; busy: boolean; settle: (sign: boolean) => void }) {
   return (
-    <div class="policy-banner policy-untrusted" role="status">
-      <p class="strong attention">{untrustedTitle}</p>
+    // Attention (docs/reference/design-system.md, "Messages"): only the person can sign them or set them aside.
+    <MessageBanner tone="attention" name="policy-banner policy-untrusted">
+      <p class="strong">{untrustedTitle}</p>
       <p class="hint">{untrustedLine(copy)}</p>
       {copy.lines.length === 0 ? <p class="hint">{untrustedNone}</p> : (
         <ul class="policy-untrusted-rules">
@@ -173,7 +175,7 @@ function Untrusted({ copy, busy, settle }: { copy: UntrustedYourPolicy; busy: bo
         <button type="button" class="prominent" disabled={busy} onClick={() => settle(true)}>{signAgain}</button>
         <button type="button" disabled={busy} onClick={() => settle(false)}>{setAside}</button>
       </div>
-    </div>
+    </MessageBanner>
   );
 }
 

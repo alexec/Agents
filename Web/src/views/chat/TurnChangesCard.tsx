@@ -7,6 +7,7 @@ import type { TurnChanges, TurnUndo } from "../../protocol/generated";
 import { cannotUndoWords, changedTitle, confirmMessage, confirmTitle, moreWords, onlyReported, stateMark, stateWord, undoHelp,
   undoing, undoneWords, undoRefusal, undoTitle } from "../../model/turnChanges";
 import { CallActionsContext } from "./Rows";
+import { ask } from "../MessageKinds";
 
 export function TurnChangesCard({ changes }: { changes: TurnChanges }) {
   const undoTurn = useContext(CallActionsContext)?.undoTurn;
@@ -20,7 +21,7 @@ export function TurnChangesCard({ changes }: { changes: TurnChanges }) {
     try {
       let result = await undo(changes.turn, false);
       if (result.changedSince.length > 0) {
-        if (!window.confirm(`${confirmTitle}\n\n${confirmMessage(result.changedSince)}`)) return;
+        if (!await ask(`${confirmTitle}\n\n${confirmMessage(result.changedSince)}`)) return;
         result = await undo(changes.turn, true);
       }
       undone.value = { turn: changes.turn, putBack: result.putBack };

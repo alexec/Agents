@@ -35,6 +35,7 @@ import { Capability } from "../protocol/capabilities.generated";
 import { OrgBudget, OrgPolicyLine, PassThroughList } from "./OrgPolicyLine";
 import { PageTitle } from "./TopBar";
 import { pageCrumbs, sectionOfActivity } from "../model/crumbs";
+import { ask } from "./MessageKinds";
 
 function navigate(destination: { host: string; folder: string; session?: string; workflow?: string }): void {
   const parts = ["h", destination.host, "p", destination.folder];
@@ -200,9 +201,9 @@ function AddAccount({ store, host, runtime }: { store: Store; host: string; runt
  */
 function RemoveAccount({ store, host, account, place }: { store: Store; host: string; account: AccountProfile; place: string }) {
   const [problem, setProblem] = useState<string>();
-  const remove = () => {
+  const remove = async () => {
     const stopping = agentsHolding(store.agents.value[host] ?? [], account).length;
-    if (!window.confirm(`Remove ${account.name}? ${removeMessage(stopping, place)}`)) return;
+    if (!await ask(`Remove ${account.name}? ${removeMessage(stopping, place)}`)) return;
     setProblem(undefined);
     store.removeAccount(host, account).catch((e: unknown) => setProblem(describe(e)));
   };

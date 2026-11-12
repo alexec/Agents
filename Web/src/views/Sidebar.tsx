@@ -12,7 +12,6 @@
 // One list for the keys: ↑ and ↓ move through every row shown, opening what they land on, as the
 // window's selection does; → unfolds a folder or group and ← folds it, or steps out to its folder
 // from a row under it. The menu key, Shift-F10 or a right click opens a row's menu.
-import { undoLabel, undoMillis } from "../model/archiveWords";
 import { healthTally, folderServers } from "../model/hostedMCP";
 import { signal, useSignal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
@@ -65,6 +64,7 @@ import { SignInRequests } from "./SignInRequests";
 import { LockJoins } from "./LockJoins";
 import { approvalID, failedRuns, opensItsSubject } from "../model/approvals";
 import { memo } from "../render/memo";
+import { ask } from "./MessageKinds";
 
 
 /** Folder Settings asked for another folder of the project, from Project Settings' Folders (#3280). */
@@ -293,7 +293,6 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       {/* What the hosts and this browser are doing, pinned at the foot: status lines rather than
           somewhere to go. Each is absent when there is nothing to say. */}
       <footer class="sidebar-foot">
-        <ArchiveUndoStrip store={store} />
         {/* This Mac's host: still connecting is said as the window says it, not as down (#250); down,
             why, in the window's words, when the control plane knows (#666). */}
         {macNotice && (macHost?.state === "connecting" && macNotice.kind === "notAnswering" ? (
@@ -829,8 +828,8 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
       run: () => void store.setFolderPinned(host.id, folder, !folderPinned) },
     // Into Archived folders, asked first (#668), as the window's Archive.
     { label: "Archive…", disabled: down, help: "Put this folder away in Archived folders",
-      run: () => {
-        if (!confirm(`${archiveFolderTitle(label)}\n\n${archiveFolderMessage}`)) return;
+      run: async () => {
+        if (!await ask(`${archiveFolderTitle(label)}\n\n${archiveFolderMessage}`)) return;
         void store.archiveFolder(host.id, folder).then((summary) => {
           if (summary && here) go({ nav: "agents" });
         });
@@ -996,8 +995,8 @@ function ArchivedFolderRow({ store, host, folder: summary, down }: {
   const unarchive = async () => {
     if (await store.unarchiveFolder(host.id, folder)) go({ host: host.id, folder: folder, compose: true });
   };
-  const remove = () => {
-    if (confirm(`${deleteFolderTitle(label)}\n\n${deleteFolderMessage}`)) void store.deleteFolder(host.id, folder);
+  const remove = async () => {
+    if (await ask(`${deleteFolderTitle(label)}\n\n${deleteFolderMessage}`)) void store.deleteFolder(host.id, folder);
   };
   const menu: MenuItem[] = [
     { label: "Unarchive", disabled: down, run: () => void unarchive() },
@@ -1211,44 +1210,3 @@ function Elsewhere({ store, folders }: { store: Store; folders: Placed[] }) {
   );
 }
 
-/**
- * Undo after Archive (ArchiveUndoStrip, #1534): "Archived “Fix the parser”" with Undo for a few
- * seconds; ⌘Z (Ctrl+Z) does the same while it shows, outside a text field. A screen reader reads
- * the line and Undo when it comes, and the seconds wait while the pointer or the focus is on it (#1676).
- */
-function ArchiveUndoStrip({ store }: { store: Store }) {
-  const undo = store.archiveUndo.value;
-  const hovering = useSignal(false);
-  const focused = useSignal(false);
-  const held = hovering.value || focused.value;
-  // A strip that goes under the pointer gets no mouseleave: each Archive starts unheld.
-  useEffect(() => { hovering.value = false; focused.value = false; }, [undo?.key]);
-  useEffect(() => {
-    if (!undo || held) return;
-    const timer = setTimeout(() => {
-      if (store.archiveUndo.value?.key === undo.key) store.archiveUndo.value = null;
-    }, undoMillis);
-    return () => clearTimeout(timer);
-  }, [undo?.key, held]);
-  useEffect(() => {
-    if (!undo) return;
-    const press = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() !== "z" || !(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return;
-      const target = e.target as HTMLElement | null;
-      if (target?.closest("input, textarea, [contenteditable=true]")) return;
-      e.preventDefault();
-      void store.undoArchive();
-    };
-    document.addEventListener("keydown", press);
-    return () => document.removeEventListener("keydown", press);
-  }, [undo?.key]);
-  if (!undo) return null;
-  return (
-    <p class="foot-line archive-undo" role="status" aria-live="polite" aria-atomic="true"
-      onMouseEnter={() => { hovering.value = true; }} onMouseLeave={() => { hovering.value = false; }}
-      onFocusIn={() => { focused.value = true; }} onFocusOut={() => { focused.value = false; }}>
-      <span>{undo.line}</span>
-      <button type="button" class="link" onClick={() => void store.undoArchive()}>{undoLabel}</button>
-    </p>
-  );
-}

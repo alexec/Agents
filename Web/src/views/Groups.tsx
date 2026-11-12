@@ -10,6 +10,7 @@ import { botWords, dollars, foot, groupBots, groupCapFoot, groupCapLine, members
 import { fromProvider, orgName } from "../model/signIn";
 import { groupRoleFoot, groupRoleWords } from "../model/orgSignIn";
 import { Modal } from "./Modal";
+import { ask } from "./MessageKinds";
 
 function GroupSheet({ store, group, people, close }: {
   store: Store; group: Group | null; people: readonly PersonRow[]; close: () => void;
@@ -92,7 +93,7 @@ export function GroupsSection({ store, down }: { store: Store; down: boolean }) 
   const problem = failure ? describe(failure) : null;
   const editing = useSignal<{ group: Group | null } | null>(null);
   const setRole = async (group: Group, admin: boolean) => {
-    if (admin && !window.confirm(`Make each person in ${group.name} an admin while they are in it? ${groupRoleFoot}`)) return;
+    if (admin && !await ask(`Make each person in ${group.name} an admin while they are in it? ${groupRoleFoot}`)) return;
     try {
       // The change comes back as control/groupsChanged.
       await store.link.call("groups/setRole", admin ? { group: group.id, role: "admin" } : { group: group.id });
@@ -101,7 +102,7 @@ export function GroupsSection({ store, down }: { store: Store; down: boolean }) 
     }
   };
   const remove = async (group: Group) => {
-    if (!window.confirm(`${removeTitle(group)} ${removeMessage}`)) return;
+    if (!await ask(`${removeTitle(group)} ${removeMessage}`)) return;
     try {
       // The change comes back as control/groupsChanged.
       await store.link.call("groups/remove", { id: group.id });

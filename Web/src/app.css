@@ -623,9 +623,6 @@ a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underli
 /* An editor problem row: a class of its own, not the error banner's .problem (#1667). */
 .source-problem { display: block; width: 100%; text-align: left; background: none; border: none; padding: 2px 10px; font: inherit; font-size: 0.8125rem; color: inherit; cursor: pointer; }
 .source-problem:hover { background: var(--paper-well); }
-/* Undo after Archive (#1534): the line and Undo, at the foot of the sidebar. */
-.archive-undo { display: flex; align-items: center; gap: 10px; }
-.archive-undo span { flex: 1; min-width: 0; }
 /* Find in Chat (#1532): one line over the chat, in the chat's column. */
 .find-bar { display: flex; align-items: center; gap: 10px; margin: 6px auto; padding: 4px 12px; width: min(100% - 32px, 760px);
   box-sizing: border-box; background: var(--paper-well); border-radius: 999px; }
@@ -848,35 +845,16 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .files ul { list-style: none; }
 .files li { padding: 3px 8px; }
 
-/* Frame F: the connection lost. What was shown stays, greyed out, and nothing can be sent. */
-.banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 14px;
-  background: var(--paper-well);
-  border-bottom: 1px solid var(--paper-rule);
-}
-/* A refusal's account page beside Try Now (#3153). */
-.banner-actions { flex: none; display: flex; align-items: center; gap: 12px; }
+/* Frame F: the connection lost (Banner.tsx, a message banner): what was shown stays, greyed out, and nothing can be sent. */
 
 /* Greyed, with what was shown still readable and scrollable, and the prompt still typable. */
 .down .columns { opacity: 0.55; }
 .down .columns button, .down .columns select, .down .columns input:not([type=search]) { pointer-events: none; }
 .host-offline .row.folder { opacity: 0.55; }
-.offline-strip { padding: 6px 16px; font-size: 0.75rem; background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
-  display: flex; align-items: center; gap: 8px; }
-.offline-strip .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--tint-attention); }
-/* A workspace host's (#691, layouts.md L1): the words, then Start or how long a start has taken, at the end. */
-.offline-strip .words { flex: 1 1 0; min-width: 0; }
-.offline-strip .spinner { flex: none; width: 8px; height: 8px; }
-.offline-strip .elapsed { flex: none; margin-left: auto; font-variant-numeric: tabular-nums; opacity: 0.7; }
-.offline-strip button { flex: none; margin-left: auto; }
+/* A host down (OfflineStrip.tsx, a message banner, #83): how long a workspace's start has taken, after the words (#691). */
+.offline-strip .elapsed { font-variant-numeric: tabular-nums; opacity: 0.7; }
 /* An agent whose folder has gone (#119): which, and the ways on, as the window's strip. */
-.missing-folder-strip { padding: 6px 16px; font-size: 0.75rem; background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.missing-folder-strip .what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.missing-folder-strip .what { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .missing-folder-strip .quiet { opacity: 0.6; }
 .ways-on { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 /* Open File: the file changed on disk under unsaved typing (#1858). */
@@ -884,13 +862,8 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   display: flex; flex-direction: column; gap: 6px; }
 .changed-on-disk p { margin: 0; }
 .changed-on-disk-diff { max-height: 240px; overflow: auto; }
-.problem.folder-gone { flex-wrap: wrap; }
 .subtitle.missing-folder { opacity: 0.7; }
 /* A chat paused by a spent allowance (#1859): Continue when it is back, or when it continues. */
-.continue-strip { padding: 6px 16px; font-size: 0.75rem; background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
-  display: flex; align-items: center; gap: 8px; }
-.continue-strip .what { flex: 1; min-width: 0; opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.continue-strip button { margin-left: auto; flex: none; }
 .chip.worktree.gone { text-decoration: line-through; }
 /* This Mac's host down, in the folders column (#83): said whole, never cut off. */
 .host-down { padding: 6px 8px 8px; }
@@ -1049,15 +1022,6 @@ button.remove:hover { opacity: 1; }
 .popover [role^=menuitem] { text-align: left; background: none; border: none; padding: 6px 10px; border-radius: var(--radius-control); }
 .popover [role^=menuitem]:hover { background: var(--paper-wash); }
 .queued-actions { display: flex; align-items: center; gap: 10px; font-size: 0.75rem; }
-.problem {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 14px;
-  background: color-mix(in srgb, var(--tint-failure) 10%, var(--paper-ground));
-  border-bottom: 1px solid var(--paper-rule);
-}
 /* A new session: the folder's name and folder in the middle, the bar at the foot (#108). */
 .new-heading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px; text-align: center; }
 .new-heading h1 { margin: 0; font-size: 1.375rem; font-weight: 600; }
@@ -1406,22 +1370,17 @@ dialog.image-viewer::backdrop { background: color-mix(in srgb, var(--paper-scrim
 .policy-rules .setting { display: flex; gap: 12px; justify-content: space-between; }
 .policy-rules dt { opacity: 0.7; }
 .policy-rules dd { margin: 0; text-align: right; }
-.policy-stopped { max-width: 596px; box-sizing: border-box; margin: 4px 0; padding: 8px 12px; border-radius: 6px; color: var(--tint-failure);
-  background: color-mix(in srgb, var(--tint-failure) 10%, transparent); border: 1px solid color-mix(in srgb, var(--tint-failure) 30%, transparent); }
 /* A choice the policy refuses (#998, FR-020): dimmed, with the line under it (views/OrgPolicyLine.tsx). */
 .org-policy-line { display: block; opacity: 0.75; }
 .org-policy-line strong { font-weight: 600; }
 .set-by-org { opacity: 0.5; }
 .org-policy-refusal { margin: 4px 0; color: var(--tint-failure); }
 /* Agents ▸ Policy (#2957): the banner, a rule's lines, and Where this comes from with the deciding layer lit. */
-.policy-banner { max-width: 596px; margin: 4px 0 8px; }
+.policy-banner { max-width: 596px; box-sizing: border-box; margin: 4px 0 8px; }
 .policy-banner p { margin: 0 0 2px; }
 /* The folders with their own rules (#2957, R13): each opens its layer in the same pane. */
 .policy-folders { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 /* Your rules signed on another Mac (#3230): what they set, and Sign with This Mac’s Key or Don’t Use Them. */
-.policy-untrusted { padding: 8px 12px; border-radius: 6px; box-sizing: border-box;
-  background: color-mix(in srgb, var(--tint-attention) 10%, transparent); border: 1px solid color-mix(in srgb, var(--tint-attention) 30%, transparent); }
-.policy-untrusted .attention { color: var(--tint-attention); }
 .policy-untrusted-rules { margin: 4px 0; padding-left: 18px; }
 .policy-untrusted-actions { display: flex; gap: 8px; margin-top: 6px; }
 .policy-rule { max-width: 596px; margin-bottom: 6px; }
@@ -2189,7 +2148,6 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-spinner { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid currentColor; border-right-color: transparent;
   animation: work-spin 1s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .work-spinner { animation-duration: 3s; } }
-.work-error .buttons { display: inline-flex; gap: 6px; flex-wrap: wrap; }
 .work-error.middle { flex-wrap: wrap; }
 /* The phone's row (under 700 px): the title on two lines, every chip under it, the short line, no avatars. */
 @container (max-width: 699px) {
@@ -2226,10 +2184,8 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-empty p { margin: 0; }
 .work-empty .work-state-icon { --open: var(--paper-ink); opacity: 0.45; margin-bottom: 4px; }
 .work-empty button { margin-top: 8px; }
-.work-error { display: flex; gap: 8px; align-items: center; margin: 0 0 8px; padding: 8px 10px; border: 1px solid var(--paper-rule);
-  border-radius: var(--radius-card); background: var(--paper-well); }
-.work-error .mark { color: var(--tint-attention); }
-.work-error .words { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.work-error { margin: 0 0 8px; }
+.work-error .message-words { display: flex; flex-direction: column; }
 .work-error.middle { margin: 48px auto; max-width: 520px; }
 /* An item's page (#4402, specs/4328-work-look/issue.md), as the window's WorkItemPage (#4400): the page's bar, the header
    with Start Agent, the timeline and the comment box, and the side panel: a 240 px column over 900 px; rows under the
@@ -2882,3 +2838,37 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 .take-over-page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 12px 12px; overflow: auto; }
 .take-over-page > .agent-browser { flex: 1; height: auto; min-height: 0; }
 .take-over-page .simulator-screen { max-height: calc(100vh - 140px); }
+
+/* Messages (docs/reference/design-system.md, "Messages"; #4740). The tint is on the icon only: the words
+   are ink, on the well (a banner) or raised (a toast). A message never pushes what the person reads. */
+.message-icon { flex: none; width: 1.1em; text-align: center; font-weight: 600; }
+.message-icon.tone-attention { color: var(--tint-attention); }
+.message-icon.tone-failure { color: var(--tint-failure); }
+.message-icon.tone-success { color: var(--tint-vouched); }
+.message-icon.tone-neutral { opacity: 0.7; }
+.message-icon.spinner { width: 8px; height: 8px; }
+.message-words { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+.message-actions { flex: none; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* A banner: inset at the top of its pane, under the toolbar; it comes and goes with a short animation. */
+.message-banner { display: flex; align-items: center; gap: 8px; margin: 8px 12px; padding: 7px 12px; font-size: 0.8125rem;
+  color: var(--paper-ink); background: var(--paper-well); border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-card); animation: message-in 160ms ease-out; }
+@keyframes message-in { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+/* The one toast: fixed at the bottom centre of the viewport, above the prompt bar. */
+.toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; width: max-content;
+  max-width: min(560px, calc(100vw - 32px)); pointer-events: none; }
+.message-toast { display: flex; align-items: center; gap: 10px; padding: 9px 12px 9px 14px; font-size: 0.8125rem;
+  color: var(--paper-ink); background: var(--paper-raised); border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-floating); box-shadow: 0 4px 16px var(--paper-shadow); pointer-events: auto;
+  animation: toast-in 160ms ease-out; }
+.message-toast button.link { flex: none; }
+.message-close { flex: none; border: none; background: none; color: inherit; opacity: 0.6; padding: 0 2px; font: inherit; cursor: pointer; }
+.message-close:hover { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .message-banner, .message-toast { animation: none; } }
+/* An alert: a choice that blocks the work, in place of window.confirm. */
+dialog.message-alert { width: min(420px, calc(100vw - 32px)); }
+.message-alert h2 { margin: 0 0 6px; }
+.message-alert-detail { margin: 0; white-space: pre-line; opacity: 0.8; }
+.message-alert .sheet-actions { margin-top: 16px; }
+.message-alert button.destructive { color: var(--tint-failure); }
