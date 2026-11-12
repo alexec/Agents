@@ -27,7 +27,8 @@ struct StartAgentView: View {
     /// Said instead of typed, as in the chat's bar (#2300).
     @State private var dictation = Dictation()
     @State private var draftLabels: [String] = []
-    /// Auto (#4559): on until a segment is picked by hand, and the pick it made from the prompt.
+    /// The live pick (#4559, #4721): always on for a new page, until a segment is picked by
+    /// hand, and the pick it made from the prompt.
     @State private var personaAuto = true
     @State private var autoPick: Persona.AutoPick?
     /// More is open (#4556); `moreAtLabels` opens it at Labels, from a label's tag.
@@ -172,7 +173,7 @@ struct StartAgentView: View {
                             personaPicker(usable, picked: picked, menu: true)
                         }
                     }
-                    // What Auto picked and the word, so the person sees what to change (#4559).
+                    // What the live pick picked and the word, so the person sees what to change (#4559).
                     if !usable.isEmpty, personaAuto {
                         Text(Persona.autoLine(autoPick))
                             .appText(.supporting)
@@ -198,32 +199,26 @@ struct StartAgentView: View {
     }
 
     static let noPersona = "No persona"
-    static let auto = "Auto"
 
     /// Segments, or a menu: the picked one's name and a chevron, where they do not fit (#2795).
-    /// Auto first (#4559): it picks from the prompt's words until a segment is picked by hand.
+    /// No Auto segment (#4721): the prompt's words pick one live until one is picked by hand.
     @ViewBuilder
     private func personaPicker(_ usable: [Persona], picked: Persona?, menu: Bool = false) -> some View {
         let picker = Picker("Persona", selection: Binding<Persona.Segment>(
-            get: { Persona.Segment(auto: personaAuto, picked: model.startPersona) },
+            get: { Persona.Segment(picked: model.startPersona) },
             set: { segment in
                 switch segment {
-                case .auto:
-                    personaAuto = true
-                    pickAuto()
                 case .none: pickPersona(nil)
                 case .persona(let id): pickPersona(usable.first { $0.id == id })
                 }
             }
         )) {
-            Text(Self.auto).tag(Persona.Segment.auto)
             Text(Self.noPersona).tag(Persona.Segment.none)
             ForEach(usable) { persona in
                 Text(persona.name).tag(Persona.Segment.persona(persona.id))
             }
         }
-        let shown = personaAuto ? Self.auto + (picked.map { ": \($0.name)" } ?? "")
-            : picked?.name ?? Self.noPersona
+        let shown = picked?.name ?? Self.noPersona
         if menu {
             picker
                 .pickerStyle(.menu)
@@ -249,7 +244,7 @@ struct StartAgentView: View {
         Task { await model.choosePersona(persona) }
     }
 
-    /// While Auto is on, the persona the prompt's words name, picked as a hand pick is (#4559).
+    /// While the pick is live, the persona the prompt's words name, picked as a hand pick is (#4559).
     private func pickAuto() {
         guard personaAuto else { return }
         let pick = Persona.autoPick(text, among: model.startPersonas)
