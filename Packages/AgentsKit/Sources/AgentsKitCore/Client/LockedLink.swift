@@ -13,7 +13,9 @@ import Foundation
 /// is taken only with its MAC too (#3541). A transport with no channel opens one again when
 /// the machine refuses a request as not in its lock: the machine took its lock after the
 /// transport opened (#3642), or the lock was made after it (#4134): with no lock key yet, the
-/// transport is wrapped all the same, so that refusal opens one.
+/// transport is wrapped all the same, so that refusal opens one. A transport with a channel
+/// opens one again when the machine refuses a request sealed on it: the machine's uplink went
+/// and came back, so it forgot the channel while this transport stayed open (#4988).
 /// The web page's is `Web/src/wire/link.ts`.
 public struct LockedLink: DaemonLink {
     public typealias Source = @Sendable () async -> LockChannel.Signer?
@@ -58,6 +60,8 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
     private var reopening = false
     /// The ids of requests that went to the machine, until they are answered.
     private var asked: Set<JSONRPCID> = []
+    /// The ids of those that went sealed on the channel as it is now, until they are answered.
+    private var onChannel: Set<JSONRPCID> = []
     private var helloID = JSONRPCID.string("lock-hello-" + UUID().uuidString)
     /// The hello sent, so its answer makes the channel as it is read, before the next line.
     private var hello: LockChannel.Hello?
@@ -116,7 +120,9 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
     /// the next request goes on a channel (#3642), as the web page's next call opens one.
     private func reopen() {
         let start = lock.withLock { () -> Bool in
-            guard channel == nil, helloWait == nil, !reopening else { return false }
+            guard helloWait == nil, !reopening else { return false }
+            channel = nil
+            onChannel = []
             reopening = true
             return true
         }
@@ -163,6 +169,7 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
         try lock.withLock {
             asked.insert(id)
             if let channel {
+                onChannel.insert(id)
                 try channel.sealThen(line) { try inner.write(line: $0) }
                 return
             }
@@ -196,9 +203,10 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
             continuation.yield(line)
             return
         }
+        let sealedOnChannel = lock.withLock { onChannel.remove(id) != nil }
         switch message {
         case .success, .failure:
-            continuation.yield(checked(line, message, id: id))
+            continuation.yield(checked(line, message, id: id, sealedOnChannel: sealedOnChannel))
         default:
             continuation.yield(line)
         }
@@ -206,7 +214,8 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
 
     /// An answer from the machine: taken with its MAC; with none only when it is a refusal (the
     /// control plane's own, offline say), or from a machine with no channel the lock does not name.
-    private func checked(_ line: String, _ message: JSONRPCMessage, id: JSONRPCID) -> String {
+    /// A refusal of a request sealed on the channel says the machine no longer has it (#4988).
+    private func checked(_ line: String, _ message: JSONRPCMessage, id: JSONRPCID, sealedOnChannel: Bool) -> String {
         let channel = lock.withLock { self.channel }
         if LockChannel.sealed(line) {
             if let channel, let body = try? channel.open(line) { return body }
@@ -215,7 +224,7 @@ final class LockedTransport: LineTransport, @unchecked Sendable {
         if case .success = message, channel != nil || lock.withLock({ required }) {
             return refusal(id, "The machine's answer was not signed, so it was not taken.")
         }
-        if channel == nil, case .failure(_, let error) = message, error.code == DaemonAPI.Failure.notInLock { reopen() }
+        if channel == nil || sealedOnChannel, case .failure(_, let error) = message, error.code == DaemonAPI.Failure.notInLock { reopen() }
         return line
     }
 
