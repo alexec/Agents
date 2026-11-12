@@ -80,6 +80,54 @@ enum TextStep {
     }
 }
 
+extension TextStep {
+    /// Reading text's line height, as a multiple of its size (`design/tokens.json`'s
+    /// `type.leading.reading`; the BDA style guide, WCAG 1.4.12).
+    static let readingLeading: CGFloat = 1.5
+    /// Reading text's letter spacing, in em (`type.tracking.reading`).
+    static let readingTracking: CGFloat = 0.01
+
+    /// The extra space between lines that makes `reading`'s line height `readingLeading`:
+    /// the font's own line height is already about 1.2 of its size.
+    var readingLineSpacing: CGFloat {
+        #if os(macOS)
+        let font = nsFont
+        let natural = font.ascender - font.descender + font.leading
+        #else
+        let font = uiFont(dynamicType: .large)
+        let natural = font.lineHeight
+        #endif
+        return max(0, font.pointSize * Self.readingLeading - natural)
+    }
+}
+
+extension View {
+    /// Prose spaced for reading (Paper v2): a line height of 1.5 and a little letter
+    /// spacing, at `reading`'s size. For messages and pages, not for rows and controls.
+    func readingSpacing() -> some View {
+        modifier(ReadingSpacing())
+    }
+}
+
+private struct ReadingSpacing: ViewModifier {
+    @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
+
+    func body(content: Content) -> some View {
+        let step = TextStep.reading
+        content
+            .lineSpacing(step.readingLineSpacing * scale)
+            .tracking(TextStep.readingTracking * Self.points * scale)
+    }
+
+    private static var points: CGFloat {
+        #if os(macOS)
+        TextStep.reading.nsFont.pointSize
+        #else
+        TextStep.reading.uiFont(dynamicType: .large).pointSize
+        #endif
+    }
+}
+
 extension View {
     /// A glyph that is not text — a status mark, a capsule's chevron — at a fixed size
     /// that still grows with the system's text size, so it keeps its place beside the

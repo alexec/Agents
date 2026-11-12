@@ -85,9 +85,9 @@
   --md-mermaid-label-fg-color: var(--paper-ink);
 
   /* Shadows: short and neutral, as the app's. */
-  --md-shadow-z1: 0 0.1rem 0.3rem var(--paper-shadow);
-  --md-shadow-z2: 0 0.2rem 0.5rem var(--paper-shadow), 0 0 0.05rem var(--paper-rule);
-  --md-shadow-z3: 0 0.4rem 1.5rem var(--paper-shadow), 0 0 0.05rem var(--paper-rule);
+  --md-shadow-z1: none;
+  --md-shadow-z2: var(--shadow-floating), 0 0 0 1px var(--paper-rule);
+  --md-shadow-z3: var(--shadow-sheet), 0 0 0 1px var(--paper-rule);
 }
 
 /* The type: the system's sans and mono, as the app. theme.font is false in mkdocs.yml, so

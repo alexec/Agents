@@ -323,8 +323,7 @@ struct EventsView: View {
 }
 
 /// One row's piece of its day's raised card, so the rows can sit in a lazy stack and
-/// still read as one card: raised paper, a rule round the outside, the shadow only
-/// where the card's outside edge is. Rounded at the top of the first row and the foot
+/// still read as one card: raised paper and a rule round the outside. Rounded at the top of the first row and the foot
 /// of the last.
 private struct CardSlice: View {
     let isFirst: Bool
@@ -337,16 +336,8 @@ private struct CardSlice: View {
                                            bottomLeadingRadius: isLast ? Self.radius : 0,
                                            bottomTrailingRadius: isLast ? Self.radius : 0,
                                            topTrailingRadius: isFirst ? Self.radius : 0)
+        // No shadow: a card on the page is set apart by its rule alone (Paper v2, #4974).
         shape.fill(Paper.raised)
-            .shadow(color: Paper.shadow, radius: 6, y: 2)
-            // A slice's shadow falling on its neighbours would draw a band across the
-            // card; keep only what falls outside it.
-            .mask {
-                Rectangle()
-                    .padding(.horizontal, -12)
-                    .padding(.top, isFirst ? -12 : 0)
-                    .padding(.bottom, isLast ? -12 : 0)
-            }
             .overlay { Edges(isFirst: isFirst, isLast: isLast, radius: Self.radius).stroke(Paper.rule, lineWidth: 1) }
     }
 

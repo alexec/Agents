@@ -58,7 +58,7 @@ def name(path):
     timeline), which keep the names the web page has always used."""
     head, rest = path[0], path[1:]
     if head == "color":
-        if rest[0] in ("tint", "label", "forge", "code", "timeline"):
+        if rest[0] in ("tint", "label", "forge", "code", "timeline", "line"):
             return "--" + "-".join(rest)
         if rest == ("accent",):
             return "--accent"
@@ -73,10 +73,27 @@ def colour(hex_value, alpha=None):
     return f"rgb({r} {g} {b} / {round(alpha * 100)}%)"
 
 
+def dimension(value):
+    """A length as CSS; a zero needs no unit."""
+    return f"{value['value']:g}{value['unit']}" if value["value"] else "0"
+
+
+def shadow(value, dark=None):
+    """A W3C shadow as CSS: its offsets, blur and spread, then its colour at its alpha; the
+    dark one takes the colour and alpha of its dark value."""
+    paint = dark or value
+    lengths = " ".join(dimension(value[k]) for k in ("offsetX", "offsetY", "blur", "spread") if value[k]["value"] or k != "spread")
+    return f"{lengths} {colour(paint['color'], paint['alpha'])}"
+
+
 def css(token, kind, dark=False):
     """The token's value as CSS, or None when it has no dark value of its own."""
     value = token["$value"]
     extensions = token.get("$extensions", {})
+    if kind == "shadow":
+        if dark:
+            return shadow(value, extensions[DARK]) if DARK in extensions else None
+        return shadow(value)
     if kind == "color":
         if dark:
             if DARK not in extensions:
@@ -88,9 +105,8 @@ def css(token, kind, dark=False):
     if kind == "fontFamily":
         return ", ".join(f'"{f}"' if " " in f else f for f in value)
     if isinstance(value, dict):
-        number = value["value"]
-        return f"{number:g}{value['unit']}"
-    return str(value)
+        return dimension(value)
+    return f"{value:g}" if isinstance(value, float) else str(value)
 
 
 def comment(token, indent):
@@ -102,13 +118,13 @@ def comment(token, indent):
 OUTPUTS = {
     # The :root blocks paper.css held before #4602, and the two lines it always had; since #4608
     # also the colours app.css named itself.
-    "Web/src/theme/tokens.css": {"groups": ("color", "radius", "font"), "dark": "media", "web": True},
-    "www/tokens.css": {"groups": ("color", "radius", "font", "type"), "dark": "media"},
-    "docs/stylesheets/tokens.css": {"groups": ("color", "radius", "font", "type"), "dark": "material"},
-    "Go/internal/forgepages/tokens.css": {"groups": ("color", "radius", "font", "type"), "dark": "light-dark"},
+    "Web/src/theme/tokens.css": {"groups": ("color", "shadow", "focus", "radius", "font", "type"), "dark": "media", "web": True},
+    "www/tokens.css": {"groups": ("color", "shadow", "focus", "radius", "font", "type"), "dark": "media"},
+    "docs/stylesheets/tokens.css": {"groups": ("color", "shadow", "focus", "radius", "font", "type"), "dark": "material"},
+    "Go/internal/forgepages/tokens.css": {"groups": ("color", "shadow", "focus", "radius", "font", "type"), "dark": "light-dark"},
     # Pages a person opens in any browser, so the dark is a media query, not light-dark() (#4617).
-    "Go/internal/paperpage/tokens.css": {"groups": ("color", "radius", "font", "type"), "dark": "media"},
-    "deploy/site/www/oauth/tokens.css": {"groups": ("color", "radius", "font", "type"), "dark": "media"},
+    "Go/internal/paperpage/tokens.css": {"groups": ("color", "shadow", "focus", "radius", "font", "type"), "dark": "media"},
+    "deploy/site/www/oauth/tokens.css": {"groups": ("color", "shadow", "focus", "radius", "font", "type"), "dark": "media"},
 }
 
 
@@ -189,17 +205,31 @@ def tables(source):
         swift = token.get("$extensions", {}).get("dev.agentloops.swift")
         shape.append(f"| {'.'.join(path[1:])} | `{name(path)}` | {code(swift)} | {size(token)} | "
                      f"{cell(token.get('$description', ''))} |")
+    for path, token in group("shadow") + group("focus"):
+        swift = token.get("$extensions", {}).get("dev.agentloops.swift")
+        kind = "shadow" if path[0] == "shadow" else "dimension"
+        value = f"`{css(token, kind)}`"
+        if kind == "shadow":
+            value += f"; dark `{css(token, kind, dark=True)}`"
+        shape.append(f"| {'.'.join(path)} | `{name(path)}` | {code(swift)} | {value} | "
+                     f"{cell(token.get('$description', ''))} |")
     fonts = ["| Token | CSS | Stack | For |", "|---|---|---|---|"]
     for path, token in group("font"):
         stack = ", ".join(token["$value"])
         fonts.append(f"| {'.'.join(path[1:])} | `{name(path)}` | `{stack}` | {cell(token.get('$description', ''))} |")
     steps = ["| Step | CSS | Mac | iPhone and iPad | Web | For |", "|---|---|---|---|---|---|"]
+    spacing = ["| Token | CSS | Swift | Value | For |", "|---|---|---|---|---|"]
     for path, token in group("type"):
+        if path[1] in ("leading", "tracking", "word-spacing"):
+            swift = token.get("$extensions", {}).get("dev.agentloops.swift")
+            spacing.append(f"| {'.'.join(path[1:])} | `{name(path)}` | {code(swift)} | {size(token)} | "
+                           f"{cell(token.get('$description', ''))} |")
+            continue
         extensions = token.get("$extensions", {})
         steps.append(f"| {'.'.join(path[1:])} | `{name(path)}` | {code(extensions.get('dev.agentloops.mac'))} | "
                      f"{code(extensions.get('dev.agentloops.ios'))} | {size(token)} | "
                      f"{cell(token.get('$description', ''))} |")
-    return {"colour": colour, "shape": shape, "font": fonts, "type": steps}
+    return {"colour": colour, "shape": shape, "font": fonts, "type": steps, "spacing": spacing}
 
 
 def splice(text, blocks):
@@ -246,13 +276,19 @@ def selftest():
                   "shadow": {"$value": "#20242a", "$extensions": {DARK: "#000000", ALPHA: 0.1}},
                   "tint": {"failure": {"$value": "#b4232b", "$extensions": {DARK: "#f08086"}}},
                   "forge": {"fill": {"open": {"$value": "#1f883d", "$extensions": {DARK: "#238636"}}}}},
+        "shadow": {"$type": "shadow", "floating": {"$value": {"color": "#1a1918", "alpha": 0.1,
+                   "offsetX": {"value": 0, "unit": "px"}, "offsetY": {"value": 4, "unit": "px"},
+                   "blur": {"value": 12, "unit": "px"}, "spread": {"value": 0, "unit": "px"}},
+                   "$extensions": {DARK: {"color": "#000000", "alpha": 0.4}}}},
         "radius": {"$type": "dimension", "card": {"$value": {"value": 10, "unit": "px"}}},
+        "type": {"leading": {"reading": {"$type": "number", "$value": 1.5}}},
         "font": {"$type": "fontFamily", "mono": {"$value": ["ui-monospace", "SF Mono"]}},
     }
     web = render(source, OUTPUTS["Web/src/theme/tokens.css"])
     for want in ("--paper-ground: #ffffff;", "--paper-shadow: rgb(32 36 42 / 10%);",
                  "--tint-failure: #f08086;", "--forge-fill-open: #238636;", "--radius-card: 10px;", '--font-mono: ui-monospace, "SF Mono";',
-                 "@media (prefers-color-scheme: dark)"):
+                 "--shadow-floating: 0 4px 12px rgb(26 25 24 / 10%);", "--shadow-floating: 0 4px 12px rgb(0 0 0 / 40%);",
+                 "--type-leading-reading: 1.5;", "@media (prefers-color-scheme: dark)"):
         assert want in web, (want, web)
     assert "--radius-card" not in web.split("@media")[1], web
     pairs = render(source, OUTPUTS["Go/internal/forgepages/tokens.css"])

@@ -35,7 +35,7 @@ struct BlocksView: View {
     private func view(for block: ContentBlock) -> some View {
         switch block {
         case .text(let text):
-            MarkdownText(markdown: text)
+            MarkdownText(markdown: text).readingSpacing()
 
         case .image(let data, _, _):
             if let image = Self.image(data) {

@@ -77,9 +77,7 @@ private struct EarnedBadge: View {
             .glyph(size: 14, weight: .semibold)
             .foregroundStyle(.white)
             .frame(width: 30, height: 30)
-            .background(Paper.accent.gradient, in: Circle())
-            .overlay { Circle().strokeBorder(.white.opacity(0.35), lineWidth: 1.5) }
-            .shadow(color: .black.opacity(0.18), radius: 1, y: 1)
+            .background(Paper.accent, in: Circle())
             .help(words)
             .accessibilityElement()
             .accessibilityLabel(words)

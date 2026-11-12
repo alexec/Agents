@@ -18,11 +18,15 @@ agree with it, so this page cannot drift from the code.
 
 ## Principles
 
-- **Paper, not glass.** Most of what the app shows is prose: a report, a transcript, a
-  document that an agent writes. The ground is a cool near-white, not pure white, and the
-  ink is charcoal, not pure black. A list is rows under hairline rules, not a stack of
-  cards. Only the things that are on top float: the prompt bar, a sheet, a menu. They sit
-  on a short, neutral shadow, as paper lifted a little off a desk.
+- **Paper, not glass (Paper v2, #4926).** Most of what the app shows is prose: a report, a
+  transcript, a document that an agent writes. The ground is a warm near-white, not pure
+  white, and the ink is a deep charcoal (17:1), not pure black.
+- **Lines, not shading.** A rule (1.5:1) sets things apart. Nothing on the page casts a
+  shadow, and there are few grey fills. Only what floats over the page (a menu, the prompt
+  bar, a toast, a sheet) has a short shadow. A control's edge is 3:1 or more (WCAG 1.4.11).
+- **Flat, with light greys.** There are no gradients. The large greys (the sidebar, a well,
+  hover, the selection) are one small step from the page. Colour never fills: it is only in
+  text, icons, lines (a state's line, the selection's bar) and a switch that is on.
 - **One sans-serif and one monospace.** Both are the system's own fonts. Nothing is loaded
   from the network: no web font, on any surface.
 - **One accent.** The cobalt of the app icon is for links, focus, controls and the
@@ -32,8 +36,9 @@ agree with it, so this page cannot drift from the code.
   app can vouch for (approved, done). In a list, only **Needs you** is drawn in colour.
 - **Label hues never read as a state.** A session label that names an issue (`#12`) is
   teal, and one that names a pull request (`P#12`) is violet. Neither is a tint.
-- **Every text colour can be read.** Each one clears 4.5:1 on the ground and on the well,
-  in light and in dark.
+- **Every text colour can be read.** Each one (ink, secondary, tertiary, the accent, the
+  tints and the label hues) clears 4.5:1 on every surface (ground, sidebar, raised, well,
+  wash and selection), in light and in dark. `DesignTokensTests` checks each pair.
 - **Marketing is a size of the system, not a second look.** The website keeps its hero
   title with the two `display` type steps.
 
@@ -46,21 +51,27 @@ Mac window and the iPhone and iPad app hold the same value.
 <!-- design.sh gen: colour -->
 | Token | CSS | Swift | Light | Dark | For |
 |---|---|---|---|---|---|
-| ground | `--paper-ground` | `Paper.ground` | `#f7f8f9` | `#1c1d20` | The page every column sits on. |
-| sidebar | `--paper-sidebar` | `Paper.sidebar` | `#f0f1f3` | `#161719` | The folders column, one shade deeper. |
-| raised | `--paper-raised` | `Paper.raised` | `#ffffff` | `#26282c` | What floats: the prompt bar, cards, menus. |
-| well | `--paper-well` | `Paper.well` | `#f0f2f4` | `#2a2d31` | What is set into the page: code, your own message. |
-| wash | `--paper-wash` | `Paper.wash` | `#e7eaee` | `#33363b` | A row under the pointer, a picked item. |
-| rule | `--paper-rule` | `Paper.rule` | `#dde1e6` | `#3a3e44` | Hairlines between rows, and round raised things. |
-| ink | `--paper-ink` | `Paper.ink` | `#1c1d20` | `#e8eaed` | Text, and the prominent button's fill. |
-| selection | `--paper-selection` | `paperSelection` | `#d8dee6` | `#3a3e44` | A selection. Nothing is drawn in the accent on it. |
-| shadow | `--paper-shadow` | `Paper.shadow` | `#20242a` at 10% | `#000000` at 10% | Under a raised thing: short and neutral, paper lifted a little off the desk. |
-| accent | `--accent` | `AccentColor.colorset` | `#1f5fc8` | `#7fb0ff` | The app icon's cobalt: links, focus, controls and the prominent button's fill. |
-| tint.attention | `--tint-attention` | `StateTint.orange` | `#ba4a13` | `#f0a06b` | Needs you; the only tint drawn in a list. |
-| tint.failure | `--tint-failure` | `StateTint.red` | `#b4232b` | `#f08086` | Failed. |
-| tint.vouched | `--tint-vouched` | `StateTint.green` | `#2d765c` | `#8bc6a7` | Approved, done: an ending the app can vouch for. |
-| label.issue | `--label-issue` | `Paper.issue` | `#0e6b82` | `#6cc6db` | A label naming an issue, #12. |
-| label.pull | `--label-pull` | `Paper.pull` | `#7442b8` | `#b79af0` | A label naming a pull request, P#12. |
+| ground | `--paper-ground` | `Paper.ground` | `#fcfbf9` | `#1a1a19` | The page every column sits on: near-white paper. |
+| sidebar | `--paper-sidebar` | `Paper.sidebar` | `#f8f7f4` | `#171716` | The folders column, one small step from the page; a rule sets it apart. |
+| raised | `--paper-raised` | `Paper.raised` | `#ffffff` | `#212120` | Cards, the prompt bar, menus, sheets. Set apart by a rule, not a shadow. |
+| well | `--paper-well` | `Paper.well` | `#f6f5f2` | `#262625` | What is set into the page: code, your own message, a filled field. |
+| wash | `--paper-wash` | `Paper.wash` | `#f1f0ec` | `#2e2e2c` | Hover; a pressed quiet button. |
+| rule | `--paper-rule` | `Paper.rule` | `#d6d2c9` | `#3d3d3a` | The line that sets things apart, in place of a shadow (1.5:1): rows, cards, columns. |
+| edge | `--paper-edge` | `Paper.edge` | `#7d786e` | `#85817a` | The edge of a field, a checkbox, a toggle's track: 3:1 or more, so a control can be found (WCAG 1.4.11). |
+| ink | `--paper-ink` | `Paper.ink` | `#1a1918` | `#f4f2ed` | Text and icons: deep charcoal, 17:1 on the ground. |
+| secondary | `--paper-secondary` | `Paper.secondary` | `#4a4741` | `#bdb9b0` | A row's second line, a speaker's name, a section heading. |
+| tertiary | `--paper-tertiary` | `Paper.tertiary` | `#625e57` | `#a29e95` | Timestamps, counts, placeholders. |
+| selection | `--paper-selection` | `Paper.selection` | `#ebe9e4` | `#363633` | The picked row, with a 3px accent bar at its edge. Every text colour is 4.5:1 or more on it. |
+| accent | `--accent` | `AccentColor.colorset` | `#1a52c0` | `#86b4ff` | The app icon's cobalt: links, focus, the chosen control, a switch that is on. |
+| line.accent | `--line-accent` | `Paper.lineAccent` | `#a9c2ee` | `#3d5687` | The chosen thing, a link card. |
+| line.attention | `--line-attention` | `Paper.lineAttention` | `#ebbf9f` | `#6b4a33` | Needs you. |
+| line.vouched | `--line-vouched` | `Paper.lineVouched` | `#a9d3bb` | `#36614d` | Done, approved. |
+| line.failure | `--line-failure` | `Paper.lineFailure` | `#eeb0b3` | `#6b3a3d` | Failed. |
+| tint.attention | `--tint-attention` | `StateTint.orange` | `#a3400e` | `#f3a672` | Needs you; the only tint drawn in a list. |
+| tint.failure | `--tint-failure` | `StateTint.red` | `#b0222a` | `#f4878d` | Failed. |
+| tint.vouched | `--tint-vouched` | `StateTint.green` | `#25684f` | `#92ccad` | Approved, done: an ending the app can vouch for. |
+| label.issue | `--label-issue` | `Paper.issue` | `#0c6278` | `#73cbe0` | A label naming an issue, #12. |
+| label.pull | `--label-pull` | `Paper.pull` | `#6c3cae` | `#bea3f2` | A label naming a pull request, P#12. |
 | on-fill | `--paper-on-fill` | `none: SwiftUI's Color.white` | `#ffffff` | `#ffffff` | What is drawn on a filled mark: a state's badge, a swipe's action. |
 | scrim | `--paper-scrim` | `none: SwiftUI's Color.black` | `#000000` | `#000000` | Behind a sheet or a viewer, mixed with transparent to the strength it needs. |
 | forge.open | `--forge-open` | `Paper.forgeOpen` | `#1a7f37` | `#3fb950` | Open; a check that passed; running. |
@@ -95,9 +106,34 @@ Mac window and the iPhone and iPad app hold the same value.
 <!-- design.sh gen: shape -->
 | Token | CSS | Swift | Value | For |
 |---|---|---|---|---|
+| code | `--radius-code` | `Paper.Radius.code` | `5px` | Code, inline and in a block. |
 | control | `--radius-control` | `Paper.Radius.control` | `7px` | Chips, the rail, inputs. |
 | card | `--radius-card` | `Paper.Radius.card` | `10px` | Rows, wells, cards. |
 | floating | `--radius-floating` | — | `16px` | Sheets, menus, the prompt bar (web). |
+| pill | `--radius-pill` | `Paper.Radius.pill` | `99px` | A state badge: round ends. |
+| shadow.floating | `--shadow-floating` | `Paper.Shadow.floating` | `0 4px 12px rgb(26 25 24 / 10%)`; dark `0 4px 12px rgb(0 0 0 / 40%)` | Menus, the prompt bar, toasts, with a rule line. |
+| shadow.sheet | `--shadow-sheet` | `Paper.Shadow.sheet` | `0 12px 32px rgb(26 25 24 / 18%)`; dark `0 12px 32px rgb(0 0 0 / 55%)` | Sheets and dialogs, over a dimmed page. |
+| focus.width | `--focus-width` | `Paper.Focus.width` | `2px` | The ring's width. |
+| focus.gap | `--focus-gap` | `Paper.Focus.gap` | `2px` | The gap between the control and the ring. |
+<!-- /design.sh gen -->
+
+## Depth and focus
+
+The `shadow` and `focus` rows are in the table above: `shadow.floating` for a menu, the
+prompt bar and a toast, `shadow.sheet` for a sheet or a dialog, and a focus ring of
+`focus.width` in the accent, `focus.gap` from the control.
+
+## Reading spacing
+
+Reading text (prose, messages) has a line height of 1.5 and a little letter and word
+spacing, from the British Dyslexia Association's style guide and WCAG 1.4.12.
+
+<!-- design.sh gen: spacing -->
+| Token | CSS | Swift | Value | For |
+|---|---|---|---|---|
+| leading.reading | `--type-leading-reading` | `TextStep.readingLeading` | `1.5` | Reading text: prose, messages. |
+| tracking.reading | `--type-tracking-reading` | `TextStep.readingTracking` | `0.01em` | Reading text: a little letter spacing. |
+| word-spacing.reading | `--type-word-spacing-reading` | `none: SwiftUI has no word spacing` | `0.06em` | Reading text: a little word spacing. |
 <!-- /design.sh gen -->
 
 ## Fonts

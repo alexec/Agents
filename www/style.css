@@ -5,7 +5,7 @@
 :root {
   /* Words that come second: a caption, the small print, the nav. The web page's own mix. */
   --muted: color-mix(in srgb, var(--paper-ink) 62%, transparent);
-  --shadow: 0 8px 24px var(--paper-shadow);
+  --shadow: var(--shadow-floating);
 }
 
 * { box-sizing: border-box; }
