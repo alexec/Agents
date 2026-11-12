@@ -168,11 +168,7 @@ private struct DeclareResourceSheet: View {
                 }
             }
             .formStyle(.columns)
-            if let problem {
-                Label(problem, systemImage: "exclamationmark.triangle")
-                    .appText(.fine)
-                    .tinted(.failure)
-            }
+            SheetNote(text: problem)
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }

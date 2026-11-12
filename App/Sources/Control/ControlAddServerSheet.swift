@@ -153,9 +153,7 @@ struct ControlAddServerSheet: View {
                 Text("Waiting for the machine to connect…").appText(.reading)
             }
         }
-        if let problem = control.problem {
-            Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
-        }
+        SheetNote(text: control.problem)
         HStack {
             Spacer()
             Button(joined == nil ? "Cancel" : "Done") { dismiss() }.buttonStyle(.paper)
@@ -279,7 +277,7 @@ struct ControlAddServerSheet: View {
             Text("Updated \(named). It starts again with this control plane’s version.")
                 .appText(.supporting).tinted(.vouched)
         case .failed(let why)?:
-            Text(why).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+            SheetNote(text: why, reservesSpace: false)
         default:
             EmptyView()
         }
@@ -302,8 +300,8 @@ struct ControlAddServerSheet: View {
         let lead = "\(named) connects through a tunnel the control plane holds over ssh."
         switch control.tunnels[named] {
         case let state? where !state.up:
-            Text("\(lead) That ssh session is down\(state.problem.map { ": \($0)" } ?? ""). It is tried again by itself.")
-                .appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+            SheetNote(text: "\(lead) That ssh session is down\(state.problem.map { ": \($0)" } ?? ""). It is tried again by itself.",
+                      reservesSpace: false)
         default:
             Text("\(lead) It is offline whenever that session is down, as when this Mac sleeps.")
                 .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

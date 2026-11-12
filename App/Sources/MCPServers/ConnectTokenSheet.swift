@@ -107,7 +107,7 @@ struct ConnectTokenSheet: View {
                 Text(words.checking).appText(.fine).foregroundStyle(.secondary)
             }
         case .failed(let why):
-            Text(why).appText(.fine).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+            SheetNote(text: why, reservesSpace: false)
         }
     }
 

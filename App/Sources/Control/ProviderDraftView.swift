@@ -141,9 +141,7 @@ struct ProviderDraftStatus: View {
             }
         case "failed":
             HStack(alignment: .firstTextBaseline) {
-                Text(update.note ?? "It couldn’t write it.")
-                    .appText(.supporting).tinted(.failure)
-                    .fixedSize(horizontal: false, vertical: true)
+                SheetNote(text: update.note ?? "It couldn’t write it.", reservesSpace: false)
                 Spacer()
                 detailsButton
                 Button("Try Again", action: again).buttonStyle(.paper)

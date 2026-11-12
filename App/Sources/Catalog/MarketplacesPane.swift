@@ -72,8 +72,8 @@ struct MarketplacesPane: View {
                     Task { await load() }
                 })
             }
-            if let problem { Text(problem).appText(.fine).tinted(.failure) }
-            if let note = answer?.problem { Text(note).appText(.fine).tinted(.attention) }
+            if let problem { SheetNote(text: problem, reservesSpace: false) }
+            if let note = answer?.problem { SheetNote(text: note, reservesSpace: false) }
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 6) {
                     ForEach(answer?.marketplaces ?? []) { marketplace in row(marketplace) }
@@ -188,7 +188,7 @@ private struct AddMarketplaceForm: View {
                 Text("The token is sealed in your secrets and is sent as a bearer token to this address only. Leave both empty if it is open.")
                     .appText(.fine).foregroundStyle(.secondary)
             }
-            if let problem { Text(problem).appText(.fine).tinted(.failure) }
+            SheetNote(text: problem)
             HStack {
                 Spacer()
                 Button("Cancel", action: cancel).buttonStyle(.paper)

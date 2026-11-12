@@ -81,15 +81,11 @@ struct MCPServersView: View {
                 .appText(.fine)
                 .padding(.top, 6)
                 if let problem {
-                    Text(problem)
-                        .appText(.fine)
-                        .foregroundStyle(StateTint.failure.style(or: .secondary))
+                    SheetNote(text: problem, reservesSpace: false)
                         .textSelection(.enabled)
                 }
                 if let removeProblem {
-                    Text(removeProblem)
-                        .appText(.fine)
-                        .foregroundStyle(StateTint.failure.style(or: .secondary))
+                    SheetNote(text: removeProblem, reservesSpace: false)
                 }
                 if servers.isEmpty {
                     Text(folder == nil ? MCPHealthWords.personalEmpty : MCPHealthWords.folderEmpty)

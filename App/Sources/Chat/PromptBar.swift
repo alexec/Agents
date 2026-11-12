@@ -1591,10 +1591,7 @@ struct PromptBar: View {
             .help(waiting == nil ? agent.cwd.path(percentEncoded: false)
                                  : "Moves when this turn ends. \(agent.cwd.path(percentEncoded: false))")
             if let problem = model.moveProblems[agent.id] {
-                Text(problem)
-                    .appText(.fine)
-                    .tinted(.failure)
-                    .lineLimit(3)
+                SheetNote(text: problem, reservesSpace: false)
                     .frame(maxWidth: 360, alignment: .leading)
             }
         })

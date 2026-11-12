@@ -152,7 +152,7 @@ struct ConnectJiraSheet: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Paper.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
         case .failed(let why):
-            Text(why).appText(.fine).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+            SheetNote(text: why, reservesSpace: false)
         }
     }
 

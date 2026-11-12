@@ -51,7 +51,7 @@ struct RemoteFolderSheet: View {
             }
             .frame(height: 260)
             if let problem {
-                Text(problem).appText(.fine).tinted(.failure)
+                FieldNote(text: problem)
             } else {
                 Text("Type a path or click into a folder. Files are shown but can’t be chosen.")
                     .appText(.fine).foregroundStyle(.secondary)

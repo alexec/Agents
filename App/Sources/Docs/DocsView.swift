@@ -389,7 +389,7 @@ private struct DocPage: View {
                     .linkStyle()
             }
             if let startProblem {
-                Text(startProblem).appText(.supporting).tinted(.failure)
+                SheetNote(text: startProblem, reservesSpace: false)
             }
         }
     }

@@ -88,8 +88,7 @@ struct RuntimeInstallRow: View {
                 .appText(.supporting).foregroundStyle(.secondary)
                 .lineLimit(1)
         case .installFailed(let reason):
-            Text(reason).appText(.supporting).tinted(.failure)
-                .fixedSize(horizontal: false, vertical: true)
+            SheetNote(text: reason, reservesSpace: false)
         case .missing:
             Text(Self.downloadNote(for: status.runtime.id).map { "Not on this Mac · \($0)" } ?? "Not on this Mac")
                 .appText(.supporting).foregroundStyle(.secondary)

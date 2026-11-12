@@ -31,9 +31,7 @@ struct ProjectBoardsCard: View {
             }
             ForEach(boards) { board in row(board) }
             // Above the fields, beside what was typed.
-            if let problem {
-                Text(problem).appText(.fine).tinted(.failure).fixedSize(horizontal: false, vertical: true)
-            }
+            FieldNote(text: problem)
             if read?.mayChange == true {
                 HStack(spacing: 8) {
                     TextField(ProjectBoardWords.namePrompt, text: $name)

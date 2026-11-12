@@ -112,9 +112,7 @@ struct BringingBackRow: View {
                         .lineLimit(1)
                         .foregroundStyle(.secondary)
                     if let problem = bringBack.state.problem {
-                        Text(problem)
-                            .appText(.fine).tinted(.failure)
-                            .lineLimit(3)
+                        SheetNote(text: problem, reservesSpace: false)
                             .help(problem)
                     } else if let result = bringBack.state.result {
                         Text(doneLine(result))
@@ -203,13 +201,8 @@ struct BringBackSheet: View {
                 .appText(.fine).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let there { form(there) }
-            if let problem {
-                Text(problem)
-                    .appText(.fine).tinted(.failure)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else if let progress {
-                Text(progress).appText(.fine).foregroundStyle(.secondary)
-            }
+            // The sheet's note (#4737): it failed, or it is under way.
+            SheetNote(tone: problem == nil ? .neutral : .failure, text: problem ?? progress)
             HStack {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }

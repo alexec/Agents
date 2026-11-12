@@ -51,9 +51,7 @@ struct AskAdminButton: View {
             TextField("Why", text: $why, prompt: Text(GovernanceWords.whyPrompt))
                 .textFieldStyle(.roundedBorder)
                 .onSubmit { Task { await send() } }
-            if let problem {
-                Text(problem).appText(.fine).tinted(.failure).fixedSize(horizontal: false, vertical: true)
-            }
+            SheetNote(text: problem)
             Text(GovernanceWords.askFoot).appText(.fine).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {

@@ -107,7 +107,7 @@ struct ServerRuntimeSignInSheet: View {
         }
         if let problem {
             Section {
-                Text(problem).foregroundStyle(StateTint.failure.style(or: .secondary))
+                SheetNote(text: problem, reservesSpace: false)
                 if !byKey && step == nil {
                     Button("Try Again") { Task { await start() } }
                 }

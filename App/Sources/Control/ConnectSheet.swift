@@ -111,10 +111,7 @@ struct ConnectSheet: View {
                     .appText(.supporting).tinted(.vouched)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if let answer {
-                Text(answer).appText(.supporting).tinted(.attention)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            SheetNote(text: answer)
             HStack {
                 Spacer()
                 if joined != nil {

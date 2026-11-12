@@ -465,7 +465,7 @@ private struct ProjectGeneralPane: View {
                 }
             }
             if let removeProblem {
-                Text(removeProblem).appText(.fine).tinted(.failure)
+                SheetNote(text: removeProblem, reservesSpace: false)
             }
             Menu(ProjectSettingsWords.addOnAnotherMachine) {
                 ForEach(otherMachines, id: \.self) { machine in

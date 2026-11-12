@@ -42,7 +42,7 @@ struct YourConnectionsView: View {
                 }
             }
             if let problem {
-                Text(problem).appText(.fine).tinted(.failure).fixedSize(horizontal: false, vertical: true)
+                SheetNote(text: problem, reservesSpace: false)
             }
             card {
                 if let connections, !connections.isEmpty {

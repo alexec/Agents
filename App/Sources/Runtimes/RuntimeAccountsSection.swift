@@ -91,9 +91,7 @@ struct RuntimeAccountsSection: View {
                 }
                 .buttonStyle(.paper)
             }
-            if let addProblem {
-                Text(addProblem).appText(.fine).foregroundStyle(StateTint.failure.style(or: .secondary))
-            }
+            FieldNote(text: addProblem)
         } else {
             Button("Add Account…") {
                 newName = ""
@@ -115,10 +113,14 @@ struct RuntimeAccountsSection: View {
                 SelectChoice(title: account.name, description: account.isOrganisation ? account.state : nil,
                              isChosen: current?.id == account.id, setBy: account.setBy) { setDefault(account.id) }
             }
-            Text(defaultProblem ?? OrgAccountWords.reachesFoot)
-                .appText(.fine)
-                .foregroundStyle(defaultProblem == nil ? AnyShapeStyle(.secondary) : StateTint.failure.style(or: .secondary))
-                .fixedSize(horizontal: false, vertical: true)
+            if let defaultProblem {
+                SheetNote(text: defaultProblem, reservesSpace: false)
+            } else {
+                Text(OrgAccountWords.reachesFoot)
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 

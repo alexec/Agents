@@ -552,9 +552,8 @@ struct ElicitationView: View {
             if let description = property.description {
                 Text(description).appText(.supporting).foregroundStyle(.secondary)
             }
-            if let problem = property.problem(with: values[property.name]), values[property.name] != nil {
-                Text(problem).appText(.supporting).tinted(.failure)
-            }
+            // The field's note keeps its line (#4737); it waits for a value, as Submit does.
+            FieldNote(text: values[property.name] == nil ? nil : property.problem(with: values[property.name]))
         }
     }
 
