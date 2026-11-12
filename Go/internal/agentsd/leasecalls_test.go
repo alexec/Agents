@@ -271,3 +271,145 @@ func TestAShortLeaseIsNotWarnedAgain(t *testing.T) {
 		t.Fatal(text)
 	}
 }
+
+func lineOf(d *Daemon, name wire.ResourceName) []wire.UUID {
+	d.leaseMu.Lock()
+	defer d.leaseMu.Unlock()
+	var ids []wire.UUID
+	if e := d.book.Entries[name]; e != nil {
+		for _, w := range e.Line {
+			ids = append(ids, w.AgentID)
+		}
+	}
+	return ids
+}
+
+func sameLine(a, b []wire.UUID) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// #4041: after a restart, an agent whose place was lost and asks again goes back at the
+// askedAt of its wait, in front of one that asked after it.
+func TestALostPlaceIsKeptOverARestart(t *testing.T) {
+	fakeRuntimes(t)
+	root := t.TempDir()
+	dir := t.TempDir()
+	at := time.Now().UTC()
+	deadline := wire.DateOf(at.Add(time.Hour))
+	finished := func(edit func(a *wire.Agent)) wire.UUID {
+		return leftWorking(t, root, wire.AgentStateFinished, "", func(a *wire.Agent) {
+			a.Cwd = store.FolderURL(dir)
+			a.EndedReason = reason(wire.EndedReasonEndTurn)
+			if edit != nil {
+				edit(a)
+			}
+		})
+	}
+	holder := finished(nil)
+	late := finished(nil)
+	orphan := finished(func(a *wire.Agent) {
+		a.EventWait = &wire.EventWait{ID: store.NewUUID(), Patterns: []wire.EventPattern{linePattern(a.ID, "build").wire()},
+			Deadline: &deadline, Since: wire.DateOf(at.Add(-10 * time.Minute))}
+	})
+	stamp := func(t time.Time) string { return t.Format("2006-01-02T15:04:05.000Z") }
+	book := map[string]any{"entries": map[string]any{"build": map[string]any{
+		"kind": "named", "displayName": "build", "rules": map[string]any{"holders": 1},
+		"leases": []any{map[string]any{"resource": "build", "displayName": "build", "holder": holder,
+			"grantedAt": stamp(at), "expiresAt": stamp(at.Add(20 * time.Minute)), "warned": false}},
+		"line": []any{map[string]any{"agentID": late, "askedAt": stamp(at.Add(-time.Minute))}}}}, "notices": map[string]any{}}
+	b, _ := json.Marshal(book)
+	os.WriteFile(filepath.Join(root, "leases.json"), b, 0o644)
+
+	d, _ := start(t, root)
+	defer d.Shutdown()
+	waitFor(t, "the wait without its place told", func() bool {
+		for _, u := range userMessages(d, orphan) {
+			if u == lostPlaceWords("build") {
+				return true
+			}
+		}
+		return false
+	})
+	waitFor(t, "its turn over", func() bool { return d.Store.Agent(orphan).State == wire.AgentStateFinished })
+	m := appClient(t, d, orphan)
+	m.post("initialize", map[string]any{}, 1)
+	if text, _ := m.tool(2, "lease_resource", map[string]any{"name": "build"}); !strings.Contains(text, "You are 1st in line.") {
+		t.Fatal(text)
+	}
+	if got := lineOf(d, "build"); !sameLine(got, []wire.UUID{orphan, late}) {
+		t.Fatalf("%v", got)
+	}
+}
+
+// #4041: an agent whose lease ran out and asks again in time goes after those that waited
+// when it ran out and before those that came later; one that asks too late goes last.
+func TestALeaseThatRanOutKeepsItsPlace(t *testing.T) {
+	fakeRuntimes(t)
+	at := time.Now()
+	setClock := func(m int) { setNowFunc(func() time.Time { return at.Add(time.Duration(m) * time.Minute) }) }
+	t.Cleanup(func() { setNowFunc(time.Now) })
+	setClock(0)
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := t.TempDir()
+	agent := func() (wire.UUID, *mcpClient) {
+		a := seeded(t, d, dir, nil)
+		m := appClient(t, d, a.ID)
+		m.post("initialize", map[string]any{}, 1)
+		return a.ID, m
+	}
+	lapse := func() {
+		d.leaseMu.Lock()
+		events := d.lapse(now().Time())
+		d.leasesChanged()
+		d.leaseMu.Unlock()
+		d.settle(events)
+	}
+	ranOut, a := agent()
+	_, b := agent()
+	waiting, w := agent()
+	later, c := agent()
+
+	a.tool(2, "lease_resource", map[string]any{"name": "build", "minutes": 3})
+	setClock(1)
+	b.tool(2, "lease_resource", map[string]any{"name": "build"})
+	setClock(2)
+	w.tool(2, "lease_resource", map[string]any{"name": "build"})
+	setClock(3)
+	lapse() // a's lease runs out; b has it now
+	setClock(4)
+	c.tool(2, "lease_resource", map[string]any{"name": "build"})
+	setClock(6)
+	text, _ := a.tool(3, "lease_resource", map[string]any{"name": "build"})
+	if !strings.HasPrefix(text, "You no longer hold build: your lease ran out at "+clock(wire.DateOf(at.Add(3*time.Minute)))+
+		". Ask for it again by "+clock(wire.DateOf(at.Add(8*time.Minute)))+" to keep your place in its line.") ||
+		!strings.Contains(text, "You are 2nd in line.") {
+		t.Fatal(text)
+	}
+	if got := lineOf(d, "build"); !sameLine(got, []wire.UUID{waiting, ranOut, later}) {
+		t.Fatalf("%v", got)
+	}
+
+	// Too late: it goes to the end of the line.
+	setClock(10)
+	a.tool(4, "lease_resource", map[string]any{"name": "other", "minutes": 1})
+	c.tool(3, "lease_resource", map[string]any{"name": "other"})
+	setClock(11)
+	lapse() // a's lease on other runs out; c has it now
+	w.tool(3, "lease_resource", map[string]any{"name": "other"})
+	setClock(17)
+	if text, _ := a.tool(5, "lease_resource", map[string]any{"name": "other"}); !strings.Contains(text, "You are 2nd in line.") {
+		t.Fatal(text)
+	}
+	if got := lineOf(d, "other"); !sameLine(got, []wire.UUID{waiting, ranOut}) {
+		t.Fatalf("%v", got)
+	}
+}

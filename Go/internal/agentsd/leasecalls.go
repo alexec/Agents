@@ -80,7 +80,8 @@ func noticeWords(n leaseNotice) string {
 	case n.Kind.EndedByPerson != nil:
 		return "You no longer hold " + n.DisplayName + ": the person ended your lease at " + clock(n.At) + "."
 	case n.Kind.Expired != nil:
-		return "You no longer hold " + n.DisplayName + ": your lease ran out at " + clock(n.At) + "."
+		return "You no longer hold " + n.DisplayName + ": your lease ran out at " + clock(n.At) + ". Ask for it again by " +
+			clock(wire.DateOf(n.At.Time().Add(leaseKeptWindow))) + " to keep your place in its line."
 	case n.Kind.EndingSoon != nil:
 		return "Your lease on " + n.DisplayName + " ends at " + clock(n.Kind.EndingSoon.ExpiresAt) +
 			". Extend it with lease_resource if you still need it."
@@ -253,12 +254,18 @@ func (d *Daemon) leaseResource(agent wire.UUID, args map[string]json.RawMessage)
 		e.Leases = append(e.Leases, l)
 		events = append(events, leaseEvent{granted: true, lease: l})
 		reply = grantedWords(l, capped)
+		d.takeKept(agent, name, t)
 	default:
 		if j := lineIndex(e, agent); j >= 0 {
 			place = j + 1
 			queued = wait
 		} else if wait {
-			place = joinLine(e, waiter{AgentID: agent, AskedAt: t, Minutes: minutes, By: by})
+			// A place it lost through no act of its own is kept (#4041).
+			asked := t
+			if kept, ok := d.takeKept(agent, name, t); ok && kept < t {
+				asked = kept
+			}
+			place = joinLine(e, waiter{AgentID: agent, AskedAt: asked, Minutes: minutes, By: by})
 			queued = true
 		}
 	}
