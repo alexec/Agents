@@ -1,0 +1,122 @@
+<!doctype html>
+<!--
+  Paper v2 mock (#4926). Not product code: a picture of the session list and chat.
+  Open with ?v=v1|A|B|C. Each page draws the light and the charcoal dark look side by side.
+  The fonts load from jsDelivr (Fontsource) for the mock only; the build bundles them (spec.md).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Paper v2 mock</title>
+<style>
+@font-face {
+  font-family: "Shantell Sans";
+  src: url("https://cdn.jsdelivr.net/fontsource/fonts/shantell-sans:vf@latest/latin-infm-normal.woff2") format("woff2-variations");
+  font-weight: 300 800;
+}
+
+/* Paper today (design/tokens.json at #4602). */
+.v1 {
+  --ground:#f7f8f9; --sidebar:#f0f1f3; --raised:#ffffff; --well:#f0f2f4; --wash:#e7eaee;
+  --rule:#dde1e6; --ink:#1c1d20; --secondary:#6b6f76; --stroke:transparent; --selection:#d8dee6;
+  --shadow:rgba(32,36,42,.10); --accent:#1f5fc8; --attention:#ba4a13; --vouched:#2d765c; --issue:#0e6b82;
+}
+.v1.dark {
+  --ground:#1c1d20; --sidebar:#161719; --raised:#26282c; --well:#2a2d31; --wash:#33363b;
+  --rule:#3a3e44; --ink:#e8eaed; --secondary:#9aa0a8; --selection:#3a3e44;
+  --shadow:rgba(0,0,0,.10); --accent:#7fb0ff; --attention:#f0a06b; --vouched:#8bc6a7; --issue:#6cc6db;
+}
+/* Paper v2: warm paper, charcoal ink and strokes (spec.md, "Token changes"). */
+.v2 {
+  --ground:#f6f5f1; --sidebar:#eeece6; --raised:#fdfcf9; --well:#ecebe5; --wash:#e4e2db;
+  --rule:#cfcbc2; --ink:#252422; --secondary:#5a5750; --stroke:#3a3935; --selection:#dcd8cf;
+  --shadow:rgba(43,42,39,.16); --accent:#1f5fc8; --attention:#a8420f; --vouched:#2a7157; --issue:#0e6b82;
+}
+.v2.dark {
+  --ground:#232321; --sidebar:#1c1c1b; --raised:#2d2d2a; --well:#2a2a28; --wash:#373734;
+  --rule:#4b4a46; --ink:#ece9e2; --secondary:#aaa69d; --stroke:#cfcbc2; --selection:#46443f;
+  --shadow:rgba(0,0,0,.35); --accent:#7fb0ff; --attention:#f0a06b; --vouched:#8bc6a7; --issue:#6cc6db;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; padding: 16px; background: #888; display: flex; gap: 16px; font: 15px/1.5 -apple-system, system-ui, sans-serif; }
+.win { width: 760px; height: 520px; display: flex; border-radius: 12px; overflow: hidden; background: var(--ground); color: var(--ink); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+.side { width: 270px; background: var(--sidebar); border-right: 1px solid var(--rule); padding: 14px 10px; }
+.main { flex: 1; display: flex; flex-direction: column; padding: 14px 18px; min-width: 0; }
+h1, h2 { margin: 0 0 8px; font-weight: 650; }
+h1 { font-size: 22px; } h2 { font-size: 13px; color: var(--secondary); margin-top: 14px; }
+.row { padding: 7px 9px; border-radius: 10px; margin-bottom: 2px; position: relative; }
+.row.sel { background: var(--selection); }
+.row .t { font-weight: 600; }
+.row .s { font-size: 13px; color: var(--secondary); }
+.row .dot { position: absolute; right: 10px; top: 11px; width: 8px; height: 8px; border-radius: 50%; background: var(--attention); }
+.chip { color: var(--issue); font-size: 12px; font-weight: 600; }
+.msg { margin: 8px 0; max-width: 92%; letter-spacing: .01em; word-spacing: .06em; }
+.who { font-size: 13px; font-weight: 650; color: var(--secondary); }
+.me { align-self: flex-end; background: var(--well); padding: 8px 12px; border-radius: 10px; }
+code { font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace; background: var(--well); padding: 1px 4px; border-radius: 5px; }
+.card { background: var(--raised); border-radius: 10px; padding: 10px 12px; margin: 8px 0; box-shadow: 0 1px 3px var(--shadow); position: relative; }
+.card .q { font-weight: 600; margin-bottom: 6px; }
+.btn { display: inline-block; padding: 3px 12px; border-radius: 7px; border: 1px solid var(--rule); margin-right: 6px; font-size: 13px; }
+.btn.p { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.prompt { margin-top: auto; background: var(--raised); border-radius: 14px; padding: 12px 14px; color: var(--secondary); box-shadow: 0 1px 4px var(--shadow); position: relative; }
+.ok { color: var(--vouched); font-weight: 600; }
+.empty { display: none; }
+.tag { position: fixed; } /* none */
+
+/* The handwritten face, where each variant puts it. */
+.hand { font-family: "Shantell Sans", -apple-system, sans-serif; font-variation-settings: "INFM" 0.5, "BNCE" 0; letter-spacing: 0; }
+.v2 h1.hand { font-size: 24px; font-weight: 600; }
+.v2 h2.hand { font-size: 14px; font-weight: 600; text-transform: none; }
+
+/* A sketched charcoal edge: the same box, its line roughened (B and C). */
+.sketch::after { content: ""; position: absolute; inset: 0; border: 1.4px solid var(--stroke); border-radius: inherit; filter: url(#rough); pointer-events: none; opacity: .85; }
+.label { color: #fff; font: 600 13px -apple-system, sans-serif; margin-bottom: 6px; }
+.col { display: flex; flex-direction: column; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <filter id="rough" x="-3%" y="-15%" width="106%" height="130%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="2.6"/></filter>
+</svg>
+<template id="window">
+  <div class="win">
+    <div class="side">
+      <h1 data-hand="AB C">Sessions</h1>
+      <h2 data-hand="AB C">Needs you</h2>
+      <div class="row sel"><div class="t" data-hand="C">Fix the login redirect</div><div class="s">Asks: which callback URL? · 2m</div><span class="dot"></span></div>
+      <h2 data-hand="AB C">Working</h2>
+      <div class="row"><div class="t" data-hand="C">Docs: dark mode screenshots</div><div class="s"><span class="chip">#812</span> · writing the page · 5m</div></div>
+      <div class="row"><div class="t" data-hand="C">Speed up the test suite</div><div class="s"><span class="chip">#790</span> · running tests · 12m</div></div>
+      <h2 data-hand="AB C">Done</h2>
+      <div class="row"><div class="t" data-hand="C">Rename the export button</div><div class="s"><span class="ok">Merged</span> · 1h</div></div>
+    </div>
+    <div class="main">
+      <h1 data-hand="AB C">Fix the login redirect</h1>
+      <div class="msg me">After sign-in the page goes back to the home page, not the page I was on.</div>
+      <div class="msg"><div class="who" data-hand="C">Claude</div>The redirect drops the <code>next</code> parameter in <code>auth/callback.ts</code>. I can keep it in the session and read it after the token exchange.</div>
+      <div class="card" data-sketch="BC">
+        <div class="q" data-hand="BC">Which callback URL do you use in production?</div>
+        <span class="btn p">/auth/callback</span><span class="btn">/oauth/return</span><span class="btn">Other…</span>
+      </div>
+      <div class="prompt" data-sketch="BC">Reply to Claude…</div>
+    </div>
+  </div>
+</template>
+<script>
+const v = new URLSearchParams(location.search).get("v") || "B";
+const names = { v1: "Paper today", A: "A · Handwriting in titles only", B: "B · Titles, questions, sketched edges", C: "C · Also session names and speakers" };
+for (const mode of ["light", "dark"]) {
+  const col = document.createElement("div"); col.className = "col";
+  col.innerHTML = `<div class="label">${names[v]} · ${mode === "dark" ? "charcoal dark" : "light"}</div>`;
+  const win = document.getElementById("window").content.cloneNode(true).firstElementChild;
+  win.classList.add(v === "v1" ? "v1" : "v2"); if (mode === "dark") win.classList.add("dark");
+  if (v !== "v1") {
+    win.querySelectorAll("[data-hand]").forEach(e => { if (e.dataset.hand.includes(v)) e.classList.add("hand"); });
+    win.querySelectorAll("[data-sketch]").forEach(e => { if (e.dataset.sketch.includes(v)) e.classList.add("sketch"); });
+  }
+  col.appendChild(win); document.body.appendChild(col);
+}
+</script>
+</body>
+</html>
