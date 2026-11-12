@@ -37,7 +37,7 @@ type ToastShown = {
   actions?: { words: string; run: () => void }[]; undo?: boolean; close: () => void;
 };
 
-/** The toast to show now, one at a time: an archive's Undo first, then a failure, which waits under it. */
+/** The toast to show now, one at a time: an Undo first (Archive's, or another action's, #4793), then a failure, which waits under it. */
 function shownToast(store: Store): ToastShown | null {
   const undo = store.archiveUndo.value;
   if (undo) {
@@ -45,6 +45,15 @@ function shownToast(store: Store): ToastShown | null {
       key: `undo-${undo.key}`, tone: "success", words: undo.line, name: "archive-undo", undo: true,
       actions: [{ words: undoLabel, run: () => void store.undoArchive() }],
       close: () => { if (store.archiveUndo.value?.key === undo.key) store.archiveUndo.value = null; },
+    };
+  }
+  // Unarchive, Rename, the labels, Mute or Later (#4793): the same toast, and ⌘Z.
+  const change = store.changeUndo.value;
+  if (change) {
+    return {
+      key: `change-undo-${change.key}`, tone: "success", words: change.line, name: "change-undo", undo: true,
+      actions: [{ words: undoLabel, run: () => void store.undoChange() }],
+      close: () => { if (store.changeUndo.value?.key === change.key) store.changeUndo.value = null; },
     };
   }
   // A New Machine the provider refused opens its sheet again with the reason (#4634), not a toast.

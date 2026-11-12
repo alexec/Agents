@@ -82,6 +82,9 @@ export function commandItems(store: Store, apple: boolean): { items: CommandItem
     add("Open File…", () => press("p", apple), commandKey("p", apple));
   }
   if (store.archiveUndo.value) add("Undo Archive", () => void store.undoArchive(), commandKey("z", apple));
+  // The same for Unarchive, Rename, the labels, Mute and Later (#4793).
+  const change = store.changeUndo.value;
+  if (change) add(change.menu, () => void store.undoChange(), commandKey("z", apple));
   for (const s of sectionsShown(adminOf(store), "overview")) {
     add(s === "overview" ? "Overview" : `Go to ${navTitle[s]}`, () => go(s === "overview" ? {} : { nav: s }), goKey(s),
       s === "settings" ? ["preferences"] : undefined);

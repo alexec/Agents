@@ -6141,14 +6141,16 @@ final class AppModel {
         }
     }
 
-    func setLabels(on id: UUID, add: [String] = [], remove: [String] = []) async {
-        await optimistic(.labels(add: add, remove: remove), on: id) {
+    func setLabels(on id: UUID, add: [String] = [], remove: [String] = [], offeringUndo: Bool = true) async {
+        let undo = offeringUndo ? work.agent(id).flatMap { SessionUndo.labels($0, add: add, remove: remove) } : nil
+        let sent = await optimistic(.labels(add: add, remove: remove), on: id) {
             await attempt(on: work.agent(id)?.host ?? .mac) {
                 try await self.client(forAgent: id).call(
                     DaemonAPI.Method.agentsSetLabels,
                     DaemonAPI.SetLabelsRequest(agentID: id, add: add, remove: remove))
             }
         }
+        if sent { offer(undo) }
     }
 
     /// A folder's labels as its host keeps them, archived sessions' included, read when
@@ -6352,6 +6354,7 @@ final class AppModel {
                                                                    archiveOne: archiveOne) else { return }
         // Undo for a few seconds, at the foot of the list (#1534).
         archiveUndo = undo
+        sessionUndo = nil
     }
 
     /// ⌫ over a selection in the sidebar: every session and workflow in it, with one Undo
@@ -6378,6 +6381,7 @@ final class AppModel {
         guard count + flows.count > 0 else { return }
         archiveUndo = ArchiveUndo(agentIDs: agentIDs, title: title, stopped: stopped,
                                   sessions: count, workflows: flows)
+        sessionUndo = nil
     }
 
     /// The last Archive, while Undo is offered for it (#1534).
@@ -6388,13 +6392,42 @@ final class AppModel {
     func undoArchive() async {
         guard let undo = archiveUndo else { return }
         archiveUndo = nil
-        for id in undo.agentIDs { await unarchive(id) }
+        for id in undo.agentIDs { await unarchive(id, offeringUndo: false) }
         for summary in undo.workflows { await setWorkflowArchived(summary, false) }
     }
 
     /// The strip's seconds are over.
     func dismissArchiveUndo(_ undo: ArchiveUndo) {
         if archiveUndo?.id == undo.id { archiveUndo = nil }
+    }
+
+    /// The last Unarchive, Rename, label change, Mute or Later, while Undo is offered for it
+    /// (#4793). One toast at a time: it and Archive's replace each other.
+    var sessionUndo: SessionUndo?
+
+    /// Offer Undo for an action that went.
+    private func offer(_ undo: SessionUndo?) {
+        guard let undo else { return }
+        sessionUndo = undo
+        archiveUndo = nil
+    }
+
+    /// Undo (⌘Z) after Unarchive, Rename, the labels, Mute or Later (#4793): the inverse,
+    /// sent with no Undo of its own.
+    func undoSessionChange() async {
+        guard let undo = sessionUndo else { return }
+        sessionUndo = nil
+        switch undo.inverse {
+        case .archive(let id): await archiveOne(id, andLeave: false)
+        case .rename(let id, let title): await rename(id, to: title, offeringUndo: false)
+        case .labels(let id, let add, let remove): await setLabels(on: id, add: add, remove: remove, offeringUndo: false)
+        case .mute(let id, let muted): await setMuted(id, muted, offeringUndo: false)
+        case .bringBack(let request): await undeferRequest(request)
+        }
+    }
+
+    func dismissSessionUndo(_ undo: SessionUndo) {
+        if sessionUndo?.id == undo.id { sessionUndo = nil }
     }
 
     @discardableResult
@@ -6409,12 +6442,14 @@ final class AppModel {
         return archived
     }
 
-    func unarchive(_ id: UUID) async {
-        await optimistic(.unarchive, on: id) {
+    func unarchive(_ id: UUID, offeringUndo: Bool = true) async {
+        let undo = offeringUndo ? work.agent(id).flatMap(SessionUndo.unarchived) : nil
+        let sent = await optimistic(.unarchive, on: id) {
             await attempt(on: work.agent(id)?.host ?? .mac) {
                 try await self.client(forAgent: id).call(DaemonAPI.Method.agentsUnarchive, DaemonAPI.AgentRequest(agentID: id))
             }
         }
+        if sent { offer(undo) }
     }
 
     /// Mark as Unread / Mark as Read, from the row's menu (#70).
@@ -6433,13 +6468,15 @@ final class AppModel {
     }
 
     /// The person's title for a session (#751), or with an empty one the runtime's again.
-    func rename(_ id: UUID, to title: String) async {
-        await optimistic(.rename(title), on: id) {
+    func rename(_ id: UUID, to title: String, offeringUndo: Bool = true) async {
+        let undo = offeringUndo ? work.agent(id).flatMap { SessionUndo.renamed($0, to: title) } : nil
+        let sent = await optimistic(.rename(title), on: id) {
             await attempt(on: work.agent(id)?.host ?? .mac) {
                 try await self.client(forAgent: id).call(DaemonAPI.Method.agentsRename,
                                                          DaemonAPI.RenameRequest(agentID: id, title: title))
             }
         }
+        if sent { offer(undo) }
     }
 
     func setUnread(_ id: UUID, _ unread: Bool) async {
@@ -6450,13 +6487,15 @@ final class AppModel {
     }
 
     /// Mute Notifications, or Unmute, from the row's or the Session menu (#2003).
-    func setMuted(_ id: UUID, _ muted: Bool) async {
-        await optimistic(.mute(muted), on: id) {
+    func setMuted(_ id: UUID, _ muted: Bool, offeringUndo: Bool = true) async {
+        let undo = offeringUndo ? work.agent(id).flatMap { SessionUndo.muted($0, muted) } : nil
+        let sent = await optimistic(.mute(muted), on: id) {
             await attempt(on: work.agent(id)?.host ?? .mac) {
                 try await self.client(forAgent: id).call(DaemonAPI.Method.agentsSetMuted,
                                                          DaemonAPI.SetMutedRequest(agentID: id, muted: muted))
             }
         }
+        if sent { offer(undo) }
     }
 
     /// Whether the host of this session can mute it: one from before #2003 cannot.
@@ -7197,9 +7236,12 @@ final class AppModel {
     /// session that asked. It stays open, in Later, until it comes back.
     @discardableResult
     func deferRequest(_ request: NeedRequest, _ params: DaemonAPI.RequestsDefer) async -> Bool {
-        await work.changing(request, to: request.deferring(params)) {
+        let sent = await work.changing(request, to: request.deferring(params)) {
             await changeRequest(request, DaemonAPI.Method.requestsDefer, params)
         }
+        // Undo is Bring Back Now (#4793).
+        if sent { offer(SessionUndo.later(request)) }
+        return sent
     }
 
     /// Bring back now (#4234): out of Later, to the top of Needs you.

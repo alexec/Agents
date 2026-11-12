@@ -1685,8 +1685,11 @@ final class RemoteModel {
         return await send(start: request, on: folder.host, told: started)
     }
 
-    func setLabels(on id: UUID, add: [String] = [], remove: [String] = []) async -> Bool {
-        await optimistic(.labels(add: add, remove: remove), on: id) { await sendLabels(on: id, add: add, remove: remove) }
+    func setLabels(on id: UUID, add: [String] = [], remove: [String] = [], offeringUndo: Bool = true) async -> Bool {
+        let undo = offeringUndo ? work.agent(id).flatMap { SessionUndo.labels($0, add: add, remove: remove) } : nil
+        let sent = await optimistic(.labels(add: add, remove: remove), on: id) { await sendLabels(on: id, add: add, remove: remove) }
+        if sent { offer(undo) }
+        return sent
     }
 
     private func sendLabels(on id: UUID, add: [String], remove: [String]) async -> Bool {
@@ -2084,9 +2087,12 @@ final class RemoteModel {
     @discardableResult
     func deferRequest(_ request: NeedRequest, _ later: NeedRequest.Later) async -> Bool {
         let params = later.params(id: request.id)
-        return await work.changing(request, to: request.deferring(params)) {
+        let sent = await work.changing(request, to: request.deferring(params)) {
             await changeRequest(request, DaemonAPI.Method.requestsDefer, params)
         }
+        // Undo is Bring Back Now (#4793).
+        if sent { offer(SessionUndo.later(request)) }
+        return sent
     }
 
     /// Bring Back Now (#4235): out of Later, to the top of Needs you.
@@ -5438,6 +5444,7 @@ final class RemoteModel {
                                                                    archiveOne: archiveOne) else { return }
         // Undo for a few seconds, at the foot of the screen (#1534).
         archiveUndo = undo
+        sessionUndo = nil
     }
 
     /// The last Archive, while Undo is offered for it (#1534).
@@ -5447,11 +5454,40 @@ final class RemoteModel {
     func undoArchive() async {
         guard let undo = archiveUndo else { return }
         archiveUndo = nil
-        for id in undo.agentIDs { await unarchive(id) }
+        for id in undo.agentIDs { await unarchive(id, offeringUndo: false) }
     }
 
     func dismissArchiveUndo(_ undo: ArchiveUndo) {
         if archiveUndo?.id == undo.id { archiveUndo = nil }
+    }
+
+    /// The last Unarchive, Rename, label change, Mute or Later, while Undo is offered for it
+    /// (#4793). One toast at a time: it and Archive's replace each other.
+    var sessionUndo: SessionUndo?
+
+    /// Offer Undo for an action that went.
+    private func offer(_ undo: SessionUndo?) {
+        guard let undo else { return }
+        sessionUndo = undo
+        archiveUndo = nil
+    }
+
+    /// Undo (⌘Z) after Unarchive, Rename, the labels, Mute or Later (#4793): the inverse,
+    /// sent with no Undo of its own.
+    func undoSessionChange() async {
+        guard let undo = sessionUndo else { return }
+        sessionUndo = nil
+        switch undo.inverse {
+        case .archive(let id): await archiveOne(id, andLeave: false)
+        case .rename(let id, let title): await rename(id, to: title, offeringUndo: false)
+        case .labels(let id, let add, let remove): _ = await setLabels(on: id, add: add, remove: remove, offeringUndo: false)
+        case .mute(let id, let muted): await setMuted(id, muted, offeringUndo: false)
+        case .bringBack(let request): await undeferRequest(request)
+        }
+    }
+
+    func dismissSessionUndo(_ undo: SessionUndo) {
+        if sessionUndo?.id == undo.id { sessionUndo = nil }
     }
 
     @discardableResult
@@ -5686,8 +5722,10 @@ final class RemoteModel {
             problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
         }
     }
-    func unarchive(_ agentID: UUID) async {
-        await optimistic(.unarchive, on: agentID) { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
+    func unarchive(_ agentID: UUID, offeringUndo: Bool = true) async {
+        let undo = offeringUndo ? work.agent(agentID).flatMap(SessionUndo.unarchived) : nil
+        let sent = await optimistic(.unarchive, on: agentID) { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
+        if sent { offer(undo) }
     }
 
     /// The archived session a menu's Delete… is asking about, until it is answered (#398).
@@ -5706,8 +5744,9 @@ final class RemoteModel {
 
     /// The person's title for a session (#751), kept by its host and told to every client.
     /// Empty, the runtime names it again.
-    func rename(_ agentID: UUID, to title: String) async {
-        await optimistic(.rename(title), on: agentID) {
+    func rename(_ agentID: UUID, to title: String, offeringUndo: Bool = true) async {
+        let undo = offeringUndo ? work.agent(agentID).flatMap { SessionUndo.renamed($0, to: title) } : nil
+        let sent = await optimistic(.rename(title), on: agentID) {
             let host = work.agent(agentID)?.host ?? .mac
             guard !isStale(on: host) else {
                 problem = notAnswering(host, "that could not be sent.")
@@ -5722,6 +5761,7 @@ final class RemoteModel {
                 return false
             }
         }
+        if sent { offer(undo) }
     }
 
     /// Delete an archived session (#398), once asked. A refusal says why it cannot go yet.
@@ -5775,8 +5815,9 @@ final class RemoteModel {
     }
 
     /// Mute Notifications, or Unmute, from the row's menu or the chat's ··· (#2003).
-    func setMuted(_ agentID: UUID, _ muted: Bool) async {
-        await optimistic(.mute(muted), on: agentID) {
+    func setMuted(_ agentID: UUID, _ muted: Bool, offeringUndo: Bool = true) async {
+        let undo = offeringUndo ? work.agent(agentID).flatMap { SessionUndo.muted($0, muted) } : nil
+        let sent = await optimistic(.mute(muted), on: agentID) {
             let host = work.agent(agentID)?.host ?? .mac
             guard !isStale(on: host) else {
                 problem = notAnswering(host, "that could not be sent.")
@@ -5792,6 +5833,7 @@ final class RemoteModel {
                 return false
             }
         }
+        if sent { offer(undo) }
     }
 
     /// Whether this session's host can mute it: one from before #2003 cannot.

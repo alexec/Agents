@@ -272,6 +272,11 @@ struct AgentsCommands: Commands {
                 Button("Undo Archive") { Task { await model.undoArchive() } }
                     .keyboardShortcut("z")
             }
+            // The same for Unarchive, Rename, the labels, Mute and Later (#4793).
+            if let undo = model.sessionUndo {
+                Button(undo.menuTitle) { Task { await model.undoSessionChange() } }
+                    .keyboardShortcut("z")
+            }
             if agent?.state == .archived {
                 Button("Unarchive") { act { await model.unarchive($0.id) } }
                     .keyboardShortcut(.delete, modifiers: [.command, .option])

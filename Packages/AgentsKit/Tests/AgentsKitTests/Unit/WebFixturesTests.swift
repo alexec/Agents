@@ -1117,6 +1117,39 @@ struct WebFixturesTests {
         }
     }
 
+    // MARK: undo/
+
+    /// Undo after Unarchive, Rename, the labels, Mute or Later (#4793): the toast's line and
+    /// the menu's item.
+    @Test func changeUndo() throws {
+        let changes: [(String, String?, JSONValue, SessionUndo.Change)] = [
+            ("unarchived", "Fix the parser", .object(["kind": .string("unarchived")]), .unarchived),
+            ("renamed", "Fix the parser", .object(["kind": .string("renamed"), "to": .string("Parser")]), .renamed(to: "Parser")),
+            ("renamed back", "Parser", .object(["kind": .string("renamed"), "to": .string(" ")]), .renamed(to: " ")),
+            ("one label added", "Fix the parser",
+             .object(["kind": .string("labels"), "add": .array([.string("ui")]), "remove": .array([])]),
+             .labels(add: ["ui"], remove: [])),
+            ("one label removed", nil,
+             .object(["kind": .string("labels"), "add": .array([]), "remove": .array([.string("ui")])]),
+             .labels(add: [], remove: ["ui"])),
+            ("labels changed", "Fix the parser",
+             .object(["kind": .string("labels"), "add": .array([.string("a")]), "remove": .array([.string("b")])]),
+             .labels(add: ["a"], remove: ["b"])),
+            ("muted", "Fix the parser", .object(["kind": .string("muted"), "muted": .bool(true)]), .muted(true)),
+            ("unmuted", "  ", .object(["kind": .string("muted"), "muted": .bool(false)]), .muted(false)),
+            ("later", "Approve the push", .object(["kind": .string("later")]), .later),
+        ]
+        let byName = Dictionary(uniqueKeysWithValues: changes.map { ($0.0, $0.3) })
+        try pin("undo/lines.json", changes.map { name, title, change, _ in
+            Case(name: name, input: .object(["title": title.map(JSONValue.string) ?? .null, "change": change,
+                                              "case": .string(name)]))
+        }) { input in
+            let change = byName[input["case"]?.stringValue ?? ""] ?? .later
+            return .object(["line": .string(SessionUndo.line(change, title: input["title"]?.stringValue)),
+                            "menu": .string(SessionUndo.menuTitle(change))])
+        }
+    }
+
     // MARK: sandbox/
 
     @Test func sandbox() throws {
