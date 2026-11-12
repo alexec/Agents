@@ -89,7 +89,12 @@ final class AppModel {
     var newMachineAsk: NewMachineAsk?
     /// The machine providers New Machine can use, as the control plane last listed them for
     /// this person (#3979): the Machines header's New Machine on ▸.
-    private(set) var machineProviders: [DaemonAPI.ProviderSummary] = []
+    var machineProviders: [DaemonAPI.ProviderSummary] { listedProviders.filter { $0.capabilities.contains("create") } }
+    /// Every machine provider this person may use, as the control plane last listed them: the
+    /// Machines group shows each one's machines that have not joined (#4978).
+    private(set) var listedProviders: [DaemonAPI.ProviderSummary] = []
+    /// How each click on a machine that never joined goes (#4978), by its row's id.
+    private(set) var machineJoins: [String: MachineJoin] = [:]
     /// How many New Machine calls wait for the provider's answer (#4610): a *Making…* row
     /// each, until the control plane lists the machine as joining.
     private(set) var machinesBeingMade = 0
@@ -4008,10 +4013,14 @@ final class AppModel {
                             self?.hostCameOnline(note.params)
                             await self?.syncControlHosts(control)
                         case DaemonAPI.Notification.controlProvidersChanged:
-                            // The Machines header's New Machine on ▸ and its default (#3979).
+                            // The Machines header's New Machine on ▸ and its default (#3979), and the
+                            // machines that have not joined (#4978).
                             if let listed = try? note.params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) {
-                                self?.machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
+                                self?.listedProviders = listed.filter(\.usable)
                             }
+                        case DaemonAPI.Notification.controlInstallProgress:
+                            // A join from the Machines group says its step on its row (#4978).
+                            self?.heardInstallStep(note.params)
                         case DaemonAPI.Notification.controlLineageChanged:
                             // Work ▸ Timeline reads the sessions again (#4276).
                             self?.lineageChanges += 1
@@ -4189,9 +4198,10 @@ final class AppModel {
     }
 
     /// The machines New Machine made that have not joined yet (#4610): a *Making…* row each
-    /// under Machines, red with the reason once the control plane gave up on one.
+    /// under Machines, red with the reason once the control plane gave up on one; and every other
+    /// machine of the person's that has not joined, grey, a click to join it (#4978).
     var machinesMaking: [MachineMaking] {
-        MachineMaking.rows(machineProviders, hostNames: Set(hosts.controlRows.values.map(\.name)))
+        MachineMaking.rows(listedProviders, hostNames: Set(hosts.controlRows.values.map(\.name)))
     }
 
     /// Delete on a row the control plane gave up on (#4610): the provider deletes the workspace.
@@ -4214,7 +4224,45 @@ final class AppModel {
               let answer = try? await controlRequests.call(DaemonAPI.Method.providersList, DaemonAPI.Empty()),
               let listed = try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)
         else { return }
-        machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
+        listedProviders = listed.filter(\.usable)
+    }
+
+    /// A click on a machine that never joined (#4978): the control plane installs Agents on it
+    /// over ssh, from the machine that carries its provider for a codespace (`gh codespace ssh`
+    /// starts a stopped one), after starting it with its provider otherwise. The row says each
+    /// step, and why it failed; it leaves when the machine joins. `trust` is a host key the
+    /// person looked at and trusts.
+    func joinMachine(_ row: MachineMaking, trust: String? = nil) async {
+        guard row.canJoin, machineJoins[row.id]?.isJoining != true, let controlRequests, let ssh = row.ssh else { return }
+        machineJoins[row.id] = .joining(step: nil)
+        var params: [String: JSONValue] = ["destination": .string(ssh), "name": .string(row.name),
+                                           "tunnel": .bool(row.tunnel), "provider": .string(row.provider.rawValue),
+                                           "workspace": .string(row.workspace)]
+        if let trust { params["trust"] = .string(trust) }
+        do {
+            let answer = try await controlRequests.call(DaemonAPI.Method.hostsInstall, JSONValue.object(params))
+            if let fingerprint = answer["needsTrust"]?.stringValue {
+                machineJoins[row.id] = .needsTrust(fingerprint)
+            } else {
+                machineJoins[row.id] = .joining(step: "started")
+            }
+        } catch let error as JSONRPCError {
+            machineJoins[row.id] = .failed(HostProblem.controlRefusal(error))
+        } catch {
+            machineJoins[row.id] = .failed("The control plane can’t be reached.")
+        }
+        await loadMachineProviders()
+    }
+
+    /// Forgets a join's host key question: the person did not trust it.
+    func cancelJoin(_ row: MachineMaking) { machineJoins[row.id] = nil }
+
+    /// `control/installProgress`: the step of a join, on the row of its name.
+    private func heardInstallStep(_ params: JSONValue?) {
+        guard let name = params?["name"]?.stringValue, let step = params?["step"]?.stringValue,
+              let row = machinesMaking.first(where: { $0.name == name }), machineJoins[row.id]?.isJoining == true
+        else { return }
+        machineJoins[row.id] = .joining(step: step)
     }
 
     /// Delete's question on a machine's row (#3979): the worktrees on it with work not
