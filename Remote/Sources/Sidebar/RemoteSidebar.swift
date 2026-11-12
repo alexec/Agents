@@ -181,9 +181,8 @@ struct RemoteSidebar: View {
                         .appText(.supporting).tag(SidebarItem.runtimes)
                     // What happened last to the person's secrets and accounts (#4161), as the window's.
                     ForEach([StatusSecretsKind.secrets, .accounts], id: \.self) { kind in
-                        StatusSecretsRow(kind: kind, state: model.userScope)
-                            .activityIcon(kind.systemImage, warns: StatusSecretsWords.warns(model.userScope.statusLines(kind)),
-                                          tint: .attention)
+                        StatusSecretsRow(kind: kind, state: model.userScope) { model.work.agent($0)?.title }
+                            .activityIcon(kind.systemImage)
                             .appText(.supporting).tag(kind == .secrets ? SidebarItem.secretsStatus : .accountsStatus)
                     }
                 } header: {

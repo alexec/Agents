@@ -131,14 +131,17 @@ public extension DaemonAPI {
         }
     }
 
-    /// An account's newest operation (#4157): `read`, `added` or `edited`, and when.
+    /// An account's newest operation (#4157): `read`, `added` or `edited`, when, and the session that did it.
     struct AccountLastOp: Codable, Sendable, Hashable {
         public var what: String
         public var at: Date
+        /// The session that did it; nil when no session did.
+        public var agent: UUID?
 
-        public init(what: String, at: Date) {
+        public init(what: String, at: Date, agent: UUID? = nil) {
             self.what = what
             self.at = at
+            self.agent = agent
         }
     }
 
@@ -199,15 +202,18 @@ public extension DaemonAPI {
         public var at: String
     }
 
-    /// A secret's last operation (#4158): what it was and when. No session, no place, no value.
+    /// A secret's last operation (#4158): what it was, when, and the session that did it. No place, no value.
     struct SecretLastOp: Codable, Sendable, Hashable {
         /// `read`, `denied`, `added`, `replaced` or `removed`.
         public var what: String
         public var at: Date
+        /// The session that did it; nil for a change no session made.
+        public var agent: UUID?
 
-        public init(what: String, at: Date) {
+        public init(what: String, at: Date, agent: UUID? = nil) {
             self.what = what
             self.at = at
+            self.agent = agent
         }
     }
 

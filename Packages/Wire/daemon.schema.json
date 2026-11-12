@@ -70,6 +70,10 @@
         },
         "at": {
           "$ref": "#/definitions/WireDate"
+        },
+        "agent": {
+          "$ref": "#/definitions/UUID",
+          "description": "The session that did it: by manage_accounts, or by reading the secret or card the account names. Left out when no session did."
         }
       },
       "required": [
@@ -90,6 +94,10 @@
         },
         "address": {
           "type": "string"
+        },
+        "agent": {
+          "$ref": "#/definitions/UUID",
+          "description": "The session whose manage_accounts call it was."
         }
       },
       "required": [
@@ -27046,13 +27054,17 @@
     },
     "SecretLastOp": {
       "type": "object",
-      "description": "A secret's last operation (#4158): what it was and when, the newest any machine reported. No session, no place, no value.",
+      "description": "A secret's last operation (#4158): what it was, when, and the session that did it, the newest any machine reported. No place, no value.",
       "properties": {
         "what": {
           "$ref": "#/definitions/SecretOperationWhat"
         },
         "at": {
           "$ref": "#/definitions/WireDate"
+        },
+        "agent": {
+          "$ref": "#/definitions/UUID",
+          "description": "The session that did it, so the person's own clients can name it beside a recent read. Left out for a change no session made."
         }
       },
       "required": [

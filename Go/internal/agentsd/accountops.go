@@ -128,7 +128,7 @@ func (d *Daemon) noteAccountOps(agent wire.UUID, ops []wire.AccountOperation) {
 	d.accountOps.mu.Lock()
 	rec := d.accountOpsLocked()
 	for _, op := range ops {
-		rec.Accounts[accountOpKey(op.Service, op.Address)] = wire.AccountLastOp{What: op.What, At: at}
+		rec.Accounts[accountOpKey(op.Service, op.Address)] = wire.AccountLastOp{What: op.What, At: at, Agent: op.Agent}
 	}
 	d.saveAccountOpsLocked()
 	d.accountOps.mu.Unlock()

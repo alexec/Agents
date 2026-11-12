@@ -37,6 +37,9 @@ type AccountLastOp struct {
 	What AccountOperationWhat `json:"what"`
 
 	At Date `json:"at"`
+
+	// The session that did it: by manage_accounts, or by reading the secret or card the account names. Left out when no session did.
+	Agent *UUID `json:"agent,omitzero"`
 }
 
 // One read or change of an outside account by manage_accounts (#4157): a get, a list filtered to its service, or an add. Never a value of the account but its service and address.
@@ -46,6 +49,9 @@ type AccountOperation struct {
 	Service string `json:"service"`
 
 	Address *string `json:"address,omitzero"`
+
+	// The session whose manage_accounts call it was.
+	Agent *UUID `json:"agent,omitzero"`
 }
 
 // What an operation on an account was (#4157): read (by manage_accounts, or a read of its secret or card), added, or edited (it took another's place).
@@ -12387,11 +12393,14 @@ type SecretGrants struct {
 	Grants []SecretGrant `json:"grants"`
 }
 
-// A secret's last operation (#4158): what it was and when, the newest any machine reported. No session, no place, no value.
+// A secret's last operation (#4158): what it was, when, and the session that did it, the newest any machine reported. No place, no value.
 type SecretLastOp struct {
 	What SecretOperationWhat `json:"what"`
 
 	At Date `json:"at"`
+
+	// The session that did it, so the person's own clients can name it beside a recent read. Left out for a change no session made.
+	Agent *UUID `json:"agent,omitzero"`
 }
 
 // A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.
