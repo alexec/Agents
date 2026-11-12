@@ -246,7 +246,12 @@ struct SettingsWindow: View {
         case .signIn:
             FormColumn { SignInPane(control: model.controlRequests, revision: model.people.revision) }
         case .policy:
+            // The Console's admin pages the window does not draw open on the web page (#4939).
             FormColumn { OrgPolicyPane(control: model.controlRequests, people: model.people) }
+                .environment(\.openWebPlace, OpenWebPlace { [control] place in
+                    guard let control else { return "The control plane can’t be reached." }
+                    return await control.openInBrowser(place: place)
+                })
         }
     }
 
