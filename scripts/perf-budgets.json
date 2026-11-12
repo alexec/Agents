@@ -1,0 +1,33 @@
+{
+  "_about": "The performance budgets (#73, #4784), in one file. `pr` holds what does not change with load (bytes and counts) and fails a pull request's check when it goes over: Web/test/perfBudgets.test.mjs (web) and Go/internal/agentsd/perfbytes_test.go (host). `night` holds the times, in ms, that scripts/perf-nightly.sh measures on a seeded scratch root on this Mac; a run over files a feature:performance issue. To raise a budget, change it here, in the PR that needs it, and say why in its body. docs/how-to/performance-budgets.md says more.",
+  "pr": {
+    "web.gzipBytes": 600000,
+    "web.callsBeforeFirstList": 7,
+    "host.leanAgentBytes": 640,
+    "host.catchUpBytes": 32500
+  },
+  "night": {
+    "host": {
+      "daemon/ping": 20,
+      "agents/list": 250,
+      "agents/list, lean": 100,
+      "folders/list": 100,
+      "open a long chat (turns + open turn)": 500,
+      "a long chat, Remote's last 500": 500,
+      "files/list, big repo root": 250,
+      "files/list, big repo deep folder": 100,
+      "changes/list, big repo": 1000
+    },
+    "mac": {
+      "cold start: first frame": 1500,
+      "cold start: first list": 2000,
+      "project switch": 150,
+      "chat open": 500
+    },
+    "web": {
+      "first list": 2000,
+      "open a session": 500,
+      "open a long transcript": 1000
+    }
+  }
+}
