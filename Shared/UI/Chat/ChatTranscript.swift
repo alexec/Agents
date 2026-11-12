@@ -429,9 +429,8 @@ struct ChatTranscript: View {
                 LoadFailureLine(sentence: loadFailure.sentence, retry: actions.reloadTranscript)
             }
             if hasMore {
-                // No button. Reaching the top is the ask.
-                ProgressView()
-                    .controlSize(.small)
+                // No button. Reaching the top is the ask. Said only after 300 ms (#4795).
+                DelayedProgress(controlSize: .small)
                     .frame(maxWidth: .infinity, alignment: .center)
             }
         }

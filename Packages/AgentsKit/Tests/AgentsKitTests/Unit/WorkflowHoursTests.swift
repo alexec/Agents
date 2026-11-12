@@ -61,4 +61,34 @@ struct WorkflowHoursTests {
             == "Waiting — 2 triggers held into one run, as it is outside its hours, and its hours name no day")
         #expect(WorkflowRefusal.codes.contains("outside_hours"))
     }
+
+    /// The status card and the row (#4819): the window, and when a held trigger runs.
+    @Test func theCardSaysTheWindowAndWhenItOpens() throws {
+        let london = TimeZone(identifier: "Europe/London")!
+        let ny = TimeZone(identifier: "America/New_York")!
+        let work = WorkflowHours(between: "9-18", days: [.mon, .tue, .wed, .thu, .fri])
+        #expect(work.sentence(viewer: london) == "Runs 09:00–18:00, Mon–Fri")
+        let night = WorkflowHours(between: "18:00-09:30", days: [.sat, .sun, .mon, .wed], timeZone: "Europe/London")
+        #expect(night.sentence(viewer: london) == "Runs 18:00–09:30, Mon, Wed, Sat, Sun")
+        #expect(night.sentence(viewer: ny) == "Runs 18:00–09:30, Mon, Wed, Sat, Sun (Europe/London)")
+        #expect(WorkflowHours(days: Array(Weekday.everyDay)).sentence(viewer: london) == nil)
+        #expect(WorkflowHours(days: []).sentence(viewer: london) == "Never runs on its own: its hours name no day")
+
+        // Monday 2026-11-16 09:00 in London is 04:00 in New York.
+        let opens = try #require(Self.calendar.date(from: DateComponents(year: 2026, month: 11, day: 16, hour: 9)))
+        var held = WorkflowSummary(workflow: Workflow(workflowID: "w", folder: URL(filePath: "/p"), hours: night),
+                                   holdsAFire: true, hoursOpenAt: opens)
+        #expect(held.waitsForItsHours)
+        #expect(held.hoursOpenSentence(viewer: london) == "Waits for its hours: opens Mon 09:00")
+        #expect(held.hoursOpenSentence(viewer: ny) == "Waits for its hours: opens Mon 09:00 (Europe/London)")
+        #expect(held.hoursRowSentence(viewer: london) == "Waits for its hours: opens Mon 09:00")
+        held.holdsAFire = false
+        #expect(!held.waitsForItsHours)
+        #expect(held.hoursOpenSentence(viewer: london) == "Outside its hours: opens Mon 09:00")
+        held.hoursOpenAt = nil
+        #expect(held.hoursRowSentence(viewer: london) == "Runs 18:00–09:30, Mon, Wed, Sat, Sun")
+        held.isArchived = true
+        #expect(held.hoursRowSentence(viewer: london) == nil)
+        #expect(WorkflowRefusal.outsideHours(until: nil).isOutsideHours && !WorkflowRefusal.coolingDown(until: nil).isOutsideHours)
+    }
 }
