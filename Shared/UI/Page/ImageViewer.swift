@@ -33,7 +33,7 @@ struct ImageViewer: View {
                 Text(label).appText(.supporting).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.middle)
                 Spacer(minLength: 8)
-                Button(action: zoom.zoomOut) { Image(systemName: "minus.magnifyingglass") }
+                Button(action: zoom.zoomOut) { Image(icon: "minus.magnifyingglass") }
                     .keyboardShortcut("-")
                     .disabled(!zoom.canZoomOut)
                     .help("Zoom Out (⌘−)")
@@ -44,7 +44,7 @@ struct ImageViewer: View {
                         .frame(minWidth: 40)
                 }
                 .help("Fit the image to the window")
-                Button(action: zoom.zoomIn) { Image(systemName: "plus.magnifyingglass") }
+                Button(action: zoom.zoomIn) { Image(icon: "plus.magnifyingglass") }
                     .keyboardShortcut("+")
                     .disabled(!zoom.canZoomIn)
                     .help("Zoom In (⌘+)")

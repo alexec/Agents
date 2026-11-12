@@ -12,7 +12,7 @@ struct AchievementCard: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "checkmark.seal.fill")
+            Image(icon: "checkmark.seal.fill")
                 // Decorative: the card says what it is in words.
                 .glyph(size: 13)
                 .foregroundStyle(Paper.accent)
@@ -29,7 +29,7 @@ struct AchievementCard: View {
             }
             Spacer(minLength: 0)
             Button(action: dismiss) {
-                Image(systemName: "xmark")
+                Image(icon: "xmark")
                     // Decorative: the button's label is said below.
                     .glyph(size: 10, weight: .semibold)
                     .foregroundStyle(.secondary)

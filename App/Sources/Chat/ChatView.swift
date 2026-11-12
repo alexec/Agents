@@ -326,7 +326,7 @@ struct ChatView: View {
                 Button {
                     Task { await model.unarchive(agent.id) }
                 } label: {
-                    Label("Unarchive", systemImage: "tray.and.arrow.up")
+                    Label("Unarchive", icon: "tray.and.arrow.up")
                 }
                 .buttonStyle(.paper)
                 .appText(.fine)

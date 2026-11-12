@@ -76,7 +76,7 @@ struct PinnedViewPage: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: "square.grid.2x2")
+            Image(icon: "square.grid.2x2")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {

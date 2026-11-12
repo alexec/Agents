@@ -16,7 +16,7 @@ struct MarketplaceMenu: View {
                         chosen = marketplace.id
                     } label: {
                         if marketplace.id == current?.id {
-                            Label(marketplace.name, systemImage: "checkmark")
+                            Label(marketplace.name, icon: "checkmark")
                         } else {
                             Text(marketplace.name)
                         }

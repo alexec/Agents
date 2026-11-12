@@ -75,7 +75,7 @@ struct AgentBrowserPane: View {
     /// session's own tab stays below, to look at and use.
     private func holderLine(_ holder: UUID) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: "cursorarrow.rays")
+            Image(icon: "cursorarrow.rays")
                 .foregroundStyle(.secondary)
             Button {
                 if !model.showInFolderWindow(holder) { model.showInMainWindow(holder, opening: openWindow) }
@@ -97,15 +97,15 @@ struct AgentBrowserPane: View {
 
     private var bar: some View {
         HStack(spacing: 6) {
-            Button { Task { await browser.navigate(.back) } } label: { Image(systemName: "chevron.left") }
+            Button { Task { await browser.navigate(.back) } } label: { Image(icon: "chevron.left") }
                 .buttonStyle(.borderless)
                 .disabled(!running)
                 .help("Back")
-            Button { Task { await browser.navigate(.forward) } } label: { Image(systemName: "chevron.right") }
+            Button { Task { await browser.navigate(.forward) } } label: { Image(icon: "chevron.right") }
                 .buttonStyle(.borderless)
                 .disabled(!running)
                 .help("Forward")
-            Button { Task { await browser.navigate(.reload) } } label: { Image(systemName: "arrow.clockwise") }
+            Button { Task { await browser.navigate(.reload) } } label: { Image(icon: "arrow.clockwise") }
                 .buttonStyle(.borderless)
                 .disabled(!running)
                 .help("Reload")
@@ -186,7 +186,7 @@ private struct Note: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: symbol)
+            Image(icon: symbol)
                 .appText(.title)
                 .foregroundStyle(.tertiary)
             Text(title)

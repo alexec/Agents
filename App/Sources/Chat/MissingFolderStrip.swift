@@ -19,21 +19,21 @@ struct MissingFolderStrip: View {
             Button {
                 Task { await model.continueInFolder(agent.id) }
             } label: {
-                Label(MissingFolderWords.continueInFolder, systemImage: "arrow.turn.down.right")
+                Label(MissingFolderWords.continueInFolder, icon: "arrow.turn.down.right")
             }
             .help("Start a new session in the folder that reads this one and carries on")
             if agent.mayRecreateWorktree {
                 Button {
                     Task { await model.recreateWorktree(agent.id) }
                 } label: {
-                    Label(MissingFolderWords.recreateWorktree, systemImage: "arrow.triangle.branch")
+                    Label(MissingFolderWords.recreateWorktree, icon: "arrow.triangle.branch")
                 }
                 .help("Make the worktree again from its branch\(agent.worktree?.branch.map { ", \($0)" } ?? "")")
             }
             Button {
                 Task { await model.archive(agent.id, andLeave: true) }
             } label: {
-                Label(MissingFolderWords.archive, systemImage: "archivebox")
+                Label(MissingFolderWords.archive, icon: "archivebox")
             }
             .help("Archive this session")
         }

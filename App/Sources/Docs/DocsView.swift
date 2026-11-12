@@ -115,10 +115,10 @@ struct DocsView: View {
         .navigationTitle("Docs")
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
-                Button { model.docsHistory.back() } label: { Image(systemName: "chevron.left") }
+                Button { model.docsHistory.back() } label: { Image(toolbarIcon: "chevron.left") }
                     .disabled(!model.docsHistory.canGoBack)
                     .help("Back")
-                Button { model.docsHistory.forward() } label: { Image(systemName: "chevron.right") }
+                Button { model.docsHistory.forward() } label: { Image(toolbarIcon: "chevron.right") }
                     .disabled(!model.docsHistory.canGoForward)
                     .help("Forward")
             }
@@ -187,7 +187,7 @@ private struct DocsListPane: View {
                                          project: list.inProject)
             List {
                 ForEach(lists.compactMap { l in l.problem.map { "\(l.name): \($0)" } }, id: \.self) { line in
-                    Label(line, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
+                    Label(line, icon: "exclamationmark.triangle").foregroundStyle(.secondary)
                 }
                 if groups.isEmpty {
                     Text(DocsList.noDocs).foregroundStyle(.secondary)

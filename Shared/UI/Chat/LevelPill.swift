@@ -42,7 +42,7 @@ struct LevelPill: View {
                         }
                     } label: {
                         if level == chosen {
-                            Label(LevelWords.level(field, level), systemImage: "checkmark")
+                            Label(LevelWords.level(field, level), icon: "checkmark")
                         } else {
                             Text(LevelWords.level(field, level))
                         }
@@ -69,7 +69,7 @@ struct LevelPill: View {
         } label: {
             HStack(spacing: 4) {
                 Text(title)
-                Image(systemName: "chevron.down")
+                Image(icon: "chevron.down")
                     // Decorative: a glyph in a capsule, not text (FR-015).
                     .glyph(size: 8, weight: .semibold)
                     .foregroundStyle(.secondary)

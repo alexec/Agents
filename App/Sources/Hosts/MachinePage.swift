@@ -363,9 +363,9 @@ struct MachineRow: View {
         // A full swipe never deletes: Delete and Remove ask first.
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if actions.delete {
-                Button("Delete", systemImage: "trash", role: .destructive) { askDelete() }
+                Button("Delete", icon: "trash", role: .destructive) { askDelete() }
             } else if actions.remove {
-                Button("Remove", systemImage: "minus.circle") { removing = true }.tint(.gray)
+                Button("Remove", icon: "minus.circle") { removing = true }.tint(.gray)
             }
         }
         .contextMenu {
@@ -565,7 +565,7 @@ struct MakingMachineRow: View {
         // A full swipe never deletes: Delete asks first.
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if gaveUp {
-                Button("Delete", systemImage: "trash", role: .destructive) { deleting = true }
+                Button("Delete", icon: "trash", role: .destructive) { deleting = true }
             }
         }
         .contextMenu {

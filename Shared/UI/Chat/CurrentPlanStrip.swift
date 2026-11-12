@@ -34,7 +34,7 @@ struct CurrentPlanStrip: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Image(systemName: "checkmark.square")
+                            Image(icon: "checkmark.square")
                                 .appText(.supporting)
                                 .accessibilityHidden(true)
                             Text(plan.stripStep)
@@ -47,7 +47,7 @@ struct CurrentPlanStrip: View {
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
                                 .fixedSize()
-                            Image(systemName: "chevron.right")
+                            Image(icon: "chevron.right")
                                 .appText(.fine)
                                 .foregroundStyle(.secondary)
                                 .rotationEffect(.degrees(isExpanded ? 90 : 0))

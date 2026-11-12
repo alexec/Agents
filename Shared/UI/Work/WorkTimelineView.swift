@@ -493,7 +493,7 @@ struct WorkTimelinePane: View {
                     if let line = drawing.lines.first(where: { $0.id == id }) { lineRow(line, drawing: drawing) }
                 }
             case .release(let release):
-                miniRow(glyph: AnyView(Image(systemName: WorkList.Kind.release.sidebarIcon).foregroundStyle(.secondary)
+                miniRow(glyph: AnyView(Image(icon: WorkList.Kind.release.sidebarIcon).foregroundStyle(.secondary)
                             .accessibilityHidden(true)),
                         title: release.tag, labels: [], line: WorkTimeline.releaseLine(release, now: drawing.now))
             }
@@ -689,7 +689,7 @@ private struct Drawing {
             let c = colour(line)
             if case .waits(let n) = line.how {
                 // Where the forecast stops: "3 wait for you", with a person.
-                let words = Text("\(Image(systemName: "person.fill")) \(WorkTimeline.waitWords(n))")
+                let words = Text("\(Image(icon: "person.fill")) \(WorkTimeline.waitWords(n))")
                 let width = WorkTimelinePane.measure(WorkTimeline.waitWords(n)) + 16
                 pill(&gc, words, at: CGPoint(x: axis.x(line.end) + 6 + width / 2, y: yl), fill: Self.waits, text: .white)
             }

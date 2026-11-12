@@ -12,7 +12,7 @@ struct EmptyState: View {
     var body: some View {
         ContentUnavailableView {
             if let systemImage {
-                Label(title, systemImage: systemImage)
+                Label(title, icon: systemImage)
             } else {
                 Text(title)
             }

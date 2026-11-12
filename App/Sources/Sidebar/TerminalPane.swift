@@ -171,7 +171,7 @@ struct ShellScreen: View {
     @ViewBuilder
     private func ended(_ client: ShellClient) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.circle")
+            Image(icon: "exclamationmark.circle")
                 .foregroundStyle(.secondary)
             Text(client.state.explanation ?? "The shell is no longer running.")
                 .appText(.reading)
@@ -192,7 +192,7 @@ struct ShellScreen: View {
     /// strip says where each of them is, and offers to type the `cd` for them.
     private func moved(_ client: ShellClient, from opened: URL, to home: (folder: URL, name: String)) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "arrow.triangle.branch")
+            Image(icon: "arrow.triangle.branch")
                 .foregroundStyle(.secondary)
             Text("This shell is in \(opened.lastPathComponent). The agent now works in \(home.name).")
                 .appText(.fine)
@@ -240,7 +240,7 @@ private struct Trouble: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle")
+            Image(icon: "exclamationmark.triangle")
                 .appText(.title)
                 .foregroundStyle(.tertiary)
             Text(message)

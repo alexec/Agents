@@ -98,7 +98,7 @@ struct AddMachineSheet: View {
     private func wayRow(_ each: AddMachine.Way) -> some View {
         Button { way = each } label: {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Image(systemName: way == each ? "largecircle.fill.circle" : "circle")
+                Image(icon: way == each ? "largecircle.fill.circle" : "circle")
                     .foregroundStyle(way == each ? Paper.accent : .secondary)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {

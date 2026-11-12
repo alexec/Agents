@@ -211,7 +211,7 @@ private struct SharedEmptyState: View {
     var body: some View {
         VStack(spacing: 14) {
             // Decorative: the tab's own symbol, large, above the words that say it all.
-            Image(systemName: SettingsPane.agentConfiguration.symbol).glyph(size: 34).foregroundStyle(.secondary)
+            Image(icon: SettingsPane.agentConfiguration.symbol).glyph(size: 34).foregroundStyle(.secondary)
             Text("Nothing here yet").appText(.title)
             Text(words)
                 .appText(.supporting).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -236,7 +236,7 @@ private struct SharedOffState: View {
     var body: some View {
         VStack(spacing: 10) {
             // Decorative: the tab's own symbol, large, above the words that say it all.
-            Image(systemName: SettingsPane.agentConfiguration.symbol).glyph(size: 34).foregroundStyle(.secondary)
+            Image(icon: SettingsPane.agentConfiguration.symbol).glyph(size: 34).foregroundStyle(.secondary)
             Text("The shared folder is off for this copy of the app").appText(.reading)
             Text("It lays out and reports on ~/.agents only for the app’s own daemon, so a copy being tried out leaves your home folder alone.")
                 .appText(.fine).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -401,7 +401,7 @@ struct AgentConfigurationPageList: View {
                             + (waiting.contains(each) ? ", waiting for your OK" : ""),
                         action: { choose(each) }) {
             if warns {
-                Image(systemName: "exclamationmark.triangle")
+                Image(icon: "exclamationmark.triangle")
                     .foregroundStyle(lit ? .white : SharedInk.attention)
             }
             if waiting.contains(each) {

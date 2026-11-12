@@ -89,7 +89,7 @@ struct LiveTile: View {
     private func tile(_ frame: LiveFrame, sources: [LiveSource]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 8) {
-                Label(LiveTileWords.name(frame), systemImage: LiveTileWords.symbol(frame.source))
+                Label(LiveTileWords.name(frame), icon: LiveTileWords.symbol(frame.source))
                     .appText(.supporting).fontWeight(.semibold)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -122,7 +122,7 @@ struct LiveTile: View {
     private func switcher(_ shown: LiveSource, sources: [LiveSource]) -> some View {
         Picker(LiveTileWords.switchLabel, selection: Binding(get: { shown }, set: { chosen = $0 })) {
             ForEach(sources.sorted { $0.rawValue < $1.rawValue }, id: \.self) { source in
-                Image(systemName: LiveTileWords.symbol(source))
+                Image(icon: LiveTileWords.symbol(source))
                     .accessibilityLabel(LiveTileWords.kind(source))
                     .help(LiveTileWords.kind(source))
                     .tag(source)
@@ -158,7 +158,7 @@ struct LiveTile: View {
     private func placeholder(symbol: String, title: String, body: String?) -> some View {
         VStack(spacing: 6) {
             // Decorative: the words under it say the same.
-            Image(systemName: symbol).font(.title2)
+            Image(icon: symbol).font(.title2)
             Text(title).appText(.reading).fontWeight(.semibold)
             if let body {
                 Text(body).appText(.supporting).multilineTextAlignment(.center)

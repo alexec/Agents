@@ -9,7 +9,7 @@ struct MachineIconView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Image(systemName: symbol)
+        Image(icon: symbol)
             .sidebarMark(style)
             .symbolEffect(.pulse, isActive: icon == .busy && !reduceMotion)
             .accessibilityHidden(true)

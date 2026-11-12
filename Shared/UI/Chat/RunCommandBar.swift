@@ -17,14 +17,14 @@ struct RunCommandBar: View {
                     run(command)
                     ran = true
                 } label: {
-                    Label("Run", systemImage: "play")
+                    Label("Run", icon: "play")
                 }
                 .help("Type this into the session's shell and run it")
                 if ran, let tell = actions.tellAgent {
                     Button {
                         tell(command)
                     } label: {
-                        Label("Tell the Agent", systemImage: "arrow.uturn.left")
+                        Label("Tell the Agent", icon: "arrow.uturn.left")
                     }
                     .help("Send the command and the end of what it printed to the agent")
                 }

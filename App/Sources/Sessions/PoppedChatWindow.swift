@@ -87,7 +87,7 @@ struct PoppedChatWindow: View {
                 Button {
                     Task { await model.setPinned(agent, !pinned) }
                 } label: {
-                    Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
+                    Label(pinned ? "Unpin" : "Pin", toolbarIcon: pinned ? "pin.slash" : "pin")
                 }
                 .disabled(agent.state == .archived)
                 .help(pinned ? "Take this session out of Pinned in the sidebar"
@@ -97,7 +97,7 @@ struct PoppedChatWindow: View {
                     Button {
                         Task { await model.unarchive(agent.id) }
                     } label: {
-                        Label("Unarchive", systemImage: "tray.and.arrow.up")
+                        Label("Unarchive", toolbarIcon: "tray.and.arrow.up")
                     }
                     .help("Unarchive this session (⌥⌘⌫)")
                 } else {
@@ -106,7 +106,7 @@ struct PoppedChatWindow: View {
                     Button {
                         Task { await model.archive(agent.id, andLeave: true) }
                     } label: {
-                        Label("Archive", systemImage: "archivebox")
+                        Label("Archive", toolbarIcon: "archivebox")
                     }
                     .help("Archive this session (⌥⌘⌫)")
                 }

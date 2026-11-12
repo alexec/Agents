@@ -76,7 +76,7 @@ struct ControlAddServerSheet: View {
             if updating != nil {
                 sshPage
             } else if let joinedHost, let joined {
-                Label("\(joined) joined.", systemImage: "checkmark.circle.fill").appText(.reading).tinted(.vouched)
+                Label("\(joined) joined.", icon: "checkmark.circle.fill").appText(.reading).tinted(.vouched)
                 HostFoldersPicker(host: joinedHost, hostName: joined, paths: control.suggestedPaths,
                                    leaveTitle: "Skip") { dismiss() }
             } else {
@@ -146,7 +146,7 @@ struct ControlAddServerSheet: View {
             ProgressView().controlSize(.small)
         }
         if let joined {
-            Label("\(joined) joined.", systemImage: "checkmark.circle.fill").appText(.reading).tinted(.vouched)
+            Label("\(joined) joined.", icon: "checkmark.circle.fill").appText(.reading).tinted(.vouched)
         } else if shown != nil {
             HStack(spacing: 8) {
                 ProgressView().controlSize(.mini)

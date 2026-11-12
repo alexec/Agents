@@ -40,7 +40,7 @@ struct ModelPill: View {
         } label: {
             HStack(spacing: 4) {
                 Text(title)
-                Image(systemName: "chevron.down")
+                Image(icon: "chevron.down")
                     // Decorative: a glyph in a capsule, not text (FR-015).
                     .glyph(size: 8, weight: .semibold)
                     .foregroundStyle(.secondary)

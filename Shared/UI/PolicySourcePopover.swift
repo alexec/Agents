@@ -15,7 +15,7 @@ struct PolicySourcePopover: View {
             ForEach(Array(rule.layers.enumerated()), id: \.offset) { _, layer in
                 let decides = rule.decides == layer.layer
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: OrgPolicyWords.layerSymbol(layer.layer.kind))
+                    Image(icon: OrgPolicyWords.layerSymbol(layer.layer.kind))
                         .frame(width: 18)
                         .foregroundStyle(decides ? AnyShapeStyle(Paper.accent) : AnyShapeStyle(.secondary))
                         .accessibilityHidden(true)

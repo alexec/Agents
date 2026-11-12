@@ -48,7 +48,7 @@ struct ProjectPicker: View {
                             Button(ProjectWords.rename) { ask(.rename(current)) }
                         }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Image(icon: "ellipsis.circle")
                             .accessibilityLabel("Project actions")
                     }
                     .fixedSize()

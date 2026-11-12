@@ -68,7 +68,7 @@ struct RenameButton: View {
         Button {
             model.renaming = renaming
         } label: {
-            Label("Rename", systemImage: "pencil")
+            Label("Rename", toolbarIcon: "pencil")
         }
         .disabled(agent.state == .archived)
         .help("Give this session a title of your own, which the runtime's no longer replaces")

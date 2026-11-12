@@ -19,7 +19,7 @@ struct ChannelLinkCard: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: request.channel == "email" ? "envelope" : "bubble.left")
+            Image(icon: request.channel == "email" ? "envelope" : "bubble.left")
                 // Decorative: the card says what it is in words.
                 .glyph(size: 13)
                 .foregroundStyle(StateTint.attention.style(or: .primary))

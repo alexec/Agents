@@ -46,7 +46,7 @@ struct WorkDocsSection: View {
         Button { model.showDocs(DocsPlace(ref: doc.ref)) } label: {
             // The panel is narrow: the title goes under the doc's name.
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: "doc.text").foregroundStyle(.secondary)
+                Image(icon: "doc.text").foregroundStyle(.secondary)
                 VStack(alignment: .leading, spacing: 1) {
                     Text(DocsList.shortForm(doc)).monospaced(doc.path != nil).lineLimit(1).truncationMode(.middle)
                     if let beside = DocsList.titleBeside(doc) {

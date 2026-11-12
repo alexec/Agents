@@ -140,7 +140,7 @@ struct SendingRow: View {
                         .buttonStyle(.link)
                         .appText(.fine)
                 }
-                Button { model.putAwaySend(send) } label: { Image(systemName: "xmark") }
+                Button { model.putAwaySend(send) } label: { Image(icon: "xmark") }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     .help("Put away")

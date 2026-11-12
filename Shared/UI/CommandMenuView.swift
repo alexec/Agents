@@ -115,7 +115,7 @@ struct CommandMenuView: View {
 
     private func row(_ item: CommandFinder.Item, isSelected: Bool) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: item.kind.symbol)
+            Image(icon: item.kind.symbol)
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
                 .accessibilityHidden(true)

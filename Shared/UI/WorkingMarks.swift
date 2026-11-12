@@ -362,8 +362,10 @@ private final class BeaconView: ClockedLayersView {
     private static func symbolImage(side: CGFloat, scale: CGFloat) -> CGImage? {
         #if os(macOS)
         let config = NSImage.SymbolConfiguration(pointSize: side, weight: .medium)
-        guard let symbol = NSImage(systemSymbolName: StatusShape.waitingSymbol, accessibilityDescription: nil)?
-            .withSymbolConfiguration(config) else { return nil }
+        // The Lucide symbol of the same meaning (#4976), as `Image(icon:)` draws it
+        let base = PaperIcon.lucide(StatusShape.waitingSymbol).flatMap { NSImage(named: $0) }
+            ?? NSImage(systemSymbolName: StatusShape.waitingSymbol, accessibilityDescription: nil)
+        guard let symbol = base?.withSymbolConfiguration(config) else { return nil }
         let fit = NSImage(size: symbol.size, flipped: false) { frame in
             symbol.draw(in: frame)
             return true

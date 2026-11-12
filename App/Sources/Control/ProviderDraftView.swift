@@ -70,7 +70,7 @@ struct ProviderDraftStatus: View {
             }
             detailsButton
             Button(action: cancel) {
-                Image(systemName: "xmark.circle.fill")
+                Image(icon: "xmark.circle.fill")
             }
             .buttonStyle(.borderless)
             .help("Stop writing. Nothing is kept.")

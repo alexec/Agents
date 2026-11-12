@@ -36,7 +36,7 @@ struct VoiceModeButton: View {
                 voice.turnOn(in: agentID, vocabulary: vocabulary(), send: send)
             } label: {
                 // On, the blue waveform, moving while it listens or speaks (Alex, 2026-10-29).
-                Image(systemName: isOnHere ? "waveform" : "waveform.circle")
+                Image(icon: isOnHere ? "waveform" : "waveform.circle")
                     .appText(.reading).fontWeight(.semibold)
                     .foregroundStyle(isOnHere ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                     .frame(width: 22, height: 22)
@@ -151,7 +151,7 @@ struct VoiceStopButton: View {
         Button {
             VoiceMode.shared.turnOff()
         } label: {
-            Image(systemName: PromptWords.stopSymbol)
+            Image(icon: PromptWords.stopSymbol)
                 .appText(.reading).fontWeight(.semibold)
                 .frame(width: 22, height: 22)
         }

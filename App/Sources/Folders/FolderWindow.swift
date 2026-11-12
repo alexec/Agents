@@ -98,7 +98,7 @@ struct FolderWindow: View {
             if let window, let summary {
                 FolderWindowColumns(window: window, summary: summary, chat: chat)
             } else if key == nil || model.hasLoadedFolders {
-                ContentUnavailableView("This folder is not open", systemImage: "folder.badge.questionmark",
+                ContentUnavailableView("This folder is not open", icon: "folder.badge.questionmark",
                                        description: Text("It has been archived or removed. Close this window."))
             } else {
                 ProgressView()
@@ -303,7 +303,7 @@ private struct FolderWindowSidebar: View {
                 Button {
                     window.requests.projectSettings = .general
                 } label: {
-                    Label(ProjectSettingsWords.menuItem, systemImage: "gearshape")
+                    Label(ProjectSettingsWords.menuItem, icon: "gearshape")
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
@@ -331,7 +331,7 @@ private struct FolderNewSessionRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "square.and.pencil")
+            Image(icon: "square.and.pencil")
                 .sidebarMark(Paper.accent)
                 .frame(width: 16)
                 .accessibilityHidden(true)
@@ -370,7 +370,7 @@ private struct FolderWindowToolbar: ToolbarContent {
                     // In its own folder's window when that is open, else the main window.
                     if !model.showInFolderWindow(agent.id) { model.showInMainWindow(agent.id, opening: openWindow) }
                 } label: {
-                    Label("✋ \(elsewhere.count) elsewhere", systemImage: "hand.raised")
+                    Label("✋ \(elsewhere.count) elsewhere", icon: "hand.raised")
                         .labelStyle(.titleOnly)
                 }
                 .help("Sessions in other folders need you. Go to the first.")
@@ -383,7 +383,7 @@ private struct FolderWindowToolbar: ToolbarContent {
             Button {
                 window.terminal.toggle()
             } label: {
-                Label("Shell", systemImage: "apple.terminal")
+                Label("Shell", toolbarIcon: "apple.terminal")
             }
             .disabled(!summary.exists)
             .help("The folder's own shell (⌃`)")

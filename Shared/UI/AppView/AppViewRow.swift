@@ -234,7 +234,7 @@ private struct AppViewCaption: View {
                 Button {
                     host.setFullscreen(true)
                 } label: {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    Image(icon: "arrow.up.left.and.arrow.down.right")
                         .accessibilityLabel("Full screen")
                 }
                 .buttonStyle(.plain)
@@ -256,7 +256,7 @@ private struct AppViewMenu: View {
             Menu {
                 Button("Pin to Folder") { host.pinToFolder() }
             } label: {
-                Image(systemName: "ellipsis.circle")
+                Image(icon: "ellipsis.circle")
                     .accessibilityLabel("View menu")
             }
             .menuStyle(.button)

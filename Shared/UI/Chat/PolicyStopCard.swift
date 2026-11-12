@@ -18,14 +18,14 @@ struct PolicyStopCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(PolicyLayersWords.stopTitle, systemImage: PolicyLayersWords.stopSymbol)
+            Label(PolicyLayersWords.stopTitle, icon: PolicyLayersWords.stopSymbol)
                 .appText(.reading).fontWeight(.semibold)
                 .tinted(.attention)
             if let rule = refusal.rule {
                 Text(PolicyLayersWords.ruleTitle(rule)).appText(.reading)
             }
             if let line = PolicyLayersWords.stopLine(refusal) {
-                Label(line, systemImage: "lock.fill")
+                Label(line, icon: "lock.fill")
                     .appText(.fine).foregroundStyle(.secondary)
             }
             Text(refusal.words)

@@ -229,7 +229,7 @@ struct ProjectSettingsSheet: View {
         RailButton(lit: lit, label: title + (waiting ? ", waiting for your OK" : ""),
                    selected: lit, action: { if !lit { $leaving.leave(unsaved: unsaved) { pane = each } } }) {
             HStack(spacing: 8) {
-                Image(systemName: symbol)
+                Image(icon: symbol)
                     .frame(width: 20)
                     .foregroundStyle(lit ? AnyShapeStyle(Paper.ground) : AnyShapeStyle(.secondary))
                     .accessibilityHidden(true)

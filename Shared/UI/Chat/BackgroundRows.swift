@@ -54,7 +54,7 @@ struct BackgroundItemRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: BackgroundWords.symbol(item))
+            Image(icon: BackgroundWords.symbol(item))
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .frame(width: 18)
@@ -164,7 +164,7 @@ struct BackgroundLine: View {
             Button {
                 isShowingList = true
             } label: {
-                Label("\(running.count) in the background", systemImage: "chevron.right")
+                Label("\(running.count) in the background", icon: "chevron.right")
                     .labelStyle(TrailingIcon())
                     .appText(.fine)
                     .foregroundStyle(.secondary)
@@ -275,7 +275,7 @@ struct SubagentStepsView: View {
             VStack(alignment: .leading, spacing: 12) {
                 if let back {
                     Button(action: back) {
-                        Label("Everything in the background", systemImage: "chevron.left")
+                        Label("Everything in the background", icon: "chevron.left")
                     }
                     .linkStyle()
                     .appText(.fine)

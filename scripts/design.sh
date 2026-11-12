@@ -18,8 +18,13 @@
 #   scripts/design.sh marks --check   write nothing; fail when a mark is not what `marks` makes
 #                                     (CI's `marks` job, #4615): the same bytes, or for a PNG the
 #                                     same size and every channel within 8/255
+#   scripts/design.sh icons           make the Lucide symbols (#4976): fetch lucide-static at the
+#                                     version and integrity design/icons.json pins, and write
+#                                     Shared/UI/Icons.xcassets and Shared/UI/LucideIcons.swift
+#                                     (design/icons/symbols.swift strokes and joins each icon)
+#   scripts/design.sh icons --check   write nothing; fail when they are not what `icons` makes
 #
-# `marks` runs on the Mac only: AppKit (design/logo/blob/final/render.swift) renders every PNG, so
+# `marks` and `icons` run on the Mac only: AppKit (design/logo/blob/final/render.swift) renders every PNG, so
 # no two targets drift by a renderer. It needs no build lease: it compiles one file.
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -189,8 +194,40 @@ case "${1:-} ${2:-}" in
 	fi
 	echo "design.sh: every mark is what the Blob source makes ($(wc -l <"$out/.marks" | tr -d ' ') files)"
 	;;
+"icons " | "icons --check")
+	# lucide-static's npm tarball, at the version and integrity design/icons.json pins: the SVGs
+	# are data, so nothing of the package runs
+	work=$(mktemp -d)
+	trap 'rm -rf "$work"' EXIT
+	pin() { python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["lucide"][sys.argv[2]])' "$root/design/icons.json" "$1"; }
+	version=$(pin version)
+	curl -fsSL -o "$work/lucide.tgz" "https://registry.npmjs.org/lucide-static/-/lucide-static-$version.tgz"
+	got="sha512-$(openssl dgst -sha512 -binary "$work/lucide.tgz" | openssl base64 -A)"
+	if [ "$got" != "$(pin integrity)" ]; then
+		echo "design.sh: lucide-static $version is not the tarball design/icons.json pins ($got)" >&2
+		exit 1
+	fi
+	tar -xzf "$work/lucide.tgz" -C "$work" package/icons package/LICENSE
+	mkdir -p "$work/out"
+	swift "$root/design/icons/symbols.swift" "$root/design/icons.json" "$work/package/icons" "$work/out"
+	mkdir -p "$work/out/design/icons" && cp "$work/package/LICENSE" "$work/out/design/icons/LICENSE"
+	if [ "${2:-}" = --check ]; then
+		stale=0
+		for f in Shared/UI/Icons.xcassets Shared/UI/LucideIcons.swift design/icons/LICENSE; do
+			diff -r "$work/out/$f" "$root/$f" >/dev/null 2>&1 || { echo "design.sh: $f is not what \`scripts/design.sh icons\` makes" >&2; stale=1; }
+		done
+		[ "$stale" = 0 ] || exit 1
+		echo "design.sh: the Lucide symbols are what design/icons.json makes"
+	else
+		rm -rf "$root/Shared/UI/Icons.xcassets"
+		cp -R "$work/out/Shared/UI/Icons.xcassets" "$root/Shared/UI/Icons.xcassets"
+		cp "$work/out/Shared/UI/LucideIcons.swift" "$root/Shared/UI/LucideIcons.swift"
+		cp "$work/out/design/icons/LICENSE" "$root/design/icons/LICENSE"
+		echo "design.sh: wrote $(find "$root/Shared/UI/Icons.xcassets" -name "*.symbolset" -type d | wc -l | tr -d " ") Lucide symbols"
+	fi
+	;;
 *)
-	echo "usage: scripts/design.sh gen | check | selftest | marks [--check]" >&2
+	echo "usage: scripts/design.sh gen | check | selftest | marks [--check] | icons [--check]" >&2
 	exit 2
 	;;
 esac

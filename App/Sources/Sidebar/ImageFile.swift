@@ -65,7 +65,7 @@ struct ImageFile: View {
     /// double-clicking do the same; these are for a mouse, and for finding out it zooms.
     private var zoomControls: some View {
         HStack(spacing: 4) {
-            Button(action: zoom.zoomOut) { Image(systemName: "minus.magnifyingglass") }
+            Button(action: zoom.zoomOut) { Image(icon: "minus.magnifyingglass") }
                 .disabled(!zoom.canZoomOut)
                 .help("Zoom out")
             Button(action: zoom.actualSize) {
@@ -75,7 +75,7 @@ struct ImageFile: View {
                     .frame(minWidth: 36)
             }
             .help("Actual size")
-            Button(action: zoom.zoomIn) { Image(systemName: "plus.magnifyingglass") }
+            Button(action: zoom.zoomIn) { Image(icon: "plus.magnifyingglass") }
                 .disabled(!zoom.canZoomIn)
                 .help("Zoom in")
             Button("Fit", action: zoom.fit)

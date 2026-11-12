@@ -27,7 +27,7 @@ struct HandOffCard: View {
             Label {
                 Text(handOff.step).fontWeight(.semibold)
             } icon: {
-                Image(systemName: "hand.raised").foregroundStyle(.secondary)
+                Image(icon: "hand.raised").foregroundStyle(.secondary)
             }
             .appText(.reading)
             if let reason = handOff.reason, !reason.isEmpty {

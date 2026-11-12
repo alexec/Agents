@@ -37,7 +37,7 @@ extension View {
 /// when voice mode ends.
 struct ListeningMark: View {
     var body: some View {
-        Image(systemName: "mic.fill")
+        Image(icon: "mic.fill")
             .appText(.fine)
             .sidebarMark(Paper.accent)
             .help("Voice mode listens in this chat")

@@ -146,7 +146,7 @@ struct WorkItemPage: View {
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     .help("All \(place.kind.title.lowercased())")
-                Image(systemName: "chevron.compact.right").foregroundStyle(.tertiary).accessibilityHidden(true)
+                Image(icon: "chevron.compact.right").foregroundStyle(.tertiary).accessibilityHidden(true)
                 Text(WorkList.shortRef(node.ref)).fontWeight(.semibold).monospacedDigit()
             }
             .appText(.reading)
@@ -171,7 +171,7 @@ struct WorkItemPage: View {
             // An HStack, not a Label: the bar draws a Label's icon alone.
             Button { back() } label: {
                 HStack(spacing: 4) {
-                    Image(systemName: "chevron.left").fontWeight(.semibold)
+                    Image(icon: "chevron.left").fontWeight(.semibold)
                     Text(backWords)
                 }
             }
@@ -180,17 +180,17 @@ struct WorkItemPage: View {
         ToolbarItemGroup(placement: .topBarTrailing) {
             if let n = model.workNeighbours {
                 let list = model.workLists[place.kind]
-                Button { Task { await model.stepWork(forward: false) } } label: { Image(systemName: "chevron.up") }
+                Button { Task { await model.stepWork(forward: false) } } label: { Image(toolbarIcon: "chevron.up") }
                     .disabled(n.previous == nil)
                     .accessibilityLabel("Previous")
                 Button { Task { await model.stepWork(forward: true) } } label: {
-                    if list.loadingMore { ProgressView() } else { Image(systemName: "chevron.down") }
+                    if list.loadingMore { ProgressView() } else { Image(toolbarIcon: "chevron.down") }
                 }
                 .disabled(!model.workHasNext || list.loadingMore)
                 .accessibilityLabel("Next")
             }
             if compact, let url = forgeURL {
-                Button { openURL(url) } label: { Image(systemName: "arrow.up.right.square") }
+                Button { openURL(url) } label: { Image(toolbarIcon: "arrow.up.right.square") }
                     .accessibilityLabel(WorkList.openOnWords(node.ref))
             }
         }
@@ -271,7 +271,7 @@ struct WorkItemPage: View {
             Spacer(minLength: 8)
             if let url {
                 Button { openURL(url) } label: {
-                    Label(WorkList.openOnWords(node.ref), systemImage: "arrow.up.right.square")
+                    Label(WorkList.openOnWords(node.ref), icon: "arrow.up.right.square")
                 }
                 .linkStyle()
                 .help(WorkList.openOnWords(node.ref))
@@ -316,7 +316,7 @@ struct WorkItemPage: View {
         if let lead = model.workLead(of: node) {
             Button { model.openWorkSession(lead.id) } label: {
                 HStack(spacing: 6) {
-                    Label("Open lead", systemImage: "person")
+                    Label("Open lead", icon: "person")
                     Circle().fill(leadDot(lead.state)).frame(width: 7, height: 7).accessibilityHidden(true)
                 }
                 .frame(maxWidth: narrow ? .infinity : nil)
@@ -327,7 +327,7 @@ struct WorkItemPage: View {
             .accessibilityValue(WorkPlan.leadWords(lead.state))
         } else if writes, item?.state == "open", let start = detail?.got.start {
             Button { startLead(start) } label: {
-                Label("Start lead", systemImage: "sparkle").frame(maxWidth: narrow ? .infinity : nil)
+                Label("Start lead", icon: "sparkle").frame(maxWidth: narrow ? .infinity : nil)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(compact ? .large : .regular)
@@ -358,7 +358,7 @@ struct WorkItemPage: View {
 
     private func startButton(_ start: DaemonAPI.ForgeStart) -> some View {
         Button { startAgent(start) } label: {
-            Label("Start Agent", systemImage: "sparkle").frame(maxWidth: narrow ? .infinity : nil)
+            Label("Start Agent", icon: "sparkle").frame(maxWidth: narrow ? .infinity : nil)
         }
         .buttonStyle(.borderedProminent)
         .controlSize(compact ? .large : .regular)
@@ -405,7 +405,7 @@ struct WorkItemPage: View {
 
     /// An arrow with a target a pointer finds.
     private func stepLabel(_ symbol: String) -> some View {
-        Image(systemName: symbol).frame(width: 24, height: 24).contentShape(Rectangle())
+        Image(icon: symbol).frame(width: 24, height: 24).contentShape(Rectangle())
     }
     #endif
 
@@ -423,7 +423,7 @@ struct WorkItemPage: View {
     /// Try again and Open on GitHub.
     private func couldNotRead(_ words: String) -> some View {
         VStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle")
+            Image(icon: "exclamationmark.triangle")
                 // The state's own glyph, larger than any text step: a marked decorative glyph.
                 .font(.system(size: 28))
                 .foregroundStyle(.secondary)
@@ -565,7 +565,7 @@ struct WorkItemPage: View {
 
     private var olderComments: some View {
         WorkTimelineEntry {
-            Image(systemName: "ellipsis").appText(.fine).foregroundStyle(.secondary)
+            Image(icon: "ellipsis").appText(.fine).foregroundStyle(.secondary)
                 .frame(width: 22, height: 22).background(Circle().fill(Paper.well))
         } content: {
             Button(olderLoading ? "Loading…" : "Older comments") { Task { await readOlder() } }
@@ -629,7 +629,7 @@ struct WorkItemPage: View {
         if node.kind == "pr", let files = WorkLook.branchWords(detail?.got.filesChanged) {
             // The head and base branches and the size come with the forge's fields (#4406).
             WorkSideSection(title: "Branch") {
-                Label(files, systemImage: "arrow.triangle.branch").monospacedDigit()
+                Label(files, icon: "arrow.triangle.branch").monospacedDigit()
             }
         }
         WorkSideSection(title: "Repo") {

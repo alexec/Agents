@@ -18,7 +18,7 @@ struct JumpToEnd: View {
 
     var body: some View {
         Button(action: go) {
-            Image(systemName: "arrow.down")
+            Image(icon: "arrow.down")
                 // Decorative: a glyph in a capsule, not text (FR-015).
                 .glyph(size: 10, weight: .semibold)
                 // A thumb, not a pointer, on a touch screen: the same capsule, larger.

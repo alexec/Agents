@@ -49,7 +49,7 @@ struct WorkEmptyState: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: symbol)
+            Image(icon: symbol)
                 // The empty state's own glyph, larger than any text step: a marked decorative glyph.
                 .font(.system(size: 28))
                 .foregroundStyle(.tertiary)

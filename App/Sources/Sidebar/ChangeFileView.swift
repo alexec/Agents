@@ -188,14 +188,14 @@ struct ChangeFileView: View {
             Button {
                 go(to: current.map { stops[max($0 - 1, 0)] } ?? stops[0])
             } label: {
-                Image(systemName: "chevron.up")
+                Image(icon: "chevron.up")
             }
             .help("Previous change")
             .disabled(current == nil || current == 0)
             Button {
                 go(to: current.map { stops[min($0 + 1, stops.count - 1)] } ?? stops[0])
             } label: {
-                Image(systemName: "chevron.down")
+                Image(icon: "chevron.down")
             }
             .help("Next change")
             .disabled(current == stops.count - 1)
@@ -215,7 +215,7 @@ struct ChangeFileView: View {
             Button {
                 state.changesSelection = nil
             } label: {
-                Image(systemName: "chevron.left")
+                Image(icon: "chevron.left")
             }
             .buttonStyle(.borderless)
             .help("All changed files")

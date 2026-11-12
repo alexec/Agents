@@ -27,7 +27,7 @@ struct GuardedChangeCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(change.headline, systemImage: "exclamationmark.shield")
+            Label(change.headline, icon: "exclamationmark.shield")
                 .appText(.reading).fontWeight(.semibold)
                 .tinted(.attention)
             // A folder's policy (#2957, frame D): which rules the change makes looser.

@@ -62,7 +62,7 @@ struct SidebarFoldRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "chevron.right")
+            Image(icon: "chevron.right")
                 .rotationEffect(.degrees(isOpen ? 90 : 0))
                 .appText(.fine)
                 .foregroundStyle(.secondary)
@@ -188,7 +188,7 @@ struct WorkflowListRow: View {
             HStack(spacing: 4) {
                 // Its runs send no notifications (#2003), marked as a muted session is.
                 if summary.workflow.isMuted, !summary.isArchived {
-                    Image(systemName: MuteWords.symbol)
+                    Image(icon: MuteWords.symbol)
                         .appText(.fine)
                         .sidebarMark(.tertiary)
                         .help(MuteWords.mutedHelp)

@@ -71,7 +71,7 @@ struct PolicyPane: View {
         Section {
             VStack(alignment: .leading, spacing: 4) {
                 Label(PolicyLayersWords.banner(effective),
-                      systemImage: effective.organisation == nil ? "person" : OrgPolicyWords.symbol)
+                      icon: effective.organisation == nil ? "person" : OrgPolicyWords.symbol)
                     .appText(.reading).fontWeight(.semibold)
                 if effective.organisation != nil {
                     if let openOrganisationPolicy {
@@ -101,7 +101,7 @@ struct PolicyPane: View {
     private func untrustedSection(_ copy: DaemonAPI.UntrustedYourPolicy) -> some View {
         Section {
             VStack(alignment: .leading, spacing: 6) {
-                Label(PolicyLayersWords.untrustedTitle, systemImage: "exclamationmark.shield")
+                Label(PolicyLayersWords.untrustedTitle, icon: "exclamationmark.shield")
                     .appText(.reading).fontWeight(.semibold).tinted(.attention)
                 Text(PolicyLayersWords.untrustedLine(copy)).appText(.fine)
                     .fixedSize(horizontal: false, vertical: true)

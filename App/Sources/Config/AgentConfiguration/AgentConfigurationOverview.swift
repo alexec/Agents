@@ -58,7 +58,7 @@ struct AgentConfigurationOverview: View {
                                                                              : AnyShapeStyle(.secondary))
                             .lineLimit(1)
                         Spacer(minLength: 8)
-                        Image(systemName: "chevron.right").foregroundStyle(.secondary).accessibilityHidden(true)
+                        Image(icon: "chevron.right").foregroundStyle(.secondary).accessibilityHidden(true)
                     }
                 }
             }

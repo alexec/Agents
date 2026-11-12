@@ -705,7 +705,7 @@ struct QueuedPromptRow: View {
                             if going {
                                 Telling(host: actions.recipient(agentID), doing: acting?.doing)
                             } else {
-                                Label("Send now", systemImage: "arrow.up")
+                                Label("Send now", icon: "arrow.up")
                                     .appText(.supporting)
                             }
                         }
@@ -728,7 +728,7 @@ struct QueuedPromptRow: View {
                     Button {
                         draft = prompt.text
                     } label: {
-                        Image(systemName: "pencil")
+                        Image(icon: "pencil")
                             .appText(.supporting)
                             .frame(width: 18, height: 18)
                             #if os(iOS)
@@ -746,7 +746,7 @@ struct QueuedPromptRow: View {
                 Button {
                     Task { await actions.unqueue(prompt, agentID) }
                 } label: {
-                    Image(systemName: "xmark")
+                    Image(icon: "xmark")
                         .appText(.supporting)
                         .frame(width: 18, height: 18)
                         #if os(iOS)
@@ -1077,7 +1077,7 @@ struct QuietLine: View {
 /// The chat is being picked back up by the daemon, and nobody typed for it.
 struct ComingBackLine: View {
     var body: some View {
-        Label(AgentsModel.comingBackDescription, systemImage: AgentsModel.comingBackSymbol)
+        Label(AgentsModel.comingBackDescription, icon: AgentsModel.comingBackSymbol)
             .appText(.reading)
             .foregroundStyle(.secondary)
     }

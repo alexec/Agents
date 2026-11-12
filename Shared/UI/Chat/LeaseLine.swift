@@ -28,7 +28,7 @@ struct LeaseLine: View {
                     Button { open(line.name) } label: {
                         HStack(spacing: 4) {
                             words(line.text)
-                            Image(systemName: "chevron.right")
+                            Image(icon: "chevron.right")
                                 .appText(.fine)
                                 .imageScale(.small)
                                 .foregroundStyle(.tertiary)

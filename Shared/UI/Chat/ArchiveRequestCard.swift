@@ -17,7 +17,7 @@ struct ArchiveRequestCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(ArchiveRequestWords.question, systemImage: ArchiveRequestWords.symbol)
+            Label(ArchiveRequestWords.question, icon: ArchiveRequestWords.symbol)
                 .appText(.reading).fontWeight(.semibold)
                 .tinted(.attention)
             Text(agent.report?.message ?? ArchiveRequestWords.noReport)

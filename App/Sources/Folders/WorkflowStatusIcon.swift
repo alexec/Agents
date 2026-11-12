@@ -12,7 +12,7 @@ struct WorkflowStatusIcon: View {
     var accented = false
 
     var body: some View {
-        Image(systemName: name)
+        Image(icon: name)
             // The sidebar's icons are the size of its rows' text (#495); the page's larger.
             .appText(accented ? .supporting : .reading)
             .sidebarMark(summary.needsAPerson ? StateTint.attention.style(or: .secondary)

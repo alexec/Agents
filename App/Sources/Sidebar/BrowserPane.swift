@@ -50,13 +50,13 @@ struct BrowserPane: View {
 
     private var bar: some View {
         HStack(spacing: 6) {
-            Button { web.goBack() } label: { Image(systemName: "chevron.left") }
+            Button { web.goBack() } label: { Image(icon: "chevron.left") }
                 .buttonStyle(.borderless)
                 .disabled(!web.canGoBack)
-            Button { web.goForward() } label: { Image(systemName: "chevron.right") }
+            Button { web.goForward() } label: { Image(icon: "chevron.right") }
                 .buttonStyle(.borderless)
                 .disabled(!web.canGoForward)
-            Button { web.reload() } label: { Image(systemName: "arrow.clockwise") }
+            Button { web.reload() } label: { Image(icon: "arrow.clockwise") }
                 .buttonStyle(.borderless)
                 .disabled(state.browserURL == nil)
 
@@ -90,7 +90,7 @@ private struct Empty: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: "globe")
+            Image(icon: "globe")
                 .appText(.title)
                 .foregroundStyle(.tertiary)
             Text("Nothing loaded")
@@ -114,7 +114,7 @@ private struct Failed: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle")
+            Image(icon: "exclamationmark.triangle")
                 .appText(.title)
                 .foregroundStyle(.tertiary)
             Text(message)

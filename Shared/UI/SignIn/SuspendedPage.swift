@@ -11,7 +11,7 @@ struct SuspendedPage: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "person.crop.circle.badge.xmark")
+            Image(icon: "person.crop.circle.badge.xmark")
                 .appText(.title)
                 .imageScale(.large)
                 .foregroundStyle(.secondary)

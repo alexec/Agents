@@ -42,7 +42,7 @@ struct KeptPromptRow: View {
                 Button {
                     Task { await actions.dropKept(kept) }
                 } label: {
-                    Image(systemName: "xmark")
+                    Image(icon: "xmark")
                         .appText(.supporting)
                         .frame(width: 18, height: 18)
                         #if os(iOS)

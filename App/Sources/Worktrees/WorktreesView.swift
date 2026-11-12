@@ -97,7 +97,7 @@ struct WorktreeRow: View {
     var body: some View {
         // An icon at the reading size, a semibold name, a grey line under it, as `AgentRow`.
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "arrow.triangle.branch")
+            Image(icon: "arrow.triangle.branch")
                 .appText(.reading)
                 .foregroundStyle(.secondary)
                 .padding(.top, 1)
