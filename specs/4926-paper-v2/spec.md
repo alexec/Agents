@@ -155,7 +155,7 @@ The web page must not clip when a person sets 0.12em letter spacing and 0.16em w
 - Decided: no handwriting, because Alex wants a clean, simple look (2026-11-12).
 - Decided: higher contrast (ink 17:1), lines (1.5:1) in place of shadows on the page, few grey fills, short shadows only on what floats, no gradients, and light greys one small step from the page, with colour only in text, icons, lines and a switch that is on, because Alex asked for more contrast, less shading, and a lighter grey in place of any gradient (2026-11-12). Alex can overrule.
 - Decided: one icon set, Lucide at a 1.5 stroke, on all three clients, because the clients draw different icons today and Lucide is the one set that meets the library rule. Alex can overrule.
-- Decided: the colour, gradient, depth, radius and spacing tokens above, because each passes WCAG AA and follows the principles. Alex can overrule.
+- Decided: the colour, state-line, depth, radius and spacing tokens above, because each passes WCAG AA and follows the principles. Alex can overrule.
 - Decided: no setting to turn the face off, because one clear look is simpler. Alex can overrule.
 - **Alex's choice (pending):** the contact sheet as a whole, including the face (Atkinson Hyperlegible Next is proposed).
 
