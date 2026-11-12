@@ -178,6 +178,7 @@ class YouTube:
 
     def __init__(self, token=None):
         self.token = token or access_token()
+        self.waits = (5, 10, 20, 30)  # seconds, while a new playlist is 404
 
     def send(self, method, url, data=None, headers=None, timeout=120):
         """One request: the answer's headers and body. Fails with APIError on an HTTP error."""
@@ -203,6 +204,18 @@ class YouTube:
             if not answer.get("nextPageToken"):
                 return
             query["pageToken"] = answer["nextPageToken"]
+
+    def settled(self, call, *args):
+        """`call(*args)`, again after a wait while it is 404: YouTube answers 404
+        (playlistNotFound) for a playlist made a few seconds before (#4838)."""
+        for wait in (*self.waits, None):
+            try:
+                return call(*args)
+            except APIError as error:
+                if error.code != 404 or wait is None:
+                    raise
+                log(f"YouTube does not know the playlist yet (404): again in {wait} s")
+                time.sleep(wait)
 
     def channel(self):
         """The signed-in channel's title, or None when the sign-in has no channel."""
@@ -342,13 +355,13 @@ def upload(scene, mp4, yt=None):
             log(f"not uploaded, {mp4} is kept: {why}")
             return None
     playlist = yt.playlist(title, about)
-    older = []
-    for item in yt.pages("playlistItems", {"part": "snippet", "playlistId": playlist, "maxResults": 50}):
-        if marker(scene.ID) in item["snippet"].get("description", ""):
-            older.append((item["id"], item["snippet"]["resourceId"]["videoId"]))
+    older = [(item["id"], item["snippet"]["resourceId"]["videoId"])
+             for item in yt.settled(lambda: list(yt.pages("playlistItems", {
+                 "part": "snippet", "playlistId": playlist, "maxResults": 50})))
+             if marker(scene.ID) in item["snippet"].get("description", "")]
     log(f"uploading {mp4.name} ({mp4.stat().st_size // 1_000_000} MB), private, to {title!r}")
     video = yt.upload(mp4, describe(scene))
-    yt.call("POST", "playlistItems", {"part": "snippet"}, {"snippet": {
+    yt.settled(yt.call, "POST", "playlistItems", {"part": "snippet"}, {"snippet": {
         "playlistId": playlist, "position": 0, "resourceId": {"kind": "youtube#video", "videoId": video}}})
     for item, old in older:
         yt.call("PUT", "videos", {"part": "status"}, {"id": old, "status": {"privacyStatus": "private"}})
@@ -376,13 +389,16 @@ def upload(scene, mp4, yt=None):
 class FakeYouTube(YouTube):
     """Answers as the API does, from state in memory, and keeps every request."""
 
-    def __init__(self, channel=CHANNEL, thumbnails=True):
+    def __init__(self, channel=CHANNEL, thumbnails=True, unknown_for=0):
         self.token = "fake"
+        self.waits = (0, 0, 0, 0)
         self.requests = []
         self.playlists, self.items, self.videos = {}, {}, {}
         self.captions_of, self.thumbnails = {}, {}
         self.channel_title, self.thumbnails_allowed = channel, thumbnails
         self.n = 0
+        self.unknown_for = unknown_for  # playlistItems calls that 404 after a playlist is made
+        self.unknown = {}
 
     def new_id(self, kind):
         self.n += 1
@@ -402,7 +418,13 @@ class FakeYouTube(YouTube):
         if path.endswith("/youtube/v3/playlists") and method == "POST":
             made = self.new_id("PL")
             self.playlists[made] = body
+            self.unknown[made] = self.unknown_for
             return answer({"id": made})
+        if path.endswith("/playlistItems") and method in ("GET", "POST"):
+            playlist = query.get("playlistId") or body["snippet"]["playlistId"]
+            if self.unknown.get(playlist):
+                self.unknown[playlist] -= 1
+                raise APIError(method, url, 404, b'{"error": {"errors": [{"reason": "playlistNotFound"}]}}')
         if path.endswith("/playlistItems") and method == "GET":
             return answer({"items": [{"id": i, "snippet": {**self.videos[v["snippet"]["resourceId"]["videoId"]]["snippet"],
                                                            "resourceId": v["snippet"]["resourceId"]}}
@@ -514,6 +536,11 @@ def self_test():
         made = upload(scene("u3", "usage"), take("u3"), bare)
         assert made in bare.captions_of and not bare.thumbnails
         print("ok: a channel that cannot set a thumbnail still gets the video and its captions")
+
+        slow = FakeYouTube(unknown_for=2)
+        made = upload(scene("u4", "usage"), take("u4"), slow)
+        assert [i["snippet"]["resourceId"]["videoId"] for i in slow.items.values()] == [made], slow.items
+        print("ok: a playlist YouTube does not know yet (404) is asked again")
 
         assert check_channel(FakeYouTube()) is None
         assert "not 'Loops'" in check_channel(FakeYouTube(channel="Someone else"))
