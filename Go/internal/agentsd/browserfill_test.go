@@ -98,6 +98,11 @@ func fillSetUp(t *testing.T, secrets map[string]string) (*mcpClient, *fillPage, 
 	}
 	d, _ := start(t, t.TempDir())
 	t.Cleanup(d.Shutdown)
+	// As main does before it accepts a connection (#4857): your policy's first read makes
+	// the first-start move, which writes the person key and settings/policy-yours.json into
+	// the root. Read lazily, it ran on whichever goroutine asked first, as late as the
+	// root's TempDir removal ("settings: directory not empty").
+	d.WarmYourPolicy()
 	m := appClient(t, d, seeded(t, d, t.TempDir(), nil).ID)
 	m.post("initialize", map[string]any{}, 1)
 	return m, page, d

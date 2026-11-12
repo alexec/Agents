@@ -4,6 +4,7 @@
 import type { Agent, AgentWorktree, EventPattern, EventWait, LeaseSnapshot, MCPEventTrigger, ResourceKind } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { eventMeaning, triggerWords } from "./workflows";
+import { isOpenBlock } from "./groups";
 
 /** LeaseWords.clock: "14:12". */
 export function clock(date: Date): string {
@@ -354,6 +355,54 @@ export function eventWaitMark(agent: Agent, title: (id: string) => string | unde
   return `◷ Waiting for ${what}`;
 }
 
+/** WaitKind (#5022): what a waiting session waits on, which its mark draws. */
+export type WaitKind = "time" | "pullRequest" | "checks" | "agents" | "line" | "other";
+
+/** WaitKind.of(eventName:): `pr.*`, `checks.*` and `ci.*`, and `agent.*`. */
+function eventKind(name: string): WaitKind {
+  if (name.startsWith("pr.")) return "pullRequest";
+  if (name.startsWith("checks.") || name.startsWith("ci.")) return "checks";
+  if (name.startsWith("agent.")) return "agents";
+  return "other";
+}
+
+/** WaitKind.of(_ wait:): a place in line, a time, or the one kind its patterns share; a PR beside its checks is the PR. */
+export function eventWaitKind(agent: Agent): WaitKind {
+  const wait = agent.eventWait;
+  if (!wait) return "other";
+  if (lineResource(agent) !== undefined) return "line";
+  if (isTimeWait(wait)) return "time";
+  const kinds = new Set(wait.patterns.map((p) => eventKind(p.name)));
+  if (kinds.size === 1) return [...kinds][0]!;
+  if (kinds.size === 2 && kinds.has("pullRequest") && kinds.has("checks")) return "pullRequest";
+  return "other";
+}
+
+/** WaitKind.of(_ agent:): its open wait on events first, then a block that names agents. */
+export function waitKind(agent: Agent): WaitKind {
+  if (agent.eventWait && agent.eventWait.ending === undefined) return eventWaitKind(agent);
+  return isOpenBlock(agent.report) && (agent.report?.block?.waits.length ?? 0) > 0 ? "agents" : "other";
+}
+
+/** WaitKind.pullRequest(of:): the one PR its server events name, "#4980", else undefined. */
+function waitPullRequest(wait: EventWait): string | undefined {
+  const numbers = new Set((wait.serverEvents ?? []).flatMap((e) => {
+    const pr = e.trigger.arguments["pr"];
+    return typeof pr === "number" || typeof pr === "string" ? [String(pr)] : [];
+  }));
+  return numbers.size === 1 ? `#${[...numbers][0]}` : undefined;
+}
+
+/** WaitKind.thing(of:): a time, a PR or its checks as one thing in words (#5022), else undefined. */
+function waitThing(agent: Agent, wait: EventWait): string | undefined {
+  const kind = eventWaitKind(agent);
+  if (kind === "time") return wait.deadline === undefined ? undefined : `until ${clock(fromWireDate(wait.deadline))}`;
+  const pr = waitPullRequest(wait);
+  if (kind === "pullRequest") return pr ? `PR ${pr}` : "a pull request";
+  if (kind === "checks") return pr ? `checks on ${pr}` : "checks";
+  return undefined;
+}
+
 /** WaitStatus.things: what a wait on events waits for, one thing a pattern, an agent finishing by its name in quotes. */
 export function eventWaitThings(agent: Agent, title: (id: string) => string | undefined,
   snapshot?: LeaseSnapshot): string[] {
@@ -362,16 +411,24 @@ export function eventWaitThings(agent: Agent, title: (id: string) => string | un
   // A place in a line, by the resource's short name, as the lease mark had it (#2361).
   const resource = lineResource(agent);
   if (resource !== undefined) return [linePlace(agent, resource, snapshot, title)?.short ?? resource];
+  // A time, a PR or its checks as one thing in words (#5022), not a pattern a thing.
+  const thing = waitThing(agent, wait);
+  if (thing !== undefined) return [thing];
   return wait.patterns.map((p) => {
     const id = p.name === "agent.finished" && Object.keys(p.anyOf ?? p.filters).length === 1 ? single(p, "agent") : undefined;
     return id === undefined ? patternLabel(p) : `“${title(id) ?? id}”`;
   });
 }
 
-/** WaitStatus.rowLine: "◷ Waiting for “Fix login” (+2)", the first thing it waits for and how many more. */
+/**
+ * WaitStatus.rowLine: "Waiting for “Fix login” (+2)", the first thing it waits for and how many more, or
+ * "Waiting until 14:30". No ◷ (#5022): the row's mark says what kind of wait it is.
+ */
 export function rowWaitLine(things: string[]): string | null {
-  if (things.length === 0) return null;
-  return `◷ Waiting for ${things[0]}${things.length > 1 ? ` (+${things.length - 1})` : ""}`;
+  const first = things[0];
+  if (first === undefined) return null;
+  const what = first.startsWith("until ") ? `Waiting ${first}` : `Waiting for ${first}`;
+  return `${what}${things.length > 1 ? ` (+${things.length - 1})` : ""}`;
 }
 
 /** WaitMark: a waiting row's one line, and every line it stands for, for its title (#582). */
@@ -387,7 +444,7 @@ export function waitMark(agent: Agent, block: { names: string[]; lines: string[]
   const things = [...block.names, ...eventWaitThings(agent, title, snapshot), ...(leases?.waitingNames ?? [])];
   const event = eventWaitLine(agent, title, snapshot);
   const detail = [...block.lines, ...(event ? [event] : []), ...(leases?.waitingFull ?? [])];
-  const line = rowWaitLine(things) ?? (detail[0] !== undefined ? `◷ ${detail[0]}` : null);
+  const line = rowWaitLine(things) ?? detail[0] ?? null;
   return line === null ? null : { line, detail: detail.join("\n") };
 }
 

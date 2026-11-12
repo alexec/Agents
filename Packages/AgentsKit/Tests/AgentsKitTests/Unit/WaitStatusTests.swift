@@ -71,8 +71,52 @@ struct WaitStatusTests {
 
     @Test func aRowSaysTheFirstThingAndHowManyMore() {
         #expect(WaitStatus.rowLine([]) == nil)
-        #expect(WaitStatus.rowLine(["“Fix login”"]) == "◷ Waiting for “Fix login”")
-        #expect(WaitStatus.rowLine(["“Fix login”", "“Docs”", "build"]) == "◷ Waiting for “Fix login” (+2)")
+        #expect(WaitStatus.rowLine(["“Fix login”"]) == "Waiting for “Fix login”")
+        #expect(WaitStatus.rowLine(["“Fix login”", "“Docs”", "build"]) == "Waiting for “Fix login” (+2)")
+        #expect(WaitStatus.rowLine(["until 14:30"]) == "Waiting until 14:30")
+    }
+
+    /// The mark draws what it waits on (#5022), from the agent's own record.
+    @Test func theMarkSaysWhatKindOfWaitItIs() {
+        func kind(_ names: [String]) -> WaitKind {
+            WaitKind.of(EventWait(patterns: names.map { EventPattern($0) }, from: 0, deadline: until, since: since))
+        }
+        #expect(kind([EventWait.timeReached]) == .time)
+        #expect(kind(["pr.merged", "pr.closed", "checks.failed", "checks.passed", "pr.conflicted"]) == .pullRequest)
+        #expect(kind(["checks.failed", "checks.passed"]) == .checks)
+        #expect(kind(["ci.finished"]) == .checks)
+        #expect(kind(["agent.finished", "agent.failed"]) == .agents)
+        #expect(kind(["agent.finished", "mac.wake"]) == .other)
+        #expect(kind(["branch.moved"]) == .other)
+        var waiting = agent()
+        #expect(WaitKind.of(waiting) == .other)
+        waiting.eventWait = EventWait(patterns: [EventPattern("lease.granted", filters: [
+            "agent": DetailFilter(waiting.id.uuidString), "resource": DetailFilter("build")])], from: 0, since: since)
+        #expect(WaitKind.of(waiting) == .line)
+        waiting.eventWait = nil
+        waiting.report = WorkReport(outcome: .waiting, message: "waiting", at: since,
+                                    block: Block(waits: [Wait(agentID: UUID(), nameAtReport: "Docs")]))
+        #expect(WaitKind.of(waiting) == .agents)
+        #expect(WaitKind.allCases.map(\.symbol) == ["clock", "arrow.triangle.pull", "checkmark.seal", "person.2", "lock",
+                                                    StatusShape.waitingSymbol])
+    }
+
+    /// A time, a PR or its checks is one thing in words on the row (#5022), not a pattern a thing.
+    @Test func aRowSaysATimeAPullRequestAndChecksInWords() {
+        let pr: (String) -> WaitServerEvent = {
+            WaitServerEvent(trigger: MCPEventTrigger(event: $0, arguments: ["repo": .string("alexec/Agents"), "pr": .int(4980)]),
+                            servers: ["github"])
+        }
+        let time = EventWait(patterns: [EventPattern(EventWait.timeReached)], from: 0, deadline: until, since: since)
+        #expect(WaitStatus.things(time, names: { _ in nil }) == ["until 09:00"])
+        #expect(WaitStatus.rowLine(WaitStatus.things(time, names: { _ in nil })) == "Waiting until 09:00")
+        let merge = EventWait(patterns: [EventPattern("pr.merged"), EventPattern("checks.failed")], from: 0, since: since,
+                              serverEvents: [pr("pr.merged"), pr("checks.failed")])
+        #expect(WaitStatus.rowLine(WaitStatus.things(merge, names: { _ in nil })) == "Waiting for PR #4980")
+        let checks = EventWait(patterns: [EventPattern("checks.passed")], from: 0, since: since, serverEvents: [pr("checks.passed")])
+        #expect(WaitStatus.rowLine(WaitStatus.things(checks, names: { _ in nil })) == "Waiting for checks on #4980")
+        let anyPR = EventWait(patterns: [EventPattern("pr.merged")], from: 0, since: since)
+        #expect(WaitStatus.things(anyPR, names: { _ in nil }) == ["a pull request"])
     }
 
     @Test func aWaitOnEventsIsOneThingAPattern() {
