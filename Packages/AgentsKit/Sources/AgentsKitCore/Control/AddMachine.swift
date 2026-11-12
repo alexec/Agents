@@ -52,11 +52,7 @@ public enum AddMachine {
         public static let repositoryOptional = "Clone a repository (optional)"
         public static let nameNote = "Letters, digits and dashes, starting with a letter."
 
-        public static let serverTitle = "Add a Machine"
-        public static let serverNote = "Run this on the machine. It installs Agents and joins as your machine. It works once."
-        public static let codeTitle = "Add a Machine by Code"
         public static let codeNote = "On the other machine, start its agents with agentsd --control-code and this code. It works once."
-        public static let makingCode = "Making a code…"
         public static func joined(_ name: String) -> String { "\(name) joined. The code can’t be used again." }
 
         /// What New Machine… says once the provider has made it.

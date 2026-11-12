@@ -16,10 +16,23 @@ import SwiftUI
 /// the web page implements its own event rows.
 struct EventRow: View {
     let event: Event
-    /// "This Mac", or the folder's name.
+    /// "This Mac", the folder's name, or "From mac-mini" for another machine's (#4732).
     let scopeName: String
     var openAgent: ((UUID) -> Void)?
     var openWorkflow: ((URL, String) -> Void)?
+    /// The envelope's provider, topic and ref under the name (#4732): the Mac's Events page,
+    /// which reads every machine's bus. The Remote's list leaves it out (tier mac+web).
+    var showsEnvelope = false
+
+    private var nameLine: String {
+        var parts = [event.type ?? event.name]
+        if showsEnvelope {
+            if let provider = event.provider, !provider.isEmpty { parts.append(provider) }
+            if let topic = event.topic, !topic.isEmpty { parts.append(topic) }
+        }
+        parts.append(scopeName)
+        return "\(event.subject?.glyph ?? "·") " + parts.joined(separator: " · ")
+    }
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
@@ -40,11 +53,20 @@ struct EventRow: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Text("\(event.subject?.glyph ?? "·") \(event.name) · \(scopeName)")
+                Text(nameLine)
                     .appText(.fine)
                     .monospaced()
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                if showsEnvelope, let ref = event.ref {
+                    Text(ref)
+                        .appText(.fine)
+                        .monospaced()
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .help("This event's ref. Right-click to copy it.")
+                }
                 if let message = event.message, !message.isEmpty {
                     Text("\u{201C}\(message)\u{201D}")
                         .appText(.supporting)

@@ -8,13 +8,28 @@ import (
 	"testing"
 
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The events over the fake Bitbucket: the gitlab server's names, the trust filter (#728), and
 // each one raised once from what Bitbucket says.
 
 func TestTheEventsAreTheGitLabServersNames(t *testing.T) {
-	same(t, EventNames(), gitlabmcp.EventNames())
+	// The gitlab server's, but for run.completed and deploy.waiting, which each forge has
+	// where its API does; run.completed is after checks.failed, as there (#4217).
+	without := func(names []string) []string {
+		var out []string
+		for _, n := range names {
+			if n != "run.completed" && n != "deploy.waiting" {
+				out = append(out, n)
+			}
+		}
+		return out
+	}
+	same(t, without(EventNames()), without(gitlabmcp.EventNames()))
+	if names := EventNames(); len(without(names)) != len(names) && names[1] != "run.completed" {
+		t.Fatalf("run.completed is not after checks.failed: %v", names)
+	}
 }
 
 func TestOpenedIsRaisedWhenReadyAndOnlyForTheReposOwn(t *testing.T) {
@@ -159,7 +174,7 @@ func TestChecksFailedForAPullRequestsHead(t *testing.T) {
 		f.statuses["sha2"] = []obj{{"key": "pipeline-2", "state": "SUCCESSFUL", "updated_on": at(1)}}
 	})
 	ids, result := p.poll()
-	same(t, ids, []string{"checks.failed:acme/app:sha1:" + timeString(start.Add(60e9))})
+	same(t, ids, []string{"checks.failed:acme/app:sha1:" + mcpevents.TimeString(start.Add(60e9))})
 	d := data(t, result, 0)
 	same(t, d["headSha"], "sha1")
 	same(t, d["run"], map[string]any{"id": 12, "name": "Pipeline #12 for feature", "url": run})
@@ -207,7 +222,7 @@ func TestIssueEvents(t *testing.T) {
 	same(t, ids, []string{"issue.commented:acme/app:10"})
 	same(t, data(t, result, 0)["comment"], map[string]any{"author": "dev", "url": "https://bitbucket.org/c/10", "body": "Seen it."})
 	ids, result = closed.poll()
-	same(t, ids, []string{"issue.closed:acme/app:3:" + timeString(start.Add(60e9))})
+	same(t, ids, []string{"issue.closed:acme/app:3:" + mcpevents.TimeString(start.Add(60e9))})
 	same(t, data(t, result, 0)["by"], "alex")
 	ids, result = labelled.poll()
 	same(t, ids, []string{"issue.labelled:acme/app:label:20:component"})
@@ -450,7 +465,7 @@ func TestIssueTakesAList(t *testing.T) {
 		f.changes[3] = []obj{{"id": 30, "user": alex, "created_on": at(1), "changes": obj{"state": obj{"old": "open", "new": "resolved"}}}}
 	})
 	ids, _ := listed.poll()
-	same(t, ids, []string{"issue.closed:acme/app:3:" + timeString(start.Add(60e9))})
+	same(t, ids, []string{"issue.closed:acme/app:3:" + mcpevents.TimeString(start.Add(60e9))})
 	ids, _ = notListed.poll()
 	same(t, ids, []string(nil))
 }

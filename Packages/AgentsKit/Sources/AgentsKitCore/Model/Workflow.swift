@@ -230,14 +230,6 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
         cooldown.map { "at most once every \(WorkflowCooldown.words($0))" }
     }
 
-    /// When a run started at `lastStarted` lets the next one start, if that is later
-    /// than `now`.
-    public func cooldownEnds(after lastStarted: Date?, now: Date) -> Date? {
-        guard let cooldown, let lastStarted else { return nil }
-        let end = lastStarted.addingTimeInterval(cooldown)
-        return end > now ? end : nil
-    }
-
     /// The next time a clock makes this fire, across all of its schedules.
     public func nextDue(after date: Date, calendar: Calendar = .current) -> Date? {
         guard problem == nil else { return nil }
@@ -377,15 +369,6 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         self.nextFireAt = nextFireAt
         self.lastOutcome = lastOutcome
         self.isRunning = isRunning
-    }
-
-    /// What its queue holds, for a row, while it holds anything (#422).
-    public var queuedSentence: String? {
-        switch queued {
-        case 0: return nil
-        case 1: return "1 trigger queued — it runs when this run ends"
-        default: return "\(queued) triggers queued — each runs in turn"
-        }
     }
 
     /// Whether Approve is offered: waiting for an OK, or denied on this host, where

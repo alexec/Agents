@@ -109,10 +109,6 @@ public struct Toolset: Hashable, Sendable {
 
     // MARK: Shared by the server's install script and the Mac's installer
 
-    /// What `npm ci` is given besides `--prefix` and `--cache`: the lock and nothing else,
-    /// no install scripts, and nothing said to a server about audits or funding.
-    public static let npmCIArguments = ["ci", "--ignore-scripts", "--omit=dev", "--no-audit", "--no-fund"]
-
     /// The name of the shim in `bin/`: the runtime's own `executable`, which is what
     /// discovery looks for there. `npx` for Claude, whose recipe is `npx -y <adapter>`;
     /// `codex-acp` for Codex (047).

@@ -4,7 +4,8 @@ import (
 	"context"
 	"regexp"
 	"strings"
-	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // What the events read from Forgejo or Gitea (#1753), in the gitlab server's shape
@@ -195,21 +196,10 @@ func (c ReviewComment) data() map[string]any {
 		"comment": map[string]any{"id": c.ID, "author": c.Author, "path": c.Path, "line": c.Line, "body": c.Body, "url": c.URL}}
 }
 
-// Listed is how far a listing read: Newest is the newest time of anything it listed, wanted
-// or not (in timeLayout, "" when it listed nothing), and Truncated says it stopped at maxPages
-// before it reached since.
-type Listed struct {
-	Newest    string
-	Truncated bool
-}
-
-// saw is l with t seen too.
-func (l Listed) saw(t string) Listed {
-	if t = normalized(t); t > l.Newest {
-		l.Newest = t
-	}
-	return l
-}
+// Listed is how far a listing read (mcpevents.Listed): Newest is the newest time of anything it
+// listed, wanted or not (in mcpevents.TimeLayout, "" when it listed nothing), and Truncated says
+// it stopped at maxPages before it reached since.
+type Listed = mcpevents.Listed
 
 // Forgejo is what the events ask of Forgejo or Gitea.
 type Forgejo interface {
@@ -221,6 +211,9 @@ type Forgejo interface {
 	ClosedPRs(ctx context.Context, repo, since string) (merged []MergedPR, closed []ClosedPR, listed Listed, err error)
 	// FailedChecks are the open pull requests whose head commit failed its checks, in any order.
 	FailedChecks(ctx context.Context, repo, since string) (failed []FailedChecks, listed Listed, err error)
+	// CompletedRuns are the Actions runs that finished at or after since, of workflow (its
+	// file), branch (or tag) and run (its number) when each is set (#4217).
+	CompletedRuns(ctx context.Context, repo, workflow, branch string, run int, since string) (runs []CompletedRun, listed Listed, err error)
 	// IssueActivity is what happened to the repository's issues at or after since, of one kind.
 	IssueActivity(ctx context.Context, repo string, kind IssueKind, since string) (items []IssueActivity, listed Listed, err error)
 	// ReviewComments are the comments on pull requests' diffs made at or after since.
@@ -287,37 +280,4 @@ var botName = regexp.MustCompile(`[-_]bot$|\[bot\]$|^ghost$|-actions$`)
 // ids are below 1.
 func isBot(login string, id int) bool {
 	return id <= 0 || botName.MatchString(strings.ToLower(login))
-}
-
-// timeLayout is how the events draft carries a time: ISO 8601 in UTC with milliseconds, which
-// sorts as text in time order.
-const timeLayout = "2006-01-02T15:04:05.000Z"
-
-func timeString(t time.Time) string { return t.UTC().Format(timeLayout) }
-
-func parseTime(text string) (time.Time, bool) {
-	t, err := time.Parse(time.RFC3339Nano, text)
-	return t, err == nil
-}
-
-// normalized is text in timeLayout, or "" when it is not a time.
-func normalized(text string) string {
-	t, ok := parseTime(text)
-	if !ok {
-		return ""
-	}
-	return timeString(t)
-}
-
-// before says whether a is earlier than b; a time that is not one is earliest of all.
-func before(a, b string) bool {
-	ta, oka := parseTime(a)
-	tb, okb := parseTime(b)
-	switch {
-	case !oka:
-		return okb
-	case !okb:
-		return false
-	}
-	return ta.Before(tb)
 }

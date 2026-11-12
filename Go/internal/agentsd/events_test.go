@@ -92,9 +92,14 @@ func TestEventsAreKeptAndReadBack(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer d2.Shutdown()
-	got := d2.eventsPage(wire.EventsListRequest{}).Events
+	listed := d2.eventsPage(wire.EventsListRequest{})
+	got := listed.Events
 	if len(got) != int(base)+2 || got[1].Count != 2 || len(got[0].Consequences) != 1 {
 		t.Fatalf("%+v", got)
+	}
+	// The page says this machine's producer ref, as its own events have it (#4732).
+	if listed.Producer == nil || *listed.Producer != "agents:machine:#"+d2.envelopeMachine() {
+		t.Fatalf("producer %v", listed.Producer)
 	}
 	if e := d2.raise(wire.EventDraft{Name: "server.offline", At: now(), Scope: macScope(), Sentence: "ci went offline."}); e.Position != 2+eventPositionBlock {
 		t.Fatalf("%+v", e)

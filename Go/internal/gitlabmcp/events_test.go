@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The events over the fake GitLab: the github server's cases, for merge requests, pipelines
@@ -62,7 +64,7 @@ func same(t *testing.T, got, want []string) {
 }
 
 func TestTheEventsAreTheGitHubServersNames(t *testing.T) {
-	same(t, EventNames(), []string{"checks.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "review.requested", "review.comment",
+	same(t, EventNames(), []string{"checks.failed", "run.completed", "deploy.waiting", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "review.requested", "review.comment",
 		"issue.opened", "issue.labelled", "issue.commented", "issue.closed", "issue.assigned"})
 }
 
@@ -86,7 +88,7 @@ func TestOpenedIsRaisedWhenReadyAndOnlyForTheProjectsOwn(t *testing.T) {
 			mrJSON(7, "guest", guest, nil))
 	})
 	ids, result := own.poll()
-	same(t, ids, []string{"pr.opened:group/app:2:" + timeString(start.Add(time.Minute))})
+	same(t, ids, []string{"pr.opened:group/app:2:" + mcpevents.TimeString(start.Add(time.Minute))})
 	pr := data(t, result, 0)["pr"].(map[string]any)
 	if pr["author"] != "dev" || pr["branch"] != "feature" || pr["number"] != 2 {
 		t.Fatalf("pr %v", pr)
@@ -307,8 +309,8 @@ func TestLabelledWaitReadsOnlyWhatIsNew(t *testing.T) {
 	var asked []int
 	for i := 1; i <= 20; i++ {
 		f.set(func() {
-			f.issues = append(f.issues, issueObj(i, dev, obj{"updated_at": timeString(agent.now), "labels": []string{"bug"}}))
-			f.labelled[i] = []obj{{"id": 100 + i, "action": "add", "created_at": timeString(agent.now), "user": dev, "label": obj{"name": "bug"}}}
+			f.issues = append(f.issues, issueObj(i, dev, obj{"updated_at": mcpevents.TimeString(agent.now), "labels": []string{"bug"}}))
+			f.labelled[i] = []obj{{"id": 100 + i, "action": "add", "created_at": mcpevents.TimeString(agent.now), "user": dev, "label": obj{"name": "bug"}}}
 		})
 		before := len(f.asked())
 		ids, _ := agent.poll()
@@ -593,7 +595,7 @@ func TestEventsListGivesWhichArgumentsNameOne(t *testing.T) {
 		if hasMine != named[name] || hasFixes != named[name] {
 			t.Fatalf("%s: mine %v, fixes %v", name, hasMine, hasFixes)
 		}
-		if want := named[name] || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled"; hasAny != want {
+		if want := named[name] || name == "run.completed" || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled"; hasAny != want {
 			t.Fatalf("%s: any %v", name, hasAny)
 		}
 		if hasFixes {

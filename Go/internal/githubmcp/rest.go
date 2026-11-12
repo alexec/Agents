@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // RealGitHub reads GitHub's REST and GraphQL APIs as the person, with the token of the
@@ -502,7 +503,7 @@ func (g *RealGitHub) runs(ctx context.Context, repo, branch, since, status strin
 func (g *RealGitHub) CompletedRuns(ctx context.Context, repo, workflow, branch string, run int, since string) ([]CompletedRun, bool, error) {
 	var runs []CompletedRun
 	keep := func(r runJSON) {
-		if r.Status == "completed" && !before(r.UpdatedAt, since) && (workflow == "" || path.Base(r.Path) == workflow) &&
+		if r.Status == "completed" && !mcpevents.Before(r.UpdatedAt, since) && (workflow == "" || path.Base(r.Path) == workflow) &&
 			(branch == "" || r.HeadBranch == branch) && (run == 0 || r.ID == run) {
 			runs = append(runs, r.completed(repo))
 		}
@@ -582,8 +583,8 @@ func (g *RealGitHub) RunDeploys(ctx context.Context, repo string, run CompletedR
 // since to keep, newest created first, until the runs were created before since's rerun window.
 func (g *RealGitHub) listRuns(ctx context.Context, list, branch, since string, keep func(runJSON)) (bool, error) {
 	floor := ""
-	if t, ok := parseTime(since); ok {
-		floor = timeString(t.Add(-rerunWindow))
+	if t, ok := mcpevents.ParseTime(since); ok {
+		floor = mcpevents.TimeString(t.Add(-rerunWindow))
 	}
 	if branch != "" {
 		list += "&branch=" + url.QueryEscape(branch)
@@ -596,12 +597,12 @@ func (g *RealGitHub) listRuns(ctx context.Context, list, branch, since string, k
 			return false, err
 		}
 		for _, r := range got.Runs {
-			if !before(r.UpdatedAt, since) {
+			if !mcpevents.Before(r.UpdatedAt, since) {
 				keep(r)
 			}
 		}
 		// Runs are listed newest created first; a rerun keeps its created_at.
-		if len(got.Runs) < perPage || before(got.Runs[len(got.Runs)-1].CreatedAt, floor) {
+		if len(got.Runs) < perPage || mcpevents.Before(got.Runs[len(got.Runs)-1].CreatedAt, floor) {
 			return false, nil
 		}
 	}
@@ -668,15 +669,15 @@ func (g *RealGitHub) ClosedPRs(ctx context.Context, repo, since string) ([]Merge
 			return nil, nil, false, err
 		}
 		for _, p := range list {
-			if before(p.UpdatedAt, since) {
+			if mcpevents.Before(p.UpdatedAt, since) {
 				return merged, closed, false, nil
 			}
 			switch {
 			case p.MergedAt != nil:
-				if !before(*p.MergedAt, since) {
+				if !mcpevents.Before(*p.MergedAt, since) {
 					merged = append(merged, MergedPR{PR: p.pr(), MergedAt: *p.MergedAt, MergeSHA: p.MergeSHA, Trusted: p.trusted(repo)})
 				}
-			case p.ClosedAt != nil && !before(*p.ClosedAt, since):
+			case p.ClosedAt != nil && !mcpevents.Before(*p.ClosedAt, since):
 				closed = append(closed, ClosedPR{PR: p.pr(), ClosedAt: *p.ClosedAt, Trusted: p.trusted(repo)})
 			}
 		}
@@ -892,7 +893,7 @@ func newest[T any](ctx context.Context, g *RealGitHub, path, since string, at fu
 			return nil, false, err
 		}
 		for _, item := range list {
-			if before(at(item), since) {
+			if mcpevents.Before(at(item), since) {
 				return items, false, nil
 			}
 			items = append(items, item)

@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The events over a fake Jira held in memory: the linear server's cases, for Jira.
@@ -53,7 +55,9 @@ func issue(key, project string, labels ...string) Issue {
 
 var start = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 
-func at(minutes int) string { return timeString(start.Add(time.Duration(minutes) * time.Minute)) }
+func at(minutes int) string {
+	return mcpevents.TimeString(start.Add(time.Duration(minutes) * time.Minute))
+}
 
 type poller struct {
 	t      *testing.T

@@ -205,6 +205,12 @@ public final class AgentsModel {
     /// The machines whose folders and sessions on screen are this device's copy (#4791),
     /// drawn before their host answered. A host's own list takes its machine out.
     public private(set) var drawnFromCopy: Set<MachineRef> = []
+    /// Each host's point in its order of changes, as its last catch-up said (#4794).
+    @ObservationIgnored private var listPoints: [MachineRef: DaemonAPI.ListRevision] = [:]
+    /// How many entries the open chat's host had when it last gave a page of it (#4794):
+    /// every entry from here on was written after, so a reconnect asks `from` here. Nil
+    /// when no page of the open chat is held.
+    @ObservationIgnored public private(set) var transcriptEnd: Int?
     /// Whether the open chat is this device's copy, until its host's page lands (#4791).
     public private(set) var transcriptFromCopy = false
     /// A host listed a machine's agents or folders (#4791): the local copy writes them.
@@ -281,6 +287,8 @@ public final class AgentsModel {
             if let oldValue, let left = shownTranscript(of: oldValue) { onLeavingChat?(left) }
             shown.id = watching
             clearTranscript()
+            // A prompt the host took is in the transcript the next chat loads (#4814).
+            if let oldValue { dropAnsweredSends(of: oldValue) }
             // A chat opens at its end, whatever the last one was left at.
             isFollowingEnd = true
             // Output is kept for the chat on screen only (#203). The host sends what a
@@ -398,6 +406,16 @@ public final class AgentsModel {
                                                 shown: ShownEvents)?
     /// Whether the daemon has older events than `recentEvents` reaches.
     public private(set) var moreEvents = false
+    /// The bus log's events (#4732), every machine's, newest first, as far back as has been
+    /// paged in, each with a position below zero; the Events page shows the ones this
+    /// machine's log does not have.
+    public private(set) var busEvents: [Event] = [] {
+        didSet { eventsRevision &+= 1 }
+    }
+    /// Where the bus log's next page back starts; nil when there is none.
+    public private(set) var busNext: String?
+    /// This machine's producer ref, as `events/list` last said it (#4732).
+    public private(set) var eventsProducer: String?
     /// What `recentEvents` is narrowed to. Set by whoever asks for a page, before it
     /// asks, so a page that comes back for a filter since left is dropped.
     public var eventsFilter = EventFilter()
@@ -412,6 +430,8 @@ public final class AgentsModel {
     public func clearEvents() {
         recentEvents = []
         moreEvents = false
+        busEvents = []
+        busNext = nil
         lastEventAt = nil
         eventsLoaded = false
     }
@@ -490,6 +510,27 @@ public final class AgentsModel {
     @ObservationIgnored private var answering: Set<UUID> = []
     /// Of those, the ones the host said were settled while the answer was going.
     @ObservationIgnored private var answeredElsewhere: Set<UUID> = []
+    /// An approval in one folder on one host (#4814).
+    private struct HeldApproval: Hashable {
+        let key: FolderKey
+        let id: String
+    }
+    /// The approvals answered here whose answer is on its way (#4814): out of their
+    /// folder's list until it is back, as a permission's card is.
+    @ObservationIgnored private var answeringApprovals: [HeldApproval: Approval] = [:]
+    /// Of those, the ones a host's list no longer had while the answer was going.
+    @ObservationIgnored private var approvalsAnsweredElsewhere: Set<HeldApproval> = []
+
+    /// A prompt sent here and not yet in its transcript (#4814): the chat draws it as the
+    /// person's bubble at once, until the host's own entry for it lands.
+    public struct SendingPrompt: Identifiable, Equatable, Sendable {
+        public let id: UUID
+        public let text: String
+        /// The host took it. The next entry it sends is the prompt, whatever its words.
+        var answered = false
+    }
+    /// The prompts on their way, by agent, oldest first.
+    public private(set) var sendingPrompts: [UUID: [SendingPrompt]] = [:]
 
     /// What each agent has been asked to do and has not yet answered (#87): the control
     /// that sent it shows it is on its way, and every control that would send another is
@@ -722,6 +763,7 @@ public final class AgentsModel {
             }
             entryIDs.insert(notification.entry.id)
             entries.append(notification.entry)
+            landed(notification.entry, on: notification.agentID)
             display.add(notification.entry)
             let indexed = fileIndex.add(notification.entry)
             if indexed.changes { fileChanges = fileIndex.changes }
@@ -1198,6 +1240,7 @@ public final class AgentsModel {
     }
 
     public func upsert(_ summary: DaemonAPI.FolderSummary) {
+        let summary = hidingAnswered(summary)
         if let index = folders.firstIndex(where: { $0.folder.folder == summary.folder.folder && $0.host == summary.host }) {
             folders[index] = summary
         } else {
@@ -1229,7 +1272,7 @@ public final class AgentsModel {
     }
 
     public func replaceFolders(_ listed: [DaemonAPI.FolderSummary]) {
-        folders = listed.sorted(by: SidebarOrder.byAdded)
+        folders = listed.map(hidingAnswered).sorted(by: SidebarOrder.byAdded)
     }
 
     /// One host's agents, as it just listed them. Every other host's are left alone:
@@ -1239,12 +1282,14 @@ public final class AgentsModel {
         let held = byID.filter { $0.value.host == host }
         let stamped = listed.map { var agent = $0.keepingLists(of: held[$0.id]); agent.host = host; return agent }
         refile(byID.values.filter { $0.host != host }.map { hostRecords[$0.id] ?? $0 } + stamped, heard: stamped.map(\.id))
+        // A host let go of: its point goes too, so nothing resumes onto an empty list (#4794).
+        if listed.isEmpty { listPoints[host] = nil }
         drawnFromCopy.remove(host)
         onListed?(host)
     }
 
     public func replaceFolders(_ listed: [DaemonAPI.FolderSummary], from host: MachineRef) {
-        let stamped = listed.map { var summary = $0; summary.host = host; return summary }
+        let stamped = listed.map { var summary = $0; summary.host = host; return hidingAnswered(summary) }
         folders = (folders.filter { $0.host != host } + stamped).sorted(by: SidebarOrder.byAdded)
         onListed?(host)
     }
@@ -1259,6 +1304,8 @@ public final class AgentsModel {
         replaceFolders(machine.folders, from: machine.host)
         replaceAgents(machine.agents, from: machine.host)
         drawnFromCopy.insert(machine.host)
+        // The host's first catch-up asks only for what changed since the copy (#4794).
+        listPoints[machine.host] = machine.point
     }
 
     /// What an offline host last listed (#962), for a client that started while it was down:
@@ -1270,6 +1317,34 @@ public final class AgentsModel {
     }
 
     public func holdsFolders(of host: MachineRef) -> Bool { folders.contains { $0.host == host } }
+
+    /// Where a host's sessions held here are in its order of changes (#4794): what the next
+    /// catch-up asks `changedSince`. Nil when nothing says, and the client asks for all.
+    public func listPoint(of host: MachineRef) -> DaemonAPI.ListRevision? { listPoints[host] }
+
+    /// A host's catch-up said where its list is (#4794). Nil from a host that predates it:
+    /// the next one asks for all again.
+    public func notePoint(_ changes: DaemonAPI.AgentChanges?, of host: MachineRef) {
+        listPoints[host] = changes?.point
+    }
+
+    /// What changed on a host since the point held (#4794), in place of its whole list: each
+    /// changed record filed, each removed one let go, and the new point kept. An archived one
+    /// that is not held stays out, as a lean `agent/changed` of one does: a client holds the
+    /// live sessions and the archived ones on screen. What the copy drew is the host's now.
+    public func takeChanges(_ changed: [Agent], _ changes: DaemonAPI.AgentChanges, from host: MachineRef) {
+        for agent in changed {
+            let held = byID[agent.id]
+            guard held != nil || agent.state != .archived else { continue }
+            var stamped = agent.keepingLists(of: held)
+            stamped.host = host
+            file(stamped)
+        }
+        forget(changes.removed.filter { byID[$0]?.host == host })
+        listPoints[host] = changes.point
+        drawnFromCopy.remove(host)
+        onListed?(host)
+    }
 
     /// Down to the budget, never taking the terminal just written to.
     private func dropOldTerminalOutput() {
@@ -1388,8 +1463,31 @@ public final class AgentsModel {
             moreEvents = false
         }
         waitingAgents = page.waiting
+        if let producer = page.producer { eventsProducer = producer }
         eventsLoaded = true
     }
+
+    /// A page of the bus log (#4732), asked for with `filter`. The first page replaces what
+    /// was there; one from further back (`appending`) goes on the end. A page for a filter
+    /// other than the current one is too late, and dropped.
+    public func takeBusLog(_ page: DaemonAPI.BusLogPage, for filter: EventFilter = EventFilter(),
+                           appending: Bool = false) {
+        guard filter == eventsFilter else { return }
+        let kept = appending ? busEvents : []
+        let known = Set(kept.compactMap(\.ref))
+        var next = (kept.map(\.position).min() ?? 0) - 1
+        var events = kept
+        for bus in page.events where !known.contains(bus.id) {
+            events.append(Event(bus: bus, position: next))
+            next -= 1
+        }
+        if events.count > Self.eventsPagedMost { events.removeLast(events.count - Self.eventsPagedMost) }
+        busEvents = events
+        busNext = page.hasMore && events.count < Self.eventsPagedMost ? page.next : nil
+    }
+
+    /// Whether the Events page has older events to page in, from this machine's log or the bus's.
+    public var moreEventsAnywhere: Bool { moreEvents || busNext != nil }
 
     /// `recentEvents` narrowed to `filter` and cut into days, as an Events page draws
     /// them. Worked out again only when the events, the filter or the calendar change,
@@ -1397,10 +1495,24 @@ public final class AgentsModel {
     /// asking is redrawn when they change.
     public func shownEvents(_ filter: EventFilter, calendar: Calendar = .current) -> ShownEvents {
         let events = recentEvents
+        let bus = busEvents
         if let memo = shownMemo, memo.revision == eventsRevision, memo.filter == filter, memo.calendar == calendar {
             return memo.shown
         }
-        let shown = ShownEvents(events.filter(filter.matches), calendar: calendar)
+        var shownEvents = events.filter(filter.matches)
+        // The bus's events this machine's log does not have (#4732): another machine's. They
+        // have no folder here, so a folder's page leaves them out.
+        if filter.scope == nil, !bus.isEmpty {
+            let here = Set(events.compactMap(\.ref))
+            let others = bus.filter { !($0.ref.map(here.contains) ?? false) && filter.matches($0) }
+            if !others.isEmpty {
+                // By when each happened, as the days cut them; stable, so this machine's keep their order.
+                shownEvents = (shownEvents + others).enumerated()
+                    .sorted { $0.element.at != $1.element.at ? $0.element.at > $1.element.at : $0.offset < $1.offset }
+                    .map(\.element)
+            }
+        }
+        let shown = ShownEvents(shownEvents, calendar: calendar)
         shownMemo = (eventsRevision, filter, calendar, shown)
         return shown
     }
@@ -1524,10 +1636,12 @@ public final class AgentsModel {
     /// record goes back, with any other change still pending drawn over it. Answered, it
     /// stays drawn until the host's record says so, or until the host next speaks about
     /// this agent: its word is the last one either way.
-    public func settleWrite(_ id: Int, on agentID: UUID, failed: Bool) {
+    /// `done`: the host's answer says the change is made already (a move made at once,
+    /// #4814), so it goes now and the host's record shows the rest.
+    public func settleWrite(_ id: Int, on agentID: UUID, failed: Bool, done: Bool = false) {
         guard var writes = pendingWrites[agentID], let at = writes.firstIndex(where: { $0.id == id }),
               let host = hostRecords[agentID] else { return }
-        if failed || writes[at].write.isSettled(by: host) {
+        if failed || done || writes[at].write.isSettled(by: host) {
             writes.remove(at: at)
         } else {
             writes[at].answered = true
@@ -1637,6 +1751,98 @@ public final class AgentsModel {
         return sent
     }
 
+    /// Approve, Deny, Request changes or Dismiss a waiting item (#4814): out of its
+    /// folder's list at once, before the host has the answer, and back when the answer did
+    /// not go, unless a list from the host said meanwhile that it was no longer there.
+    @discardableResult
+    public func answering(_ approval: Approval, in key: FolderKey, _ send: () async -> Bool) async -> Bool {
+        let held = HeldApproval(key: key, id: approval.id)
+        answeringApprovals[held] = approval
+        if let index = folders.firstIndex(where: { $0.host == key.host && $0.folder.folder == key.folder }) {
+            folders[index].approvals?.removeAll { $0.id == approval.id }
+        }
+        let sent = await send()
+        let resolved = approvalsAnsweredElsewhere.remove(held) != nil
+        answeringApprovals[held] = nil
+        if !sent, !resolved,
+           let index = folders.firstIndex(where: { $0.host == key.host && $0.folder.folder == key.folder }),
+           !(folders[index].approvals ?? []).contains(where: { $0.id == approval.id }) {
+            folders[index].approvals = (folders[index].approvals ?? []) + [approval]
+        }
+        return sent
+    }
+
+    /// A waiting item by its id, also while its answer is on its way (#4814): the Review
+    /// page that sent it stays on it, to say a refusal in place.
+    public func approval(_ id: String, in key: FolderKey) -> Approval? {
+        folder(key)?.approvals?.first { $0.id == id } ?? answeringApprovals[HeldApproval(key: key, id: id)]
+    }
+
+    /// A host's list of a folder, with the approvals answered here and still on their way
+    /// left out. One it no longer has was answered, here or elsewhere.
+    private func hidingAnswered(_ summary: DaemonAPI.FolderSummary) -> DaemonAPI.FolderSummary {
+        guard !answeringApprovals.isEmpty else { return summary }
+        let key = FolderKey(host: summary.host, folder: summary.folder.folder)
+        let listed = Set((summary.approvals ?? []).map(\.id))
+        for held in answeringApprovals.keys where held.key == key && !listed.contains(held.id) {
+            approvalsAnsweredElsewhere.insert(held)
+        }
+        var summary = summary
+        summary.approvals = summary.approvals?.filter { answeringApprovals[HeldApproval(key: key, id: $0.id)] == nil }
+        return summary
+    }
+
+    // MARK: Prompts on their way (#4814)
+
+    /// Draw a prompt in the chat now, as the person's bubble, before its host has it. Only
+    /// for an agent between turns: one that will queue it shows it in its queue, from the
+    /// host's record. Nil when nothing was drawn.
+    public func beginSending(_ text: String, to agentID: UUID) -> UUID? {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, let agent = byID[agentID], !Self.willQueue(agent) else { return nil }
+        let id = UUID()
+        sendingPrompts[agentID, default: []].append(SendingPrompt(id: id, text: text))
+        return id
+    }
+
+    /// The call for a prompt came back. Not sent, its bubble goes (the prompt bar has the
+    /// words back). Sent, it stays until the host's entry for it lands.
+    public func endSending(_ id: UUID?, to agentID: UUID, sent: Bool) {
+        guard let id, var sending = sendingPrompts[agentID], let at = sending.firstIndex(where: { $0.id == id }) else { return }
+        if sent, agentID == watching {
+            sending[at].answered = true
+        } else {
+            sending.remove(at: at)
+        }
+        sendingPrompts[agentID] = sending.isEmpty ? nil : sending
+    }
+
+    /// The prompts on their way to an agent, for its chat to draw.
+    public func sending(to agentID: UUID) -> [SendingPrompt] { sendingPrompts[agentID] ?? [] }
+
+    /// Whether what is sent now waits for the turn to end rather than go: the prompt bar's rule.
+    public nonisolated static func willQueue(_ agent: Agent) -> Bool {
+        agent.state.hasTurnInFlight || agent.state == .queued || !agent.queuedPrompts.isEmpty
+    }
+
+    /// An entry landed in the chat: the person's prompt with the same words is the one on
+    /// its way, and any entry after the host took one means that one is in.
+    private func landed(_ entry: TranscriptEntry, on agentID: UUID) {
+        guard var sending = sendingPrompts[agentID], !sending.isEmpty else { return }
+        if case .userMessage(let text, _, .person) = entry.kind,
+           let at = sending.firstIndex(where: { $0.text == text.trimmingCharacters(in: .whitespacesAndNewlines) }) {
+            sending.remove(at: at)
+        } else if let at = sending.firstIndex(where: \.answered) {
+            sending.remove(at: at)
+        }
+        sendingPrompts[agentID] = sending.isEmpty ? nil : sending
+    }
+
+    private func dropAnsweredSends(of agentID: UUID) {
+        guard let sending = sendingPrompts[agentID]?.filter({ !$0.answered }) else { return }
+        sendingPrompts[agentID] = sending.isEmpty ? nil : sending
+    }
+
     /// Answer a question card, the same way as a permission (#4786).
     @discardableResult
     public func answering(_ request: ElicitationRequest, _ send: () async -> Bool) async -> Bool {
@@ -1723,7 +1929,10 @@ public final class AgentsModel {
         return LocalCopy.Transcript(
             session: session,
             turns: TurnsPage(turns: turns, firstTurn: firstTurn, openStart: openTurnStart, firstPrompt: firstPrompt),
-            page: TranscriptPage(firstIndex: firstEntryIndex, total: firstEntryIndex + entries.count, entries: entries),
+            // The host's count, not this one's: a reconnect resumes from it (#4794), and an
+            // entry heard but never written would count past it.
+            page: TranscriptPage(firstIndex: firstEntryIndex, total: transcriptEnd ?? firstEntryIndex + entries.count,
+                                 entries: entries),
             ask: leadAsk)
     }
 
@@ -1743,11 +1952,30 @@ public final class AgentsModel {
         entries = Self.entriesKeepingLatest(page.entries + (heardSincePage ?? []))
         heardSincePage = nil
         transcriptFromCopy = false
+        transcriptEnd = page.total
         firstEntryIndex = page.firstIndex
         hasMoreBefore = page.firstIndex > openTurnStart
         leadAsk = page.firstIndex > openTurnStart ? ask.flatMap { TranscriptItem.entry($0).isPersonsAsk ? $0 : nil } : nil
         transcriptLoadFailure = nil
         refold()
+    }
+
+    /// The entries written since the open chat's last page (#4794), asked `from:
+    /// transcriptEnd`, laid after what is held, with what was heard meanwhile: the chat as
+    /// it would be had it heard them live. False, and nothing changed, when `load` is not the
+    /// latest or the page does not start where the held one ended (more was written than
+    /// one page holds, or the transcript is not the one held); the chat then opens whole.
+    @discardableResult
+    public func takeResumed(_ page: TranscriptPage, load: Int) -> Bool {
+        guard isLatestTranscriptLoad(load), let end = transcriptEnd, page.firstIndex == end, page.total >= end
+        else { return false }
+        entries = Self.entriesKeepingLatest(entries + page.entries + (heardSincePage ?? []))
+        heardSincePage = nil
+        transcriptFromCopy = false
+        transcriptEnd = page.total
+        transcriptLoadFailure = nil
+        refold()
+        return true
     }
 
     private static func entriesKeepingLatest(_ entries: [TranscriptEntry]) -> [TranscriptEntry] {
@@ -1779,6 +2007,7 @@ public final class AgentsModel {
     public func clearTranscript() {
         entries = []
         transcriptFromCopy = false
+        transcriptEnd = nil
         // A chat chosen is a page on its way.
         heardSincePage = []
         transcriptLoadFailure = nil

@@ -2238,6 +2238,12 @@ public enum DaemonAPI {
         /// (`SessionLabelQuery`), archived ones included when `includeArchived` is.
         /// What a search asks the host for, rather than filtering what it holds (#165).
         public var query: String?
+        /// Only the records changed since this point (#4785), every one, archived ones too:
+        /// `limit`, `after`, `includeArchived` and `archivedOnly` do not apply. The removed
+        /// ones come in `client/catchUp`'s `agentChanges`. A point the host cannot vouch for
+        /// fails `agents/list` with `Failure.revisionGone`; `client/catchUp` then answers as
+        /// without it, with `agentChanges.all`. A host that predates it answers everything.
+        public var changedSince: ListRevision?
 
         /// How many come back when `limit` is not said, and the most that ever do (#164).
         /// A whole list is pages: ask again `after` the last until fewer than asked come.
@@ -2248,7 +2254,7 @@ public enum DaemonAPI {
                     archivedOnly: Bool = false, folder: URL? = nil,
                     startedByWorkflow: String? = nil, limit: Int? = nil,
                     lean: Bool = false, agentID: UUID? = nil,
-                    after: ListCursor? = nil, query: String? = nil) {
+                    after: ListCursor? = nil, query: String? = nil, changedSince: ListRevision? = nil) {
             self.includeArchived = includeArchived
             self.archivedCommands = archivedCommands
             self.archivedOnly = archivedOnly
@@ -2259,6 +2265,7 @@ public enum DaemonAPI {
             self.agentID = agentID
             self.after = after
             self.query = query
+            self.changedSince = changedSince
         }
 
         /// One agent's whole record, archived or not (#107).
@@ -2290,7 +2297,42 @@ public enum DaemonAPI {
             agentID = try c.decodeIfPresent(UUID.self, forKey: .agentID)
             after = try c.decodeIfPresent(ListCursor.self, forKey: .after)
             query = try c.decodeIfPresent(String.self, forKey: .query)
+            changedSince = try c.decodeIfPresent(ListRevision.self, forKey: .changedSince)
         }
+    }
+
+    /// A point in a host's order of changes to its session records (#4785). The epoch
+    /// names the order: the host makes a new one when it cannot vouch for the old one.
+    public struct ListRevision: Codable, Hashable, Sendable {
+        public var epoch: String
+        public var revision: Int
+
+        public init(epoch: String, revision: Int) {
+            self.epoch = epoch
+            self.revision = revision
+        }
+    }
+
+    /// Where a `client/catchUp`'s agents are in the host's order of changes (#4785). Ask
+    /// next time with `ListRequest.changedSince` set to `point`.
+    public struct AgentChanges: Codable, Hashable, Sendable {
+        public var epoch: String
+        /// Every change up to here is in this answer or an earlier one.
+        public var revision: Int
+        /// The records removed since `changedSince`.
+        public var removed: [UUID]
+        /// `agents` is the list as without `changedSince`: none was given, or it was too
+        /// old or of another epoch. Drop each record held that is not in it.
+        public var all: Bool
+
+        public init(epoch: String, revision: Int, removed: [UUID] = [], all: Bool) {
+            self.epoch = epoch
+            self.revision = revision
+            self.removed = removed
+            self.all = all
+        }
+
+        public var point: ListRevision { ListRevision(epoch: epoch, revision: revision) }
     }
 
     /// Where a page of `agents/list` ended (#164): its last agent's activity and id. The
@@ -2959,6 +3001,9 @@ public enum DaemonAPI {
         /// A scratch daemon asked to run an agent in a folder outside its own root
         /// (#228), without `--allow-outside-root`.
         public static let outsideScratchRoot = -32098
+        /// `agents/list` with a `changedSince` this host cannot vouch for (#4785): too old,
+        /// or of another epoch. Ask for the whole list.
+        public static let revisionGone = -32105
     }
 
     // MARK: Workflows

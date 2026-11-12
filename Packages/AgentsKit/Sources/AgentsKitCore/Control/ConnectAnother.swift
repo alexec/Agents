@@ -104,7 +104,6 @@ public enum ConnectAnother {
 
         public static let pairing = "Connecting this window…"
         public static let joining = "Joining this Mac…"
-        public static let startingHere = "Starting the control plane on this Mac…"
         public static let noMachineCode = "The control plane made no code for this Mac."
         /// A browser asked for the sign-in to agentloops.dev (#4257): it opens in the window.
         public static let signingInHere = "Sign in to agentloops.dev in Agents on this Mac."

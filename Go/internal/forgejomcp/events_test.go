@@ -9,13 +9,28 @@ import (
 	"testing"
 
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The events over the fake Forgejo: the gitlab server's names, the trust filter (#728), and
 // each one raised once from what Forgejo says.
 
 func TestTheEventsAreTheGitLabServersNames(t *testing.T) {
-	same(t, EventNames(), gitlabmcp.EventNames())
+	// The gitlab server's, but for run.completed and deploy.waiting, which each forge has
+	// where its API does; run.completed is after checks.failed, as there (#4217).
+	without := func(names []string) []string {
+		var out []string
+		for _, n := range names {
+			if n != "run.completed" && n != "deploy.waiting" {
+				out = append(out, n)
+			}
+		}
+		return out
+	}
+	same(t, without(EventNames()), without(gitlabmcp.EventNames()))
+	if names := EventNames(); len(without(names)) != len(names) && names[1] != "run.completed" {
+		t.Fatalf("run.completed is not after checks.failed: %v", names)
+	}
 }
 
 func TestOpenedIsRaisedWhenReadyAndOnlyForTheReposOwn(t *testing.T) {
@@ -143,7 +158,7 @@ func TestChecksFailedForAPullRequestsHead(t *testing.T) {
 		f.statuses["sha2"] = obj{"state": "success", "sha": "sha2", "statuses": []any{}}
 	})
 	ids, result := p.poll()
-	same(t, ids, []string{"checks.failed:acme/app:sha1:" + timeString(start.Add(60e9))})
+	same(t, ids, []string{"checks.failed:acme/app:sha1:" + mcpevents.TimeString(start.Add(60e9))})
 	d := data(t, result, 0)
 	same(t, d["headSha"], "sha1")
 	same(t, d["run"], map[string]any{"id": 12, "name": "ci / test (pull_request)", "url": "https://forgejo.test/acme/app/actions/runs/12/jobs/0"})
@@ -196,10 +211,10 @@ func TestIssueEvents(t *testing.T) {
 	same(t, ids, []string{"issue.commented:acme/app:10"})
 	same(t, data(t, result, 0)["comment"], map[string]any{"author": "dev", "url": "https://forgejo.test/acme/app/issues/2#issuecomment-10", "body": "Seen it."})
 	ids, result = closed.poll()
-	same(t, ids, []string{"issue.closed:acme/app:3:" + timeString(start.Add(60e9))})
+	same(t, ids, []string{"issue.closed:acme/app:3:" + mcpevents.TimeString(start.Add(60e9))})
 	same(t, data(t, result, 0)["by"], "alex")
 	ids, _ = closedList.poll()
-	same(t, ids, []string{"issue.closed:acme/app:3:" + timeString(start.Add(60e9))})
+	same(t, ids, []string{"issue.closed:acme/app:3:" + mcpevents.TimeString(start.Add(60e9))})
 	ids, _ = closedOther.poll()
 	same(t, ids, []string(nil))
 	ids, result = labelled.poll()
@@ -325,7 +340,7 @@ func TestEventsListSchemas(t *testing.T) {
 		}
 		has("mine", named[name])
 		has("fixes", named[name])
-		has("any", named[name] || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled")
+		has("any", named[name] || name == "run.completed" || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled")
 		if issue, ok := props["issue"].(map[string]any); ok && name != "issue.assigned" && !reflect.DeepEqual(issue["type"], []string{"integer", "array"}) {
 			t.Errorf("%s: issue is %v", name, issue["type"])
 		}

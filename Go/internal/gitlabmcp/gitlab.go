@@ -4,7 +4,8 @@ import (
 	"context"
 	"regexp"
 	"strings"
-	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // What the events read from GitLab (#1629). RealGitLab reads it over the REST API v4 with a
@@ -93,6 +94,8 @@ type Pipeline struct {
 	SHA       string
 	Ref       string
 	UpdatedAt string
+	// Listed is its name as the listing gave it: "" when GitLab did not say (an older GitLab).
+	Listed string
 	// MRNumber is the merge request its ref names (refs/merge-requests/12/head); 0 for a
 	// branch pipeline, whose merge request is found by its commit.
 	MRNumber int
@@ -202,21 +205,10 @@ func (c ReviewComment) data() map[string]any {
 		"comment": map[string]any{"id": c.ID, "author": c.Author, "path": c.Path, "line": c.Line, "body": c.Body, "url": c.URL}}
 }
 
-// Listed is how far a listing read: Newest is the newest time of anything it listed, wanted
-// or not (in timeLayout, "" when it listed nothing), and Truncated says it stopped at maxPages
-// before it reached since.
-type Listed struct {
-	Newest    string
-	Truncated bool
-}
-
-// saw is l with t seen too.
-func (l Listed) saw(t string) Listed {
-	if t = normalized(t); t > l.Newest {
-		l.Newest = t
-	}
-	return l
-}
+// Listed is how far a listing read (mcpevents.Listed): Newest is the newest time of anything it
+// listed, wanted or not (in mcpevents.TimeLayout, "" when it listed nothing), and Truncated says
+// it stopped at maxPages before it reached since.
+type Listed = mcpevents.Listed
 
 // GitLab is what the events ask of GitLab.
 type GitLab interface {
@@ -230,6 +222,17 @@ type GitLab interface {
 	FailedPipelines(ctx context.Context, project, since string) (pipelines []Pipeline, listed Listed, err error)
 	// PipelineDetails is the pipeline's merge request and failed jobs, or nil when it belongs to none.
 	PipelineDetails(ctx context.Context, project string, p Pipeline) (*FailedPipelineData, error)
+	// FinishedPipelines are the finished pipelines updated at or after since, of branch (or a
+	// tag) and run (a pipeline's id) when each is set, in any order (#4217).
+	FinishedPipelines(ctx context.Context, project, branch string, run int, since string) (pipelines []Pipeline, listed Listed, err error)
+	// CompletedPipeline is a finished pipeline with who started it and when it finished.
+	CompletedPipeline(ctx context.Context, project string, id int) (*CompletedPipeline, error)
+	// PipelineDeploys are what a finished pipeline deployed, as deploy refs.
+	PipelineDeploys(ctx context.Context, project string, c CompletedPipeline) ([]string, error)
+	// WaitingDeploys are the pipelines whose deployments wait for an approval, of branch when set.
+	WaitingDeploys(ctx context.Context, project, branch string) ([]WaitingDeploy, error)
+	// Approvers is who may answer a waiting pipeline, and whether the connection's owner may.
+	Approvers(ctx context.Context, project string, w WaitingDeploy) (reviewers []string, canApprove bool, err error)
 	// IssueActivity is what happened to the project's issues at or after since, of one kind.
 	IssueActivity(ctx context.Context, project string, kind IssueKind, since string) (items []IssueActivity, listed Listed, err error)
 	// ReviewComments are the comments on merge requests' diffs made at or after since.
@@ -299,37 +302,4 @@ var botName = regexp.MustCompile(`^(project|group)_\d+_bot|[-_]bot$|^ghost$`)
 
 func isBot(username string, bot bool) bool {
 	return bot || botName.MatchString(strings.ToLower(username))
-}
-
-// timeLayout is how the events draft carries a time: ISO 8601 in UTC with milliseconds, which
-// sorts as text in time order.
-const timeLayout = "2006-01-02T15:04:05.000Z"
-
-func timeString(t time.Time) string { return t.UTC().Format(timeLayout) }
-
-func parseTime(text string) (time.Time, bool) {
-	t, err := time.Parse(time.RFC3339Nano, text)
-	return t, err == nil
-}
-
-// normalized is text in timeLayout, or "" when it is not a time.
-func normalized(text string) string {
-	t, ok := parseTime(text)
-	if !ok {
-		return ""
-	}
-	return timeString(t)
-}
-
-// before says whether a is earlier than b; a time that is not one is earliest of all.
-func before(a, b string) bool {
-	ta, oka := parseTime(a)
-	tb, okb := parseTime(b)
-	switch {
-	case !oka:
-		return okb
-	case !okb:
-		return false
-	}
-	return ta.Before(tb)
 }

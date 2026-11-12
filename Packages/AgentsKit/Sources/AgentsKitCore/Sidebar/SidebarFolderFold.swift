@@ -75,15 +75,6 @@ public struct SidebarFolderFold {
     /// Whether there is a Pinned heading to draw: a pinned session or workflow.
     public var hasPinned: Bool { !pinned.isEmpty || !pinnedWorkflows.isEmpty }
 
-    /// How many the Pinned heading counts: sessions and workflows.
-    public var pinnedCount: Int { pinned.count + pinnedWorkflows.count }
-
-    /// The pinned sessions' heading: attention on a folded one, so folding it never hides
-    /// that somebody is waiting.
-    public func pinnedWantsAPerson(in work: AgentsModel) -> Bool {
-        pinned.contains { work.group(of: $0) == .needsAttention } || pinnedWorkflows.contains(where: \.needsAPerson)
-    }
-
     /// How many archived sessions the fold says it holds: the host's count while there is
     /// no search, since the client holds a page of them only while the fold is open (#165).
     public func archivedCount(_ summary: DaemonAPI.FolderSummary?) -> Int {

@@ -88,9 +88,6 @@ public enum AppTool {
         "message_agent", "park_agent",
     ]
 
-    /// The retired names that, with no id, asked about the caller's own session.
-    static let retiredOwnArchive = ["request_archive", "archive_agent", "park_agent"]
-
     // Three more for taking turns with the Mac's shared things (036). Offered to every
     // agent, including one another agent started: waiting for the simulator is not
     // managing anyone.

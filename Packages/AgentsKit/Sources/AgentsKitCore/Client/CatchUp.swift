@@ -36,6 +36,9 @@ public extension DaemonAPI {
         /// The first page of live agents. A full page means there are more, which come
         /// a folder at a time as each folder's page opens. Read a row at a time (#2650).
         @AgentRows public var agents: [Agent]
+        /// Where `agents` is in the host's order of changes (#4785). Nil from a host that
+        /// predates it.
+        public var agentChanges: AgentChanges?
         public var permissions: [PermissionRequest]
         public var elicitations: [ElicitationRequest]
         public var attention: AttentionPending

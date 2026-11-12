@@ -48,7 +48,7 @@ struct PermissionSheet: View {
         // In the chat column, at the end of the conversation, as on the Mac
         // (033, #723).
         .chatColumn()
-        .animation(.snappy(duration: 0.2), value: chosen)
+        .animation(ResponseMotion.snappy, value: chosen)
     }
 
     /// Title, kind and what it wants to do — everything above the answers. Scrolls

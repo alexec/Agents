@@ -121,7 +121,7 @@ func eventsList() map[string]any { return mcpevents.List(events) }
 
 // MARK: Polling
 
-// candidate is something that may be raised: its id, its time (in timeLayout) and its data.
+// candidate is something that may be raised: its id, its time (in mcpevents.TimeLayout) and its data.
 type candidate struct {
 	eventID string
 	time    string
@@ -177,7 +177,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 		return nil, eventsError(&JiraError{Kind: NotSignedIn, Message: notSignedIn})
 	}
 	now := s.now()
-	return polls.Poll(e.Name, p, func() string { return timeString(now) }, func(since string) ([]mcpevents.Candidate, mcpevents.Listed, error) {
+	return polls.Poll(e.Name, p, func() string { return mcpevents.TimeString(now) }, func(since string) ([]mcpevents.Candidate, mcpevents.Listed, error) {
 		found, truncated, err := s.candidates(ctx, e, a, since)
 		list := make([]mcpevents.Candidate, len(found))
 		for i, c := range found {

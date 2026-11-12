@@ -86,6 +86,7 @@ export const Failure = {
   policyRefused: -32076,
   providerFailed: -32066,
   providersNeedOneCopy: -32064,
+  revisionGone: -32105,
   runtimeNotFound: -32001,
   runtimeWillNotStart: -32002,
   sandboxWillNotStart: -32061,
@@ -259,6 +260,12 @@ export type AfterTurn =
 
 export interface Agent {
   id: UUID;
+  /**
+   * Where this record's last change is in its host's order of changes (#4785): a number per host
+   * that goes up with each change to any of its records, kept on disk. Ask for the records changed
+   * since with ListRequest.changedSince.
+   */
+  revision?: number;
   runtimeID: string;
   cwd: URLString;
   title?: string;
@@ -394,6 +401,23 @@ export interface Agent {
 export type AgentArchivedReason =
   | "byUser"
   | "byAgent";
+
+/**
+ * Where a client/catchUp's agents are in the host's order of changes (#4785). The client asks next
+ * time with ListRequest.changedSince set to this epoch and revision.
+ */
+export interface AgentChanges {
+  epoch: string;
+  /** Every change up to here is in this answer or an earlier one. */
+  revision: number;
+  /** The records removed since changedSince. */
+  removed: UUID[];
+  /**
+   * True when agents is the list as without changedSince: none was given, or it was too old or of
+   * another epoch. The client then drops each record it holds that is not in it.
+   */
+  all: boolean;
+}
 
 /** A Markdown file under skills, personas or workflows in Agent Configuration. */
 export interface AgentConfigEditorFile {
@@ -1626,6 +1650,35 @@ export interface BusLeased {
 }
 
 /**
+ * bus/log's answer (#4732): envelopes of the caller's bus, newest first. Envelope only, as the bus
+ * keeps it: no data.
+ */
+export interface BusLogPage {
+  events: BusEvent[];
+  /** Where the next page back starts, as before; none when nothing older was read. */
+  next?: string;
+  /** Whether older envelopes are on the bus log. */
+  hasMore: boolean;
+}
+
+/**
+ * bus/log (#4732, spec 4724-event-bus, "The bus log"): a page of the caller's bus log, newest
+ * first, narrowed by the envelope's fields.
+ */
+export interface BusLogQuery {
+  /** The next of the page before: only envelopes older than it. */
+  before?: string;
+  /** At most this many; 100 when absent, never more than 500. */
+  limit?: number;
+  /** Only events of this provider (#4732): github, jira, agents and so on. */
+  provider?: string;
+  /** Only events of this type (#4732), noun.verbed, or noun.* for every type of that noun. */
+  type?: string;
+  /** Only events on this topic (#4732), such as a repo's full name; lower case. */
+  topic?: string;
+}
+
+/**
  * One producer lease (#4731): the machine that polls, until when, and whether it is the one that
  * asked. A machine that is not the holder stands by: it does not poll, and the control plane
  * delivers it what the holder's poll makes.
@@ -1936,6 +1989,7 @@ export interface CatchUpRequest {
 
 export interface CatchUpSnapshot {
   agents: Agent[];
+  agentChanges?: AgentChanges;
   permissions: PermissionRequest[];
   elicitations: ElicitationRequest[];
   attention: AttentionPending;
@@ -4020,6 +4074,11 @@ export interface EventsListRequest {
 export interface EventsPage {
   events: Event[];
   waiting: WaitingAgent[];
+  /**
+   * This machine's producer ref (#4732), agents:machine:#<machine>, as its own events say it: an
+   * event whose producer is another says which machine raised it.
+   */
+  producer?: string;
   hasMore: boolean;
 }
 
@@ -6396,6 +6455,23 @@ export interface ListRequest {
    * project's sessions on this machine.
    */
   project?: string;
+  /**
+   * Only the records changed since this point (#4785), every one, archived ones too: limit, after,
+   * includeArchived and archivedOnly do not apply, so a client sees a session archived or brought
+   * back. The records removed come in client/catchUp's agentChanges. When the point is too old or
+   * of another epoch, agents/list fails with revisionGone and client/catchUp answers as without it,
+   * with agentChanges.all. A host that predates it answers the whole list.
+   */
+  changedSince?: ListRevision;
+}
+
+/**
+ * A point in a host's order of changes to its session records (#4785). The epoch names the order:
+ * the host makes a new one when it cannot vouch for the old one.
+ */
+export interface ListRevision {
+  epoch: string;
+  revision: number;
 }
 
 export interface ListedSkill {
@@ -10560,6 +10636,17 @@ export interface ReportCounts {
 }
 
 /**
+ * A repo's delivery figures on Reports ▸ Planning (#4555): lineage.DeliveryOf over the scope's
+ * machines' nodes, each node once, with each release tag's time from its earliest link. Of a scope,
+ * never of a person.
+ */
+export interface ReportDelivery {
+  /** As LineageCostNode.repo, in the full form (#4800). */
+  repo: string;
+  figures: LineageDelivery;
+}
+
+/**
  * How far the estimates were from the actual figures (#3561), over the issues closed in the range
  * that had an estimate when their work started: the median of max(estimate/actual,
  * actual/estimate), so 1.5 means 1.5 times too high or too low. A figure is absent when no issue
@@ -10843,6 +10930,12 @@ export interface ReportValue {
    * Planning can ask lineage/forecast when each lands.
    */
   openEpics?: LineageNode[];
+  /**
+   * The scope's delivery figures (#4555, epic #4551), a repo each: the repos with the most PRs
+   * merged in the 28 days to now, at most 3, the most first, whatever the range. Absent from a
+   * control plane before it; empty when no repo had a merge.
+   */
+  delivery?: ReportDelivery[];
   issues: ReportValueRow[];
   /** One row per release (#3023): the PRs part-of it and the issues those PRs fix. */
   releases: ReportValueRow[];
@@ -14750,10 +14843,12 @@ export interface Methods {
   "browser/watch": { params: BrowserWatchRequest; result: BrowserPageState };
   "browserControl/set": { params: BrowserControlSettings; result: BrowserControlSettings };
   "browserControl/state": { params: Empty; result: BrowserControlSettings };
+  "bus/log": { params: BusLogQuery; result: BusLogPage };
   "capacity/state": { params: Empty; result: CapacityState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
   "changes/undoTurn": { params: UndoTurnRequest; result: UndoTurnResult };
+  "client/catchUp": { params: CatchUpRequest; result: CatchUpSnapshot };
   "clientPermissions/set": { params: ClientPermissionSettings; result: ClientPermissionSettings };
   "clientPermissions/state": { params: Empty; result: ClientPermissionSettings };
   "clients/forgetSelf": { params: Empty; result: Empty };
@@ -15186,10 +15281,12 @@ export const MethodTarget = {
   "browser/watch": "host",
   "browserControl/set": "host",
   "browserControl/state": "host",
+  "bus/log": "control",
   "capacity/state": "host",
   "changes/file": "host",
   "changes/list": "host",
   "changes/undoTurn": "host",
+  "client/catchUp": "host",
   "clientPermissions/set": "host",
   "clientPermissions/state": "host",
   "clients/forgetSelf": "control",
@@ -15637,7 +15734,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AddFolderRequest: { required: ["folder"], optional: ["project"] },
   Admitted: { required: [], optional: ["client", "host"] },
   AdoptRequest: { required: ["runtimeID", "sessionID", "cwd"], optional: [] },
-  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["title", "labels", "runtimeSessionID", "runtimeKeepsCopy", "browserUsedAt", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "movedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
+  Agent: { required: ["id", "runtimeID", "cwd", "state", "startOptions", "advertisedOptions", "availableCommands", "createdAt", "lastActivityAt"], optional: ["revision", "title", "labels", "runtimeSessionID", "runtimeKeepsCopy", "browserUsedAt", "isUnread", "isMuted", "reportSeenAt", "endedReason", "archivedReason", "usage", "lastTurnUsage", "costToDate", "costCeiling", "tokensToDate", "tokenCeiling", "plans", "background", "additionalDirectories", "mcpServers", "queuedPrompts", "suggestedPrompts", "startedByWorkflow", "purpose", "startedByRun", "startedByAgent", "chainDepth", "eventWait", "worktree", "pendingMove", "startingPoint", "startRequestID", "persona", "restartPickUps", "report", "outcomeAsked", "archiveRequest", "afterTurn", "archivedAt", "sandboxOverride", "effectiveSandbox", "pendingSandboxFailure", "desktopControlPause", "missingFolder", "listsLeftOut", "titleIsPersons", "runtimeTitle", "madeInRoot", "queuedStart", "branchedFrom", "movedFrom", "fileToSee", "continueWhenBack", "runningTool", "accountID", "auto", "clientPermission", "levels", "voiceHungUpAt", "goal", "project"] },
+  AgentChanges: { required: ["epoch", "revision", "removed", "all"], optional: [] },
   AgentConfigEditorFile: { required: ["path", "content"], optional: [] },
   AgentConfigEditorRequest: { required: ["kind"], optional: ["folder"] },
   AgentConfigEditorSaveRequest: { required: ["kind", "path", "content"], optional: ["folder", "delete"] },
@@ -15743,6 +15841,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BusEvent: { required: ["specversion", "id", "type", "provider", "topic", "source", "time", "producer"], optional: ["subject", "sealed", "poll"] },
   BusLease: { required: ["polls"], optional: ["release"] },
   BusLeased: { required: ["leases"], optional: [] },
+  BusLogPage: { required: ["events", "hasMore"], optional: ["next"] },
+  BusLogQuery: { required: [], optional: ["before", "limit", "provider", "type", "topic"] },
   BusProducerLease: { required: ["poll", "holder", "mine", "until"], optional: [] },
   BusPublish: { required: ["events"], optional: [] },
   BusPublished: { required: ["kept", "dropped"], optional: [] },
@@ -15771,7 +15871,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   CatalogUseRow: { required: ["kind", "name", "version", "machines", "people"], optional: ["source"] },
   CatchUpLeases: { required: ["leases", "hosted", "health"], optional: [] },
   CatchUpRequest: { required: [], optional: ["agents", "parts"] },
-  CatchUpSnapshot: { required: ["agents", "permissions", "elicitations", "attention", "resuming", "folders"], optional: ["disk", "storeNotes", "achievements", "workflows", "pins", "leases"] },
+  CatchUpSnapshot: { required: ["agents", "permissions", "elicitations", "attention", "resuming", "folders"], optional: ["agentChanges", "disk", "storeNotes", "achievements", "workflows", "pins", "leases"] },
   ChangedFile: { required: ["path", "source", "state", "editCount", "beyondReported", "inProgress", "outsideFolder"], optional: ["relativePath", "added", "removed", "firstLine", "oldPath"] },
   ChangedFileDetail: { required: ["file", "edits"], optional: ["hunks", "whole"] },
   ChangesFileRequest: { required: ["agentID", "path", "whole"], optional: [] },
@@ -15927,7 +16027,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID", "serverEvents", "forPerson"] },
   EventsChange: { required: ["waiting"], optional: ["event"] },
   EventsListRequest: { required: ["limit"], optional: ["before", "scope", "groups"] },
-  EventsPage: { required: ["events", "waiting", "hasMore"], optional: [] },
+  EventsPage: { required: ["events", "waiting", "hasMore"], optional: ["producer"] },
   FeatureUsage: { required: ["days", "features"], optional: ["since"] },
   FeatureUse: { required: ["method", "week", "quarter", "clients"], optional: ["lastUsed"] },
   FileCompletion: { required: ["label"], optional: ["insert", "detail"] },
@@ -16111,7 +16211,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageSyncAnswer: { required: [], optional: ["full"] },
   LineageWalkAllRequest: { required: ["node"], optional: ["depth", "scope"] },
   ListCursor: { required: ["lastActivityAt", "id"], optional: ["archivedAt"] },
-  ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project"] },
+  ListRequest: { required: ["includeArchived", "archivedCommands", "archivedOnly", "lean"], optional: ["folder", "startedByWorkflow", "limit", "agentID", "after", "query", "project", "changedSince"] },
+  ListRevision: { required: ["epoch", "revision"], optional: [] },
   ListedSkill: { required: ["name", "folder"], optional: ["description", "managed"] },
   LiveAgent: { required: ["host", "hostName", "owner", "ownerName", "bot", "agent", "runtime", "state"], optional: ["waitsOnOthers", "workflow", "since", "costToDate", "heardAt"] },
   LiveBoard: { required: ["agents"], optional: [] },
@@ -16465,6 +16566,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RemoveResourceRequest: { required: ["name"], optional: [] },
   RenameRequest: { required: ["agentID", "title"], optional: [] },
   ReportCounts: { required: ["sessions", "failedSessions", "prsOpened", "prsMerged", "prsReverted", "mergeSeconds", "waits", "waitBuckets", "workflowRuns", "workflowFailures"], optional: [] },
+  ReportDelivery: { required: ["repo", "figures"], optional: [] },
   ReportEstimateError: { required: ["issues"], optional: ["cost", "workingSeconds", "coverage", "landsAtErrorDays"] },
   ReportExport: { required: ["text", "count", "format"], optional: [] },
   ReportForecastScore: { required: ["epics", "p50Held", "p85Held"], optional: ["errorDays"] },
@@ -16478,7 +16580,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReportScope: { required: ["kind"], optional: ["group"] },
   ReportScopeOption: { required: ["scope", "name"], optional: [] },
   ReportScopes: { required: ["scopes", "admin"], optional: [] },
-  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "releases"], optional: ["loaded", "overhead", "leadTimeSeconds", "cycleTimeSeconds", "estimateError", "forecastScore", "openEpics", "limited"] },
+  ReportValue: { required: ["range", "scope", "total", "waste", "unlinked", "perMergedPR", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "issues", "releases"], optional: ["loaded", "overhead", "leadTimeSeconds", "cycleTimeSeconds", "estimateError", "forecastScore", "openEpics", "delivery", "limited"] },
   ReportValueRow: { required: ["node", "total", "waste", "prsMerged", "prsClosed", "prsReverted", "failedChecks"], optional: ["leadTimeSeconds", "cycleTimeSeconds", "level"] },
   ReportView: { required: ["id", "name", "page", "scope", "range"], optional: ["by"] },
   ReportViewID: { required: ["id"], optional: [] },

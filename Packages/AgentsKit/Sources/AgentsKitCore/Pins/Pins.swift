@@ -253,7 +253,6 @@ public enum PinLimits {
     public static let sessionsPerFolder = 10
     /// Pinned workflows a folder may hold, apart from its pages and sessions (#432).
     public static let workflowsPerFolder = 10
-    public static let titleLength = 60
     /// A view pin's arguments, as JSON (#189).
     public static let viewArgumentsBytes = 2048
 }

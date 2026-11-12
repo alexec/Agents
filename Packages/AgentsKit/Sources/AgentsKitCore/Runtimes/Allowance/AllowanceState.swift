@@ -153,10 +153,6 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         }
     }
 
-    /// A plan's sign-in, the same on the Mac and on every server that relays it (047,
-    /// 056): what one learns about it, the other needs to know. A key keeps its own.
-    public var isShared: Bool { credentialKey.hasSuffix(":sign-in") }
-
     public var returnsAt: Date? {
         switch status {
         case .available: return nil
@@ -179,12 +175,6 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         changedAt = now
         rateLimitStreak = []
         return true
-    }
-
-    /// A check failed or could not run. Keep the credential out and try again later.
-    public mutating func deferCheck(now: Date) {
-        guard case .out(let until, _, let why) = status else { return }
-        status = .out(until: until, retryAfter: now.addingTimeInterval(Self.retryWithoutATime), why: why)
     }
 
     /// Spent. `until` is the runtime's own return time. Every credential gets a check
@@ -224,16 +214,6 @@ public struct AllowanceState: Codable, Hashable, Sendable {
         changedAt = now
         learnedFrom = .runtimeFailure
         rateLimitStreak = []
-        return true
-    }
-
-    /// A provider failed on one model, not the runtime (#140). Marked once: a second
-    /// failure on a model already out keeps its first time.
-    @discardableResult
-    public mutating func markModelFailed(_ model: String, name: String?, now: Date) -> Bool {
-        guard !(modelsOut ?? []).contains(where: { $0.model == model }) else { return false }
-        modelsOut = (modelsOut ?? []) + [ModelOut(model: model, name: name, since: now,
-                                                  retryAfter: now.addingTimeInterval(Self.retryWithoutATime))]
         return true
     }
 

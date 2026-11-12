@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // IssueReader reads the upstream issue_read result for a single issue.
@@ -648,7 +650,7 @@ func (g *RealGitHub) PRPage(ctx context.Context, repo string, number int) (map[s
 		j["review"] = review
 		notes = append(notes, note{r.SubmittedAt, j})
 	}
-	sort.SliceStable(notes, func(i, j int) bool { return before(notes[i].at, notes[j].at) })
+	sort.SliceStable(notes, func(i, j int) bool { return mcpevents.Before(notes[i].at, notes[j].at) })
 	conversation := make([]any, len(notes))
 	for i, n := range notes {
 		conversation[i] = n.json

@@ -505,12 +505,3 @@ public enum ElicitationOutcome: Hashable, Sendable {
         }
     }
 }
-
-extension PermissionOption {
-    /// The two options for a question the app is asking on an agent's behalf, when the
-    /// agent gave us none of its own. Used for a served file write.
-    public static let allowOrReject: [PermissionOption] = [
-        PermissionOption(optionID: "allow_once", name: "Approve", kind: .allowOnce),
-        PermissionOption(optionID: "reject_once", name: "Deny", kind: .rejectOnce),
-    ]
-}

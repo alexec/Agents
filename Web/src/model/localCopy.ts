@@ -4,7 +4,7 @@
 // draws it at once, marked as from this device, and the host's answer always wins. A forget
 // deletes the database, so the copy goes with the keys (direction.md, customer data).
 import { effect } from "@preact/signals";
-import type { Agent, ControlMachine, FolderSummary, TranscriptPage, TurnsPage } from "../protocol/generated";
+import type { Agent, ControlMachine, FolderSummary, ListRevision, TranscriptPage, TurnsPage } from "../protocol/generated";
 import { formatRef } from "../protocol/ref";
 import { openAgentsDatabase } from "../wire/keys";
 import type { Store } from "./store";
@@ -25,6 +25,8 @@ export interface MachineCopy {
   host: ControlMachine;
   folders?: FolderSummary[];
   agents: Agent[];
+  /** Where `agents` are in the host's order of changes (#4794): a launch asks only for what changed since. */
+  point?: ListRevision;
   at: number;
 }
 
@@ -205,7 +207,9 @@ export function transcriptEnd(store: Store, host: string, session: string, at: n
     kind: "transcript", ref: sessionRef(session), host, session, at,
     turns: { turns: store.turns.peek(), firstTurn: store.firstTurn.peek(), openStart: store.openTurnStart.peek(),
       ...(store.firstPrompt.peek() === null ? {} : { firstPrompt: store.firstPrompt.peek()! }) },
-    page: { firstIndex, total: firstIndex + kept.length, entries: kept },
+    // The host's count, not this page's (#4794): a reconnect resumes from it, and an entry heard but
+    // never written would count past it.
+    page: { firstIndex, total: store.chatEnd() ?? firstIndex + kept.length, entries: kept },
   };
 }
 
@@ -216,7 +220,10 @@ export function transcriptEnd(store: Store, host: string, session: string, at: n
  */
 export function startLocalCopy(store: Store, copy: LocalCopy, now: () => number = Date.now): () => void {
   void copy.machines().then((machines) => store.drawCopy(machines));
-  const written = new Map<string, { host: ControlMachine; folders?: FolderSummary[] | undefined; agents?: Agent[] | undefined }>();
+  // A chat with nothing held reads its copy before asking its host, so it can resume from it (#4794).
+  store.readCopy = (session) => copy.transcript(session);
+  const written = new Map<string, { host: ControlMachine; folders?: FolderSummary[] | undefined; agents?: Agent[] | undefined;
+    point?: ListRevision | undefined }>();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const later = (write: () => void) => {
     if (timer) clearTimeout(timer);
@@ -230,10 +237,12 @@ export function startLocalCopy(store: Store, copy: LocalCopy, now: () => number 
       if (fromDevice.has(host.id)) continue;
       const folders = store.folders.peek()[host.id];
       const agents = store.agents.peek()[host.id];
+      const point = store.listPoint(host.id);
       const was = written.get(host.id);
-      if (was && was.host === host && was.folders === folders && was.agents === agents) continue;
-      written.set(host.id, { host, folders, agents });
-      records.push({ kind: "machine", ref: machineRef(host.id), host, ...(folders ? { folders } : {}), agents: agents ?? [], at: now() });
+      if (was && was.host === host && was.folders === folders && was.agents === agents && was.point === point) continue;
+      written.set(host.id, { host, folders, agents, point });
+      records.push({ kind: "machine", ref: machineRef(host.id), host, ...(folders ? { folders } : {}), agents: agents ?? [],
+        ...(point ? { point } : {}), at: now() });
     }
     for (const id of [...written.keys()]) if (!hosts.some((h) => h.id === id)) written.delete(id);
     void copy.put(records, hosts.map((h) => h.id));
@@ -266,6 +275,7 @@ export function startLocalCopy(store: Store, copy: LocalCopy, now: () => number 
     void copy.transcript(watching.session).then((got) => { if (got) store.drawTranscriptCopy(got); });
   });
   return () => {
+    store.readCopy = undefined;
     stopMachines();
     stopTranscript();
     stopDraw();

@@ -76,7 +76,8 @@ public final class LocalCopyKeeper {
             guard !Task.isCancelled, let self, let work = self.work else { return }
             self.pending[host] = nil
             let machine = LocalCopy.Machine(host: host, folders: work.folders.filter { $0.host == host },
-                                            agents: work.agents.filter { $0.host == host })
+                                            agents: work.agents.filter { $0.host == host },
+                                            point: work.listPoint(of: host))
             await self.copy.keep(machine)
         }
     }

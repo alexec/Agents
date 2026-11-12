@@ -91,6 +91,20 @@ var events = append([]event{
 			"run":        object(map[string]any{"id": integer, "name": str, "url": str}),
 			"failedJobs": map[string]any{"type": "array", "items": object(map[string]any{"name": str, "url": str})},
 		})},
+	// A run no pull request owns, as main's or a tag's, as the github server's (#3810, #4217).
+	{Name: "run.completed", Title: "Actions run finished",
+		Description: "A Forgejo Actions run of the repository finished, whatever started it (a push, a tag, workflow_dispatch, a schedule) and whatever its result (success, failure, cancelled, skipped): one event per run and finish time, so a run again is a new one. For a run no pull request owns, such as a tag's release.yml or a dry run started by hand; a pull request's failed checks are checks.failed. run.id is its number (failed_log and retry_pipeline take it), run.workflow its file. Only runs started by a collaborator with write access, never a bot, and never a fork's pull request's, unless anyone is true. deploys is always empty: Forgejo has no deployments. Forgejo has no approval API, so there is no deploy.waiting here.",
+		Input: schema{repoProperty,
+			property{Name: "workflow", Kind: "string", Description: "Only runs of this workflow, by its file name, as release.yml.",
+				Pattern: regexp.MustCompile(`^[A-Za-z0-9_.-]+\.ya?ml$`), LooksLike: "release.yml"},
+			branchProperty("Only runs on this branch or tag, as main or v0.16.0."),
+			property{Name: "run", Kind: "integer", Description: "Only this run, by its number."}, anyoneProperty, anyProperty},
+		Payload: object(map[string]any{
+			"run": object(map[string]any{"id": integer, "name": str, "workflow": str, "event": str, "branch": str, "headSha": str,
+				"url": str, "conclusion": str, "actor": str}),
+			"completedAt": str,
+			"deploys":     map[string]any{"type": "array", "items": str},
+		})},
 	{Name: "pr.opened", Title: "Pull request opened",
 		Description: "A pull request was opened, or a draft (a title that starts WIP:) was marked ready: a pull request open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownPRs,
 		Input:       prInput(),
@@ -177,7 +191,7 @@ func eventsList() map[string]any { return mcpevents.List(events) }
 
 // MARK: Polling
 
-// candidate is something that may be raised: its id, its time (in timeLayout), and its data,
+// candidate is something that may be raised: its id, its time (in mcpevents.TimeLayout), and its data,
 // looked up only once it is taken; nil data skips it, though the cursor still moves past it.
 type candidate = mcpevents.Candidate
 
@@ -189,7 +203,7 @@ const (
 type pollParams = mcpevents.Params
 
 // polls is how it polls, with Forgejo's times and errors.
-var polls = mcpevents.Poller{NextPollMs: nextPollMs, Normalize: normalized, Fail: eventsError}
+var polls = mcpevents.Poller{NextPollMs: nextPollMs, Normalize: mcpevents.Normalized, Fail: eventsError}
 
 // Events answers events/list and events/poll over a Forgejo.
 type Events struct {
@@ -299,7 +313,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 // start of this second: Forgejo gives times to the second, so a thing made in it would
 // otherwise be older than the cursor.
 func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidate, Listed, error)) (map[string]any, *rpcError) {
-	return polls.Poll(e.Name, p, func() string { return timeString(s.now().Truncate(time.Second)) },
+	return polls.Poll(e.Name, p, func() string { return mcpevents.TimeString(s.now().Truncate(time.Second)) },
 		func(since string) ([]candidate, mcpevents.Listed, error) {
 			found, listed, err := find(since)
 			return found, mcpevents.Listed{Truncated: listed.Truncated, Newest: listed.Newest}, err
@@ -325,7 +339,7 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 	if strings.HasPrefix(name, "issue.") {
 		root = "issue" // issue.assigned (#2034)
 	}
-	return polls.Diff(name, key, p, func() string { return timeString(s.now()) }, func() ([]mcpevents.State, error) {
+	return polls.Diff(name, key, p, func() string { return mcpevents.TimeString(s.now()) }, func() ([]mcpevents.State, error) {
 		prs, err := states()
 		var out []mcpevents.State
 		for _, st := range prs {
@@ -340,7 +354,8 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 }
 
 // The refs of what forgejo's events happen to (#4728, spec 4724-event-bus, "A ref").
-func prRef(repo string, n int) wire.Ref { return mcpevents.Ref("forgejo", "pr", repo, fmt.Sprint(n)) }
+func prRef(repo string, n int) wire.Ref  { return mcpevents.Ref("forgejo", "pr", repo, fmt.Sprint(n)) }
+func runRef(repo string, n int) wire.Ref { return mcpevents.Ref("forgejo", "run", repo, fmt.Sprint(n)) }
 func issueRef(repo string, n int) wire.Ref {
 	return mcpevents.Ref("forgejo", "issue", repo, fmt.Sprint(n))
 }
@@ -374,7 +389,7 @@ func candidates(ctx context.Context, f Forgejo, name string, a args, yours *Your
 				(a.label != "" && it.Kind == IssueLabelled && it.Label != a.label) {
 				continue
 			}
-			at := normalized(it.At)
+			at := mcpevents.Normalized(it.At)
 			if at == "" {
 				continue
 			}
@@ -393,11 +408,25 @@ func candidates(ctx context.Context, f Forgejo, name string, a args, yours *Your
 		var list []candidate
 		// Trust is about who commented; mine only narrows the pull request (#3797).
 		for _, c := range comments {
-			if at := normalized(c.At); at != "" && (a.pr == 0 || c.PR.Number == a.pr) && (a.branch == "" || c.PR.Branch == a.branch) &&
+			if at := mcpevents.Normalized(c.At); at != "" && (a.pr == 0 || c.PR.Number == a.pr) && (a.branch == "" || c.PR.Branch == a.branch) &&
 				a.closesOne(c.PR) && a.byMe(c.PR, yours) && (a.anyone || c.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d", repo, c.ID), Time: at,
 					Data:    func() (map[string]any, error) { return c.data(), nil },
 					Subject: prRef(repo, c.PR.Number), Key: fmt.Sprint(c.ID)})
+			}
+		}
+		return list, listed, nil
+	case "run.completed":
+		runs, listed, err := f.CompletedRuns(ctx, repo, a.workflow, a.branch, a.run, since)
+		if err != nil {
+			return nil, Listed{}, err
+		}
+		// Its finish time in the id: a run again (its failed jobs) is a new event.
+		var list []candidate
+		for _, c := range runs {
+			if a.anyone || c.Trusted {
+				list = append(list, candidate{EventID: fmt.Sprintf("run.completed:%s:%d:%s", repo, c.Number, c.At), Time: c.At,
+					Data: mcpevents.Data(c.data()), Subject: runRef(repo, c.Number), Key: c.At})
 			}
 		}
 		return list, listed, nil
@@ -409,7 +438,7 @@ func candidates(ctx context.Context, f Forgejo, name string, a args, yours *Your
 		// The newest failed status's time is in its id: run again and failed again, it is new.
 		var list []candidate
 		for _, d := range failed {
-			if at := normalized(d.At); at != "" && wanted(d.PR, d.Trusted) {
+			if at := mcpevents.Normalized(d.At); at != "" && wanted(d.PR, d.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("checks.failed:%s:%s:%s", repo, d.HeadSHA, at), Time: at,
 					Data:    func() (map[string]any, error) { return d.json(), nil },
 					Subject: prRef(repo, d.PR.Number), Key: d.HeadSHA + ":" + at})
@@ -424,7 +453,7 @@ func candidates(ctx context.Context, f Forgejo, name string, a args, yours *Your
 	var list []candidate
 	if name == "pr.merged" {
 		for _, m := range merged {
-			if at := normalized(m.MergedAt); wanted(m.PR, m.Trusted) && at != "" {
+			if at := mcpevents.Normalized(m.MergedAt); wanted(m.PR, m.Trusted) && at != "" {
 				list = append(list, candidate{EventID: fmt.Sprintf("pr.merged:%s:%d", repo, m.PR.Number), Time: at,
 					Subject: prRef(repo, m.PR.Number),
 					Data: func() (map[string]any, error) {
@@ -436,7 +465,7 @@ func candidates(ctx context.Context, f Forgejo, name string, a args, yours *Your
 	}
 	// Its close time in the id: a pull request reopened and closed again is a new event.
 	for _, c := range closed {
-		if at := normalized(c.ClosedAt); wanted(c.PR, c.Trusted) && at != "" {
+		if at := mcpevents.Normalized(c.ClosedAt); wanted(c.PR, c.Trusted) && at != "" {
 			list = append(list, candidate{EventID: fmt.Sprintf("pr.closed:%s:%d:%s", repo, c.PR.Number, at), Time: at,
 				Subject: prRef(repo, c.PR.Number), Key: at,
 				Data: func() (map[string]any, error) {

@@ -148,11 +148,6 @@ public struct ArchiveToolset: Hashable, Sendable {
         #endif
     }
 
-    /// A Linux server's platform, in the registry's words.
-    public static func linuxPlatform(_ architecture: Architecture) -> String? {
-        architecture.binarySuffix.map { "linux-\($0)" }
-    }
-
     /// The name of the shim in `bin/`: the runtime's own `executable`.
     public var shimName: String {
         RuntimeCatalog.runtime(id: manifest.runtimeID)?.executable ?? manifest.runtimeID

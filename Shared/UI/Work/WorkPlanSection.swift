@@ -299,7 +299,7 @@ struct WorkPlanSection: View {
         let title = WorkPlan.stepTitle(step, in: plan)
         let words = WorkPlan.stepWords(step, in: plan, rollups: rollups)
         return Button {
-            withAnimation(.easeInOut(duration: 0.15)) { folded[step.step] = !isFolded }
+            withAnimation(ResponseMotion.response) { folded[step.step] = !isFolded }
         } label: {
             band {
                 Image(systemName: "chevron.right")

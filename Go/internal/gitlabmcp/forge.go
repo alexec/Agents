@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The daemon's forge reads (#3209, after GitHub's in #3129): the issues or merge requests of
@@ -239,7 +241,7 @@ func (j forgeJSON) item(project string, mr bool) Item {
 	return i
 }
 
-// listCursor is where a list goes on: before the time Before (in timeLayout), leaving out Seen,
+// listCursor is where a list goes on: before the time Before (in mcpevents.TimeLayout), leaving out Seen,
 // the items given already that were updated in its millisecond or the one after it.
 type listCursor struct {
 	Before string   `json:"before"`
@@ -260,7 +262,7 @@ func cursorOf(s string) (listCursor, error) {
 	if err != nil || json.Unmarshal(b, &c) != nil {
 		return c, &GitLabError{Kind: Failed, Message: "GitLab: the cursor is not one a list gave"}
 	}
-	if _, ok := parseTime(c.Before); !ok {
+	if _, ok := mcpevents.ParseTime(c.Before); !ok {
 		return c, &GitLabError{Kind: Failed, Message: "GitLab: the cursor is not one a list gave"}
 	}
 	return c, nil
@@ -273,16 +275,16 @@ func (i Item) key() string {
 
 // after is the cursor after item i, given the cursor the page began at.
 func (c listCursor) after(i Item, page []Item) listCursor {
-	t, _ := parseTime(i.UpdatedAt)
+	t, _ := mcpevents.ParseTime(i.UpdatedAt)
 	t = t.Truncate(time.Millisecond)
-	next := listCursor{Before: timeString(t)}
+	next := listCursor{Before: mcpevents.TimeString(t)}
 	// GitLab keeps microseconds and says milliseconds: what is asked for is up to the
 	// millisecond after, and what was given in it is left out.
-	if old, ok := parseTime(c.Before); ok && !old.After(t.Add(time.Millisecond)) {
+	if old, ok := mcpevents.ParseTime(c.Before); ok && !old.After(t.Add(time.Millisecond)) {
 		next.Seen = append(next.Seen, c.Seen...)
 	}
 	for _, p := range page {
-		pt, ok := parseTime(p.UpdatedAt)
+		pt, ok := mcpevents.ParseTime(p.UpdatedAt)
 		if pt = pt.Truncate(time.Millisecond); ok && !pt.Before(t) && !pt.After(t.Add(time.Millisecond)) && !slices.Contains(next.Seen, p.key()) {
 			next.Seen = append(next.Seen, p.key())
 		}
@@ -310,8 +312,8 @@ func listPath(project string, f SearchFilter, state, before string, first int) s
 	q := url.Values{"state": {state}, "order_by": {"updated_at"}, "sort": {"desc"}, "with_labels_details": {"true"},
 		"per_page": {strconv.Itoa(first)}}
 	if before != "" {
-		t, _ := parseTime(before)
-		q.Set("updated_before", timeString(t.Add(time.Millisecond)))
+		t, _ := mcpevents.ParseTime(before)
+		q.Set("updated_before", mcpevents.TimeString(t.Add(time.Millisecond)))
 	}
 	// GitLab's labels are all of them, by commas.
 	var labels []string
@@ -384,8 +386,8 @@ func (g *RealGitLab) Search(ctx context.Context, projects []string, f SearchFilt
 		}
 	}
 	slices.SortStableFunc(all, func(a, b Item) int {
-		ta, _ := parseTime(a.UpdatedAt)
-		tb, _ := parseTime(b.UpdatedAt)
+		ta, _ := mcpevents.ParseTime(a.UpdatedAt)
+		tb, _ := mcpevents.ParseTime(b.UpdatedAt)
 		return cmp.Or(tb.Compare(ta), cmp.Compare(a.key(), b.key()))
 	})
 	if len(all) > first {

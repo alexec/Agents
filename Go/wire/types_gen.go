@@ -177,6 +177,9 @@ const AfterTurnArchive AfterTurn = "archive"
 type Agent struct {
 	ID UUID `json:"id"`
 
+	// Where this record's last change is in its host's order of changes (#4785): a number per host that goes up with each change to any of its records, kept on disk. Ask for the records changed since with ListRequest.changedSince.
+	Revision *int64 `json:"revision,omitzero"`
+
 	RuntimeID string `json:"runtimeID"`
 
 	Cwd URL `json:"cwd"`
@@ -336,6 +339,20 @@ type AgentArchivedReason string
 
 const AgentArchivedReasonByUser AgentArchivedReason = "byUser"
 const AgentArchivedReasonByAgent AgentArchivedReason = "byAgent"
+
+// Where a client/catchUp's agents are in the host's order of changes (#4785). The client asks next time with ListRequest.changedSince set to this epoch and revision.
+type AgentChanges struct {
+	Epoch string `json:"epoch"`
+
+	// Every change up to here is in this answer or an earlier one.
+	Revision int64 `json:"revision"`
+
+	// The records removed since changedSince.
+	Removed []UUID `json:"removed"`
+
+	// True when agents is the list as without changedSince: none was given, or it was too old or of another epoch. The client then drops each record it holds that is not in it.
+	All bool `json:"all"`
+}
 
 // A Markdown file under skills, personas or workflows in Agent Configuration.
 type AgentConfigEditorFile struct {
@@ -1756,6 +1773,35 @@ type BusLeased struct {
 	Leases []BusProducerLease `json:"leases"`
 }
 
+// bus/log's answer (#4732): envelopes of the caller's bus, newest first. Envelope only, as the bus keeps it: no data.
+type BusLogPage struct {
+	Events []BusEvent `json:"events"`
+
+	// Where the next page back starts, as before; none when nothing older was read.
+	Next *string `json:"next,omitzero"`
+
+	// Whether older envelopes are on the bus log.
+	HasMore bool `json:"hasMore"`
+}
+
+// bus/log (#4732, spec 4724-event-bus, "The bus log"): a page of the caller's bus log, newest first, narrowed by the envelope's fields.
+type BusLogQuery struct {
+	// The next of the page before: only envelopes older than it.
+	Before *string `json:"before,omitzero"`
+
+	// At most this many; 100 when absent, never more than 500.
+	Limit *int64 `json:"limit,omitzero"`
+
+	// Only events of this provider (#4732): github, jira, agents and so on.
+	Provider *string `json:"provider,omitzero"`
+
+	// Only events of this type (#4732), noun.verbed, or noun.* for every type of that noun.
+	Type *string `json:"type,omitzero"`
+
+	// Only events on this topic (#4732), such as a repo's full name; lower case.
+	Topic *string `json:"topic,omitzero"`
+}
+
 // One producer lease (#4731): the machine that polls, until when, and whether it is the one that asked. A machine that is not the holder stands by: it does not poll, and the control plane delivers it what the holder's poll makes.
 type BusProducerLease struct {
 	Poll string `json:"poll"`
@@ -2127,6 +2173,8 @@ type CatchUpRequest struct {
 
 type CatchUpSnapshot struct {
 	Agents []Agent `json:"agents"`
+
+	AgentChanges *AgentChanges `json:"agentChanges,omitzero"`
 
 	Permissions []PermissionRequest `json:"permissions"`
 
@@ -4467,6 +4515,9 @@ type EventsPage struct {
 	Events []Event `json:"events"`
 
 	Waiting []WaitingAgent `json:"waiting"`
+
+	// This machine's producer ref (#4732), agents:machine:#<machine>, as its own events say it: an event whose producer is another says which machine raised it.
+	Producer *string `json:"producer,omitzero"`
 
 	HasMore bool `json:"hasMore"`
 }
@@ -6851,6 +6902,16 @@ type ListRequest struct {
 
 	// Only the sessions whose folder is in this project (#3276), as .agents/folder.json names it: the project's sessions on this machine.
 	Project *string `json:"project,omitzero"`
+
+	// Only the records changed since this point (#4785), every one, archived ones too: limit, after, includeArchived and archivedOnly do not apply, so a client sees a session archived or brought back. The records removed come in client/catchUp's agentChanges. When the point is too old or of another epoch, agents/list fails with revisionGone and client/catchUp answers as without it, with agentChanges.all. A host that predates it answers the whole list.
+	ChangedSince *ListRevision `json:"changedSince,omitzero"`
+}
+
+// A point in a host's order of changes to its session records (#4785). The epoch names the order: the host makes a new one when it cannot vouch for the old one.
+type ListRevision struct {
+	Epoch string `json:"epoch"`
+
+	Revision int64 `json:"revision"`
 }
 
 type ListedSkill struct {
@@ -11370,6 +11431,14 @@ type ReportCounts struct {
 	WorkflowFailures int64 `json:"workflowFailures"`
 }
 
+// A repo's delivery figures on Reports ▸ Planning (#4555): lineage.DeliveryOf over the scope's machines' nodes, each node once, with each release tag's time from its earliest link. Of a scope, never of a person.
+type ReportDelivery struct {
+	// As LineageCostNode.repo, in the full form (#4800).
+	Repo string `json:"repo"`
+
+	Figures LineageDelivery `json:"figures"`
+}
+
 // How far the estimates were from the actual figures (#3561), over the issues closed in the range that had an estimate when their work started: the median of max(estimate/actual, actual/estimate), so 1.5 means 1.5 times too high or too low. A figure is absent when no issue had it. coverage and landsAtErrorDays (#4525) check the claims the kept estimate made: how often its P10-P90 dollar range held the actual, and how many days its landing date was off by, the median over the same issues.
 type ReportEstimateError struct {
 	// The closed issues with an estimate.
@@ -11665,6 +11734,9 @@ type ReportValue struct {
 
 	// The open epics in the scope (#4528), the most recently changed first, at most 20, so Reports ▸ Planning can ask lineage/forecast when each lands.
 	OpenEpics []LineageNode `json:"openEpics,omitzero"`
+
+	// The scope's delivery figures (#4555, epic #4551), a repo each: the repos with the most PRs merged in the 28 days to now, at most 3, the most first, whatever the range. Absent from a control plane before it; empty when no repo had a merge.
+	Delivery []ReportDelivery `json:"delivery,omitzero"`
 
 	Issues []ReportValueRow `json:"issues"`
 

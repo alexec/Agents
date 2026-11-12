@@ -17,6 +17,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // A fake GitLab over HTTP (no account, #1629): the REST API v4 paths the server reads and
@@ -48,6 +50,8 @@ type fakeGitLab struct {
 	discuss     map[int][]obj // merge request → its discussions
 	traces      map[int]string
 	labelled    map[int][]obj // issue → its resource label events
+	deploys     []obj         // the project's deployments (#4217)
+	groupMember map[int]bool  // user id → a member of group 9
 	status      int           // answer every request with this, when set
 	header      http.Header
 	sent        int // bytes of the bodies answered
@@ -56,7 +60,7 @@ type fakeGitLab struct {
 
 func newFake(t *testing.T) *fakeGitLab {
 	f := &fakeGitLab{t: t, jobs: map[int][]obj{}, commits: map[string][]obj{}, members: map[int]int{}, diffs: map[int][]obj{},
-		discuss: map[int][]obj{}, traces: map[int]string{}, labelled: map[int][]obj{}}
+		discuss: map[int][]obj{}, traces: map[int]string{}, labelled: map[int][]obj{}, groupMember: map[int]bool{}}
 	f.server = httptest.NewServer(http.HandlerFunc(f.serve))
 	t.Cleanup(f.server.Close)
 	return f
@@ -108,7 +112,9 @@ var (
 	path  = regexp.MustCompile(`^/api/v4/projects/group%2Fapp(?:/(.*))?$`)
 )
 
-func at(minutes int) string { return timeString(start.Add(time.Duration(minutes) * time.Minute)) }
+func at(minutes int) string {
+	return mcpevents.TimeString(start.Add(time.Duration(minutes) * time.Minute))
+}
 
 func (f *fakeGitLab) set(fn func()) {
 	f.mu.Lock()
@@ -155,6 +161,14 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.URL.Path == "/api/v4/user" {
 		answer(200, alex)
+		return
+	}
+	if id, ok := strings.CutPrefix(r.URL.Path, "/api/v4/groups/9/members/all/"); ok {
+		if n, _ := strconv.Atoi(id); f.groupMember[n] {
+			answer(200, obj{"id": n, "access_level": 30})
+			return
+		}
+		answer(404, obj{"message": "404 Not found"})
 		return
 	}
 	m := path.FindStringSubmatch(r.URL.EscapedPath())
@@ -245,8 +259,32 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, f.traces[id])
 	case len(parts) == 3 && parts[2] == "notes" && r.Method == http.MethodPost:
 		answer(201, obj{"id": 900, "body": "x"})
+	case len(parts) == 1 && parts[0] == "pipelines" && q.Get("scope") == "finished":
+		done := []obj{}
+		for _, p := range f.pipes {
+			if finished(fmt.Sprint(p["status"])) {
+				done = append(done, p)
+			}
+		}
+		answer(200, stated(done, "", ""))
 	case len(parts) == 1 && parts[0] == "pipelines":
 		answer(200, stated(f.pipes, "status", q.Get("status")))
+	case len(parts) == 1 && parts[0] == "deployments":
+		// GitLab's finished_after and finished_before, by finished_at.
+		out := []obj{}
+		for _, d := range stated(orEmpty(f.deploys), "status", q.Get("status")) {
+			done, _ := d["finished_at"].(string)
+			if (q.Get("finished_after") == "" || done > q.Get("finished_after")) && (q.Get("finished_before") == "" || done != "" && done < q.Get("finished_before")) {
+				out = append(out, d)
+			}
+		}
+		answer(200, out)
+	case len(parts) == 2 && parts[0] == "deployments":
+		if o, ok := byIID(f.deploys, "id", parts[1]); ok {
+			answer(200, o)
+			return
+		}
+		answer(404, obj{"message": "404 Not found"})
 	case len(parts) == 2 && parts[0] == "pipelines":
 		if o, ok := byIID(f.pipes, "id", parts[1]); ok {
 			answer(200, o)

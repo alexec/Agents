@@ -4,7 +4,8 @@ import (
 	"context"
 	"regexp"
 	"strings"
-	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // What the events and the tools read from Azure Boards (#3804). RealBoards reads it over Azure
@@ -102,7 +103,7 @@ type Activity struct {
 
 func (a Activity) data() map[string]any {
 	d := map[string]any{"issue": a.WorkItem.json()}
-	at := normalized(a.At)
+	at := mcpevents.Normalized(a.At)
 	switch a.Kind {
 	case Opened:
 		d["openedAt"] = at
@@ -175,24 +176,4 @@ func isBot(i identity) bool {
 	return i.IsContainer || strings.HasPrefix(unique, `build\`) || strings.HasPrefix(descriptor, "svc.") ||
 		strings.HasPrefix(descriptor, "s2s.") || strings.HasPrefix(descriptor, "vssgp.") ||
 		botName.MatchString(strings.ToLower(i.DisplayName))
-}
-
-// timeLayout is how the events draft carries a time: ISO 8601 in UTC with milliseconds, which
-// sorts as text in time order.
-const timeLayout = "2006-01-02T15:04:05.000Z"
-
-func timeString(t time.Time) string { return t.UTC().Format(timeLayout) }
-
-func parseTime(text string) (time.Time, bool) {
-	t, err := time.Parse(time.RFC3339Nano, text)
-	return t, err == nil
-}
-
-// normalized is text in timeLayout, or "" when it is not a time.
-func normalized(text string) string {
-	t, ok := parseTime(text)
-	if !ok {
-		return ""
-	}
-	return timeString(t)
 }

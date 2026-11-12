@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // RealJira over a fake site: Jira Cloud's answers (accountId, /search/jql) and Data Center's
@@ -102,7 +104,7 @@ func TestOpenedIsReadByMinutesAgoAndCheckedToTheMillisecond(t *testing.T) {
 			restIssueJSON("ENG-2", since.Add(time.Minute).Format(jiraTime), nil),
 		}, "isLast": true}
 	})
-	items, more, err := j.Activity(context.Background(), Opened, "ENG", timeString(since))
+	items, more, err := j.Activity(context.Background(), Opened, "ENG", mcpevents.TimeString(since))
 	if err != nil || more || len(items) != 2 {
 		t.Fatalf("%v %v %v", items, more, err)
 	}
@@ -118,10 +120,10 @@ func TestOpenedIsReadByMinutesAgoAndCheckedToTheMillisecond(t *testing.T) {
 		t.Fatalf("issue %+v", i)
 	}
 	// RealJira gives what JQL found, to the minute; the poll drops what is before since, by
-	// the times in timeLayout, which sort as text.
+	// the times in mcpevents.TimeLayout, which sort as text.
 	e := &Events{Jira: j}
-	cand, _, _ := e.candidates(context.Background(), events[0], args{}, timeString(since))
-	if len(cand) != 2 || cand[1].eventID != "issue.opened:12" || !(cand[0].time < timeString(since) && timeString(since) < cand[1].time) {
+	cand, _, _ := e.candidates(context.Background(), events[0], args{}, mcpevents.TimeString(since))
+	if len(cand) != 2 || cand[1].eventID != "issue.opened:12" || !(cand[0].time < mcpevents.TimeString(since) && mcpevents.TimeString(since) < cand[1].time) {
 		t.Fatalf("candidates %+v", cand)
 	}
 }
@@ -135,7 +137,7 @@ func TestCommentsSinceAreCommented(t *testing.T) {
 				map[string]any{"id": "101", "body": "new *one*", "created": since.Add(time.Minute).Format(jiraTime), "author": appUser},
 			}}})}}
 	})
-	items, _, err := j.Activity(context.Background(), Commented, "", timeString(since))
+	items, _, err := j.Activity(context.Background(), Commented, "", mcpevents.TimeString(since))
 	if err != nil || len(items) != 1 {
 		t.Fatalf("%v %v", items, err)
 	}
@@ -166,7 +168,7 @@ func TestTheChangelogGivesLabelsAddedAndAssignedToMe(t *testing.T) {
 			return i
 		}()}}
 	})
-	labelled, more, err := j.Activity(context.Background(), Labelled, "", timeString(since))
+	labelled, more, err := j.Activity(context.Background(), Labelled, "", mcpevents.TimeString(since))
 	if err != nil || more || len(labelled) != 2 || labelled[0].Label != "agent" || labelled[1].Label != "docs" || labelled[0].ID != "500:agent" {
 		t.Fatalf("labelled %+v %v %v", labelled, more, err)
 	}
@@ -176,7 +178,7 @@ func TestTheChangelogGivesLabelsAddedAndAssignedToMe(t *testing.T) {
 	if expand, _ := json.Marshal(f.bodies[0]["expand"]); string(expand) != `["changelog"]` {
 		t.Fatalf("Data Center's expand is a list: %s", expand)
 	}
-	assigned, _, err := j.Activity(context.Background(), Assigned, "", timeString(since))
+	assigned, _, err := j.Activity(context.Background(), Assigned, "", mcpevents.TimeString(since))
 	if err != nil || len(assigned) != 1 || assigned[0].By.Name != "Sam" || assigned[0].Issue.Key != "ENG-4" {
 		t.Fatalf("assigned %+v %v", assigned, err)
 	}
@@ -196,7 +198,7 @@ func TestJirasFailures(t *testing.T) {
 		{http.StatusInternalServerError, nil, Failed, 0},
 	} {
 		f.status, f.header = c.status, c.header
-		_, _, err := j.Activity(context.Background(), Opened, "NOPE", timeString(time.Now()))
+		_, _, err := j.Activity(context.Background(), Opened, "NOPE", mcpevents.TimeString(time.Now()))
 		je, ok := err.(*JiraError)
 		if !ok || je.Kind != c.kind || je.RetryAfterMs != c.retry {
 			t.Errorf("%d: %#v", c.status, err)

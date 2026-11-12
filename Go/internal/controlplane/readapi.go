@@ -19,7 +19,8 @@ import (
 
 // The read API (#2019, #1804 decision 4): a BI tool reads the organisation's reports with a
 // token an admin made, GET /v1/read/reports?range=month[&group=<id>][&format=json|csv|jsonl],
-// the same rows as reports/usage and reports/export. A token reads that and nothing else:
+// the same rows as reports/usage and reports/export; with report=delivery, Reports ▸
+// Planning's delivery figures instead (#4555). A token reads that and nothing else:
 // no socket, no method, no write. It is shown once; the store keeps its SHA-256 only, as its
 // key. Each token may ask readPerMinute times a minute, and works only while the admin who
 // made it is an admin.
@@ -180,6 +181,10 @@ func (rt *readTokens) serve(w http.ResponseWriter, r *http.Request) {
 	if group := q.Get("group"); group != "" {
 		scope = &wire.ReportScope{Kind: wire.ReportScopeKindGroup, Group: &group}
 	}
+	if q.Get("report") == "delivery" {
+		rt.serveDelivery(w, r, scope, t.Made.By.User, now)
+		return
+	}
 	report, err := rt.s.scopedReport(r.Context(), period, scope, t.Made.By.User)
 	if err != nil {
 		status, words := http.StatusBadRequest, err.Error()
@@ -212,6 +217,29 @@ func (rt *readTokens) serve(w http.ResponseWriter, r *http.Request) {
 	default:
 		plain(w, http.StatusBadRequest, "format is json, csv or jsonl\n")
 	}
+}
+
+// serveDelivery is GET /v1/read/reports?report=delivery[&group=<id>] (#4555): the scope's
+// delivery figures, as Reports ▸ Planning's Delivery row has them, in JSON.
+func (rt *readTokens) serveDelivery(w http.ResponseWriter, r *http.Request, scope *wire.ReportScope, user string, now time.Time) {
+	if f := r.URL.Query().Get("format"); f != "" && f != "json" {
+		plain(w, http.StatusBadRequest, "report=delivery is json only\n")
+		return
+	}
+	delivery, err := rt.s.deliveryReport(r.Context(), scope, user, now)
+	if err != nil {
+		status, words := http.StatusBadRequest, err.Error()
+		if e, ok := err.(*RPCError); ok {
+			words = e.Message
+			if e.Code == storeUnavailable {
+				status = http.StatusServiceUnavailable
+			}
+		}
+		plain(w, status, words+"\n")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"delivery": delivery})
 }
 
 // list is every token, newest first.

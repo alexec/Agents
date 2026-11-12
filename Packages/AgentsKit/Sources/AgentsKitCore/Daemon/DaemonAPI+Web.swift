@@ -52,6 +52,8 @@ public extension DaemonAPI {
                 Row(Method.agentsTranscript, params: TranscriptRequest.self, result: TranscriptPage.self, kind: .hostRequest),
                 Row(Method.agentsTouchedPaths, params: AgentRequest.self, result: [String].self, kind: .hostRequest),
                 Row(Method.agentsTurns, params: TurnsRequest.self, result: TurnsPage.self, kind: .hostRequest),
+                // The page's sessions on each connection, only what changed since its point (#4794).
+                Row(Method.clientCatchUp, params: CatchUpRequest.self, result: CatchUpSnapshot.self, kind: .hostRequest),
                 Row(Method.agentsOptions, params: OptionsRequest.self, result: OptionsResponse.self, kind: .hostRequest),
                 Row(Method.agentsDiscardDraft, params: DiscardDraftRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.runtimesList, params: Empty.self, result: [RuntimeStatus].self, kind: .hostRequest),
@@ -528,6 +530,8 @@ public extension DaemonAPI {
                 Row(Method.hostsRetryKept, params: KeptRequestID.self, result: Empty.self, kind: .controlRequest),
                 // What an offline host last listed (#962).
                 Row(Method.hostsLastHeard, params: MachineRequest.self, result: MachineLastHeard.self, kind: .controlRequest),
+                // Every machine's events (#4732): the Events page.
+                Row(Method.busLog, params: BusLogQuery.self, result: BusLogPage.self, kind: .controlRequest),
                 // Who did what (#996): Events ▸ Audit.
                 Row(Method.auditList, params: AuditQuery.self, result: AuditList.self, kind: .controlRequest),
                 Row(Method.auditExport, params: AuditQuery.self, result: AuditExport.self, kind: .controlRequest),

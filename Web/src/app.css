@@ -65,7 +65,7 @@ a[href] { cursor: pointer; }
   box-sizing: border-box;
 }
 
-.connecting { margin: 0; opacity: 0; animation: connecting-shows 0.2s ease-in 0.6s forwards; }
+.connecting { margin: 0; opacity: 0; animation: connecting-shows 0.15s ease-in 0.15s forwards; }
 @keyframes connecting-shows { to { opacity: 0.55; } }
 
 .pairing-card {
@@ -565,7 +565,7 @@ button.link.reading:hover { text-decoration: underline; }
 /* The PR or issue named in them, as a link (#3077): the accent colour, underlined. */
 a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underline; }
 .wait-card-progress { height: 3px; overflow: hidden; border-radius: 99px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
-.wait-card-progress span { display: block; height: 100%; background: var(--accent); transition: width .2s linear; }
+.wait-card-progress span { display: block; height: 100%; background: var(--accent); transition: width .15s linear; }
 .wait-card .wait-answers { display: flex; justify-content: flex-end; gap: 10px; }
 /* A wait only the person can settle (#3147): tinted as a question is, its session under Needs you. */
 .wait-card.for-person {
@@ -617,6 +617,9 @@ a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underli
   opacity: 0.65;
 }
 .queued p { margin: 0; }
+/* A prompt on its way (#4814): the person's .bubble, dimmed until its host's entry lands. */
+.bubble.sending { opacity: 0.65; }
+.bubble.sending p { margin: 0; white-space: pre-wrap; }
 /* The language server's completions (#844), under the editor while asked for: a class of their own, not the prompt's .completions (#1688). */
 .source-completions { border-top: 1px solid var(--paper-rule); max-height: 180px; overflow-y: auto; }
 .completion { display: block; width: 100%; text-align: left; background: none; border: none; padding: 2px 10px; font-family: var(--code-font, ui-monospace, monospace); font-size: 0.8125rem; color: inherit; cursor: pointer; }
@@ -1179,7 +1182,7 @@ dialog.image-viewer::backdrop { background: color-mix(in srgb, var(--paper-scrim
 .diff-word { color: inherit; background: color-mix(in srgb, var(--paper-ink) 14%, transparent); border-radius: 2px; }
 .live-page .page { line-height: 1.6; max-width: 70ch; margin: 0 auto; }
 .live-page .page.gone { opacity: 0.6; }
-.passage { padding: 2px 8px; margin: 0 -8px 10px; border-radius: var(--radius-control); transition: background 0.6s; }
+.passage { padding: 2px 8px; margin: 0 -8px 10px; border-radius: var(--radius-control); transition: background 0.15s; }
 .passage[role=button] { cursor: text; }
 .passage[role=button]:hover { background: var(--paper-wash); }
 .passage.marked { background: color-mix(in srgb, var(--tint-attention) 10%, transparent); }
@@ -1247,6 +1250,15 @@ dialog.image-viewer::backdrop { background: color-mix(in srgb, var(--paper-scrim
   padding: 10px 12px; background: var(--paper-raised); }
 .report-scopes { margin-bottom: 8px; }
 .report-whatif { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+/* Reports ▸ Planning's Delivery row (#4555): a card a figure, wrapping on a narrow page. */
+.delivery-repo h4 { margin: 4px 0; }
+.delivery-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.delivery-card { display: flex; flex-direction: column; gap: 3px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
+  padding: 8px 10px; background: var(--paper-raised); min-width: 0; }
+.delivery-value { font-size: 1.125rem; }
+.delivery-spark { display: block; height: 22px; }
+.delivery-spark path { fill: none; stroke: var(--accent, currentColor); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.delivery-band { align-self: flex-start; font-size: 0.6875rem; padding: 0 6px; border-radius: 8px; border: 1px solid var(--paper-rule); }
 /* A feature with no use in 90 days (#2165), as the window's orange mark. */
 .report-unused { color: var(--tint-attention); }
 /* The Console's pages draw Settings' sections (People, Groups): Settings' rows, as sidebar.css has them under .with-sidebar. */
@@ -1839,9 +1851,9 @@ button.plain:hover { opacity: 1; }
 button.file-card { cursor: pointer; }
 /* What an agent told the person with notify (#2805): Shared/UI/Chat/NotifiedLine.swift. */
 .notice-line { display: flex; gap: 8px; align-items: baseline; border-radius: 6px; margin: -6px; padding: 6px;
-  transition: background-color 0.6s ease-out; }
+  transition: background-color 0.15s ease-out; }
 /* Gone to from its notification (#2860): lit a moment. */
-.notice-line.lit { background: color-mix(in srgb, var(--accent) 18%, transparent); transition-duration: 0.2s; }
+.notice-line.lit { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .notice-bell { opacity: 0.65; }
 .notice-title { margin: 0; font-weight: 600; }
 .notice-body { margin: 2px 0 0; }
@@ -2863,7 +2875,7 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 /* A banner: inset at the top of its pane, under the toolbar; it comes and goes with a short animation. */
 .message-banner { display: flex; align-items: center; gap: 8px; margin: 8px 12px; padding: 7px 12px; font-size: 0.8125rem;
   color: var(--paper-ink); background: var(--paper-well); border: 1px solid var(--paper-rule);
-  border-radius: var(--radius-card); animation: message-in 160ms ease-out; }
+  border-radius: var(--radius-card); animation: message-in 150ms ease-out; }
 @keyframes message-in { from { opacity: 0; transform: translateY(-4px); } }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 /* The one toast: fixed at the bottom centre of the viewport, above the prompt bar. */
@@ -2872,7 +2884,7 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 .message-toast { display: flex; align-items: center; gap: 10px; padding: 9px 12px 9px 14px; font-size: 0.8125rem;
   color: var(--paper-ink); background: var(--paper-raised); border: 1px solid var(--paper-rule);
   border-radius: var(--radius-floating); box-shadow: 0 4px 16px var(--paper-shadow); pointer-events: auto;
-  animation: toast-in 160ms ease-out; }
+  animation: toast-in 150ms ease-out; }
 .message-toast button.link { flex: none; }
 .message-close { flex: none; border: none; background: none; color: inherit; opacity: 0.6; padding: 0 2px; font: inherit; cursor: pointer; }
 .message-close:hover { opacity: 1; }

@@ -716,7 +716,7 @@ private struct RemoteLaterRows: View {
 
     var body: some View {
         if !requests.isEmpty {
-            Button { withAnimation(.snappy) { open.toggle() } } label: {
+            Button { withAnimation(ResponseMotion.snappy) { open.toggle() } } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "chevron.right")
                         .imageScale(.small)

@@ -82,7 +82,7 @@ struct ContextMeter: View {
                 .rotationEffect(.degrees(-90))
         }
         .frame(width: 12, height: 12)
-        .animation(.default, value: fraction)
+        .animation(ResponseMotion.response, value: fraction)
         .accessibilityLabel(helpText(usage))
     }
 

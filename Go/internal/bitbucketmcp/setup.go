@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"os/exec"
 	"strings"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The reads that prove a repository's set-up on Bitbucket Cloud (#3785), as the forgejo
@@ -106,7 +108,7 @@ func (b *RealBitbucket) LastChecks(ctx context.Context, repo string) (*Newest, e
 	}
 	n := &Newest{Title: "Checks on " + branch, Outcome: checksOutcome(combined(statuses))}
 	for _, s := range statuses {
-		if when := s.UpdatedOn; n.At == "" || before(n.At, when) {
+		if when := s.UpdatedOn; n.At == "" || mcpevents.Before(n.At, when) {
 			n.At, n.URL = when, s.URL
 		}
 	}

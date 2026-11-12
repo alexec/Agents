@@ -17,7 +17,7 @@ import (
 
 // Instructions are the server's words.
 const Instructions = "This repository's pull requests, their checks, and its issues on Forgejo or Gitea, as events polled as the person whose token this server has: " +
-	"checks.failed (a pull request's head commit failed its checks), pr.opened, pr.merged, pr.closed, pr.conflicted, review.comment (a comment on a line of a pull request's diff), " +
+	"checks.failed (a pull request's head commit failed its checks), run.completed (an Actions run of any trigger, as main's or a tag's), pr.opened, pr.merged, pr.closed, pr.conflicted, review.comment (a comment on a line of a pull request's diff), " +
 	"issue.opened, issue.labelled, issue.commented, issue.closed. " +
 	"list_pull_requests, get_pull_request, get_checks, list_issues and get_issue read them; " +
 	"comment_on_pull_request and comment_on_issue comment; failed_log reads the end of a failed Forgejo Actions run's jobs' logs (runId is run.id in checks.failed), retry_pipeline runs them again. " +

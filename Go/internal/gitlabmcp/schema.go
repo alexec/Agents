@@ -26,14 +26,14 @@ type property = mcpevents.Property
 // errors list them, none required, no others allowed.
 type schema = mcpevents.Schema
 
-// args are an event's checked arguments. pr is a merge request's number (its iid), named as
-// the github server names it.
+// args are an event's checked arguments. pr is a merge request's number (its iid) and run a
+// pipeline's id, named as the github server names them; pipeline is a pipeline's name.
 type args struct {
-	project, branch, label string
-	pr                     int
-	issues                 []int
-	fixes                  []string
-	anyone, mine, all      bool
+	project, branch, label, pipeline string
+	pr, run                          int
+	issues                           []int
+	fixes                            []string
+	anyone, mine, all                bool
 }
 
 // wantsIssue is whether the issue numbered n is one asked for: any, when none is.
@@ -87,6 +87,6 @@ func check(s schema, raw json.RawMessage) (args, *rpcError) {
 		return args{}, bad
 	}
 	return args{project: v.String("project"), branch: v.String("branch"), label: v.String("label"),
-		pr: v.Int("pr"), issues: v.Ints("issue"), fixes: v.Strings("fixes"),
+		pipeline: v.String("pipeline"), pr: v.Int("pr"), run: v.Int("run"), issues: v.Ints("issue"), fixes: v.Strings("fixes"),
 		anyone: v.Bool("anyone"), mine: v.Bool("mine"), all: v.Bool("any")}, nil
 }

@@ -13,6 +13,7 @@ import (
 
 	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
 
+	"github.com/alexec/agents/Go/internal/mcpevents"
 	"github.com/alexec/agents/Go/internal/richtext"
 )
 
@@ -186,12 +187,12 @@ func (f *RealBoards) forgeItem(org string, w workItemJSON, states map[string]map
 	kind, state := w.text(fieldType), w.text(fieldState)
 	author := w.who(fieldCreatedBy).person()
 	i := Item{ID: w.ID, Project: project, State: "open", Status: state, Type: kind, Title: w.text(fieldTitle),
-		URL: f.webURL(project, w.ID), Author: author.name(), AuthorAvatar: author.avatar(), UpdatedAt: normalized(w.text(fieldChanged)),
-		CreatedAt: normalized(w.text(fieldCreated)),
+		URL: f.webURL(project, w.ID), Author: author.name(), AuthorAvatar: author.avatar(), UpdatedAt: mcpevents.Normalized(w.text(fieldChanged)),
+		CreatedAt: mcpevents.Normalized(w.text(fieldCreated)),
 		Labels:    tags(w.text(fieldTags)), Assignees: []string{}, Comments: w.number(fieldComments), Parent: w.number(fieldParent)}
 	if closedIn(states, kind, state) {
 		i.State, i.StateReason = "closed", stateReasonOf(states[kind][state], w.text(fieldReason))
-		i.ClosedAt = normalized(w.text(fieldStateChanged))
+		i.ClosedAt = mcpevents.Normalized(w.text(fieldStateChanged))
 	}
 	if a := w.who(fieldAssigned).person(); a != nil {
 		i.Assignees = append(i.Assignees, a.name())
@@ -532,7 +533,7 @@ func (f *RealBoards) ItemPage(ctx context.Context, project string, id int, befor
 			body = markdown(body)
 		}
 		p := c.CreatedBy.person()
-		d.Thread = append(d.Thread, ForgeComment{Author: p.name(), Avatar: p.avatar(), Body: body, At: normalized(c.CreatedDate), URL: d.URL, Bot: p != nil && p.Bot})
+		d.Thread = append(d.Thread, ForgeComment{Author: p.name(), Avatar: p.avatar(), Body: body, At: mcpevents.Normalized(c.CreatedDate), URL: d.URL, Bot: p != nil && p.Bot})
 	}
 	d.Before = list.Next
 	return d, nil

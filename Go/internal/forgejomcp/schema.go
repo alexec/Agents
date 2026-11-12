@@ -29,11 +29,11 @@ var issueRefPattern = regexp.MustCompile(`^([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[1
 // args are an event's checked arguments. pr is a pull request's number, named as
 // the github server names it.
 type args struct {
-	repo, branch, label string
-	pr                  int
-	issues              []int
-	fixes               []string
-	anyone, mine, all   bool
+	repo, branch, label, workflow string
+	pr, run                       int
+	issues                        []int
+	fixes                         []string
+	anyone, mine, all             bool
 }
 
 // wantsIssue is whether the issue numbered n is one asked for: any, when none is.
@@ -87,6 +87,6 @@ func check(s schema, raw json.RawMessage) (args, *rpcError) {
 		return args{}, bad
 	}
 	return args{repo: v.String("repo"), branch: v.String("branch"), label: v.String("label"),
-		pr: v.Int("pr"), issues: v.Ints("issue"), fixes: v.Strings("fixes"),
+		workflow: v.String("workflow"), pr: v.Int("pr"), run: v.Int("run"), issues: v.Ints("issue"), fixes: v.Strings("fixes"),
 		anyone: v.Bool("anyone"), mine: v.Bool("mine"), all: v.Bool("any")}, nil
 }

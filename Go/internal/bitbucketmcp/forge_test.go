@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The forge reads and writes (#3786) against a stand-in Bitbucket Cloud over HTTP: the issues
@@ -72,7 +74,7 @@ func (f *forgeFake) serve(w http.ResponseWriter, r *http.Request) {
 		f.lists = append(f.lists, p+"?"+q.Get("q"))
 		var out []obj
 		for _, i := range of[strings.TrimSuffix(p, suffix)] {
-			if b := bbqlBefore(q.Get("q")); b != "" && before(b, i["updated_on"].(string)) {
+			if b := bbqlBefore(q.Get("q")); b != "" && mcpevents.Before(b, i["updated_on"].(string)) {
 				continue
 			}
 			out = append(out, i)

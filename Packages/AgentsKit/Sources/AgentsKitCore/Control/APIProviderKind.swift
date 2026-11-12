@@ -161,10 +161,7 @@ public enum MachineProviderWords {
         + "Docker, Cloud Workstations, your own commands and MCP servers are added in the Mac app."
     public static let add = "Add Provider…"
     public static let secretsFoot = ProviderCarrier.secretsFoot(nil)
-    public static let editSecret = "Leave empty to keep the one it has."
     public static func removeTitle(_ name: String) -> String { "Remove \(name)?" }
-    public static let removeNote = "Its machines stay as they are, unlinked: nothing here can start or stop them any more."
-    public static let noHosts = "No machine to link: add one in the Mac app, or start one from a repository."
     public static let notAHostYet = "Not joined yet: add it as a machine in the Mac app, in Settings ▸ Machine Providers."
 
     /// What a workspace with no host says when no host is free to link to it (#1931): this

@@ -263,6 +263,8 @@
 :is(.with-sidebar, .sub-app) .settings-body .worktrees .worktrees-head { margin: 14px 8px 4px; font-size: 0.8125rem; }
 :is(.with-sidebar, .sub-app) .event-day { font-size: 0.75rem; font-weight: 600; margin: 14px 8px 4px; opacity: 0.65; }
 :is(.with-sidebar, .sub-app) .event-list .event-name { font-family: var(--font-mono); font-size: 0.6875rem; }
+/* An event's ref (#4732): small, and one click selects all of it, to copy. */
+:is(.with-sidebar, .sub-app) .event-list .event-ref { font-family: var(--font-mono); font-size: 0.625rem; user-select: all; overflow-wrap: anywhere; }
 :is(.with-sidebar, .sub-app) .event-consequence { display: block; margin-left: 8px; }
 :is(.with-sidebar, .sub-app) .event-waiting { display: flex; width: 100%; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; border: 0; background: none; padding: 4px 8px; }
 :is(.with-sidebar, .sub-app) .event-waiting:hover { background: var(--paper-wash); }
@@ -311,7 +313,8 @@
 :is(.with-sidebar, .sub-app) .waiting-list li { display: flex; align-items: center; gap: 4px; }
 :is(.with-sidebar, .sub-app) .event-stop { border: 0; background: none; padding: 4px 8px; font-size: 0.75rem; opacity: 0.55; }
 :is(.with-sidebar, .sub-app) .event-stop:hover { opacity: 1; }
-:is(.with-sidebar, .sub-app) .event-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+:is(.with-sidebar, .sub-app) .event-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+:is(.with-sidebar, .sub-app) .event-head .section-head { margin-right: auto; }
 :is(.with-sidebar, .sub-app) .event-head select { font: inherit; font-size: 0.75rem; margin-right: 8px; }
 :is(.with-sidebar, .sub-app) .event-open { border: 0; background: none; padding: 0; text-align: left; font: inherit; color: inherit; cursor: pointer; }
 :is(.with-sidebar, .sub-app) .event-open:hover { text-decoration: underline; }

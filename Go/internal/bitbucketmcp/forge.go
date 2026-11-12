@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The daemon's forge reads (#3786, after Forgejo's in #3753): the issues or pull requests of
@@ -283,7 +285,7 @@ func cursorOf(s string) (listCursor, error) {
 	if err != nil || json.Unmarshal(b, &c) != nil {
 		return c, &BitbucketError{Kind: Failed, Message: "Bitbucket: the cursor is not one a list gave"}
 	}
-	if _, ok := parseTime(c.Before); !ok {
+	if _, ok := mcpevents.ParseTime(c.Before); !ok {
 		return c, &BitbucketError{Kind: Failed, Message: "Bitbucket: the cursor is not one a list gave"}
 	}
 	return c, nil
@@ -293,7 +295,7 @@ func cursorOf(s string) (listCursor, error) {
 func (i Item) key() string { return i.Repo + "#" + strconv.Itoa(i.Number) }
 
 func updated(i Item) time.Time {
-	t, _ := parseTime(i.UpdatedAt)
+	t, _ := mcpevents.ParseTime(i.UpdatedAt)
 	return t
 }
 
@@ -304,7 +306,7 @@ func bbqlTime(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.9
 func (c listCursor) after(i Item, page []Item) listCursor {
 	t := updated(i)
 	next := listCursor{Before: bbqlTime(t)}
-	if old, ok := parseTime(c.Before); ok && old.Equal(t) {
+	if old, ok := mcpevents.ParseTime(c.Before); ok && old.Equal(t) {
 		next.Seen = append(next.Seen, c.Seen...)
 	}
 	for _, p := range page {

@@ -2,9 +2,7 @@ package slackmcp
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -21,17 +19,11 @@ import (
 // outside content. Each names its sender, so it starts work only as the person the Slack
 // user is linked to (#1762).
 
-// rpcError is a JSON-RPC error answer.
-type rpcError struct {
-	Code    int            `json:"code"`
-	Message string         `json:"message"`
-	Data    map[string]any `json:"data,omitempty"`
-}
-
-func (e *rpcError) Error() string { return e.Message }
+// rpcError is a JSON-RPC error answer: its code, message and optional data.
+type rpcError = mcpevents.Error
 
 func invalidParams(format string, args ...any) *rpcError {
-	return &rpcError{Code: -32602, Message: fmt.Sprintf(format, args...)}
+	return mcpevents.InvalidParams(format, args...)
 }
 
 // The events.
@@ -179,22 +171,13 @@ type cursor struct {
 }
 
 func (c cursor) encoded() string {
-	data, _ := json.Marshal(c)
-	return base64.RawURLEncoding.EncodeToString(data)
+	return mcpevents.EncodeCursor(c)
 }
 
 func decodeCursor(raw json.RawMessage) (cursor, *rpcError) {
-	refused := invalidParams("cursor is not one this server gave")
-	var text string
-	if err := json.Unmarshal(raw, &text); err != nil {
-		return cursor{}, refused
-	}
-	data, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(text, "="))
-	if err != nil {
-		return cursor{}, refused
-	}
+	refused := mcpevents.RefusedCursor()
 	var c cursor
-	if json.Unmarshal(data, &c) != nil || c.Boot == "" {
+	if !mcpevents.DecodeCursor(raw, &c) || c.Boot == "" {
 		return cursor{}, refused
 	}
 	return c, nil
@@ -203,17 +186,11 @@ func decodeCursor(raw json.RawMessage) (cursor, *rpcError) {
 // MARK: Polling
 
 const (
-	maxEvents = 100
 	// pollMs is the pace: a poll reads memory, so it costs Slack nothing.
 	pollMs = 3000
 )
 
-type pollParams struct {
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments"`
-	Cursor    json.RawMessage `json:"cursor"`
-	MaxEvents *int            `json:"maxEvents"`
-}
+type pollParams = mcpevents.Params
 
 // Events answers events/poll from an Inbox that a Listener fills.
 type Events struct {
@@ -229,7 +206,7 @@ func (s *Events) Poll(_ context.Context, raw json.RawMessage) (map[string]any, *
 		return nil, invalidParams("params must be an object")
 	}
 	if !contains(EventNames(), p.Name) {
-		return nil, &rpcError{Code: -32011, Message: fmt.Sprintf("no event %s; this server offers %s", p.Name, strings.Join(EventNames(), ", "))}
+		return nil, mcpevents.NoEvent(p.Name, EventNames())
 	}
 	a, bad := checkArgs(p.Name, p.Arguments)
 	if bad != nil {
@@ -241,16 +218,12 @@ func (s *Events) Poll(_ context.Context, raw json.RawMessage) (map[string]any, *
 	if err := s.Listener.Refused(); err != nil {
 		return nil, &rpcError{Code: -32012, Message: err.Error(), Data: map[string]any{"reason": "not connected"}}
 	}
-	limit := 50
-	if p.MaxEvents != nil {
-		limit = *p.MaxEvents
-	}
-	limit = min(maxEvents, max(1, limit))
+	limit := p.Limit()
 	answer := func(events []any, c cursor, lost, more bool) map[string]any {
 		return map[string]any{"events": events, "cursor": c.encoded(), "truncated": lost, "hasMore": more, "nextPollMs": pollMs}
 	}
 	now := cursor{Boot: s.Inbox.boot, Seq: s.Inbox.last()}
-	if len(p.Cursor) == 0 || string(p.Cursor) == "null" {
+	if p.FirstPoll() {
 		return answer([]any{}, now, false, false), nil
 	}
 	c, bad := decodeCursor(p.Cursor)

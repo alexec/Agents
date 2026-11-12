@@ -110,6 +110,7 @@ func (d *Daemon) reconcileLineWaits() {
 		name  wire.ResourceName
 		held  bool
 	}
+	at := now()
 	var orphans []orphan
 	for _, a := range d.Store.LiveAgents() {
 		name, ok := lineWaitResource(a.EventWait, a.ID)
@@ -120,7 +121,15 @@ func (d *Daemon) reconcileLineWaits() {
 		if e != nil && lineIndex(e, a.ID) >= 0 {
 			continue
 		}
-		orphans = append(orphans, orphan{a.ID, name, e != nil && holderIndex(e, a.ID) >= 0})
+		held := e != nil && holderIndex(e, a.ID) >= 0
+		if !held {
+			// Its place is kept, as of when its wait began (#4041).
+			d.keepPlace(a.ID, keptPlace{Resource: name, AskedAt: a.EventWait.Since, Until: keptUntil(a.EventWait, at.Time())})
+		}
+		orphans = append(orphans, orphan{a.ID, name, held})
+	}
+	if len(orphans) > 0 {
+		d.leasesChanged()
 	}
 	d.leaseMu.Unlock()
 	d.settle(loaded)
@@ -154,5 +163,5 @@ func (d *Daemon) reconcileLineWaits() {
 
 func lostPlaceWords(name wire.ResourceName) string {
 	return "Your wait for your turn with " + string(name) + " ended: when Agents started again, you were no longer in its line. " +
-		"Call lease_resource again if you still need it."
+		"Call lease_resource again if you still need it: you keep your place in its line."
 }

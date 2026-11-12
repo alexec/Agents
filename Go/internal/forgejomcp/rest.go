@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // RealForgejo reads Forgejo's REST API v1 (Gitea's too: they share it) as the person, with the
@@ -221,7 +223,7 @@ func (f *RealForgejo) get(ctx context.Context, path string, shared bool, into an
 // time the thing at path changed at, so what is shared is never older than what the caller
 // has seen.
 func (f *RealForgejo) getAsOf(ctx context.Context, path, asOf string, into any) error {
-	body, err := f.shared(path+" "+normalized(asOf), func() ([]byte, error) { return f.do(ctx, http.MethodGet, path, nil) })
+	body, err := f.shared(path+" "+mcpevents.Normalized(asOf), func() ([]byte, error) { return f.do(ctx, http.MethodGet, path, nil) })
 	if err != nil {
 		return err
 	}
@@ -317,11 +319,11 @@ func newest[T any](ctx context.Context, f *RealForgejo, path, since string, at f
 			return nil, Listed{}, err
 		}
 		for _, item := range list {
-			if before(at(item), since) {
+			if mcpevents.Before(at(item), since) {
 				return items, listed, nil
 			}
 			items = append(items, item)
-			listed = listed.saw(at(item))
+			listed = listed.Saw(at(item))
 		}
 		if len(list) < perPage {
 			return items, listed, nil
@@ -685,13 +687,13 @@ func (f *RealForgejo) ClosedPRs(ctx context.Context, repo, since string) ([]Merg
 	var closed []ClosedPR
 	for _, p := range list {
 		switch {
-		case p.Merged && p.MergedAt != nil && !before(*p.MergedAt, since):
+		case p.Merged && p.MergedAt != nil && !mcpevents.Before(*p.MergedAt, since):
 			trusted, err := f.trustedPR(ctx, repo, p)
 			if err != nil {
 				return nil, nil, Listed{}, err
 			}
 			merged = append(merged, MergedPR{PR: p.pr(), MergedAt: *p.MergedAt, MergeSHA: p.MergeCommitSHA, Trusted: trusted})
-		case !p.Merged && p.ClosedAt != nil && !before(*p.ClosedAt, since):
+		case !p.Merged && p.ClosedAt != nil && !mcpevents.Before(*p.ClosedAt, since):
 			trusted, err := f.trustedPR(ctx, repo, p)
 			if err != nil {
 				return nil, nil, Listed{}, err
@@ -734,7 +736,7 @@ func (f *RealForgejo) FailedChecks(ctx context.Context, repo, since string) ([]F
 			if !failedStatus(s.State) {
 				continue
 			}
-			if at := normalized(s.UpdatedAt); at > d.At {
+			if at := mcpevents.Normalized(s.UpdatedAt); at > d.At {
 				d.At = at
 			}
 			d.Failed = append(d.Failed, Check{Name: s.Context, URL: s.TargetURL})
@@ -745,8 +747,8 @@ func (f *RealForgejo) FailedChecks(ctx context.Context, repo, since string) ([]F
 				}
 			}
 		}
-		listed = listed.saw(d.At)
-		if d.At == "" || before(d.At, since) {
+		listed = listed.Saw(d.At)
+		if d.At == "" || mcpevents.Before(d.At, since) {
 			continue
 		}
 		if d.Trusted, err = f.trustedPR(ctx, repo, p); err != nil {
@@ -767,7 +769,7 @@ func (f *RealForgejo) issuesSince(ctx context.Context, repo, state, since string
 	}
 	listed := Listed{Truncated: truncated}
 	for _, i := range items {
-		listed = listed.saw(i.UpdatedAt)
+		listed = listed.Saw(i.UpdatedAt)
 	}
 	return items, listed, nil
 }
@@ -790,7 +792,7 @@ func (f *RealForgejo) IssueActivity(ctx context.Context, repo string, kind Issue
 		}
 		var out []IssueActivity
 		for _, i := range items {
-			if before(i.CreatedAt, since) {
+			if mcpevents.Before(i.CreatedAt, since) {
 				continue
 			}
 			trusted, err := f.trusted(ctx, repo, &i.User)
@@ -818,7 +820,7 @@ func (f *RealForgejo) IssueActivity(ctx context.Context, repo string, kind Issue
 				return nil, Listed{}, err
 			}
 			for _, l := range lines {
-				if before(l.CreatedAt, since) {
+				if mcpevents.Before(l.CreatedAt, since) {
 					continue
 				}
 				// A label line's body is "1" when it was added, empty when taken off.
@@ -838,7 +840,7 @@ func (f *RealForgejo) IssueActivity(ctx context.Context, repo string, kind Issue
 				if added {
 					a.ID, a.Label = "label:"+a.ID, l.Label.Name
 				} else {
-					a.ID = strconv.Itoa(i.Number) + ":" + normalized(l.CreatedAt)
+					a.ID = strconv.Itoa(i.Number) + ":" + mcpevents.Normalized(l.CreatedAt)
 				}
 				out = append(out, a)
 			}
@@ -855,8 +857,8 @@ func (f *RealForgejo) IssueActivity(ctx context.Context, repo string, kind Issue
 	// An issue is read once per poll, shared with other waits that saw the same comment on it.
 	issues := map[int]issueJSON{}
 	for _, c := range comments {
-		listed = listed.saw(c.CreatedAt)
-		if c.PullRequestURL != "" || before(c.CreatedAt, since) {
+		listed = listed.Saw(c.CreatedAt)
+		if c.PullRequestURL != "" || mcpevents.Before(c.CreatedAt, since) {
 			continue
 		}
 		number, err := strconv.Atoi(c.IssueURL[strings.LastIndex(c.IssueURL, "/")+1:])
@@ -893,10 +895,10 @@ func (f *RealForgejo) reviewComments(ctx context.Context, repo string, p pullJSO
 	var out []reviewCommentJSON
 	for _, r := range reviews {
 		at := r.UpdatedAt
-		if before(at, r.SubmittedAt) {
+		if mcpevents.Before(at, r.SubmittedAt) {
 			at = r.SubmittedAt
 		}
-		if r.CommentsCount == 0 || (since != "" && before(at, since)) {
+		if r.CommentsCount == 0 || (since != "" && mcpevents.Before(at, since)) {
 			continue
 		}
 		var comments []reviewCommentJSON
@@ -923,7 +925,7 @@ func (f *RealForgejo) ReviewComments(ctx context.Context, repo, since string) ([
 			return nil, Listed{}, err
 		}
 		for _, c := range comments {
-			if before(c.CreatedAt, since) {
+			if mcpevents.Before(c.CreatedAt, since) {
 				continue
 			}
 			trusted := !p.fork()

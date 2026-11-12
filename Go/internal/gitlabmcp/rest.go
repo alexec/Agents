@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // RealGitLab reads GitLab's REST API v4 as the person, with the token Token gives: the GitLab
@@ -253,7 +255,7 @@ func (g *RealGitLab) getCounted(ctx context.Context, path string, into any) (int
 // time the thing at path changed at, or something newer than it was seen at, so what is
 // shared is never older than what the caller has seen.
 func (g *RealGitLab) getAsOf(ctx context.Context, path, asOf string, into any) error {
-	body, err := g.shared(path+" "+normalized(asOf), func() ([]byte, error) { return g.do(ctx, http.MethodGet, path, nil) })
+	body, err := g.shared(path+" "+mcpevents.Normalized(asOf), func() ([]byte, error) { return g.do(ctx, http.MethodGet, path, nil) })
 	if err != nil {
 		return err
 	}
@@ -330,11 +332,11 @@ func newest[T any](ctx context.Context, g *RealGitLab, path, since string, at fu
 			return nil, Listed{}, err
 		}
 		for _, item := range list {
-			if before(at(item), since) {
+			if mcpevents.Before(at(item), since) {
 				return items, listed, nil
 			}
 			items = append(items, item)
-			listed = listed.saw(at(item))
+			listed = listed.Saw(at(item))
 		}
 		if len(list) < perPage {
 			return items, listed, nil
@@ -369,7 +371,7 @@ func (g *RealGitLab) labelled(ctx context.Context, project, since string) ([]Iss
 			return nil, Listed{}, err
 		}
 		for _, e := range events {
-			if e.Action != "add" || e.Label == nil || before(e.CreatedAt, since) {
+			if e.Action != "add" || e.Label == nil || mcpevents.Before(e.CreatedAt, since) {
 				continue
 			}
 			trusted, err := g.trusted(ctx, project, &e.User)
@@ -514,22 +516,29 @@ func (g *RealGitLab) trusted(ctx context.Context, project string, u *user) (bool
 	if u == nil || u.ID == 0 || isBot(u.Username, u.Bot) {
 		return false, nil
 	}
-	key := project + "\x00" + strconv.Itoa(u.ID)
+	level, err := g.level(ctx, project, u.ID)
+	return level >= reporterAccess, err
+}
+
+// level is a person's access to the project, directly or through a group: 0 when they are no
+// member. GitLab is asked once per person per memberFor.
+func (g *RealGitLab) level(ctx context.Context, project string, id int) (int, error) {
+	key := project + "\x00" + strconv.Itoa(id)
 	g.mu.Lock()
 	kept, ok := g.members[key]
 	g.mu.Unlock()
 	if ok && time.Since(kept.at) < memberFor {
-		return kept.level >= reporterAccess, nil
+		return kept.level, nil
 	}
 	var m struct {
 		AccessLevel int `json:"access_level"`
 	}
-	err := g.get(ctx, fmt.Sprintf("projects/%s/members/all/%d", pid(project), u.ID), false, &m)
+	err := g.get(ctx, fmt.Sprintf("projects/%s/members/all/%d", pid(project), id), false, &m)
 	if gl, ok := err.(*GitLabError); ok && gl.Kind == NotFound {
 		m.AccessLevel, err = 0, nil
 	}
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 	g.mu.Lock()
 	if len(g.members) >= maxMembers {
@@ -537,7 +546,7 @@ func (g *RealGitLab) trusted(ctx context.Context, project string, u *user) (bool
 	}
 	g.members[key] = member{time.Now(), m.AccessLevel}
 	g.mu.Unlock()
-	return m.AccessLevel >= reporterAccess, nil
+	return m.AccessLevel, nil
 }
 
 // trustedMR says whether a merge request is the project's own: its branch in the project, not
@@ -666,17 +675,17 @@ func (g *RealGitLab) ClosedMRs(ctx context.Context, project, since string) ([]Me
 		if err != nil {
 			return nil, nil, Listed{}, err
 		}
-		listed = listed.saw(more.Newest)
+		listed = listed.Saw(more.Newest)
 		listed.Truncated = listed.Truncated || more.Truncated
 		for _, m := range list {
 			switch {
-			case st == "merged" && m.MergedAt != nil && !before(*m.MergedAt, since):
+			case st == "merged" && m.MergedAt != nil && !mcpevents.Before(*m.MergedAt, since):
 				trusted, err := g.trustedMR(ctx, project, m)
 				if err != nil {
 					return nil, nil, Listed{}, err
 				}
 				merged = append(merged, MergedMR{MR: m.mr(), MergedAt: *m.MergedAt, MergeSHA: m.mergeSHA(), Trusted: trusted})
-			case st == "closed" && m.ClosedAt != nil && !before(*m.ClosedAt, since):
+			case st == "closed" && m.ClosedAt != nil && !mcpevents.Before(*m.ClosedAt, since):
 				trusted, err := g.trustedMR(ctx, project, m)
 				if err != nil {
 					return nil, nil, Listed{}, err
@@ -692,16 +701,18 @@ func (g *RealGitLab) ClosedMRs(ctx context.Context, project, since string) ([]Me
 var mrRef = regexp.MustCompile(`^refs/merge-requests/([0-9]+)/`)
 
 type pipelineJSON struct {
-	ID        int    `json:"id"`
-	IID       int    `json:"iid"`
-	Name      string `json:"name"`
-	Status    string `json:"status"`
-	Source    string `json:"source"`
-	Ref       string `json:"ref"`
-	SHA       string `json:"sha"`
-	WebURL    string `json:"web_url"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
+	ID         int    `json:"id"`
+	User       *user  `json:"user"`
+	FinishedAt string `json:"finished_at"`
+	IID        int    `json:"iid"`
+	Name       string `json:"name"`
+	Status     string `json:"status"`
+	Source     string `json:"source"`
+	Ref        string `json:"ref"`
+	SHA        string `json:"sha"`
+	WebURL     string `json:"web_url"`
+	CreatedAt  string `json:"created_at"`
+	UpdatedAt  string `json:"updated_at"`
 }
 
 func (p pipelineJSON) pipeline() Pipeline {
@@ -709,7 +720,7 @@ func (p pipelineJSON) pipeline() Pipeline {
 	if name == "" {
 		name = fmt.Sprintf("Pipeline #%d", p.ID)
 	}
-	out := Pipeline{ID: p.ID, Name: name, URL: p.WebURL, SHA: p.SHA, Ref: p.Ref, UpdatedAt: p.UpdatedAt}
+	out := Pipeline{ID: p.ID, Name: name, URL: p.WebURL, SHA: p.SHA, Ref: p.Ref, UpdatedAt: p.UpdatedAt, Listed: p.Name}
 	if m := mrRef.FindStringSubmatch(p.Ref); m != nil {
 		out.MRNumber, _ = strconv.Atoi(m[1])
 	}
@@ -813,7 +824,7 @@ func (g *RealGitLab) IssueActivity(ctx context.Context, project string, kind Iss
 		}
 		var out []IssueActivity
 		for _, i := range items {
-			if i.ClosedAt == nil || before(*i.ClosedAt, since) {
+			if i.ClosedAt == nil || mcpevents.Before(*i.ClosedAt, since) {
 				continue
 			}
 			trusted, err := g.trusted(ctx, project, i.ClosedBy)
@@ -824,7 +835,7 @@ func (g *RealGitLab) IssueActivity(ctx context.Context, project string, kind Iss
 			if i.ClosedBy != nil {
 				by = i.ClosedBy.Username
 			}
-			out = append(out, IssueActivity{ID: strconv.Itoa(i.IID) + ":" + normalized(*i.ClosedAt), At: *i.ClosedAt, Issue: i.issue(),
+			out = append(out, IssueActivity{ID: strconv.Itoa(i.IID) + ":" + mcpevents.Normalized(*i.ClosedAt), At: *i.ClosedAt, Issue: i.issue(),
 				Kind: IssueClosed, By: by, Trusted: trusted})
 		}
 		return out, listed, nil
@@ -924,7 +935,7 @@ func (g *RealGitLab) notes(ctx context.Context, project, since string) ([]noteJS
 	}
 	// after is a day, and not that day: the day before since's.
 	after := ""
-	if t, ok := parseTime(since); ok {
+	if t, ok := mcpevents.ParseTime(since); ok {
 		after = "&after=" + t.UTC().AddDate(0, 0, -1).Format("2006-01-02")
 	}
 	path := fmt.Sprintf("projects/%s/events?action=commented&sort=desc%s", pid(project), after)

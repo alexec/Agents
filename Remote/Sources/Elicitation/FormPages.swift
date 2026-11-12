@@ -59,7 +59,7 @@ struct FormPages: View {
             footer
         }
         .onAppear(perform: fillInDefaults)
-        .animation(.snappy(duration: 0.2), value: page)
+        .animation(ResponseMotion.snappy, value: page)
     }
 
     // MARK: The page

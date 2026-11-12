@@ -29,7 +29,7 @@ struct PaneHost<Chat: View>: View {
                     .transition(.move(edge: .trailing))
             }
         }
-        .animation(.snappy(duration: 0.2), value: state.pane)
+        .animation(ResponseMotion.snappy, value: state.pane)
         .onGeometryChange(for: Double.self) { $0.size.width } action: { width = $0 }
         .navigationDestination(isPresented: fullScreen) {
             PaneView(agent: agent, isColumn: false)

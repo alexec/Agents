@@ -111,7 +111,7 @@ struct ImageViewer: View {
             }
             .onEnded { _ in
                 pinchStart = nil
-                if zoom <= ImageViewerZoom.fit { withAnimation(.snappy) { offset = .zero; settled = .zero } }
+                if zoom <= ImageViewerZoom.fit { withAnimation(ResponseMotion.snappy) { offset = .zero; settled = .zero } }
             }
     }
 
@@ -132,13 +132,13 @@ struct ImageViewer: View {
                 } else if value.translation.height > 120 || value.predictedEndTranslation.height > 300 {
                     dismiss()
                 } else {
-                    withAnimation(.snappy) { offset = .zero }
+                    withAnimation(ResponseMotion.snappy) { offset = .zero }
                 }
             }
     }
 
     private func toggleZoom() {
-        withAnimation(.snappy) {
+        withAnimation(ResponseMotion.snappy) {
             zoom = zoom > ImageViewerZoom.fit ? ImageViewerZoom.fit : ImageViewerZoom.doubleTap
             offset = .zero
             settled = .zero

@@ -383,6 +383,10 @@
         "id": {
           "$ref": "#/definitions/UUID"
         },
+        "revision": {
+          "type": "integer",
+          "description": "Where this record's last change is in its host's order of changes (#4785): a number per host that goes up with each change to any of its records, kept on disk. Ask for the records changed since with ListRequest.changedSince."
+        },
         "runtimeID": {
           "type": "string"
         },
@@ -656,6 +660,37 @@
         "byUser",
         "byAgent"
       ]
+    },
+    "AgentChanges": {
+      "type": "object",
+      "description": "Where a client/catchUp's agents are in the host's order of changes (#4785). The client asks next time with ListRequest.changedSince set to this epoch and revision.",
+      "properties": {
+        "epoch": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "description": "Every change up to here is in this answer or an earlier one."
+        },
+        "removed": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UUID"
+          },
+          "description": "The records removed since changedSince."
+        },
+        "all": {
+          "type": "boolean",
+          "description": "True when agents is the list as without changedSince: none was given, or it was too old or of another epoch. The client then drops each record it holds that is not in it."
+        }
+      },
+      "required": [
+        "epoch",
+        "revision",
+        "removed",
+        "all"
+      ],
+      "additionalProperties": false
     },
     "AgentConfigEditorFile": {
       "description": "A Markdown file under skills, personas or workflows in Agent Configuration.",
@@ -3520,6 +3555,58 @@
       ],
       "additionalProperties": false
     },
+    "BusLogPage": {
+      "type": "object",
+      "description": "bus/log's answer (#4732): envelopes of the caller's bus, newest first. Envelope only, as the bus keeps it: no data.",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BusEvent"
+          }
+        },
+        "next": {
+          "type": "string",
+          "description": "Where the next page back starts, as before; none when nothing older was read."
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether older envelopes are on the bus log."
+        }
+      },
+      "required": [
+        "events",
+        "hasMore"
+      ],
+      "additionalProperties": false
+    },
+    "BusLogQuery": {
+      "type": "object",
+      "description": "bus/log (#4732, spec 4724-event-bus, \"The bus log\"): a page of the caller's bus log, newest first, narrowed by the envelope's fields.",
+      "properties": {
+        "before": {
+          "type": "string",
+          "description": "The next of the page before: only envelopes older than it."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "At most this many; 100 when absent, never more than 500."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Only events of this provider (#4732): github, jira, agents and so on."
+        },
+        "type": {
+          "type": "string",
+          "description": "Only events of this type (#4732), noun.verbed, or noun.* for every type of that noun."
+        },
+        "topic": {
+          "type": "string",
+          "description": "Only events on this topic (#4732), such as a repo's full name; lower case."
+        }
+      },
+      "additionalProperties": false
+    },
     "BusProducerLease": {
       "type": "object",
       "description": "One producer lease (#4731): the machine that polls, until when, and whether it is the one that asked. A machine that is not the holder stands by: it does not poll, and the control plane delivers it what the holder's poll makes.",
@@ -4421,6 +4508,9 @@
           "items": {
             "$ref": "#/definitions/Agent"
           }
+        },
+        "agentChanges": {
+          "$ref": "#/definitions/AgentChanges"
         },
         "permissions": {
           "type": "array",
@@ -9440,6 +9530,10 @@
           "items": {
             "$ref": "#/definitions/WaitingAgent"
           }
+        },
+        "producer": {
+          "type": "string",
+          "description": "This machine's producer ref (#4732), agents:machine:#<machine>, as its own events say it: an event whose producer is another says which machine raised it."
         },
         "hasMore": {
           "type": "boolean"
@@ -14655,6 +14749,10 @@
         "project": {
           "type": "string",
           "description": "Only the sessions whose folder is in this project (#3276), as .agents/folder.json names it: the project's sessions on this machine."
+        },
+        "changedSince": {
+          "$ref": "#/definitions/ListRevision",
+          "description": "Only the records changed since this point (#4785), every one, archived ones too: limit, after, includeArchived and archivedOnly do not apply, so a client sees a session archived or brought back. The records removed come in client/catchUp's agentChanges. When the point is too old or of another epoch, agents/list fails with revisionGone and client/catchUp answers as without it, with agentChanges.all. A host that predates it answers the whole list."
         }
       },
       "required": [
@@ -14662,6 +14760,23 @@
         "archivedCommands",
         "archivedOnly",
         "lean"
+      ],
+      "additionalProperties": false
+    },
+    "ListRevision": {
+      "type": "object",
+      "description": "A point in a host's order of changes to its session records (#4785). The epoch names the order: the host makes a new one when it cannot vouch for the old one.",
+      "properties": {
+        "epoch": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "epoch",
+        "revision"
       ],
       "additionalProperties": false
     },
@@ -24782,6 +24897,24 @@
       ],
       "additionalProperties": false
     },
+    "ReportDelivery": {
+      "type": "object",
+      "description": "A repo's delivery figures on Reports ▸ Planning (#4555): lineage.DeliveryOf over the scope's machines' nodes, each node once, with each release tag's time from its earliest link. Of a scope, never of a person.",
+      "properties": {
+        "repo": {
+          "type": "string",
+          "description": "As LineageCostNode.repo, in the full form (#4800)."
+        },
+        "figures": {
+          "$ref": "#/definitions/LineageDelivery"
+        }
+      },
+      "required": [
+        "repo",
+        "figures"
+      ],
+      "additionalProperties": false
+    },
     "ReportEstimateError": {
       "type": "object",
       "description": "How far the estimates were from the actual figures (#3561), over the issues closed in the range that had an estimate when their work started: the median of max(estimate/actual, actual/estimate), so 1.5 means 1.5 times too high or too low. A figure is absent when no issue had it. coverage and landsAtErrorDays (#4525) check the claims the kept estimate made: how often its P10-P90 dollar range held the actual, and how many days its landing date was off by, the median over the same issues.",
@@ -25329,6 +25462,13 @@
             "$ref": "#/definitions/LineageNode"
           },
           "description": "The open epics in the scope (#4528), the most recently changed first, at most 20, so Reports ▸ Planning can ask lineage/forecast when each lands."
+        },
+        "delivery": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportDelivery"
+          },
+          "description": "The scope's delivery figures (#4555, epic #4551), a repo each: the repos with the most PRs merged in the 28 days to now, at most 3, the most first, whatever the range. Absent from a control plane before it; empty when no repo had a merge."
         },
         "issues": {
           "type": "array",

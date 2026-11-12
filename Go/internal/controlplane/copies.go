@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // agentsKept is HostCopies.agentsKept: the most agents kept of a host's list.
@@ -46,29 +48,102 @@ func newHostCopies(s store.Store) *hostCopies {
 func copyKey(host string) string { return copiesPrefix + host + ".json" }
 
 // keepsList is HostCopies.keeps: only the whole lists a window opens with, folders/list,
-// and agents/list asked lean with nothing narrowing it.
+// agents/list asked lean with nothing narrowing it, and client/catchUp's live agents, whole
+// or what changed since (#4794), which take lays on the list kept.
 func keepsList(method string, params json.RawMessage) bool {
 	switch method {
 	case "folders/list":
 		return true
 	case "agents/list":
-		var asked map[string]json.RawMessage
-		if json.Unmarshal(params, &asked) != nil || asked == nil {
+		return wholeLeanList(params, false)
+	case wire.CallClientCatchUp.Name:
+		var asked struct {
+			Agents json.RawMessage `json:"agents"`
+		}
+		if json.Unmarshal(params, &asked) != nil {
 			return false
 		}
-		absent := func(k string) bool { v, ok := asked[k]; return !ok || string(v) == "null" }
-		off := func(k string) bool { return absent(k) || string(asked[k]) == "false" }
-		if string(asked["lean"]) != "true" || !off("includeArchived") || !off("archivedOnly") {
-			return false
-		}
-		for _, k := range []string{"folder", "startedByWorkflow", "agentID", "after", "query"} {
-			if !absent(k) {
-				return false
-			}
-		}
-		return true
+		// None asked is the first page: live and lean.
+		return len(asked.Agents) == 0 || string(asked.Agents) == "null" || wholeLeanList(asked.Agents, true)
 	}
 	return false
+}
+
+// wholeLeanList is a lean list of the live agents with nothing narrowing it; with changes,
+// one asked only for what changed since a point (#4794) is one too.
+func wholeLeanList(params json.RawMessage, changes bool) bool {
+	var asked map[string]json.RawMessage
+	if json.Unmarshal(params, &asked) != nil || asked == nil {
+		return false
+	}
+	absent := func(k string) bool { v, ok := asked[k]; return !ok || string(v) == "null" }
+	off := func(k string) bool { return absent(k) || string(asked[k]) == "false" }
+	if string(asked["lean"]) != "true" || !off("includeArchived") || !off("archivedOnly") {
+		return false
+	}
+	narrowing := []string{"folder", "startedByWorkflow", "agentID", "after", "query"}
+	if !changes {
+		narrowing = append(narrowing, "changedSince")
+	}
+	for _, k := range narrowing {
+		if !absent(k) {
+			return false
+		}
+	}
+	return true
+}
+
+// caughtUp is the agents of a client/catchUp's answer as the list to keep (#4794): the
+// whole live list, or what changed laid on the one held. False when it is not one.
+func caughtUp(result json.RawMessage, held json.RawMessage) ([]json.RawMessage, bool) {
+	var snapshot struct {
+		Agents  []json.RawMessage `json:"agents"`
+		Changes *struct {
+			Removed []string `json:"removed"`
+			All     bool     `json:"all"`
+		} `json:"agentChanges"`
+	}
+	if json.Unmarshal(result, &snapshot) != nil || snapshot.Agents == nil {
+		return nil, false
+	}
+	if snapshot.Changes == nil || snapshot.Changes.All {
+		return snapshot.Agents, true
+	}
+	// Changes on nothing held are not the list.
+	var kept []json.RawMessage
+	if len(held) == 0 || json.Unmarshal(held, &kept) != nil {
+		return nil, false
+	}
+	type record struct {
+		ID    string `json:"id"`
+		State string `json:"state"`
+	}
+	idOf := func(raw json.RawMessage) record {
+		var r record
+		_ = json.Unmarshal(raw, &r)
+		r.ID = strings.ToUpper(r.ID)
+		return r
+	}
+	drop := map[string]bool{}
+	for _, id := range snapshot.Changes.Removed {
+		drop[strings.ToUpper(id)] = true
+	}
+	// The changed ones first, newest activity first as the host lists them; an archived one
+	// leaves the live list.
+	out := []json.RawMessage{}
+	for _, raw := range snapshot.Agents {
+		r := idOf(raw)
+		drop[r.ID] = true
+		if r.State != string(wire.AgentStateArchived) {
+			out = append(out, raw)
+		}
+	}
+	for _, raw := range kept {
+		if !drop[idOf(raw).ID] {
+			out = append(out, raw)
+		}
+	}
+	return out, true
 }
 
 // take keeps a host's answer to a whole list. The store is written only when the list
@@ -78,8 +153,7 @@ func (c *hostCopies) take(host, method, reply string) {
 	var answer struct {
 		Result json.RawMessage `json:"result"`
 	}
-	var items []json.RawMessage
-	if json.Unmarshal([]byte(reply), &answer) != nil || json.Unmarshal(answer.Result, &items) != nil {
+	if json.Unmarshal([]byte(reply), &answer) != nil {
 		return
 	}
 	ctx := context.Background()
@@ -87,6 +161,16 @@ func (c *hostCopies) take(host, method, reply string) {
 	next := hostCopy{}
 	if copy != nil {
 		next = *copy
+	}
+	var items []json.RawMessage
+	if method == wire.CallClientCatchUp.Name {
+		listed, ok := caughtUp(answer.Result, next.Agents)
+		if !ok {
+			return
+		}
+		items = listed
+	} else if json.Unmarshal(answer.Result, &items) != nil {
+		return
 	}
 	same := false
 	if method == "folders/list" {

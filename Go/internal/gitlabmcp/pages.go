@@ -1,7 +1,6 @@
 package gitlabmcp
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -13,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/mcpevents"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -271,7 +271,7 @@ func (g *RealGitLab) MRPage(ctx context.Context, project string, number int) (ma
 		threads = append(threads, j)
 	}
 	sort.SliceStable(conversation, func(i, j int) bool {
-		return before(conversation[i].(map[string]any)["at"].(string), conversation[j].(map[string]any)["at"].(string))
+		return mcpevents.Before(conversation[i].(map[string]any)["at"].(string), conversation[j].(map[string]any)["at"].(string))
 	})
 	runs := []any{}
 	checks, pipelineID := "none", 0
@@ -526,56 +526,15 @@ func plain(text string) string {
 	return controls.ReplaceAllString(sections.ReplaceAllString(escapes.ReplaceAllString(text, ""), ""), "")
 }
 
-// tailSlack is how many lines before the last logLines are kept too, for those at the end
-// that are nothing once cleaned (a section's end mark).
-const tailSlack = 100
-
-// maxLogLine is how much of one line of a log is kept: its start.
-const maxLogLine = 16 << 10
-
 // traceTail is the last n lines of a job's log as it is read, cleaned, without the trailing
-// lines that are nothing once cleaned (P20261020-4): a log can be tens of MB, and only its end
-// is given, so it is never held whole. The lines are kept in a ring whose slots are used again.
+// lines that are blank once cleaned (P20261020-4; mcpevents.LogTail): a log can be tens of MB,
+// and only its end is given, so it is never held whole.
 func traceTail(r io.Reader, n int) (string, error) {
-	br := bufio.NewReaderSize(r, 64<<10)
-	ring := make([][]byte, n+tailSlack)
-	next, count := 0, 0
-	var line []byte
-	for {
-		chunk, err := br.ReadSlice('\n')
-		if len(line) < maxLogLine {
-			line = append(line, chunk[:min(len(chunk), maxLogLine-len(line))]...)
-		}
-		if err == bufio.ErrBufferFull {
-			continue
-		}
-		if len(chunk) > 0 && chunk[len(chunk)-1] == '\n' || (err == io.EOF && len(line) > 0) {
-			if line[len(line)-1] == '\n' {
-				line = line[:len(line)-1]
-			}
-			ring[next] = append(ring[next][:0], line...)
-			next, count = (next+1)%len(ring), count+1
-			line = line[:0]
-		}
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return "", &GitLabError{Kind: Failed, Message: "GitLab: " + err.Error()}
-		}
+	tail, err := mcpevents.LogTail(r, n, false, plain)
+	if err != nil {
+		return "", &GitLabError{Kind: Failed, Message: "GitLab: " + err.Error()}
 	}
-	kept := min(count, len(ring))
-	lines := make([]string, 0, kept)
-	for i := range kept {
-		lines = append(lines, plain(string(ring[(next-kept+i+len(ring))%len(ring)])))
-	}
-	for len(lines) > 0 && lines[len(lines)-1] == "" {
-		lines = lines[:len(lines)-1]
-	}
-	if len(lines) > n {
-		lines = lines[len(lines)-n:]
-	}
-	return strings.Join(lines, "\n"), nil
+	return tail, nil
 }
 
 // FailedLog is the end of each failed job's log in a pipeline (not those allowed to fail), or of one job by name.

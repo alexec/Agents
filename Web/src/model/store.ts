@@ -14,14 +14,14 @@ import type {
   PermissionNotification, PermissionRequest, FolderSummary, HelperLimits, DiskThresholds, NotCommittedResponse, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, MCPToolsAnswer, ConnectorToolLevel, DiskState, CapacityState, StoreNotes,
-  CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings, WorkflowHours,
+  BusEvent, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings, WorkflowHours,
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, VelocityHistory, Achievements, Multiplier,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ConnectAnotherRequest, ConnectReport, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, DriveApproval, WakeSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
   Connection, LineageNode, LineageSessionIssue, MoveNotification, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestSecretUse, LockDelivery, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder,
-  OutsideAccount, OutsideAccounts, PlaneMoveAsk, PlaneMoveReport, UserSecretRow, WebRemoteStatus, WireDate } from "../protocol/generated";
+  OutsideAccount, OutsideAccounts, AgentChanges, ListRevision, PlaneMoveAsk, PlaneMoveReport, UserSecretRow, WebRemoteStatus, WireDate } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
@@ -43,6 +43,7 @@ import { folderKey, folderPath as agentFolderPath, folderView, type FolderView }
 import { decideMacHostNotice, steadyNotice, type MacHostNotice } from "./macHostNotice";
 import { DisplayBuilder, isPersonsAsk, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
 import { sortedRuntimes } from "./runtimes";
+import { busLogQuery, type EnvelopeFilter } from "./eventBus";
 import { personPrompts } from "./sessionPrompts";
 import { shownItems } from "./thoughts";
 import { blockLines, openBlock } from "./block";
@@ -68,11 +69,14 @@ import type { ChartHint } from "./chart";
 import { Providers } from "./providers";
 import { MachineLock } from "./machineLock";
 import { isLead, leadEpic, leadProgressWords } from "./leadProgress";
-import { type AgentWrite, PendingWrites, omitting, writeFailure } from "./pendingWrites";
+import { type AgentWrite, PendingWrites, failureLine, omitting, writeFailure } from "./pendingWrites";
+import { approvalFailure, approvalID } from "./approvals";
+import { landed, type Sending, willQueue } from "./sending";
 import { type ChangeUndo, type Inverse, changeUndoLine, changeUndoMenu, labelsUndo, laterUndo, mutedUndo, renamedUndo,
   unarchivedUndo } from "./changeUndo";
 import { sessionRef as copyRef, type MachineCopy, type TranscriptCopy } from "./localCopy";
 import { sessionRef } from "../protocol/ref";
+import { mark, markOnce } from "./marks";
 
 /** What this page keeps by folder on a host, kept to the folders it lists (#3750). */
 function pruneFolderKeys(host: string, folders: readonly string[]): void {
@@ -250,6 +254,11 @@ export class Work {
 
   /** The conversation being read, and only that one. */
   readonly watching = signal<{ host: string; session: string } | null>(null);
+  /**
+   * The prompts on their way to each agent, by `host|agentID` (#4814): drawn in its chat as the
+   * person's bubble at once, until the host's own entry for one lands, and gone when one did not go.
+   */
+  readonly sending = signal<Record<string, Sending[]>>({});
   /** The conversation last looked for: once it is, one not in hand has gone (#2652), as PoppedChat.looked. */
   readonly lookedFor = signal<{ host: string; session: string } | null>(null);
   readonly entries = signal<TranscriptEntry[]>([]);
@@ -655,6 +664,15 @@ export class Work {
   private leadAsk: TranscriptEntry | null = null;
   /** What was heard while a page is on its way, to lay over it; null when none is (#214). */
   protected heardSincePage: TranscriptEntry[] | null = [];
+  /**
+   * How many entries the open chat's host had when it last gave a page of it (#4794): every entry
+   * from here on was written after, so a reconnect asks `from` here. Null when no page is held.
+   */
+  protected transcriptEnd: number | null = null;
+  /** Each host's point in its order of changes, as its last catch-up said (#4794). */
+  protected readonly listPoints = new Map<string, ListRevision>();
+  /** A prompt was sent and its echo is not heard yet: the next entry marks `agents:echo` (#4784). */
+  protected echoAwaited = false;
 
   /** One notification from one host. Returns false for one this does not know. */
   apply(method: string, params: unknown, host: string): boolean {
@@ -869,7 +887,78 @@ export class Work {
   upsertFolder(summary: FolderSummary, host: string): void {
     const list = (this.folders.value[host] ?? [])
       .filter((p) => folderKey(p.folder.folder) !== folderKey(summary.folder.folder));
-    this.folders.value = { ...this.folders.value, [host]: [...list, summary] };
+    this.folders.value = { ...this.folders.value, [host]: [...list, this.hidingAnswered(summary, host)] };
+  }
+
+  /**
+   * The approvals answered here whose answer is on its way (#4814), by host, folder and id: out of
+   * their folder's list until the call is back, and `gone` once the host's list no longer has one.
+   */
+  private answeringApprovals = new Map<string, { approval: Approval; gone: boolean }>();
+
+  private static approvalSlot(host: string, folder: string, id: string): string {
+    return `${host}|${folderKey(folder)}|${id}`;
+  }
+
+  /** A host's summary of a folder, less the approvals being answered here (#4814). */
+  private hidingAnswered(summary: FolderSummary, host: string): FolderSummary {
+    if (this.answeringApprovals.size === 0) return summary;
+    const prefix = Work.approvalSlot(host, summary.folder.folder, "");
+    const listed = summary.approvals ?? [];
+    for (const [slot, held] of this.answeringApprovals) {
+      if (slot.startsWith(prefix) && !listed.some((a) => approvalID(a) === approvalID(held.approval))) held.gone = true;
+    }
+    const approvals = listed.filter((a) => !this.answeringApprovals.has(prefix + approvalID(a)));
+    return approvals.length === listed.length ? summary : { ...summary, approvals };
+  }
+
+  /** Every summary of a host's list, less the approvals being answered here. */
+  protected hidingAnsweredIn(summaries: FolderSummary[], host: string): FolderSummary[] {
+    return this.answeringApprovals.size === 0 ? summaries : summaries.map((p) => this.hidingAnswered(p, host));
+  }
+
+  /**
+   * An approval as the page shows it, found also while its answer is on its way (#4814): the Review
+   * page stays on it, to say a refusal in place, while its row has already gone.
+   */
+  approvalShown(host: string, folder: string, id: string): Approval | undefined {
+    const summary = (this.folders.value[host] ?? []).find((p) => folderKey(p.folder.folder) === folderKey(folder));
+    return summary?.approvals?.find((a) => approvalID(a) === id)
+      ?? this.answeringApprovals.get(Work.approvalSlot(host, folder, id))?.approval;
+  }
+
+  /**
+   * Answer an approval: it leaves its folder's list at once, before the host has the answer
+   * (#4814), and comes back when `send` answers null (it did not go), unless the host's list
+   * meanwhile no longer has it.
+   */
+  protected async answeringApproval<T>(host: string, folder: string, id: string, send: () => Promise<T | null>): Promise<T | null> {
+    const slot = Work.approvalSlot(host, folder, id);
+    const list = this.folders.peek()[host] ?? [];
+    const summary = list.find((p) => folderKey(p.folder.folder) === folderKey(folder));
+    const approval = summary?.approvals?.find((a) => approvalID(a) === id);
+    if (!summary || !approval || this.answeringApprovals.has(slot)) return send();
+    const held = { approval, gone: false };
+    this.answeringApprovals.set(slot, held);
+    this.placeFolder({ ...summary, approvals: (summary.approvals ?? []).filter((a) => approvalID(a) !== id) }, host);
+    let sent: T | null = null;
+    try {
+      sent = await send();
+    } finally {
+      this.answeringApprovals.delete(slot);
+      const now = (this.folders.peek()[host] ?? []).find((p) => folderKey(p.folder.folder) === folderKey(folder));
+      if (sent === null && !held.gone && now && !(now.approvals ?? []).some((a) => approvalID(a) === id)) {
+        this.placeFolder({ ...now, approvals: [...(now.approvals ?? []), approval] }, host);
+      }
+    }
+    return sent;
+  }
+
+  /** A summary into its place in the host's list, as it is: no approval hidden or shown again. */
+  private placeFolder(summary: FolderSummary, host: string): void {
+    const list = this.folders.peek()[host] ?? [];
+    this.folders.value = { ...this.folders.value,
+      [host]: list.map((p) => (folderKey(p.folder.folder) === folderKey(summary.folder.folder) ? summary : p)) };
   }
 
   /**
@@ -905,6 +994,70 @@ export class Work {
     const kept = [...held.values()].filter((a) => !incoming.has(a.id));
     this.setAgents(host, newestFirst([...kept, ...listed.map((a) => keepingLists(a, held.get(a.id)))]),
       listed.map(agentFolderPath));
+  }
+
+  /**
+   * What changed on a host since the point held (#4794), in place of its whole list: each changed
+   * record laid on, each removed one let go, and the new point kept. An archived one not held stays
+   * out, as `agent/changed` of one does. What this device's copy drew is the host's now.
+   */
+  takeChanges(changed: Agent[], changes: AgentChanges, host: string): void {
+    const held = new Map((this.agents.value[host] ?? []).map((a) => [a.id, a]));
+    const gone = new Set(changes.removed);
+    const touched: string[] = [];
+    for (const agent of changed) {
+      const was = held.get(agent.id);
+      if (!was && agent.state === "archived") continue;
+      if (was) touched.push(agentFolderPath(was));
+      touched.push(agentFolderPath(agent));
+      held.set(agent.id, keepingLists(agent, was));
+    }
+    for (const id of gone) {
+      const was = held.get(id);
+      if (!was) continue;
+      touched.push(agentFolderPath(was));
+      held.delete(id);
+    }
+    batch(() => {
+      this.setAgents(host, newestFirst([...held.values()]), touched);
+      this.listPoints.set(host, { epoch: changes.epoch, revision: changes.revision });
+      this.answered(host);
+    });
+  }
+
+  /** A host's catch-up said where its list is (#4794); none, from a host before it, asks for all next time. */
+  notePoint(changes: AgentChanges | undefined, host: string): void {
+    if (changes) this.listPoints.set(host, { epoch: changes.epoch, revision: changes.revision });
+    else this.listPoints.delete(host);
+  }
+
+  /** The open chat's host's count of entries at its last page (#4794): what the copy keeps as its end. */
+  chatEnd(): number | null {
+    return this.transcriptEnd;
+  }
+
+  /** Where a host's sessions held here are in its order of changes (#4794). */
+  listPoint(host: string): ListRevision | undefined {
+    return this.listPoints.get(host);
+  }
+
+  /**
+   * The entries written since the open chat's last page (#4794), asked `from` its end, laid after
+   * what is held with what was heard meanwhile. False, and nothing changed, when the page does not
+   * start where the held one ended: the chat then opens whole.
+   */
+  takeResumed(page: TranscriptPage): boolean {
+    const end = this.transcriptEnd;
+    if (end === null || page.firstIndex !== end || page.total < end) return false;
+    const entries = keepingLatestByID([...this.entries.value, ...page.entries, ...(this.heardSincePage ?? [])]);
+    this.heardSincePage = null;
+    this.transcriptEnd = page.total;
+    batch(() => {
+      this.transcriptLoadFailure.value = null;
+      this.transcriptSource.value = "host";
+      this.refold(entries);
+    });
+    return true;
   }
 
   /**
@@ -993,6 +1146,7 @@ export class Work {
     batch(() => {
       this.watching.value = { host, session };
       this.clearTranscript();
+      this.dropAnsweredSends();
     });
   }
 
@@ -1000,8 +1154,30 @@ export class Work {
     batch(() => {
       this.watching.value = null;
       this.clearTranscript();
+      this.dropAnsweredSends();
     });
   }
+
+  /** The prompts on their way to an agent, as its chat draws them (#4814). */
+  sendingTo(host: string, agentID: string): Sending[] {
+    return this.sending.value[`${host}|${agentID}`] ?? [];
+  }
+
+  protected setSending(host: string, agentID: string, going: Sending[]): void {
+    const { [`${host}|${agentID}`]: _was, ...rest } = this.sending.peek();
+    this.sending.value = going.length > 0 ? { ...rest, [`${host}|${agentID}`]: going } : rest;
+  }
+
+  /** Answered ones wait for their chat's next entry: a chat left will not hear it. */
+  private dropAnsweredSends(): void {
+    const held = this.sending.peek();
+    if (!Object.values(held).some((going) => going.some((s) => s.answered))) return;
+    this.sending.value = Object.fromEntries(Object.entries(held)
+      .map(([key, going]) => [key, going.filter((s) => !s.answered)] as const)
+      .filter(([, going]) => going.length > 0));
+  }
+
+  protected nextSend = 0;
 
   /**
    * Told of an entry too big for its host to send (#203): its stub holds its place, drawing
@@ -1025,7 +1201,14 @@ export class Work {
   private takeEntry(note: EntryNotification, host: string): void {
     const watching = this.watching.value;
     if (!watching || watching.host !== host || watching.session !== note.agentID) return;
+    const going = this.sending.peek()[`${host}|${note.agentID}`];
+    if (going?.length) this.setSending(host, note.agentID, landed(going, note.entry));
     if (note.oversized !== undefined) this.oversized(host, note.agentID, note.entry.id, note.index);
+    // The first entry after a send is its echo: the night's walk times send to echo (#4784).
+    if (this.echoAwaited) {
+      this.echoAwaited = false;
+      mark("echo", "send");
+    }
     const heard = this.heardSincePage;
     if (heard) {
       const prior = heard.findIndex((entry) => entry.id === note.entry.id);
@@ -1147,6 +1330,7 @@ export class Work {
   replaceTranscript(page: TranscriptPage, ask?: TranscriptEntry): void {
     const entries = keepingLatestByID([...page.entries, ...(this.heardSincePage ?? [])]);
     this.heardSincePage = null;
+    this.transcriptEnd = page.total;
     this.leadAsk = page.firstIndex > this.openTurnStart.value && ask && isAskEntry(ask) ? ask : null;
     batch(() => {
       this.firstEntryIndex.value = page.firstIndex;
@@ -1170,6 +1354,7 @@ export class Work {
       // Earlier pages wait for the host's answer.
       this.hasMoreBefore.value = false;
       this.transcriptSource.value = "device";
+      this.transcriptEnd = copy.page.total;
       // A load that failed before the copy was read said nothing was on show; now something is.
       if (this.transcriptLoadFailure.value?.nothingLoaded) this.transcriptLoadFailure.value = null;
       this.refold(keepingLatestByID([...copy.page.entries, ...this.entries.value]));
@@ -1185,7 +1370,11 @@ export class Work {
     batch(() => {
       this.takeHosts(machines.map((m) => m.host));
       this.folders.value = { ...this.folders.value, ...Object.fromEntries(machines.filter((m) => m.folders).map((m) => [m.host.id, m.folders!])) };
-      for (const m of machines) this.replaceAgents(m.agents, m.host.id);
+      for (const m of machines) {
+        this.replaceAgents(m.agents, m.host.id);
+        // The host's first catch-up asks only for what changed since the copy (#4794).
+        if (m.point) this.listPoints.set(m.host.id, m.point);
+      }
       this.fromDevice.value = new Set(machines.map((m) => m.host.id));
     });
   }
@@ -1212,6 +1401,7 @@ export class Work {
   private clearTranscript(): void {
     // A chat chosen is a page on its way.
     this.heardSincePage = [];
+    this.transcriptEnd = null;
     this.transcriptLoadFailure.value = null;
     this.transcriptSource.value = "none";
     this.firstEntryIndex.value = 0;
@@ -1479,10 +1669,10 @@ export class Store extends Work {
   constructor(readonly link: Link) {
     super();
     // The person's display choices are kept on their Mac (#1033).
-    sendPreferencesWith((changes) => {
-      void this.link.call("preferences/set", changes as Record<string, JSONValue>, this.macHostID.peek())
-        .then((said) => preferencesSaid(said)).catch(() => undefined);
-    });
+    // A change that did not go is put back and said (#4814), never swallowed.
+    sendPreferencesWith(
+      (changes) => this.link.call("preferences/set", changes as Record<string, JSONValue>, this.macHostID.peek()),
+      (error) => this.say(failureLine("save the setting", describe(error))));
     this.providers = new Providers(link);
     this.machineLock = new MachineLock({
       call: (method, params) => link.call(method as never, params as never),
@@ -1660,7 +1850,10 @@ export class Store extends Work {
       }
     });
     link.onState((state) => {
-      if (state.kind === "open") void this.load().then(() => this.sealWaiting());
+      if (state.kind === "open") {
+        markOnce("connected");
+        void this.load().then(() => this.sealWaiting());
+      }
     });
   }
 
@@ -1956,6 +2149,7 @@ export class Store extends Work {
   /** A host removed: what was held of it goes with it, the runtimes included (#291). */
   private forgetHost(host: string): void {
     const prefix = `${host}|`;
+    this.listPoints.delete(host);
     pruneFolderKeys(host, []);
     const without = <T,>(held: Record<string, T>) => Object.fromEntries(Object.entries(held).filter(([key]) => key !== host));
     const notOf = <T,>(held: Record<string, T>) => Object.fromEntries(Object.entries(held).filter(([key]) => !key.startsWith(prefix)));
@@ -2010,7 +2204,7 @@ export class Store extends Work {
     batch(() => {
       this.answered(host);
       if (heard.agents) this.replaceAgents(heard.agents, host);
-      if (heard.folders) this.folders.value = { ...this.folders.value, [host]: heard.folders };
+      if (heard.folders) this.folders.value = { ...this.folders.value, [host]: this.hidingAnsweredIn(heard.folders, host) };
     });
   }
 
@@ -2022,11 +2216,7 @@ export class Store extends Work {
     };
     // Lean: the columns read none of the option and command lists, 4 MB of 200 agents (#107).
     // The open session's come with loadWhole.
-    const agents = await this.listLive(host).catch(failed("agents/list"));
-    if (agents) batch(() => {
-      this.replaceAgents(agents, host);
-      this.answered(host);
-    });
+    if (await this.listSessions(host).then(() => true, failed("client/catchUp"))) markOnce("first-list", "connected");
     // The Archived folds that were open are listed again rather than left empty by the live list,
     // and the workflows on screen asked again: they may have changed meanwhile.
     const prefix = `${host}|`;
@@ -2049,7 +2239,7 @@ export class Store extends Work {
     // (#343), and Spending still counts what they cost.
     const folders = await this.link.call("folders/list", { includeArchived: true }, host).catch(failed("folders/list"));
     if (folders) {
-      this.folders.value = { ...this.folders.value, [host]: folders };
+      this.folders.value = { ...this.folders.value, [host]: this.hidingAnsweredIn(folders, host) };
       pruneFolderKeys(host, folders.map((p) => p.folder.folder));
     }
     const clones = await this.link.call("folders/clones", {}, host).catch(failed("folders/clones"));
@@ -2140,6 +2330,36 @@ export class Store extends Work {
       if (permissions) this.permissions.value = { ...this.permissions.value,
         [host]: [...permissions].sort((a, b) => a.askedAt - b.askedAt) };
       if (elicitations) this.elicitations.value = { ...this.elicitations.value, [host]: elicitations };
+    });
+  }
+
+  /**
+   * A host's sessions (#4794): only what changed since the point held (the last catch-up's, or this
+   * device's copy's), by `client/catchUp`; all of them when the host cannot say what changed since
+   * then, and a page at a time from a host before `client/catchUp`.
+   */
+  private async listSessions(host: string): Promise<void> {
+    const point = this.listPoint(host);
+    const snapshot = !this.has(host, Capability.client1) ? null : await this.link.call("client/catchUp", {
+      agents: { includeArchived: false, archivedCommands: false, archivedOnly: false, lean: true, ...(point ? { changedSince: point } : {}) },
+      parts: [],
+    }, host).catch(() => null);
+    // A host before it, or one that does not answer it, lists as before, a page at a time.
+    if (!snapshot) {
+      const agents = await this.listLive(host);
+      batch(() => {
+        this.replaceAgents(agents, host);
+        this.notePoint(undefined, host);
+        this.answered(host);
+      });
+      return;
+    }
+    const changes = snapshot.agentChanges;
+    if (point && changes && !changes.all) return this.takeChanges(snapshot.agents, changes, host);
+    batch(() => {
+      this.replaceAgents(snapshot.agents, host);
+      this.notePoint(changes, host);
+      this.answered(host);
     });
   }
 
@@ -2403,6 +2623,9 @@ export class Store extends Work {
     if (now?.host === host && now.session === session) this.prefetchNeighbours(host, session);
   }
 
+  /** This device's copy of a chat (#4790), set by `startLocalCopy`: read before a chat with nothing held is asked for. */
+  readCopy: ((session: string) => Promise<TranscriptCopy | null | undefined>) | undefined;
+
   /** Chats fetched before they are opened (#4795): in memory only, the newest few, for a minute. */
   private prefetched = new Map<string, TranscriptCopy>();
   private prefetching = new Set<string>();
@@ -2470,7 +2693,11 @@ export class Store extends Work {
    * with Try Again instead of calling the session deleted (#2743). Only the history is waited for.
    */
   private async loadTranscript(host: string, session: string): Promise<void> {
-    const page = this.loadPage(host, session);
+    mark("open-session");
+    const page = this.loadPage(host, session).then((shown) => {
+      if (shown) mark("session-open", "open-session");
+      return shown;
+    });
     void Promise.all([this.loadWhole(host, session), page]).then(([listed, paged]) => {
       const now = this.watching.value;
       if (listed && paged && now?.host === host && now.session === session) this.lookedFor.value = { host, session };
@@ -2488,6 +2715,23 @@ export class Store extends Work {
     this.heardSincePage = [];
     const load = ++this.transcriptLoads;
     const agentID = session as never;
+    const current = () => {
+      const now = this.watching.value;
+      return now?.host === host && now.session === session && load === this.transcriptLoads;
+    };
+    // Nothing held: this device's copy first, read from IndexedDB, so the chat can resume from it (#4794).
+    if (this.chatEnd() === null && this.readCopy) {
+      const copy = await this.readCopy(session).catch(() => undefined);
+      if (copy && current()) this.drawTranscriptCopy(copy);
+    }
+    // What was written since the end held (#4794), one page from it, in place of the whole opening;
+    // a page that leaves a gap, or no answer, opens it whole.
+    const end = this.chatEnd();
+    if (end !== null) {
+      const resumed = await this.link.call("agents/transcript", { agentID, limit: turnPage, from: end }, host).catch(() => null);
+      if (!current()) return false;
+      if (resumed && this.takeResumed(resumed)) return true;
+    }
     // The last 12, as the window opens a chat (#90); the rest come as the top is reached. A host
     // too old to keep turns gives the lot; any other failure is said, and the chat still opens (#400).
     const failed: { turns?: string; page?: string } = {};
@@ -2924,16 +3168,17 @@ export class Store extends Work {
   }
 
   /**
-   * Calls `method`, and on failure says why in `problem` and answers null. With `write`, the line
-   * says what failed first: "Could not archive — …" (#4786).
+   * Calls `method`, and on failure says why in `problem` and answers null. With `write` (a change,
+   * or the verb of one), the line says what failed first: "Could not archive — …" (#4786, #4814).
    */
   async act<M extends keyof Methods>(method: M, params: Methods[M]["params"], host: string,
-                                     write?: AgentWrite): Promise<Methods[M]["result"] | null> {
+                                     write?: AgentWrite | string): Promise<Methods[M]["result"] | null> {
     try {
       return await this.link.call(method, params, host);
     } catch (error) {
       log("call.failed", error instanceof CallFailed ? error.code : undefined);
-      this.say(write ? writeFailure(write, describe(error)) : describe(error));
+      const why = describe(error);
+      this.say(write === undefined ? why : typeof write === "string" ? failureLine(write, why) : writeFailure(write, why));
       return null;
     }
   }
@@ -3081,12 +3326,31 @@ export class Store extends Work {
    */
   async answerApproval(host: string, folder: string, approval: Approval, action: ApprovalAction,
     digest: string | undefined, note?: string): Promise<FolderSummary> {
-    const summary = await this.link.call("approvals/answer", {
-      folder: folder as never, kind: approval.kind, key: approval.key, action,
-      ...(digest !== undefined ? { digest } : {}), ...(note !== undefined ? { note } : {}),
-    }, host);
+    let failure: unknown;
+    // Out of the list at once, and back if the answer did not go (#4814).
+    const summary = await this.answeringApproval(host, folder, approvalID(approval), async () => {
+      try {
+        return await this.link.call("approvals/answer", {
+          folder: folder as never, kind: approval.kind, key: approval.key, action,
+          ...(digest !== undefined ? { digest } : {}), ...(note !== undefined ? { note } : {}),
+        }, host);
+      } catch (error) {
+        failure = error;
+        return null;
+      }
+    });
+    if (!summary) throw failure;
     this.upsertFolder(summary, host);
     return summary;
+  }
+
+  /**
+   * Approve or Deny from a row's menu, of the version the row shows (#4814): the row goes at once,
+   * and a refusal comes back as "Could not approve — <why>", with the row.
+   */
+  async settleApproval(host: string, folder: string, approval: Approval, action: ApprovalAction): Promise<void> {
+    await this.answerApproval(host, folder, approval, action, approval.digest)
+      .catch((error: unknown) => this.say(approvalFailure(action, describe(error))));
   }
 
   /**
@@ -3115,8 +3379,9 @@ export class Store extends Work {
   async keepSession(host: string, agent: Agent): Promise<void> {
     const folder = agentFolderPath(agent);
     const listed = (this.folders.value[host] ?? []).find((p) => folderKey(p.folder.folder) === folder)?.folder.folder;
-    const summary = await this.act("approvals/answer",
-      { folder: (listed ?? folder) as never, kind: "archive", key: agent.id, action: "deny" }, host);
+    const summary = await this.answeringApproval(host, listed ?? folder, `archive:${agent.id}`, () =>
+      this.act("approvals/answer",
+        { folder: (listed ?? folder) as never, kind: "archive", key: agent.id, action: "deny" }, host, "keep the session"));
     if (summary) this.upsertFolder(summary, host);
   }
 
@@ -3125,10 +3390,11 @@ export class Store extends Work {
    * record on its host. From the row's menu, so a refusal is said in `problem`.
    */
   async dismissWorkflowFailure(host: string, folder: string, approval: Approval): Promise<void> {
-    const summary = await this.act("approvals/answer", {
-      folder: folder as never, kind: approval.kind, key: approval.key, action: "dismiss",
-      ...(approval.digest !== undefined ? { digest: approval.digest } : {}),
-    }, host);
+    const summary = await this.answeringApproval(host, folder, approvalID(approval), () =>
+      this.act("approvals/answer", {
+        folder: folder as never, kind: approval.kind, key: approval.key, action: "dismiss",
+        ...(approval.digest !== undefined ? { digest: approval.digest } : {}),
+      }, host, "dismiss"));
     if (summary) this.upsertFolder(summary, host);
   }
 
@@ -3472,10 +3738,28 @@ export class Store extends Work {
   }
 
   async prompt(host: string, agentID: string, text: string, attachments: Attachment[]): Promise<boolean> {
+    // The person's bubble at once (#4814), unless it will wait in the queue, which draws its own.
+    const shown = this.agent(host, agentID);
+    const bubble: Sending | null = shown && !willQueue(shown) ? { id: `send-${++this.nextSend}`, text, answered: false } : null;
+    if (bubble) this.setSending(host, agentID, [...this.sending.peek()[`${host}|${agentID}`] ?? [], bubble]);
+    const settle = (went: boolean) => {
+      if (!bubble) return;
+      const going = this.sending.peek()[`${host}|${agentID}`] ?? [];
+      const watched = this.watching.peek();
+      // Went: kept until the host's entry for it, in the chat that will hear it.
+      const keep = went && watched?.host === host && watched.session === agentID;
+      this.setSending(host, agentID, keep
+        ? going.map((s) => (s.id === bubble.id ? { ...s, answered: true } : s))
+        : going.filter((s) => s.id !== bubble.id));
+    };
     try {
+      mark("send");
+      this.echoAwaited = true;
       await this.link.call("agents/prompt", { agentID: agentID as UUID, text, attachments, from: "person" }, host);
+      settle(true);
       return true;
     } catch (error) {
+      settle(false);
       // Kept for a stopped workspace (#691 US3): its bubble says so, and it goes when the host is up.
       if (error instanceof CallFailed && error.code === Failure.kept && this.noteKept(error)) return true;
       // Its folder has gone (#119): said with the ways on, carrying what was typed.
@@ -4325,6 +4609,26 @@ export class Store extends Work {
       const hasMore = page.hasMore || merged.length > eventsKept;
       this.events.value = { ...this.events.value, [host]: { ...page, events: merged.slice(0, eventsKept), hasMore } };
     }
+  }
+
+  /**
+   * The person's bus log (#4732): every machine's events, newest first, for the rows no host here
+   * has. Null until read, and on a control plane too old for it. `filter` is what it was read for.
+   */
+  readonly busLog = signal<{ events: BusEvent[]; next?: string; filter: EnvelopeFilter } | null>(null);
+
+  /** The newest page of the bus log, narrowed by the envelope's fields; an older page with `older`. */
+  async loadBusLog(filter: EnvelopeFilter, older = false): Promise<void> {
+    const held = this.busLog.value;
+    if (older && !held?.next) return;
+    const page = await this.link.call("bus/log", busLogQuery(filter, older ? held?.next : undefined)).catch(() => null);
+    if (!page) return;
+    const now = this.busLog.value;
+    // A page for a filter since left is too late.
+    if (older && (!now || JSON.stringify(now.filter) !== JSON.stringify(filter))) return;
+    const events = older && now ? [...now.events, ...page.events.filter((e: BusEvent) => !now.events.some((n) => n.id === e.id))] : page.events;
+    const kept = events.slice(0, eventsPagedMost);
+    this.busLog.value = { events: kept, filter, ...(page.hasMore && page.next !== undefined && kept.length < eventsPagedMost && { next: page.next }) };
   }
 
   /** Events ▸ Waiting now's ✕ (#541): the wait ends and nothing starts the agent again for it. */

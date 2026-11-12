@@ -10,6 +10,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // CIWatcherTests.swift's event cases, over a fake GitHub held in memory.
@@ -147,7 +149,7 @@ func (f *fakeGitHub) runsWith(branch, since, conclusion string) ([]RunRef, bool,
 	f.listed = branch
 	var out []RunRef
 	for _, r := range f.runs {
-		if r.conclusion == conclusion && (branch == "" || r.ref.Branch == branch) && !before(r.ref.UpdatedAt, since) {
+		if r.conclusion == conclusion && (branch == "" || r.ref.Branch == branch) && !mcpevents.Before(r.ref.UpdatedAt, since) {
 			out = append(out, r.ref)
 		}
 	}
@@ -163,7 +165,7 @@ func (f *fakeGitHub) CompletedRuns(_ context.Context, _, workflow, branch string
 	var out []CompletedRun
 	for _, r := range f.completed {
 		if (workflow == "" || r.Workflow == workflow) && (branch == "" || r.Run.Branch == branch) &&
-			(run == 0 || r.Run.ID == run) && !before(r.Run.UpdatedAt, since) {
+			(run == 0 || r.Run.ID == run) && !mcpevents.Before(r.Run.UpdatedAt, since) {
 			out = append(out, r)
 		}
 	}
@@ -241,9 +243,9 @@ func (f *fakeGitHub) ClosedPRs(_ context.Context, _, since string) ([]MergedPR, 
 	var closed []ClosedPR
 	for _, p := range f.prs {
 		switch {
-		case p.state == "merged" && !before(p.mergedAt, since):
+		case p.state == "merged" && !mcpevents.Before(p.mergedAt, since):
 			merged = append(merged, MergedPR{PR: p.pr, MergedAt: p.mergedAt, MergeSHA: fmt.Sprintf("abc%d", p.pr.Number), Trusted: p.trusted})
-		case p.state == "closed" && !before(p.closedAt, since):
+		case p.state == "closed" && !mcpevents.Before(p.closedAt, since):
 			closed = append(closed, ClosedPR{PR: p.pr, ClosedAt: p.closedAt, Trusted: p.trusted})
 		}
 	}
@@ -282,7 +284,7 @@ func (f *fakeGitHub) IssueActivity(_ context.Context, _ string, kind IssueKind, 
 	}
 	var out []IssueActivity
 	for _, a := range f.activity {
-		if a.Kind == kind && !before(a.At, since) {
+		if a.Kind == kind && !mcpevents.Before(a.At, since) {
 			out = append(out, a)
 		}
 	}
@@ -297,7 +299,7 @@ func (f *fakeGitHub) PRLabelActivity(_ context.Context, _ string, kind PRLabelKi
 	}
 	var out []PRLabelActivity
 	for _, a := range f.prLabels {
-		if a.Kind == kind && !before(a.At, since) {
+		if a.Kind == kind && !mcpevents.Before(a.At, since) {
 			out = append(out, a)
 		}
 	}
@@ -312,7 +314,7 @@ func (f *fakeGitHub) PRComments(_ context.Context, _, since string, pr int) ([]P
 	}
 	var out []PRComment
 	for _, c := range f.prComments {
-		if before(c.At, since) {
+		if mcpevents.Before(c.At, since) {
 			continue
 		}
 		if strings.HasPrefix(c.Body, agentCommentPrefix) || pr != 0 && c.PR.Number != pr {
@@ -331,7 +333,7 @@ func (f *fakeGitHub) PRReviews(_ context.Context, _, since string, pr int) ([]PR
 	}
 	var out []PRReview
 	for _, r := range f.prReviews {
-		if !before(r.At, since) && (pr == 0 || r.PR.Number == pr) {
+		if !mcpevents.Before(r.At, since) && (pr == 0 || r.PR.Number == pr) {
 			out = append(out, r)
 		}
 	}
@@ -360,7 +362,9 @@ func newHarness(t *testing.T) *harness {
 }
 
 // at is a time n seconds after the harness's start.
-func (h *harness) at(n int) string { return timeString(h.clock.Add(time.Duration(n) * time.Second)) }
+func (h *harness) at(n int) string {
+	return mcpevents.TimeString(h.clock.Add(time.Duration(n) * time.Second))
+}
 
 func (h *harness) rpc(params map[string]any) (map[string]any, *rpcError) {
 	raw, _ := json.Marshal(params)
@@ -849,7 +853,7 @@ func TestTiesAtOneTimeArentLost(t *testing.T) {
 
 func TestACursorOlderThan90DaysIsTruncated(t *testing.T) {
 	h := newHarness(t)
-	old := cursor{Since: timeString(time.Now().Add(-91 * 24 * time.Hour))}.encoded()
+	old := cursor{Since: mcpevents.TimeString(time.Now().Add(-91 * 24 * time.Hour))}.encoded()
 	equal(t, h.poll("pr.merged", map[string]any{"repo": repo}, old)["truncated"], true, "truncated")
 }
 
@@ -932,7 +936,7 @@ func TestPROpenedRaisesAReadyPROnceAndADraftWhenMarkedReady(t *testing.T) {
 
 func TestNotSignedInAndARateLimit(t *testing.T) {
 	h := newHarness(t)
-	c := cursor{Since: timeString(time.Now())}.encoded()
+	c := cursor{Since: mcpevents.TimeString(time.Now())}.encoded()
 	h.fake.err = &GitHubError{Kind: NotSignedIn, Message: NotConnected}
 	_, err := h.rpc(map[string]any{"name": "checks.failed", "arguments": map[string]any{"repo": repo}, "cursor": c})
 	if err == nil || err.Code != -32012 || err.Data["reason"] != "not connected" {

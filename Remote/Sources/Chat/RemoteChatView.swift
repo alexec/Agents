@@ -457,7 +457,7 @@ struct RemoteChatView: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }
         // The scene's toast floats above it (#4737).
         .liftsRemoteToasts()
-        .animation(.snappy(duration: 0.2), value: isQuestionUp)
+        .animation(ResponseMotion.snappy, value: isQuestionUp)
     }
 
     private var isQuestionUp: Bool {
@@ -545,6 +545,7 @@ struct RemoteChatView: View {
             kept: { [model] agentID in model.kept(for: agentID) },
             dropKept: { [model] in await model.dropKept($0) },
             retryKept: { [model] in await model.retryKept($0) },
+            sending: { [model] agentID in model.work.sending(to: agentID) },
             hostName: { [model] in model.hostName($0) },
             // A card in the chat opens its file in Files, as the agent's call did (#836).
             showFile: { [model] file in model.openShownFile(file) },

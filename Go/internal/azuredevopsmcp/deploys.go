@@ -10,6 +10,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // Deploys on Azure Pipelines (#3820), in the github server's shapes (#3584, #3587):
@@ -208,12 +210,14 @@ func (f *RealAzureDevOps) WaitingDeploys(ctx context.Context, repo, pipeline, br
 			return nil, err
 		}
 		approvals := byBuild[id]
-		sort.SliceStable(approvals, func(i, j int) bool { return normalized(approvals[i].CreatedOn) < normalized(approvals[j].CreatedOn) })
+		sort.SliceStable(approvals, func(i, j int) bool {
+			return mcpevents.Normalized(approvals[i].CreatedOn) < mcpevents.Normalized(approvals[j].CreatedOn)
+		})
 		w := WaitingDeploy{Build: completed(b), CanApprove: true}
 		for _, a := range approvals {
 			w.Environments = append(w.Environments, Environment{ID: a.ID, Name: stageOf(records, a.ID), URL: b.Links.Web.Href})
 			w.CanApprove = w.CanApprove && a.canUpdate()
-			if at := normalized(a.CreatedOn); at > w.Since {
+			if at := mcpevents.Normalized(a.CreatedOn); at > w.Since {
 				w.Since = at
 			}
 			for _, s := range a.Steps {

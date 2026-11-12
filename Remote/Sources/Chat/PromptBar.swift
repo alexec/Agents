@@ -106,15 +106,16 @@ struct PromptBar: View {
         .task(id: sending > 0) {
             sendingIsSlow = false
             guard sending > 0 else { return }
-            try? await Task.sleep(for: .milliseconds(400))
+            // Only a wait for the network, and only after 300 ms (specs/4777-fast).
+            try? await Task.sleep(for: .milliseconds(300))
             if !Task.isCancelled { sendingIsSlow = true }
         }
         // The same column the transcript draws in, so the bar's edges track its edges
         // at every width, as on the Mac (FR-020, FR-021).
         .chatColumn()
         .padding(.vertical, 12)
-        .animation(.easeOut(duration: 0.15), value: isCompleting)
-        .animation(.easeOut(duration: 0.15), value: isMentioning)
+        .animation(ResponseMotion.response, value: isCompleting)
+        .animation(ResponseMotion.response, value: isMentioning)
         .onAppear { restoreDraft() }
         .onChange(of: agent.id) { restoreDraft() }
         // Voice mode listens with its own dictation: this bar's stops, so the same words do
@@ -315,21 +316,16 @@ struct PromptBar: View {
                     .accessibilityLabel("Stop")
                     .accessibilityValue(acting == .stop ? Telling.words(doing: "Stopping", host: model.answerRecipient(agent.id)) : "")
                 } else {
+                    // No spinner: the prompt is in the chat at once, as the person's bubble (#4814).
                     Button(action: send) {
-                        Group {
-                            if sending > 0 {
-                                ProgressView()
-                            } else {
-                                Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
-                                    .appText(.reading).fontWeight(.semibold)
-                            }
-                        }
-                        .frame(width: 22, height: 22)
+                        Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
+                            .appText(.reading).fontWeight(.semibold)
+                            .frame(width: 22, height: 22)
                     }
                     .buttonStyle(.paperProminent)
                     .buttonBorderShape(.circle)
-                    // Bright while its own spinner turns, as the answer that went stays bright
-                    // on the cards (#86); `send()` refuses the press meanwhile.
+                    // Bright while a send is on its way, as the answer that went stays bright
+                    // on the cards (#86); `send()` refuses an empty field.
                     .disabled(!canSend && sending == 0)
                     .accessibilityLabel(PromptWords.sendLabel(willQueue: willQueue))
                     .accessibilityHint(willQueue ? PromptWords.sendHelp(willQueue: true) : "")

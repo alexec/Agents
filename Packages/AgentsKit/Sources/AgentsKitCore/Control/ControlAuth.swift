@@ -194,7 +194,6 @@ public enum ControlAuth {
     // MARK: Keys
 
     public static let clientSalt = "agents-control-client-v1"
-    public static let hostSalt = "agents-control-host-v1"
 
     /// What a client and the control plane share: the same derivation `ControlKeys`
     /// makes with CryptoKit, so a key paired under the first build still proves itself.
