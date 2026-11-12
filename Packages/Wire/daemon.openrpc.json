@@ -7569,8 +7569,8 @@
     },
     {
       "name": "providers/ssh",
-      "x-capability": "providers.carry/1",
-      "description": "Asked by the control plane on channel 0 (#3398): start a codespace's agentsd over ssh, or read its host key, with the token of the codespaces provider carried here.",
+      "x-capability": "providers.carry/2",
+      "description": "Asked by the control plane on channel 0 (#3398): start a codespace's agentsd over ssh, read its host key, install Agents in it, or keep it awake while its machine works (keepAwake and letSleep, #4637: providers.carry/2), with the token of the codespaces provider carried here.",
       "paramStructure": "by-name",
       "params": [
         {

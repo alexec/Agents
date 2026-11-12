@@ -115,7 +115,7 @@ func (d *Daemon) addAccounts(agent wire.UUID, have wire.OutsideAccounts, plan ac
 	}
 	listed := have
 	if len(send) > 0 {
-		ops := plan.ops(replace)
+		ops := byAgent(agent, plan.ops(replace))
 		var err error
 		if listed, err = d.askAccounts(wire.MachineAccountsCall{Add: send, Ops: ops}); err != nil {
 			return "", err
@@ -221,6 +221,14 @@ func (p accountsPlan) ops(replaced bool) []wire.AccountOperation {
 	return ops
 }
 
+// byAgent is ops, each with the session that did it, so the person's clients can name it.
+func byAgent(agent wire.UUID, ops []wire.AccountOperation) []wire.AccountOperation {
+	for i := range ops {
+		ops[i].Agent = agentRef(agent)
+	}
+	return ops
+}
+
 func readOps(accounts []wire.OutsideAccount) []wire.AccountOperation {
 	var ops []wire.AccountOperation
 	for _, a := range accounts {
@@ -235,6 +243,7 @@ func (d *Daemon) accountsDone(agent wire.UUID, ops []wire.AccountOperation) {
 	if len(ops) == 0 {
 		return
 	}
+	ops = byAgent(agent, ops)
 	d.noteAccountOps(agent, ops)
 	if _, err := d.askAccounts(wire.MachineAccountsCall{Ops: ops}); err != nil {
 		log.Printf("manage_accounts: the control plane was not told of %d reads: %v", len(ops), err)

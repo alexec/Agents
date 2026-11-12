@@ -294,3 +294,30 @@ func TestLogTail(t *testing.T) {
 type iotest struct{}
 
 func (iotest) Read([]byte) (int, error) { return 0, errors.New("reset") }
+
+// An event says its subject and key (#4728); a state with no key of its own takes the
+// poll's time; a bad ref says none.
+func TestAPolledEventSaysItsEnvelope(t *testing.T) {
+	pr := Ref("github", "pr", "Alexec/Agents", "4702")
+	got := Enveloped(map[string]any{"eventId": "x"}, pr, "2457")
+	if got["subject"] != "github:pr:alexec/agents#4702" || got["key"] != "2457" {
+		t.Fatalf("%v", got)
+	}
+	if got := Enveloped(map[string]any{}, pr, ""); got["key"] != nil || got["subject"] == nil {
+		t.Fatalf("%v", got)
+	}
+	if got := Enveloped(map[string]any{}, Ref("github", "pr", "a:b", "1"), "k"); len(got) != 0 {
+		t.Fatalf("a bad ref: %v", got)
+	}
+	var pl Poller
+	on := true
+	first, _ := pl.Diff("pr.conflicted", "conflictedAt", Params{}, func() string { return "t1" },
+		func() ([]State, error) { return nil, nil })
+	raw, _ := json.Marshal(first["cursor"])
+	answer, bad := pl.Diff("pr.conflicted", "conflictedAt", Params{Cursor: raw}, func() string { return "t2" },
+		func() ([]State, error) { return []State{{ID: "p1", Number: 1, On: &on, Subject: pr}}, nil })
+	events, _ := answer["events"].([]any)
+	if bad != nil || len(events) != 1 || events[0].(map[string]any)["key"] != "t2" {
+		t.Fatalf("%v %v", answer, bad)
+	}
+}

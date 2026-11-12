@@ -331,8 +331,8 @@ const gigabyte = 1_000_000_000
 // fits a 256 GB laptop and a 4 TB server alike.
 type diskThresholds struct{ lowPercent, criticalPercent float64 }
 
-// defaultDiskThresholds is DiskThresholds' defaults: low below 20%, critical below 1%.
-var defaultDiskThresholds = diskThresholds{20, 1}
+// defaultDiskThresholds is DiskThresholds' defaults: low below 10%, critical below 1% (#4699).
+var defaultDiskThresholds = diskThresholds{10, 1}
 
 func (t diskThresholds) lowLine(total int64) int64 { return int64(float64(total) / 100 * t.lowPercent) }
 func (t diskThresholds) criticalLine(total int64) int64 {

@@ -39,6 +39,10 @@ final class WindowRequests {
     /// Open File… is up over the window (#415), searching the open session's folders.
     var showsFileSearch = false
 
+    /// The ⌘K command menu is up over the window (#4787), with the actions the menu bar
+    /// offered when it was asked for; nil while it is shut.
+    var commandMenu: [CommandMenuAction]?
+
     /// Help ▸ Report a Problem… is up over the window (#3718).
     var showsReportProblem = false
 
@@ -117,16 +121,16 @@ struct AgentsCommands: Commands {
 
         CommandGroup(replacing: .newItem) {
             Button("New Session") { newSession() }
-                .keyboardShortcut("n")
+                .keyboardShortcut(MenuKeys.newSession)
                 .disabled(keyFolder == nil)
             Button("New Session in a Worktree") { newSession(inWorktree: true) }
-                .keyboardShortcut("n", modifiers: [.command, .option])
+                .keyboardShortcut(MenuKeys.newWorktreeSession)
                 .disabled(keyFolder == nil || !model.draftWorktrees.canMakeNew)
             Divider()
             Button("Add Folder…") { requests.folderSheet = .chooseFolder() }
-                .keyboardShortcut("o")
+                .keyboardShortcut(MenuKeys.addFolder)
             Button("Clone Folder from Git URL…") { requests.folderSheet = .clone() }
-                .keyboardShortcut("o", modifiers: [.command, .shift])
+                .keyboardShortcut(MenuKeys.cloneFolder)
             // On a server (037).
             if !model.hosts.servers.isEmpty {
                 Menu("Add Folder On") {
@@ -177,7 +181,7 @@ struct AgentsCommands: Commands {
 
         CommandGroup(after: .sidebar) {
             Button(keyFrame.isOpen ? "Hide Inspector" : "Show Inspector") { toggleInspector() }
-                .keyboardShortcut("i", modifiers: [.command, .option])
+                .keyboardShortcut(MenuKeys.inspector)
                 .disabled(sessionAgent == nil || popped != nil || (!keyFrame.isOpen && !inspectorFits))
             Divider()
             ForEach(Array(SidebarPane.allCases.enumerated()), id: \.element) { index, pane in
@@ -190,16 +194,16 @@ struct AgentsCommands: Commands {
             // The folder's own shell (#418), the editor's key for a terminal. ⌘J,
             // the usual panel key, is Next Needing Attention.
             Button(keyTerminal.isOpen ? "Hide Folder Terminal" : "Folder Terminal") { keyTerminal.toggle() }
-                .keyboardShortcut("`", modifiers: .control)
+                .keyboardShortcut(MenuKeys.terminal)
                 .disabled(!keyTerminal.isOpen && keyFolder?.exists != true)
             Divider()
             Button("Events") { model.showEvents() }
-                .keyboardShortcut("e", modifiers: [.command, .option])
+                .keyboardShortcut(MenuKeys.events)
             Button("Resources") { model.showResources() }
-                .keyboardShortcut("l", modifiers: [.command, .option])
+                .keyboardShortcut(MenuKeys.resources)
             // Status's page (#3998).
             Button("Runtimes") { model.showRuntimes() }
-                .keyboardShortcut("r", modifiers: [.command, .option])
+                .keyboardShortcut(MenuKeys.runtimes)
             // The person's own, in Settings ▸ You (#3998).
             Button("Connectors") { model.settingsPaneAsked = .connectors; openSettings() }
             Button("Secrets") { model.settingsPaneAsked = .secrets; openSettings() }
@@ -217,9 +221,10 @@ struct AgentsCommands: Commands {
             Button("Multiplier") { model.showMultiplier() }
                 .keyboardShortcut(pageZoom == nil ? KeyboardShortcut("0") : nil)
             Button("Cost") { model.showsSpending = true }
-                .keyboardShortcut("s", modifiers: [.command, .option])
+                .keyboardShortcut(MenuKeys.cost)
             Button("Tokens") { model.showsTokens = true }
             Button("Time") { model.showsTime = true }
+            Button("Velocity") { model.showsVelocity = true }
             // Agents as a web page on this Mac, found from here (#109).
             Button("Open in Browser") { openInBrowser() }
                 .disabled(model.controlPlaneHosts == nil)
@@ -234,19 +239,19 @@ struct AgentsCommands: Commands {
             Button(ChatThoughts.menuTitle(showsThoughts: showsThoughts)) { showsThoughts.toggle() }
                 .help(ChatThoughts.menuHelp)
             Divider()
-            // In the main window's open chat, ⌘F finds in it (#1532), and Find Session
-            // takes ⌥⌘F; with no chat open, ⌘F is Find Session as before.
-            // On a host too old to find (#1748) it is greyed and keeps ⌘F, so the key never
-            // moves the focus out of a chat to Find Session (#1867).
+            // ⌘F is always Find in Chat (#4787): greyed, and still ⌘F, with no chat open in the
+            // main window or on a host too old to find (#1748, #1867), so the key never moves
+            // the focus to Find Session. Find Session keeps ⌥⌘F for one release; ⌘K finds
+            // sessions now.
             let find = ChatFindItem.of(
                 chatOpen: popped == nil && folderWindow == nil && model.selectedAgent != nil,
                 hostFinds: model.agent(model.selectedAgent?.id, has: Capability.agentsFind1))
             Button("Find in Chat") { requests.wantsChatFind = true }
-                .keyboardShortcut(find.isShown ? KeyboardShortcut("f") : nil)
+                .keyboardShortcut(MenuKeys.findInChat)
                 .disabled(!find.isEnabled)
                 .help(find == .needsUpdate ? UpdateWords.hostNeedsUpdate : "Find words in this chat's prompts and replies")
             Button("Find Session") { requests.focusSessionSearch() }
-                .keyboardShortcut(find.isShown ? KeyboardShortcut("f", modifiers: [.command, .option]) : KeyboardShortcut("f"))
+                .keyboardShortcut(MenuKeys.findSession)
                 .disabled(model.selectedFolderSummary == nil)
         }
 
@@ -255,7 +260,7 @@ struct AgentsCommands: Commands {
             // Held while something is already on its way to it (#87).
             let acting = agent.flatMap { model.acting($0.id) } != nil
             Button("Stop") { act { await model.stop($0.id) } }
-                .keyboardShortcut(".")
+                .keyboardShortcut(MenuKeys.stop)
                 .disabled(agent.map { !model.canStop($0) } ?? true || acting)
             // Title case, as menu items are; the button says it in a sentence.
             Button("Carry On") { act { await model.carryOn($0.id) } }
@@ -272,7 +277,7 @@ struct AgentsCommands: Commands {
                     .keyboardShortcut(.delete, modifiers: [.command, .option])
             } else {
                 Button("Archive") { archive() }
-                    .keyboardShortcut(.delete, modifiers: [.command, .option])
+                    .keyboardShortcut(MenuKeys.archive)
                     .disabled(agent == nil || acting)
             }
             // At the top of its folder whatever its state (#180).
@@ -301,11 +306,11 @@ struct AgentsCommands: Commands {
             // The person's prompts in the main window's chat, to go to one or branch from it
             // (#1658). ⇧⌘P is free: Print is gone, and ⌘P is Open File….
             Button("Prompts") { requests.wantsPrompts = true }
-                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .keyboardShortcut(MenuKeys.prompts)
                 .disabled(popped != nil || folderWindow != nil || model.selectedAgent == nil)
             Divider()
             Button("Branch") { act { await model.fork($0.id) } }
-                .keyboardShortcut("b", modifiers: [.command, .option])
+                .keyboardShortcut(MenuKeys.branch)
                 .disabled(agent == nil || agent?.state == .archived)
             Divider()
             // Beside the main window or on another screen (#826). Its own window is
@@ -341,9 +346,13 @@ struct AgentsCommands: Commands {
         }
 
         CommandMenu("Go") {
+            // Every session, folder, issue, pull request and action, found by its words (#4787).
+            // A terminal with the keyboard takes ⌘K first, to clear (#401).
+            Button(CommandMenuWords.menuItem) { openCommandMenu() }
+                .keyboardShortcut(MenuKeys.commandMenu)
             // ⌘P, as in every editor: the session's files by name (#415).
             Button("Open File…") { requests.showsFileSearch = true }
-                .keyboardShortcut("p")
+                .keyboardShortcut(MenuKeys.openFile)
                 .disabled(model.selectedAgent == nil)
             Divider()
             // ⌥⌘↓ and ⌥⌘↑ go through the list in front: a Work page's list while one opened
@@ -361,7 +370,7 @@ struct AgentsCommands: Commands {
             .keyboardShortcut(.upArrow, modifiers: [.command, .option])
             .disabled(item == nil ? sessionsHere.isEmpty : item?.previous == nil)
             Button("Next Needing Attention") { nextNeedingAttention() }
-                .keyboardShortcut("j")
+                .keyboardShortcut(MenuKeys.nextNeedingAttention)
                 // Each folder's count, not the list itself: the menu bar is drawn again
                 // whenever what it reads changes, and the list reads every session (#165).
                 .disabled(!foldersInListOrder.contains { model.work.shelf($0.key).toVisit > 0 })
@@ -370,7 +379,7 @@ struct AgentsCommands: Commands {
             ForEach(Array(foldersInListOrder.prefix(9).enumerated()), id: \.element.key) { index, summary in
                 Button(summary.name) { model.showFolder(summary.key) }
                     // ⌃⌘ rather than ⌃ alone, which Mission Control takes for Spaces.
-                    .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")), modifiers: [.control, .command])
+                    .keyboardShortcut(MenuKeys.folder(at: index))
             }
         }
 
@@ -496,6 +505,85 @@ struct AgentsCommands: Commands {
         Task { await model.archive(agent.id, andLeave: true) }
     }
 
+    // MARK: Command menu
+
+    /// ⌘K (#4787): the main window's command menu, in front, with the actions that can be
+    /// done now. A folder's or a session's own window brings the main window forward.
+    private func openCommandMenu() {
+        if popped != nil || folderWindow != nil { model.bringMainWindowForward(opening: openWindow) }
+        requests.showsFileSearch = false
+        requests.commandMenu = commandMenuActions
+        Task {
+            // The Work lists' issues and PRs, read once; a list read already is not read again.
+            await model.workLists[.issue].load(model: model)
+            await model.workLists[.pr].load(model: model)
+        }
+    }
+
+    /// The actions ⌘K offers, as the menu bar has them, with the same keys; only those that
+    /// can be done now.
+    private var commandMenuActions: [CommandMenuAction] {
+        let agent = sessionAgent
+        let acting = agent.flatMap { model.acting($0.id) } != nil
+        let live = agent.map { $0.state != .archived } ?? false
+        var actions: [CommandMenuAction] = []
+        func add(_ title: String, _ key: KeyboardShortcut? = nil, keywords: [String] = [], when: Bool = true,
+                 _ perform: @escaping @MainActor () -> Void) {
+            if when { actions.append(CommandMenuAction(title, key: key, keywords: keywords, perform: perform)) }
+        }
+        let folder = keyFolder
+        add("New Session", MenuKeys.newSession, when: folder != nil) { newSession() }
+        add("New Session in a Worktree", MenuKeys.newWorktreeSession,
+            when: folder != nil && model.draftWorktrees.canMakeNew) { newSession(inWorktree: true) }
+        for summary in foldersInListOrder where summary.key != folder?.key {
+            add("New Session in \(summary.name)", keywords: ["start"]) {
+                model.showFolder(summary.key)
+                model.composing = true
+                model.draftWorktree = nil
+                requests.focusPrompt()
+            }
+        }
+        add("Archive Session", MenuKeys.archive, when: live && !acting) { archive() }
+        add("Unarchive Session", when: agent?.state == .archived) { act { await model.unarchive($0.id) } }
+        add("Stop Session", MenuKeys.stop, when: agent.map { model.canStop($0) } ?? false && !acting) {
+            act { await model.stop($0.id) }
+        }
+        add("Rename Session…", when: live) { rename() }
+        add("Branch Session", MenuKeys.branch, when: live) { act { await model.fork($0.id) } }
+        let pinned = agent.map(model.isPinned) ?? false
+        add(pinned ? "Unpin Session" : "Pin Session", when: live) {
+            guard let agent else { return }
+            Task { await model.setPinned(agent, !pinned) }
+        }
+        let chatOpen = popped == nil && folderWindow == nil && model.selectedAgent != nil
+        add("Find in Chat", MenuKeys.findInChat,
+            when: chatOpen && model.agent(model.selectedAgent?.id, has: Capability.agentsFind1)) {
+            requests.wantsChatFind = true
+        }
+        add("Prompts", MenuKeys.prompts, when: chatOpen) { requests.wantsPrompts = true }
+        add("Open File…", MenuKeys.openFile, when: model.selectedAgent != nil) { requests.showsFileSearch = true }
+        add("Next Needing Attention", MenuKeys.nextNeedingAttention,
+            when: foldersInListOrder.contains { model.work.shelf($0.key).toVisit > 0 }) { nextNeedingAttention() }
+        add(keyFrame.isOpen ? "Hide Inspector" : "Show Inspector", MenuKeys.inspector,
+            when: agent != nil && popped == nil && (keyFrame.isOpen || inspectorFits)) { toggleInspector() }
+        add(keyTerminal.isOpen ? "Hide Folder Terminal" : "Folder Terminal", MenuKeys.terminal,
+            when: keyTerminal.isOpen || keyFolder?.exists == true) { keyTerminal.toggle() }
+        add("Add Folder…", MenuKeys.addFolder) { requests.folderSheet = .chooseFolder() }
+        add("Clone Folder from Git URL…", MenuKeys.cloneFolder) { requests.folderSheet = .clone() }
+        add("Show in Finder", when: folderForFinder != nil) { showInFinder() }
+        add("Events", MenuKeys.events) { model.showEvents() }
+        add("Resources", MenuKeys.resources) { model.showResources() }
+        add("Runtimes", MenuKeys.runtimes) { model.showRuntimes() }
+        for kind in WorkList.Kind.allCases {
+            add("Work: \(kind.title)") { model.sidebarItem = .work(kind) }
+        }
+        add("Multiplier") { model.showMultiplier() }
+        add("Cost", MenuKeys.cost) { model.showsSpending = true }
+        add("Docs") { model.showDocs(model.docsHistory.current ?? DocsPlace()) }
+        add("Settings…", KeyboardShortcut(","), keywords: ["preferences"]) { openSettings() }
+        return actions
+    }
+
     // MARK: Go
 
     /// A permission or elicitation card is on the open chat: ⌘1…n belong to its
@@ -504,13 +592,7 @@ struct AgentsCommands: Commands {
         !model.permissionsForSelection.isEmpty || model.elicitationForSelection != nil
     }
 
-    /// The folder list's order: this Mac's folders, then each server's (037).
-    private var foldersInListOrder: [DaemonAPI.FolderSummary] {
-        let live = model.liveFolders
-        guard !model.hosts.isEmpty else { return live }
-        return live.filter { $0.host == .mac }
-            + model.hosts.servers.flatMap { host in live.filter { $0.host == host } }
-    }
+    private var foldersInListOrder: [DaemonAPI.FolderSummary] { model.foldersInListOrder }
 
     /// The selected folder's live sessions, in the order its page draws them.
     private var sessionsHere: [UUID] {

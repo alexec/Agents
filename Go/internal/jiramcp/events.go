@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The MCP events (#3247) of the Jira site's issues, in the linear server's shape
@@ -125,6 +126,10 @@ type candidate struct {
 	eventID string
 	time    string
 	data    map[string]any
+	// subject and key are its envelope (#4728): the issue, and the comment's, label's or
+	// changelog entry's own id when it can happen again.
+	subject wire.Ref
+	key     string
 }
 
 const (
@@ -176,7 +181,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 		found, truncated, err := s.candidates(ctx, e, a, since)
 		list := make([]mcpevents.Candidate, len(found))
 		for i, c := range found {
-			list[i] = mcpevents.Candidate{EventID: c.eventID, Time: c.time, Data: mcpevents.Data(c.data)}
+			list[i] = mcpevents.Candidate{EventID: c.eventID, Time: c.time, Data: mcpevents.Data(c.data), Subject: c.subject, Key: c.key}
 		}
 		return list, mcpevents.Listed{Truncated: truncated}, err
 	})
@@ -212,7 +217,12 @@ func (s *Events) candidates(ctx context.Context, e event, a args, since string) 
 		if at == "" {
 			continue
 		}
-		list = append(list, candidate{eventID: e.Name + ":" + it.ID, time: at, data: it.data()})
+		key := ""
+		if it.Kind != Opened {
+			key = it.ID
+		}
+		list = append(list, candidate{eventID: e.Name + ":" + it.ID, time: at, data: it.data(),
+			subject: mcpevents.Ref("jira", "issue", it.Issue.Project, it.Issue.Key), key: key})
 	}
 	return list, truncated, nil
 }

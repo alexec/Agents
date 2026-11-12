@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestEachCodespaceHasABlockOfItsOwn(t *testing.T) {
@@ -129,5 +130,55 @@ func TestRemoveTakesOutOnlyItsBlock(t *testing.T) {
 	Remove(path, "second")
 	if data, _ := os.ReadFile(path); string(data) != "Host mine\n  User me\n" {
 		t.Errorf("the person's lines changed: %q", data)
+	}
+}
+
+// KeepAwake holds gh's session with the provider's token alone, saying a line each
+// KeepAwakeEvery, until it is cancelled (#4637).
+func TestKeepAwakeHoldsASessionUntilCancelled(t *testing.T) {
+	dir := fakeGH(t, `echo "$GH_TOKEN $GITHUB_TOKEN $*" >> "$(dirname "$0")/calls"
+exec sleep 30
+`)
+	was := KeepAwakeEvery
+	KeepAwakeEvery = 240 * time.Second
+	t.Cleanup(func() { KeepAwakeEvery = was })
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- KeepAwake(ctx, "fuzzy", "ghp_test", []string{"PATH=/usr/bin:/bin", "GITHUB_TOKEN=other"}) }()
+	calls := filepath.Join(dir, "calls")
+	for start := time.Now(); ; time.Sleep(10 * time.Millisecond) {
+		if data, _ := os.ReadFile(calls); len(data) > 0 {
+			break
+		}
+		if time.Since(start) > 5*time.Second {
+			t.Fatal("gh never ran")
+		}
+	}
+	select {
+	case err := <-done:
+		t.Fatalf("ended before it was cancelled: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Errorf("a cancelled session said %v", err)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("still running after cancel")
+	}
+	data, _ := os.ReadFile(calls)
+	if want := "ghp_test  codespace ssh -c fuzzy -- while :; do echo keepalive; sleep 240; done\n"; string(data) != want {
+		t.Errorf("calls %q", data)
+	}
+}
+
+// A session that ends by itself says why, with gh's words.
+func TestKeepAwakeSaysWhyTheSessionEnded(t *testing.T) {
+	fakeGH(t, "echo 'codespace is not running' >&2; exit 1\n")
+	err := KeepAwake(context.Background(), "fuzzy", "t", nil)
+	if err == nil || !strings.Contains(err.Error(), "not running") || !strings.Contains(err.Error(), "fuzzy") {
+		t.Errorf("%v", err)
 	}
 }

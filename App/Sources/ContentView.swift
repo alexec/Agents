@@ -60,6 +60,24 @@ struct ContentView: View {
         }
     }
 
+    /// The ⌘K command menu (#4787) over what is being read, while it is asked for.
+    @ViewBuilder
+    private var commandMenu: some View {
+        if let actions = requests.commandMenu {
+            CommandMenuView(items: CommandMenuItems.items(model, actions: actions),
+                            repos: CommandMenuItems.repos(model),
+                            choose: { item in
+                                requests.commandMenu = nil
+                                if let action = actions.first(where: { $0.item.id == item.id }) {
+                                    action.perform()
+                                } else {
+                                    CommandMenuItems.open(item, model)
+                                }
+                            },
+                            dismiss: { requests.commandMenu = nil })
+        }
+    }
+
     /// A conversation and, when it is open and there is room, the sidebar beside it.
     private func chat(inWindowOf width: CGFloat) -> some View {
         HStack(spacing: 0) {
@@ -117,6 +135,8 @@ struct ContentView: View {
             TokensView().paperGround()
         } else if model.showsTime {
             TimeView().paperGround()
+        } else if model.showsVelocity {
+            VelocityView().paperGround()
         } else if model.showsWork {
             WorkView(model: model).paperGround()
         } else if model.showsDocs {
@@ -181,7 +201,7 @@ struct ContentView: View {
         } else {
             MultiplierPage(multiplier: model.work.multiplier, achievements: model.work.achievements,
                            agentsWorking: model.agents.count { $0.state == .starting || $0.state == .running },
-                           hints: "⌘0 Multiplier · ⌘N new session · ↑↓ move · ⌘F find",
+                           hints: "⌘0 Multiplier · ⌘N new session · ↑↓ move · ⌘K find",
                            refresh: { await model.refreshMultiplier() })
                 .paperGround()
         }
@@ -193,7 +213,7 @@ struct ContentView: View {
     private var folderForTerminal: DaemonAPI.FolderSummary? {
         guard terminal.isOpen, !model.showsEvents, !model.showsRuntimes, model.statusSecretsPage == nil,
               model.machinePage == nil,
-              !model.showsSpending, !model.showsTokens, !model.showsTime,
+              !model.showsSpending, !model.showsTokens, !model.showsTime, !model.showsVelocity,
               !model.showsWork, !model.showsDocs, !model.showsMessages, !model.showsSummary, let folder = model.selectedFolderSummary, folder.exists else { return nil }
         return folder
     }
@@ -208,7 +228,7 @@ struct ContentView: View {
     private var showsChat: Bool {
         model.selection != nil && !model.showsEvents
             && !model.showsRuntimes && model.statusSecretsPage == nil && model.machinePage == nil
-            && !model.showsSpending && !model.showsTime && !model.showsWork && !model.showsDocs && !model.showsMessages
+            && !model.showsSpending && !model.showsTime && !model.showsVelocity && !model.showsWork && !model.showsDocs && !model.showsMessages
             && !model.showsSummary && model.openWorkflow == nil
             && model.folderPage == nil && model.openPin == nil
     }
@@ -319,6 +339,7 @@ struct ContentView: View {
                     // this is the width the inspector measures itself against.
                     .onGeometryChange(for: Double.self) { $0.size.width } action: { frame.windowWidth = $0 }
                     .overlay { fileSearch }
+                    .overlay { commandMenu }
                     .toolbar { detailToolbar }
                     .navigationTitle(title)
                     .navigationSubtitle(subtitle)

@@ -9,6 +9,10 @@ export function Banner({ session }: { session: Session }) {
   // when the address refused and only the person can act.
   const state = session.state.value;
   const tryNow = <button type="button" onClick={() => session.link.retryNow()}>Try Now</button>;
+  // Drawn from this device's copy (#4790) while the control plane is asked: what is shown may be old.
+  if (state.kind === "connecting" || state.kind === "loading") {
+    return <MessageBanner tone="neutral" name="banner"><strong>From this device.</strong> Connecting to the control plane.</MessageBanner>;
+  }
   if (state.kind === "down" && state.crowded) {
     return <MessageBanner tone="neutral" name="banner" actions={tryNow}><strong>{pairingWords.crowded}</strong> Trying again.</MessageBanner>;
   }

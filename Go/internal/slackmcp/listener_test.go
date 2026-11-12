@@ -86,6 +86,10 @@ func TestTheListenerBringsMessagesAndAnswersIn(t *testing.T) {
 	if _, ok := data["text"]; ok {
 		t.Fatal("an event has the message's text")
 	}
+	// Its envelope (#4728): the message's ref, and no key, as a message comes once.
+	if _, keyed := first["key"]; first["subject"] != "slack:message:t1/c1#1762300004.000100" || keyed {
+		t.Fatalf("the message's subject and key: %v %v", first["subject"], first["key"])
+	}
 	if sender := first["sender"].(map[string]any); !reflect.DeepEqual(sender,
 		map[string]any{"channel": "slack", "identity": "T1/U2", "name": "Sam", "email": "sam@example.com"}) {
 		t.Fatalf("sender: %v", sender)

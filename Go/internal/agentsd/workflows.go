@@ -114,8 +114,13 @@ type workflowBook struct {
 	workflowStarting map[wire.UUID]bool // runs whose agent has not returned from startFor
 	workflowRecsBad  bool
 	workflowFiles    map[string]map[string]*workflowFile // folder → id → file
-	machineIDOnce    sync.Once
-	machineValue     string
+	// workflowTold is the digest each watched folder's workflows were last told with
+	// (folder → id → digest). The folder watch compares against it, not workflowFiles:
+	// every reader scans workflowFiles afresh, so a file that arrived just before a
+	// workflows/list was in it already, and the watch told nothing (#4750).
+	workflowTold  map[string]map[string]string
+	machineIDOnce sync.Once
+	machineValue  string
 	// clockStop ends the workflow clock, and clockRunning waits for a tick still going:
 	// Shutdown stops it, as a host on a context nobody cancels would keep ticking (#2823).
 	clockStop     chan struct{}
@@ -741,6 +746,13 @@ func (d *Daemon) editWorkflowLocked(folder, id string, byPerson bool, edit func(
 func (d *Daemon) tellWorkflow(folder, id string) {
 	d.workflowMu.Lock()
 	f := d.fileLocked(folder, id)
+	if told := d.workflowTold[folder]; told != nil {
+		if f == nil {
+			delete(told, id)
+		} else {
+			told[id] = f.digest
+		}
+	}
 	if f == nil {
 		d.workflowMu.Unlock()
 		Broadcast(d, wire.NotifyWorkflowRemoved, wire.WorkflowRemovedNotification{Folder: store.FolderURL(folder), WorkflowID: id})

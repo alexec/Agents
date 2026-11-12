@@ -37,6 +37,9 @@ type AccountLastOp struct {
 	What AccountOperationWhat `json:"what"`
 
 	At Date `json:"at"`
+
+	// The session that did it: by manage_accounts, or by reading the secret or card the account names. Left out when no session did.
+	Agent *UUID `json:"agent,omitzero"`
 }
 
 // One read or change of an outside account by manage_accounts (#4157): a get, a list filtered to its service, or an add. Never a value of the account but its service and address.
@@ -46,6 +49,9 @@ type AccountOperation struct {
 	Service string `json:"service"`
 
 	Address *string `json:"address,omitzero"`
+
+	// The session whose manage_accounts call it was.
+	Agent *UUID `json:"agent,omitzero"`
 }
 
 // What an operation on an account was (#4157): read (by manage_accounts, or a read of its secret or card), added, or edited (it took another's place).
@@ -4153,6 +4159,36 @@ type Event struct {
 
 	// Who raised it, when a person's call through the control plane did (#1751, spec 736 FR-040): the actor the control plane gave the call's channel, never taken from the client. None for what an agent, a workflow or the machine did.
 	Actor *AuditActor `json:"actor,omitzero"`
+
+	// The CloudEvents version of the envelope (#4728, spec 4724-event-bus, "An event"): always "1.0".
+	Specversion *string `json:"specversion,omitzero"`
+
+	// The event's ref (#4728): the subject's ref, "@", the type, and, when the same type can happen again to that thing, "/" and the provider's key for this one, such as github:pr:alexec/agents#4702@pr.commented/2457. It comes from the provider's data only, never from the machine or the clock, so two machines make the same id for the same happening.
+	ID *string `json:"id,omitzero"`
+
+	// The event's type, noun.verbed (#4728): the same as name, which stays for one release.
+	Type *string `json:"type,omitzero"`
+
+	// Who the event is about (#4728): github, jira, slack and so on; agents for the app's own events; server:<name> for an MCP server's event that says no subject.
+	Provider *string `json:"provider,omitzero"`
+
+	// The provider's space (#4728, spec 4724-event-bus, "Topics"): a repo's full name, a Jira project, a Slack channel; the project or the machine for the app's own events. Lower case; can be empty.
+	Topic *string `json:"topic,omitzero"`
+
+	// The ref of the thing the event happened to (#4728). None for an MCP server's event that says no subject.
+	Subject *Ref `json:"subject,omitzero"`
+
+	// provider:topic, as CloudEvents asks for one (#4728).
+	Source *string `json:"source,omitzero"`
+
+	// When it happened, in RFC 3339 (#4728): the provider's own time when it says one.
+	Time *string `json:"time,omitzero"`
+
+	// The machine that raised it (#4728), as agents:machine:#<machine>. Not part of the event's identity.
+	Producer *string `json:"producer,omitzero"`
+
+	// What the event carries (#4728): an MCP server's event data, or the app's own event's details. The details stay for one release.
+	Data JSONValue `json:"data,omitzero"`
 }
 
 type EventDraft struct {
@@ -10768,7 +10804,7 @@ type ProviderRuntimes struct {
 	Why *string `json:"why,omitzero"`
 }
 
-// providers/ssh (#3398): the machine that carries a codespaces provider starts a codespace's agentsd over ssh (`start`), reads its host key (`hostKey`), or installs Agents in it with a host code from the control plane (`install`, #3497), with the token it keeps. Its result is ProviderSSHResult.
+// providers/ssh (#3398): the machine that carries a codespaces provider starts a codespace's agentsd over ssh (`start`), reads its host key (`hostKey`), installs Agents in it with a host code from the control plane (`install`, #3497), or holds an ssh session to it that GitHub counts as use while its machine works (`keepAwake`, renewed each few minutes, and `letSleep`, #4637), with the token it keeps. Its result is ProviderSSHResult.
 type ProviderSSH struct {
 	Provider ProviderID `json:"provider"`
 
@@ -12448,11 +12484,14 @@ type SecretGrants struct {
 	Grants []SecretGrant `json:"grants"`
 }
 
-// A secret's last operation (#4158): what it was and when, the newest any machine reported. No session, no place, no value.
+// A secret's last operation (#4158): what it was, when, and the session that did it, the newest any machine reported. No place, no value.
 type SecretLastOp struct {
 	What SecretOperationWhat `json:"what"`
 
 	At Date `json:"at"`
+
+	// The session that did it, so the person's own clients can name it beside a recent read. Left out for a change no session made.
+	Agent *UUID `json:"agent,omitzero"`
 }
 
 // A machine that was removed with a secret on it (#1760, FR-026): change the secret where it was issued.

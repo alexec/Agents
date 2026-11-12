@@ -11,6 +11,7 @@ import { forgetPins } from "./model/machineLock";
 import { effect } from "@preact/signals";
 import { startAgentLinks } from "./model/agentLink";
 import { startSpinnerClock } from "./spinnerClock";
+import { LocalCopy, startLocalCopy } from "./model/localCopy";
 
 const session = new Session();
 const store = new Store(session.link);
@@ -18,10 +19,20 @@ startPresence(store);
 startPageNotices(store);
 startAgentLinks(store);
 startSpinnerClock();
-// Forgotten, here or in another tab (#3670): the drafts, the lock pins and the push subscription
-// were that control plane's, and go with it.
+// This device's copy of the sessions (#4790): drawn at once, written only while signed in.
+const copy = new LocalCopy();
+startLocalCopy(store, copy);
 effect(() => {
-  if (session.state.value.kind !== "forgotten") return;
+  const kind = session.state.value.kind;
+  if (kind === "open" || kind === "down") copy.writing = true;
+});
+// Forgotten, here or in another tab (#3670): the drafts, the lock pins and the push subscription
+// were that control plane's, and go with it, as does the copy, deleted with the keys (#4790).
+effect(() => {
+  const kind = session.state.value.kind;
+  if (kind === "unpaired" || kind === "pairing") copy.forget();
+  if (kind !== "forgotten") return;
+  copy.forget();
   store.drafts.clear();
   forgetPins();
   void dropWebPush();

@@ -31,7 +31,7 @@ import { sealWork } from "../wire/sealing";
 import type { FolderGoneAsk } from "./missingFolder";
 import { describe, knowVersions, methodNotFound } from "./errors";
 import { freeProjectName } from "./projectSettings";
-import { fromWireDate } from "../protocol/dates";
+import { fromWireDate, toWireDate } from "../protocol/dates";
 import { addCap, dropCap, openCaps } from "./teamGroups";
 import { withGovernanceRequest } from "./governance";
 import { withBudgetRequest } from "./console";
@@ -68,6 +68,8 @@ import type { ChartHint } from "./chart";
 import { Providers } from "./providers";
 import { MachineLock } from "./machineLock";
 import { isLead, leadEpic, leadProgressWords } from "./leadProgress";
+import { type AgentWrite, PendingWrites, omitting, writeFailure } from "./pendingWrites";
+import type { MachineCopy, TranscriptCopy } from "./localCopy";
 
 /** What this page keeps by folder on a host, kept to the folders it lists (#3750). */
 function pruneFolderKeys(host: string, folders: readonly string[]): void {
@@ -236,6 +238,10 @@ export class Work {
   /** The conversation last looked for: once it is, one not in hand has gone (#2652), as PoppedChat.looked. */
   readonly lookedFor = signal<{ host: string; session: string } | null>(null);
   readonly entries = signal<TranscriptEntry[]>([]);
+  /** Where the open chat's entries came from (#4790): none yet, this device's copy, or its host. */
+  readonly transcriptSource = signal<"none" | "device" | "host">("none");
+  /** The hosts drawn from this device's copy (#4790) whose own answer has not come yet. */
+  readonly fromDevice = signal<ReadonlySet<string>>(new Set());
   /** The page as the chat draws it, folded once as each entry lands. */
   readonly items = signal<Item[]>([]);
   /**
@@ -898,6 +904,8 @@ export class Work {
 
   /** Each folder's agents by `host|folder`, kept as each change lands: one change redraws one folder (#170). */
   private slices = new Map<string, Signal<Agent[]>>();
+  /** The changes drawn on agents before their hosts answer (#4786): one layer for every action. */
+  protected readonly pending = new PendingWrites();
   private views = new Map<string, ReadonlySignal<FolderView>>();
   private byID = new Map<string, ReadonlySignal<Agent | undefined>>();
 
@@ -905,8 +913,10 @@ export class Work {
    * Every write to a host's agents. `touched` names the folders that changed; without it every
    * folder of the host is worked out again, and only those whose agents differ are told.
    */
-  protected setAgents(host: string, list: Agent[], touched?: readonly string[]): void {
+  protected setAgents(host: string, heard: Agent[], touched?: readonly string[]): void {
     const prefix = `${host}|`;
+    // What is pending is drawn over the host's records here, on every way in (#4786).
+    const list = heard.map((a) => this.pending.overlay(host, a));
     batch(() => {
       this.agents.value = { ...this.agents.value, [host]: list };
       if (touched) {
@@ -1124,8 +1134,50 @@ export class Work {
       this.firstEntryIndex.value = page.firstIndex;
       this.hasMoreBefore.value = page.firstIndex > this.openTurnStart.value;
       this.transcriptLoadFailure.value = null;
+      this.transcriptSource.value = "host";
       this.refold(entries);
     });
+  }
+
+  /**
+   * This device's copy of a chat (#4790), drawn while its host's page is on its way: never over
+   * a page the host gave. What is heard meanwhile is laid after it, and kept for the page.
+   */
+  drawTranscriptCopy(copy: TranscriptCopy): void {
+    const watching = this.watching.value;
+    if (watching?.host !== copy.host || watching.session !== copy.session || this.transcriptSource.value !== "none") return;
+    batch(() => {
+      this.replaceTurns(copy.turns);
+      this.firstEntryIndex.value = copy.page.firstIndex;
+      // Earlier pages wait for the host's answer.
+      this.hasMoreBefore.value = false;
+      this.transcriptSource.value = "device";
+      // A load that failed before the copy was read said nothing was on show; now something is.
+      if (this.transcriptLoadFailure.value?.nothingLoaded) this.transcriptLoadFailure.value = null;
+      this.refold(keepingLatestByID([...copy.page.entries, ...this.entries.value]));
+    });
+  }
+
+  /**
+   * This device's copy of the machines (#4790), drawn before the control plane answers: only
+   * on a page that holds none yet. Each host stays marked until it answers.
+   */
+  drawCopy(machines: readonly MachineCopy[]): void {
+    if (machines.length === 0 || this.hosts.value.length > 0) return;
+    batch(() => {
+      this.takeHosts(machines.map((m) => m.host));
+      this.folders.value = { ...this.folders.value, ...Object.fromEntries(machines.filter((m) => m.folders).map((m) => [m.host.id, m.folders!])) };
+      for (const m of machines) this.replaceAgents(m.agents, m.host.id);
+      this.fromDevice.value = new Set(machines.map((m) => m.host.id));
+    });
+  }
+
+  /** A host answered for itself: no longer from this device. */
+  protected answered(host: string): void {
+    if (!this.fromDevice.value.has(host)) return;
+    const left = new Set(this.fromDevice.value);
+    left.delete(host);
+    this.fromDevice.value = left;
   }
 
   /** An earlier page, put in front of what is held. Past the cap, it waits (#291). */
@@ -1143,6 +1195,7 @@ export class Work {
     // A chat chosen is a page on its way.
     this.heardSincePage = [];
     this.transcriptLoadFailure.value = null;
+    this.transcriptSource.value = "none";
     this.firstEntryIndex.value = 0;
     this.hasMoreBefore.value = false;
     this.turns.value = [];
@@ -1644,6 +1697,12 @@ export class Store extends Work {
           this.loadRemoveRequests()])),
         this.loadSignInRequests()]);
       this.takeHosts(hosts);
+      // A machine this device's copy drew that the control plane no longer lists goes (#4790).
+      for (const host of this.fromDevice.value) {
+        if (hosts.some((h) => h.id === host)) continue;
+        this.forgetHost(host);
+        this.answered(host);
+      }
       // This page's place in its lock first: a machine that holds the lock takes a call only
       // on a channel this page opens with its lock key (#3492).
       await this.lockStep().catch(() => undefined);
@@ -1925,10 +1984,13 @@ export class Store extends Work {
   /** What an offline host last listed, from the control plane (#962), when nothing of it is held:
    *  a page opened while it is stopped lists its folders and sessions as one open when it went. */
   private async loadLastHeard(host: string): Promise<void> {
-    if (this.hostIsOnline(host) || this.folders.value[host] !== undefined) return;
+    // What this device's copy drew is not held: the control plane's word is newer (#4790).
+    const held = () => this.folders.value[host] !== undefined && !this.fromDevice.value.has(host);
+    if (this.hostIsOnline(host) || held()) return;
     const heard = await this.link.call("machines/lastHeard", { host: host as MachineRef }).catch(() => null);
-    if (!heard || this.hostIsOnline(host) || this.folders.value[host] !== undefined) return;
+    if (!heard || this.hostIsOnline(host) || held()) return;
     batch(() => {
+      this.answered(host);
       if (heard.agents) this.replaceAgents(heard.agents, host);
       if (heard.folders) this.folders.value = { ...this.folders.value, [host]: heard.folders };
     });
@@ -1943,7 +2005,10 @@ export class Store extends Work {
     // Lean: the columns read none of the option and command lists, 4 MB of 200 agents (#107).
     // The open session's come with loadWhole.
     const agents = await this.listLive(host).catch(failed("agents/list"));
-    if (agents) this.replaceAgents(agents, host);
+    if (agents) batch(() => {
+      this.replaceAgents(agents, host);
+      this.answered(host);
+    });
     // The Archived folds that were open are listed again rather than left empty by the live list,
     // and the workflows on screen asked again: they may have changed meanwhile.
     const prefix = `${host}|`;
@@ -2373,6 +2438,8 @@ export class Store extends Work {
     const now = this.watching.value;
     if (now?.host !== host || now.session !== session || load !== this.transcriptLoads) return false;
     if (!page) {
+      // This device's copy stays on show until the host answers (#4790).
+      if (this.transcriptSource.value === "device") return gone;
       this.transcriptLoadFailure.value = { nothingLoaded: true, reason: failed.page ?? "no answer." };
       return gone;
     }
@@ -2786,15 +2853,40 @@ export class Store extends Work {
     await this.link.call("machines/retryKept", { host: kept.host, id: kept.id }).catch((error: unknown) => this.say(describe(error)));
   }
 
-  /** Calls `method`, and on failure says why in `problem` and answers null. */
-  async act<M extends keyof Methods>(method: M, params: Methods[M]["params"], host: string): Promise<Methods[M]["result"] | null> {
+  /**
+   * Calls `method`, and on failure says why in `problem` and answers null. With `write`, the line
+   * says what failed first: "Could not archive — …" (#4786).
+   */
+  async act<M extends keyof Methods>(method: M, params: Methods[M]["params"], host: string,
+                                     write?: AgentWrite): Promise<Methods[M]["result"] | null> {
     try {
       return await this.link.call(method, params, host);
     } catch (error) {
       log("call.failed", error instanceof CallFailed ? error.code : undefined);
-      this.say(describe(error));
+      this.say(write ? writeFailure(write, describe(error)) : describe(error));
       return null;
     }
+  }
+
+  /**
+   * A change drawn on the agent at once, and settled by `send`: kept on screen when it went,
+   * and the host's record put back when it did not (#4786).
+   */
+  private async optimistic(host: string, agentID: string, write: AgentWrite, send: () => Promise<boolean>): Promise<boolean> {
+    const shown = (this.agents.peek()[host] ?? []).find((a) => a.id === agentID);
+    const begun = shown ? this.pending.begin(host, shown, write) : null;
+    if (begun) this.showAgent(host, begun.agent);
+    const sent = await send();
+    const back = begun ? this.pending.settle(host, agentID, begun.id, !sent) : null;
+    if (back) this.showAgent(host, back);
+    return sent;
+  }
+
+  /** One agent as this page now shows it, in its place. */
+  private showAgent(host: string, agent: Agent): void {
+    const held = this.agents.peek()[host] ?? [];
+    if (!held.some((a) => a.id === agent.id)) return;
+    this.setAgents(host, held.map((a) => (a.id === agent.id ? agent : a)), [agentFolderPath(agent)]);
   }
 
   /**
@@ -3388,8 +3480,9 @@ export class Store extends Work {
   }
 
   async sendNow(host: string, agentID: string, promptID: string): Promise<void> {
-    await this.acting(agentID, { sendNow: promptID }, () =>
-      this.act("agents/sendNow", { agentID: agentID as UUID, promptID: promptID as UUID }, host));
+    const write: AgentWrite = { kind: "sendNow", promptID };
+    await this.acting(agentID, { sendNow: promptID }, () => this.optimistic(host, agentID, write, async () =>
+      await this.act("agents/sendNow", { agentID: agentID as UUID, promptID: promptID as UUID }, host, write) !== null));
   }
 
   /**
@@ -3461,7 +3554,11 @@ export class Store extends Work {
   async perform(host: string, agentID: string,
                 action: "agents/stop" | "agents/archive" | "agents/unarchive"): Promise<boolean> {
     let done = false;
-    await this.acting(agentID, action, async () => { done = await this.act(action, { agentID: agentID as UUID }, host) !== null; });
+    const write: AgentWrite = { kind: action === "agents/stop" ? "stop" : action === "agents/archive" ? "archive" : "unarchive" };
+    await this.acting(agentID, action, async () => {
+      done = await this.optimistic(host, agentID, write, async () =>
+        await this.act(action, { agentID: agentID as UUID }, host, write) !== null);
+    });
     return done;
   }
 
@@ -3647,14 +3744,30 @@ export class Store extends Work {
 
   /** Later on a request (#4236): out of Needs You until its time, or until the person is next at the Mac. */
   async deferRequest(host: string, request: string, later: Later): Promise<void> {
-    const changed = await this.act("requests/defer", deferParams(request, later), host);
+    const params = deferParams(request, later);
+    const at = toWireDate(new Date());
+    const deferred = params.atMac ? { atMac: true, at } : params.until === undefined ? { at } : { until: params.until, at };
+    await this.changingRequest(host, request, (r) => ({ ...r, deferred }), () => this.act("requests/defer", params, host));
+  }
+
+  /**
+   * Later or Bring Back, drawn at once (#4786), the host's answer placed when it comes, and the
+   * request put back as it was when the call did not go, unless the host changed it meanwhile.
+   */
+  private async changingRequest(host: string, id: string, draw: (r: PersonRequest) => PersonRequest,
+                                send: () => Promise<RequestUpdate | null>): Promise<void> {
+    const held = (this.personRequests.peek()[host] ?? []).find((r) => r.id === id);
+    const shown = held ? draw(held) : null;
+    if (shown) this.placeRequest(host, shown);
+    const changed = await send();
     if (changed) this.placeRequest(host, changed.request);
+    else if (held && (this.personRequests.peek()[host] ?? []).find((r) => r.id === id) === shown) this.placeRequest(host, held);
   }
 
   /** Bring Back Now (#4236): a deferred request back into Needs You at once. */
   async undeferRequest(host: string, request: string): Promise<void> {
-    const changed = await this.act("requests/undefer", { id: request as never }, host);
-    if (changed) this.placeRequest(host, changed.request);
+    await this.changingRequest(host, request, (r) => omitting(r, "deferred"),
+      () => this.act("requests/undefer", { id: request as never }, host));
   }
 
   /** A folder's pull requests waiting for the person's approval (#3330), newest first. */
@@ -3908,12 +4021,16 @@ export class Store extends Work {
 
   /** The person's title for a session (#751); empty, the runtime names it again. */
   async rename(host: string, agentID: string, title: string): Promise<void> {
-    await this.act("agents/rename", { agentID: agentID as UUID, title }, host);
+    const write: AgentWrite = { kind: "rename", title };
+    await this.optimistic(host, agentID, write, async () =>
+      await this.act("agents/rename", { agentID: agentID as UUID, title }, host, write) !== null);
   }
 
   /** Mute Notifications / Unmute Notifications (#2003): kept by the session's host. */
   async setMuted(host: string, agentID: string, muted: boolean): Promise<void> {
-    await this.act("agents/setMuted", { agentID: agentID as UUID, muted }, host);
+    const write: AgentWrite = { kind: "mute", muted };
+    await this.optimistic(host, agentID, write, async () =>
+      await this.act("agents/setMuted", { agentID: agentID as UUID, muted }, host, write) !== null);
   }
 
   /** Mute Notifications for a workflow's runs, or Unmute (#2003): `muted: true` in its file. */
@@ -3939,9 +4056,12 @@ export class Store extends Work {
   }
 
   async setLabels(host: string, agentID: string, add: string[], remove: string[]): Promise<boolean> {
-    const agent = await this.act("agents/setLabels", { agentID: agentID as UUID, add, remove }, host);
-    if (agent) this.upsertAgent(agent, host);
-    return agent !== null;
+    const write: AgentWrite = { kind: "labels", add, remove };
+    return this.optimistic(host, agentID, write, async () => {
+      const agent = await this.act("agents/setLabels", { agentID: agentID as UUID, add, remove }, host, write);
+      if (agent) this.upsertAgent(agent, host);
+      return agent !== null;
+    });
   }
 
   async labelVocabulary(host: string, folder: string): Promise<string[]> {

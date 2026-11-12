@@ -120,7 +120,7 @@ func (d *Daemon) secretsHeld() []wire.MachineSecretHeld {
 			h.Hint = new(hint.Hint)
 		}
 		if op, ok := d.secretLastOp(n); ok {
-			h.LastOp = &wire.SecretLastOp{What: op.What, At: op.At}
+			h.LastOp = &wire.SecretLastOp{What: op.What, At: op.At, Agent: op.Agent}
 		}
 		held = append(held, h)
 	}

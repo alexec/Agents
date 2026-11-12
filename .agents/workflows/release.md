@@ -16,4 +16,4 @@ TestFlight, with nobody watching. Follow the `release` skill
 release, with Run now or a message. Nothing else starts one.
 
 You do not start fix lanes, merge or push anything but the tag: high fixes go
-through the Scrum Master (medium ones are filed and listed, not waited for), and you wait for them to land. Security findings stay private.
+through the bug lane's lead (#4207) (medium ones are filed and listed, not waited for), and you wait for them to land. Security findings stay private.

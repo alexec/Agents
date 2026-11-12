@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -207,4 +208,42 @@ func withoutTokens(env []string) []string {
 		out = append(out, kv)
 	}
 	return out
+}
+
+// KeepAwakeEvery is how often KeepAwake's session says a line: well under GitHub's smallest
+// idle timeout, 5 minutes (#4637).
+var KeepAwakeEvery = 4 * time.Minute
+
+// KeepAwake holds `gh codespace ssh -c <name>`, run with token, saying a line each
+// KeepAwakeEvery until ctx ends (#4637). GitHub counts the session's output as use, so the
+// codespace is not stopped by its idle timeout while the session runs; tested on a real
+// codespace with a 5-minute timeout. It returns when the session ends: nil when ctx ended it.
+func KeepAwake(ctx context.Context, name, token string, env []string) error {
+	every := int(KeepAwakeEvery / time.Second)
+	if every < 1 {
+		every = 1
+	}
+	cmd := exec.CommandContext(ctx, GH, "codespace", "ssh", "-c", name, "--",
+		fmt.Sprintf("while :; do echo keepalive; sleep %d; done", every))
+	cmd.Env = append(withoutTokens(env), Token(token))
+	cmd.Stdout = io.Discard
+	var stderr strings.Builder
+	cmd.Stderr = &stderr
+	// A cancelled session's gh gets a moment to close its connection.
+	cmd.WaitDelay = 5 * time.Second
+	err := cmd.Run()
+	if ctx.Err() != nil {
+		return nil
+	}
+	if errors.Is(err, exec.ErrNotFound) || errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("This machine has no GitHub CLI (gh) to keep the codespace %s awake", name)
+	}
+	said := strings.TrimSpace(stderr.String())
+	if said == "" && err != nil {
+		said = err.Error()
+	}
+	if said == "" {
+		said = "the session ended"
+	}
+	return fmt.Errorf("GitHub CLI's session to keep the codespace %s awake ended: %s", name, said)
 }

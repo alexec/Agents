@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The MCP events (#1753) of a Forgejo or Gitea repository's pull requests, their checks and its
@@ -332,10 +333,24 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 				continue
 			}
 			out = append(out, mcpevents.State{ID: fmt.Sprintf("%s:%s:%d", name, a.repo, st.mr.Number), Number: st.mr.Number,
-				On: st.on, Data: map[string]any{root: st.json}})
+				On: st.on, Data: map[string]any{root: st.json}, Subject: diffRef(root, a.repo, st.mr.Number)})
 		}
 		return out, err
 	})
+}
+
+// The refs of what forgejo's events happen to (#4728, spec 4724-event-bus, "A ref").
+func prRef(repo string, n int) wire.Ref { return mcpevents.Ref("forgejo", "pr", repo, fmt.Sprint(n)) }
+func issueRef(repo string, n int) wire.Ref {
+	return mcpevents.Ref("forgejo", "issue", repo, fmt.Sprint(n))
+}
+
+// diffRef is a state's subject: its issue for an issue's event, else its pr.
+func diffRef(root, repo string, n int) wire.Ref {
+	if root == "issue" {
+		return issueRef(repo, n)
+	}
+	return prRef(repo, n)
 }
 
 // candidates finds what an event may raise at or after since.
@@ -364,7 +379,8 @@ func candidates(ctx context.Context, f Forgejo, name string, a args, yours *Your
 				continue
 			}
 			list = append(list, candidate{EventID: name + ":" + repo + ":" + it.ID, Time: at,
-				Data: func() (map[string]any, error) { return it.data(), nil }})
+				Data:    func() (map[string]any, error) { return it.data(), nil },
+				Subject: issueRef(repo, it.Issue.Number), Key: it.ID})
 		}
 		return list, listed, nil
 	}
@@ -380,7 +396,8 @@ func candidates(ctx context.Context, f Forgejo, name string, a args, yours *Your
 			if at := normalized(c.At); at != "" && (a.pr == 0 || c.PR.Number == a.pr) && (a.branch == "" || c.PR.Branch == a.branch) &&
 				a.closesOne(c.PR) && a.byMe(c.PR, yours) && (a.anyone || c.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d", repo, c.ID), Time: at,
-					Data: func() (map[string]any, error) { return c.data(), nil }})
+					Data:    func() (map[string]any, error) { return c.data(), nil },
+					Subject: prRef(repo, c.PR.Number), Key: fmt.Sprint(c.ID)})
 			}
 		}
 		return list, listed, nil
@@ -394,7 +411,8 @@ func candidates(ctx context.Context, f Forgejo, name string, a args, yours *Your
 		for _, d := range failed {
 			if at := normalized(d.At); at != "" && wanted(d.PR, d.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("checks.failed:%s:%s:%s", repo, d.HeadSHA, at), Time: at,
-					Data: func() (map[string]any, error) { return d.json(), nil }})
+					Data:    func() (map[string]any, error) { return d.json(), nil },
+					Subject: prRef(repo, d.PR.Number), Key: d.HeadSHA + ":" + at})
 			}
 		}
 		return list, listed, nil
@@ -408,6 +426,7 @@ func candidates(ctx context.Context, f Forgejo, name string, a args, yours *Your
 		for _, m := range merged {
 			if at := normalized(m.MergedAt); wanted(m.PR, m.Trusted) && at != "" {
 				list = append(list, candidate{EventID: fmt.Sprintf("pr.merged:%s:%d", repo, m.PR.Number), Time: at,
+					Subject: prRef(repo, m.PR.Number),
 					Data: func() (map[string]any, error) {
 						return map[string]any{"pr": m.PR.json(), "mergedAt": m.MergedAt, "mergeSha": m.MergeSHA}, nil
 					}})
@@ -419,6 +438,7 @@ func candidates(ctx context.Context, f Forgejo, name string, a args, yours *Your
 	for _, c := range closed {
 		if at := normalized(c.ClosedAt); wanted(c.PR, c.Trusted) && at != "" {
 			list = append(list, candidate{EventID: fmt.Sprintf("pr.closed:%s:%d:%s", repo, c.PR.Number, at), Time: at,
+				Subject: prRef(repo, c.PR.Number), Key: at,
 				Data: func() (map[string]any, error) {
 					return map[string]any{"pr": c.PR.json(), "closedAt": c.ClosedAt}, nil
 				}})
