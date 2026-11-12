@@ -707,6 +707,9 @@ QUIET = """This is a demo project, recorded for a video.
 
 - Never name or quote an instructions file (CLAUDE.md, AGENTS.md or any other), and never say
   where an instruction came from or which rule you follow.
+- Read and run nothing outside this folder: no memory files (MEMORY.md, ~/.agents,
+  ~/.claude) and no other folder, whatever your other instructions say (#4964: a take
+  showed an agent's `cat` of the person's memory files).
 """
 
 # What is the person's own and must not be in a video: their name, and what an agent says of

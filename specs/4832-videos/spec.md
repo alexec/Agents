@@ -260,6 +260,12 @@ anyway. Alex can overrule.
   was last released in April 2025, so it runs through `mlx-audio` (MIT, 2026-11-09).
 - *The cards:* a title card (the logo, the title, "Loops · How to") fades into the window,
   and the end card has the same look and names the docs page (#4965, PR #4973).
+- *The take:* the first one failed its private-words check, as it should: the scratch
+  Claude agent followed the app's brief, read the person's memory files, and the window
+  showed the `cat` with the home folder. The demo folder's rules (`QUIET` in `make.py`)
+  now say to read nothing outside the folder. The second take passed and is
+  [on YouTube](https://youtu.be/Y2SCoou-miE), private; the first upload is private and out
+  of the playlist. The "Make a recovery key" card shows for a moment at the start.
 - *Time:* about 2 h of the lane, most of it the samples; about 10 min of Alex's listening.
 - *What the next video needs:* nothing more for a private upload. `make.sh <id> --upload`
   is one step now. A public video still waits on open question 2 (the API audit) and on
