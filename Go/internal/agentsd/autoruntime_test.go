@@ -331,7 +331,7 @@ func TestContinueOnAuto(t *testing.T) {
 }
 
 // A helper on Auto asks unless its starter approves every request itself: Grok's Approve
-// for me is Yes to all, which runs shell commands Claude's Accept edits asks about.
+// for me is Always Approve, which runs shell commands Claude's Accept edits asks about.
 func TestAnAutoHelperAsksLikeItsStarter(t *testing.T) {
 	fakeRuntimes(t)
 	d, c := start(t, t.TempDir())

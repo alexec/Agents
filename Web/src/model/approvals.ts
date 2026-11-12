@@ -19,7 +19,7 @@ export const kindWords: Record<ApprovalKind, string> = {
 export function actionWord(kind: ApprovalKind, action: ApprovalAction): string {
   switch (action) {
     case "approve": return kind === "file" ? "Keep" : kind === "archive" ? "Archive" : "Approve";
-    case "deny": return kind === "file" ? "Undo" : kind === "archive" ? "Keep Session" : kind === "deploy" ? "Reject" : "Deny";
+    case "deny": return kind === "file" ? "Undo" : kind === "archive" ? "Keep Session" : "Deny";
     case "requestChanges": return "Request Changes";
     case "dismiss": return "Dismiss";
   }

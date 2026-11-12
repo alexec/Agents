@@ -14,6 +14,8 @@ something up, not for reading through.
   in the app.
 - [Tools the app gives agents](agent-tools.md): every tool an agent gets from the app, and
   whether you are asked before it runs.
+- [Approval words](approval-words.md): the words on every approval: Approve, Approve for
+  This Session, Always Approve, Approve for 1 Hour and Deny.
 - [The sidebar](sidebar.md): what the sidebar holds, in what order, which smart groups
   start on or off, sessions under their starter, and read and unread.
 - [Settings, and the Runtimes and Resources pages](settings.md): every control in Settings

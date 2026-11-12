@@ -753,7 +753,7 @@ func (d *Daemon) startAutoHelper(me *wire.Agent, args map[string]json.RawMessage
 }
 
 // helperRequests keeps a helper on Auto to Request cards unless its starter approves every
-// request itself: Yes to all, the Approve for me cell on Cursor, Grok and OpenCode, answers
+// request itself: Always Approve, the Approve for me cell on Cursor, Grok and OpenCode, answers
 // shell commands too, which Approve for me on Claude still asks about.
 func (d *Daemon) helperRequests(r *wire.StartRequest, starter *wire.Agent) {
 	if r.RuntimeID != autoRuntimeID || starter != nil && d.approvesEverything(starter) {
@@ -768,7 +768,7 @@ func (d *Daemon) helperRequests(r *wire.StartRequest, starter *wire.Agent) {
 }
 
 // approvesEverything is an agent that runs every command without asking: in Bypass
-// permissions, or answering its requests with Yes to all.
+// permissions, or answering its requests with Always Approve.
 func (d *Daemon) approvesEverything(a *wire.Agent) bool {
 	bypass := func(l *wire.Levels) bool {
 		return l != nil && l.Permission != nil && *l.Permission == wire.PermissionLevelBypassPermissions

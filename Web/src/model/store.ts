@@ -2496,7 +2496,7 @@ export class Store extends Work {
    * once with the host's row; the start's progress comes as `control/hostChanged`, and a refusal
    * is said in `problem`.
    */
-  /** Allow or Don’t Allow: any client may answer, and the control plane takes the first. */
+  /** Approve or Deny: any client may answer, and the control plane takes the first. */
   async answerGitLend(ask: GitLendAsk, allowed: boolean): Promise<void> {
     this.gitAsksAnswered.value = new Set([...this.gitAsksAnswered.value, askID(ask.host, ask.server)]);
     await this.lendGit(ask.host, ask.from, ask.server, allowed);

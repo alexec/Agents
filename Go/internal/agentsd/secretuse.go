@@ -186,7 +186,7 @@ func (d *Daemon) secretUseAllowed(agent wire.UUID, name string, use wire.SecretU
 		return true
 	}
 	d.secretUseMu.Unlock()
-	// An account's Allow Always is its Ask before use turned off (accountuse.go), not a grant.
+	// An account's Always Approve is its Ask before use turned off (accountuse.go), not a grant.
 	if use == wire.SecretUseAccount || d.isSessionSecret(agent, name) {
 		return false
 	}
@@ -266,7 +266,7 @@ func (d *Daemon) answerSecretUse(rec wire.Request, a *wire.RequestSecretUseAnswe
 		return d.answerAccountUse(rec, a, by)
 	}
 	if a.Action == secretUseHour {
-		return wire.RequestUpdate{}, Invalid("Allow for 1 Hour is for a terminal's request; this one takes once, session, always or deny.")
+		return wire.RequestUpdate{}, Invalid("Approve for 1 Hour is for a terminal's request; this one takes once, session, always or deny.")
 	}
 	if rec.AskedBy == nil {
 		return wire.RequestUpdate{}, Invalid("This request has no session.")

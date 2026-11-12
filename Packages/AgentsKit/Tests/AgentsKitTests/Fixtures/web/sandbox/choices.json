@@ -625,7 +625,7 @@
         "on" : "No sandbox",
         "runtime" : "No sandbox"
       },
-      "why" : "OpenCode has no command sandbox. It asks before running commands unless set to Always-approve.",
+      "why" : "OpenCode has no command sandbox. It asks before running commands unless set to Always Approve.",
       "words" : {
         "off" : "No sandbox",
         "on" : "Runtime sandbox",
@@ -658,7 +658,7 @@
         "on" : "No sandbox",
         "runtime" : "No sandbox"
       },
-      "why" : "OpenCode has no command sandbox. It asks before running commands unless set to Always-approve.",
+      "why" : "OpenCode has no command sandbox. It asks before running commands unless set to Always Approve.",
       "words" : {
         "off" : "No sandbox",
         "on" : "Runtime sandbox",
@@ -691,7 +691,7 @@
         "on" : "No sandbox",
         "runtime" : "No sandbox"
       },
-      "why" : "OpenCode has no command sandbox. It asks before running commands unless set to Always-approve.",
+      "why" : "OpenCode has no command sandbox. It asks before running commands unless set to Always Approve.",
       "words" : {
         "off" : "No sandbox",
         "on" : "Runtime sandbox",

@@ -49,7 +49,7 @@ export function accountAsks(a: OutsideAccount): boolean {
 
 /** Under the sheet's Ask before use toggle, as the window's AccountsWords.askHint. */
 export function accountAskHint(on: boolean): string {
-  return on ? "An agent's read of it waits for your approval: Allow Once, for This Session, Always or Deny."
+  return on ? "An agent's read of it waits for your approval: Approve, Approve for This Session, Always Approve or Deny."
     : "Every agent can read it with no approval.";
 }
 

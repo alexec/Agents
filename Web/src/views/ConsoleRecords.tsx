@@ -83,7 +83,7 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
               <li key={r.request} class="request">
                 <span>{linkWords(r)}</span>
                 <span class="request-actions">
-                  <button type="button" disabled={down} onClick={() => void decide(r, false)}>Refuse</button>
+                  <button type="button" disabled={down} onClick={() => void decide(r, false)}>Deny</button>
                   <button type="button" class="prominent" disabled={down} onClick={() => void decide(r, true)}>Approve</button>
                 </span>
               </li>
@@ -192,7 +192,7 @@ function BudgetRequests({ store, down }: { store: Store; down: boolean }) {
                     aria-label={`Today's budget for ${r.userName}, in ${inTokens ? "tokens" : "dollars"}`}
                     value={amount(r)} onInput={(e) => { amounts.value = { ...amounts.value, [r.id]: (e.currentTarget as HTMLInputElement).value }; }} />
                 </label>
-                <button type="button" disabled={down} onClick={() => void answer(r, false)}>Refuse</button>
+                <button type="button" disabled={down} onClick={() => void answer(r, false)}>Deny</button>
                 <button type="button" class="prominent" disabled={down || !(usd > 0)} onClick={() => void answer(r, true)}>{raiseTitle}</button>
               </span>
             </li>

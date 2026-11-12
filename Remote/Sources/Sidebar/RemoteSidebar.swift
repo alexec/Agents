@@ -614,9 +614,9 @@ private struct RemoteCheckSuggestionRow: View {
 
 /// One request to the person under Needs You (#3864), the window's `RequestListRow`: a tap
 /// opens the session that asked it, where its card takes the answer. A secret's use (#4017)
-/// has no card: Allow Once is a leading swipe, Deny a trailing one, and the long press has
+/// has no card: Approve is a leading swipe, Deny a trailing one, and the long press has
 /// all its answers, as an approval's row has. A terminal's agents-secret (#4179) has no session
-/// to open: its long press has Allow Once, Allow for 1 Hour and Deny.
+/// to open: its long press has Approve, Approve for 1 Hour and Deny.
 ///
 /// Later (#4235) is a trailing swipe, after Deny, that asks when, and a menu in the long press,
 /// with the window's choices. In Later, Bring Back Now is a leading swipe and in the long press.

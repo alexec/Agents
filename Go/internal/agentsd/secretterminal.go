@@ -46,7 +46,7 @@ const secretUseHour = "hour"
 // terminalCaveat is the known gap, in the request's words on every client.
 const terminalCaveat = "Agents cannot tell a terminal from an agent outside its session."
 
-// terminalHour is how long Allow for 1 Hour lasts; a test makes it short.
+// terminalHour is how long Approve for 1 Hour lasts; a test makes it short.
 var terminalHour = time.Hour
 
 // terminalPlace is a terminal's read's place in the record, as the spike #4168 says it.
@@ -144,7 +144,7 @@ func (d *Daemon) terminalSecret(ctx context.Context, name, command string, hold 
 		return d.terminalValue(home, name)
 	}
 	if rec := d.request(id); rec != nil && rec.State == wire.RequestStateOpen {
-		words := "Waiting for a person to allow " + name + " in Needs you (Allow Once, Allow for 1 Hour or Deny)."
+		words := "Waiting for a person to allow " + name + " in Needs you (Approve, Approve for 1 Hour or Deny)."
 		return wire.SecretTerminalValue{Request: &id, Words: &words}, nil
 	}
 	return wire.SecretTerminalValue{}, Invalid("A person denied %s to this terminal.", name)

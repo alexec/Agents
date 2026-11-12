@@ -17,7 +17,7 @@ extension AppModel {
         GitLendAsk.first(in: controlPlaneHosts ?? [], thisMac: thisMacHostID, answered: gitAsksAnswered)
     }
 
-    /// Allow or Don’t Allow (#1122): said to the control plane, which answers the waiting git.
+    /// Approve or Deny (#1122): said to the control plane, which answers the waiting git.
     func answerGitLend(_ ask: GitLendAsk, allowed: Bool) {
         gitAsksAnswered.insert(ask.id)
         lendGit(host: ask.host, from: ask.from, server: ask.server, allowed: allowed)

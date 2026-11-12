@@ -63,7 +63,7 @@ func TestAFlaggedFillWaitsOnAPerson(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Allow once: the held call fills.
+	// Approve: the held call fills.
 	done := fillAsync(m, 2)
 	r := openSecretUse(t, d)
 	if r.Kind != wire.RequestKindApprove || r.Source != wire.RequestSourceSecretUse || r.Title != "Fill GITLAB_PASSWORD on shop.example.com" ||
@@ -276,7 +276,7 @@ func TestASecretUseIsPostedWithItsAnswers(t *testing.T) {
 	for _, a := range needs[0].Headline.Answers {
 		answers = append(answers, a.ID+"="+a.Title+fmt.Sprint(a.IsDestructive))
 	}
-	if strings.Join(answers, ", ") != "once=Allow Oncefalse, session=Allow for This Sessionfalse, always=Allow Alwaysfalse, deny=Denytrue" {
+	if strings.Join(answers, ", ") != "once=Approvefalse, session=Approve for This Sessionfalse, always=Always Approvefalse, deny=Denytrue" {
 		t.Fatal(answers)
 	}
 	if b, _ := json.Marshal(needs); strings.Contains(string(b), filledValue) {
@@ -289,7 +289,7 @@ func TestASecretUseIsPostedWithItsAnswers(t *testing.T) {
 	}
 }
 
-// A session's own secret has no Allow always on its banner, as on its row.
+// A session's own secret has no Always Approve on its banner, as on its row.
 func TestASessionSecretsBannerHasNoAllowAlways(t *testing.T) {
 	yes := true
 	var ids []string

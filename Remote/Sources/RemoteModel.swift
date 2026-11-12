@@ -2849,7 +2849,7 @@ final class RemoteModel {
         GitLendAsk.first(in: controlHosts, thisMac: nil, answered: gitAsksAnswered)
     }
 
-    /// Allow or Don’t Allow on the ask.
+    /// Approve or Deny on the ask.
     func answerGitLend(_ ask: GitLendAsk, allowed: Bool) async {
         gitAsksAnswered.insert(ask.id)
         await lendGit(host: ask.host, from: ask.from, server: ask.server, allowed: allowed)

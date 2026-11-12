@@ -263,8 +263,8 @@ struct RemoteView: View {
         // A host's git asked to use a Mac's git access (#1122).
         .alert(model.gitLendAsk?.title ?? "", isPresented: Binding(get: { model.gitLendAsk != nil }, set: { _ in }),
                presenting: model.gitLendAsk) { ask in
-            Button("Allow") { Task { await model.answerGitLend(ask, allowed: true) } }
-            Button("Don’t Allow", role: .cancel) { Task { await model.answerGitLend(ask, allowed: false) } }
+            Button("Approve") { Task { await model.answerGitLend(ask, allowed: true) } }
+            Button("Deny", role: .cancel) { Task { await model.answerGitLend(ask, allowed: false) } }
         } message: { ask in
             Text(ask.message)
         }

@@ -854,7 +854,7 @@ func (c *client) WriteTextFile(ctx context.Context, p sdk.WriteTextFileRequest) 
 }
 
 // writeRequest is the card for a write the runtime asks the client for
-// (FileService.writeToolCall): the diff against the file as it is, Allow or Refuse.
+// (FileService.writeToolCall): the diff against the file as it is, Approve or Deny.
 func writeRequest(asked, path, content string) sdk.RequestPermissionRequest {
 	diff := sdk.ToolDiffContent(asked, content)
 	if b, err := os.ReadFile(path); err == nil {
@@ -864,8 +864,8 @@ func writeRequest(asked, path, content string) sdk.RequestPermissionRequest {
 		ToolCall: sdk.ToolCallUpdate{Title: sdk.Ptr("Write " + filepath.Base(asked)), Kind: sdk.Ptr(sdk.ToolKindEdit),
 			Status: sdk.Ptr(sdk.ToolCallStatusPending), Content: []sdk.ToolCallContent{diff},
 			Locations: []sdk.ToolCallLocation{{Path: asked}}},
-		Options: []sdk.PermissionOption{{OptionId: "allow_once", Name: "Allow", Kind: sdk.PermissionOptionKindAllowOnce},
-			{OptionId: "reject_once", Name: "Refuse", Kind: sdk.PermissionOptionKindRejectOnce}},
+		Options: []sdk.PermissionOption{{OptionId: "allow_once", Name: "Approve", Kind: sdk.PermissionOptionKindAllowOnce},
+			{OptionId: "reject_once", Name: "Deny", Kind: sdk.PermissionOptionKindRejectOnce}},
 	}
 }
 

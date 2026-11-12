@@ -52,7 +52,7 @@ struct GuardedChangeCard: View {
                 Group {
                     Button(change.policy?.keepTitle ?? "Undo") { answer(keep: false) }
                         .buttonStyle(.paper)
-                    Button(change.policy == nil ? "Keep" : "Allow") { answer(keep: true) }
+                    Button(change.policy == nil ? "Keep" : "Approve") { answer(keep: true) }
                         .buttonStyle(.paperProminent)
                 }
                 .disabled(reading == nil || busy || isOffline)

@@ -40,7 +40,7 @@ import (
 // Linux machine with no control plane keeps no flagged value.
 //
 // The associated data binds where it is kept, its name, the flag and its grants (#4015's
-// "Allow always" places), so a record moved or changed by hand does not open. Turning the
+// "Always Approve" places), so a record moved or changed by hand does not open. Turning the
 // flag on or off seals the record again, with the other flag.
 //
 // The store also keeps secrets with the flag off (#4176, the spike #4168): the machine's

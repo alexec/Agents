@@ -2009,7 +2009,7 @@ export interface ClientPermissionSettings {
   grok: ClientPermissionMode;
   opencode: ClientPermissionMode;
   /**
-   * Set when the organisation's mode ceiling is below approving every request: Always-approve is
+   * Set when the organisation's mode ceiling is below approving every request: Always Approve is
    * refused, and no agent's requests are answered for the person.
    */
   setBy?: PolicySetBy;
@@ -8352,7 +8352,7 @@ export interface OutsideAccount {
   /**
    * Ask before use (#4163): an agent's manage_accounts get of it waits on a person's approval, as a
    * secret's use does (#4015). Absent is on, also for an account an agent adds; false is off, which
-   * a person sets, or Allow Always on its request does. Not sealed: kept with the account, and
+   * a person sets, or Always Approve on its request does. Not sealed: kept with the account, and
    * agentsd enforces it.
    */
   askBeforeUse?: boolean;
@@ -10690,7 +10690,8 @@ export interface RequestSecretUse {
    */
   call?: string;
   /**
-   * The secret is the session's own (#3548): Allow always is the same as Allow for this session.
+   * The secret is the session's own (#3548): Always Approve is the same as Approve for This
+   * Session.
    */
   sessionOnly?: boolean;
   /**
@@ -11500,7 +11501,7 @@ export interface SecretTerminalValue {
  * secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a
  * terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163)
  * is not a secret's use: manage_accounts reads an account with Ask before use; the request names
- * the account, and Allow Always turns its Ask before use off.
+ * the account, and Always Approve turns its Ask before use off.
  */
 export type SecretUse =
   | "fill"
