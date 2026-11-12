@@ -5593,6 +5593,19 @@ export interface LineageCostNode {
    * recovery time.
    */
   reverts?: string;
+  /**
+   * When a PR was opened (#4553): pr.opened's openedAt, the earliest kept. The approval wait's
+   * start when askedAt is unknown.
+   */
+  openedAt?: WireDate;
+  /** When a PR was labelled needs-approval (#4553), from pr.labelled: the approval wait's start. */
+  askedAt?: WireDate;
+  /**
+   * A PR's first answer by a person (#4553): the first pr.reviewed or pr.commented at or after the
+   * wait's start, while it was open, not by a bot and not a comment that starts with <!-- agent
+   * -->. The approval wait is this less askedAt, else openedAt.
+   */
+  answeredAt?: WireDate;
 }
 
 /**
@@ -5657,6 +5670,17 @@ export interface LineageDelivery {
    * median. Counted by its last merge.
    */
   flowEfficiency: LineageDeliveryFigure;
+  /**
+   * The approval wait (#4553), in seconds: from a PR's needs-approval label (its opening when the
+   * label is unknown) to its first answer by a person; the median, and p90. Counted by the answer's
+   * time.
+   */
+  approvalWait: LineageDeliveryFigure;
+  /**
+   * The share of merged PRs, 0 to 1, that waited for a person's answer before their merge (#4553),
+   * by merge time. count is the merged PRs.
+   */
+  approvalShare: LineageDeliveryFigure;
 }
 
 /**
@@ -13206,6 +13230,12 @@ export interface TimeHistory {
   timeZone?: string;
   recap: Record<string, DayRecap>;
   records: TimeRecords;
+  /**
+   * How long this machine's PRs waited for a person's answer (#4553), over every repo it has: the
+   * approvalWait of LineageDelivery. Reports ▸ Time's line on the web page. Absent from a host too
+   * old to say.
+   */
+  approvalWait?: LineageDeliveryFigure;
 }
 
 export interface TimeRecord {
@@ -15994,9 +16024,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageChanged: { required: ["host", "states"], optional: ["links"] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "milestone", "endedAt", "resolved", "sessions", "estimate", "forecast", "files", "reverts"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "milestone", "endedAt", "resolved", "sessions", "estimate", "forecast", "files", "reverts", "openedAt", "askedAt", "answeredAt"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
-  LineageDelivery: { required: ["since", "at", "windowDays", "leadTime", "deploymentFrequency", "changeFailureRate", "recoveryTime", "reworkRate", "flowEfficiency"], optional: [] },
+  LineageDelivery: { required: ["since", "at", "windowDays", "leadTime", "deploymentFrequency", "changeFailureRate", "recoveryTime", "reworkRate", "flowEfficiency", "approvalWait", "approvalShare"], optional: [] },
   LineageDeliveryFigure: { required: ["count", "weeks"], optional: ["value", "p90", "band"] },
   LineageDeliveryWeek: { required: ["since", "count"], optional: ["value"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
@@ -16635,7 +16665,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   TeamWorkflowRuns: { required: ["workflow", "runs"], optional: ["lastRunAt"] },
   TeamWorkflows: { required: ["bots"], optional: [] },
   TimeBucket: { required: ["agent", "tools", "others", "person", "turns"], optional: [] },
-  TimeHistory: { required: ["hours", "days", "now", "recap", "records"], optional: ["timeZone"] },
+  TimeHistory: { required: ["hours", "days", "now", "recap", "records"], optional: ["timeZone", "approvalWait"] },
   TimeRecord: { required: ["value", "day"], optional: [] },
   TimeRecords: { required: [], optional: ["mostAgents", "mostPRs", "longestClear"] },
   ToolCall: { required: ["title", "content", "locations"], optional: ["toolCallID", "name", "kind", "status", "rawInput", "rawOutput", "raw"] },
