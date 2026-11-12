@@ -287,6 +287,8 @@ public final class AgentsModel {
             if let oldValue, let left = shownTranscript(of: oldValue) { onLeavingChat?(left) }
             shown.id = watching
             clearTranscript()
+            // A prompt the host took is in the transcript the next chat loads (#4814).
+            if let oldValue { dropAnsweredSends(of: oldValue) }
             // A chat opens at its end, whatever the last one was left at.
             isFollowingEnd = true
             // Output is kept for the chat on screen only (#203). The host sends what a
@@ -508,6 +510,27 @@ public final class AgentsModel {
     @ObservationIgnored private var answering: Set<UUID> = []
     /// Of those, the ones the host said were settled while the answer was going.
     @ObservationIgnored private var answeredElsewhere: Set<UUID> = []
+    /// An approval in one folder on one host (#4814).
+    private struct HeldApproval: Hashable {
+        let key: FolderKey
+        let id: String
+    }
+    /// The approvals answered here whose answer is on its way (#4814): out of their
+    /// folder's list until it is back, as a permission's card is.
+    @ObservationIgnored private var answeringApprovals: [HeldApproval: Approval] = [:]
+    /// Of those, the ones a host's list no longer had while the answer was going.
+    @ObservationIgnored private var approvalsAnsweredElsewhere: Set<HeldApproval> = []
+
+    /// A prompt sent here and not yet in its transcript (#4814): the chat draws it as the
+    /// person's bubble at once, until the host's own entry for it lands.
+    public struct SendingPrompt: Identifiable, Equatable, Sendable {
+        public let id: UUID
+        public let text: String
+        /// The host took it. The next entry it sends is the prompt, whatever its words.
+        var answered = false
+    }
+    /// The prompts on their way, by agent, oldest first.
+    public private(set) var sendingPrompts: [UUID: [SendingPrompt]] = [:]
 
     /// What each agent has been asked to do and has not yet answered (#87): the control
     /// that sent it shows it is on its way, and every control that would send another is
@@ -740,6 +763,7 @@ public final class AgentsModel {
             }
             entryIDs.insert(notification.entry.id)
             entries.append(notification.entry)
+            landed(notification.entry, on: notification.agentID)
             display.add(notification.entry)
             let indexed = fileIndex.add(notification.entry)
             if indexed.changes { fileChanges = fileIndex.changes }
@@ -1216,6 +1240,7 @@ public final class AgentsModel {
     }
 
     public func upsert(_ summary: DaemonAPI.FolderSummary) {
+        let summary = hidingAnswered(summary)
         if let index = folders.firstIndex(where: { $0.folder.folder == summary.folder.folder && $0.host == summary.host }) {
             folders[index] = summary
         } else {
@@ -1247,7 +1272,7 @@ public final class AgentsModel {
     }
 
     public func replaceFolders(_ listed: [DaemonAPI.FolderSummary]) {
-        folders = listed.sorted(by: SidebarOrder.byAdded)
+        folders = listed.map(hidingAnswered).sorted(by: SidebarOrder.byAdded)
     }
 
     /// One host's agents, as it just listed them. Every other host's are left alone:
@@ -1264,7 +1289,7 @@ public final class AgentsModel {
     }
 
     public func replaceFolders(_ listed: [DaemonAPI.FolderSummary], from host: MachineRef) {
-        let stamped = listed.map { var summary = $0; summary.host = host; return summary }
+        let stamped = listed.map { var summary = $0; summary.host = host; return hidingAnswered(summary) }
         folders = (folders.filter { $0.host != host } + stamped).sorted(by: SidebarOrder.byAdded)
         onListed?(host)
     }
@@ -1611,10 +1636,12 @@ public final class AgentsModel {
     /// record goes back, with any other change still pending drawn over it. Answered, it
     /// stays drawn until the host's record says so, or until the host next speaks about
     /// this agent: its word is the last one either way.
-    public func settleWrite(_ id: Int, on agentID: UUID, failed: Bool) {
+    /// `done`: the host's answer says the change is made already (a move made at once,
+    /// #4814), so it goes now and the host's record shows the rest.
+    public func settleWrite(_ id: Int, on agentID: UUID, failed: Bool, done: Bool = false) {
         guard var writes = pendingWrites[agentID], let at = writes.firstIndex(where: { $0.id == id }),
               let host = hostRecords[agentID] else { return }
-        if failed || writes[at].write.isSettled(by: host) {
+        if failed || done || writes[at].write.isSettled(by: host) {
             writes.remove(at: at)
         } else {
             writes[at].answered = true
@@ -1722,6 +1749,98 @@ public final class AgentsModel {
         let sent = await send()
         if !sent, requests.first(where: { $0.id == request.id }) == shown { apply(.requestChanged(held)) }
         return sent
+    }
+
+    /// Approve, Deny, Request changes or Dismiss a waiting item (#4814): out of its
+    /// folder's list at once, before the host has the answer, and back when the answer did
+    /// not go, unless a list from the host said meanwhile that it was no longer there.
+    @discardableResult
+    public func answering(_ approval: Approval, in key: FolderKey, _ send: () async -> Bool) async -> Bool {
+        let held = HeldApproval(key: key, id: approval.id)
+        answeringApprovals[held] = approval
+        if let index = folders.firstIndex(where: { $0.host == key.host && $0.folder.folder == key.folder }) {
+            folders[index].approvals?.removeAll { $0.id == approval.id }
+        }
+        let sent = await send()
+        let resolved = approvalsAnsweredElsewhere.remove(held) != nil
+        answeringApprovals[held] = nil
+        if !sent, !resolved,
+           let index = folders.firstIndex(where: { $0.host == key.host && $0.folder.folder == key.folder }),
+           !(folders[index].approvals ?? []).contains(where: { $0.id == approval.id }) {
+            folders[index].approvals = (folders[index].approvals ?? []) + [approval]
+        }
+        return sent
+    }
+
+    /// A waiting item by its id, also while its answer is on its way (#4814): the Review
+    /// page that sent it stays on it, to say a refusal in place.
+    public func approval(_ id: String, in key: FolderKey) -> Approval? {
+        folder(key)?.approvals?.first { $0.id == id } ?? answeringApprovals[HeldApproval(key: key, id: id)]
+    }
+
+    /// A host's list of a folder, with the approvals answered here and still on their way
+    /// left out. One it no longer has was answered, here or elsewhere.
+    private func hidingAnswered(_ summary: DaemonAPI.FolderSummary) -> DaemonAPI.FolderSummary {
+        guard !answeringApprovals.isEmpty else { return summary }
+        let key = FolderKey(host: summary.host, folder: summary.folder.folder)
+        let listed = Set((summary.approvals ?? []).map(\.id))
+        for held in answeringApprovals.keys where held.key == key && !listed.contains(held.id) {
+            approvalsAnsweredElsewhere.insert(held)
+        }
+        var summary = summary
+        summary.approvals = summary.approvals?.filter { answeringApprovals[HeldApproval(key: key, id: $0.id)] == nil }
+        return summary
+    }
+
+    // MARK: Prompts on their way (#4814)
+
+    /// Draw a prompt in the chat now, as the person's bubble, before its host has it. Only
+    /// for an agent between turns: one that will queue it shows it in its queue, from the
+    /// host's record. Nil when nothing was drawn.
+    public func beginSending(_ text: String, to agentID: UUID) -> UUID? {
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, let agent = byID[agentID], !Self.willQueue(agent) else { return nil }
+        let id = UUID()
+        sendingPrompts[agentID, default: []].append(SendingPrompt(id: id, text: text))
+        return id
+    }
+
+    /// The call for a prompt came back. Not sent, its bubble goes (the prompt bar has the
+    /// words back). Sent, it stays until the host's entry for it lands.
+    public func endSending(_ id: UUID?, to agentID: UUID, sent: Bool) {
+        guard let id, var sending = sendingPrompts[agentID], let at = sending.firstIndex(where: { $0.id == id }) else { return }
+        if sent, agentID == watching {
+            sending[at].answered = true
+        } else {
+            sending.remove(at: at)
+        }
+        sendingPrompts[agentID] = sending.isEmpty ? nil : sending
+    }
+
+    /// The prompts on their way to an agent, for its chat to draw.
+    public func sending(to agentID: UUID) -> [SendingPrompt] { sendingPrompts[agentID] ?? [] }
+
+    /// Whether what is sent now waits for the turn to end rather than go: the prompt bar's rule.
+    public nonisolated static func willQueue(_ agent: Agent) -> Bool {
+        agent.state.hasTurnInFlight || agent.state == .queued || !agent.queuedPrompts.isEmpty
+    }
+
+    /// An entry landed in the chat: the person's prompt with the same words is the one on
+    /// its way, and any entry after the host took one means that one is in.
+    private func landed(_ entry: TranscriptEntry, on agentID: UUID) {
+        guard var sending = sendingPrompts[agentID], !sending.isEmpty else { return }
+        if case .userMessage(let text, _, .person) = entry.kind,
+           let at = sending.firstIndex(where: { $0.text == text.trimmingCharacters(in: .whitespacesAndNewlines) }) {
+            sending.remove(at: at)
+        } else if let at = sending.firstIndex(where: \.answered) {
+            sending.remove(at: at)
+        }
+        sendingPrompts[agentID] = sending.isEmpty ? nil : sending
+    }
+
+    private func dropAnsweredSends(of agentID: UUID) {
+        guard let sending = sendingPrompts[agentID]?.filter({ !$0.answered }) else { return }
+        sendingPrompts[agentID] = sending.isEmpty ? nil : sending
     }
 
     /// Answer a question card, the same way as a permission (#4786).

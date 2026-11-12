@@ -12,7 +12,8 @@ struct ReviewDestination: View {
     let folder: FolderKey
 
     var body: some View {
-        if let approval = model.work.folder(folder)?.approvals?.first(where: { $0.id == id }) {
+        // Also while its answer is on its way (#4814): a refusal is said here, in place.
+        if let approval = model.work.approval(id, in: folder) {
             ReviewPage(approval: approval, place: place,
                        read: { await model.readApproval(approval, for: folder) },
                        answer: { action, digest, note in

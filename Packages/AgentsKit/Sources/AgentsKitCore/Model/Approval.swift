@@ -52,6 +52,19 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
 
     public var id: String { "\(kind.rawValue):\(key)" }
 
+    /// The one line a client shows when an answer drawn at once did not go (#4814).
+    public func failure(_ action: Action, _ reason: String) -> String {
+        let verb = switch (kind, action) {
+        case (.archive, .approve): "archive the session"
+        case (.archive, .deny): "keep the session"
+        case (_, .approve): "approve"
+        case (_, .deny): "deny"
+        case (_, .requestChanges): "request changes"
+        case (_, .dismiss): "dismiss"
+        }
+        return AgentWrite.failure(verb, reason)
+    }
+
     public init(kind: Kind, key: String, title: String, digest: String?, line: String, since: Date? = nil,
                 actions: [Action], agentID: UUID? = nil) {
         self.kind = kind

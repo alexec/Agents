@@ -69,11 +69,14 @@ import type { ChartHint } from "./chart";
 import { Providers } from "./providers";
 import { MachineLock } from "./machineLock";
 import { isLead, leadEpic, leadProgressWords } from "./leadProgress";
-import { type AgentWrite, PendingWrites, omitting, writeFailure } from "./pendingWrites";
+import { type AgentWrite, PendingWrites, failureLine, omitting, writeFailure } from "./pendingWrites";
+import { approvalFailure, approvalID } from "./approvals";
+import { landed, type Sending, willQueue } from "./sending";
 import { type ChangeUndo, type Inverse, changeUndoLine, changeUndoMenu, labelsUndo, laterUndo, mutedUndo, renamedUndo,
   unarchivedUndo } from "./changeUndo";
 import { sessionRef as copyRef, type MachineCopy, type TranscriptCopy } from "./localCopy";
 import { sessionRef } from "../protocol/ref";
+import { mark, markOnce } from "./marks";
 
 /** What this page keeps by folder on a host, kept to the folders it lists (#3750). */
 function pruneFolderKeys(host: string, folders: readonly string[]): void {
@@ -251,6 +254,11 @@ export class Work {
 
   /** The conversation being read, and only that one. */
   readonly watching = signal<{ host: string; session: string } | null>(null);
+  /**
+   * The prompts on their way to each agent, by `host|agentID` (#4814): drawn in its chat as the
+   * person's bubble at once, until the host's own entry for one lands, and gone when one did not go.
+   */
+  readonly sending = signal<Record<string, Sending[]>>({});
   /** The conversation last looked for: once it is, one not in hand has gone (#2652), as PoppedChat.looked. */
   readonly lookedFor = signal<{ host: string; session: string } | null>(null);
   readonly entries = signal<TranscriptEntry[]>([]);
@@ -663,6 +671,8 @@ export class Work {
   protected transcriptEnd: number | null = null;
   /** Each host's point in its order of changes, as its last catch-up said (#4794). */
   protected readonly listPoints = new Map<string, ListRevision>();
+  /** A prompt was sent and its echo is not heard yet: the next entry marks `agents:echo` (#4784). */
+  protected echoAwaited = false;
 
   /** One notification from one host. Returns false for one this does not know. */
   apply(method: string, params: unknown, host: string): boolean {
@@ -877,7 +887,78 @@ export class Work {
   upsertFolder(summary: FolderSummary, host: string): void {
     const list = (this.folders.value[host] ?? [])
       .filter((p) => folderKey(p.folder.folder) !== folderKey(summary.folder.folder));
-    this.folders.value = { ...this.folders.value, [host]: [...list, summary] };
+    this.folders.value = { ...this.folders.value, [host]: [...list, this.hidingAnswered(summary, host)] };
+  }
+
+  /**
+   * The approvals answered here whose answer is on its way (#4814), by host, folder and id: out of
+   * their folder's list until the call is back, and `gone` once the host's list no longer has one.
+   */
+  private answeringApprovals = new Map<string, { approval: Approval; gone: boolean }>();
+
+  private static approvalSlot(host: string, folder: string, id: string): string {
+    return `${host}|${folderKey(folder)}|${id}`;
+  }
+
+  /** A host's summary of a folder, less the approvals being answered here (#4814). */
+  private hidingAnswered(summary: FolderSummary, host: string): FolderSummary {
+    if (this.answeringApprovals.size === 0) return summary;
+    const prefix = Work.approvalSlot(host, summary.folder.folder, "");
+    const listed = summary.approvals ?? [];
+    for (const [slot, held] of this.answeringApprovals) {
+      if (slot.startsWith(prefix) && !listed.some((a) => approvalID(a) === approvalID(held.approval))) held.gone = true;
+    }
+    const approvals = listed.filter((a) => !this.answeringApprovals.has(prefix + approvalID(a)));
+    return approvals.length === listed.length ? summary : { ...summary, approvals };
+  }
+
+  /** Every summary of a host's list, less the approvals being answered here. */
+  protected hidingAnsweredIn(summaries: FolderSummary[], host: string): FolderSummary[] {
+    return this.answeringApprovals.size === 0 ? summaries : summaries.map((p) => this.hidingAnswered(p, host));
+  }
+
+  /**
+   * An approval as the page shows it, found also while its answer is on its way (#4814): the Review
+   * page stays on it, to say a refusal in place, while its row has already gone.
+   */
+  approvalShown(host: string, folder: string, id: string): Approval | undefined {
+    const summary = (this.folders.value[host] ?? []).find((p) => folderKey(p.folder.folder) === folderKey(folder));
+    return summary?.approvals?.find((a) => approvalID(a) === id)
+      ?? this.answeringApprovals.get(Work.approvalSlot(host, folder, id))?.approval;
+  }
+
+  /**
+   * Answer an approval: it leaves its folder's list at once, before the host has the answer
+   * (#4814), and comes back when `send` answers null (it did not go), unless the host's list
+   * meanwhile no longer has it.
+   */
+  protected async answeringApproval<T>(host: string, folder: string, id: string, send: () => Promise<T | null>): Promise<T | null> {
+    const slot = Work.approvalSlot(host, folder, id);
+    const list = this.folders.peek()[host] ?? [];
+    const summary = list.find((p) => folderKey(p.folder.folder) === folderKey(folder));
+    const approval = summary?.approvals?.find((a) => approvalID(a) === id);
+    if (!summary || !approval || this.answeringApprovals.has(slot)) return send();
+    const held = { approval, gone: false };
+    this.answeringApprovals.set(slot, held);
+    this.placeFolder({ ...summary, approvals: (summary.approvals ?? []).filter((a) => approvalID(a) !== id) }, host);
+    let sent: T | null = null;
+    try {
+      sent = await send();
+    } finally {
+      this.answeringApprovals.delete(slot);
+      const now = (this.folders.peek()[host] ?? []).find((p) => folderKey(p.folder.folder) === folderKey(folder));
+      if (sent === null && !held.gone && now && !(now.approvals ?? []).some((a) => approvalID(a) === id)) {
+        this.placeFolder({ ...now, approvals: [...(now.approvals ?? []), approval] }, host);
+      }
+    }
+    return sent;
+  }
+
+  /** A summary into its place in the host's list, as it is: no approval hidden or shown again. */
+  private placeFolder(summary: FolderSummary, host: string): void {
+    const list = this.folders.peek()[host] ?? [];
+    this.folders.value = { ...this.folders.value,
+      [host]: list.map((p) => (folderKey(p.folder.folder) === folderKey(summary.folder.folder) ? summary : p)) };
   }
 
   /**
@@ -1065,6 +1146,7 @@ export class Work {
     batch(() => {
       this.watching.value = { host, session };
       this.clearTranscript();
+      this.dropAnsweredSends();
     });
   }
 
@@ -1072,8 +1154,30 @@ export class Work {
     batch(() => {
       this.watching.value = null;
       this.clearTranscript();
+      this.dropAnsweredSends();
     });
   }
+
+  /** The prompts on their way to an agent, as its chat draws them (#4814). */
+  sendingTo(host: string, agentID: string): Sending[] {
+    return this.sending.value[`${host}|${agentID}`] ?? [];
+  }
+
+  protected setSending(host: string, agentID: string, going: Sending[]): void {
+    const { [`${host}|${agentID}`]: _was, ...rest } = this.sending.peek();
+    this.sending.value = going.length > 0 ? { ...rest, [`${host}|${agentID}`]: going } : rest;
+  }
+
+  /** Answered ones wait for their chat's next entry: a chat left will not hear it. */
+  private dropAnsweredSends(): void {
+    const held = this.sending.peek();
+    if (!Object.values(held).some((going) => going.some((s) => s.answered))) return;
+    this.sending.value = Object.fromEntries(Object.entries(held)
+      .map(([key, going]) => [key, going.filter((s) => !s.answered)] as const)
+      .filter(([, going]) => going.length > 0));
+  }
+
+  protected nextSend = 0;
 
   /**
    * Told of an entry too big for its host to send (#203): its stub holds its place, drawing
@@ -1097,7 +1201,14 @@ export class Work {
   private takeEntry(note: EntryNotification, host: string): void {
     const watching = this.watching.value;
     if (!watching || watching.host !== host || watching.session !== note.agentID) return;
+    const going = this.sending.peek()[`${host}|${note.agentID}`];
+    if (going?.length) this.setSending(host, note.agentID, landed(going, note.entry));
     if (note.oversized !== undefined) this.oversized(host, note.agentID, note.entry.id, note.index);
+    // The first entry after a send is its echo: the night's walk times send to echo (#4784).
+    if (this.echoAwaited) {
+      this.echoAwaited = false;
+      mark("echo", "send");
+    }
     const heard = this.heardSincePage;
     if (heard) {
       const prior = heard.findIndex((entry) => entry.id === note.entry.id);
@@ -1558,10 +1669,10 @@ export class Store extends Work {
   constructor(readonly link: Link) {
     super();
     // The person's display choices are kept on their Mac (#1033).
-    sendPreferencesWith((changes) => {
-      void this.link.call("preferences/set", changes as Record<string, JSONValue>, this.macHostID.peek())
-        .then((said) => preferencesSaid(said)).catch(() => undefined);
-    });
+    // A change that did not go is put back and said (#4814), never swallowed.
+    sendPreferencesWith(
+      (changes) => this.link.call("preferences/set", changes as Record<string, JSONValue>, this.macHostID.peek()),
+      (error) => this.say(failureLine("save the setting", describe(error))));
     this.providers = new Providers(link);
     this.machineLock = new MachineLock({
       call: (method, params) => link.call(method as never, params as never),
@@ -1739,7 +1850,10 @@ export class Store extends Work {
       }
     });
     link.onState((state) => {
-      if (state.kind === "open") void this.load().then(() => this.sealWaiting());
+      if (state.kind === "open") {
+        markOnce("connected");
+        void this.load().then(() => this.sealWaiting());
+      }
     });
   }
 
@@ -2090,7 +2204,7 @@ export class Store extends Work {
     batch(() => {
       this.answered(host);
       if (heard.agents) this.replaceAgents(heard.agents, host);
-      if (heard.folders) this.folders.value = { ...this.folders.value, [host]: heard.folders };
+      if (heard.folders) this.folders.value = { ...this.folders.value, [host]: this.hidingAnsweredIn(heard.folders, host) };
     });
   }
 
@@ -2102,7 +2216,7 @@ export class Store extends Work {
     };
     // Lean: the columns read none of the option and command lists, 4 MB of 200 agents (#107).
     // The open session's come with loadWhole.
-    await this.listSessions(host).catch(failed("client/catchUp"));
+    if (await this.listSessions(host).then(() => true, failed("client/catchUp"))) markOnce("first-list", "connected");
     // The Archived folds that were open are listed again rather than left empty by the live list,
     // and the workflows on screen asked again: they may have changed meanwhile.
     const prefix = `${host}|`;
@@ -2125,7 +2239,7 @@ export class Store extends Work {
     // (#343), and Spending still counts what they cost.
     const folders = await this.link.call("folders/list", { includeArchived: true }, host).catch(failed("folders/list"));
     if (folders) {
-      this.folders.value = { ...this.folders.value, [host]: folders };
+      this.folders.value = { ...this.folders.value, [host]: this.hidingAnsweredIn(folders, host) };
       pruneFolderKeys(host, folders.map((p) => p.folder.folder));
     }
     const clones = await this.link.call("folders/clones", {}, host).catch(failed("folders/clones"));
@@ -2579,7 +2693,11 @@ export class Store extends Work {
    * with Try Again instead of calling the session deleted (#2743). Only the history is waited for.
    */
   private async loadTranscript(host: string, session: string): Promise<void> {
-    const page = this.loadPage(host, session);
+    mark("open-session");
+    const page = this.loadPage(host, session).then((shown) => {
+      if (shown) mark("session-open", "open-session");
+      return shown;
+    });
     void Promise.all([this.loadWhole(host, session), page]).then(([listed, paged]) => {
       const now = this.watching.value;
       if (listed && paged && now?.host === host && now.session === session) this.lookedFor.value = { host, session };
@@ -3050,16 +3168,17 @@ export class Store extends Work {
   }
 
   /**
-   * Calls `method`, and on failure says why in `problem` and answers null. With `write`, the line
-   * says what failed first: "Could not archive — …" (#4786).
+   * Calls `method`, and on failure says why in `problem` and answers null. With `write` (a change,
+   * or the verb of one), the line says what failed first: "Could not archive — …" (#4786, #4814).
    */
   async act<M extends keyof Methods>(method: M, params: Methods[M]["params"], host: string,
-                                     write?: AgentWrite): Promise<Methods[M]["result"] | null> {
+                                     write?: AgentWrite | string): Promise<Methods[M]["result"] | null> {
     try {
       return await this.link.call(method, params, host);
     } catch (error) {
       log("call.failed", error instanceof CallFailed ? error.code : undefined);
-      this.say(write ? writeFailure(write, describe(error)) : describe(error));
+      const why = describe(error);
+      this.say(write === undefined ? why : typeof write === "string" ? failureLine(write, why) : writeFailure(write, why));
       return null;
     }
   }
@@ -3207,12 +3326,31 @@ export class Store extends Work {
    */
   async answerApproval(host: string, folder: string, approval: Approval, action: ApprovalAction,
     digest: string | undefined, note?: string): Promise<FolderSummary> {
-    const summary = await this.link.call("approvals/answer", {
-      folder: folder as never, kind: approval.kind, key: approval.key, action,
-      ...(digest !== undefined ? { digest } : {}), ...(note !== undefined ? { note } : {}),
-    }, host);
+    let failure: unknown;
+    // Out of the list at once, and back if the answer did not go (#4814).
+    const summary = await this.answeringApproval(host, folder, approvalID(approval), async () => {
+      try {
+        return await this.link.call("approvals/answer", {
+          folder: folder as never, kind: approval.kind, key: approval.key, action,
+          ...(digest !== undefined ? { digest } : {}), ...(note !== undefined ? { note } : {}),
+        }, host);
+      } catch (error) {
+        failure = error;
+        return null;
+      }
+    });
+    if (!summary) throw failure;
     this.upsertFolder(summary, host);
     return summary;
+  }
+
+  /**
+   * Approve or Deny from a row's menu, of the version the row shows (#4814): the row goes at once,
+   * and a refusal comes back as "Could not approve — <why>", with the row.
+   */
+  async settleApproval(host: string, folder: string, approval: Approval, action: ApprovalAction): Promise<void> {
+    await this.answerApproval(host, folder, approval, action, approval.digest)
+      .catch((error: unknown) => this.say(approvalFailure(action, describe(error))));
   }
 
   /**
@@ -3241,8 +3379,9 @@ export class Store extends Work {
   async keepSession(host: string, agent: Agent): Promise<void> {
     const folder = agentFolderPath(agent);
     const listed = (this.folders.value[host] ?? []).find((p) => folderKey(p.folder.folder) === folder)?.folder.folder;
-    const summary = await this.act("approvals/answer",
-      { folder: (listed ?? folder) as never, kind: "archive", key: agent.id, action: "deny" }, host);
+    const summary = await this.answeringApproval(host, listed ?? folder, `archive:${agent.id}`, () =>
+      this.act("approvals/answer",
+        { folder: (listed ?? folder) as never, kind: "archive", key: agent.id, action: "deny" }, host, "keep the session"));
     if (summary) this.upsertFolder(summary, host);
   }
 
@@ -3251,10 +3390,11 @@ export class Store extends Work {
    * record on its host. From the row's menu, so a refusal is said in `problem`.
    */
   async dismissWorkflowFailure(host: string, folder: string, approval: Approval): Promise<void> {
-    const summary = await this.act("approvals/answer", {
-      folder: folder as never, kind: approval.kind, key: approval.key, action: "dismiss",
-      ...(approval.digest !== undefined ? { digest: approval.digest } : {}),
-    }, host);
+    const summary = await this.answeringApproval(host, folder, approvalID(approval), () =>
+      this.act("approvals/answer", {
+        folder: folder as never, kind: approval.kind, key: approval.key, action: "dismiss",
+        ...(approval.digest !== undefined ? { digest: approval.digest } : {}),
+      }, host, "dismiss"));
     if (summary) this.upsertFolder(summary, host);
   }
 
@@ -3598,10 +3738,28 @@ export class Store extends Work {
   }
 
   async prompt(host: string, agentID: string, text: string, attachments: Attachment[]): Promise<boolean> {
+    // The person's bubble at once (#4814), unless it will wait in the queue, which draws its own.
+    const shown = this.agent(host, agentID);
+    const bubble: Sending | null = shown && !willQueue(shown) ? { id: `send-${++this.nextSend}`, text, answered: false } : null;
+    if (bubble) this.setSending(host, agentID, [...this.sending.peek()[`${host}|${agentID}`] ?? [], bubble]);
+    const settle = (went: boolean) => {
+      if (!bubble) return;
+      const going = this.sending.peek()[`${host}|${agentID}`] ?? [];
+      const watched = this.watching.peek();
+      // Went: kept until the host's entry for it, in the chat that will hear it.
+      const keep = went && watched?.host === host && watched.session === agentID;
+      this.setSending(host, agentID, keep
+        ? going.map((s) => (s.id === bubble.id ? { ...s, answered: true } : s))
+        : going.filter((s) => s.id !== bubble.id));
+    };
     try {
+      mark("send");
+      this.echoAwaited = true;
       await this.link.call("agents/prompt", { agentID: agentID as UUID, text, attachments, from: "person" }, host);
+      settle(true);
       return true;
     } catch (error) {
+      settle(false);
       // Kept for a stopped workspace (#691 US3): its bubble says so, and it goes when the host is up.
       if (error instanceof CallFailed && error.code === Failure.kept && this.noteKept(error)) return true;
       // Its folder has gone (#119): said with the ways on, carrying what was typed.

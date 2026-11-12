@@ -237,6 +237,7 @@ struct ChatView: View {
             kept: { [model] agentID in model.kept(for: agentID) },
             dropKept: { [model] in await model.dropKept($0) },
             retryKept: { [model] in await model.retryKept($0) },
+            sending: { [model] agentID in model.work.sending(to: agentID) },
             hostName: { [model] in model.hosts.label($0) },
             // A card in the chat opens its file in Files, as the agent's call did (#836).
             showFile: { [model, frame, states, agent, hasInspector] file in
