@@ -8395,6 +8395,29 @@ type MoveAsker string
 const MoveAskerAgent MoveAsker = "agent"
 const MoveAskerPerson MoveAsker = "person"
 
+// move/changed (#4641): how a move to another machine goes, whoever asked for it. `sent` of `total` bytes of the branch are on that machine (0 of 0 while the bundle is made); `branchSent` once they are all there and the session itself goes; `finished` once it ended, whichever way: with no `problem` the session is there and gone from here, else `problem` says why it stopped, in the person's words, and the session stays here.
+type MoveNotification struct {
+	AgentID UUID `json:"agentID"`
+
+	Machine string `json:"machine"`
+
+	MachineName string `json:"machineName"`
+
+	Folder string `json:"folder"`
+
+	StartedAt Date `json:"startedAt"`
+
+	Sent int64 `json:"sent"`
+
+	Total int64 `json:"total"`
+
+	BranchSent bool `json:"branchSent"`
+
+	Finished bool `json:"finished"`
+
+	Problem *string `json:"problem,omitzero"`
+}
+
 // The person moving an agent (053). No target takes back the person's move that is waiting.
 type MoveRequest struct {
 	AgentID UUID `json:"agentID"`

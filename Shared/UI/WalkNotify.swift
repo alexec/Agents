@@ -12,6 +12,9 @@ import Foundation
 enum WalkNotify {
     /// The window's model, set when it starts.
     static var model: AgentsModel?
+    /// What the window's own model reads beyond the shared one, such as `move/changed`
+    /// (#4641): true when it took the notification.
+    static var also: ((String, JSONValue?) -> Bool)?
 
     static func perform(_ request: [String: Any]) -> [String: Any] {
         guard let method = request["method"] as? String else { return ["ok": false, "error": "want a method"] }
@@ -24,6 +27,7 @@ enum WalkNotify {
             }
             params = value
         }
+        if also?(method, params) == true { return ["ok": true, "did": "applied \(method)"] }
         return model.apply(method, params) ? ["ok": true, "did": "applied \(method)"] : ["ok": false, "error": "the model does not know \(method)"]
     }
 }

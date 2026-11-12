@@ -31,6 +31,16 @@ import (
 type machineMove struct {
 	machine, folder string
 	asker           wire.UUID
+	// name is the machine as the person knows it, for the words; machine when empty.
+	name string
+}
+
+// label is the machine as the person knows it.
+func (m machineMove) label() string {
+	if m.name != "" {
+		return m.name
+	}
+	return m.machine
 }
 
 // moveSessionTool is move_session.
@@ -68,7 +78,11 @@ func (d *Daemon) moveSessionTool(caller wire.UUID, args map[string]json.RawMessa
 		if me.AfterTurn != nil && *me.AfterTurn == wire.AfterTurnArchive {
 			return "", Invalid("Nothing was moved: you asked to be archived once this turn ends. Call archive_session with no id to take that back, or do not move.")
 		}
-	} else if target.PendingMove != nil {
+	}
+	if err := d.alreadyMoving(target); err != nil {
+		return "", err
+	}
+	if !self && target.PendingMove != nil {
 		return "", Invalid("Nothing was moved: %s moves into another folder when its turn ends.", quotedTitle(target.Title))
 	}
 	folder := strings.TrimSpace(argString(args, "folder"))
@@ -178,8 +192,25 @@ func (d *Daemon) afterTurnMachineMove(id wire.UUID, s wire.AgentState) {
 }
 
 // moveToMachine moves the session id to order's machine; carry starts it again there. The
-// session stays here until that machine has it.
+// session stays here until that machine has it, and move/changed says how it goes (#4641).
 func (d *Daemon) moveToMachine(id wire.UUID, order machineMove, carry bool) error {
+	m, err := d.beginMove(id, order)
+	if err != nil {
+		return err
+	}
+	return d.carryMove(m, order, carry)
+}
+
+// carryMove makes the move m began, and says how it ended.
+func (d *Daemon) carryMove(m *moving, order machineMove, carry bool) error {
+	err := d.moveSteps(m, order, carry)
+	d.endMove(m, err)
+	return err
+}
+
+// moveSteps are the steps of a move: the branch, then the session.
+func (d *Daemon) moveSteps(m *moving, order machineMove, carry bool) error {
+	id := m.n.AgentID
 	a := d.Store.Agent(id)
 	if a == nil {
 		return noSuchAgent()
@@ -195,9 +226,14 @@ func (d *Daemon) moveToMachine(id wire.UUID, order machineMove, carry bool) erro
 	if b.heads, err = d.readyThere(asker, order.machine, order.folder); err != nil {
 		return err
 	}
-	if err := d.sendThere(asker, order.machine, order.folder, b); err != nil {
+	if _, err := d.packThere(asker, order.machine,
+		wire.SendPackRequest{Folder: store.PathURL(b.path), Branches: []string{b.branch}, LeavingOut: b.heads, IncludeChanges: true},
+		wire.ReceiveRequest{Folder: order.folder, Checkout: b.branch, Origin: b.origin}, func(done, total int64) {
+			d.moveChanged(m, func(n *wire.MoveNotification) { n.Sent, n.Total = done, total })
+		}); err != nil {
 		return err
 	}
+	d.moveChanged(m, func(n *wire.MoveNotification) { n.BranchSent = true })
 	// Its runtime goes now, so nothing more is said here; the record is what it says then.
 	d.releaseRuntime(id)
 	d.dropLeases(id, "holderStopped")
@@ -266,11 +302,16 @@ func (d *Daemon) registerMoveIn() {
 	On(d, wire.CallAgentsMoveToMachine, func(_ context.Context, _ *Client, r wire.MoveToMachineRequest) (wire.MoveToMachineAnswer, error) {
 		return d.personMovesToMachine(r)
 	})
+	On(d, wire.CallAgentsMoves, func(_ context.Context, _ *Client, _ wire.Empty) ([]wire.MoveNotification, error) {
+		return d.movesUnderWay(), nil
+	})
 }
 
 // personMovesToMachine is agents/moveToMachine (#3790): Move to Machine… in a client. The
 // person asked, so no card asks them again; the session itself asks the control plane, as
-// it does for its own move. A running turn stops first, and carries on there.
+// it does for its own move. A running turn stops first, and carries on there. It answers
+// once the move is checked, and moves in the background (#4641): a large branch takes
+// minutes, and the client is free the whole time.
 func (d *Daemon) personMovesToMachine(r wire.MoveToMachineRequest) (wire.MoveToMachineAnswer, error) {
 	a := d.Store.Agent(r.AgentID)
 	if a == nil {
@@ -299,6 +340,9 @@ func (d *Daemon) personMovesToMachine(r wire.MoveToMachineRequest) (wire.MoveToM
 	if _, waiting := d.machineMoves.Load(a.ID); waiting {
 		return wire.MoveToMachineAnswer{}, Invalid("Nothing was moved: %s already moves to another machine when its turn ends.", quotedTitle(a.Title))
 	}
+	if err := d.alreadyMoving(a); err != nil {
+		return wire.MoveToMachineAnswer{}, err
+	}
 	folder := ""
 	if r.Folder != nil {
 		folder = strings.TrimSpace(*r.Folder)
@@ -324,16 +368,23 @@ func (d *Daemon) personMovesToMachine(r wire.MoveToMachineRequest) (wire.MoveToM
 		code, msg := errMessage(err)
 		return wire.MoveToMachineAnswer{}, &Error{Code: code, Message: "Nothing was moved to " + name + ": " + msg}
 	}
+	order := machineMove{machine: machine, folder: folder, asker: a.ID, name: name}
+	m, err := d.beginMove(a.ID, order)
+	if err != nil {
+		return wire.MoveToMachineAnswer{}, err
+	}
 	l := d.live(a.ID)
 	l.mu.Lock()
 	working := inFlight(a.State) || l.running || l.inTurn
 	l.mu.Unlock()
-	if working {
-		d.stopHelper(a)
-	}
-	if err := d.moveToMachine(a.ID, machineMove{machine: machine, folder: folder, asker: a.ID}, working); err != nil {
-		code, msg := errMessage(err)
-		return wire.MoveToMachineAnswer{}, &Error{Code: code, Message: quotedTitle(a.Title) + " was not moved to " + name + ": " + msg + " It stays here."}
+	if !d.goAfterTurn("move "+string(a.ID)+" to "+name, func() {
+		if working {
+			d.stopHelper(a)
+		}
+		_ = d.carryMove(m, order, working) // endMove says how it ended, on the row
+	}) {
+		d.endMove(m, &Error{Code: wire.FailureNotSupported, Message: "this machine is shutting down."})
+		return wire.MoveToMachineAnswer{}, &Error{Code: wire.FailureNotSupported, Message: "Nothing was moved: this machine is shutting down."}
 	}
 	return wire.MoveToMachineAnswer{Folder: folder, CarriesOn: working}, nil
 }

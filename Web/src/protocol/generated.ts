@@ -7560,6 +7560,26 @@ export type MoveAsker =
   | "agent"
   | "person";
 
+/**
+ * move/changed (#4641): how a move to another machine goes, whoever asked for it. `sent` of `total`
+ * bytes of the branch are on that machine (0 of 0 while the bundle is made); `branchSent` once they
+ * are all there and the session itself goes; `finished` once it ended, whichever way: with no
+ * `problem` the session is there and gone from here, else `problem` says why it stopped, in the
+ * person's words, and the session stays here.
+ */
+export interface MoveNotification {
+  agentID: UUID;
+  machine: string;
+  machineName: string;
+  folder: string;
+  startedAt: WireDate;
+  sent: number;
+  total: number;
+  branchSent: boolean;
+  finished: boolean;
+  problem?: string;
+}
+
 /** The person moving an agent (053). No target takes back the person's move that is waiting. */
 export interface MoveRequest {
   agentID: UUID;
@@ -14148,6 +14168,7 @@ export interface Methods {
   "agents/labelVocabulary": { params: LabelVocabularyRequest; result: string[] };
   "agents/list": { params: ListRequest; result: Agent[] };
   "agents/moveToMachine": { params: MoveToMachineRequest; result: MoveToMachineAnswer };
+  "agents/moves": { params: Empty; result: MoveNotification[] };
   "agents/options": { params: OptionsRequest; result: OptionsResponse };
   "agents/prewarm": { params: PrewarmRequest; result: Empty };
   "agents/prompt": { params: PromptRequest; result: Empty };
@@ -14579,6 +14600,7 @@ export const MethodTarget = {
   "agents/labelVocabulary": "host",
   "agents/list": "host",
   "agents/moveToMachine": "host",
+  "agents/moves": "host",
   "agents/options": "host",
   "agents/prewarm": "host",
   "agents/prompt": "host",
@@ -15045,6 +15067,7 @@ export interface Notifications {
   "mcp/healthChanged": MCPHealthSnapshot;
   "mcp/hostedChanged": HostedMCPSnapshot;
   "modes/changed": Record<string, JSONValue>;
+  "move/changed": MoveNotification;
   "multiplier/changed": Multiplier;
   "pages/changed": PagesChangedNotification;
   "pins/changed": PinsChangedNotification;
@@ -15670,6 +15693,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MessagingServer: { required: ["name", "word", "state"], optional: ["proof", "message", "events"] },
   MissingFolder: { required: ["branchKept"], optional: [] },
   MoveAnswer: { required: ["when", "message"], optional: ["agent"] },
+  MoveNotification: { required: ["agentID", "machine", "machineName", "folder", "startedAt", "sent", "total", "branchSent", "finished"], optional: ["problem"] },
   MoveRequest: { required: ["agentID", "removeLeft", "discardChanges"], optional: ["target"] },
   MoveToMachineAnswer: { required: ["folder", "carriesOn"], optional: [] },
   MoveToMachineRequest: { required: ["agentID", "machine"], optional: ["machineName", "folder"] },

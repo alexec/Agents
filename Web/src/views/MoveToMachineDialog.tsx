@@ -1,12 +1,14 @@
 // Move to Machine… (#3790), from a session's menu, as the window's sheet: the machine, and the
 // folder there. Its host stops the turn if one runs, sends the branch with its uncommitted changes,
-// and the session goes on there with this conversation; the page then opens it there.
+// and the session goes on there with this conversation. The host answers once it has checked the
+// move (#4641): the dialog closes, the session's row says how it goes, and the page opens it there
+// once that machine has it, when it is still the open one.
 import { signal, useSignal } from "@preact/signals";
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { folderHelp, moveTargets, noTargets, whatGoes } from "../model/moveToMachine";
 import { canStop } from "../model/tree";
-import { go } from "../route";
+import { go, route } from "../route";
 import { Modal } from "./Modal";
 
 const moving = signal<{ host: string; agent: Agent } | null>(null);
@@ -33,9 +35,11 @@ function MoveToMachine({ store, host, agent, close }: { store: Store; host: stri
     busy.value = true;
     failure.value = null;
     try {
-      const answer = await store.moveToMachine(host, agent.id, machine.value, folder.value);
+      const there = machine.value;
+      await store.moveToMachine(host, agent.id, there, folder.value, (answer) => {
+        if (route.peek().session === agent.id) go({ host: there, folder: answer.folder, session: agent.id });
+      });
       close();
-      go({ host: machine.value, folder: answer.folder, session: agent.id });
     } catch (error) {
       failure.value = error instanceof Error ? error.message : String(error);
       busy.value = false;
