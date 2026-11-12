@@ -158,8 +158,7 @@ struct RemoteProjectSettings: View {
                     .textSelection(.enabled)
             }
             if !summary.exists {
-                Label(RemoteProjectSettingsWords.missing, systemImage: "exclamationmark.triangle")
-                    .tinted(.failure)
+                FieldNote(text: RemoteProjectSettingsWords.missing)
             }
             LabeledContent(RemoteProjectSettingsWords.machine, value: model.machineName(summary.host))
             LabeledContent(RemoteProjectSettingsWords.spent) {

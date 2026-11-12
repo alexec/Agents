@@ -2616,12 +2616,22 @@ final class RemoteModel {
               let state = try? await other.call(DaemonAPI.Method.diskState, Optional<String>.none, returning: DiskState.self)
         else { return }
         serverDisks[host] = state
+        if let capacity = try? await other.call(DaemonAPI.Method.capacityState, Optional<String>.none,
+                                                returning: DaemonAPI.CapacityState.self) {
+            work.replaceCapacity(capacity, from: host)
+        }
     }
 
     /// A machine's most urgent need, as its row says it (#3764).
     func need(of host: MachineRef) -> MachineNeed? {
         MachineNeed.most(row: machineRow(host), offline: machineOffline(host),
-                         runtimes: runtimes(on: host), disks: diskAlarms(host))
+                         runtimes: runtimes(on: host), disks: diskAlarms(host), capacity: capacityLevel(host))
+    }
+
+    /// The machine's capacity level, as it last pushed it (#4748); nil while it is offline,
+    /// where what it last said is old.
+    func capacityLevel(_ host: MachineRef) -> DaemonAPI.CapacityLevel? {
+        machineOffline(host) ? nil : work.capacity[host]?.level
     }
 
     /// Whether a disk on the machine is low or almost full, as its page says (#3626).
@@ -4245,6 +4255,11 @@ final class RemoteModel {
                                                returning: DaemonAPI.MCPHealthSnapshot.self) {
             work.replaceMCPHealth(health)
         }
+        // The Mac's capacity level, for its row (#4748).
+        if let capacity = try? await client.call(DaemonAPI.Method.capacityState, Optional<String>.none,
+                                                 returning: DaemonAPI.CapacityState.self) {
+            work.replaceCapacity(capacity, from: .mac)
+        }
     }
 
     /// The files the Mac's host could not read in this run (#205, #223), then heard as
@@ -5739,6 +5754,10 @@ final class RemoteModel {
 
     func dismissProblem() { problem = nil }
 
+    /// A failure of something the person did, from a view that holds the call's answer (an
+    /// account not added, a device not forgotten): shown as the scene's failure toast (#4737).
+    func report(_ problem: String) { self.problem = problem }
+
 #if DEBUG
     /// Open a named folder, and optionally a named agent, straight after connecting.
     ///
@@ -5780,6 +5799,12 @@ final class RemoteModel {
                 try? await Task.sleep(for: .seconds(2))
                 movingToMachine = work.agent(agent.id)
             }
+        }
+        // `-problem WORDS`: a failure, as an action that failed reports it, for a walk of the
+        // scene's failure toast (#4739).
+        if let words = value("-problem") {
+            try? await Task.sleep(for: .seconds(1))
+            report(words)
         }
         // `-workflow` opens a workflow's page on the chosen folder, by its name.
         if let name = value("-workflow"),

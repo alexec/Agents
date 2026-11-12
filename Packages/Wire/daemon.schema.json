@@ -3427,6 +3427,23 @@
         "full"
       ]
     },
+    "CapacityState": {
+      "type": "object",
+      "description": "capacity/state and capacity/changed (#4748): the machine's level, pushed when it moves, so a machine's row says it with no page open.",
+      "properties": {
+        "level": {
+          "$ref": "#/definitions/CapacityLevel"
+        },
+        "words": {
+          "type": "string",
+          "description": "The level as a sentence's subject and verb: \"this Mac is near capacity\" or \"this Mac is at capacity\". Absent at ok."
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "additionalProperties": false
+    },
     "CatalogApproval": {
       "type": "object",
       "description": "An approval of an MCP server or skill (#2019, M5): for a group, or for one person.",
@@ -23956,6 +23973,14 @@
       ],
       "additionalProperties": false
     },
+    "Ref": {
+      "type": "string",
+      "description": "A ref (#4727, spec 4724-event-bus): one thing, as provider:type:topic#id, such as github:pr:alexec/agents#4702 or agents:machine:#mac-mini. Provider, type and topic are lower case; the first # ends the topic, and the id keeps its case and can hold # and /. Always the full form on the wire; a short form (#123, P#123, owner/repo#123) is input only.",
+      "pattern": "^[a-z0-9-]+:[a-z0-9-]+:[^:#A-Z]*#.+$",
+      "x-swift-type": "WireRef",
+      "x-go-type": "Ref",
+      "x-ts-type": "string & { readonly __brand: \"Ref\" }"
+    },
     "RelayDelivery": {
       "type": "object",
       "description": "A notice for one device (T097), which the control plane sends through APNs or Web Push: seal the headline to `publicKey` and post it for `device`; no headline is a withdrawal.",
@@ -25587,6 +25612,10 @@
         },
         "endingSoon": {
           "type": "boolean"
+        },
+        "capacityWait": {
+          "type": "string",
+          "description": "Why its line waits for the machine, not for a holder (#4579, #4748): \"this Mac is near capacity\", \"this Mac is at capacity\", or \"this Mac has capacity again\" while the line is served one a look. Only on a compute resource (capacity, build) with a free place and a line; absent otherwise and from a host from before #4748."
         }
       },
       "required": [

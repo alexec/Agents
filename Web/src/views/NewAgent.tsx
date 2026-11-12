@@ -121,7 +121,8 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   const personas = useSignal<Persona[]>([]);
   const persona = useSignal<string | undefined>(undefined);
   const pendingPersona = useRef<Persona | undefined>(undefined);
-  /** Auto (#4559): on until a segment is picked by hand, the pick it made, and the prompt it read. */
+  /** The live pick (#4559, #4721): always on for a new draft, until a segment is picked by hand,
+   *  the pick it made, and the prompt it read. */
   const personaAuto = useSignal(true);
   const autoPick = useSignal<AutoPick | undefined>(undefined);
   const promptText = useRef("");
@@ -305,17 +306,13 @@ export function NewAgent({ store, host, folder, folderName, down }: {
     if (form.value.state !== "ready") pendingPersona.current = picked;
     else form.value = { ...form.value, chosen: { ...form.value.chosen, ...personaChoices(picked, form.value.options) } };
   };
-  // Auto (#4559): the persona the prompt's words name, picked as a hand pick is, as it is typed.
+  // The live pick (#4559): the persona the prompt's words name, picked as a hand pick is, as it is typed.
   const pickAuto = (text: string) => {
     promptText.current = text;
     if (!personaAuto.peek()) return;
     const pick = autoPersona(text, personas.peek());
     autoPick.value = pick;
     if (pick?.persona.id !== persona.peek()) choosePersona(pick?.persona.id ?? "", true);
-  };
-  const chooseAuto = () => {
-    personaAuto.value = true;
-    pickAuto(promptText.current);
   };
   const usablePersonas = personas.value.filter((p) => p.problem === undefined);
   const brokenPersonas = personas.value.filter((p) => p.problem !== undefined);
@@ -516,8 +513,8 @@ export function NewAgent({ store, host, folder, folderName, down }: {
         {personas.value.length > 0 && (
           <div class="persona-choice">
             {usablePersonas.length > 0 && (
-              <PersonaSwitch personas={usablePersonas} picked={persona.value} auto={personaAuto.value} down={down}
-                choose={(id) => choosePersona(id)} chooseAuto={chooseAuto} />
+              <PersonaSwitch personas={usablePersonas} picked={persona.value} down={down}
+                choose={(id) => choosePersona(id)} />
             )}
             {usablePersonas.length > 0 && personaAuto.value && <p class="quiet small">{autoLine(autoPick.value)}</p>}
             {description && <p class="quiet small">{description}</p>}
@@ -801,15 +798,12 @@ export function offerStart(store: Store, host: string, folder: string, start: St
  */
 /** The kind of session to start (#760), the same control as the folder's name, a size smaller,
     on its own line under it (#913). */
-/** The menu's value for Auto: no file's id, which is a file name. */
-const autoValue = "\0auto";
-
-function PersonaSwitch({ personas, picked, auto, down, choose, chooseAuto }: {
-  personas: Persona[]; picked: string | undefined; auto: boolean; down: boolean;
-  choose: (id: string) => void; chooseAuto: () => void;
+/* No Auto segment (#4721): the prompt's words pick one live until one is picked by hand. */
+function PersonaSwitch({ personas, picked, down, choose }: {
+  personas: Persona[]; picked: string | undefined; down: boolean; choose: (id: string) => void;
 }) {
   const name = personas.find((p) => p.id === picked)?.name;
-  const shown = auto ? `Auto${name ? `: ${name}` : ""}` : name ?? "No persona";
+  const shown = name ?? "No persona";
   // The segments when they fit; where they do not, a menu drawn as the folder's (#2795). The
   // segments stay, hidden, so a wider page can bring them back.
   const box = useRef<HTMLDivElement>(null);
@@ -826,15 +820,13 @@ function PersonaSwitch({ personas, picked, auto, down, choose, chooseAuto }: {
     return () => resized.disconnect();
   }, [personas]);
   return (
-    <div ref={box} class={`persona-switch${name || auto ? "" : " none"}${fits.value ? "" : " menu"}`} title="Start a kind of session: a persona sets what it names">
+    <div ref={box} class={`persona-switch${name ? "" : " none"}${fits.value ? "" : " menu"}`} title="Start a kind of session: a persona sets what it names">
       <div ref={segments} class="button-group persona-segments" role="group" aria-label="Persona" aria-hidden={!fits.value}>
-        <button type="button" aria-pressed={auto} class={auto ? "on" : ""}
-          disabled={down} tabIndex={fits.value ? undefined : -1} onClick={chooseAuto}>Auto</button>
-        <button type="button" aria-pressed={!auto && picked === undefined} class={!auto && picked === undefined ? "on" : ""}
+        <button type="button" aria-pressed={picked === undefined} class={picked === undefined ? "on" : ""}
           disabled={down} tabIndex={fits.value ? undefined : -1} onClick={() => choose("")}>No persona</button>
         {personas.map((persona) => (
-          <button key={persona.id} type="button" aria-pressed={!auto && picked === persona.id}
-            class={!auto && picked === persona.id ? "on" : ""} disabled={down} tabIndex={fits.value ? undefined : -1}
+          <button key={persona.id} type="button" aria-pressed={picked === persona.id}
+            class={picked === persona.id ? "on" : ""} disabled={down} tabIndex={fits.value ? undefined : -1}
             onClick={() => choose(persona.id)}>
             {persona.name}
           </button>
@@ -843,13 +835,8 @@ function PersonaSwitch({ personas, picked, auto, down, choose, chooseAuto }: {
       {!fits.value && (
         <label class="persona-menu">
           <span aria-hidden="true">{shown} <span class="caret">▾</span></span>
-          <select aria-label="Persona" disabled={down} value={auto ? autoValue : picked ?? ""}
-            onChange={(e) => {
-              const value = (e.currentTarget as HTMLSelectElement).value;
-              if (value === autoValue) chooseAuto();
-              else choose(value);
-            }}>
-            <option value={autoValue}>Auto</option>
+          <select aria-label="Persona" disabled={down} value={picked ?? ""}
+            onChange={(e) => choose((e.currentTarget as HTMLSelectElement).value)}>
             <option value="">No persona</option>
             {personas.map((persona) => <option key={persona.id} value={persona.id}>{persona.name}</option>)}
           </select>

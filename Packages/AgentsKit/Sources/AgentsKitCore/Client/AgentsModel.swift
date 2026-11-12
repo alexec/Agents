@@ -366,6 +366,9 @@ public final class AgentsModel {
     /// Every volume that is low on space (#195), as the daemon last said. Replaced whole
     /// by each `disk/changed`. Empty from a daemon too old to say, which draws nothing.
     public private(set) var disk = DiskState()
+    /// Each machine's capacity level (#4748), as `capacity/state` and `capacity/changed` last
+    /// said it, for its row. Missing from a daemon too old to say, which draws nothing.
+    public private(set) var capacity: [MachineRef: DaemonAPI.CapacityState] = [:]
     /// Every folder's worktrees on each host (#790), for each machine's page, as last
     /// asked: a list, not kept up by the host, so asked again when the page is shown.
     public private(set) var worktrees: [MachineRef: [DaemonAPI.FolderWorktrees]] = [:]
@@ -505,6 +508,8 @@ public final class AgentsModel {
         case mcpHealthChanged(DaemonAPI.MCPHealthSnapshot, host: MachineRef)
         case diskChanged(DiskState)
         /// From the Mac until `stamp` says which host.
+        case capacityChanged(DaemonAPI.CapacityState, host: MachineRef)
+        /// From the Mac until `stamp` says which host.
         case worktreesSized(DaemonAPI.WorktreesSized, host: MachineRef)
         case eventsChanged(DaemonAPI.EventsChange)
         case modesChanged(DaemonAPI.RememberedModes)
@@ -568,6 +573,8 @@ public final class AgentsModel {
         case DaemonAPI.Notification.mcpHealthChanged:
             return decode(DaemonAPI.MCPHealthSnapshot.self) { Update.mcpHealthChanged($0, host: .mac) }
         case DaemonAPI.Notification.diskChanged: return decode(DiskState.self, Update.diskChanged)
+        case DaemonAPI.Notification.capacityChanged:
+            return decode(DaemonAPI.CapacityState.self) { Update.capacityChanged($0, host: .mac) }
         case DaemonAPI.Notification.worktreesSized:
             return decode(DaemonAPI.WorktreesSized.self) { Update.worktreesSized($0, host: .mac) }
         case DaemonAPI.Notification.eventsChanged: return decode(DaemonAPI.EventsChange.self, Update.eventsChanged)
@@ -637,6 +644,8 @@ public final class AgentsModel {
             return .mcpHealthChanged(snapshot, host: host)
         case .worktreesSized(let sized, _):
             return .worktreesSized(sized, host: host)
+        case .capacityChanged(let state, _):
+            return .capacityChanged(state, host: host)
         default:
             return update
         }
@@ -788,6 +797,9 @@ public final class AgentsModel {
 
         case .diskChanged(let state):
             disk = state
+
+        case .capacityChanged(let state, let host):
+            capacity[host] = state
 
         case .worktreesSized(let sized, let host):
             for note in sized.sizes { worktreeSizes[host, default: [:]][note.root] = note.size }
@@ -1299,6 +1311,8 @@ public final class AgentsModel {
         leaseByAgent = next
     }
     public func replaceDisk(_ state: DiskState) { disk = state }
+    /// The level a machine said as it connected (#4748).
+    public func replaceCapacity(_ state: DaemonAPI.CapacityState, from host: MachineRef) { capacity[host] = state }
 
     /// A page of events from `events/list`, asked for with `filter`. The first page
     /// replaces what was there; a page from further back (`appending`) goes on the end.
@@ -1800,6 +1814,14 @@ public final class AgentsModel {
     /// What a queued helper's row says in its report's place (#362): "Queued, 2nd", its
     /// place in its folder's queue. Nil for any other agent. Queued agents are under
     /// Waiting, so only that group is counted.
+    /// A queued start's line at the foot of its chat while its machine is near or at capacity
+    /// (#4748), as a lease's wait says it: "◷ In line to start · this Mac is near capacity".
+    /// The machine holds every queued start then, also one that waits for a place too (#4580).
+    public func capacityStartLine(_ agent: Agent) -> String? {
+        guard agent.state == .queued, let words = capacity[agent.host]?.words else { return nil }
+        return CapacityWords.startLine(words)
+    }
+
     public func queuedLine(_ agent: Agent) -> String? {
         guard agent.state == .queued else { return nil }
         let position = HelperLimit.queuePosition(of: agent, among: agents(in: agent.folderPath, group: .waiting))

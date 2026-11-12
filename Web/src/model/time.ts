@@ -2,7 +2,7 @@
 // what the window's and the Remote's say. Each bar is stacked by kind of time. Every stamp is the
 // host's, counted back from history.now; nothing asks the browser's clock what today is.
 import type { TimeBucket, TimeHistory } from "../protocol/generated";
-import { dayStamp, hourStamp, mergeTiers, stampDate, type UsageRange } from "./usage";
+import { mergeTiers, usageSlots, type UsageRange } from "./usage";
 
 export type TimeKind = "agent" | "tools" | "others" | "person";
 /** Drawn in this order from the bottom: TimeKind.allCases. */
@@ -49,32 +49,9 @@ export function mergeTime(histories: readonly TimeHistory[]): TimeHistory | unde
   return { ...mergeTiers(histories, emptyTime, add), recap: first.recap, records: first.records };
 }
 
-const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-
 export function timeChart(history: TimeHistory, range: UsageRange): TimeChart {
-  const now = stampDate(history.now) ?? new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const slots: { stamp: string; start: Date; keys: string[] }[] = [];
+  const slots = usageSlots(history.now, range);
   const tier = range === "D" ? history.hours : history.days;
-  if (range === "D") {
-    for (let hour = 0; hour < 24; hour++) {
-      const start = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour);
-      slots.push({ stamp: hourStamp(start), start, keys: [hourStamp(start)] });
-    }
-  } else if (range === "W" || range === "M") {
-    const count = range === "W" ? 7 : 30;
-    for (let back = count - 1; back >= 0; back--) {
-      const start = addDays(today, -back);
-      slots.push({ stamp: dayStamp(start), start, keys: [dayStamp(start)] });
-    }
-  } else {
-    for (let week = 12; week >= 0; week--) {
-      const start = addDays(today, -(week * 7 + 6));
-      const keys = [0, 1, 2, 3, 4, 5, 6].map((n) => dayStamp(addDays(start, n)));
-      slots.push({ stamp: keys[0]!, start, keys });
-    }
-  }
-
   const merged = emptyTime();
   const byRuntime: Record<string, TimeBucket> = {};
   const daysWithData = new Set<string>();

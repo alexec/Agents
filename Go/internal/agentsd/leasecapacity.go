@@ -159,3 +159,34 @@ func lowerFirst(s string) string {
 	}
 	return strings.ToLower(s[:1]) + s[1:]
 }
+
+// capacityWait is why e's line waits for the machine, not for a holder, for its row in the
+// lease snapshot (#4748): "this Mac is near capacity", or "this Mac has capacity again"
+// while the line is served one a look. "" when it waits for a holder, or not at all. The
+// words have no numbers, so the snapshot moves with the level, not with every look.
+// Under leaseMu.
+func (d *Daemon) capacityWait(name wire.ResourceName, e *leaseEntry) string {
+	if e == nil || !isCompute(name) || e.full() || len(e.Line) == 0 || d.computeHeld() == "" {
+		return ""
+	}
+	if w := capacityLevelWords(d.capacityLevel()); w != "" {
+		return w
+	}
+	return thisMachine() + " has capacity again"
+}
+
+// capacityWaitMoved says resources/changed when the level moved under a compute line, so
+// its reason is new (#4748).
+func (d *Daemon) capacityWaitMoved() {
+	d.leaseMu.Lock()
+	defer d.leaseMu.Unlock()
+	if d.book == nil {
+		return
+	}
+	for name, e := range d.book.Entries {
+		if isCompute(name) && !e.full() && len(e.Line) > 0 {
+			d.leasesChanged()
+			return
+		}
+	}
+}

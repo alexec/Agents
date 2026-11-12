@@ -22,6 +22,7 @@ const CapBackups1 = "backups/1"
 const CapBots1 = "bots/1"
 const CapBringBack1 = "bring.back/1"
 const CapBrowser1 = "browser/1"
+const CapCapacity1 = "capacity/1"
 const CapCatalog1 = "catalog/1"
 const CapChangesUndo1 = "changes.undo/1"
 const CapChanges1 = "changes/1"
@@ -283,6 +284,7 @@ var HostCapabilities = pairs([][2]string{
 	{"browser/state", "host.browser-settings/1"},
 	{"browser/unwatch", "browser/1"},
 	{"browser/watch", "browser/1"},
+	{"capacity/state", "capacity/1"},
 	{"catalog/destination-state", "catalog/1"},
 	{"catalog/preview", "catalog/1"},
 	{"catalog/search", "catalog/1"},
@@ -622,6 +624,7 @@ var HostCapabilities = pairs([][2]string{
 	{"bringBack/changed", "bring.back/1"},
 	{"browser/frame", "browser/1"},
 	{"browser/pageChanged", "browser/1"},
+	{"capacity/changed", "capacity/1"},
 	{"clientPermissions/changed", "client-permissions/1"},
 	{"clone/changed", "clone/1"},
 	{"cost/changed", "cost/1"},
@@ -684,6 +687,7 @@ var HostNotifications = set([]string{
 	"bringBack/changed",
 	"browser/frame",
 	"browser/pageChanged",
+	"capacity/changed",
 	"clientPermissions/changed",
 	"clone/changed",
 	"cost/changed",

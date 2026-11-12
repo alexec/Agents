@@ -225,7 +225,6 @@ struct RemoteChatView: View {
                 if let agent, ContinueWhenBackWords.offers(agent) || agent.continueWhenBack != nil,
                    model.host(agent.host, has: Capability.chatContinueWhenBack1) {
                     RemoteContinueWhenBackStrip(agent: agent)
-                        .background(Paper.ground)
                 }
                 // Under the banner, not over it: when the Mac has gone quiet, what
                 // the agent last said it would do is the less urgent of the two.
@@ -446,6 +445,8 @@ struct RemoteChatView: View {
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }
+        // The scene's toast floats above it (#4737).
+        .liftsRemoteToasts()
         .animation(.snappy(duration: 0.2), value: isQuestionUp)
     }
 
@@ -547,6 +548,7 @@ struct RemoteChatView: View {
                 return Image(uiImage: image)
             },
             leaseStatus: { [model] agentID in model.work.leaseStatus(of: agentID) },
+            capacityStart: { [model] agent in model.work.capacityStartLine(agent) },
             openLease: openLease,
             fromLine: { [model] sender in model.work.fromLine(sender) },
             // Ask for More on a Stopped by a policy card (#3262); the Remote has no Spending.

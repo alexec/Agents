@@ -156,10 +156,10 @@ export function groupedPages(list: readonly NavPage[]): [string, NavPage[]][] {
   return [...out];
 }
 
-/** Usage's three panes, which were Activity's Cost, Tokens and Time. */
-export type UsagePane = "spending" | "tokens" | "time";
-export const usagePanes: readonly UsagePane[] = ["spending", "tokens", "time"];
-export const usagePaneTitle: Record<UsagePane, string> = { spending: "Cost", tokens: "Tokens", time: "Time" };
+/** Usage's panes: Activity's Cost, Tokens and Time, then Velocity, the PRs that landed (#4598). */
+export type UsagePane = "spending" | "tokens" | "time" | "velocity";
+export const usagePanes: readonly UsagePane[] = ["spending", "tokens", "time", "velocity"];
+export const usagePaneTitle: Record<UsagePane, string> = { spending: "Cost", tokens: "Tokens", time: "Time", velocity: "Velocity" };
 
 /** Where an address from before #2141 goes now: `#/console/<page>` and `#/a/<page>`. */
 export function movedPage(app: "console" | "a", page: string | undefined): { nav?: NavSection; section?: string; usage?: UsagePane } {
@@ -184,7 +184,7 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
     case "worktrees": case "resources": return { nav: "machines", section: "machines" };
     case "events": return { nav: "status", section: page };
     case "achievements": return { nav: "reports", section: "multiplier" };
-    case "spending": case "tokens": case "time": return { nav: "reports", section: "usage", usage: page };
+    case "spending": case "tokens": case "time": case "velocity": return { nav: "reports", section: "usage", usage: page };
     default: return {};
   }
 }

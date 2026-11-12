@@ -16,6 +16,13 @@ export type WireDate = number & { readonly __brand: "WireDate" };
 export type URLString = string & { readonly __brand: "URLString" };
 export type MachineRef = string & { readonly __brand: "MachineRef" };
 export type ProviderID = string & { readonly __brand: "ProviderID" };
+/**
+ * A ref (#4727, spec 4724-event-bus): one thing, as provider:type:topic#id, such as
+ * github:pr:alexec/agents#4702 or agents:machine:#mac-mini. Provider, type and topic are lower
+ * case; the first # ends the topic, and the id keeps its case and can hold # and /. Always the full
+ * form on the wire; a short form (#123, P#123, owner/repo#123) is input only.
+ */
+export type Ref = string & { readonly __brand: "Ref" };
 /** ResourceName (Model/Lease.swift): the name, trimmed and lower-cased, as a single string. */
 export type ResourceName = string & { readonly __brand: "ResourceName" };
 
@@ -1541,6 +1548,19 @@ export type CapacityLevel =
   | "ok"
   | "near"
   | "full";
+
+/**
+ * capacity/state and capacity/changed (#4748): the machine's level, pushed when it moves, so a
+ * machine's row says it with no page open.
+ */
+export interface CapacityState {
+  level: CapacityLevel;
+  /**
+   * The level as a sentence's subject and verb: "this Mac is near capacity" or "this Mac is at
+   * capacity". Absent at ok.
+   */
+  words?: string;
+}
 
 /** An approval of an MCP server or skill (#2019, M5): for a group, or for one person. */
 export interface CatalogApproval {
@@ -10746,6 +10766,13 @@ export interface ResourceState {
   declared?: DeclaredResource;
   line: LineMember[];
   endingSoon: boolean;
+  /**
+   * Why its line waits for the machine, not for a holder (#4579, #4748): "this Mac is near
+   * capacity", "this Mac is at capacity", or "this Mac has capacity again" while the line is served
+   * one a look. Only on a compute resource (capacity, build) with a free place and a line; absent
+   * otherwise and from a host from before #4748.
+   */
+  capacityWait?: string;
 }
 
 export interface ResumingNotification {
@@ -14244,6 +14271,7 @@ export interface Methods {
   "browser/state": { params: Empty; result: BrowserState };
   "browser/unwatch": { params: Empty; result: Empty };
   "browser/watch": { params: BrowserWatchRequest; result: BrowserPageState };
+  "capacity/state": { params: Empty; result: CapacityState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
   "changes/undoTurn": { params: UndoTurnRequest; result: UndoTurnResult };
@@ -14677,6 +14705,7 @@ export const MethodTarget = {
   "browser/state": "host",
   "browser/unwatch": "host",
   "browser/watch": "host",
+  "capacity/state": "host",
   "changes/file": "host",
   "changes/list": "host",
   "changes/undoTurn": "host",
@@ -15051,6 +15080,7 @@ export interface Notifications {
   "backups/changed": BackupState;
   "browser/frame": BrowserFrame;
   "browser/pageChanged": BrowserPageState;
+  "capacity/changed": CapacityState;
   "clientPermissions/changed": ClientPermissionSettings;
   "clone/changed": CloneNotification;
   "control/budgetRequested": BudgetRequest;
@@ -15229,6 +15259,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   CancelWaitRequest: { required: ["agentID"], optional: [] },
   CapReached: { required: ["user", "name", "spentUSD", "capUSD", "until"], optional: ["group"] },
+  CapacityState: { required: ["level"], optional: ["words"] },
   CatalogApproval: { required: ["kind", "name", "by", "at"], optional: ["source", "group", "groupName", "user", "userName"] },
   CatalogApprovalList: { required: ["approvals"], optional: [] },
   CatalogAsk: { required: ["kind", "name"], optional: ["source", "why"] },
@@ -15976,7 +16007,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RequestsListResult: { required: ["requests"], optional: [] },
   RequestsUndefer: { required: ["id"], optional: [] },
   RequiredCapabilities: { required: ["host", "client"], optional: [] },
-  ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared"] },
+  ResourceState: { required: ["name", "kind", "displayName", "isGone", "line", "endingSoon"], optional: ["holds", "lease", "places", "declared", "capacityWait"] },
   ResumingNotification: { required: ["agentID", "isResuming"], optional: [] },
   ResumingResponse: { required: ["agentIDs"], optional: [] },
   RetentionSetRequest: { required: ["settings", "confirmed"], optional: [] },

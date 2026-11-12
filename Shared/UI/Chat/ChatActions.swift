@@ -85,6 +85,9 @@ struct ChatActions {
     /// What an agent holds and waits for in line (036), by its id, drawn with the working
     /// line (#2344). Nil draws nothing.
     var leaseStatus: @MainActor (UUID) -> LeaseStatus? = { _ in nil }
+    /// A queued start's line while its machine is near or at capacity (#4748), drawn with the
+    /// lease line: `AgentsModel.capacityStartLine`. Nil draws nothing.
+    var capacityStart: @MainActor (Agent) -> String? = { _ in nil }
     /// A press on that line: the Mac opens Resources at the resource, the Remote its
     /// Resources page. Nil draws the words alone.
     var openLease: (@MainActor (ResourceName) -> Void)? = nil

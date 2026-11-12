@@ -1714,6 +1714,14 @@ const CapacityLevelOk CapacityLevel = "ok"
 const CapacityLevelNear CapacityLevel = "near"
 const CapacityLevelFull CapacityLevel = "full"
 
+// capacity/state and capacity/changed (#4748): the machine's level, pushed when it moves, so a machine's row says it with no page open.
+type CapacityState struct {
+	Level CapacityLevel `json:"level"`
+
+	// The level as a sentence's subject and verb: "this Mac is near capacity" or "this Mac is at capacity". Absent at ok.
+	Words *string `json:"words,omitzero"`
+}
+
 // An approval of an MCP server or skill (#2019, M5): for a group, or for one person.
 type CatalogApproval struct {
 	Kind CatalogKind `json:"kind"`
@@ -11746,6 +11754,9 @@ type ResourceState struct {
 	Line []LineMember `json:"line"`
 
 	EndingSoon bool `json:"endingSoon"`
+
+	// Why its line waits for the machine, not for a holder (#4579, #4748): "this Mac is near capacity", "this Mac is at capacity", or "this Mac has capacity again" while the line is served one a look. Only on a compute resource (capacity, build) with a free place and a line; absent otherwise and from a host from before #4748.
+	CapacityWait *string `json:"capacityWait,omitzero"`
 }
 
 type ResumingNotification struct {

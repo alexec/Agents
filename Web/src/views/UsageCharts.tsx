@@ -81,13 +81,15 @@ export function UsageCharts({ metric, history, runtimeName }: {
   );
 }
 
-function tick(range: UsageRange, i: number, count: number): boolean {
+/** Whether a bar's label is drawn under it; Velocity's bars use it too (#4598). */
+export function tick(range: UsageRange, i: number, count: number): boolean {
   if (range === "D") return i % 6 === 0;
   if (range === "W") return true;
   return (count - 1 - i) % (range === "M" ? 7 : 3) === 0;
 }
 
-function label(range: UsageRange, bar: UsageBar, short = false): string {
+/** A bar's day or hour in words: short under the bar, long for a picked one. */
+export function label(range: UsageRange, bar: UsageBar, short = false): string {
   const d = bar.start;
   if (range === "D") return d.toLocaleTimeString(undefined, { hour: "numeric" });
   if (range === "W") return d.toLocaleDateString(undefined, short ? { weekday: "short" } : { weekday: "long", day: "numeric", month: "long" });
@@ -95,7 +97,8 @@ function label(range: UsageRange, bar: UsageBar, short = false): string {
   return d.toLocaleDateString(undefined, short ? { day: "numeric", month: "short" } : { weekday: "long", day: "numeric", month: "long" });
 }
 
-function when(range: UsageRange, bars: UsageBar[], bar: UsageBar | null): string {
+/** The when line under the figure: the range, Today in D, or a picked bar's own. */
+export function when(range: UsageRange, bars: UsageBar[], bar: UsageBar | null): string {
   if (bar) {
     if (range === "D") {
       const next = new Date(bar.start.getTime() + 3600_000);

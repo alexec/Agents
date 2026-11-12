@@ -1693,6 +1693,8 @@ button.plain:hover { opacity: 1; }
 .lease-line .link .chevron { opacity: 0.45; }
 .lease-line .link:hover .words { opacity: 1; }
 @media (hover: none) { .lease-line .link { min-height: 44px; } }
+/* A queued start the machine holds (#4748): words only, as a lease line's, with no way anywhere. */
+.lease-line > .words { display: inline-flex; align-items: center; min-height: 24px; font-size: 0.75rem; opacity: 0.7; }
 
 /* The new-session page's folder name, a menu of every folder (#495, #499): the browser's own
    menu over the name, as a pill's. */

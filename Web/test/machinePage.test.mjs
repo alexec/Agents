@@ -84,3 +84,15 @@ test("the summary says the load and the level, and a line why at near and full (
   assert.equal(c.queuedWords(1), "1 start queued");
   assert.equal(c.queuedWords(2), "2 starts queued");
 });
+
+test("the waits for the machine say why (#4748)", async () => {
+  const c = await load("src/model/capacity.ts");
+  assert.equal(c.leasesInLineWords(0), null);
+  assert.equal(c.leasesInLineWords(1), "1 lease in line for the machine");
+  assert.equal(c.leasesInLineWords(2), "2 leases in line for the machine");
+  const member = { agentID: "a", askedAt: 0, isCallOpen: true };
+  assert.equal(c.leasesInLine([{ name: "build", line: [member, member], capacityWait: "this Mac is near capacity" },
+    { name: "screen", line: [member] }]), 2);
+  assert.equal(c.startLineWords("this Mac is near capacity"), "◷ In line to start · this Mac is near capacity");
+  assert.equal(c.heldForCapacityWords("this Mac is at capacity"), "Held for capacity: this Mac is at capacity");
+});

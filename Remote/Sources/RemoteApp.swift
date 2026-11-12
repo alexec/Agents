@@ -53,8 +53,9 @@ struct RemoteApp: App {
                 }
             }
                 .background(Paper.ground)
-                // Undo after Archive (#1534), for a few seconds, over the foot of whatever shows.
-                .modifier(ArchiveUndoOverlay())
+                // The scene's toast (#4737): a failure, or Undo after Archive (#1534), above
+                // the prompt bar.
+                .modifier(RemoteToasts())
                 .modifier(MoveToMachineAsk())
                 .modifier(ProjectSettingsAsk())
                 .environment(model)
@@ -283,13 +284,6 @@ struct RemoteView: View {
             await model.openFromLaunchArguments()
 #endif
         }
-        .alert("That did not work",
-               isPresented: Binding(get: { model.problem != nil },
-                                    set: { if !$0 { model.dismissProblem() } })) {
-            Button("OK") { model.dismissProblem() }
-        } message: {
-            Text(model.problem ?? "")
-        }
         // New Machine (#4634): the defaults chosen, Make to confirm; a refused make opens it again.
         .sheet(item: Binding(get: { model.newMachineAsk }, set: { model.newMachineAsk = $0 })) { ask in
             NavigationStack {
@@ -328,7 +322,7 @@ struct RemoteView: View {
         }
         // A send refused because the folder has gone (#119), with the ways on.
         .alert("This agent’s folder isn’t there",
-               isPresented: Binding(get: { model.folderGone != nil && model.problem == nil },
+               isPresented: Binding(get: { model.folderGone != nil },
                                     set: { if !$0 { model.folderGone = nil } }),
                presenting: model.folderGone) { ask in
             Button(MissingFolderWords.continueInFolder) {
@@ -520,27 +514,6 @@ private struct PhoneFolderCover: ViewModifier {
                 .modifier(TakeOverCover(overFolder: true))
                 .environment(model)
         }
-    }
-}
-
-/// Undo after Archive (#1534) over the foot of the scene, on the scene's root: RemoteView's
-/// own chain is at the type checker's limit.
-private struct ArchiveUndoOverlay: ViewModifier {
-    @Environment(RemoteModel.self) private var model
-
-    func body(content: Content) -> some View {
-        content
-            .overlay(alignment: .bottom) {
-                if let undo = model.archiveUndo {
-                    ArchiveUndoStrip(undo: undo,
-                                     perform: { Task { await model.undoArchive() } },
-                                     dismiss: { model.dismissArchiveUndo(undo) })
-                        .frame(maxWidth: 480)
-                        .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
-                        .padding(.bottom, 12)
-                }
-            }
-            .animation(.easeOut(duration: 0.2), value: model.archiveUndo?.id)
     }
 }
 
