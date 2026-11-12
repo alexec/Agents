@@ -48,6 +48,20 @@ public struct EventWait: Codable, Hashable, Sendable {
 
     public var isOpen: Bool { ending == nil }
 
+    /// The wait on a time alone (#4843): a marker, not an event. Nothing raises it, and a
+    /// wait on it ends at its deadline.
+    public static let timeReached = "time.reached"
+
+    /// Whether it waits on a time alone: `time.reached`.
+    public var isTimeWait: Bool { patterns.count == 1 && patterns[0].name == Self.timeReached }
+
+    /// The heading of its card at the foot of the chat: "Waiting until 15:30" for a time,
+    /// "Waiting for event" for the rest. The web page's is `eventWaitCardTitle`.
+    public var cardTitle: String {
+        guard isTimeWait, let deadline else { return "Waiting for event" }
+        return "Waiting until \(deadline.formatted(date: .omitted, time: .shortened))"
+    }
+
     /// A server's event matches by the subscription that raised it (#577), never by its
     /// details: its `where` went to the server as arguments.
     public func matches(_ event: Event) -> Bool {

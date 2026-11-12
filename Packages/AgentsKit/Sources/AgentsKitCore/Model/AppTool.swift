@@ -108,9 +108,6 @@ public enum AppTool {
     /// Wait for an event in this folder or on this Mac.
     public static let waitForEvent = "wait_for_event"
 
-    /// Resume after a set number of minutes.
-    public static let checkAgain = "check_again"
-
     /// Stop waiting.
     public static let cancelWait = "cancel_wait"
 
@@ -173,7 +170,7 @@ public enum AppTool {
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
         finishTurn, showFile, notify, manageWorkflows, manageAccounts, askQuestion, askSecret, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
-        leaseResource, releaseResource, listResources, waitForEvent, checkAgain,
+        leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, listSessions, readSession,
         setSessionLabels, moveWorktree, messageSession, cancelMessage,
     ] + machineTools + writerTools

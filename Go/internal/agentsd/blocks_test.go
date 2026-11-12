@@ -158,34 +158,74 @@ func TestABlockOutlivesACardInTheSameTurn(t *testing.T) {
 	}
 }
 
-func TestCheckAgainNeedsInMinutes(t *testing.T) {
+// A wait on a time alone is wait_for_event on time.reached (#4843): check_again is gone,
+// a list with time.reached and other events is refused, and the wait ends saying the time
+// has come, not that it timed out.
+func TestTimeReachedIsTheWaitOnATime(t *testing.T) {
 	fakeRuntimes(t)
+	was := eventHoldLimit
+	eventHoldLimit = 300 * time.Millisecond
+	defer func() { eventHoldLimit = was }()
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	title := func(s string) *string { return &s }
 	lead := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.Title, a.State, a.EndedReason = title("Lead"), wire.AgentStateRunning, nil })
 	m := appClient(t, d, lead.ID)
 	m.post("initialize", map[string]any{}, 1)
-	if text, isErr := m.tool(2, "check_again", map[string]any{}); !isErr ||
-		!strings.HasPrefix(text, "Nothing is waited for: in_minutes is required") {
+	for _, tool := range appToolCalls() {
+		if tool.name == "check_again" {
+			t.Fatal("check_again is still a tool")
+		}
+	}
+	if text, isErr := m.tool(3, "wait_for_event", map[string]any{"events": []string{"time.reached", "lease.granted"}, "until_minutes": 30}); !isErr ||
+		!strings.HasPrefix(text, "time.reached goes alone") {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(3, "check_again", map[string]any{"in_minutes": 0}); !isErr ||
-		!strings.Contains(text, "in_minutes has to be a whole number from") {
+	if text, isErr := m.tool(4, "wait_for_event", map[string]any{"events": "time.reached", "where": map[string]any{"pr": 1}, "until_minutes": 30}); !isErr ||
+		!strings.HasPrefix(text, "time.reached takes no where") {
 		t.Fatal(text)
 	}
-	text, _ := m.tool(4, "check_again", map[string]any{"in_minutes": 30, "message": "Waiting for CI."})
-	if !strings.Contains(text, "Recorded.") || !strings.Contains(text, "Waiting") {
+	if d.Store.Agent(lead.ID).EventWait != nil {
+		t.Fatal("a refused wait was recorded")
+	}
+	text, _ := m.tool(5, "wait_for_event", map[string]any{"events": "time.reached", "until_minutes": 30})
+	if !strings.HasPrefix(text, "Waiting until ") || !strings.Contains(text, "You'll be started again at that time.") {
 		t.Fatal(text)
 	}
-	if r := d.Store.Agent(lead.ID).Report; r == nil || r.Outcome != wire.WorkOutcomeWaiting {
-		t.Fatalf("%+v", r)
+	w := d.Store.Agent(lead.ID).EventWait
+	if !isTimeWait(w) || w.Ending != nil {
+		t.Fatalf("%+v", w)
+	}
+	status := d.waitStatus(d.Store.Agent(lead.ID))
+	if status == nil || !strings.HasPrefix(status.Mark, "◷ Waiting until ") {
+		t.Fatalf("%+v", status)
+	}
+	// An event of any name never wakes it.
+	if waitMatches(w, wire.Event{Name: "time.reached", Position: w.From + 1}) {
+		t.Fatal("time.reached matched an event")
+	}
+	past := wire.DateOf(time.Now().Add(-time.Second))
+	d.change(lead.ID, func(a *wire.Agent) {
+		w := *a.EventWait
+		w.Deadline = &past
+		a.EventWait = &w
+	})
+	d.waitDeadlinesPassed()
+	if words := timedOutWords(w, past); !strings.HasPrefix(words, "The time you asked for has come (") {
+		t.Fatal(words)
+	}
+	if w := d.Store.Agent(lead.ID).EventWait; w == nil || w.Ending == nil {
+		t.Fatalf("the wait did not end: %+v", w)
+	}
+	// A workflow never triggers on it: a schedule runs at a time.
+	if _, problem := parsePattern("time.reached", nil); !strings.Contains(problem, "is never raised") || !strings.Contains(problem, "schedule") {
+		t.Fatal(problem)
 	}
 }
 
-// Only one of a Block (check_again, a wait on agent.ended) and an EventWait (wait_for_event) is
-// ever open at a time, in either order (#3094): the chat draws one wait card at the foot
-// of the chat, not two.
+// Only one of a Block (a wait on agent.ended) and an EventWait (wait_for_event) is ever
+// open at a time, in either order (#3094): the chat draws one wait card at the foot of the
+// chat, not two.
 func TestOnlyOneWaitAtATime(t *testing.T) {
 	fakeRuntimes(t)
 	was := eventHoldLimit
@@ -193,11 +233,15 @@ func TestOnlyOneWaitAtATime(t *testing.T) {
 	defer func() { eventHoldLimit = was }()
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
-	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateRunning, nil })
+	title := func(s string) *string { return &s }
+	dir := t.TempDir()
+	seeded(t, d, dir, func(a *wire.Agent) { a.Title, a.State, a.EndedReason = title("Build"), wire.AgentStateRunning, nil })
+	a := seeded(t, d, dir, func(a *wire.Agent) { a.Title, a.State, a.EndedReason = title("Lead"), wire.AgentStateRunning, nil })
 	m := appClient(t, d, a.ID)
 	m.post("initialize", map[string]any{}, 1)
+	onBuild := map[string]any{"events": "agent.ended", "where": map[string]any{"agent": []string{"Build"}}, "until_minutes": 30}
 
-	text, _ := m.tool(2, "check_again", map[string]any{"in_minutes": 30, "message": "Waiting for CI."})
+	text, _ := m.tool(2, "wait_for_event", onBuild)
 	if !strings.Contains(text, "Recorded.") {
 		t.Fatal(text)
 	}
@@ -205,21 +249,21 @@ func TestOnlyOneWaitAtATime(t *testing.T) {
 		t.Fatalf("no open block: %+v", r)
 	}
 
-	// wait_for_event closes the open block: it is replaced, not stacked.
+	// wait_for_event on events closes the open block: it is replaced, not stacked.
 	text, _ = m.tool(3, "wait_for_event", map[string]any{"events": "branch.moved", "where": map[string]any{"any": true}, "until_minutes": 10})
 	if !strings.HasPrefix(text, "Still waiting for branch.moved") {
 		t.Fatal(text)
 	}
 	if r := d.Store.Agent(a.ID).Report; isOpenBlock(r) {
-		t.Fatalf("the check-again block is still open: %+v", r.Block)
+		t.Fatalf("the block is still open: %+v", r.Block)
 	}
 	if d.Store.Agent(a.ID).EventWait == nil {
 		t.Fatal("no event wait was recorded")
 	}
 
-	// check_again closes the open event wait the same way.
-	text, _ = m.tool(4, "check_again", map[string]any{"in_minutes": 15, "message": "Waiting again."})
-	if !strings.Contains(text, "Replaced your earlier wait on branch.moved") || !strings.Contains(text, "Recorded.") {
+	// A wait on a session closes the open event wait the same way.
+	text, _ = m.tool(4, "wait_for_event", onBuild)
+	if !strings.Contains(text, "Recorded.") {
 		t.Fatal(text)
 	}
 	if d.Store.Agent(a.ID).EventWait != nil {

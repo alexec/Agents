@@ -34,6 +34,11 @@ var eventHoldLimit = 45 * time.Second
 // while no wait held its subscription.
 const waitLooksBack = 15 * time.Minute
 
+// timeReached is the wait on a time alone (#4843): a marker, not an event. Nothing raises
+// it on the bus; a wait on it ends at its until_minutes, and the agent is told the time has
+// come. It goes alone, and a workflow trigger refuses it: a schedule runs at a time.
+const timeReached = "time.reached"
+
 const (
 	waitMinutesLow  = 1
 	waitMinutesHigh = 1440
@@ -291,6 +296,10 @@ func (p waitPattern) label() string {
 }
 
 func (p waitPattern) matches(e wire.Event) bool {
+	// A time, not an event (#4843): no event wakes it, whatever its name.
+	if p.name == timeReached {
+		return false
+	}
 	if subject, ok := strings.CutSuffix(p.name, ".*"); ok {
 		if isSubject(subject) {
 			if !strings.HasPrefix(e.Name, subject+".") {
@@ -404,6 +413,9 @@ func parsePattern(given string, filters map[string][]string) (waitPattern, strin
 		clean[strings.TrimSpace(k)] = out
 	}
 	p := waitPattern{name: name, filters: clean}
+	if name == timeReached {
+		return p, timeReachedTriggerWords
+	}
 	if name == "custom" || strings.HasPrefix(name, "custom.") {
 		return p, `"` + name + `" is never raised: agents no longer publish events, so there are no custom.* events to wait or trigger on. ` +
 			"Use one the app raises, such as agent.ended or branch.moved; to wait for particular agents, use agent.ended with agent."
@@ -419,7 +431,7 @@ func parsePattern(given string, filters map[string][]string) (waitPattern, strin
 			guess = " Did you mean " + g + "?"
 		}
 		return p, `"` + name + `" is not an event.` + guess + " Events you can wait on: " + strings.Join(names, ", ") +
-			", or a subject with .* such as agent.*."
+			", or a subject with .* such as agent.*. To wait until a time with no event, use time.reached alone."
 	}
 	if subject, ok := strings.CutSuffix(name, ".*"); ok {
 		if !isSubject(subject) {
@@ -649,7 +661,24 @@ func matchedWords(e wire.Event, waited *int) string {
 	return said + " You can carry on." + hint
 }
 
+// timeReachedTriggerWords is why a trigger on time.reached is refused (#4843).
+const timeReachedTriggerWords = `"time.reached" is never raised: it is only for wait_for_event, alone, to wait until its until_minutes. ` +
+	"For a workflow that runs at a time, use a schedule."
+
+// timeReachedMixedWords is why a wait on time.reached and other events is refused (#4843).
+const timeReachedMixedWords = "time.reached goes alone: every wait already ends at its until_minutes, so wait on the other events " +
+	"without it. Nothing is waiting."
+
+// isTimeWait says the wait is on a time alone: time.reached (#4843).
+func isTimeWait(w *wire.EventWait) bool {
+	return w != nil && len(w.Patterns) == 1 && w.Patterns[0].Name == timeReached
+}
+
 func stillWaitingWords(w *wire.EventWait) string {
+	if isTimeWait(w) && w.Deadline != nil {
+		return "Waiting until " + clock(*w.Deadline) + ", since " + clock(w.Since) +
+			". Your place is kept; you can end your turn. You'll be started again at that time."
+	}
 	until := ""
 	if w.Deadline != nil {
 		until = ", until " + clock(*w.Deadline)
@@ -717,6 +746,10 @@ func wakeWords(e wire.Event, extra int) string {
 }
 
 func timedOutWords(w *wire.EventWait, at wire.Date) string {
+	if isTimeWait(w) {
+		return "The time you asked for has come (" + clock(at) + "). Check the state of what you were waiting for now, " +
+			"then carry on or wait again."
+	}
 	return "Your wait for " + waitLabel(w) + " timed out at " + clock(at) + " with no match. No event is not proof that nothing " +
 		"happened (the bus is best effort): check the state now, by its ref, before you go on."
 }
@@ -754,6 +787,10 @@ func (d *Daemon) waitStatus(a *wire.Agent) *wire.WaitStatus {
 			return &wire.WaitStatus{Line: waitSymbol + " Waiting for " + what, Mark: waitSymbol + " Waiting for " + what}
 		}
 		return nil
+	}
+	if isTimeWait(w) && w.Deadline != nil {
+		until := waitSymbol + " Waiting until " + clock(*w.Deadline)
+		return &wire.WaitStatus{Line: until + " · since " + clock(w.Since), Mark: until, Cancellable: true}
 	}
 	what := waitLabel(w)
 	ps := waitPatterns(w)
@@ -927,6 +964,17 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	if minutes < waitMinutesLow || minutes > waitMinutesHigh {
 		return "", eventRefused(fmt.Sprintf("until_minutes has to be from %d to %d.", waitMinutesLow, waitMinutesHigh))
 	}
+	// A wait on a time alone (#4843): with other events it is refused, since every wait
+	// already ends at its deadline, so the agent learns the rule.
+	timeOnly := false
+	for _, n := range names {
+		if strings.EqualFold(n, timeReached) {
+			timeOnly = true
+		}
+	}
+	if timeOnly && len(names) > 1 {
+		return "", eventRefused(timeReachedMixedWords)
+	}
 	filters, problem := readFilters(args["where"])
 	if problem != "" {
 		return "", eventRefused(problem)
@@ -934,6 +982,9 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	bus, problem := waitBusFilter(args)
 	if problem != "" {
 		return "", eventRefused(problem + " Nothing is waiting.")
+	}
+	if timeOnly && (len(filters) > 0 || bus.wide() || argString(args, "wake_on") != "") {
+		return "", eventRefused("time.reached takes no where, provider, topic, subject or wake_on: it is a time, not an event. Nothing is waiting.")
 	}
 	wakeOn := strings.ToLower(strings.TrimSpace(argString(args, "wake_on")))
 	if words := endedWaitWords(names, filters, wakeOn); words != "" {
@@ -943,6 +994,10 @@ func (d *Daemon) waitForEvent(agent wire.UUID, args map[string]json.RawMessage) 
 	var serverNames []string
 	warning0 := ""
 	for _, n := range names {
+		if timeOnly {
+			patterns = append(patterns, waitPattern{name: timeReached, filters: map[string][]string{}})
+			continue
+		}
 		p, problem := parsePattern(n, filters)
 		if problem != "" {
 			return "", eventRefused(problem)

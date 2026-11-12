@@ -205,7 +205,7 @@ public enum EventPatternProblem: Error, Hashable, Sendable {
             let guess = Self.closest(to: name).map { " Did you mean \($0)?" } ?? ""
             let names = EventCatalogue.all.map(\.name).joined(separator: ", ")
             return "\"\(name)\" is not an event.\(guess) Events you can wait on: \(names), "
-                + "or a subject with .* such as agent.*."
+                + "or a subject with .* such as agent.*. To wait until a time with no event, use time.reached alone."
         case .retiredCustom(let name):
             return "\"\(name)\" is never raised: agents no longer publish events, so there are no custom.* "
                 + "events to wait or trigger on. Use one the app raises, such as agent.ended or "

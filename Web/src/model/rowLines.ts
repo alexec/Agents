@@ -238,11 +238,24 @@ export function triggerURL(trigger: MCPEventTrigger): string | undefined {
   return undefined;
 }
 
+/** EventWait.isTimeWait (#4843): a wait on a time alone, time.reached, a marker that nothing raises. */
+export function isTimeWait(wait: EventWait): boolean {
+  return wait.patterns.length === 1 && wait.patterns[0]?.name === "time.reached";
+}
+
+/** EventWait.cardTitle: "Waiting until 15:30" for a time, "Waiting for event" for the rest. */
+export function eventWaitCardTitle(wait: EventWait): string {
+  if (!isTimeWait(wait) || wait.deadline === undefined) return "Waiting for event";
+  return `Waiting until ${fromWireDate(wait.deadline).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+}
+
 /**
  * WaitEventLine.lines (#2599, #2747): events from one source with the same filters share a line,
  * a session said by its title and an event by its catalogue meaning.
  */
 export function eventWaitSummaryLines(wait: EventWait, title: (id: string) => string | undefined): EventWaitSummaryLine[] {
+  // A time is no event: the card's heading says it (#4843).
+  if (isTimeWait(wait)) return [];
   type Phrase = { finishers: true } | { words: string };
   const groups: { id: string; source: string; arguments: string[]; url: string | undefined; events: string[]; finishers: string[]; phrases: Phrase[] }[] = [];
   for (const pattern of wait.patterns) {

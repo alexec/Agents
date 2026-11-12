@@ -102,6 +102,7 @@ RULES: list[tuple[str, str]] = [
 # Tools that start a wait. The call is only the first part of it: the daemon
 # holds it for up to 45 s, then the wait goes on with the turn ended. A wait is
 # not running time.
+# check_again went in #4843: older records still name it.
 WAITS = {"wait_for_event", "ask_question", "hand_to_person", "check_again"}
 
 
@@ -171,6 +172,8 @@ def wake_reason(text: str) -> str:
         return f"event: {name}" + (f" ({r.group(1)})" if r else "")
     if first.startswith("Your wait for"):
         return "wait timed out"
+    if first.startswith("The time you asked for has come"):
+        return "time reached"
     if first.startswith("The time you asked to check again"):
         return "check_again timer"
     if first.startswith("The wait you reported has cleared"):
@@ -516,7 +519,7 @@ def main() -> int:
               f"{fmt(statistics.median(v))} | {fmt(pct(v, 0.9))} | {failed.get(k, 0)} |")
 
     print("\n## Waits, call to wake\n")
-    print("From the wait call (`wait_for_event`, `check_again`, `ask_question`, `hand_to_person`, "
+    print("From the wait call (`wait_for_event`, `ask_question`, `hand_to_person`, "
           "a question to the person) to what woke the session.\n")
     print("| Woken by | Waits | Median | p90 | Total | Answered in the call |")
     print("|---|---:|---:|---:|---:|---:|")

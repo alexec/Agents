@@ -51,7 +51,7 @@ export function checkAgainLine(block: Block): string | null {
 
 /** Block.cardTitle: the heading of its card at the foot of the chat (#2750). */
 export function cardTitle(block: Block): string {
-  return block.waits.length === 0 ? "Waiting to check again" : block.waits.length === 1 ? "Waiting for a session" : "Waiting for sessions";
+  return block.waits.length === 0 ? "Waiting until a set time" : block.waits.length === 1 ? "Waiting for a session" : "Waiting for sessions";
 }
 
 /** AgentsModel.waitName: its title now, or the one it had when the block was made. */

@@ -249,7 +249,7 @@ type appPrompt struct {
 	text string
 }
 
-// appPrompts is the prompts in the transcript: a cleared block, a check-again, a wait's end.
+// appPrompts is the prompts in the transcript: a cleared block, a wait's end.
 func (r assessRecord) appPrompts() []appPrompt {
 	var out []appPrompt
 	for _, e := range r.transcript {
@@ -865,9 +865,9 @@ func (r assessRecord) ending() (verdict, string) {
 			withTime = true
 		}
 	}
-	// A wait on a time alone: check_again.
-	for _, c := range r.callsOf("waits/checkAgain") {
-		if _, ok := intArg(c, "in_minutes", "inMinutes"); c.Ok && ok {
+	// A wait on a time alone: wait_for_event on time.reached (#4843).
+	for _, c := range r.callsOf("events/wait") {
+		if _, ok := intArg(c, "until_minutes", "untilMinutes"); c.Ok && ok && waitsOn(c, timeReached) {
 			outcomes = append(outcomes, "waiting")
 			withTime = true
 		}
@@ -881,7 +881,7 @@ func (r assessRecord) ending() (verdict, string) {
 		missing = append(missing, "waiting on the helper")
 	}
 	if !withTime {
-		missing = append(missing, "waiting with a check-again time")
+		missing = append(missing, "waiting on time.reached")
 	}
 	recorded := strings.Join(outcomes, ", ")
 	if len(missing) > 0 {

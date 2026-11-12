@@ -18,6 +18,8 @@ public struct WaitEventLine: Identifiable, Hashable, Sendable {
     public let url: URL?
 
     public static func lines(for wait: EventWait, names: (UUID) -> String?) -> [WaitEventLine] {
+        // A time is no event: the card's heading says it (#4843).
+        if wait.isTimeWait { return [] }
         var groups: [Group] = []
         for pattern in wait.patterns {
             let server = wait.serverEvents?.first { $0.trigger.event == pattern.name }

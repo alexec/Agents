@@ -85,7 +85,6 @@ var appToolMethods = map[string]string{
 	"release_resource":     "resources/release",
 	"list_resources":       "resources/list",
 	"wait_for_event":       "events/wait",
-	"check_again":          "waits/checkAgain",
 	"cancel_wait":          "events/cancel",
 	"list_machines":        "machines/list",
 	"start_machine":        "machines/start",

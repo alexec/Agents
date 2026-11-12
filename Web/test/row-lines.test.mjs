@@ -227,3 +227,12 @@ test("a line that waits for the machine says the machine, not a holder (#4748)",
     patterns: [{ name: "lease.granted", filters: { agent: "me", resource: "build" } }] } };
   assert.equal(lines.eventWaitLine(agent, title, snapshot), "◷ Waiting for build · this Mac is near capacity · 1st in line");
 });
+
+test("a wait on a time alone heads its card with the time, and has no event lines (#4843)", () => {
+  const wait = { id: "w", from: 0, since: 0, deadline: 1800, patterns: [{ name: "time.reached", filters: {} }] };
+  assert.equal(lines.isTimeWait(wait), true);
+  assert.match(lines.eventWaitCardTitle(wait), /^Waiting until \d{1,2}:\d{2}/);
+  assert.deepEqual(lines.eventWaitSummaryLines(wait, title), []);
+  const other = { id: "w", from: 0, since: 0, deadline: 1800, patterns: [{ name: "branch.moved", filters: {} }] };
+  assert.equal(lines.eventWaitCardTitle(other), "Waiting for event");
+});

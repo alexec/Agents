@@ -53,4 +53,19 @@ struct EventWaitModelTests {
         let plain = try StoreCoding.encoder.encode(agent)
         #expect(!String(decoding: plain, as: UTF8.self).contains("eventWait"))
     }
+
+    /// A wait on a time alone (#4843): its card says until when, with no event lines, and its
+    /// end says the time has come.
+    @Test func aWaitOnATime() {
+        let since = Date(timeIntervalSince1970: 0)
+        let wait = EventWait(patterns: [EventPattern(EventWait.timeReached)], from: 0,
+                             deadline: since.addingTimeInterval(1800), since: since)
+        #expect(wait.isTimeWait)
+        #expect(wait.cardTitle.hasPrefix("Waiting until "))
+        #expect(WaitEventLine.lines(for: wait, names: { _ in nil }).isEmpty)
+        #expect(EventWords.timedOut(wait, at: since).hasPrefix("The time you asked for has come"))
+        let other = EventWait(patterns: [EventPattern("folder.idle")], from: 0, since: since)
+        #expect(!other.isTimeWait)
+        #expect(other.cardTitle == "Waiting for event")
+    }
 }

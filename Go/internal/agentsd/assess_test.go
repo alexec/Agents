@@ -117,7 +117,7 @@ func TestEveryAppToolIsOneMethodNamedAfterIt(t *testing.T) {
 	// quiet folders (#3355). docs_search and docs_read name their noun first, as the docs/search
 	// and docs/read methods they are over (#3317). make_app_repository makes repositories, whose
 	// plural is not the noun with an s (#3708).
-	nouns := map[string]string{"bring_back": "branches", "notify": "people", "ask_question": "questions", "cancel_wait": "events", "wait_for_event": "events", "check_again": "waits", "hang_up": "calls", "cancel_message": "sessions", "drive_screen": "screen", "write_daily_summary": "summaries", "docs_search": "docs", "docs_read": "docs", "make_app_repository": "repositories"}
+	nouns := map[string]string{"bring_back": "branches", "notify": "people", "ask_question": "questions", "cancel_wait": "events", "wait_for_event": "events", "hang_up": "calls", "cancel_message": "sessions", "drive_screen": "screen", "write_daily_summary": "summaries", "docs_search": "docs", "docs_read": "docs", "make_app_repository": "repositories"}
 	verbs := map[string]string{"docs_search": "search", "docs_read": "read"}
 	seen := map[string]string{}
 	for _, tool := range appToolCalls() {

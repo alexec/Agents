@@ -109,6 +109,7 @@ func toolTimeKind(name string) string {
 	case strings.HasSuffix(n, "release_resource"):
 		// release_resource ends with lease_resource: a release is quick, and a tool.
 		return "tools"
+	// check_again went in #4843; an old transcript still names it.
 	case strings.HasSuffix(n, "wait_for_event") ||
 		strings.HasSuffix(n, "check_again") || strings.HasSuffix(n, "lease_resource"):
 		return "others"

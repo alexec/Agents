@@ -1,7 +1,6 @@
 package agentsd
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -246,32 +245,18 @@ func (d *Daemon) waitForEnded(caller wire.UUID, list []string, wakeOn string, mi
 	if len(names) == 0 {
 		return "", eventRefused("agent.ended: name the sessions in agent, by id or exact title. Nothing is waiting.")
 	}
-	return d.waitOn(caller, names, wakeOn, &minutes, message, "until_minutes")
+	return d.waitOn(caller, names, wakeOn, minutes, message)
 }
 
-// checkAgain is check_again: the turn ends waiting until in_minutes.
-func (d *Daemon) checkAgain(caller wire.UUID, args map[string]json.RawMessage) (string, error) {
-	var minutes *int
-	if n, ok := argInt(args, "in_minutes"); ok {
-		minutes = &n
-	}
-	return d.waitOn(caller, nil, "", minutes, argString(args, "message"), "in_minutes")
-}
-
-// waitOn ends the turn waiting on named sessions, or on a time alone.
-func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes *int, message, minutesKey string) (string, error) {
+// waitOn ends the turn waiting on named sessions. A wait on a time alone is
+// wait_for_event on time.reached (#4843), an event wait, not a block.
+func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes int, message string) (string, error) {
 	me := d.Store.Agent(caller)
 	if me == nil {
 		return "", &Error{Code: CodeNoSuchAgent, Message: "That conversation is not open any more, so nothing is waited for."}
 	}
-	if minutes == nil {
-		if minutesKey == "in_minutes" {
-			return "", Invalid("Nothing is waited for: in_minutes is required: say how many minutes until you resume, from %d to %d.", blockMinutesLow, blockMinutesHigh)
-		}
-		return "", Invalid("Nothing is waited for: %s", deadlineRequiredWords())
-	}
-	if *minutes < blockMinutesLow || *minutes > blockMinutesHigh {
-		return "", Invalid("Nothing is waited for: %s has to be a whole number from %d to %d.", minutesKey, blockMinutesLow, blockMinutesHigh)
+	if minutes < blockMinutesLow || minutes > blockMinutesHigh {
+		return "", Invalid("Nothing is waited for: until_minutes has to be a whole number from %d to %d.", blockMinutesLow, blockMinutesHigh)
 	}
 	var wake *wire.BlockWakeOn
 	switch wakeOn {
@@ -290,11 +275,7 @@ func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes
 		return "", Invalid("Nothing was recorded: you have a question waiting to be answered, so this work is not over. Answer it first, or let it be answered.")
 	}
 	if strings.TrimSpace(message) == "" {
-		if len(names) == 0 {
-			message = fmt.Sprintf("Waiting, to check again in %d minutes.", *minutes)
-		} else {
-			message = "Waiting for other agents to finish."
-		}
+		message = "Waiting for other agents to finish."
 	}
 	at := now()
 	block := wire.Block{Waits: []wire.Wait{}}
@@ -350,7 +331,7 @@ func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes
 	if len(ended) > 0 && (onAny || len(block.Waits) == 0) {
 		return d.endedAtOnceWords(ended, block.Waits, onAny), nil
 	}
-	check := wire.DateOf(at.Time().Add(time.Duration(*minutes) * time.Minute))
+	check := wire.DateOf(at.Time().Add(time.Duration(minutes) * time.Minute))
 	block.CheckAgainAt = &check
 	if wake != nil && *wake == wire.BlockWakeOnAny && len(block.Waits) > 0 {
 		block.WakeOn = wake
@@ -562,7 +543,7 @@ func (d *Daemon) resumePrompt(b *wire.Block, message string, why wire.BlockClear
 	case why == wire.BlockClearingWaits:
 		lines = append(lines, "Carry on from here. To wait on the rest, call wait_for_event on agent.ended again, naming them in agent.")
 	default:
-		lines = append(lines, "Check on it, and carry on or call check_again.")
+		lines = append(lines, "Check on it, and carry on or wait again with wait_for_event.")
 	}
 	return strings.Join(lines, "\n")
 }
