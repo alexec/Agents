@@ -93,6 +93,16 @@ struct RemoteChatView: View {
                 .accessibilityHidden(true)
         }
         .onChange(of: agent?.id) { searchingFiles = false }
+        // What the ⌘K command menu asked of the open chat (#4792); not of a popped-out one.
+        .onChange(of: model.chatAsk, initial: true) {
+            guard popped == nil, let ask = model.chatAsk else { return }
+            model.chatAsk = nil
+            switch ask {
+            case .findInChat: if findsInChat { finding = true }
+            case .openFile: if agent != nil { searchingFiles = true }
+            case .prompts: if agent != nil { showingPrompts = true }
+            }
+        }
     }
 
     /// Open File… (#415): the session's files by name, found on its host. The one chosen

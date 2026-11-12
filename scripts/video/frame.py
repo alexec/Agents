@@ -23,6 +23,7 @@ import subprocess
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from voice import duration
 
 W, H, FPS = 2560, 1440, 30
 ASSETS = Path.home() / ".agents/video/assets"
@@ -358,6 +359,7 @@ def compose(scene, takes, work, out_dir):
 
     # The narration, each line at its marker.
     cues, audio = [], []
+    spans = []  # where each part of the track plays, for the sound test (sound.py, #4855)
     for name, at in marks:
         if not name.startswith("say:"):
             continue
@@ -365,6 +367,7 @@ def compose(scene, takes, work, out_dir):
         take = takes[key]
         t = timeline(at - start)
         cues.append((t, t + take["duration"], take["text"]))
+        spans.append({"kind": "narration", "name": key, "from": t, "to": t + take["duration"]})
         i = add(take["path"], loop=False)
         audio.append(f"[{i}:a]{MIXED},adelay={int(t * 1000)}:all=1[a{len(audio)}]")
     # Voice mode's tape (#4854): each sentence of speech.wav and each sound at its place.
@@ -376,14 +379,17 @@ def compose(scene, takes, work, out_dir):
                          f"{MIXED},adelay={int(t * 1000)}:all=1[a{len(audio)}]")
             if mark.get("said"):
                 cues.append((t, t + mark["seconds"], mark["said"]))
+            spans.append({"kind": "speech", "name": mark.get("said") or "", "from": t, "to": t + mark["seconds"]})
         elif "sound" in mark:
             sound = Path(f"/System/Library/Sounds/{mark['sound']}.aiff")
             if not sound.exists():
                 print(f"  warning: no {sound} for the tape's sound at {mark['t']:.1f}s (a Remote's SystemSoundID?): left out")
                 continue
             i = add(sound, loop=False)
+            spans.append({"kind": "sound", "name": mark["sound"], "from": t, "to": t + duration(sound)})
             audio.append(f"[{i}:a]volume={mark.get('volume', 1):.3f},{MIXED},adelay={int(t * 1000)}:all=1[a{len(audio)}]")
     cues.sort()
+    (work / "sound.json").write_text(json.dumps({"length": length, "spans": sorted(spans, key=lambda s: s["from"])}, indent=1))
     graph += audio
     if audio:
         graph.append("".join(f"[a{i}]" for i in range(len(audio))) +

@@ -14,9 +14,20 @@ struct CommandMenuView: View {
     let choose: (CommandFinder.Item) -> Void
     let dismiss: () -> Void
 
-    @State private var term = ""
+    @State private var term: String
     @State private var selected = 0
     @FocusState private var focused: Bool
+
+    /// `term` is what is typed to start with: the Remote's sidebar search, when the menu is
+    /// opened from it on a phone with no keyboard (#4792).
+    init(items: [CommandFinder.Item], repos: [String], term: String = "",
+         choose: @escaping (CommandFinder.Item) -> Void, dismiss: @escaping () -> Void) {
+        self.items = items
+        self.repos = repos
+        self.choose = choose
+        self.dismiss = dismiss
+        _term = State(initialValue: term)
+    }
 
     private var found: [CommandFinder.Item] {
         let matched = CommandFinder.matches(items, query: term)
@@ -152,8 +163,67 @@ enum CommandMenuWords {
     static let menuItem = "Command Menu…"
     static let prompt = "Find a session, folder, issue or action"
     static let label = "Command menu"
+    /// The row at the top of the Remote's sidebar search (#4792): the menu, with no keyboard.
+    static func searchRow(_ term: String) -> String {
+        "Actions, folders and issues for “\(term.trimmingCharacters(in: .whitespaces))”"
+    }
     static func nothing(_ term: String) -> String { "Nothing matches “\(term.trimmingCharacters(in: .whitespaces))”." }
     static func shortcut(_ glyphs: String) -> String { "Shortcut \(glyphs)" }
+}
+
+/// One action in the ⌘K command menu (#4787): its row, and what choosing it does. On the Mac the
+/// menu bar makes them, as it knows each action's state and key; on the Remote,
+/// `RemoteCommandMenu.actions` (#4792).
+struct CommandMenuAction {
+    let item: CommandFinder.Item
+    let perform: @MainActor () -> Void
+
+    init(_ title: String, key: KeyboardShortcut? = nil, keywords: [String] = [],
+         perform: @escaping @MainActor () -> Void) {
+        item = CommandFinder.Item(id: "action:\(title)", kind: .action, title: title,
+                                shortcut: key?.glyphs ?? "", keywords: keywords)
+        self.perform = perform
+    }
+}
+
+/// The command menu's issues and pull requests, from the Work lists read so far, for every
+/// client that draws it: the Mac window and the Remote (#4792).
+@MainActor
+enum CommandMenuWork {
+    /// The rows the Work list of a kind has read, as items; none before it is read.
+    static func items(_ lists: WorkLists, _ kind: WorkList.Kind) -> [CommandFinder.Item] {
+        lists[kind].all.map { row in
+            CommandFinder.Item(id: "\(kind == .pr ? "pr" : "issue"):\(row.node.ref)", kind: kind == .pr ? .pr : .issue,
+                               title: row.title, detail: ReportValueWords.name(.init(kind: "", ref: WorkList.repo(of: row.node.ref))),
+                               ref: WorkList.shortRef(row.node.ref))
+        }
+    }
+
+    /// The repos the read issues and PRs are from, for a ref typed that no item has.
+    static func repos(_ lists: WorkLists) -> [String] {
+        var seen = Set<String>()
+        return (lists[.issue].all + lists[.pr].all)
+            .map { WorkList.repo(of: $0.node.ref) }
+            .filter { seen.insert($0).inserted }
+    }
+
+    /// The Work page an issue or pull request item opens, or nil for any other item.
+    static func place(of item: CommandFinder.Item) -> WorkPlace? {
+        let (prefix, rest) = CommandMenuID.split(item.id)
+        switch prefix {
+        case "issue": return WorkPlace(kind: .issue, ref: rest)
+        case "pr": return WorkPlace(kind: .pr, ref: rest)
+        default: return nil
+        }
+    }
+}
+
+/// An item's id, `kind:rest`, taken apart.
+enum CommandMenuID {
+    static func split(_ id: String) -> (String, String) {
+        guard let colon = id.firstIndex(of: ":") else { return (id, "") }
+        return (String(id[..<colon]), String(id[id.index(after: colon)...]))
+    }
 }
 
 extension KeyboardShortcut {

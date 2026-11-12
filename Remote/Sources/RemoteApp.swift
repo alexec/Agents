@@ -209,6 +209,13 @@ struct RemoteView: View {
                 })
     }
 
+    /// The ⌘K command menu (#4792), with Folder Terminal when a folder is open.
+    private var commandMenu: RemoteCommandMenuOverlay {
+        guard model.selectedFolder != nil else { return RemoteCommandMenuOverlay(openTerminal: nil) }
+        let shows = $showsFolderTerminal
+        return RemoteCommandMenuOverlay { @MainActor in shows.wrappedValue = true }
+    }
+
     var body: some View {
         @Bindable var model = model
         NavigationSplitView(preferredCompactColumn: $compactColumn) {
@@ -231,6 +238,8 @@ struct RemoteView: View {
             .id(model.sidebarItem)
         }
         .navigationSplitViewStyle(.balanced)
+        // ⌘K, the command menu (#4792), over the whole window, as on the Mac.
+        .modifier(commandMenu)
         // A label's chip, in a card or the chat, filters the sidebar by it (#3898). The
         // chat stays open; on a phone, Back shows the list it filtered.
         .environment(\.labelFilter, LabelFilter(query: model.sidebarSearch) { model.sidebarSearch = $0 })
