@@ -16,7 +16,21 @@ import (
 // each one raised once from what Forgejo says.
 
 func TestTheEventsAreTheGitLabServersNames(t *testing.T) {
-	same(t, EventNames(), gitlabmcp.EventNames())
+	// The gitlab server's, but for run.completed and deploy.waiting, which each forge has
+	// where its API does; run.completed is after checks.failed, as there (#4217).
+	without := func(names []string) []string {
+		var out []string
+		for _, n := range names {
+			if n != "run.completed" && n != "deploy.waiting" {
+				out = append(out, n)
+			}
+		}
+		return out
+	}
+	same(t, without(EventNames()), without(gitlabmcp.EventNames()))
+	if names := EventNames(); len(without(names)) != len(names) && names[1] != "run.completed" {
+		t.Fatalf("run.completed is not after checks.failed: %v", names)
+	}
 }
 
 func TestOpenedIsRaisedWhenReadyAndOnlyForTheReposOwn(t *testing.T) {
