@@ -209,6 +209,41 @@ anyway. Alex can overrule.
   its agent cost: the root is deleted after it.
 - *Length:* 42 s with the end card, not 60 s: the lines are short and the agent quick.
 
+**Steps 3 to 5, the upload (#4838, 2026-11-12).** U1 is
+[on YouTube](https://youtu.be/4SCWbBAnMxA): private, in `Loops usage`, English captions, 43 s.
+
+- *What broke:*
+  - **A new playlist is 404 for a few seconds.** The first `make.sh u1 --upload` made
+    `Loops usage`, and its next call (`playlistItems`) answered 404 playlistNotFound. A
+    minute later the same call worked. `upload.py` now waits 5, 10, 20 and 30 s on a 404
+    before it fails; the self-test's fake answers 404 twice.
+  - **Captions need another scope.** The second run uploaded the video, then
+    `captions.insert` answered 403 insufficientPermissions: the sign-in of #4837 asked for
+    `youtube`, which has no captions. The sign-in now asks for `youtube.force-ssl` (upload,
+    playlists, privacy and captions), and `--preflight` fails a token without it. That
+    meant a new consent: the agents' Chrome came up `--incognito` from `cdp.mjs start`
+    (signed out), and was started again without it; the account chooser took an agent's
+    click; Google's "hasn't verified this app" warning went to Alex by a form (#4840), and
+    the consent was done in that window. The captionless take is private and out of the
+    playlist, not deleted.
+  - **No thumbnail:** `thumbnails.set` answers 403 until the channel is verified by a
+    phone number. `upload.py` logs it and goes on, so YouTube picked the frame: #4961
+    (`alex-todo`).
+  - **The title is a build id:** "Your first agent — Loops v0.18.0-404-g14d039882", from
+    `git describe` on the lane's branch: #4962.
+  - Not broken: the take itself, three times over. Whisper heard 0% of the script wrong
+    each time, the sound test passed, and the contact sheet shows only scratch data (Sam's
+    Mac, `/tmp/run-vid-u1`, the `weather` folder).
+- *Time:* three runs of `make.sh u1 --upload`: 7, 5 and 3.5 min (the voice and the build
+  cached after the first). With the two fixes and the new consent, about 45 min of the
+  lane; about 5 min of Alex's (the consent, and a form).
+- *Cost:* one Claude turn per take in a scratch folder (a few cents each, on the
+  subscription). YouTube: no money; three uploads of the 10,000 daily quota units (an
+  upload is about 1,600, a caption 400, a playlist call 50).
+- *What the next video needs:* nothing more for a private upload. `make.sh <id> --upload`
+  is one step now. A public video still waits on open question 2 (the API audit) and on
+  Alex's watch of this one.
+
 ## Open questions
 
 1. **The channel:** answered (Alex, 2026-11-11, changed 2026-11-12): a new channel for the
