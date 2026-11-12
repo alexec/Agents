@@ -182,7 +182,7 @@ func TestDeliveryApprovalWait(t *testing.T) {
 		d := wire.DateOf(now.Add(-time.Duration(hours * float64(time.Hour))))
 		return &d
 	}
-	const repo = "github:alexec/agents"
+	repo := FullRepoText("github:alexec/agents")
 	pr := func(ref string, change func(*wire.LineageCostNode)) wire.LineageCostNode {
 		r := repo
 		n := wire.LineageCostNode{Node: wire.LineageNode{Kind: KindPR, Ref: repo + ref}, Repo: &r, Banked: blankCost()}
