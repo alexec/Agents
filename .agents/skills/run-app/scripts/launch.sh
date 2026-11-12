@@ -13,6 +13,7 @@ CONFIG=Debug
 SLUG=""
 BUILD=1
 FRONT=0
+PLACE=""
 WINDOW=1
 FIRST_RUN=0
 LAN=0
@@ -26,6 +27,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --no-build)  BUILD=0 ;;
     --front)     FRONT=1 ;;          # bring the window to the front; steals focus
+    --place)     PLACE="$2"; shift ;;  # top-left|top-right|bottom-left|bottom-right|X,Y,W,H|none (default $AGENTS_SCRATCH_PLACE, else bottom-right)
     --no-window) WINDOW=0 ;;         # the host and control plane only, for socket work
     --first-run) FIRST_RUN=1 ;;      # the window unpaired, on Connect this window; pair it by hand with PAIR_CODE
     --lan)       LAN=1 ;;            # the control plane at this Mac's LAN address, for a container
@@ -44,7 +46,7 @@ while [ $# -gt 0 ]; do
     --fake-azure-devops) FAKE_AZURE_DEVOPS=1 ;;  # Azure Repos and Azure Boards for the host (scripts/fake-azure-devops.py, #4063)
     --fake-bitbucket) FAKE_BITBUCKET=1 ;;  # Bitbucket Cloud for the host (scripts/fake-bitbucket.py, #4136)
     --fake-forgejo) FAKE_FORGEJO=1 ;;      # a Forgejo for the host (scripts/fake-forgejo.py, #4136)
-    *) echo "usage: launch.sh [--slug NAME] [--config Debug|Live] [--seeded] [--no-build] [--front] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--control-arg ARG]… [--appearance light|dark] [--app-arg ARG]… [--outside-checkout] [--person NAME] [--fake-azure-devops] [--fake-bitbucket] [--fake-forgejo]" >&2; exit 2 ;;
+    *) echo "usage: launch.sh [--slug NAME] [--config Debug|Live] [--seeded] [--no-build] [--front] [--place WHERE] [--no-window] [--first-run] [--lan] [--host-first] [--web-port N] [--env KEY=VALUE]… [--control-env KEY=VALUE]… [--control-arg ARG]… [--appearance light|dark] [--app-arg ARG]… [--outside-checkout] [--person NAME] [--fake-azure-devops] [--fake-bitbucket] [--fake-forgejo]" >&2; exit 2 ;;
   esac
   shift
 done
@@ -283,6 +285,11 @@ if [ "$WINDOW" = 1 ]; then
       echo "the window process $APP_PID has no window after 30s (see the scratch-app-opens-no-window note)" >&2
     elif [ "$WINDOW_ON" = off ]; then
       echo "the window is on another Space (a full-screen app is in front): shot.sh works, ui.swift dump/find/press/set do not" >&2
+    fi
+    # Away from the person's own window, which it would open on top of: a quarter of its
+    # screen, or a frame, never under 70% of the laptop's screen (place.py).
+    if [ -n "${WINDOW_ID:-}" ]; then
+      "$(dirname "${BASH_SOURCE[0]}")/place.py" "$ROOT" "$APP_PID" ${PLACE:+"$PLACE"} >&2 || echo "the window stays where it opened" >&2
     fi
   fi
 fi

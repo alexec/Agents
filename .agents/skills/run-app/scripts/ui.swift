@@ -1,6 +1,9 @@
 // Look at, and press, one app's window — by pid, without taking focus.
 //
 //   swift ui.swift windows <pid>              window ids, bounds, name and on|off (for screencapture -l)
+//   swift ui.swift screens <pid>              each screen's visible frame, top left from the main
+//                                             screen's: x y w h builtin(1|0) window(1|0), window
+//                                             is the screen under the pid's largest window
 //   swift ui.swift selftest                   check that `windows` finds a window not on screen
 //   swift ui.swift dump <pid> [depth]         the accessibility tree, indented
 //   swift ui.swift find <pid> <text>          every element whose label holds <text>
@@ -62,6 +65,17 @@ func walk(_ element: AXUIElement, depth: Int, limit: Int, visit: (AXUIElement, I
     for child in children(element) { walk(child, depth: depth + 1, limit: limit, visit: visit) }
 }
 
+/// The window's bounds, top left from the main screen's, as the window server has them.
+func bounds(of pid: pid_t) -> [CGRect] {
+    let list = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+    return list.compactMap { window in
+        guard (window[kCGWindowOwnerPID as String] as? pid_t) == pid,
+              (window[kCGWindowLayer as String] as? Int) == 0 else { return nil }
+        return (window[kCGWindowBounds as String] as CFTypeRef?)
+            .flatMap { CGRect(dictionaryRepresentation: $0 as! CFDictionary) }
+    }
+}
+
 /// The pid's ordinary windows (layer 0), on this Space or not: a window on another Space,
 /// or behind a full-screen app, is not "on screen" and is still the app's window (#1131).
 func windows(of pid: pid_t) -> [(id: Int, width: Int, height: Int, name: String, on: Bool)] {
@@ -101,7 +115,7 @@ if arguments.count == 2, arguments[1] == "selftest" {
     exit(0)
 }
 guard arguments.count >= 3, let pid = pid_t(arguments[2]) else {
-    print("usage: ui.swift windows|dump|find|press|set <pid> [args]")
+    print("usage: ui.swift windows|screens|dump|find|press|set <pid> [args]")
     exit(2)
 }
 let verb = arguments[1]
@@ -109,6 +123,23 @@ let verb = arguments[1]
 if verb == "windows" {
     for window in windows(of: pid) {
         print("\(window.id)\t\(window.width)x\(window.height)\t\(window.name)\t\(window.on ? "on" : "off")")
+    }
+    exit(0)
+}
+
+if verb == "screens" {
+    // Cocoa's frames grow up from the first screen's bottom left; AX and the walk's `size`
+    // count down from its top left.
+    let top = NSScreen.screens.first?.frame.maxY ?? 0
+    let largest = bounds(of: pid).max { $0.width * $0.height < $1.width * $1.height }
+    let centre = largest.map { CGPoint(x: $0.midX, y: $0.midY) }
+    for screen in NSScreen.screens {
+        let visible = screen.visibleFrame, whole = screen.frame
+        let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID ?? 0
+        let flipped = CGRect(x: whole.minX, y: top - whole.maxY, width: whole.width, height: whole.height)
+        let holds = centre.map { flipped.contains($0) } ?? false
+        print("\(Int(visible.minX)) \(Int(top - visible.maxY)) \(Int(visible.width)) \(Int(visible.height)) "
+            + "\(CGDisplayIsBuiltin(id) != 0 ? 1 : 0) \(holds ? 1 : 0)")
     }
     exit(0)
 }

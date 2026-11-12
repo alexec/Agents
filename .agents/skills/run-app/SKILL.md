@@ -52,6 +52,14 @@ $S/walk.py $ROOT shot /tmp/run-mychange-1.png    # then Read the png; works on a
 $S/stop.sh $ROOT                                  # must print clean
 ```
 
+**Where the window opens.** A scratch window would open on top of Alex's own Agents
+window, so `launch.sh` moves it to the bottom-right quarter of its screen (`place.py`).
+`--place top-left|top-right|bottom-left|bottom-right`, `--place X,Y,W,H` (points from the
+main screen's top left) or `--place none` changes that; so does `AGENTS_SCRATCH_PLACE`.
+The window is never smaller than 70% of the laptop's own screen, so on the laptop a
+quarter grows to a usable size, never larger than its screen, and it stays on screen.
+`$S/place.py $ROOT $APP_PID WHERE` moves a running one.
+
 `launch.sh` builds with `xcodegen generate`, then `xcodebuild -scheme AgentsHost`
 into `build/DD`, with `-skipPackagePluginValidation`. Skip the build with `--no-build` when
 nothing has changed since the last one. The build log is at
