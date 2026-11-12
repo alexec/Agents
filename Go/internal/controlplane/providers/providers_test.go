@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -745,6 +746,42 @@ func TestAMakeThatFailsStaysAsAFailedRow(t *testing.T) {
 	}
 	if said == nil || deref(said.Reason) != "The droplet limit is reached." {
 		t.Errorf("%+v", said)
+	}
+}
+
+// Seven New Machine presses in one second (#4706) reach the provider one at a time: all
+// seven sent at once failed within 3 s at GitHub. Each still makes its own machine-N.
+func TestMakesOnOneProviderGoOneAtATime(t *testing.T) {
+	h := newHarness(t)
+	h.add()
+	h.provider.mu.Lock()
+	h.provider.createTakes = 20 * time.Millisecond
+	h.provider.mu.Unlock()
+	var wg sync.WaitGroup
+	names := make(chan string, 7)
+	for range 7 {
+		wg.Go(func() {
+			made, err := h.createNameless()
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			names <- made.Workspace.Name
+		})
+	}
+	wg.Wait()
+	close(names)
+	seen := map[string]bool{}
+	for name := range names {
+		seen[name] = true
+	}
+	if len(seen) != 7 {
+		t.Errorf("seven names, got %v", seen)
+	}
+	h.provider.mu.Lock()
+	defer h.provider.mu.Unlock()
+	if h.provider.mostMaking != 1 {
+		t.Errorf("%d makes at the provider at once, want 1", h.provider.mostMaking)
 	}
 }
 

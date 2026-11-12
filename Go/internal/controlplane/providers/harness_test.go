@@ -203,6 +203,9 @@ type standIn struct {
 	madeWith       []any
 	// failCreate: Create fails with these words (#3972).
 	failCreate string
+	// createTakes: how long a Create takes; making and mostMaking count the Creates at once (#4706).
+	createTakes          time.Duration
+	making, mostMaking int
 }
 
 func newStandIn(ws []MachineInfo) *standIn { return &standIn{workspaces: ws, firstBootRuns: true} }
@@ -287,7 +290,14 @@ func (s *standIn) Options() (any, error) {
 
 func (s *standIn) Create(name string, options any, firstBoot *string) (*MachineInfo, bool, error) {
 	s.mu.Lock()
+	s.making++
+	s.mostMaking = max(s.mostMaking, s.making)
+	takes := s.createTakes
+	s.mu.Unlock()
+	time.Sleep(takes)
+	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.making--
 	if firstBoot != nil {
 		s.firstBoots = append(s.firstBoots, *firstBoot)
 	}
