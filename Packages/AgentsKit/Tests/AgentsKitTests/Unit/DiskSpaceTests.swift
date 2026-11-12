@@ -7,26 +7,30 @@ import Testing
 struct DiskSpaceTests {
     private let gb = DiskSpace.gigabyte
 
-    /// A 1 TB disk with `free` GB free: 20% of it, the low line, is 200 GB; 1%, critical, is 10 GB.
+    /// The lines the level tests use: low at 20% (200 GB of a 1 TB disk), critical at the
+    /// default 1% (10 GB). Not the default low line (10%), so these tests do not move with it.
+    private let lines = DiskThresholds(lowPercent: 20)
+
+    /// A 1 TB disk with `free` GB free.
     private func reading(_ free: Double, total: Int64 = 1000) -> DiskReading {
         DiskReading(volume: "Macintosh HD", mount: "/", freeBytes: Int64(free * Double(gb)), totalBytes: total * gb)
     }
 
-    /// A percent of the disk, never a size: the same setting is 200 GB on a 1 TB disk and 40 GB on a 200 GB one.
+    /// A percent of the disk, never a size: the same setting is 100 GB on a 1 TB disk and 20 GB on a 200 GB one.
     @Test func theLinesAreAPercentOfTheDisk() {
-        #expect(DiskThresholds().lowLine(total: 1000 * gb) == 200 * gb)
-        #expect(DiskThresholds().lowLine(total: 200 * gb) == 40 * gb)
+        #expect(DiskThresholds().lowLine(total: 1000 * gb) == 100 * gb, "the default low line is 10% (#4699)")
+        #expect(DiskThresholds().lowLine(total: 200 * gb) == 20 * gb)
         #expect(DiskThresholds().criticalLine(total: 1000 * gb) == 10 * gb)
         #expect(DiskThresholds().criticalLine(total: 200 * gb) == 2 * gb)
-        #expect(DiskThresholds(lowPercent: 10).lowLine(total: 1000 * gb) == 100 * gb)
+        #expect(DiskThresholds(lowPercent: 20).lowLine(total: 1000 * gb) == 200 * gb)
     }
 
     @Test func aFirstLookSaysOnlyWhatIsWrong() {
-        #expect(DiskSpace.next(from: nil, reading(400), DiskThresholds()) == (.ok, nil))
-        let low = DiskSpace.next(from: nil, reading(150), DiskThresholds())
+        #expect(DiskSpace.next(from: nil, reading(400), lines) == (.ok, nil))
+        let low = DiskSpace.next(from: nil, reading(150), lines)
         #expect(low.level == .low)
         #expect(low.crossing == .low(.low, threshold: 200 * gb))
-        let critical = DiskSpace.next(from: nil, reading(5), DiskThresholds())
+        let critical = DiskSpace.next(from: nil, reading(5), lines)
         #expect(critical.crossing == .low(.critical, threshold: 10 * gb))
     }
 
@@ -34,7 +38,7 @@ struct DiskSpaceTests {
         var level: DiskLevel? = .ok
         var said: [DiskCrossing] = []
         for free in [400, 210, 199, 180, 150, 100, 9, 8, 5, 9] as [Double] {
-            let next = DiskSpace.next(from: level, reading(free), DiskThresholds())
+            let next = DiskSpace.next(from: level, reading(free), lines)
             level = next.level
             if let crossing = next.crossing { said.append(crossing) }
         }
@@ -45,7 +49,7 @@ struct DiskSpaceTests {
     /// Climbing back must pass the line by a margin — a tenth of it, at least 1 GB — so a
     /// volume hovering at the line does not say low, ok, low, ok.
     @Test func climbingBackNeedsTheMargin() {
-        let thresholds = DiskThresholds()
+        let thresholds = lines
         // Low is below 200 GB; ok again only from 220 GB.
         #expect(DiskSpace.next(from: .low, reading(201), thresholds) == (.low, nil))
         #expect(DiskSpace.next(from: .low, reading(219.9), thresholds) == (.low, nil))
@@ -63,7 +67,7 @@ struct DiskSpaceTests {
     }
 
     @Test func fromCriticalBackToLowIsNotNewsButCriticalAgainIs() {
-        let thresholds = DiskThresholds()
+        let thresholds = lines
         // Critical is below 10 GB; left only from 11 GB.
         #expect(DiskSpace.next(from: .critical, reading(10.5), thresholds) == (.critical, nil))
         #expect(DiskSpace.next(from: .critical, reading(50), thresholds) == (.low, nil))
@@ -81,7 +85,7 @@ struct DiskSpaceTests {
     }
 
     @Test func aSettingIsKeptOnlyWhenItDiffersAndMakesSense() {
-        #expect(DiskThresholds(lowPercent: 20, criticalPercent: 1).orNilIfDefault == nil)
+        #expect(DiskThresholds(lowPercent: 10, criticalPercent: 1).orNilIfDefault == nil)
         #expect(DiskThresholds(lowPercent: 50).orNilIfDefault == DiskThresholds(lowPercent: 50))
         #expect(DiskThresholds(lowPercent: 5, criticalPercent: 10).problem != nil)
         #expect(DiskThresholds(lowPercent: 0).problem != nil)
