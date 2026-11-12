@@ -69,6 +69,7 @@ import { Providers } from "./providers";
 import { MachineLock } from "./machineLock";
 import { isLead, leadEpic, leadProgressWords } from "./leadProgress";
 import { type AgentWrite, PendingWrites, omitting, writeFailure } from "./pendingWrites";
+import type { MachineCopy, TranscriptCopy } from "./localCopy";
 
 /** What this page keeps by folder on a host, kept to the folders it lists (#3750). */
 function pruneFolderKeys(host: string, folders: readonly string[]): void {
@@ -237,6 +238,10 @@ export class Work {
   /** The conversation last looked for: once it is, one not in hand has gone (#2652), as PoppedChat.looked. */
   readonly lookedFor = signal<{ host: string; session: string } | null>(null);
   readonly entries = signal<TranscriptEntry[]>([]);
+  /** Where the open chat's entries came from (#4790): none yet, this device's copy, or its host. */
+  readonly transcriptSource = signal<"none" | "device" | "host">("none");
+  /** The hosts drawn from this device's copy (#4790) whose own answer has not come yet. */
+  readonly fromDevice = signal<ReadonlySet<string>>(new Set());
   /** The page as the chat draws it, folded once as each entry lands. */
   readonly items = signal<Item[]>([]);
   /**
@@ -1129,8 +1134,50 @@ export class Work {
       this.firstEntryIndex.value = page.firstIndex;
       this.hasMoreBefore.value = page.firstIndex > this.openTurnStart.value;
       this.transcriptLoadFailure.value = null;
+      this.transcriptSource.value = "host";
       this.refold(entries);
     });
+  }
+
+  /**
+   * This device's copy of a chat (#4790), drawn while its host's page is on its way: never over
+   * a page the host gave. What is heard meanwhile is laid after it, and kept for the page.
+   */
+  drawTranscriptCopy(copy: TranscriptCopy): void {
+    const watching = this.watching.value;
+    if (watching?.host !== copy.host || watching.session !== copy.session || this.transcriptSource.value !== "none") return;
+    batch(() => {
+      this.replaceTurns(copy.turns);
+      this.firstEntryIndex.value = copy.page.firstIndex;
+      // Earlier pages wait for the host's answer.
+      this.hasMoreBefore.value = false;
+      this.transcriptSource.value = "device";
+      // A load that failed before the copy was read said nothing was on show; now something is.
+      if (this.transcriptLoadFailure.value?.nothingLoaded) this.transcriptLoadFailure.value = null;
+      this.refold(keepingLatestByID([...copy.page.entries, ...this.entries.value]));
+    });
+  }
+
+  /**
+   * This device's copy of the machines (#4790), drawn before the control plane answers: only
+   * on a page that holds none yet. Each host stays marked until it answers.
+   */
+  drawCopy(machines: readonly MachineCopy[]): void {
+    if (machines.length === 0 || this.hosts.value.length > 0) return;
+    batch(() => {
+      this.takeHosts(machines.map((m) => m.host));
+      this.folders.value = { ...this.folders.value, ...Object.fromEntries(machines.filter((m) => m.folders).map((m) => [m.host.id, m.folders!])) };
+      for (const m of machines) this.replaceAgents(m.agents, m.host.id);
+      this.fromDevice.value = new Set(machines.map((m) => m.host.id));
+    });
+  }
+
+  /** A host answered for itself: no longer from this device. */
+  protected answered(host: string): void {
+    if (!this.fromDevice.value.has(host)) return;
+    const left = new Set(this.fromDevice.value);
+    left.delete(host);
+    this.fromDevice.value = left;
   }
 
   /** An earlier page, put in front of what is held. Past the cap, it waits (#291). */
@@ -1148,6 +1195,7 @@ export class Work {
     // A chat chosen is a page on its way.
     this.heardSincePage = [];
     this.transcriptLoadFailure.value = null;
+    this.transcriptSource.value = "none";
     this.firstEntryIndex.value = 0;
     this.hasMoreBefore.value = false;
     this.turns.value = [];
@@ -1649,6 +1697,12 @@ export class Store extends Work {
           this.loadRemoveRequests()])),
         this.loadSignInRequests()]);
       this.takeHosts(hosts);
+      // A machine this device's copy drew that the control plane no longer lists goes (#4790).
+      for (const host of this.fromDevice.value) {
+        if (hosts.some((h) => h.id === host)) continue;
+        this.forgetHost(host);
+        this.answered(host);
+      }
       // This page's place in its lock first: a machine that holds the lock takes a call only
       // on a channel this page opens with its lock key (#3492).
       await this.lockStep().catch(() => undefined);
@@ -1930,10 +1984,13 @@ export class Store extends Work {
   /** What an offline host last listed, from the control plane (#962), when nothing of it is held:
    *  a page opened while it is stopped lists its folders and sessions as one open when it went. */
   private async loadLastHeard(host: string): Promise<void> {
-    if (this.hostIsOnline(host) || this.folders.value[host] !== undefined) return;
+    // What this device's copy drew is not held: the control plane's word is newer (#4790).
+    const held = () => this.folders.value[host] !== undefined && !this.fromDevice.value.has(host);
+    if (this.hostIsOnline(host) || held()) return;
     const heard = await this.link.call("machines/lastHeard", { host: host as MachineRef }).catch(() => null);
-    if (!heard || this.hostIsOnline(host) || this.folders.value[host] !== undefined) return;
+    if (!heard || this.hostIsOnline(host) || held()) return;
     batch(() => {
+      this.answered(host);
       if (heard.agents) this.replaceAgents(heard.agents, host);
       if (heard.folders) this.folders.value = { ...this.folders.value, [host]: heard.folders };
     });
@@ -1948,7 +2005,10 @@ export class Store extends Work {
     // Lean: the columns read none of the option and command lists, 4 MB of 200 agents (#107).
     // The open session's come with loadWhole.
     const agents = await this.listLive(host).catch(failed("agents/list"));
-    if (agents) this.replaceAgents(agents, host);
+    if (agents) batch(() => {
+      this.replaceAgents(agents, host);
+      this.answered(host);
+    });
     // The Archived folds that were open are listed again rather than left empty by the live list,
     // and the workflows on screen asked again: they may have changed meanwhile.
     const prefix = `${host}|`;
@@ -2378,6 +2438,8 @@ export class Store extends Work {
     const now = this.watching.value;
     if (now?.host !== host || now.session !== session || load !== this.transcriptLoads) return false;
     if (!page) {
+      // This device's copy stays on show until the host answers (#4790).
+      if (this.transcriptSource.value === "device") return gone;
       this.transcriptLoadFailure.value = { nothingLoaded: true, reason: failed.page ?? "no answer." };
       return gone;
     }
