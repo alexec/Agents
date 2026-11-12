@@ -1,7 +1,7 @@
 <!doctype html>
 <!--
   Paper v2 mock (#4926). Not product code: a picture of the session list and chat.
-  Open with ?v=v1|A|B|C. Each page draws the light and the charcoal dark look side by side.
+  Open with ?v=v1|A|B|C: today, then three faces on the v2 colours. Each page draws the light and the charcoal dark look side by side.
   The fonts load from jsDelivr (Fontsource) for the mock only; the build bundles them (spec.md).
 -->
 <html lang="en">
@@ -9,16 +9,15 @@
 <meta charset="utf-8">
 <title>Paper v2 mock</title>
 <style>
-@font-face {
-  font-family: "Shantell Sans";
-  src: url("https://cdn.jsdelivr.net/fontsource/fonts/shantell-sans:vf@latest/latin-infm-normal.woff2") format("woff2-variations");
-  font-weight: 300 800;
-}
+@font-face { font-family: "Atkinson Hyperlegible Next"; src: url("https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible-next:vf@latest/latin-wght-normal.woff2") format("woff2-variations"); font-weight: 100 900; }
+@font-face { font-family: "Atkinson Hyperlegible Mono"; src: url("https://cdn.jsdelivr.net/fontsource/fonts/atkinson-hyperlegible-mono:vf@latest/latin-wght-normal.woff2") format("woff2-variations"); font-weight: 100 900; }
+@font-face { font-family: "Lexend"; src: url("https://cdn.jsdelivr.net/fontsource/fonts/lexend:vf@latest/latin-wght-normal.woff2") format("woff2-variations"); font-weight: 100 900; }
+@font-face { font-family: "Figtree"; src: url("https://cdn.jsdelivr.net/fontsource/fonts/figtree:vf@latest/latin-wght-normal.woff2") format("woff2-variations"); font-weight: 100 900; }
 
 /* Paper today (design/tokens.json at #4602). */
 .v1 {
   --ground:#f7f8f9; --sidebar:#f0f1f3; --raised:#ffffff; --well:#f0f2f4; --wash:#e7eaee;
-  --rule:#dde1e6; --ink:#1c1d20; --secondary:#6b6f76; --stroke:transparent; --selection:#d8dee6;
+  --rule:#dde1e6; --ink:#1c1d20; --secondary:#6b6f76; --selection:#d8dee6;
   --shadow:rgba(32,36,42,.10); --accent:#1f5fc8; --attention:#ba4a13; --vouched:#2d765c; --issue:#0e6b82;
 }
 .v1.dark {
@@ -26,15 +25,15 @@
   --rule:#3a3e44; --ink:#e8eaed; --secondary:#9aa0a8; --selection:#3a3e44;
   --shadow:rgba(0,0,0,.10); --accent:#7fb0ff; --attention:#f0a06b; --vouched:#8bc6a7; --issue:#6cc6db;
 }
-/* Paper v2: warm paper, charcoal ink and strokes (spec.md, "Token changes"). */
+/* Paper v2: warm paper, charcoal ink and hairlines (spec.md, "Token changes"). */
 .v2 {
   --ground:#f6f5f1; --sidebar:#eeece6; --raised:#fdfcf9; --well:#ecebe5; --wash:#e4e2db;
-  --rule:#cfcbc2; --ink:#252422; --secondary:#5a5750; --stroke:#3a3935; --selection:#dcd8cf;
+  --rule:#cfcbc2; --ink:#252422; --secondary:#5a5750; --selection:#dcd8cf;
   --shadow:rgba(43,42,39,.16); --accent:#1f5fc8; --attention:#a8420f; --vouched:#2a7157; --issue:#0e6b82;
 }
 .v2.dark {
   --ground:#232321; --sidebar:#1c1c1b; --raised:#2d2d2a; --well:#2a2a28; --wash:#373734;
-  --rule:#4b4a46; --ink:#ece9e2; --secondary:#aaa69d; --stroke:#cfcbc2; --selection:#46443f;
+  --rule:#4b4a46; --ink:#ece9e2; --secondary:#aaa69d; --selection:#46443f;
   --shadow:rgba(0,0,0,.35); --accent:#7fb0ff; --attention:#f0a06b; --vouched:#8bc6a7; --issue:#6cc6db;
 }
 
@@ -64,57 +63,50 @@ code { font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace; background: var
 .empty { display: none; }
 .tag { position: fixed; } /* none */
 
-/* The handwritten face, where each variant puts it. */
-.hand { font-family: "Shantell Sans", -apple-system, sans-serif; font-variation-settings: "INFM" 0.5, "BNCE" 0; letter-spacing: 0; }
-.v2 h1.hand { font-size: 24px; font-weight: 600; }
-.v2 h2.hand { font-size: 14px; font-weight: 600; text-transform: none; }
-
-/* A sketched charcoal edge: the same box, its line roughened (B and C). */
-.sketch::after { content: ""; position: absolute; inset: 0; border: 1.4px solid var(--stroke); border-radius: inherit; filter: url(#rough); pointer-events: none; opacity: .85; }
+/* The face each variant tries (spec.md, "Fonts"). */
+.fA { font-family: "Atkinson Hyperlegible Next", -apple-system, sans-serif; }
+.fA code { font-family: "Atkinson Hyperlegible Mono", ui-monospace, monospace; }
+.fB { font-family: "Lexend", -apple-system, sans-serif; letter-spacing: 0; }
+.fC { font-family: "Figtree", -apple-system, sans-serif; }
+.win h1 { letter-spacing: -0.01em; }
 .label { color: #fff; font: 600 13px -apple-system, sans-serif; margin-bottom: 6px; }
 .col { display: flex; flex-direction: column; }
 </style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute">
-  <filter id="rough" x="-3%" y="-15%" width="106%" height="130%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="2" seed="4"/><feDisplacementMap in="SourceGraphic" scale="2.6"/></filter>
-</svg>
 <template id="window">
   <div class="win">
     <div class="side">
-      <h1 data-hand="AB C">Sessions</h1>
-      <h2 data-hand="AB C">Needs you</h2>
-      <div class="row sel"><div class="t" data-hand="C">Fix the login redirect</div><div class="s">Asks: which callback URL? · 2m</div><span class="dot"></span></div>
-      <h2 data-hand="AB C">Working</h2>
-      <div class="row"><div class="t" data-hand="C">Docs: dark mode screenshots</div><div class="s"><span class="chip">#812</span> · writing the page · 5m</div></div>
-      <div class="row"><div class="t" data-hand="C">Speed up the test suite</div><div class="s"><span class="chip">#790</span> · running tests · 12m</div></div>
-      <h2 data-hand="AB C">Done</h2>
-      <div class="row"><div class="t" data-hand="C">Rename the export button</div><div class="s"><span class="ok">Merged</span> · 1h</div></div>
+      <h1>Sessions</h1>
+      <h2>Needs you</h2>
+      <div class="row sel"><div class="t">Fix the login redirect</div><div class="s">Asks: which callback URL? · 2m</div><span class="dot"></span></div>
+      <h2>Working</h2>
+      <div class="row"><div class="t">Docs: dark mode screenshots</div><div class="s"><span class="chip">#812</span> · writing the page · 5m</div></div>
+      <div class="row"><div class="t">Speed up the test suite</div><div class="s"><span class="chip">#790</span> · running tests · 12m</div></div>
+      <h2>Done</h2>
+      <div class="row"><div class="t">Rename the export button</div><div class="s"><span class="ok">Merged</span> · 1h</div></div>
     </div>
     <div class="main">
-      <h1 data-hand="AB C">Fix the login redirect</h1>
+      <h1>Fix the login redirect</h1>
       <div class="msg me">After sign-in the page goes back to the home page, not the page I was on.</div>
-      <div class="msg"><div class="who" data-hand="C">Claude</div>The redirect drops the <code>next</code> parameter in <code>auth/callback.ts</code>. I can keep it in the session and read it after the token exchange.</div>
-      <div class="card" data-sketch="BC">
-        <div class="q" data-hand="BC">Which callback URL do you use in production?</div>
+      <div class="msg"><div class="who">Claude</div>The redirect drops the <code>next</code> parameter in <code>auth/callback.ts</code>. I can keep it in the session and read it after the token exchange.</div>
+      <div class="card">
+        <div class="q">Which callback URL do you use in production?</div>
         <span class="btn p">/auth/callback</span><span class="btn">/oauth/return</span><span class="btn">Other…</span>
       </div>
-      <div class="prompt" data-sketch="BC">Reply to Claude…</div>
+      <div class="prompt">Reply to Claude…</div>
     </div>
   </div>
 </template>
 <script>
-const v = new URLSearchParams(location.search).get("v") || "B";
-const names = { v1: "Paper today", A: "A · Handwriting in titles only", B: "B · Titles, questions, sketched edges", C: "C · Also session names and speakers" };
+const v = new URLSearchParams(location.search).get("v") || "A";
+const names = { v1: "Paper today · system font", A: "A · Atkinson Hyperlegible Next + Mono", B: "B · Lexend", C: "C · Figtree" };
 for (const mode of ["light", "dark"]) {
   const col = document.createElement("div"); col.className = "col";
   col.innerHTML = `<div class="label">${names[v]} · ${mode === "dark" ? "charcoal dark" : "light"}</div>`;
   const win = document.getElementById("window").content.cloneNode(true).firstElementChild;
   win.classList.add(v === "v1" ? "v1" : "v2"); if (mode === "dark") win.classList.add("dark");
-  if (v !== "v1") {
-    win.querySelectorAll("[data-hand]").forEach(e => { if (e.dataset.hand.includes(v)) e.classList.add("hand"); });
-    win.querySelectorAll("[data-sketch]").forEach(e => { if (e.dataset.sketch.includes(v)) e.classList.add("sketch"); });
-  }
+  if (v !== "v1") win.classList.add("f" + v);
   col.appendChild(win); document.body.appendChild(col);
 }
 </script>

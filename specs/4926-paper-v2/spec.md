@@ -1,45 +1,43 @@
-# Paper, version 2: more charcoal, a handwritten feel, friendly to dyslexia (#4926)
+# Paper, version 2: more charcoal and a face of our own, easy to read (#4926)
 
 **Status:** spike, 2026-11-12. Epic #4925. No product code: this spec, a mock (`mock.html`) and the stories.
 **Clients:** none in the spike. The build is Core: the Mac window, the Remote and the web page.
 
 ## What Alex asked for
 
-The app must be very comfortable to use and nice to look at. Paper (#326, #4600, `design/tokens.json`) is close, but it has not enough charcoal and no handwriting. Most handwriting fonts are hard to read for people with dyslexia, so the handwriting must not make reading harder.
+The app must be very comfortable to use and nice to look at. Paper (#326, #4600, `design/tokens.json`) is close, but it has not enough charcoal.
+
+Alex, 2026-11-12, on the first mock (handwriting): the goal is not handwriting. It is **a clean, modern character: a look of our own that separates us from the competition, that is simple, very easy on the eye and very easy to read.** So this version has no handwritten face and no sketched edges.
 
 ## The answer in short
 
-1. **Charcoal:** a warm paper ground (not pure white), charcoal ink (not pure black), darker hairlines, a new charcoal `stroke` for sketched edges, deeper charcoal shadows, and a charcoal dark mode (warm greys, not blue-black).
-2. **Handwriting only where text is short:** page titles, section headings, question titles, empty states. Body text, chat, code, lists' second lines and all controls stay in the system sans-serif.
-3. **The handwritten face is Shantell Sans** at a fixed, calm setting (Informality 0.5, Bounce 0, weight 600). Its letters are open and different from each other, so it stays readable.
-4. **Reading text gets the dyslexia guides' spacing:** line height 1.5, a little letter and word spacing, and lines of at most about 70 characters.
+1. **Charcoal:** a warm paper ground (not pure white), charcoal ink (not pure black), darker hairlines, deeper charcoal shadows, and a charcoal dark mode (warm greys, not blue-black).
+2. **One face of our own for all text:** most tools in this space draw in Inter, Geist or the system font, so a different, clear face is the quickest way to a look of our own. The mock compares three, all made for reading.
+3. **Reading text gets the dyslexia guides' spacing:** line height 1.5, a little letter and word spacing, and lines of at most about 70 characters.
 
 ## Mock
 
-`mock.html` draws the session list and the chat, light and charcoal dark side by side (`?v=v1|A|B|C`). The pictures are in the PR (`pr-shots.sh`, branch `screenshots`, `pr-<n>/mock-*.png`).
+`mock.html` draws the session list and the chat, light and charcoal dark side by side (`?v=v1|A|B|C`). The pictures are in the PR (`pr-shots.sh`, branch `screenshots`, `pr-<n>/mock-*.png`). A, B and C have the v2 colours; only the face differs.
 
-| Variant | Handwriting | Sketched edges |
+| Variant | Text | Code |
 |---|---|---|
-| **today** (`v1`) | none | none |
-| **A** | the page title, the sidebar title, section headings | none |
-| **B** | A, and the title of a question card | the question card and the prompt bar get a charcoal edge that looks drawn by hand |
-| **C** | B, and every session's name in the list, and the speaker's name in the chat | as B |
-
-Every variant has the v2 colours. Body text is the same in all four.
+| **today** (`v1`) | system sans (SF) | system mono |
+| **A** | Atkinson Hyperlegible Next | Atkinson Hyperlegible Mono |
+| **B** | Lexend | system mono |
+| **C** | Figtree | system mono |
 
 ## Fonts
 
-| Font | For | Licence | Last release | Size (Latin woff2) | SwiftUI | Web | Verdict |
-|---|---|---|---|---|---|---|---|
-| **Shantell Sans** (Arrow Type, Shantell Martin) | the handwritten face | SIL OFL 1.1 | v1.011, Fontsource 5.2.7 (2025) | 146 KB (Informality axis), 79 KB (weight only) | `Font.custom(_:size:relativeTo:)` on a static instance | `@font-face`, self-hosted | **Chosen** |
-| Atkinson Hyperlegible Next (Braille Institute) | a body face, if we want one | SIL OFL 1.1 | 2025-02 | ~60 KB per weight | yes | yes | Not now: the system sans is as clear, follows Dynamic Type and every script, and costs nothing to load. It is the first choice if Alex wants a body face of our own. |
-| Lexend | a body face | SIL OFL 1.1 | 2023 | ~70 KB | yes | yes | Not chosen: its wide spacing helps some readers, but the same spacing on the system sans gives most of it. |
-| OpenDyslexic | a body face for dyslexia | SIL OFL 1.1 | 2023 | ~120 KB | yes | yes | Not chosen: studies found no reading gain (Wery and Diliberto 2017; Kuster et al. 2018), and people find its heavy bottoms tiring. |
-| Patrick Hand, Kalam, Caveat, Architects Daughter | the handwritten face | SIL OFL 1.1 | various | 30–90 KB | yes | yes | Not chosen: single letter shapes (Caveat's joined letters, Kalam's tilt, Architects Daughter's all-caps feel) are harder to tell apart; none has Shantell's axes to calm the hand down. |
+All are SIL OFL 1.1, maintained, on Google Fonts and Fontsource, and work in SwiftUI (`Font.custom(_:size:relativeTo:)`, which follows Dynamic Type) and on the web (`@font-face`, self-hosted). Sizes are the variable Latin woff2.
 
-**Why Shantell Sans.** It was drawn from an artist's hand and then made for reading: open counters, a `b` and a `d` that are not mirror shapes, an `I`, `l` and `1` that differ, and an optional slashed zero. Its Informality axis goes from a structured sans to a loose hand; at 0.5 the text looks drawn but every letter keeps its shape. Bounce 0 keeps the baseline straight, which matters for dyslexia (an uneven baseline makes the eye lose its line). It is maintained, OFL, and on Fontsource and Google Fonts.
+| Font | Made by | Character | Easy to read | Size | Verdict |
+|---|---|---|---|---|---|
+| **Atkinson Hyperlegible Next** + **Mono** | Braille Institute, Applied Design (2025) | clean grotesque with letters drawn to differ: a `b` and `d` that are not mirrors, a tailed `l`, a slashed `0`, open `a` and `e`; a mono of the same family for code | made for low vision; letters hard to confuse, which also helps dyslexia | 34 KB + 18 KB | **Recommended:** the only one with a matching mono, so text and code look like one product; rare among competitors |
+| Lexend | Bonnie Shaver-Troup, Thomas Jockin (Google, 2019–2023) | wide, round, friendly geometric | made for reading fluency; wide spacing helps some readers | 40 KB | Good; wider, so less fits in the sidebar and list |
+| Figtree | Erik Kennedy (2022) | clean, modern geometric, a little warm | clear, but `I` and `l` look alike | 20 KB | Clean, but close to Inter: less of a look of our own |
+| OpenDyslexic | Abbie Gonzalez | heavy bottoms | studies found no reading gain (Wery and Diliberto 2017; Kuster et al. 2018) | 120 KB | Not shown: neither clean nor modern |
 
-**How it ships.** One static instance (Informality 0.5, Bounce 0, weight 600), made from the variable font with fontTools' `varLib.instancer` by `scripts/design.sh fonts`, so `design/fonts/` holds the source font, its `OFL.txt` and the instance, and nothing is edited by hand. The Mac and the Remote register it at launch with `CTFontManagerRegisterFontsForURL` from `Shared/UI`'s bundle; the web page serves its woff2 from `Web/assets/fonts/` (FR-034: nothing from another origin). The About screen's acknowledgements name it with its licence.
+**How it ships.** `design/fonts/` holds the chosen family's variable fonts and `OFL.txt`; `font.text` and `font.mono` in `design/tokens.json` name it first, with the system faces after it. The Mac and the Remote register it at launch with `CTFontManagerRegisterFontsForURL` from `Shared/UI`'s bundle; the web page serves its woff2 from `Web/assets/fonts/` (FR-034: nothing from another origin). The About screen's acknowledgements name it with its licence. Scripts it has no letters for (CJK, Arabic) fall back to the system face.
 
 ## Token changes (`design/tokens.json`)
 
@@ -63,13 +61,11 @@ New tokens:
 
 | Token | Light | Dark | For |
 |---|---|---|---|
-| `color.stroke` | `#3a3935` | `#cfcbc2` | a sketched charcoal edge (question card, prompt bar, empty-state drawings); Swift `Paper.stroke` |
 | `color.secondary` | `#5a5750` | `#aaa69d` | a row's second line and the speaker's name, in place of the system's `.secondary`, so it matches the warm ground; Swift `Paper.secondary` |
-| `font.hand` | `["Shantell Sans", <font.text>]` | | titles and headings only; `$description` says where it may be used |
 | `type.leading.reading` | `1.5` | | the line height of `reading` text (chat, prose) |
 | `type.tracking.reading` | `0.01em` | | letter spacing of `reading` text; word spacing `0.06em` beside it |
 
-The steps `title` and the section heading (`reading` with a weight) get `dev.agentloops.face: "hand"`; `reading`, `supporting`, `fine` and `code` keep the system faces. The accent, the code inks, the forge colours and the timeline do not change (each still passes on the new grounds; see below).
+Changed fonts: `font.text` becomes `["Atkinson Hyperlegible Next", "-apple-system", "BlinkMacSystemFont", "system-ui", "sans-serif"]` and `font.mono` becomes `["Atkinson Hyperlegible Mono", "ui-monospace", "SF Mono", "Menlo", "monospace"]` (or the face Alex picks; Lexend and Figtree keep the system mono). `TypeScale.swift`'s steps keep their sizes and text styles. The accent, the code inks, the forge colours and the timeline do not change (each still passes on the new grounds; see below).
 
 ## Contrast (WCAG 2.2 AA)
 
@@ -81,7 +77,6 @@ Text needs 4.5:1. Every text colour on every ground it is drawn on:
 |---|---|---|---|---|---|
 | ink `#252422` | 14.2 | 13.1 | 15.1 | 13.0 | 12.0 |
 | secondary `#5a5750` | 6.6 | 6.1 | 7.0 | 6.0 | 5.6 |
-| stroke `#3a3935` | 10.6 | 9.8 | 11.3 | 9.7 | 8.9 |
 | accent `#1f5fc8` | 5.5 | 5.0 | 5.8 | 5.0 | 4.6 |
 | attention `#a8420f` | 5.6 | 5.2 | 5.9 | 5.1 | 4.7 |
 | failure `#b4232b` | 6.0 | 5.5 | 6.4 | 5.5 | 5.0 |
@@ -95,7 +90,6 @@ Text needs 4.5:1. Every text colour on every ground it is drawn on:
 |---|---|---|---|---|---|
 | ink `#ece9e2` | 13.0 | 14.1 | 11.4 | 11.9 | 9.8 |
 | secondary `#aaa69d` | 6.5 | 7.0 | 5.7 | 5.9 | 4.9 |
-| stroke `#cfcbc2` | 9.7 | 10.5 | 8.5 | 8.9 | 7.4 |
 | accent `#7fb0ff` | 7.2 | 7.8 | 6.3 | 6.5 | 5.4 |
 | attention `#f0a06b` | 7.5 | 8.1 | 6.5 | 6.8 | 5.7 |
 | failure `#f08086` | 6.1 | 6.6 | 5.4 | 5.6 | 4.6 |
@@ -103,7 +97,7 @@ Text needs 4.5:1. Every text colour on every ground it is drawn on:
 | issue `#6cc6db` | 8.1 | 8.7 | 7.1 | 7.4 | 6.1 |
 | pull `#b79af0` | 6.7 | 7.2 | 5.8 | 6.1 | 5.1 |
 
-All pass. On `selection` some tints are under 4.5:1, as today: nothing is drawn in a tint on a selection (the token's own rule). The sketched `stroke` is 9.7:1 or more, far above the 3:1 that a control's edge needs. The build's first story adds these pairs to `DesignTokensTests` so a later change cannot drop under 4.5:1.
+All pass. On `selection` some tints are under 4.5:1, as today: nothing is drawn in a tint on a selection (the token's own rule). The build's first story adds these pairs to `DesignTokensTests` so a later change cannot drop under 4.5:1.
 
 ## Reading and dyslexia
 
@@ -113,25 +107,23 @@ From the British Dyslexia Association's style guide and the WCAG 1.4.12 text-spa
 - **Line height 1.5** for reading text (chat, prose, cards). The web page's chat has it (`.reply`); the Mac and the Remote get the same.
 - **Letter spacing about 0.01em, word spacing a little more** for reading text. WCAG 1.4.12 asks that a person's own larger spacing does not break the layout: the web page must not clip at 0.12em letter and 0.16em word spacing.
 - **Line length at most about 70 characters** in the chat column (it is wider on a big window today).
-- **No italics or capitals for emphasis** in the app's own words; bold instead. Handwriting is never all capitals and never under 14 pt.
+- **No italics or capitals for emphasis** in the app's own words; bold instead.
 - **Size:** `reading` stays at the platform's body size (15 pt on the Mac, 17 pt on iOS, 1rem on the web) and follows the person's text size.
 
 ## Decisions
 
-- Decided: the handwritten face is Shantell Sans at Informality 0.5, Bounce 0, weight 600, because its letters stay distinct and its baseline straight, it is OFL and maintained, and it is small. Alex can overrule.
-- Decided: body, chat and code stay in the system faces (no Atkinson Hyperlegible Next, Lexend or OpenDyslexic), because the system sans is as clear, follows Dynamic Type and every script, and costs nothing to load. Alex can overrule.
+- Decided: no handwriting and no sketched edges, because Alex wants a clean, simple look (2026-11-12).
+- Decided: one face for all text (and its mono for code where the family has one), not a display face for titles beside a second body face, because one face is simpler and easier on the eye. Alex can overrule.
 - Decided: the token values above, because each one passes WCAG AA and follows the dyslexia guides' paper and charcoal. Alex can overrule.
 - Decided: reading spacing of 1.5 line height, 0.01em letter spacing and a 70-character line, because the dyslexia guides ask for it and it costs no look. Alex can overrule.
-- **Alex's choice (pending):** how much handwriting: A, B or C (the mock). Claude recommends **B**.
-- **Alex's choice (pending):** one look for all, or a setting to turn the handwriting off. Claude recommends a **Handwriting** toggle in Settings ▸ Appearance, on by default: dyslexia differs from person to person, and the toggle only swaps the face back to the system sans.
+- Decided: no setting to turn the face off, because a clear face is easy for everyone to read and one look is simpler. A setting can follow if a person asks. Alex can overrule.
+- **Alex's choice (pending):** the face: A (Atkinson Hyperlegible Next + Mono), B (Lexend), C (Figtree) or keep the system font. Claude recommends **A**.
 
 ## Stories (Core: Mac, Remote, web)
 
-Filed as sub-issues of #4925, each blocked by #4926. The order: 1 first; 2, 3 and 4 after it, at the same time.
+Filed as sub-issues of #4925, each blocked by #4926. Story 1 first; story 2 after it or at the same time.
 
 1. **Paper v2 colours and reading spacing** (`design/tokens.json`, `Paper.swift`, `StateTint.swift`, `paper.css`; contrast pairs in `DesignTokensTests`).
-2. **The handwritten face for titles and headings** (`design/fonts/`, `scripts/design.sh fonts`, `TypeScale.swift`, `Web/assets/fonts`, acknowledgements).
-3. **Sketched charcoal edges** on the question card, the prompt bar and empty states (only for variant B or C).
-4. **The Handwriting setting** in Settings ▸ Appearance (only if Alex wants a setting).
+2. **The chosen face for all text and code** (`design/fonts/`, `font.text` and `font.mono`, `TypeScale.swift`, `Web/assets/fonts`, acknowledgements).
 
-The docs site and www get the colours from story 1's generated CSS; the handwriting there is a later choice, not in this epic.
+The docs site and www get the colours from story 1's generated CSS, and the face from story 2's `font.text`, when they load it.
