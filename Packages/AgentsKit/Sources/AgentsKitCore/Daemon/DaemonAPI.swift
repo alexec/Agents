@@ -4001,22 +4001,13 @@ public enum DaemonAPI {
         public init(id: UUID) { self.id = id }
     }
 
-    /// What `devices/announce` answers: the device's record, as it always was. The one
-    /// object is the record's own fields, flat. Kept past the #58 cut-off: the flat shape
-    /// is the protocol now.
+    /// What `devices/announce` answers: the device's record, under `device`, as
+    /// `daemon.schema.json` and the Go host have it (#4905).
     public struct AnnounceReply: Codable, Sendable, Hashable {
         public var device: Device
 
         public init(device: Device) {
             self.device = device
-        }
-
-        public init(from decoder: any Decoder) throws {
-            device = try Device(from: decoder)
-        }
-
-        public func encode(to encoder: any Encoder) throws {
-            try device.encode(to: encoder)
         }
     }
 

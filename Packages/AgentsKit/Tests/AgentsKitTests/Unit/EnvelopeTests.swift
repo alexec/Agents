@@ -49,6 +49,21 @@ struct EnvelopeTests {
         let back = try JSONEncoder.iso.encode(device)
         #expect(String(decoding: back, as: UTF8.self).contains("wants"))
     }
+
+    /// `devices/announce` answers `{"device": {…}}`, as the schema and the Go host have
+    /// it, not the record's fields flat (#4905).
+    @Test func theAnnounceReplyHasTheDeviceUnderItsKey() throws {
+        let id = UUID()
+        let json = """
+        {"device":{"id":"\(id.uuidString)","publicKey":"","name":"Phone","kind":"iPhone",
+         "announcedAt":"2026-09-20T10:00:00Z","lastSeenAt":"2026-09-21T10:00:00Z"}}
+        """
+        let reply = try JSONDecoder.iso.decode(DaemonAPI.AnnounceReply.self, from: Data(json.utf8))
+        #expect(reply.device.id == id)
+        #expect(reply.device.kind == .iPhone)
+        let back = try JSONDecoder.iso.decode([String: JSONValue].self, from: JSONEncoder.iso.encode(reply))
+        #expect(back["device"] != nil)
+    }
 }
 
 private extension JSONDecoder {
