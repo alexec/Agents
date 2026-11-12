@@ -91,6 +91,12 @@ flags=(--slug "$SLUG" --seeded --env "SHELL=$OUT/shell")
 [ "$BUILD" = 1 ] || flags+=(--no-build)
 "$RUNAPP/launch.sh" "${flags[@]}" >"$OUT/launch.txt" 2>&1 || { cat "$OUT/launch.txt" >&2; echo "perf-nightly: launch failed" >&2; exit 1; }
 WEB_URL=$(sed -n 's/^WEB_URL=//p' "$OUT/launch.txt")
+# With no pinned Node, the build leaves an empty Web/dist and the scratch control plane serves no
+# web page, so the web walk could only time out (#4904): say so and stop.
+if [ ! -f "$REPO/Web/dist/MANIFEST" ]; then
+  echo "perf-nightly: $REPO/Web/dist/MANIFEST is missing, so the scratch app has no web page; install Node $(cat "$REPO/Web/.node-version") (scripts/web.sh dist says why in $OUT/launch.txt)" >&2
+  exit 1
+fi
 python3 "$RUNAPP/rpc.py" "$ROOT" call folders/add "{\"folder\": \"file://$ROOT/work\"}" >/dev/null
 python3 "$RUNAPP/rpc.py" "$ROOT" call folders/add "{\"folder\": \"file://$ROOT/big\"}" >/dev/null
 sleep 5
