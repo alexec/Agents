@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -79,6 +80,29 @@ func TestACarryIsRefusedOrFailsInWords(t *testing.T) {
 		Secrets: map[string]string{"TOKEN": "draft-secret-value"}})
 	if out.Error == nil || strings.Contains(*out.Error, "draft-secret-value") {
 		t.Fatalf("%+v", out)
+	}
+}
+
+// A make that fails is logged here with its reason, and no secret's value (#4706): the
+// control plane's copy of the reason can go with a redeploy.
+func TestAFailedCarriedMakeIsLoggedWithItsReason(t *testing.T) {
+	d, _ := carriedDaemon(t)
+	var logged strings.Builder
+	log.SetOutput(&logged)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	record, _ := json.Marshal(providers.ProviderRecord{ID: "p3", Name: "Gone", Kind: providers.KindStdio,
+		Command: new("/no/such/provider")})
+	out := ask(t, d, wire.CallProvidersCarry.Name, wire.ProviderCarry{Provider: "p3", Record: record, Call: "create",
+		Name: new("machine-21"), Secrets: map[string]string{"GITHUB_TOKEN": "draft-secret-value"}})
+	if out.Error == nil {
+		t.Fatalf("%+v", out)
+	}
+	text := logged.String()
+	if !strings.Contains(text, "providers: create machine-21 at p3 failed: "+*out.Error) {
+		t.Fatalf("%q", text)
+	}
+	if strings.Contains(text, "draft-secret-value") {
+		t.Fatalf("a secret reached the log: %q", text)
 	}
 }
 
