@@ -145,7 +145,7 @@ var failedEnds = map[wire.EndedReason]string{
 
 // quietRefusals are a workflow's refusals that are not a failure: it ran already, waits,
 // or is off.
-var quietRefusals = map[string]bool{"runInFlight": true, "queued": true, "disabled": true, "archived": true, "coolingDown": true}
+var quietRefusals = map[string]bool{"runInFlight": true, "queued": true, "disabled": true, "archived": true, "coolingDown": true, "outsideHours": true}
 
 // refusalName is a refusal's case, as the wire names it.
 func refusalName(r wire.WorkflowRefusal) string {

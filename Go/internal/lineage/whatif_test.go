@@ -40,7 +40,7 @@ func TestInFlightCountsOpenWork(t *testing.T) {
 	start, last := wire.DateOf(now.Add(-2*time.Hour)), wire.DateOf(now.Add(-time.Hour))
 	open, closed := "open", "closed"
 	issue := func(n int, state *string, level string) wire.LineageCostNode {
-		return wire.LineageCostNode{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#" + strconv.Itoa(n)}, Repo: new("github:o/r"),
+		return wire.LineageCostNode{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#" + strconv.Itoa(n)}, Repo: new("github:repo:#o/r"),
 			Banked: blankCost(), StartedAt: &start, LastAt: last, Level: &level, Resolved: &wire.LineageResolved{State: state}}
 	}
 	nodes = append(nodes, issue(2, &open, "task"), issue(3, &closed, "task"), issue(4, &open, "epic"))
@@ -89,7 +89,7 @@ func TestForecastOfAWhatIf(t *testing.T) {
 	var extra []wire.LineageCostNode
 	closed := "closed"
 	for e := range 5 {
-		ep := wire.LineageCostNode{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#" + strconv.Itoa(9000+e)}, Repo: new("github:o/r"),
+		ep := wire.LineageCostNode{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#" + strconv.Itoa(9000+e)}, Repo: new("github:repo:#o/r"),
 			Banked: blankCost(), Resolved: &wire.LineageResolved{Title: "epic", State: &closed, Labels: []string{"epic"}}}
 		extra = append(extra, ep)
 		for k := range 4 {
@@ -98,10 +98,10 @@ func TestForecastOfAWhatIf(t *testing.T) {
 		}
 	}
 	nodes := append(landedNodes(ls...), extra...)
-	asked := wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9999"}
+	asked := wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#9999"}
 	var children []EpicChild
 	for c := range 6 {
-		children = append(children, EpicChild{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#" + strconv.Itoa(9900+c)}, Step: 1, Open: true})
+		children = append(children, EpicChild{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#" + strconv.Itoa(9900+c)}, Step: 1, Open: true})
 	}
 	runtimes := RuntimesOf(map[string]float64{"claude": 30, "codex": 10}, map[string]map[string]float64{"claude": {"USD": 300}, "codex": {"USD": 20}})
 	as := ForecastOf(nodes, &asked, true, children, now, WhatIf{Runtimes: runtimes})

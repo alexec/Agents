@@ -69,6 +69,9 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
     /// file's `cooldown:` (#103). A trigger inside it is held, and the latest held one
     /// runs once when it ends; `nil` is no cooldown, as before.
     public var cooldown: TimeInterval?
+    /// When it may start, from the file's `hours:` (#4818). A trigger outside it is held,
+    /// and starts when it opens; `nil` is any time, as before.
+    public var hours: WorkflowHours?
     /// The Enabled switch, from the file's `enabled:` (#42, #125): `false` is off,
     /// `nil` or `true` is on. The switch writes this line, so the choice travels with
     /// the folder to every clone and host.
@@ -98,7 +101,7 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case workflowID, folder, name, triggers, mode, prompt, problem, unknownFields, settings,
-             cooldown, enabled, archived, runsOn, whenDone, continueWhenBack, muted
+             cooldown, hours, enabled, archived, runsOn, whenDone, continueWhenBack, muted
     }
 
     /// Whether it is put away.
@@ -118,8 +121,9 @@ public struct Workflow: Codable, Hashable, Sendable, Identifiable {
                 settings: WorkflowSettings = WorkflowSettings(),
                 cooldown: TimeInterval? = nil, enabled: Bool? = nil, archived: Bool? = nil,
                 runsOn: [String]? = nil, whenDone: WorkflowWhenDone? = nil, continueWhenBack: Bool? = nil,
-                muted: Bool? = nil) {
+                muted: Bool? = nil, hours: WorkflowHours? = nil) {
         self.muted = muted
+        self.hours = hours
         self.runsOn = runsOn
         self.whenDone = whenDone
         self.continueWhenBack = continueWhenBack
@@ -301,6 +305,9 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     /// When its cooldown lets the next run start, while that is still to come (#103).
     /// By the host's clock, as the next times are.
     public var cooldownEndsAt: Date?
+    /// When a fire held outside its `hours:` can start (#4818): the first time they are open
+    /// once its cooldown is over. nil while they are open by then.
+    public var hoursOpenAt: Date?
     /// Whether a trigger is being held for when the cooldown ends, or the run in flight
     /// does: the one run the fires that arrived meanwhile collapse into.
     public var holdsAFire: Bool
@@ -344,7 +351,8 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
                 nextFireAtByTrigger: [Date?] = [],
                 cooldownEndsAt: Date? = nil, holdsAFire: Bool = false, queued: Int = 0,
                 offReason: WorkflowOffReason? = nil, standingAgentID: UUID? = nil,
-                mcpTriggers: [MCPTriggerStatus]? = nil, hearsFor: String? = nil) {
+                mcpTriggers: [MCPTriggerStatus]? = nil, hearsFor: String? = nil, hoursOpenAt: Date? = nil) {
+        self.hoursOpenAt = hoursOpenAt
         self.mcpTriggers = mcpTriggers
         self.hearsFor = hearsFor
         self.offReason = offReason
@@ -473,10 +481,19 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
     public static let keepEditedHelp = "Keep your copy as it is, and say no more of this version"
 
     /// A row's tooltip: what it does, led by Turned off when it is, then where it is
-    /// (#2759) and a ready-made update (#4071). The Remote's row says where it is to VoiceOver.
+    /// (#2759), its hours (#4819) and a ready-made update (#4071). The Remote's row says
+    /// where it is and its hours to VoiceOver.
     public var rowHelp: String {
         let what = !isEnabled && !isArchived ? "Turned off. \(workflow.summary)" : workflow.summary
-        return ([what, scopeSentence, readyMadeUpdatedSentence] as [String?]).compactMap { $0 }.joined(separator: "\n")
+        return ([what, scopeSentence, hoursRowSentence(), readyMadeUpdatedSentence] as [String?])
+            .compactMap { $0 }.joined(separator: "\n")
+    }
+
+    /// Its hours as a row says them (#4819): when they open while they are shut, else the
+    /// window. nil with no `hours:`, or archived.
+    public func hoursRowSentence(viewer: TimeZone = .current) -> String? {
+        guard !isArchived, let hours = workflow.hours else { return nil }
+        return hoursOpenSentence(viewer: viewer) ?? hours.sentence(viewer: viewer)
     }
 
     /// Read leniently: a daemon from before #100 sends no `isEnabled`, and an outcome
@@ -502,6 +519,7 @@ public struct WorkflowSummary: Codable, Hashable, Sendable, Identifiable {
         lastFiredAt = try c.decodeIfPresent(Date.self, forKey: .lastFiredAt)
         lastFiredBy = (try? c.decodeIfPresent(WorkflowCause.self, forKey: .lastFiredBy)) ?? nil
         cooldownEndsAt = try c.decodeIfPresent(Date.self, forKey: .cooldownEndsAt)
+        hoursOpenAt = try c.decodeIfPresent(Date.self, forKey: .hoursOpenAt)
         holdsAFire = try c.decodeIfPresent(Bool.self, forKey: .holdsAFire) ?? false
         queued = (try? c.decodeIfPresent(Int.self, forKey: .queued)) ?? 0
         offReason = (try? c.decodeIfPresent(WorkflowOffReason.self, forKey: .offReason)) ?? nil

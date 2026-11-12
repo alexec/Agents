@@ -123,6 +123,8 @@ type Daemon struct {
 	timeBook
 	reportBook
 	lineageBook
+	// The events this machine publishes on the bus (#4729).
+	busBook
 	projectBook
 	projectToolsBook
 	achievementBook

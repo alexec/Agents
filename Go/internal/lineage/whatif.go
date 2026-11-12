@@ -2,7 +2,6 @@ package lineage
 
 import (
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/alexec/agents/Go/wire"
@@ -58,7 +57,7 @@ func InFlight(nodes []wire.LineageCostNode, landings []Landing, repo string, now
 		if n.Node.Kind != KindIssue || landed[n.Node.Ref] || parents[n.Node.Ref] || deref(n.Level) == "epic" {
 			continue
 		}
-		if repo != "" && !strings.EqualFold(deref(n.Repo), repo) {
+		if repo != "" && !SameRepo(deref(n.Repo), repo) {
 			continue
 		}
 		if n.Resolved != nil && n.Resolved.State != nil && *n.Resolved.State == "closed" {

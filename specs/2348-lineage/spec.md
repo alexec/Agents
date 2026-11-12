@@ -11,9 +11,12 @@ A graph that links the parts of the SDLC. The host keeps it. The other slices fi
   - `kind`: `issue`, `pr`, `session`, `workflow-run`, `commit`, `file`, `branch`,
     `milestone`, `workflow`, `release`, `ci-run` (#3581), `health` (#3585), `deploy` and
     `target` (#3584). The list is open.
-  - `ref` names the node apart from any tracker, as `<scheme>:<id>`:
-    `github:alexec/Agents#123`, `gitlab:group/repo!45`, `linear:ENG-4`, `jira:ABC-9`,
-    `session:<agent id>`.
+  - `ref` names the node apart from any tracker, in the full ref form
+    `provider:type:topic#id` (#4800, spec 4724-event-bus, "A ref"):
+    `github:issue:alexec/agents#123`, `gitlab:mr:group/repo#45`, `linear:issue:eng#ENG-4`,
+    `jira:issue:abc#ABC-9`, `agents:session:alexec/agents#<agent id>`. Before #4800 it was
+    `<scheme>:<id>` (`github:alexec/Agents#123`, `gitlab:group/repo!45`, `linear:ENG-4`,
+    `session:<agent id>`); a reader takes that form for one release.
   - A node is in the graph while a link names it. Nothing stores a node on its own.
 - **A link** has `from`, `to`, `rel`, `source`, `at`, and `endedAt` when it stops being
   active.
@@ -166,7 +169,7 @@ a node from this machine's totals. Each part counts once.
 | A PR, a session, any other node | itself |
 | An issue | itself, and the PRs that fix it (ended `fixes` links too) |
 | A milestone | the issues and PRs `part-of` it, and the PRs that fix those issues |
-| A repo (`kind` `repo`, `ref` `github:alexec/agents`; was `project` before #3275) | every node in that repo or tracker |
+| A repo (`kind` `repo`, `ref` `github:repo:#alexec/agents`; was `project` before #3275) | every node in that repo or tracker |
 
 - `own` is what was banked on the node itself, `total` adds its parts, `waste` is the
   parts' PRs closed without a merge or reverted, and `unlinked` is the parts' sessions:
@@ -285,8 +288,8 @@ Part 2 (this): Reports ▸ Value's release rows and the release node in the Line
   tier is below the PR's, as the last step of the chain. Like a milestone, a release
   banks no cost of its own, so the pane asks `lineage/cost` for neither.
 
-- **A release node.** Kind `release`, ref `github:<owner>/<repo>/release/<tag>` (GitLab:
-  `gitlab:<group>/<project>/release/<tag>`), the tag with its `v`.
+- **A release node.** Kind `release`, ref `github:release:<owner>/<repo>#<tag>` (GitLab:
+  `gitlab:release:<group>/<project>#<tag>`), the tag with its `v`.
 - **PR `part-of` release**, source `forge`. A new `v*` tag gets the commits since the
   version tag before it (the forge's compare API), each one's PR from the `(#n)` a GitHub
   squash title ends with, or `(!n)` on GitLab, or, when the title has none, the forge's own
@@ -367,7 +370,7 @@ requirement or design behind a change. In `Go/internal/agentsd/lineagedocs.go`.
 The health stage of the outer loop (spec `3579-outer-loop`), in
 `Go/internal/agentsd/lineagehealth.go`. No client.
 
-- **A health node.** Kind `health`, ref `sentry:<org>/<issue id>`, from the sentry events
+- **A health node.** Kind `health`, ref `sentry:issue:<org>#<issue id>`, from the sentry events
   server's `health.issue_new` and `health.issue_regressed` (#3583).
 - **Health `seen-in` release**, source `health`, at the time Sentry first saw the issue
   (or saw it come back). Sentry's release is a version string: `1.2.0`, `v1.2.0`,
@@ -382,7 +385,7 @@ The health stage of the outer loop (spec `3579-outer-loop`), in
   `com.example.app@1.2.0+42` names the build `testflight:com.example.app/42`.
 - A walk from a health node reaches the release (1 link), its PRs (2) and the issues they
   fix (3).
-- **A Better Stack incident (#3655).** Kind `health`, ref `betterstack:<incident id>`, from
+- **A Better Stack incident (#3655).** Kind `health`, ref `betterstack:incident:#<incident id>`, from
   the betterstack events server's `health.incident_started`. An incident names no version,
   so it is `seen-in` the release that was out when it started, source `health`, at the
   start: of the `v*` tags done in the repo of the folder the event is scoped to, the

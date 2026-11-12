@@ -65,16 +65,11 @@ const bitbucketNoPlan = "Bitbucket's issues have no sub-issues or dependencies, 
 // bitbucketOfNode is the repository, workspace/repo, and the number of a Bitbucket issue's or
 // pull request's node.
 func bitbucketOfNode(n wire.LineageNode) (string, int, bool) {
-	rest, ok := strings.CutPrefix(n.Ref, "bitbucket:")
-	at := strings.LastIndex(rest, "#")
-	if !ok || (n.Kind != lineage.KindIssue && n.Kind != lineage.KindPR) || at < 0 || strings.Count(rest[:at], "/") != 1 {
+	repo, number, ok := numberedNode(n, "bitbucket", lineage.KindIssue, lineage.KindPR)
+	if !ok || strings.Count(repo, "/") != 1 || strings.HasPrefix(repo, "/") || strings.HasSuffix(repo, "/") {
 		return "", 0, false
 	}
-	number, err := strconv.Atoi(rest[at+1:])
-	if err != nil || number <= 0 || strings.HasPrefix(rest, "/") || strings.HasSuffix(rest[:at], "/") {
-		return "", 0, false
-	}
-	return rest[:at], number, true
+	return repo, number, true
 }
 
 // bitbucketNode is an issue's or a pull request's node.
@@ -83,7 +78,7 @@ func bitbucketNode(repo string, number int, pr bool) wire.LineageNode {
 	if pr {
 		kind = lineage.KindPR
 	}
-	return wire.LineageNode{Kind: kind, Ref: "bitbucket:" + strings.ToLower(repo) + "#" + strconv.Itoa(number)}
+	return numbered(kind, "bitbucket", repo, number)
 }
 
 // bitbucketConnectedAPI is the connected Bitbucket API, when its connection is usable; else "".

@@ -38,15 +38,15 @@ func TestMilestoneForecastOf(t *testing.T) {
 		if c.Node.Kind != KindIssue {
 			continue
 		}
-		num, _ := strconv.Atoi(c.Node.Ref[len("github:o/r#"):])
+		num, _ := strconv.Atoi(c.Node.Ref[len("github:issue:o/r#"):])
 		if m, ok := milestones[num]; ok {
 			nodes[i].Milestone = new(m)
 		}
 	}
 	open := "open"
 	item := func(num int, level string) wire.LineageCostNode {
-		ref := "github:o/r#" + strconv.Itoa(num)
-		return wire.LineageCostNode{Node: wire.LineageNode{Kind: KindIssue, Ref: ref}, Repo: new("github:o/r"), Banked: blankCost(),
+		ref := "github:issue:o/r#" + strconv.Itoa(num)
+		return wire.LineageCostNode{Node: wire.LineageNode{Kind: KindIssue, Ref: ref}, Repo: new("github:repo:#o/r"), Banked: blankCost(),
 			Level: new(level), Milestone: new("next"), Resolved: &wire.LineageResolved{Title: ref, State: &open, Labels: []string{level}}}
 	}
 	nodes = append(nodes, item(90001, "task"), item(90002, "task"), item(90003, "story"), item(90004, "epic"))

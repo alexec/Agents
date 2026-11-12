@@ -29,6 +29,7 @@ from pathlib import Path
 GROUP = "integration"
 INTEGRATION = "linear"
 TITLE = "Linear"
+DOCS = "how-to/use-linear-issues/"  # the docs page, on docs.agentloops.dev (upload.py)
 LAYOUT = "mac+browser"
 BROWSER = (1280, 800)
 # The bar is drawn once for the whole take, which shows linear.app and the scratch web page.
@@ -123,7 +124,7 @@ def keychain_access(v):
 
 # --- the set-up ----------------------------------------------------------------------------
 def setup(v):
-    folder = v.project("shop", {
+    folder = v.add_folder("shop", {
         "README.md": "# Shop\n\nA small shop front.\n",
         ".agents/mcp.json": json.dumps({"mcpServers": {"linear": {"command": "linear-mcp", "hosted": True}}}, indent=2) + "\n",
         ".agents/pins.json": json.dumps({"pins": [{"pinned_by": {"person": True}, "title": "Linear issues",

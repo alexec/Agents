@@ -47,8 +47,8 @@ func (f *fakeForgeLinear) SetBlockedBy(_ context.Context, identifier, blocker st
 func TestPlanWritesGoToGitHub(t *testing.T) {
 	_, c, gh, _ := forgeDaemon(t)
 	gh.plan = githubmcp.Plan{Epic: planIssue(3265, "open", "epic", "feature:work")}
-	epic := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#3265"}
-	child := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#3271"}
+	epic := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#3265"}
+	child := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#3271"}
 	var done wire.ForgeDone
 	json.Unmarshal(c.call(t, 1, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Title: new("  Add a child  "), Level: new("Task")}), &done)
 	if done.URL == nil || *done.URL != "https://github.com/alexec/agents/issues/50" {
@@ -58,7 +58,7 @@ func TestPlanWritesGoToGitHub(t *testing.T) {
 	c.call(t, 3, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Issue: new("alexec/Web#9")})
 	c.call(t, 4, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Issue: new("https://github.com/o/r/issues/8")})
 	c.call(t, 5, "forge/blocked-by", wire.ForgeBlockedByRequest{Node: child,
-		Add: []wire.LineageNode{{Kind: "issue", Ref: "github:alexec/agents#3268"}}, Remove: []wire.LineageNode{{Kind: "issue", Ref: "github:alexec/web#9"}}})
+		Add: []wire.LineageNode{{Kind: "issue", Ref: "github:issue:alexec/agents#3268"}}, Remove: []wire.LineageNode{{Kind: "issue", Ref: "github:issue:alexec/web#9"}}})
 	c.call(t, 6, "forge/plan", wire.ForgePlanRequest{Node: epic})
 	want := []string{"create alexec/agents Add a child [task,feature:work]", "sub alexec/agents#3265 alexec/agents#50",
 		"sub alexec/agents#3265 alexec/agents#3270", "sub alexec/agents#3265 alexec/web#9", "sub alexec/agents#3265 o/r#8",
@@ -78,11 +78,11 @@ func TestPlanWritesGoToGitHub(t *testing.T) {
 // a block by key.
 func TestPlanWritesGoToLinear(t *testing.T) {
 	_, c, _, _, ln, _ := allForgesDaemon(t)
-	epic := wire.LineageNode{Kind: "issue", Ref: "linear:ENG-5"}
+	epic := wire.LineageNode{Kind: "issue", Ref: "linear:issue:eng#ENG-5"}
 	c.call(t, 1, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Title: new("New")})
 	c.call(t, 2, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Issue: new("https://linear.app/acme/issue/eng-7/a-title")})
-	c.call(t, 3, "forge/blocked-by", wire.ForgeBlockedByRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:ENG-7"},
-		Add: []wire.LineageNode{{Kind: "issue", Ref: "linear:ENG-6"}}})
+	c.call(t, 3, "forge/blocked-by", wire.ForgeBlockedByRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:issue:eng#ENG-7"},
+		Add: []wire.LineageNode{{Kind: "issue", Ref: "linear:issue:eng#ENG-6"}}})
 	ln.mu.Lock()
 	got := slices.Clone(ln.wrote)
 	ln.mu.Unlock()
@@ -97,7 +97,7 @@ func TestPlanWritesGoToLinear(t *testing.T) {
 // another forge or the child itself, a pull request, GitLab and Jira; and no agent may call one.
 func TestPlanWritesRefuseWhatIsWrong(t *testing.T) {
 	_, c, gh, _, ln, _ := allForgesDaemon(t)
-	epic := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#3265"}
+	epic := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#3265"}
 	for i, ask := range []struct {
 		method string
 		params any
@@ -108,10 +108,10 @@ func TestPlanWritesRefuseWhatIsWrong(t *testing.T) {
 		{"forge/add-child", wire.ForgeAddChildRequest{Node: epic, Issue: new("ENG-4")}},
 		{"forge/add-child", wire.ForgeAddChildRequest{Node: epic, Issue: new("#3265")}},
 		{"forge/add-child", wire.ForgeAddChildRequest{Node: ghPull, Title: new("A")}},
-		{"forge/add-child", wire.ForgeAddChildRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:ENG-5"}, Issue: new("#4")}},
-		{"forge/add-child", wire.ForgeAddChildRequest{Node: wire.LineageNode{Kind: "issue", Ref: "gitlab:group/app#3"}, Title: new("A")}},
+		{"forge/add-child", wire.ForgeAddChildRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:issue:eng#ENG-5"}, Issue: new("#4")}},
+		{"forge/add-child", wire.ForgeAddChildRequest{Node: wire.LineageNode{Kind: "issue", Ref: "gitlab:issue:group/app#3"}, Title: new("A")}},
 		{"forge/blocked-by", wire.ForgeBlockedByRequest{Node: ghIssue}},
-		{"forge/blocked-by", wire.ForgeBlockedByRequest{Node: ghIssue, Add: []wire.LineageNode{{Kind: "issue", Ref: "linear:ENG-6"}}}},
+		{"forge/blocked-by", wire.ForgeBlockedByRequest{Node: ghIssue, Add: []wire.LineageNode{{Kind: "issue", Ref: "linear:issue:eng#ENG-6"}}}},
 		{"forge/blocked-by", wire.ForgeBlockedByRequest{Node: ghIssue, Add: []wire.LineageNode{ghIssue}}},
 		{"forge/blocked-by", wire.ForgeBlockedByRequest{Node: ghIssue, Remove: []wire.LineageNode{ghPull}}},
 	} {

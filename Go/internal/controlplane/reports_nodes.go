@@ -103,7 +103,7 @@ func nodesPage(rows []wire.ReportNode, q wire.ReportNodesQuery, order wire.Repor
 	out := wire.ReportNodes{Nodes: []wire.ReportNode{}}
 	kept := rows[:0]
 	for _, r := range rows {
-		if q.Repo != nil && *q.Repo != "" && !inRepo(r.Node.Ref, *q.Repo) {
+		if q.Repo != nil && *q.Repo != "" && !inRepo(r.Node, *q.Repo) {
 			continue
 		}
 		if q.Since != nil && r.LastAt < *q.Since {
@@ -175,12 +175,13 @@ func nodesKeyOf(r wire.ReportNode, order wire.ReportNodesSort) nodesKey {
 
 // inRepo says ref is in repo, a ref prefix such as github:alexec/Agents: github:alexec/Agents#12
 // is, github:alexec/AgentsX#1 is not. Forges take a repo's name in any case.
-func inRepo(ref, repo string) bool {
-	ref, repo = strings.ToLower(ref), strings.ToLower(strings.TrimRight(repo, "/"))
-	if !strings.HasPrefix(ref, repo) {
+func inRepo(n wire.LineageNode, repo string) bool {
+	r, ok := lineage.RefOf(n)
+	want, err := wire.ParseRef(lineage.FullRepoText(strings.ToLower(strings.TrimRight(repo, "/"))))
+	if !ok || err != nil || want.Type != lineage.KindRepo {
 		return false
 	}
-	return len(ref) == len(repo) || strings.ContainsRune("#!/:", rune(ref[len(repo)]))
+	return r.Provider == want.Provider && r.Topic == strings.ToLower(want.ID)
 }
 
 // nodeState is a row's state: its resolved state, else a PR's outcome (a reverted PR was

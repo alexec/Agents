@@ -26,8 +26,8 @@ every frame as it is kept; then every frame is read with OCR (tokens.py) and a t
 any part of a token fails. After the take the scene revokes each token, and a token that the
 provider still takes fails the take too.
 
-Nothing is uploaded unless --upload is given (upload.py: private, to the playlist "Agents
-integrations"). Real Claude agents run in the scenes, on scratch projects: a few cents a
+Nothing is uploaded unless --upload is given (upload.py: private, on the Loops channel, to
+the playlist of the scene's GROUP, with its captions and a thumbnail; #4836). Real Claude agents run in the scenes, on scratch folders: a few cents a
 video.
 """
 import argparse
@@ -214,12 +214,15 @@ class Video:
     # --- the scratch set-up -------------------------------------------------------------
     def launch(self, build):
         # The real disk's free space is not the video's: a scratch root says its own (Debug).
+        # The Go host does not read it yet (#4851).
         Path(self.root).mkdir(parents=True)
         (Path(self.root) / "disk-free-override").write_text("500GB\n")
         args = [SKILL / "launch.sh", "--seeded", "--slug", f"vid-{self.scene.ID}", "--appearance", "light", "--outside-checkout", "--person", "Sam"]
         if not build:
             args.append("--no-build")
-        out = run(*args)
+        # The scratch machine's name is on camera (the machine lock's card, the machine
+        # list): never this Mac's own, which names the person (#3491, #4835).
+        out = run(*args, env={**os.environ, "HOST_NAME": "Sam's Mac"})
         for line in out.splitlines():
             if "=" in line and line.split("=", 1)[0].isupper():
                 key, value = line.split("=", 1)
@@ -262,8 +265,10 @@ class Video:
     def rpc(self, method, params=None, timeout=60):
         return self.client.call(method, params or {}, timeout=timeout)
 
-    def project(self, name, files, commit=True):
-        """A scratch project under the root, with these files, committed, and added."""
+    def add_folder(self, name, files, commit=True):
+        """A scratch folder under the root, with these files, committed, and added, as Add
+        Folder… would add it. (Add Folder…'s panel is the system's, in another process: no
+        walk can press it, and no shot of the window draws it.)"""
         folder = Path(self.root) / "work" / name
         folder.mkdir(parents=True, exist_ok=True)
         # The agent still reads the person's own ~/.claude/CLAUDE.md, and once said so on
@@ -424,9 +429,31 @@ class Video:
                 / f"Agents/walks/run-vid-{self.scene.ID}/opened-url")
         return path.read_text().strip() if path.exists() else None
 
+    def approve_machines(self):
+        """Approves the scratch machine's join card (the machine lock, #3490), so it is not
+        in the picture: a person set up already approved their Mac."""
+        for _ in range(3):
+            if not self.walk.call("find", text="Approve the new machine").get("matches"):
+                break
+            self.press("=Compare Digits", wait=3)
+            time.sleep(0.6)
+            self.press("=Approve", wait=5)
+            time.sleep(1.0)
+        else:
+            log("the machine's join card is still showing")
+        # Approving founds the lock, which offers a recovery key: skipped, as a person may.
+        try:
+            self.wait_until(lambda: self.walk.call("find", text="Make a recovery key").get("matches"), timeout=6, what="the recovery key card")
+        except TimeoutError:
+            return
+        if self.press("=Skip", wait=3):
+            time.sleep(0.6)
+
     def tidy(self):
-        """Puts away the Get started card and a milestone's note, if they are showing."""
-        for label in ("Dismiss Get started", "Dismiss milestone"):
+        """Puts away a milestone's note and, unless the scene keeps it (GET_STARTED = True),
+        the Get started card, if they are showing."""
+        labels = ("Dismiss milestone",) if getattr(self.scene, "GET_STARTED", False) else ("Dismiss Get started", "Dismiss milestone")
+        for label in labels:
             if self.walk.call("find", text=label).get("ok"):
                 self.press(label, wait=0)
 
@@ -569,6 +596,7 @@ def record_scene(scene, takes, work, build, keep):
             else:
                 raise RuntimeError(f"the window draws at {placed.get('scale')}×, not 2×, and its shots cannot be drawn at 2× (an app from before #1855?)")
         time.sleep(1.5)
+        v.approve_machines()
         scene.setup(v)
         time.sleep(2.0)
         v.tidy()
@@ -664,6 +692,10 @@ def private_words(v):
     text = v.walk.call("tree", depth=80).get("text", "").lower()
     found = sorted({word for word in PRIVATE if word in text})
     if found:
+        # Where, so the next take can be put right; the lines go to the log only.
+        for line in text.splitlines():
+            if any(word in line for word in found):
+                log("  shows:", line.strip()[:160])
         raise RuntimeError(f"{v.scene.ID}: the window shows {found}: the take is not kept")
 
 
@@ -755,17 +787,15 @@ INTEGRATIONS = REPO / "docs/reference/integrations.md"
 
 
 def preflight(scene_ids):
-    """Checks what a take needs from Alex's hands: the YouTube refresh token works, and the
+    """Checks what a take needs from Alex's hands, for a scene of any GROUP (#4836): the
+    YouTube refresh token works and is the Loops channel's, the scene's GROUP has a playlist, and the
     scene's video Chrome profile is signed in to its site. Each failure adds one line to
     Alex's checklist on #1793 (once) and fails that scene. Prints `ready <id>` or
     `skip <id>: <why>` per scene; exits 3 when any is skipped."""
     import upload
     youtube = None
     try:
-        yt = upload.YouTube()
-        mine = yt.call("GET", "channels", {"part": "snippet", "mine": "true"}).get("items", [])
-        if not mine:
-            youtube = "the YouTube sign-in has no channel"
+        youtube = upload.check_channel(upload.YouTube())
     except upload.NotSignedIn as why:
         youtube = str(why)
     except Exception as error:
@@ -774,6 +804,8 @@ def preflight(scene_ids):
     for scene_id in scene_ids:
         scene = load_scene(scene_id)
         why = []
+        if getattr(scene, "GROUP", "") not in upload.PLAYLISTS:
+            why.append(f"GROUP {getattr(scene, 'GROUP', '')!r} has no playlist (one of {', '.join(upload.PLAYLISTS)})")
         if youtube:
             why.append(youtube)
             todo("Run `scripts/video/upload.py --sign-in` and approve with the Google account of the YouTube channel (#1856).",

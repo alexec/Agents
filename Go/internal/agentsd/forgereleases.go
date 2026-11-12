@@ -153,12 +153,11 @@ func releaseOfNode(n wire.LineageNode) (forge, repo, tag string, ok bool) {
 	if n.Kind != lineage.KindRelease {
 		return "", "", "", false
 	}
-	forge, rest, ok := strings.Cut(n.Ref, ":")
-	at := strings.LastIndex(rest, "/release/")
-	if !ok || at <= 0 || at+len("/release/") == len(rest) {
+	r, ok := lineage.RefOf(n)
+	if !ok || r.Type != lineage.KindRelease || r.Topic == "" {
 		return "", "", "", false
 	}
-	return forge, rest[:at], rest[at+len("/release/"):], true
+	return r.Provider, r.Topic, r.ID, true
 }
 
 // forgeRelease is a release of a folder's repo, the release before it, and the pull requests

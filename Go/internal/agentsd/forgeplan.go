@@ -201,7 +201,7 @@ func (d *Daemon) leadOf(epic wire.LineageNode) *wire.ForgeLead {
 		if l.To != epic || l.From.Kind != lineage.KindSession || l.Rel != lineage.RelWorksOn || l.EndedAt != nil {
 			continue
 		}
-		id, ok := strings.CutPrefix(l.From.Ref, "session:")
+		id, ok := lineage.SessionID(l.From.Ref)
 		if !ok {
 			continue
 		}

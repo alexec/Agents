@@ -47,7 +47,7 @@ func TestLineageHealthSeenInItsRelease(t *testing.T) {
 		d.link(pr, issue, lineage.RelFixes, lineage.SourcePRBody)
 	})
 	d.lineageEvent(healthEvent("health.issue_new", folder, "agents@1.2.0"))
-	health := wire.LineageNode{Kind: "health", Ref: "sentry:scratch/42"}
+	health := wire.LineageNode{Kind: "health", Ref: "sentry:issue:scratch#42"}
 	wantLinks(t, active(d, health), health.Ref+" seen-in "+release.Ref+" (health)")
 	if l := d.lineage().Links(health).Links[0]; !l.At.Time().Equal(time.Date(2026, 11, 5, 9, 0, 0, 0, time.UTC)) {
 		t.Fatalf("linked at %v, want when Sentry first saw it", l.At.Time())
@@ -80,7 +80,7 @@ func TestLineageHealthWithNoFolder(t *testing.T) {
 	d.repos = map[string]forgeRepo{one: {"github", "alexec/agents"}, two: {"github", "alexec/other"}}
 	agents, other := d.repos[one], d.repos[two]
 	d.lineageDo(func() { d.link(agents.pr(40), agents.release("v1.2.0"), lineage.RelPartOf, lineage.SourceForge) })
-	health := wire.LineageNode{Kind: "health", Ref: "sentry:scratch/42"}
+	health := wire.LineageNode{Kind: "health", Ref: "sentry:issue:scratch#42"}
 
 	d.lineageEvent(healthEvent("health.issue_new", "", "9.9.9"))
 	d.lineageEvent(healthEvent("health.issue_new", "", "agents@main"))
@@ -109,18 +109,18 @@ func TestLineageHealthSeenInItsDeploy(t *testing.T) {
 	folder := realTempDir(t)
 	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
 	release := d.repos[folder].release("v0.16.0")
-	deploy := wire.LineageNode{Kind: "deploy", Ref: "testflight:com.example.app/812"}
+	deploy := wire.LineageNode{Kind: "deploy", Ref: "testflight:deploy:com.example.app#812"}
 	d.lineageDo(func() { d.link(release, deploy, "deployed-as", lineage.SourceForge) })
 	d.lineageEvent(healthEvent("health.issue_new", folder, "com.example.app@0.16.0+812"))
-	health := wire.LineageNode{Kind: "health", Ref: "sentry:scratch/42"}
+	health := wire.LineageNode{Kind: "health", Ref: "sentry:issue:scratch#42"}
 	wantLinks(t, active(d, health),
 		health.Ref+" seen-in "+release.Ref+" (health)",
 		health.Ref+" seen-in "+deploy.Ref+" (health)")
 
 	// A build the graph does not know links only the release.
 	d.lineageEvent(wire.Event{Name: "health.issue_new", Scope: folderScope(folder), Details: map[string]string{"payload": `{"org":"scratch","release":"com.example.app@0.16.0+813","issue":{"id":"43"}}`}})
-	wantLinks(t, active(d, wire.LineageNode{Kind: "health", Ref: "sentry:scratch/43"}),
-		"sentry:scratch/43 seen-in "+release.Ref+" (health)")
+	wantLinks(t, active(d, wire.LineageNode{Kind: "health", Ref: "sentry:issue:scratch#43"}),
+		"sentry:issue:scratch#43 seen-in "+release.Ref+" (health)")
 }
 
 func TestSentryVersion(t *testing.T) {
@@ -167,7 +167,7 @@ func TestLineageABugReportsTheHealthThatStartedIt(t *testing.T) {
 			a.Labels = []wire.SessionLabel{{Value: "#77", Owner: wire.SessionLabelOwnerAgent}}
 		})
 	}
-	health := wire.LineageNode{Kind: "health", Ref: "sentry:scratch/42"}
+	health := wire.LineageNode{Kind: "health", Ref: "sentry:issue:scratch#42"}
 	s := sessionNode(a.ID)
 	wantLinks(t, active(d, bug),
 		bug.Ref+" reports "+health.Ref+" (agent)",
@@ -210,7 +210,7 @@ func TestLineageIncidentSeenInTheReleaseOut(t *testing.T) {
 		pr := repo.pr(40 + i)
 		d.lineageDo(func() { d.linkAt(pr, repo.release(tag), lineage.RelPartOf, lineage.SourceForge, day(1+2*i)) })
 	}
-	health := wire.LineageNode{Kind: "health", Ref: "betterstack:77"}
+	health := wire.LineageNode{Kind: "health", Ref: "betterstack:incident:#77"}
 
 	d.lineageEvent(incidentEvent("health.incident_started", "", "2026-11-04T10:00:00Z"))
 	d.lineageEvent(incidentEvent("health.incident_resolved", folder, "2026-11-04T10:00:00Z"))

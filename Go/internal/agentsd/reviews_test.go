@@ -46,7 +46,7 @@ func TestForReviewListsPullRequestsWaitingForApproval(t *testing.T) {
 	got := reviewsIn(t, d, c, 1, "alexec/agents")
 	if len(got) != 2 || got[0].Number != 2 || got[1].Number != 1 || got[0].Repo != "alexec/agents" ||
 		string(got[0].URL) != newer.URL || deref(got[0].Author) != "alexec" || got[0].Title != newer.Title ||
-		deref(got[0].Ref) != "github:alexec/agents#2" {
+		deref(got[0].Ref) != "github:pr:alexec/agents#2" {
 		t.Fatalf("agents' reviews: %+v", got)
 	}
 	if web := reviewsIn(t, d, c, 2, "alexec/web"); len(web) != 1 || web[0].Number != 6 {

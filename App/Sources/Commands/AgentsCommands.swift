@@ -595,9 +595,7 @@ struct AgentsCommands: Commands {
     private var foldersInListOrder: [DaemonAPI.FolderSummary] { model.foldersInListOrder }
 
     /// The selected folder's live sessions, in the order its page draws them.
-    private var sessionsHere: [UUID] {
-        AgentGroup.live.flatMap { model.agents(in: model.selectedFolderKey, group: $0) }.map(\.id)
-    }
+    private var sessionsHere: [UUID] { model.sessionsInFront }
 
     private func step(by offset: Int) {
         let ids = sessionsHere

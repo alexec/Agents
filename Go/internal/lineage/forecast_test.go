@@ -77,15 +77,15 @@ func TestForecastIsTheSameForTheSameHistory(t *testing.T) {
 	if !ok || m.Spans != 6 || len(m.Pool) != 4+5+6+7+8+9 {
 		t.Fatalf("model: %v spans, %d gaps", m.Spans, len(m.Pool))
 	}
-	a, ok := m.Forecast(now, 8, 3, 5, 1, Rng("github:o/r#1"))
-	b, _ := m.Forecast(now, 8, 3, 5, 1, Rng("github:o/r#1"))
+	a, ok := m.Forecast(now, 8, 3, 5, 1, Rng("github:issue:o/r#1"))
+	b, _ := m.Forecast(now, 8, 3, 5, 1, Rng("github:issue:o/r#1"))
 	if !ok || !a.Mid.Equal(b.Mid) || !a.Low.Equal(b.Low) || !a.High.Equal(b.High) {
 		t.Fatalf("two forecasts of the same: %v and %v", a, b)
 	}
 	if !(now.Before(a.Low) && !a.Mid.Before(a.Low) && !a.High.Before(a.Mid)) || len(a.Children) != 5 || a.Children[4].After(a.Mid) {
 		t.Fatalf("forecast out of order: %+v", a)
 	}
-	wide, _ := m.Forecast(now, 8, 3, 5, 2, Rng("github:o/r#1"))
+	wide, _ := m.Forecast(now, 8, 3, 5, 2, Rng("github:issue:o/r#1"))
 	if !wide.Mid.Equal(a.Mid) || !wide.Low.Before(a.Low) || !wide.High.After(a.High) {
 		t.Fatalf("a width of 2 does not widen the band: %+v", wide)
 	}

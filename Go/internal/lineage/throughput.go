@@ -5,7 +5,6 @@ import (
 	"math/rand/v2"
 	"slices"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/alexec/agents/Go/wire"
@@ -93,7 +92,7 @@ func inRepo(landings []Landing, repo string) []Landing {
 	}
 	var out []Landing
 	for _, l := range landings {
-		if strings.EqualFold(l.Repo, repo) {
+		if SameRepo(l.Repo, repo) {
 			out = append(out, l)
 		}
 	}

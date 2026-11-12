@@ -83,7 +83,7 @@ func planIssue(n int, state string, labels ...string) githubmcp.Item {
 // #3267: a child's step is one more than its blockers' in the plan; a blocker outside the plan
 // adds no step but is said when open; a loop shares the step after the rest.
 func TestPlanOfPutsChildrenInSteps(t *testing.T) {
-	node := func(n string) wire.LineageNode { return wire.LineageNode{Kind: "issue", Ref: "github:a/b#" + n} }
+	node := func(n string) wire.LineageNode { return wire.LineageNode{Kind: "issue", Ref: "github:issue:a/b#" + n} }
 	child := func(n string, blockers ...planRef) planChild {
 		return planChild{item: wire.ForgeItem{Node: node(n)}, blockedBy: blockers}
 	}
@@ -96,7 +96,7 @@ func TestPlanOfPutsChildrenInSteps(t *testing.T) {
 	}, false)
 	got := []string{}
 	for _, c := range p.Children {
-		got = append(got, c.Item.Node.Ref[len("github:a/b#"):]+"@"+strconv.FormatInt(c.Step, 10))
+		got = append(got, c.Item.Node.Ref[len("github:issue:a/b#"):]+"@"+strconv.FormatInt(c.Step, 10))
 	}
 	if strings.Join(got, " ") != "2@1 3@2 4@3 5@4 6@4" {
 		t.Fatalf("steps: %v", got)
@@ -117,7 +117,7 @@ func TestForgeItemsSayTheirHierarchy(t *testing.T) {
 	i := planIssue(3268, "open", "enhancement", "Story", "feature:work")
 	i.ParentRepo, i.ParentNumber, i.SubTotal, i.SubDone = "alexec/Agents", 3265, 0, 0
 	out := forgeItemOf(i, "")
-	if deref(out.Level) != "story" || deref(out.Feature) != "work" || out.Parent == nil || out.Parent.Ref != "github:alexec/agents#3265" || out.Progress != nil {
+	if deref(out.Level) != "story" || deref(out.Feature) != "work" || out.Parent == nil || out.Parent.Ref != "github:issue:alexec/agents#3265" || out.Progress != nil {
 		t.Fatalf("item: %+v", out)
 	}
 	e := planIssue(3265, "open", "epic")
@@ -126,7 +126,7 @@ func TestForgeItemsSayTheirHierarchy(t *testing.T) {
 		t.Fatalf("epic: %+v", out)
 	}
 	if out := linearItemOf(linearmcp.Item{Identifier: "ENG-6", Parent: "ENG-5", Labels: []string{"feature:"}}, ""); out.Parent == nil ||
-		out.Parent.Ref != "linear:ENG-5" || out.Feature != nil {
+		out.Parent.Ref != "linear:issue:eng#ENG-5" || out.Feature != nil {
 		t.Fatalf("linear: %+v", out)
 	}
 	pr := planIssue(12, "open", "task")
@@ -146,11 +146,11 @@ func TestForgePlanStepsAndLead(t *testing.T) {
 		{Item: planIssue(3267, "closed", "task"), BlockedBy: []githubmcp.Ref{}},
 	}}
 	gh.plan.Epic.SubTotal, gh.plan.Epic.SubDone = 2, 1
-	epic := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#3265"}
+	epic := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#3265"}
 	var plan wire.ForgePlan
 	json.Unmarshal(c.call(t, 1, "forge/plan", wire.ForgePlanRequest{Node: epic}), &plan)
 	if plan.Item.Node != epic || plan.Item.Progress == nil || plan.Item.Progress.Done != 1 || len(plan.Children) != 2 ||
-		plan.Children[0].Item.Node.Ref != "github:alexec/agents#3267" || plan.Children[1].Step != 2 || plan.Lead != nil {
+		plan.Children[0].Item.Node.Ref != "github:issue:alexec/agents#3267" || plan.Children[1].Step != 2 || plan.Lead != nil {
 		t.Fatalf("plan: %+v", plan)
 	}
 
@@ -178,10 +178,10 @@ func TestForgePlanStepsAndLead(t *testing.T) {
 	if gh.plans != 1 {
 		t.Fatalf("GitHub was asked for the plan %d times", gh.plans)
 	}
-	if _, err := d.forgePlan(context.Background(), wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#12"}}); err == nil {
+	if _, err := d.forgePlan(context.Background(), wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#12"}}); err == nil {
 		t.Fatal("a pull request has a plan")
 	}
-	if _, err := d.forgePlan(context.Background(), wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#404"}}); err == nil {
+	if _, err := d.forgePlan(context.Background(), wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#404"}}); err == nil {
 		t.Fatal("a missing issue has a plan")
 	}
 }
@@ -190,16 +190,16 @@ func TestForgePlanStepsAndLead(t *testing.T) {
 func TestForgePlanOnGitLabAndLinear(t *testing.T) {
 	_, c, _, _, _, _ := allForgesDaemon(t)
 	var plan wire.ForgePlan
-	json.Unmarshal(c.call(t, 1, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "gitlab:group/app#5"}}), &plan)
-	if len(plan.Children) != 2 || plan.Children[0].Item.Node.Ref != "gitlab:group/app#7" || plan.Children[1].Step != 2 ||
-		plan.Children[0].Item.Parent == nil || plan.Children[0].Item.Parent.Ref != "gitlab:group/app#5" || deref(plan.Item.Level) != "epic" ||
+	json.Unmarshal(c.call(t, 1, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "gitlab:issue:group/app#5"}}), &plan)
+	if len(plan.Children) != 2 || plan.Children[0].Item.Node.Ref != "gitlab:issue:group/app#7" || plan.Children[1].Step != 2 ||
+		plan.Children[0].Item.Parent == nil || plan.Children[0].Item.Parent.Ref != "gitlab:issue:group/app#5" || deref(plan.Item.Level) != "epic" ||
 		plan.Item.Progress == nil || plan.Item.Progress.Total != 2 {
 		t.Fatalf("GitLab plan: %+v", plan)
 	}
 	plan = wire.ForgePlan{}
-	json.Unmarshal(c.call(t, 2, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:ENG-5"}}), &plan)
+	json.Unmarshal(c.call(t, 2, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "linear:issue:eng#ENG-5"}}), &plan)
 	if deref(plan.Item.Feature) != "Billing" || deref(plan.Item.Level) != "epic" || len(plan.Children) != 1 ||
-		len(plan.Children[0].BlockedOutside) != 1 || plan.Children[0].BlockedOutside[0].Ref != "linear:OPS-1" || plan.Children[0].Step != 1 {
+		len(plan.Children[0].BlockedOutside) != 1 || plan.Children[0].BlockedOutside[0].Ref != "linear:issue:ops#OPS-1" || plan.Children[0].Step != 1 {
 		t.Fatalf("Linear plan: %+v", plan)
 	}
 }
@@ -235,10 +235,10 @@ func TestForgeFeatureFilterAndFeatures(t *testing.T) {
 	}
 	// #4115: each feature's open issues and open epics, each once; those labelled alex-todo; the newest update.
 	work := out.Features[1]
-	if !slices.Equal(work.Refs, []string{"github:alexec/agents#1", "github:alexec/agents#5", "github:alexec/agents#6"}) ||
-		!slices.Equal(work.Waiting, []string{"github:alexec/agents#6"}) || work.UpdatedAt == nil ||
-		!slices.Equal(out.Features[0].Refs, []string{"github:alexec/agents#3"}) || len(out.Features[0].Waiting) != 0 ||
-		!slices.Equal(out.Approvals, []string{"github:alexec/agents#9"}) {
+	if !slices.Equal(work.Refs, []string{"github:issue:alexec/agents#1", "github:issue:alexec/agents#5", "github:issue:alexec/agents#6"}) ||
+		!slices.Equal(work.Waiting, []string{"github:issue:alexec/agents#6"}) || work.UpdatedAt == nil ||
+		!slices.Equal(out.Features[0].Refs, []string{"github:issue:alexec/agents#3"}) || len(out.Features[0].Waiting) != 0 ||
+		!slices.Equal(out.Approvals, []string{"github:pr:alexec/agents#9"}) {
 		t.Fatalf("refs: %+v, approvals %q", out.Features, out.Approvals)
 	}
 	if lineage := out.Features[0].UpdatedAt; lineage == nil || *work.UpdatedAt <= *lineage {

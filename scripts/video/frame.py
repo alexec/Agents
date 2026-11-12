@@ -158,8 +158,8 @@ def end_card(path, phone):
     logo.thumbnail((300, 300))
     img.alpha_composite(logo, ((W - logo.width) // 2, H // 2 - logo.height - 40))
     d = ImageDraw.Draw(img)
-    d.text((W // 2, H // 2 + 50), "Agents", font=font(120, "Bold"), fill="white", anchor="mm")
-    d.text((W // 2, H // 2 + 160), "Your coding agents, wherever you are.", font=font(52), fill=(220, 230, 255), anchor="mm")
+    d.text((W // 2, H // 2 + 50), "Loops", font=font(120, "Bold"), fill="white", anchor="mm")
+    d.text((W // 2, H // 2 + 160), "docs.agentloops.dev", font=font(52), fill=(220, 230, 255), anchor="mm")
     if phone:
         d.text((W // 2, H - 60), TRADEMARK, font=font(26), fill=(190, 205, 240), anchor="mm")
     img.convert("RGB").save(path)

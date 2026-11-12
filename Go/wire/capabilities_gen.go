@@ -57,6 +57,7 @@ const CapDocs1 = "docs/1"
 const CapDropbox1 = "dropbox/1"
 const CapElicitations1 = "elicitations/1"
 const CapEventsAudit1 = "events.audit/1"
+const CapEventsBus1 = "events.bus/1"
 const CapEventsTeam1 = "events.team/1"
 const CapEvents1 = "events/1"
 const CapFeatures1 = "features/1"
@@ -752,6 +753,8 @@ var ControlCapabilities = pairs([][2]string{
 	{"bots/make", "bots/1"},
 	{"bots/setCaps", "bots/1"},
 	{"bots/stopRun", "bots/1"},
+	{"bus/publish", "events.bus/1"},
+	{"bus/subscribe", "events.bus/1"},
 	{"clients/announce", "clients/1"},
 	{"clients/connections", "clients/1"},
 	{"clients/forget", "clients/1"},
@@ -965,6 +968,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"workflows/claimRun", "bots/1"},
 	{"workflows/fire", "events.team/1"},
 	{"workflows/trigger", "events.team/1"},
+	{"bus/deliver", "events.bus/1"},
 	{"control/budgetRequested", "policy.ask/1"},
 	{"control/capReached", "bots/1"},
 	{"control/clientChanged", "control/1"},
@@ -1024,6 +1028,7 @@ var ControlCapabilities = pairs([][2]string{
 
 // ControlNotifications is each notification in control.openrpc.json: what its server sends, not serves.
 var ControlNotifications = set([]string{
+	"bus/deliver",
 	"control/budgetRequested",
 	"control/capReached",
 	"control/clientChanged",

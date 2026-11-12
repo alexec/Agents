@@ -30,7 +30,7 @@ func TestCostGoesOnTheActiveLinks(t *testing.T) {
 	d.bankSessionCost(a.ID, wire.Cost{Amount: 1, Currency: "USD"})
 	d.bankTurnUsage(a.ID, wire.TurnUsage{TotalTokens: 1001, InputTokens: 1000, OutputTokens: 1})
 
-	issue, pr := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#12"}, wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#40"}
+	issue, pr := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#12"}, wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#40"}
 	i, p := d.lineageCost(issue), d.lineageCost(pr)
 	if usd(i.Own) != 0.5 || usd(p.Own) != 0.5 || i.Own.InputTokens+p.Own.InputTokens != 1000 ||
 		i.Own.OutputTokens+p.Own.OutputTokens != 1 || i.Own.Turns != 0.5 {
@@ -54,7 +54,7 @@ func TestCostGoesOnTheActiveLinks(t *testing.T) {
 	if got := d.lineageCost(sessionNode(b.ID)); usd(got.Own) != 0.25 {
 		t.Fatalf("session %+v", got.Own)
 	}
-	repo := d.lineageCost(wire.LineageNode{Kind: lineage.KindRepo, Ref: "github:alexec/agents"})
+	repo := d.lineageCost(wire.LineageNode{Kind: lineage.KindRepo, Ref: "github:repo:#alexec/agents"})
 	if usd(repo.Total) != 3.25 || usd(repo.Unlinked) != 0.25 {
 		t.Fatalf("repo %+v", repo)
 	}
@@ -80,10 +80,10 @@ func TestAHelpersCostGoesToItsParentsWork(t *testing.T) {
 	d.noteLineage(nil, lane)
 	d.bankSessionCost(helper.ID, wire.Cost{Amount: 2, Currency: "USD"})
 	d.bankSessionCost(lane.ID, wire.Cost{Amount: 5, Currency: "USD"})
-	if got := d.lineageCost(wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#7"}); usd(got.Own) != 2 {
+	if got := d.lineageCost(wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#7"}); usd(got.Own) != 2 {
 		t.Fatalf("#7 %+v", got.Own)
 	}
-	if got := d.lineageCost(wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#8"}); usd(got.Own) != 5 {
+	if got := d.lineageCost(wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#8"}); usd(got.Own) != 5 {
 		t.Fatalf("#8 %+v", got.Own)
 	}
 }
@@ -120,10 +120,10 @@ func TestAnIssueAddsUpItsPRsAndTheirWaste(t *testing.T) {
 	// The merge's multiplierChanged runs away from the caller and reports when it finds a
 	// control plane: wait for it before one is set, so it does not report alongside (#4624).
 	c.until(t, "the merge told", func(m string, p json.RawMessage) bool {
-		return m == "multiplier/changed" && strings.Contains(string(p), `"github:alexec/agents#10"`)
+		return m == "multiplier/changed" && strings.Contains(string(p), `"github:pr:alexec/agents#10"`)
 	})
 
-	issue := d.lineageCost(wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#7"})
+	issue := d.lineageCost(wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#7"})
 	if usd(issue.Own) != 1+1+2 || usd(issue.Total) != 7 || usd(issue.Waste) != 1 ||
 		issue.PrsClosed != 1 || issue.PrsMerged != 1 || issue.FailedChecks != 2 || len(issue.Parts) != 3 {
 		t.Fatalf("%+v", issue)
@@ -141,14 +141,14 @@ func TestAnIssueAddsUpItsPRsAndTheirWaste(t *testing.T) {
 			work[n.Node.Ref] = n
 		}
 	}
-	closed := work["github:alexec/agents#9"]
+	closed := work["github:pr:alexec/agents#9"]
 	if len(work) != 3 || closed.Outcome == nil || *closed.Outcome != "closed" || len(closed.Fixes) != 1 ||
-		len(work["github:alexec/agents#7"].PartOf) != 0 {
+		len(work["github:issue:alexec/agents#7"].PartOf) != 0 {
 		t.Fatalf("%+v", work)
 	}
 	// Reports ▸ Value's lead time (#2351): when the work started, and when a PR ended.
 	if closed.EndedAt == nil || closed.FirstAt == nil || *closed.FirstAt > *closed.EndedAt ||
-		work["github:alexec/agents#7"].FirstAt == nil || work["github:alexec/agents#7"].EndedAt != nil {
+		work["github:issue:alexec/agents#7"].FirstAt == nil || work["github:issue:alexec/agents#7"].EndedAt != nil {
 		t.Fatalf("%+v", work)
 	}
 	sent = nil
@@ -164,7 +164,7 @@ func TestAnIssueAddsUpItsPRsAndTheirWaste(t *testing.T) {
 	d.workMu.Lock()
 	d.workLedger = nil
 	d.workMu.Unlock()
-	if got := d.lineageCost(wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#7"}); usd(got.Total) != 7 {
+	if got := d.lineageCost(wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#7"}); usd(got.Total) != 7 {
 		t.Fatalf("read again: %+v", got)
 	}
 }
@@ -174,20 +174,20 @@ func TestPruneCost(t *testing.T) {
 	now := time.Now()
 	f := &costLedgerFile{Nodes: map[string]wire.LineageCostNode{}, Unsent: map[string]int64{}}
 	for i := range costNodesKept + 2 {
-		n := wire.LineageNode{Kind: "issue", Ref: "github:o/r#" + strconv.Itoa(i+1)}
+		n := wire.LineageNode{Kind: "issue", Ref: "github:issue:o/r#" + strconv.Itoa(i+1)}
 		f.Nodes[costKey(n)] = wire.LineageCostNode{Node: n, LastAt: wire.DateOf(now.Add(-time.Duration(i) * time.Minute))}
 		f.Unsent[costKey(n)] = 1
 	}
-	old := wire.LineageNode{Kind: "pr", Ref: "github:o/r#0"}
+	old := wire.LineageNode{Kind: "pr", Ref: "github:pr:o/r#0"}
 	f.Nodes[costKey(old)] = wire.LineageCostNode{Node: old, LastAt: wire.DateOf(now.Add(-91 * 24 * time.Hour))}
 	pruneCost(f, now)
 	if len(f.Nodes) != costNodesKept || len(f.Unsent) != costNodesKept {
 		t.Fatalf("%d %d", len(f.Nodes), len(f.Unsent))
 	}
-	if _, ok := f.Nodes["issue\tgithub:o/r#1"]; !ok {
+	if _, ok := f.Nodes["issue\tgithub:issue:o/r#1"]; !ok {
 		t.Fatal("the newest went")
 	}
-	if _, ok := f.Nodes["issue\tgithub:o/r#"+strconv.Itoa(costNodesKept+2)]; ok {
+	if _, ok := f.Nodes["issue\tgithub:issue:o/r#"+strconv.Itoa(costNodesKept+2)]; ok {
 		t.Fatal("the oldest stayed")
 	}
 }
@@ -210,7 +210,7 @@ func TestSentCostSaysSessionsAndResolved(t *testing.T) {
 	d.bankSessionCost(a.ID, wire.Cost{Amount: 1, Currency: "USD"})
 	d.lineageSettle(2 * time.Second)
 
-	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#12"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#12"}
 	sentNode := func() (wire.LineageCostNode, bool) {
 		t.Helper()
 		work, sent := d.unsentCost()
@@ -252,15 +252,15 @@ func TestCostNodeKeepsStartAndLevel(t *testing.T) {
 	defer d.Shutdown()
 	folder := t.TempDir()
 	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
-	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#12"}
-	epic := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#10"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#12"}
+	epic := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#10"}
 	seeded(t, d, folder, nil)
 	asked := make(chan int, 4)
 	d.resolveLookup = func(_ context.Context, _ string, _ forgeRepo, _ string, n int) (wire.LineageResolved, error) {
 		asked <- n
 		return wire.LineageResolved{Title: "Fix it", Labels: []string{"Story", "feature:estimates"}}, nil
 	}
-	s := wire.LineageNode{Kind: "session", Ref: "session:a"}
+	s := wire.LineageNode{Kind: "session", Ref: "agents:session:#a"}
 	began := time.Now().Add(-3 * time.Hour)
 	d.linkAt(s, issue, lineage.RelWorksOn, lineage.SourceStart, began)
 	d.linkAt(s, issue, lineage.RelOpens, lineage.SourceStart, began.Add(time.Hour))
@@ -325,7 +325,7 @@ func TestLineageEstimateOfAnEpic(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	issue := func(n int) wire.LineageNode {
-		return wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#" + strconv.Itoa(n)}
+		return wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#" + strconv.Itoa(n)}
 	}
 	state, merged, level, ended := "closed", lineage.OutcomeMerged, "task", wire.DateOf(time.Now())
 	var prs []wire.LineageCostNode
@@ -335,7 +335,7 @@ func TestLineageEstimateOfAnEpic(t *testing.T) {
 		c := wire.LineageCostNode{Node: issue(n), Banked: wire.LineageCost{Cost: map[string]float64{"USD": float64(n)}}, Level: &level,
 			Resolved: &wire.LineageResolved{Title: "Done", State: &state, Labels: []string{"enhancement", "task"}}}
 		f.Nodes[costKey(c.Node)] = c
-		pr := wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#" + strconv.Itoa(100+n)},
+		pr := wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#" + strconv.Itoa(100+n)},
 			Banked: wire.LineageCost{Cost: map[string]float64{}}, Fixes: []string{c.Node.Ref}, Outcome: &merged, EndedAt: &ended}
 		f.Nodes[costKey(pr.Node)] = pr
 		prs = append(prs, pr)
@@ -368,7 +368,7 @@ func TestLineageEstimateKeepsTheStartAndSaysTheActual(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	issue := func(n int) wire.LineageNode {
-		return wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#" + strconv.Itoa(n)}
+		return wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#" + strconv.Itoa(n)}
 	}
 	now := time.Now()
 	began := wire.DateOf(now.Add(-5 * time.Hour))
@@ -379,7 +379,7 @@ func TestLineageEstimateKeepsTheStartAndSaysTheActual(t *testing.T) {
 		c := wire.LineageCostNode{Node: issue(n), Banked: wire.LineageCost{Cost: map[string]float64{"USD": usd}}, Level: &level,
 			StartedAt: startedAt, Resolved: &wire.LineageResolved{Title: "Done", State: &state, Labels: labels}}
 		ended := wire.DateOf(mergedAt)
-		pr := wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#" + strconv.Itoa(100+n)},
+		pr := wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#" + strconv.Itoa(100+n)},
 			Banked: wire.LineageCost{Cost: map[string]float64{"USD": 1}}, Fixes: []string{c.Node.Ref}, Outcome: &merged, EndedAt: &ended}
 		d.workMu.Lock()
 		f := d.costLedgerLocked()
@@ -425,7 +425,7 @@ func TestKeepEstimatesBackfillsCycleTimeAndLandsAt(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	issue := func(n int) wire.LineageNode {
-		return wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#" + strconv.Itoa(n)}
+		return wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#" + strconv.Itoa(n)}
 	}
 	str := func(s string) *string { return &s }
 	now := time.Now()
@@ -437,7 +437,7 @@ func TestKeepEstimatesBackfillsCycleTimeAndLandsAt(t *testing.T) {
 		started, ended := wire.DateOf(now.Add(-10*time.Hour)), wire.DateOf(now.Add(-9*time.Hour))
 		c := wire.LineageCostNode{Node: issue(n), Banked: wire.LineageCost{Cost: map[string]float64{"USD": float64(n)}}, Level: &level,
 			StartedAt: &started, Resolved: &wire.LineageResolved{Title: "Done", State: &state, Labels: labels}}
-		pr := wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#" + strconv.Itoa(100+n)},
+		pr := wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#" + strconv.Itoa(100+n)},
 			Banked: wire.LineageCost{Cost: map[string]float64{}}, Fixes: []string{c.Node.Ref}, Outcome: &merged, EndedAt: &ended}
 		f.Nodes[costKey(c.Node)], f.Nodes[costKey(pr.Node)] = c, pr
 	}
@@ -475,7 +475,7 @@ func TestATurnThatStartsALaneGoesOnItsWork(t *testing.T) {
 	})
 	d.noteLineage(nil, lane)
 	d.bankSessionCost(sm.ID, wire.Cost{Amount: 1, Currency: "USD"})
-	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#8"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#8"}
 	if got := d.lineageCost(issue); usd(got.Own) != 1 {
 		t.Fatalf("#8 %+v", got.Own)
 	}
@@ -534,7 +534,7 @@ func TestARunStartedByChecksFailedWorksOnItsPR(t *testing.T) {
 	d.lineagePRStarted(event("pr.merged"), ship.ID)
 	d.bankSessionCost(fix.ID, wire.Cost{Amount: 2, Currency: "USD"})
 	d.bankSessionCost(ship.ID, wire.Cost{Amount: 5, Currency: "USD"})
-	pr := wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#9"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#9"}
 	if got := d.lineageCost(pr); usd(got.Own) != 2 {
 		t.Fatalf("pr %+v", got.Own)
 	}
@@ -555,11 +555,11 @@ func TestAReleaseSessionsCostGoesOnItsRelease(t *testing.T) {
 	})
 	d.noteLineage(nil, a)
 	d.bankSessionCost(a.ID, wire.Cost{Amount: 4, Currency: "USD"})
-	release := wire.LineageNode{Kind: lineage.KindRelease, Ref: "github:alexec/agents/release/v1.2.0"}
+	release := wire.LineageNode{Kind: lineage.KindRelease, Ref: "github:release:alexec/agents#v1.2.0"}
 	if got := d.lineageCost(release); usd(got.Own) != 4 || usd(got.Total) != 4 {
 		t.Fatalf("release %+v", got)
 	}
-	repo := d.lineageCost(wire.LineageNode{Kind: lineage.KindRepo, Ref: "github:alexec/agents"})
+	repo := d.lineageCost(wire.LineageNode{Kind: lineage.KindRepo, Ref: "github:repo:#alexec/agents"})
 	if usd(repo.Total) != 4 || usd(repo.Unlinked) != 0 {
 		t.Fatalf("repo %+v", repo)
 	}

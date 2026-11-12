@@ -23,7 +23,7 @@ func TestMultiplierCountsThePersonsMachines(t *testing.T) {
 
 	ended := wire.DateOf(time.Now().Add(-time.Hour))
 	pr := func(n int, outcome string) wire.LineageCostNode {
-		return wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: fmt.Sprintf("github:o/r#%d", n)},
+		return wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: fmt.Sprintf("github:pr:o/r#%d", n)},
 			Banked: wire.LineageCost{Cost: map[string]float64{}}, LastAt: ended, Outcome: &outcome, EndedAt: &ended,
 			Sessions: []string{"s"}}
 	}

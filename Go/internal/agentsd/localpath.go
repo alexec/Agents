@@ -180,6 +180,10 @@ func (d *Daemon) Told(method string, params json.RawMessage) {
 		d.toldLockJoin(params)
 		return
 	}
+	if method == wire.NotifyBusDeliver.Name {
+		d.toldBusDelivery(params)
+		return
+	}
 	if method == wire.NotifyMachineUser.Name {
 		d.toldHostUser(params)
 		return

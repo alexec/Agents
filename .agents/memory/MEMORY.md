@@ -58,7 +58,7 @@ What agents learnt about this repo: its code, tools, process and decisions. One 
 - [Type into a scratch window by pid](type-into-a-scratch-window-by-pid.md) — AX set never moves a SwiftUI search binding; AX…
 - [Browser tool, not Chrome](use-browser-tool-not-chrome.md) — Alex 2026-11-06: web work via browser_* tools, not the cdp.mjs private Chrome
 - [Vendor scripts touch the real home](vendor-scripts-touch-the-real-home.md) — 048 walks need AGENTS_TEST_INSTALL_SCRIPT; ui.s…
-- [Voice mode not in the scratch app](voice-mode-not-in-scratch-app.md) — real mic/speech works only in the installed Mac app; walk it with the voice walk command
+- [Voice mode not in the scratch app](voice-mode-not-in-scratch-app.md) — real mic/speech works only in the installed Mac app; walk with the voice command; a spoken walked reply crashes (#4853); sound in videos via the tape (#4854)
 - [Walk socket traps (#1172)](walk-socket-in-process-walks.md) — AXEnhancedUserInterface, legacy children, List user-select paths, GPU laye…
 - [walk-what-you-ship](walk-what-you-ship.md) — Never ship a build whose final code was not run on a scratch Mac app; a walk of an earlier commit does not cov
 - [Where each agent reads plugins](where-each-agent-reads-plugins.md) — project folders, manifests, index files per age…
@@ -71,3 +71,4 @@ What agents learnt about this repo: its code, tools, process and decisions. One 
 - [Developer ID has no Apple sign-in](developer-id-has-no-apple-sign-in.md) — Apple leaves applesignin out of Developer ID profiles; only the Live build has it (#4283); no release secret
 - [Shell is a stranger to the live socket](shell-is-a-stranger-to-the-live-socket.md) — control-role methods refused from a script; pair_web_page missing 2026-11-10; set connectors up by PR + Alex Approve
 - [Claude works after its prompt ends](claude-works-after-its-prompt-ends.md) — background command's end starts a cycle with no prompt; agentsd's unprompted turn (#4323)
+- [Lineage tests fail on Mac main](lineage-tests-fail-on-mac-main.md) — health/sessions/signin agentsd tests fail on main on the Mac; check on a main copy, let Linux CI prove them

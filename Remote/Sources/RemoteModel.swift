@@ -20,6 +20,9 @@ import Observation
 @Observable
 final class RemoteModel {
     let work = AgentsModel()
+    /// This device's local copy (#4791): sessions and chat ends kept in the app's Caches,
+    /// drawn at launch before the Mac answers. The Mac always wins.
+    @ObservationIgnored private(set) var localCopy: LocalCopyKeeper?
     private var labelVocabularies: [URL: [String]] = [:]
     @ObservationIgnored private var attentionRefreshTask: Task<Void, Never>?
 
@@ -351,6 +354,11 @@ final class RemoteModel {
         userScope.lock = lock
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
+        // At once, so the list and a chat restored at launch draw before the Mac answers.
+        // An unpaired device has none: a forget deletes it.
+        let localCopy = LocalCopyKeeper(copy: .remote(), work: work)
+        self.localCopy = localCopy
+        Task { await localCopy.drawMachines() }
         #if DEBUG
         WalkNotify.model = work
         WalkNotify.also = { [weak self] method, params in
@@ -465,6 +473,8 @@ final class RemoteModel {
     /// every banner delivered from it.
     private func forgetKept() {
         StartDraftKeeper.shared.forgetAll()
+        // The copy of its sessions and chats goes with the pairing (#4791).
+        Task { [localCopy] in await localCopy?.forget() }
         liveActivities.endAll()
         notifier.forgetAll()
         AttentionSnapshotStore.clear()
@@ -4827,6 +4837,11 @@ final class RemoteModel {
         // Only the latest load puts its answer on screen: opening the chat and a
         // catch-up both load it, and the older answer could land last (#400).
         let load = work.beginTranscriptLoad()
+        // What was fetched for it under the pointer or beside the last one opened, at once
+        // (#4795); else this device's copy of its end, while the Mac's page is on its way (#4791).
+        if localCopy?.drawPrefetched(of: selection, load: load) != true {
+            Task { [localCopy] in await localCopy?.drawOpening(of: selection, load: load) }
+        }
         let turnsRequest = DaemonAPI.TurnsRequest.opening(selection)
         let pageSize = firstPageSize
         // Whether its host answered: with the history, or that it has no such session.
@@ -4852,7 +4867,11 @@ final class RemoteModel {
             // A chat left before its page arrived does not get that page shown under the
             // next one's name.
             guard self.selection == selection else { return }
-            work.takeOpening(opening, load: load)
+            if work.takeOpening(opening, load: load) {
+                localCopy?.opened(selection, opening)
+                // The rows either side, which are opened next (#4795).
+                prefetchNeighbours(of: selection)
+            }
             if let why = opening.turnsFailure { note("chat: turns of \(selection) did not load: \(why)") }
         } catch {
             // Said in the chat, with Try Again, where it used to stay blank without a
@@ -4867,6 +4886,47 @@ final class RemoteModel {
         // Again rather than calling the session deleted (#2743).
         guard await whole.value, answered, self.selection == selection else { return }
         lookedForSelection = selection
+    }
+
+    /// A chat's opening page from its host, as `loadTranscript` reads it, for a prefetch.
+    private func fetchOpening(_ id: UUID) async throws -> ChatOpening.Loaded {
+        let turnsRequest = DaemonAPI.TurnsRequest.opening(id)
+        return try await ChatOpening.load(
+            limit: firstPageSize,
+            turns: {
+                try await self.client(for: turnsRequest).call(DaemonAPI.Method.agentsTurns, turnsRequest,
+                                                              returning: TurnsPage.self)
+            },
+            transcript: { from, limit in
+                let request = DaemonAPI.TranscriptRequest(agentID: id, limit: limit, from: from)
+                return try await self.client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                                returning: TranscriptPage.self)
+            },
+            entry: { index in
+                let request = DaemonAPI.TranscriptRequest.entry(index, of: id)
+                return try await self.client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                                returning: TranscriptPage.self)
+            },
+            describe: Self.describeLoadFailure)
+    }
+
+    /// Fetches a chat before it is opened (#4795): the row under an iPad's pointer, and the
+    /// rows beside the open one. Not the open one, and not one whose host is not answering.
+    func prefetch(_ id: UUID) {
+        guard id != selection, let agent = work.agent(id), !isStale(agent) else { return }
+        localCopy?.prefetched.prefetch(id) { [weak self] in
+            guard let self else { throw CancellationError() }
+            return try await self.fetchOpening(id)
+        }
+    }
+
+    /// The live sessions of the open one's folder, in the order its list draws them, either
+    /// side of it.
+    private func prefetchNeighbours(of id: UUID) {
+        guard let agent = work.agent(id) else { return }
+        let key = FolderKey(host: agent.host, folder: agent.folderPath)
+        let list = AgentGroup.live.flatMap { work.agents(in: key, group: $0) }.map(\.id)
+        for neighbour in OpeningPrefetch.neighbours(of: id, in: list) { prefetch(neighbour) }
     }
 
     /// A chat's history that did not come, in words (#400).

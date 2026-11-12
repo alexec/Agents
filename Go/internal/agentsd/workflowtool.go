@@ -226,6 +226,9 @@ func workflowSummaryWords(w wire.Workflow) string {
 	if w.Cooldown != nil {
 		base += ", at most once every " + cooldownWords(*w.Cooldown)
 	}
+	if h := hoursWords(w.Hours); h != "" {
+		base += ", " + h
+	}
 	if s := settingsSummary(w.Settings); w.Mode != wire.WorkflowModeTriggering && s != "" {
 		base += ", " + s
 	}
@@ -240,9 +243,9 @@ func outcomeWords(o wire.WorkflowOutcome) string {
 	r, n := o.Refused.Value, o.Refused.Repeats
 	m := refusalWords(r)
 	switch {
-	case r.CoolingDown != nil && n > 1:
+	case (r.CoolingDown != nil || r.OutsideHours != nil) && n > 1:
 		return fmt.Sprintf("Waiting — %d triggers held into one run, as %s", n, m)
-	case r.CoolingDown != nil:
+	case r.CoolingDown != nil || r.OutsideHours != nil:
 		return "Waiting — " + m
 	case r.Queued != nil && n > 1:
 		return fmt.Sprintf("Queued — %d triggers, each to run in turn, as %s", n, m)

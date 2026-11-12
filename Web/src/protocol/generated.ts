@@ -1538,6 +1538,131 @@ export interface BuildOutputRemoved {
   freed: WorktreeSize;
 }
 
+/**
+ * bus/deliver (#4729): one event on the bus that matched subscriptions of this machine, and which
+ * ones. Best effort: usually once, sometimes never, rarely twice.
+ */
+export interface BusDelivery {
+  event: BusEvent;
+  subscriptions: string[];
+}
+
+/**
+ * An event on the bus (#4729, spec 4724-event-bus, "The bus"): its envelope, and its data sealed to
+ * the person's machines (#4825). The control plane reads only refs, names and times (principle 7,
+ * #4726) and opens no sealed copy; a machine with no copy of its own reads the subject's state now,
+ * by its ref.
+ */
+export interface BusEvent {
+  /**
+   * The CloudEvents version of the envelope (#4728, spec 4724-event-bus, "An event"): always "1.0".
+   */
+  specversion: string;
+  /**
+   * The event's ref (#4728): the subject's ref, "@", the type, and, when the same type can happen
+   * again to that thing, "/" and the provider's key for this one, such as
+   * github:pr:alexec/agents#4702@pr.commented/2457. It comes from the provider's data only, never
+   * from the machine or the clock, so two machines make the same id for the same happening.
+   */
+  id: string;
+  /** The event's type, noun.verbed (#4728): the same as name, which stays for one release. */
+  type: string;
+  /**
+   * Who the event is about (#4728): github, jira, slack and so on; agents for the app's own events;
+   * server:<name> for an MCP server's event that says no subject.
+   */
+  provider: string;
+  /**
+   * The provider's space (#4728, spec 4724-event-bus, "Topics"): a repo's full name, a Jira
+   * project, a Slack channel; the project or the machine for the app's own events. Lower case; can
+   * be empty.
+   */
+  topic: string;
+  /**
+   * The ref of the thing the event happened to (#4728). None for an MCP server's event that says no
+   * subject.
+   */
+  subject?: Ref;
+  /** provider:topic, as CloudEvents asks for one (#4728). */
+  source: string;
+  /** When it happened, in RFC 3339 (#4728): the provider's own time when it says one. */
+  time: string;
+  /**
+   * The machine that raised it (#4728), as agents:machine:#<machine>. Not part of the event's
+   * identity.
+   */
+  producer: string;
+  /**
+   * The event's data (at most 256 KB), sealed by the machine that raised it to each machine of its
+   * person's lock (#4825). In bus/deliver, only the copy for the machine it goes to. None when the
+   * data is larger, or the machine has no lock.
+   */
+  sealed?: BusSealedData[];
+}
+
+/**
+ * bus/publish (#4729): events a machine recorded, at most 100 at a time, oldest first. Best effort:
+ * one not sent when it happened is never sent later.
+ */
+export interface BusPublish {
+  events: BusEvent[];
+}
+
+/**
+ * bus/publish's answer (#4729): how many events were new on the bus, and how many were dropped as
+ * copies of one already on it (the same id).
+ */
+export interface BusPublished {
+  kept: number;
+  dropped: number;
+}
+
+/**
+ * An event's data sealed to one machine (#4825): HPKE to the sealing key the lock's addMachine
+ * names, with the associated data busdata.v1|<person>|m:<machine>|<event id>. Inside is the data
+ * and the raising machine's signature of it, so a control plane can neither read it nor make one
+ * up.
+ */
+export interface BusSealedData {
+  /** The machine it is sealed to, by its id. */
+  machine: string;
+  sealed: SealedEnvelope;
+}
+
+/**
+ * bus/subscribe (#4729): every subscription of a machine, at most 1,000. It replaces the ones the
+ * machine sent before; an empty list ends them all. A machine sends it again after each connect, as
+ * the control plane keeps none across a restart.
+ */
+export interface BusSubscribe {
+  subscriptions: BusSubscription[];
+}
+
+/**
+ * bus/subscribe's answer (#4729): how many subscriptions the control plane holds for the machine
+ * now.
+ */
+export interface BusSubscribed {
+  count: number;
+}
+
+/**
+ * One subscription on the bus (#4729): a wait or a workflow trigger of a machine. Each field that
+ * is there must match the event's envelope; one that is not there matches every event.
+ */
+export interface BusSubscription {
+  /** The machine's own name for it, sent back with each event it matches. */
+  id: string;
+  /** The event's provider: github, jira, agents and so on. */
+  provider?: string;
+  /** The event's type, noun.verbed, or noun.* for every type of that noun. */
+  type?: string;
+  /** The topics it is about; none for every topic. Lower case. */
+  topics?: string[];
+  /** The one thing it is about. */
+  subject?: Ref;
+}
+
 export interface CancelWaitRequest {
   agentID: UUID;
 }
@@ -4481,7 +4606,7 @@ export interface ForgeImageRequest {
 /**
  * An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for
  * GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind
- * issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the
+ * issue or pr, ref github:issue:alexec/agents#12). state is open, closed or merged; status is the
  * tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one
  * in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from.
  * labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own
@@ -5340,8 +5465,9 @@ export interface LineageCost {
 export interface LineageCostNode {
   node: LineageNode;
   /**
-   * The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's
-   * repo (folder:<name> without one). Not a project (#3275).
+   * The repo or tracker the node is in, as a ref (#4800): github:repo:#alexec/agents,
+   * linear:repo:#eng, or for a session its folder's repo (folder:repo:#<name> without one). Not a
+   * project (#3275).
    */
   repo?: string;
   banked: LineageCost;
@@ -5402,14 +5528,24 @@ export interface LineageCostNode {
    * lands.
    */
   forecast?: LineageForecastKept;
+  /**
+   * A merged PR's files, by path, at most 100, as the forge said them when it merged (#4552), for
+   * the rework rate. Dropped 60 days after its merge.
+   */
+  files?: string[];
+  /**
+   * The PR a merged revert reverts, by ref, from its body's "Reverts owner/repo#n" (#4552), for the
+   * recovery time.
+   */
+  reverts?: string;
 }
 
 /**
  * lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total
  * adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a
- * repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a
- * merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes
- * added up, newest first, at most 500; limited says there are more.
+ * repo's every node (kind repo, ref github:repo:#alexec/agents). waste is the parts' PRs closed
+ * without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is
+ * the nodes added up, newest first, at most 500; limited says there are more.
  */
 export interface LineageCostRollup {
   node: LineageNode;
@@ -5423,6 +5559,72 @@ export interface LineageCostRollup {
   failedChecks: number;
   parts: LineageCostNode[];
   limited?: boolean;
+}
+
+/**
+ * A repo's delivery figures (#4552, epic #4551), from this machine's totals: the four DORA keys,
+ * DORA 2025's rework rate and flow efficiency, over the windowDays (28) before at, each with a
+ * weekly series. A week is 7 days back from at, not a calendar week. A figure says how many it is
+ * made from; one made from none has no value. band is where a value falls among DORA 2024's
+ * clusters, a reference from teams of people, not a grade; rework rate and flow efficiency have
+ * none.
+ */
+export interface LineageDelivery {
+  since: WireDate;
+  at: WireDate;
+  windowDays: number;
+  /**
+   * Lead time for changes, in seconds: from the first work on an issue to the first release tag
+   * that carries a merged PR that fixes it; the median, and p90. Counted by the tag's time.
+   */
+  leadTime: LineageDeliveryFigure;
+  /** Release tags a week (#3023), 0 for none, as is each week's; count is the tags. */
+  deploymentFrequency: LineageDeliveryFigure;
+  /**
+   * Failures over merged PRs, 0 to 1, by merge time. A failure is a merged revert (a PR whose title
+   * starts with Revert), or a merged PR that fixes, by any lineage link, a priority:high bug filed
+   * within 7 days after a release tag in its repo. count is the merged PRs.
+   */
+  changeFailureRate: LineageDeliveryFigure;
+  /**
+   * Failed deployment recovery time, in seconds, the median: a revert's merge less the merge of the
+   * PR it reverts, or a fix's merge less its bug's filing. Counted by the recovery's merge.
+   */
+  recoveryTime: LineageDeliveryFigure;
+  /**
+   * DORA 2025's rework rate, 0 to 1: the share of merged PRs, of those with their files known, that
+   * change a file another PR merged in the 21 days before changed. count is the PRs with their
+   * files known.
+   */
+  reworkRate: LineageDeliveryFigure;
+  /**
+   * The agents' working time on a closed issue and its PRs over its cycle time, at most 1, the
+   * median. Counted by its last merge.
+   */
+  flowEfficiency: LineageDeliveryFigure;
+}
+
+/**
+ * One delivery figure (#4552): value over the window, absent when made from none; p90 for lead
+ * time; count is what it is made from; weeks is the 4 weeks, oldest first; band is DORA 2024's.
+ */
+export interface LineageDeliveryFigure {
+  value?: number;
+  p90?: number;
+  count: number;
+  weeks: LineageDeliveryWeek[];
+  /** elite, high, medium or low. The list is open. */
+  band?: string;
+}
+
+/**
+ * A week of a delivery figure (#4552): the 7 days from since; value as the figure's, absent when
+ * made from none.
+ */
+export interface LineageDeliveryWeek {
+  since: WireDate;
+  value?: number;
+  count: number;
 }
 
 /**
@@ -5573,12 +5775,14 @@ export interface LineageEstimateRequest {
 }
 
 /**
- * lineage/figures (#4427): a release's Lineage panel on its Work page, from this machine's totals.
- * cost is its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its
- * parts, each once; running is how many of them run now (starting, running or waiting on the
- * person). runtimes is the runtimes of the sessions this machine has, the most sessions first.
+ * lineage/figures (#4427): a release's Lineage panel on its Work page, from this machine's totals;
+ * or (#4552) a repo's (kind repo, ref as LineageCostNode.repo), with its delivery figures. cost is
+ * its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its parts,
+ * each once; running is how many of them run now (starting, running or waiting on the person).
+ * runtimes is the runtimes of the sessions this machine has, the most sessions first.
  * leadTimeSeconds is from the first work on its parts to its tag (#3878 removed the milestone
- * figures). limited says the rollup had more parts than it counts. Another kind of node is refused.
+ * figures). limited says the rollup had more parts than it counts. delivery is a repo's only.
+ * Another kind of node is refused.
  */
 export interface LineageFigures {
   node: LineageNode;
@@ -5588,6 +5792,7 @@ export interface LineageFigures {
   runtimes: LineageRuntimeCount[];
   leadTimeSeconds?: number;
   limited?: boolean;
+  delivery?: LineageDelivery;
 }
 
 /**
@@ -5845,9 +6050,11 @@ export interface LineageLinks {
 
 /**
  * A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run,
- * commit, file, branch or release, and the list is open. ref names it apart from any tracker, as
- * <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9,
- * session:<agent id>.
+ * commit, file, branch or release, and the list is open. ref names it apart from any tracker, in
+ * the full ref form provider:type:topic#id (#4800): github:issue:alexec/agents#123,
+ * gitlab:mr:group/repo#45, linear:issue:eng#ENG-4, jira:issue:abc#ABC-9,
+ * agents:session:alexec/agents#<agent id>. A reader takes the old form (<scheme>:<id>, as
+ * github:alexec/Agents#123 or session:<agent id>) for one release.
  */
 export interface LineageNode {
   kind: string;
@@ -5899,6 +6106,11 @@ export interface LineageResolved {
   title: string;
   state?: string;
   labels?: string[];
+  /**
+   * When the forge says the issue or PR was made (#4552): a bug's filing, for the change failure
+   * rate.
+   */
+  createdAt?: WireDate;
 }
 
 /** A runtime of lineage/figures' sessions, and how many of them it ran (#4427). */
@@ -10337,9 +10549,9 @@ export interface ReportNodes {
 /**
  * reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The
  * scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a
- * PR with none falls back to its outcome); releases have no state in v1. repo is a ref prefix
- * (github:alexec/Agents). since is on the node's last change. limit is 1 to 100, 50 when absent.
- * cursor is the last page's, opaque.
+ * PR with none falls back to its outcome); releases have no state in v1. repo is a repo's ref
+ * (github:repo:#alexec/agents; the old github:alexec/agents is read too). since is on the node's
+ * last change. limit is 1 to 100, 50 when absent. cursor is the last page's, opaque.
  */
 export interface ReportNodesQuery {
   /** issue, pr or release. */
@@ -13477,6 +13689,11 @@ export interface UserSettings {
    */
   accounts?: JSONValue;
   /**
+   * The person's time zone (#4818), as a UserTimeZone. Their Mac sets it from its own clock; a
+   * workflow's hours: with no time-zone: go by it.
+   */
+  timeZone?: JSONValue;
+  /**
    * #2957, research R11: your layer, as a SignedYourPolicy. Only the keeper sets it
    * (user/setPolicy); a client cannot (user/setSettings refuses this part).
    */
@@ -13504,9 +13721,9 @@ export interface UserSettingsPart {
 
 /**
  * A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers,
- * agent configuration, runtimes, cost limits, notices (#2859) and outside accounts (#3967) follow
- * the person. Resources belong to each machine. policy (#2957) is set only by the keeper, through
- * user/setPolicy; user/setSettings refuses it.
+ * agent configuration, runtimes, cost limits, notices (#2859), outside accounts (#3967) and the
+ * time zone (#4818) follow the person. Resources belong to each machine. policy (#2957) is set only
+ * by the keeper, through user/setPolicy; user/setSettings refuses it.
  */
 export type UserSettingsPartName =
   | "mcpServers"
@@ -13515,6 +13732,7 @@ export type UserSettingsPartName =
   | "costLimits"
   | "notifications"
   | "accounts"
+  | "timeZone"
   | "policy";
 
 /**
@@ -13528,6 +13746,12 @@ export interface UserSuspended {
   at: WireDate;
 }
 
+/** The timeZone part of user settings (#4818). */
+export interface UserTimeZone {
+  /** An IANA name, as TimeZone.identifier says it: Europe/London. */
+  identifier: string;
+}
+
 /**
  * The PRs that landed in an hour or a day in one repository (#4596): merged is every PR the agents
  * worked on that merged, merged reverts included; reverted is the merged reverts among them.
@@ -13539,8 +13763,8 @@ export interface VelocityBucket {
 
 /**
  * velocity/history's answer (#4596): the PRs that landed, by the hour (168 hours) and by the day
- * (90 days), then by repository (github:alexec/agents), from this machine's lineage store. Shaped
- * as usage/history is.
+ * (90 days), then by repository (its ref, github:repo:#alexec/agents), from this machine's lineage
+ * store. Shaped as usage/history is.
  */
 export interface VelocityHistory {
   hours: Record<string, Record<string, VelocityBucket>>;
@@ -13947,6 +14171,7 @@ export interface Workflow {
   unknownFields: Record<string, JSONValue>;
   settings: WorkflowSettings;
   cooldown?: number;
+  hours?: WorkflowHours;
   enabled?: boolean;
   archived?: boolean;
   whenDone?: WorkflowWhenDone;
@@ -14010,6 +14235,22 @@ export interface WorkflowEnableRequest {
   enabled: boolean;
 }
 
+/**
+ * hours: (#4818): when a workflow may start, as the file says it. A fire outside it is held, and
+ * starts when it opens; Run now always runs.
+ */
+export interface WorkflowHours {
+  /**
+   * As the file says it, "09:00-18:00"; it can go past midnight, "18:00-09:00". Absent is the whole
+   * day.
+   */
+  between?: string;
+  /** The days its window starts on. Absent is every day. */
+  days?: Weekday[];
+  /** time-zone:, an IANA name. Absent is the person's timeZone setting, else the host's zone. */
+  timeZone?: string;
+}
+
 export type WorkflowLimit = "folder";
 
 /**
@@ -14071,7 +14312,8 @@ export type WorkflowRefusal =
   | { settingRefused: { setting: string; detail: string } }
   | { awaitingApproval: Record<string, never> }
   | { deniedHere: Record<string, never> }
-  | { coolingDown: { until?: WireDate } };
+  | { coolingDown: { until?: WireDate } }
+  | { outsideHours: { until?: WireDate } };
 
 export interface WorkflowRemovedNotification {
   folder: URLString;
@@ -14085,6 +14327,10 @@ export interface WorkflowRequest {
 
 export interface WorkflowSchedule {
   minutes: number[];
+  /**
+   * The first and the last hour of between:. The first is after the last when it goes past midnight
+   * (#4818): the hours after midnight belong to the day before.
+   */
   hours: [number, number];
   startMinute: number;
   endMinute: number;
@@ -14159,6 +14405,11 @@ export interface WorkflowSummary {
   lastFiredAt?: WireDate;
   lastFiredBy?: WorkflowCause;
   cooldownEndsAt?: WireDate;
+  /**
+   * When a fire held outside the workflow's hours: can start (#4818): the first time its hours: are
+   * open once its cooldown is over. Absent while its hours: are open by then.
+   */
+  hoursOpenAt?: WireDate;
   holdsAFire: boolean;
   queued: number;
   offReason?: WorkflowOffReason;
@@ -15363,6 +15614,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BudgetRequest: { required: ["id", "user", "userName", "day", "at", "state"], optional: ["why", "daily", "dailyTokens", "decidedBy", "decidedAt"] },
   BudgetRequestList: { required: ["requests"], optional: [] },
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
+  BusDelivery: { required: ["event", "subscriptions"], optional: [] },
+  BusEvent: { required: ["specversion", "id", "type", "provider", "topic", "source", "time", "producer"], optional: ["subject", "sealed"] },
+  BusPublish: { required: ["events"], optional: [] },
+  BusPublished: { required: ["kept", "dropped"], optional: [] },
+  BusSealedData: { required: ["machine", "sealed"], optional: [] },
+  BusSubscribe: { required: ["subscriptions"], optional: [] },
+  BusSubscribed: { required: ["count"], optional: [] },
+  BusSubscription: { required: ["id"], optional: ["provider", "type", "topics", "subject"] },
   CancelWaitRequest: { required: ["agentID"], optional: [] },
   CapReached: { required: ["user", "name", "spentUSD", "capUSD", "until"], optional: ["group"] },
   CapacityState: { required: ["level"], optional: ["words"] },
@@ -15677,15 +15936,18 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageChanged: { required: ["host", "states"], optional: ["links"] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "milestone", "endedAt", "resolved", "sessions", "estimate", "forecast"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "milestone", "endedAt", "resolved", "sessions", "estimate", "forecast", "files", "reverts"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
+  LineageDelivery: { required: ["since", "at", "windowDays", "leadTime", "deploymentFrequency", "changeFailureRate", "recoveryTime", "reworkRate", "flowEfficiency"], optional: [] },
+  LineageDeliveryFigure: { required: ["count", "weeks"], optional: ["value", "p90", "band"] },
+  LineageDeliveryWeek: { required: ["since", "count"], optional: ["value"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
   LineageEstimate: { required: ["node", "closedIssues", "matches"], optional: ["type", "level", "step", "matchedBy", "cost", "inputTokens", "outputTokens", "workingSeconds", "leadTimeSeconds", "cycleTimeSeconds", "landsAt", "openChildren", "closedChildren", "spent", "children", "kept", "actual", "loaded", "overhead"] },
   LineageEstimateDates: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateKept: { required: ["at", "matches"], optional: ["matchedBy", "cost", "costP10", "costP90", "outputTokens", "outputTokensP10", "outputTokensP90", "workingSeconds", "workingSecondsP10", "workingSecondsP90", "cycleTimeSeconds", "landsAt"] },
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
-  LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["leadTimeSeconds", "limited"] },
+  LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["leadTimeSeconds", "limited", "delivery"] },
   LineageForecast: { required: ["at", "windowDays", "landings", "burn", "serviceLevels"], optional: ["node", "milestone", "lands", "noForecast", "toComplete", "kept", "spend", "overhead", "assumes", "whatIf"] },
   LineageForecastAssumes: { required: ["lanes", "peakLanes", "runtimes"], optional: [] },
   LineageForecastBurn: { required: ["credentialKey", "window", "used", "at", "resetsAt", "lasts"], optional: ["runsOutAt"] },
@@ -15705,7 +15967,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
   LineageOverhead: { required: ["windowDays", "linked", "unlinked", "uncounted"], optional: ["currency", "unlinkedRatio", "epicRatio"] },
-  LineageResolved: { required: ["title"], optional: ["state", "labels"] },
+  LineageResolved: { required: ["title"], optional: ["state", "labels", "createdAt"] },
   LineageRuntimeCount: { required: ["runtimeID", "sessions"], optional: [] },
   LineageSessionIssue: { required: ["node"], optional: ["title"] },
   LineageSessionMatch: { required: ["agentID", "on"], optional: [] },
@@ -16352,10 +16614,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserSecretRequest: { required: ["name"], optional: [] },
   UserSecretRow: { required: ["name", "updated", "machines"], optional: ["kind", "created", "hint", "lastOp", "backedUp", "leftOn", "version", "waiting", "needsApproval", "description"] },
   UserSecretSet: { required: ["name", "version", "values"], optional: ["kind", "needsApproval", "description"] },
-  UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "notifications", "accounts", "policy", "updated"] },
+  UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "notifications", "accounts", "timeZone", "policy", "updated"] },
   UserSettingsChanged: { required: [], optional: ["parts", "agentConfigFiles", "secrets"] },
   UserSettingsPart: { required: ["part", "value"], optional: [] },
   UserSuspended: { required: ["user", "provider", "at"], optional: ["off"] },
+  UserTimeZone: { required: ["identifier"], optional: [] },
   VelocityBucket: { required: ["merged", "reverted"], optional: [] },
   VelocityHistory: { required: ["hours", "days", "now"], optional: ["timeZone"] },
   ViewAsk: { required: ["server", "uri", "hash", "isNew"], optional: [] },
@@ -16392,13 +16655,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkTimelineRelease: { required: ["tag", "at", "repo"], optional: ["url"] },
   WorkTimelineRequest: { required: ["project", "from", "to"], optional: [] },
   WorkTimelineSegment: { required: [], optional: ["startedAt", "closedAt"] },
-  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "whenDone", "continueWhenBack", "muted", "runsOn"] },
+  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "hours", "enabled", "archived", "whenDone", "continueWhenBack", "muted", "runsOn"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: ["note"] },
   WorkflowApproveRequest: { required: ["folder", "workflowID", "digest"], optional: [] },
   WorkflowArchiveRequest: { required: ["folder", "workflowID", "archived"], optional: [] },
   WorkflowClaim: { required: ["workflow", "trigger"], optional: [] },
   WorkflowClaimed: { required: ["won"], optional: [] },
   WorkflowEnableRequest: { required: ["folder", "workflowID", "enabled"], optional: [] },
+  WorkflowHours: { required: [], optional: ["between", "days", "timeZone"] },
   WorkflowLimitSettings: { required: [], optional: ["total"] },
   WorkflowMCPClearMissedRequest: { required: ["folder", "workflowID", "name"], optional: ["server"] },
   WorkflowMuteRequest: { required: ["folder", "workflowID", "muted"], optional: [] },
@@ -16407,7 +16671,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort", "permissionRequests", "sandbox"] },
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "whenDone", "continueWhenBack", "runsOn"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "readyMadeUpdatedAt", "newerReadyMade", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "readyMadeUpdatedAt", "newerReadyMade", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "hoursOpenAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowWriteRequest: { required: ["workflowID", "content"], optional: [] },
   WorkflowsListRequest: { required: [], optional: ["folder", "scope"] },
   WorktreeRemovalRequest: { required: ["root", "confirmed", "folder"], optional: [] },

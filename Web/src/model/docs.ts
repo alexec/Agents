@@ -4,6 +4,7 @@
 import type { Doc, DocsSearchResult, DocsSource } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { maximumLabelLength } from "./labels";
+import { legacyRef } from "../protocol/ref";
 
 export type DocsSort = "updated" | "title";
 export const docsSortTitle: Record<DocsSort, string> = { updated: "Last updated", title: "Title" };
@@ -274,7 +275,7 @@ export const relatedMost = 3;
 
 /** github:alexec/agents/doc/ for github:alexec/agents#12; undefined for an item of no repo. */
 export function repoPrefix(itemRef: string): string | undefined {
-  const m = /^([a-z]+:[^\s#!]+\/[^\s#!]+)[#!][0-9]+$/.exec(itemRef);
+  const m = /^([a-z]+:[^\s#!]+\/[^\s#!]+)[#!][0-9]+$/.exec(legacyRef(itemRef));
   return m ? `${m[1]!.toLowerCase()}/doc/` : undefined;
 }
 

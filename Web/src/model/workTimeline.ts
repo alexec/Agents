@@ -6,6 +6,7 @@
 import type { Agent, ForgeLabel, LineageNode, LineageSessionOn, WireDate, WorkTimeline, WorkTimelineBacktest, WorkTimelineRelease } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { shortAge, shortRef } from "./work";
+import { sessionIdOf } from "../protocol/ref";
 
 const ms = (d: number | undefined) => d === undefined ? undefined : fromWireDate(d as never).getTime();
 const day = 86_400_000;
@@ -507,8 +508,9 @@ export function startedBySessions(timeline: WorkTimeline, sessions: readonly Lin
  * the window's `WorkTimeline.workingNow`.
  */
 export function workingNow(timeline: WorkTimeline, sessions: readonly LineageSessionOn[], agents: readonly Agent[]): Set<string> {
-  const known = new Set(agents.map((a) => `session:${a.id}`.toUpperCase()));
-  const out = new Set(sessions.filter((s) => s.state?.state === "working" && !known.has(s.node.ref.toUpperCase()))
+  // By the session's id: its ref's topic is its project's, which the page does not know (#4800).
+  const known = new Set(agents.map((a) => a.id.toUpperCase()));
+  const out = new Set(sessions.filter((s) => s.state?.state === "working" && !known.has((sessionIdOf(s.node.ref) ?? s.node.ref).toUpperCase()))
     .flatMap((s) => s.on.map((n) => n.ref)));
   const labels = new Set(agents.filter((a) => a.state === "running" || a.state === "starting")
     .flatMap((a) => (a.labels ?? []).map((l) => l.value)));

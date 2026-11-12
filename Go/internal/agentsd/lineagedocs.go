@@ -61,13 +61,17 @@ func docsPage(raw string) (wire.LineageNode, bool) {
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || !isDocsPage(u) {
 		return wire.LineageNode{}, false
 	}
-	ref := "https://" + strings.ToLower(u.Host) + strings.TrimSuffix(u.EscapedPath(), "/")
-	return wire.LineageNode{Kind: lineage.KindDoc, Ref: ref}, len(ref) <= 512
+	path := strings.TrimSuffix(u.EscapedPath(), "/")
+	if path == "" {
+		path = "/"
+	}
+	n := lineage.NodeOf(lineage.KindDoc, wire.Ref{Provider: "web", Type: "doc", Topic: strings.ToLower(u.Host), ID: path})
+	return n, len(n.Ref) <= 512
 }
 
 // doc is a file of the repo, by its path in it.
 func (r forgeRepo) doc(rel string) wire.LineageNode {
-	return wire.LineageNode{Kind: lineage.KindDoc, Ref: r.forge + ":" + r.path + "/doc/" + rel}
+	return r.node(lineage.KindDoc, "doc", rel)
 }
 
 // sessionRoots is where a session's files are: its working folder (a worktree's own), and
@@ -123,7 +127,7 @@ func (d *Daemon) docOfFile(folder string, roots []string, rel string) (wire.Line
 		if repo := d.folderRepo(folder); repo.forge != "" {
 			n = repo.doc(rel)
 		} else {
-			n = wire.LineageNode{Kind: lineage.KindDoc, Ref: "file:" + filepath.ToSlash(filepath.Join(folder, rel))}
+			n = lineage.NodeOf(lineage.KindDoc, wire.Ref{Provider: "file", Type: "doc", ID: filepath.ToSlash(filepath.Join(folder, rel))})
 		}
 		return n, len(n.Ref) <= 512
 	}
@@ -200,8 +204,8 @@ func (d *Daemon) noteDocs(id wire.UUID, rel string, paths, rels []string, pages 
 		return
 	}
 	folder, roots := sessionRoots(a)
-	s := sessionNode(id)
 	d.lineageDo(func() {
+		s := d.sessionNode(id)
 		seen := map[wire.LineageNode]bool{}
 		link := func(n wire.LineageNode) {
 			if !seen[n] {
@@ -228,18 +232,24 @@ func (d *Daemon) noteDocs(id wire.UUID, rel string, paths, rels []string, pages 
 // docName is a doc as the Lineage section names it: its path in the repo, or the page's
 // host and path.
 func docName(ref string) string {
-	if _, rest, ok := strings.Cut(ref, "/doc/"); ok && !strings.HasPrefix(ref, "http") {
-		return rest
+	r, ok := lineage.RefOf(wire.LineageNode{Kind: lineage.KindDoc, Ref: ref})
+	if !ok {
+		return ref
 	}
-	if rest, ok := strings.CutPrefix(ref, "file:"); ok {
+	switch r.Provider {
+	case "web":
+		break
+	case "file":
 		for _, top := range []string{"/specs/", "/docs/"} {
-			if i := strings.LastIndex(rest, top); i >= 0 {
-				return rest[i+1:]
+			if i := strings.LastIndex(r.ID, top); i >= 0 {
+				return r.ID[i+1:]
 			}
 		}
-		return rest
+		return r.ID
+	default:
+		return r.ID
 	}
-	name := strings.TrimPrefix(strings.TrimPrefix(ref, "https://"), "http://")
+	name := r.Topic + strings.TrimSuffix(r.ID, "/")
 	if r := []rune(name); len(r) > 80 {
 		name = string(r[:80]) + "…"
 	}
@@ -250,15 +260,14 @@ func docName(ref string) string {
 // the GitLab, Forgejo or Azure DevOps (dev.azure.com without one) of the page, on its default
 // branch.
 func docURL(ref, base string) string {
-	if strings.HasPrefix(ref, "https://") || strings.HasPrefix(ref, "http://") {
-		return ref
-	}
-	scheme, id, _ := strings.Cut(ref, ":")
-	repo, rel, ok := strings.Cut(id, "/doc/")
-	if !ok {
+	r, ok := lineage.RefOf(wire.LineageNode{Kind: lineage.KindDoc, Ref: ref})
+	if !ok || r.Type != "doc" {
 		return ""
 	}
+	scheme, repo, rel := r.Provider, r.Topic, r.ID
 	switch scheme {
+	case "web":
+		return "https://" + repo + strings.TrimSuffix(rel, "/")
 	case "github":
 		return "https://github.com/" + repo + "/blob/HEAD/" + rel
 	case "gitlab":

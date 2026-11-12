@@ -59,9 +59,9 @@ func (jiraForge) Caps() forgeCaps {
 	}
 }
 
-// Owns is jira:PROJ-12, an issue.
+// Owns is jira:issue:proj#PROJ-12, an issue.
 func (jiraForge) Owns(node wire.LineageNode) (forgeRef, bool) {
-	key, ok := strings.CutPrefix(node.Ref, "jira:")
+	key, ok := keyOfIssue(node, "jira")
 	if !ok || node.Kind != lineage.KindIssue || !linearLabel.MatchString(key) {
 		return forgeRef{}, false
 	}
@@ -275,12 +275,12 @@ func (j jiraForge) SetState(ctx context.Context, r forgeRef, closed bool, transi
 
 // jiraNode is a Jira issue's node.
 func jiraNode(key string) wire.LineageNode {
-	return wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + key}
+	return keyedIssue("jira", key)
 }
 
 // jiraStart is the new-agent form for a Jira issue, labelled with its key (PROJ-3).
 func jiraStart(i wire.ForgeItem) *wire.ForgeStart {
-	key := strings.TrimPrefix(i.Node.Ref, "jira:")
+	key, _ := keyOfIssue(i.Node, "jira")
 	return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Jira issue: %s", key, i.Title, deref(i.URL)),
 		Labels: []string{key}, Worktree: optional(key + " " + i.Title)}
 }

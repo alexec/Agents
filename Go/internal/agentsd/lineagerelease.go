@@ -73,7 +73,7 @@ type releaseTagsBook struct {
 }
 
 func (r forgeRepo) release(tag string) wire.LineageNode {
-	return wire.LineageNode{Kind: lineage.KindRelease, Ref: r.forge + ":" + r.path + "/release/" + tag}
+	return r.node(lineage.KindRelease, "release", tag)
 }
 
 func (d *Daemon) releaseTagsPath() string {

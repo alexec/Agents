@@ -87,10 +87,11 @@ func (d *Daemon) tellMilestoneLate(m milestoneOf, f wire.LineageForecast) {
 	if f.Lands == nil || f.Lands.Growing != nil && *f.Lands.Growing {
 		return
 	}
-	path, ok := strings.CutPrefix(m.repo, "github:")
-	if !ok {
+	r, err := wire.ParseRef(lineage.FullRepoText(m.repo))
+	if err != nil || r.Provider != "github" || r.Type != "repo" {
 		return
 	}
+	path := r.ID
 	gh, err := d.forgeGitHub()
 	if err != nil {
 		return

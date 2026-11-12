@@ -24,6 +24,9 @@ final class AppModel {
     /// half typed, and what it has cost since it opened. None of that is the daemon's
     /// and none of it is the phone's.
     let work = AgentsModel()
+    /// This window's local copy (#4791): sessions and chat ends kept in its root's Caches,
+    /// drawn at launch before the host answers. The host always wins.
+    @ObservationIgnored private(set) var localCopy: LocalCopyKeeper?
 
     private(set) var runtimes: [RuntimeStatus] = []
     /// The start-up sheet offering to install what is missing (048). Raised once per
@@ -1194,6 +1197,10 @@ final class AppModel {
 
     init() {
         userScope.lock = lock
+        let localCopy = LocalCopyKeeper(copy: .mac(), work: work)
+        self.localCopy = localCopy
+        // At once, so the sidebar and a chat restored at launch draw before the host answers.
+        Task { await localCopy.drawMachines() }
         // On `controlLink` itself, not a link of its own (#445): a second connection that
         // nothing else knew of was never let go of, so a wedged one stayed for good.
         if let controlLink { client = DaemonClient(link: hostLink(.mac, through: controlLink), machine: .mac) }
@@ -2647,6 +2654,15 @@ final class AppModel {
         return await userScope.set(part, to: encoded, on: controlRequests)
     }
 
+    /// The person's time zone (#4818): this Mac's, set at the user scope when it differs, so
+    /// a workflow's `hours:` with no `time-zone:` go by it on a server too. It has no control.
+    func keepTimeZone() async {
+        guard let settings = userScope.settings else { return }
+        let here = TimeZone.current.identifier
+        if (try? settings.timeZone?.decode(DaemonAPI.UserTimeZone.self))?.identifier == here { return }
+        _ = await setUserPart(.timeZone, DaemonAPI.UserTimeZone(identifier: here))
+    }
+
     /// After an edit in Agent Configuration or Agent Runtimes: a part that follows the person
     /// is set again from this Mac, when it changed here.
     func keepFollowingParts() async {
@@ -3910,6 +3926,15 @@ final class AppModel {
                     await self?.signIn.connected(control)
                     // Status ▸ Secrets and Accounts' rows say when the newest operation was (#4161).
                     await self?.userScope.load(control)
+                    await self?.keepTimeZone()
+                    // A change of this Mac's zone is the person's, while connected (#4818).
+                    let zoneWatch = Task { [weak self] in
+                        for await _ in NotificationCenter.default.notifications(named: .NSSystemTimeZoneDidChange) {
+                            NSTimeZone.resetSystemTimeZone()
+                            await self?.keepTimeZone()
+                        }
+                    }
+                    defer { zoneWatch.cancel() }
                     if let client = ControlConfig.client { await self?.lock.connected(control, client: client) }
                     await Self.sealWaiting(on: control, lock: self?.lock)
                     for await note in control.notifications() {
@@ -5303,6 +5328,11 @@ final class AppModel {
         // Only the latest load of this chat puts its answer on screen: it is loaded on
         // opening, on every reconnect and on its host's lists, and these overlap (#400).
         let load = work.beginTranscriptLoad()
+        // What was fetched for it under the pointer or beside the last one opened, at once
+        // (#4795); else this device's copy of its end, while the host's page is on its way (#4791).
+        if localCopy?.drawPrefetched(of: selection, load: load) != true {
+            Task { [localCopy] in await localCopy?.drawOpening(of: selection, load: load) }
+        }
         // Beside the transcript rather than before it: neither waits on the other.
         async let whole = loadWholeAgent(selection)
         // The chat's own host, both for the call and for the check that it is up: a
@@ -5339,6 +5369,9 @@ final class AppModel {
                 guard self.selection == selection else { return }
                 let dataIn = self.chatOpening.map { Perf.elapsed($0.timing) }
                 guard self.work.takeOpening(opening, load: load) else { return }
+                self.localCopy?.opened(selection, opening)
+                // The rows either side, which the arrow keys open next (#4795).
+                self.prefetchNeighbours(of: selection)
                 if let why = opening.turnsFailure { Self.chatLog.notice("turns of \(selection) did not load: \(why, privacy: .public)") }
                 if let started = self.chatOpening, started.agent == selection {
                     self.chatOpening = nil
@@ -5370,6 +5403,47 @@ final class AppModel {
             Self.chatLog.notice("record of \(selection) did not load from \(host.rawValue, privacy: .public)")
             work.failOpening("Its host has this session, but this Mac could not read its record.", load: load)
         }
+    }
+
+    /// A chat's opening page from its host, as `loadTranscript` reads it, for a prefetch.
+    private func fetchOpening(_ id: UUID) async throws -> ChatOpening.Loaded {
+        let client = client(for: host(ofAgent: id))
+        return try await ChatOpening.load(
+            turns: {
+                try await client.call(DaemonAPI.Method.agentsTurns, DaemonAPI.TurnsRequest.opening(id),
+                                      returning: TurnsPage.self)
+            },
+            transcript: { from, limit in
+                try await client.call(DaemonAPI.Method.agentsTranscript,
+                                      DaemonAPI.TranscriptRequest(agentID: id, limit: limit, from: from),
+                                      returning: TranscriptPage.self)
+            },
+            entry: { index in
+                try await client.call(DaemonAPI.Method.agentsTranscript,
+                                      DaemonAPI.TranscriptRequest.entry(index, of: id),
+                                      returning: TranscriptPage.self)
+            },
+            describe: { self.describe($0) })
+    }
+
+    /// Fetches a chat before it is opened (#4795): the row under the pointer, and the rows
+    /// beside the open one. Not the open one, and not one whose host is not answering.
+    func prefetch(_ id: UUID) {
+        guard id != selection, let agent = work.agent(id), !hostUnreachable(agent.host) else { return }
+        localCopy?.prefetched.prefetch(id) { [weak self] in
+            guard let self else { throw CancellationError() }
+            return try await self.fetchOpening(id)
+        }
+    }
+
+    /// The selected folder's live sessions, in the order its page and the sidebar draw
+    /// them: the list ⌥⌘↑ and ⌥⌘↓ step through.
+    var sessionsInFront: [UUID] {
+        AgentGroup.live.flatMap { agents(in: selectedFolderKey, group: $0) }.map(\.id)
+    }
+
+    private func prefetchNeighbours(of id: UUID) {
+        for neighbour in OpeningPrefetch.neighbours(of: id, in: sessionsInFront) { prefetch(neighbour) }
     }
 
     /// A session's transcript in a window of its own (#826), loaded as the main window's

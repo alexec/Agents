@@ -166,7 +166,7 @@ func TestForgeListsBitbucketRepositories(t *testing.T) {
 			item = &i
 		}
 	}
-	if item == nil || item.Node != (wire.LineageNode{Kind: "issue", Ref: "bitbucket:walkalex/app#7"}) || deref(item.Folder) == "" ||
+	if item == nil || item.Node != (wire.LineageNode{Kind: "issue", Ref: "bitbucket:issue:walkalex/app#7"}) || deref(item.Folder) == "" ||
 		item.Labels[0].Name != "bug" || item.Labels[0].Color != nil || item.UpdatedAt == 0 || len(list.Errors) != 0 {
 		t.Fatalf("the Bitbucket item: %+v in %+v", item, list)
 	}
@@ -174,7 +174,7 @@ func TestForgeListsBitbucketRepositories(t *testing.T) {
 	json.Unmarshal(c.call(t, 2, "forge/pulls", wire.ForgeListRequest{}), &pulls)
 	found := false
 	for _, i := range pulls.Items {
-		if i.Node.Ref == "bitbucket:walkalex/app#7" {
+		if i.Node.Ref == "bitbucket:pr:walkalex/app#7" {
 			found = true
 			if i.Node.Kind != "pr" || deref(i.Mergeable) != "unknown" || i.AutoMerge == nil || *i.AutoMerge {
 				t.Fatalf("a Bitbucket pull request: %+v", i)
@@ -203,13 +203,13 @@ func TestForgeListSaysBitbucketIsNotConnected(t *testing.T) {
 func TestForgeReadsABitbucketIssueAndPullRequest(t *testing.T) {
 	_, c, bb, _ := bitbucketDaemon(t)
 	var issue wire.ForgeItemDetail
-	json.Unmarshal(c.call(t, 1, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "bitbucket:walkalex/app#7"}}), &issue)
+	json.Unmarshal(c.call(t, 1, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "bitbucket:issue:walkalex/app#7"}}), &issue)
 	if issue.Body != "The body." || deref(issue.Cursor) != "2" || len(issue.Comments) != 1 || issue.Start == nil ||
 		!strings.Contains(issue.Start.Prompt, "Work on this Bitbucket issue: https://bitbucket.org/walkalex/App/issues/7") || issue.Start.Labels[0] != "#7" {
 		t.Fatalf("issue: %+v", issue)
 	}
 	var pr wire.ForgeItemDetail
-	json.Unmarshal(c.call(t, 2, "forge/pull", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "pr", Ref: "bitbucket:walkalex/app#8"}}), &pr)
+	json.Unmarshal(c.call(t, 2, "forge/pull", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "pr", Ref: "bitbucket:pr:walkalex/app#8"}}), &pr)
 	if deref(pr.Head) != "abc123def456" || len(pr.Checks) != 4 || *pr.FilesChanged != 2 || len(pr.MergeMethods) != 2 || pr.MergeMethods[0] != "squash" ||
 		deref(pr.Item.Review) != "approved" || pr.Start != nil {
 		t.Fatalf("pull: %+v", pr)
@@ -218,9 +218,9 @@ func TestForgeReadsABitbucketIssueAndPullRequest(t *testing.T) {
 		t.Fatalf("Bitbucket was asked %v", bb.items)
 	}
 	for i, n := range []wire.LineageNode{
-		{Kind: "issue", Ref: "bitbucket:walkalex/app#404"},
-		{Kind: "issue", Ref: "bitbucket:kim/notes#1"},
-		{Kind: "issue", Ref: "bitbucket:nobody#1"},
+		{Kind: "issue", Ref: "bitbucket:issue:walkalex/app#404"},
+		{Kind: "issue", Ref: "bitbucket:issue:kim/notes#1"},
+		{Kind: "issue", Ref: "bitbucket:issue:nobody#1"},
 	} {
 		if e := c.callError(t, 10+i, "forge/issue", wire.ForgeItemRequest{Node: n}); e == nil || !strings.Contains(e.Message, "forge/issue") {
 			t.Fatalf("%s: %v", n.Ref, e)
@@ -233,8 +233,8 @@ func TestForgeReadsABitbucketIssueAndPullRequest(t *testing.T) {
 // once; a pull request has no labels.
 func TestForgeWritesOnABitbucketItem(t *testing.T) {
 	_, c, bb, _ := bitbucketDaemon(t)
-	issue := wire.LineageNode{Kind: "issue", Ref: "bitbucket:walkalex/app#7"}
-	pr := wire.LineageNode{Kind: "pr", Ref: "bitbucket:walkalex/app#8"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "bitbucket:issue:walkalex/app#7"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "bitbucket:pr:walkalex/app#8"}
 	var done wire.ForgeDone
 	json.Unmarshal(c.call(t, 1, "forge/comment", wire.ForgeCommentRequest{Node: issue, Body: "Done"}), &done)
 	if deref(done.URL) != "https://bitbucket.org/c/1" {
@@ -297,12 +297,12 @@ func TestForgeWritesOnABitbucketItem(t *testing.T) {
 
 func TestBitbucketOfNode(t *testing.T) {
 	for ref, want := range map[string]string{
-		"bitbucket:walkalex/app#7": "walkalex/app 7",
-		"bitbucket:a/b#0":          "",
-		"bitbucket:a#1":            "",
-		"bitbucket:a/b/c#1":        "",
-		"bitbucket:/b#1":           "",
-		"forgejo:a/b#1":            "",
+		"bitbucket:issue:walkalex/app#7": "walkalex/app 7",
+		"bitbucket:issue:a/b#0":          "",
+		"bitbucket:issue:a#1":            "",
+		"bitbucket:issue:a/b/c#1":        "",
+		"bitbucket:issue:/b#1":           "",
+		"forgejo:issue:a/b#1":            "",
 	} {
 		repo, n, ok := bitbucketOfNode(wire.LineageNode{Kind: "issue", Ref: ref})
 		got := ""
@@ -351,7 +351,7 @@ func TestForgeFeaturesCountBitbucketComponents(t *testing.T) {
 // #3880: a Bitbucket issue has no plan, and forge/plan says why.
 func TestForgePlanRefusesABitbucketIssue(t *testing.T) {
 	_, c, _, _ := bitbucketDaemon(t)
-	e := c.callError(t, 1, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "bitbucket:walkalex/app#7"}})
+	e := c.callError(t, 1, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "bitbucket:issue:walkalex/app#7"}})
 	if e == nil || !strings.Contains(e.Message, bitbucketNoPlan) {
 		t.Fatalf("forge/plan: %+v", e)
 	}

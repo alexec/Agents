@@ -3,6 +3,7 @@ browser in the same step, and the page has the same sidebar."""
 GROUP = "usage"
 LAYOUT = "mac+browser"
 TITLE = "Use Agents in a browser"
+DOCS = "how-to/use-agents-in-a-browser/"  # the docs page, on docs.agentloops.dev (upload.py)
 BROWSER = (1200, 760)
 WINDOW = (1180, 740)
 
@@ -15,10 +16,10 @@ LINES = {
 
 
 def setup(v):
-    folder = v.project("weather-app", {"README.md": "# Weather\n"})
+    folder = v.add_folder("weather-app", {"README.md": "# Weather\n"})
     agent = v.start(folder, "Add a line to README.md saying the app shows the weekly forecast.")
     v.wait_state(agent, states=("finished", "idle", "done"), timeout=300)
-    v.project("landing-page", {"index.html": "<h1>Lumen</h1>\n"})
+    v.add_folder("landing-page", {"index.html": "<h1>Lumen</h1>\n"})
     v.tidy()
     v.unfold("weather-app")
     v.open_browser(pair=False)

@@ -65,18 +65,18 @@ func TestLineageOnABitbucketFolder(t *testing.T) {
 		a.Worktree = &wire.AgentWorktree{Name: "7-fix", Branch: &branch, Folder: store.FolderURL(folder)}
 	})
 	d.noteLineage(nil, a)
-	s := sessionNode(a.ID)
+	s := d.sessionNode(a.ID)
 	d.lineageEvent(wire.Event{Name: "pr.opened", Details: map[string]string{"payload": `{"pr":{"number":8,"branch":"agents/7-fix",` +
 		`"url":"https://bitbucket.org/walkalex/App/pull-requests/8","fixes":["#7"]}}`}})
-	pr := wire.LineageNode{Kind: "pr", Ref: "bitbucket:walkalex/app#8"}
-	issue := wire.LineageNode{Kind: "issue", Ref: "bitbucket:walkalex/app#7"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "bitbucket:pr:walkalex/app#8"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "bitbucket:issue:walkalex/app#7"}
 	wantLinks(t, active(d, pr),
 		s.Ref+" opens "+pr.Ref+" (branch)",
 		pr.Ref+" fixes "+issue.Ref+" (pr-body)")
 	wantLinks(t, active(d, s),
 		s.Ref+" works-on "+issue.Ref+" (start)",
 		s.Ref+" opens "+pr.Ref+" (branch)")
-	if n, ok := d.labelNode(folder, "P#4"); !ok || n != (wire.LineageNode{Kind: "pr", Ref: "bitbucket:walkalex/app#4"}) {
+	if n, ok := d.labelNode(folder, "P#4"); !ok || n != (wire.LineageNode{Kind: "pr", Ref: "bitbucket:pr:walkalex/app#4"}) {
 		t.Fatalf("P#4: %+v", n)
 	}
 	if _, _, ok := nodeOfRepo(pr); ok {
@@ -90,7 +90,7 @@ func TestLineageOnABitbucketFolder(t *testing.T) {
 	d.lineageCIEvent(wire.Event{Name: "checks.failed", Details: map[string]string{"payload": `{"pr":{"number":8,` +
 		`"url":"https://bitbucket.org/walkalex/App/pull-requests/8"},"run":{"id":12}}`}})
 	settleParents(t, d)
-	if !active(d, pr)["bitbucket:walkalex/app/pipelines/12 builds "+pr.Ref+" (forge)"] {
+	if !active(d, pr)["bitbucket:run:walkalex/app#12 builds "+pr.Ref+" (forge)"] {
 		t.Errorf("the run: %v", active(d, pr))
 	}
 
@@ -127,7 +127,7 @@ func TestLineageAsksBitbucket(t *testing.T) {
 	release := repo.release("v0.2.0")
 	wantLinks(t, active(d, release),
 		pr.Ref+" part-of "+release.Ref+" (forge)",
-		"bitbucket:walkalex/app#9 part-of "+release.Ref+" (forge)")
+		"bitbucket:pr:walkalex/app#9 part-of "+release.Ref+" (forge)")
 
 	// The cost comment, by the connection.
 	asks, _ := d.connectionAsks("bitbucket")
@@ -169,7 +169,7 @@ func TestTheBitbucketServersViewsAskForLineage(t *testing.T) {
 		t.Fatalf("the issue's: %s", raw)
 	}
 	v := r.StructuredContent
-	if v.Ref != "bitbucket:walkalex/app#7" || len(v.Sessions) != 1 || v.Sessions[0].Title != "Fix the walk" {
+	if v.Ref != "bitbucket:issue:walkalex/app#7" || len(v.Sessions) != 1 || v.Sessions[0].Title != "Fix the walk" {
 		t.Errorf("the issue's: %+v", v)
 	}
 	if len(v.PRs) != 1 || v.PRs[0].URL != "https://bitbucket.org/walkalex/app/pull-requests/8" {

@@ -145,9 +145,9 @@ func TestForgeIssuesReadsTheFoldersJiraProjects(t *testing.T) {
 	if jira == nil || len(list.Errors) != 0 {
 		t.Fatalf("list: %+v", list)
 	}
-	if jira.Node != (wire.LineageNode{Kind: "issue", Ref: "jira:PROJ-7"}) || jira.State != "open" || deref(jira.Status) != "In Review" ||
+	if jira.Node != (wire.LineageNode{Kind: "issue", Ref: "jira:issue:proj#PROJ-7"}) || jira.State != "open" || deref(jira.Status) != "In Review" ||
 		deref(jira.Milestone) != "2.4" || deref(jira.Folder) == "" ||
-		jira.Comments != 2 || jira.Parent == nil || jira.Parent.Ref != "jira:PROJ-1" || len(jira.Labels) != 1 || jira.Labels[0].Color != nil {
+		jira.Comments != 2 || jira.Parent == nil || jira.Parent.Ref != "jira:issue:proj#PROJ-1" || len(jira.Labels) != 1 || jira.Labels[0].Color != nil {
 		t.Fatalf("Jira item: %+v", *jira)
 	}
 	if d.jiraFolder("PROJ") != deref(jira.Folder) {
@@ -164,7 +164,7 @@ func TestForgeIssuesReadsTheFoldersJiraProjects(t *testing.T) {
 func TestForgeReadsAJiraIssue(t *testing.T) {
 	_, c, _, _ := jiraDaemon(t)
 	var i wire.ForgeItemDetail
-	json.Unmarshal(c.call(t, 1, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "jira:PROJ-7"}}), &i)
+	json.Unmarshal(c.call(t, 1, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "jira:issue:proj#PROJ-7"}}), &i)
 	if i.Body != "**Bold** words." || deref(i.Cursor) != "3" || len(i.Comments) != 1 || i.Comments[0].Bot == nil ||
 		deref(i.Item.Status) != "To Do" || deref(i.Item.Folder) == "" || i.Item.Progress == nil {
 		t.Fatalf("Jira issue: %+v", i)
@@ -175,10 +175,10 @@ func TestForgeReadsAJiraIssue(t *testing.T) {
 	if i.Start == nil || !slices.Equal(i.Start.Labels, []string{"PROJ-7"}) || !strings.Contains(i.Start.Prompt, "Work on this Jira issue: https://acme.atlassian.net/browse/PROJ-7") {
 		t.Fatalf("start: %+v", i.Start)
 	}
-	if e := c.callError(t, 2, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "jira:PROJ-404"}}); e == nil || !strings.Contains(e.Message, "forge/issue") {
+	if e := c.callError(t, 2, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "jira:issue:proj#PROJ-404"}}); e == nil || !strings.Contains(e.Message, "forge/issue") {
 		t.Fatalf("PROJ-404: %+v", e)
 	}
-	if e := c.callError(t, 3, "forge/pull", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "pr", Ref: "jira:PROJ-7"}}); e == nil || !strings.Contains(e.Message, "forge/pull") {
+	if e := c.callError(t, 3, "forge/pull", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "pr", Ref: "jira:issue:proj#PROJ-7"}}); e == nil || !strings.Contains(e.Message, "forge/pull") {
 		t.Fatalf("a Jira pull request: %+v", e)
 	}
 }
@@ -187,7 +187,7 @@ func TestForgeReadsAJiraIssue(t *testing.T) {
 // workflow's own transitions go to Jira; a transition on another forge is invalid.
 func TestForgeWritesOnAJiraIssue(t *testing.T) {
 	_, c, j, _ := jiraDaemon(t)
-	node := wire.LineageNode{Kind: "issue", Ref: "jira:PROJ-7"}
+	node := wire.LineageNode{Kind: "issue", Ref: "jira:issue:proj#PROJ-7"}
 	var done wire.ForgeDone
 	json.Unmarshal(c.call(t, 1, "forge/comment", wire.ForgeCommentRequest{Node: node, Body: "On it."}), &done)
 	if deref(done.URL) != "https://acme.atlassian.net/browse/PROJ-7?focusedCommentId=9" {
@@ -207,7 +207,7 @@ func TestForgeWritesOnAJiraIssue(t *testing.T) {
 	if !slices.Equal(wrote, want) {
 		t.Fatalf("wrote %q, want %q", wrote, want)
 	}
-	gh := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#5"}
+	gh := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#5"}
 	if e := c.callError(t, 7, "forge/close", wire.ForgeCloseRequest{Node: gh, Transition: new("21")}); e == nil || !strings.Contains(e.Message, "forge/close") {
 		t.Fatalf("a transition on GitHub: %+v", e)
 	}
@@ -228,10 +228,10 @@ func TestForgeJiraNotSignedIn(t *testing.T) {
 // a PR's title and branch name the Jira keys of its folder's projects.
 func TestJiraKeysInLabelsTitlesAndBranches(t *testing.T) {
 	d, _, _, app := jiraDaemon(t)
-	if n, _ := d.labelNode(app, "PROJ-7"); n.Ref != "jira:PROJ-7" {
+	if n, _ := d.labelNode(app, "PROJ-7"); n.Ref != "jira:issue:proj#PROJ-7" {
 		t.Fatalf("PROJ-7 in a Jira folder: %+v", n)
 	}
-	if n, _ := d.labelNode(app, "ENG-4"); n.Ref != "linear:ENG-4" {
+	if n, _ := d.labelNode(app, "ENG-4"); n.Ref != "linear:issue:eng#ENG-4" {
 		t.Fatalf("ENG-4 in a Jira folder: %+v", n)
 	}
 	jira := []string{"PROJ"}
@@ -250,8 +250,8 @@ func TestJiraKeysInLabelsTitlesAndBranches(t *testing.T) {
 func TestForgePlanReadsAJiraParent(t *testing.T) {
 	_, c, _, _ := jiraDaemon(t)
 	var plan wire.ForgePlan
-	json.Unmarshal(c.call(t, 1, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "jira:PROJ-7"}}), &plan)
-	if plan.Item.Node.Ref != "jira:PROJ-7" || len(plan.Children) != 2 || plan.Children[1].Item.Node.Ref != "jira:PROJ-9" || plan.Children[1].Step != 2 {
+	json.Unmarshal(c.call(t, 1, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "jira:issue:proj#PROJ-7"}}), &plan)
+	if plan.Item.Node.Ref != "jira:issue:proj#PROJ-7" || len(plan.Children) != 2 || plan.Children[1].Item.Node.Ref != "jira:issue:proj#PROJ-9" || plan.Children[1].Step != 2 {
 		t.Fatalf("plan: %+v", plan)
 	}
 }

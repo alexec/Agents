@@ -1699,6 +1699,94 @@ type BuildOutputRemoved struct {
 	Freed WorktreeSize `json:"freed"`
 }
 
+// bus/deliver (#4729): one event on the bus that matched subscriptions of this machine, and which ones. Best effort: usually once, sometimes never, rarely twice.
+type BusDelivery struct {
+	Event BusEvent `json:"event"`
+
+	Subscriptions []string `json:"subscriptions"`
+}
+
+// An event on the bus (#4729, spec 4724-event-bus, "The bus"): its envelope, and its data sealed to the person's machines (#4825). The control plane reads only refs, names and times (principle 7, #4726) and opens no sealed copy; a machine with no copy of its own reads the subject's state now, by its ref.
+type BusEvent struct {
+	// The CloudEvents version of the envelope (#4728, spec 4724-event-bus, "An event"): always "1.0".
+	Specversion string `json:"specversion"`
+
+	// The event's ref (#4728): the subject's ref, "@", the type, and, when the same type can happen again to that thing, "/" and the provider's key for this one, such as github:pr:alexec/agents#4702@pr.commented/2457. It comes from the provider's data only, never from the machine or the clock, so two machines make the same id for the same happening.
+	ID string `json:"id"`
+
+	// The event's type, noun.verbed (#4728): the same as name, which stays for one release.
+	Type string `json:"type"`
+
+	// Who the event is about (#4728): github, jira, slack and so on; agents for the app's own events; server:<name> for an MCP server's event that says no subject.
+	Provider string `json:"provider"`
+
+	// The provider's space (#4728, spec 4724-event-bus, "Topics"): a repo's full name, a Jira project, a Slack channel; the project or the machine for the app's own events. Lower case; can be empty.
+	Topic string `json:"topic"`
+
+	// The ref of the thing the event happened to (#4728). None for an MCP server's event that says no subject.
+	Subject *Ref `json:"subject,omitzero"`
+
+	// provider:topic, as CloudEvents asks for one (#4728).
+	Source string `json:"source"`
+
+	// When it happened, in RFC 3339 (#4728): the provider's own time when it says one.
+	Time string `json:"time"`
+
+	// The machine that raised it (#4728), as agents:machine:#<machine>. Not part of the event's identity.
+	Producer string `json:"producer"`
+
+	// The event's data (at most 256 KB), sealed by the machine that raised it to each machine of its person's lock (#4825). In bus/deliver, only the copy for the machine it goes to. None when the data is larger, or the machine has no lock.
+	Sealed []BusSealedData `json:"sealed,omitzero"`
+}
+
+// bus/publish (#4729): events a machine recorded, at most 100 at a time, oldest first. Best effort: one not sent when it happened is never sent later.
+type BusPublish struct {
+	Events []BusEvent `json:"events"`
+}
+
+// bus/publish's answer (#4729): how many events were new on the bus, and how many were dropped as copies of one already on it (the same id).
+type BusPublished struct {
+	Kept int64 `json:"kept"`
+
+	Dropped int64 `json:"dropped"`
+}
+
+// An event's data sealed to one machine (#4825): HPKE to the sealing key the lock's addMachine names, with the associated data busdata.v1|<person>|m:<machine>|<event id>. Inside is the data and the raising machine's signature of it, so a control plane can neither read it nor make one up.
+type BusSealedData struct {
+	// The machine it is sealed to, by its id.
+	Machine string `json:"machine"`
+
+	Sealed SealedEnvelope `json:"sealed"`
+}
+
+// bus/subscribe (#4729): every subscription of a machine, at most 1,000. It replaces the ones the machine sent before; an empty list ends them all. A machine sends it again after each connect, as the control plane keeps none across a restart.
+type BusSubscribe struct {
+	Subscriptions []BusSubscription `json:"subscriptions"`
+}
+
+// bus/subscribe's answer (#4729): how many subscriptions the control plane holds for the machine now.
+type BusSubscribed struct {
+	Count int64 `json:"count"`
+}
+
+// One subscription on the bus (#4729): a wait or a workflow trigger of a machine. Each field that is there must match the event's envelope; one that is not there matches every event.
+type BusSubscription struct {
+	// The machine's own name for it, sent back with each event it matches.
+	ID string `json:"id"`
+
+	// The event's provider: github, jira, agents and so on.
+	Provider *string `json:"provider,omitzero"`
+
+	// The event's type, noun.verbed, or noun.* for every type of that noun.
+	Type *string `json:"type,omitzero"`
+
+	// The topics it is about; none for every topic. Lower case.
+	Topics []string `json:"topics,omitzero"`
+
+	// The one thing it is about.
+	Subject *Ref `json:"subject,omitzero"`
+}
+
 type CancelWaitRequest struct {
 	AgentID UUID `json:"agentID"`
 }
@@ -5012,7 +5100,7 @@ type ForgeImageRequest struct {
 	URL string `json:"url"`
 }
 
-// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars). stateReason is why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it (ForgeCapabilities.stateReason); absent on an open issue and on a pull request. createdAt is when it opened and closedAt when it closed or merged (#4373), where the forge says them (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open. A pull request's branches (#4409): headRef is the branch it merges from and baseRef the one it merges into, where the forge says them (ForgeCapabilities.branches); on its own read at least, and on a list's row where the list says them. A merged pull request's mergedBy is who merged it and mergeCommit the commit it made on baseRef (ForgeCapabilities.mergedBy and mergeCommit); each is absent while it is open or closed unmerged.
+// An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind issue or pr, ref github:issue:alexec/agents#12). state is open, closed or merged; status is the tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from. labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own fields: draft; checks is passing, failing, running or none; review is approved, changes_requested or review_required; mergeable is mergeable, conflicting or unknown; autoMerge says auto-merge is on. The hierarchy (#3267): parent is the issue it is a sub-issue (a Linear or GitLab child) of; level is epic, story, task or spike, from its labels; feature is the name of its feature:<name> label; progress is a parent's closed children of all of them, where the forge says it: in a GitHub list, and on an issue's own read. standing says it has the label standing: a standing epic, whose plan is a query (#3659). authorAvatar is the author's picture, a URL that only forge/image reads (#4363), where the forge gives one (ForgeCapabilities.avatars). stateReason is why a closed issue closed (#4365): completed, not_planned or duplicate, where the forge says it (ForgeCapabilities.stateReason); absent on an open issue and on a pull request. createdAt is when it opened and closedAt when it closed or merged (#4373), where the forge says them (ForgeCapabilities.createdAt and closedAt); closedAt is absent while it is open. A pull request's branches (#4409): headRef is the branch it merges from and baseRef the one it merges into, where the forge says them (ForgeCapabilities.branches); on its own read at least, and on a list's row where the list says them. A merged pull request's mergedBy is who merged it and mergeCommit the commit it made on baseRef (ForgeCapabilities.mergedBy and mergeCommit); each is absent while it is open or closed unmerged.
 type ForgeItem struct {
 	Node LineageNode `json:"node"`
 
@@ -5951,7 +6039,7 @@ type LineageCost struct {
 type LineageCostNode struct {
 	Node LineageNode `json:"node"`
 
-	// The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's repo (folder:<name> without one). Not a project (#3275).
+	// The repo or tracker the node is in, as a ref (#4800): github:repo:#alexec/agents, linear:repo:#eng, or for a session its folder's repo (folder:repo:#<name> without one). Not a project (#3275).
 	Repo *string `json:"repo,omitzero"`
 
 	Banked LineageCost `json:"banked"`
@@ -6002,9 +6090,15 @@ type LineageCostNode struct {
 
 	// An epic's first landing forecast (#4526), kept once made, for the forecast against when it lands.
 	Forecast *LineageForecastKept `json:"forecast,omitzero"`
+
+	// A merged PR's files, by path, at most 100, as the forge said them when it merged (#4552), for the rework rate. Dropped 60 days after its merge.
+	Files []string `json:"files,omitzero"`
+
+	// The PR a merged revert reverts, by ref, from its body's "Reverts owner/repo#n" (#4552), for the recovery time.
+	Reverts *string `json:"reverts,omitzero"`
 }
 
-// lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
+// lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a repo's every node (kind repo, ref github:repo:#alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
 type LineageCostRollup struct {
 	Node LineageNode `json:"node"`
 
@@ -6027,6 +6121,56 @@ type LineageCostRollup struct {
 	Parts []LineageCostNode `json:"parts"`
 
 	Limited *bool `json:"limited,omitzero"`
+}
+
+// A repo's delivery figures (#4552, epic #4551), from this machine's totals: the four DORA keys, DORA 2025's rework rate and flow efficiency, over the windowDays (28) before at, each with a weekly series. A week is 7 days back from at, not a calendar week. A figure says how many it is made from; one made from none has no value. band is where a value falls among DORA 2024's clusters, a reference from teams of people, not a grade; rework rate and flow efficiency have none.
+type LineageDelivery struct {
+	Since Date `json:"since"`
+
+	At Date `json:"at"`
+
+	WindowDays int64 `json:"windowDays"`
+
+	// Lead time for changes, in seconds: from the first work on an issue to the first release tag that carries a merged PR that fixes it; the median, and p90. Counted by the tag's time.
+	LeadTime LineageDeliveryFigure `json:"leadTime"`
+
+	// Release tags a week (#3023), 0 for none, as is each week's; count is the tags.
+	DeploymentFrequency LineageDeliveryFigure `json:"deploymentFrequency"`
+
+	// Failures over merged PRs, 0 to 1, by merge time. A failure is a merged revert (a PR whose title starts with Revert), or a merged PR that fixes, by any lineage link, a priority:high bug filed within 7 days after a release tag in its repo. count is the merged PRs.
+	ChangeFailureRate LineageDeliveryFigure `json:"changeFailureRate"`
+
+	// Failed deployment recovery time, in seconds, the median: a revert's merge less the merge of the PR it reverts, or a fix's merge less its bug's filing. Counted by the recovery's merge.
+	RecoveryTime LineageDeliveryFigure `json:"recoveryTime"`
+
+	// DORA 2025's rework rate, 0 to 1: the share of merged PRs, of those with their files known, that change a file another PR merged in the 21 days before changed. count is the PRs with their files known.
+	ReworkRate LineageDeliveryFigure `json:"reworkRate"`
+
+	// The agents' working time on a closed issue and its PRs over its cycle time, at most 1, the median. Counted by its last merge.
+	FlowEfficiency LineageDeliveryFigure `json:"flowEfficiency"`
+}
+
+// One delivery figure (#4552): value over the window, absent when made from none; p90 for lead time; count is what it is made from; weeks is the 4 weeks, oldest first; band is DORA 2024's.
+type LineageDeliveryFigure struct {
+	Value *float64 `json:"value,omitzero"`
+
+	P90 *float64 `json:"p90,omitzero"`
+
+	Count int64 `json:"count"`
+
+	Weeks []LineageDeliveryWeek `json:"weeks"`
+
+	// elite, high, medium or low. The list is open.
+	Band *string `json:"band,omitzero"`
+}
+
+// A week of a delivery figure (#4552): the 7 days from since; value as the figure's, absent when made from none.
+type LineageDeliveryWeek struct {
+	Since Date `json:"since"`
+
+	Value *float64 `json:"value,omitzero"`
+
+	Count int64 `json:"count"`
 }
 
 // lineage/end (#2348): the link from one node to another by this relationship stops being active now. Nothing is removed: the link keeps its start and gets an end.
@@ -6173,7 +6317,7 @@ type LineageEstimateRequest struct {
 	StartAt *Date `json:"startAt,omitzero"`
 }
 
-// lineage/figures (#4427): a release's Lineage panel on its Work page, from this machine's totals. cost is its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its parts, each once; running is how many of them run now (starting, running or waiting on the person). runtimes is the runtimes of the sessions this machine has, the most sessions first. leadTimeSeconds is from the first work on its parts to its tag (#3878 removed the milestone figures). limited says the rollup had more parts than it counts. Another kind of node is refused.
+// lineage/figures (#4427): a release's Lineage panel on its Work page, from this machine's totals; or (#4552) a repo's (kind repo, ref as LineageCostNode.repo), with its delivery figures. cost is its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its parts, each once; running is how many of them run now (starting, running or waiting on the person). runtimes is the runtimes of the sessions this machine has, the most sessions first. leadTimeSeconds is from the first work on its parts to its tag (#3878 removed the milestone figures). limited says the rollup had more parts than it counts. delivery is a repo's only. Another kind of node is refused.
 type LineageFigures struct {
 	Node LineageNode `json:"node"`
 
@@ -6188,6 +6332,8 @@ type LineageFigures struct {
 	LeadTimeSeconds *float64 `json:"leadTimeSeconds,omitzero"`
 
 	Limited *bool `json:"limited,omitzero"`
+
+	Delivery *LineageDelivery `json:"delivery,omitzero"`
 }
 
 // lineage/forecast (#4526; the method is specs/4533-forecasting/spec.md): what comes next, from this machine's totals. landings is the issues (not epics) that landed with a merged PR in the window of windowDays (14) before at, in the epic's repo when a node is asked for, else in every repo. milestone is the milestone asked for (#4620), whose landings are its repo's. lands is when the epic or the milestone lands; noForecast says why there is none (too little history, too few closed epics, nothing open). toComplete is the epic's estimate to complete, once three of its children closed with an estimate kept at their start. kept is the forecast kept on the epic's node, the first one made, so it can be scored when the epic lands. spend is what a week and a month cost at the window's pace, burn is each weekly allowance's pace, and serviceLevels is how long each level's issues took. Every figure says its window; a range is a probability, not a promise.
@@ -6419,7 +6565,7 @@ type LineageLinks struct {
 	States []LineageSessionState `json:"states,omitzero"`
 }
 
-// A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or release, and the list is open. ref names it apart from any tracker, as <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9, session:<agent id>.
+// A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run, commit, file, branch or release, and the list is open. ref names it apart from any tracker, in the full ref form provider:type:topic#id (#4800): github:issue:alexec/agents#123, gitlab:mr:group/repo#45, linear:issue:eng#ENG-4, jira:issue:abc#ABC-9, agents:session:alexec/agents#<agent id>. A reader takes the old form (<scheme>:<id>, as github:alexec/Agents#123 or session:<agent id>) for one release.
 type LineageNode struct {
 	Kind string `json:"kind"`
 
@@ -6459,6 +6605,9 @@ type LineageResolved struct {
 	State *string `json:"state,omitzero"`
 
 	Labels []string `json:"labels,omitzero"`
+
+	// When the forge says the issue or PR was made (#4552): a bug's filing, for the change failure rate.
+	CreatedAt *Date `json:"createdAt,omitzero"`
 }
 
 // A runtime of lineage/figures' sessions, and how many of them it ran (#4427).
@@ -11240,7 +11389,7 @@ type ReportNodes struct {
 	Unresolved int64 `json:"unresolved"`
 }
 
-// reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a PR with none falls back to its outcome); releases have no state in v1. repo is a ref prefix (github:alexec/Agents). since is on the node's last change. limit is 1 to 100, 50 when absent. cursor is the last page's, opaque.
+// reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a PR with none falls back to its outcome); releases have no state in v1. repo is a repo's ref (github:repo:#alexec/agents; the old github:alexec/agents is read too). since is on the node's last change. limit is 1 to 100, 50 when absent. cursor is the last page's, opaque.
 type ReportNodesQuery struct {
 	// issue, pr or release.
 	Kind string `json:"kind"`
@@ -14846,6 +14995,9 @@ type UserSettings struct {
 	// The person's outside accounts (#3967), as an OutsideAccounts. The control plane refuses one with a value that looks like a secret.
 	Accounts JSONValue `json:"accounts,omitzero"`
 
+	// The person's time zone (#4818), as a UserTimeZone. Their Mac sets it from its own clock; a workflow's hours: with no time-zone: go by it.
+	TimeZone JSONValue `json:"timeZone,omitzero"`
+
 	// #2957, research R11: your layer, as a SignedYourPolicy. Only the keeper sets it (user/setPolicy); a client cannot (user/setSettings refuses this part).
 	Policy JSONValue `json:"policy,omitzero"`
 
@@ -14870,7 +15022,7 @@ type UserSettingsPart struct {
 	Value JSONValue `json:"value"`
 }
 
-// A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits, notices (#2859) and outside accounts (#3967) follow the person. Resources belong to each machine. policy (#2957) is set only by the keeper, through user/setPolicy; user/setSettings refuses it.
+// A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits, notices (#2859), outside accounts (#3967) and the time zone (#4818) follow the person. Resources belong to each machine. policy (#2957) is set only by the keeper, through user/setPolicy; user/setSettings refuses it.
 type UserSettingsPartName string
 
 const UserSettingsPartNameMcpServers UserSettingsPartName = "mcpServers"
@@ -14879,6 +15031,7 @@ const UserSettingsPartNameRuntimes UserSettingsPartName = "runtimes"
 const UserSettingsPartNameCostLimits UserSettingsPartName = "costLimits"
 const UserSettingsPartNameNotifications UserSettingsPartName = "notifications"
 const UserSettingsPartNameAccounts UserSettingsPartName = "accounts"
+const UserSettingsPartNameTimeZone UserSettingsPartName = "timeZone"
 const UserSettingsPartNamePolicy UserSettingsPartName = "policy"
 
 // user/suspended (#1002, FR-018): to each machine of a suspended person, at hello before its settings and within 5 seconds of a change; off: true ends it.
@@ -14892,6 +15045,12 @@ type UserSuspended struct {
 	At Date `json:"at"`
 }
 
+// The timeZone part of user settings (#4818).
+type UserTimeZone struct {
+	// An IANA name, as TimeZone.identifier says it: Europe/London.
+	Identifier string `json:"identifier"`
+}
+
 // The PRs that landed in an hour or a day in one repository (#4596): merged is every PR the agents worked on that merged, merged reverts included; reverted is the merged reverts among them.
 type VelocityBucket struct {
 	Merged int64 `json:"merged"`
@@ -14899,7 +15058,7 @@ type VelocityBucket struct {
 	Reverted int64 `json:"reverted"`
 }
 
-// velocity/history's answer (#4596): the PRs that landed, by the hour (168 hours) and by the day (90 days), then by repository (github:alexec/agents), from this machine's lineage store. Shaped as usage/history is.
+// velocity/history's answer (#4596): the PRs that landed, by the hour (168 hours) and by the day (90 days), then by repository (its ref, github:repo:#alexec/agents), from this machine's lineage store. Shaped as usage/history is.
 type VelocityHistory struct {
 	Hours map[string]map[string]VelocityBucket `json:"hours"`
 
@@ -15352,6 +15511,8 @@ type Workflow struct {
 
 	Cooldown *float64 `json:"cooldown,omitzero"`
 
+	Hours *WorkflowHours `json:"hours,omitzero"`
+
 	Enabled *bool `json:"enabled,omitzero"`
 
 	Archived *bool `json:"archived,omitzero"`
@@ -15420,6 +15581,18 @@ type WorkflowEnableRequest struct {
 	WorkflowID string `json:"workflowID"`
 
 	Enabled bool `json:"enabled"`
+}
+
+// hours: (#4818): when a workflow may start, as the file says it. A fire outside it is held, and starts when it opens; Run now always runs.
+type WorkflowHours struct {
+	// As the file says it, "09:00-18:00"; it can go past midnight, "18:00-09:00". Absent is the whole day.
+	Between *string `json:"between,omitzero"`
+
+	// The days its window starts on. Absent is every day.
+	Days []Weekday `json:"days,omitzero"`
+
+	// time-zone:, an IANA name. Absent is the person's timeZone setting, else the host's zone.
+	TimeZone *string `json:"timeZone,omitzero"`
 }
 
 type WorkflowLimit string
@@ -15538,6 +15711,8 @@ type WorkflowRefusal struct {
 	DeniedHere *struct{} `json:"deniedHere,omitzero"`
 
 	CoolingDown *WorkflowRefusalCoolingDown `json:"coolingDown,omitzero"`
+
+	OutsideHours *WorkflowRefusalOutsideHours `json:"outsideHours,omitzero"`
 }
 
 type WorkflowRefusalChainTooDeep struct {
@@ -15572,6 +15747,10 @@ type WorkflowRefusalCoolingDown struct {
 	Until *Date `json:"until,omitzero"`
 }
 
+type WorkflowRefusalOutsideHours struct {
+	Until *Date `json:"until,omitzero"`
+}
+
 type WorkflowRemovedNotification struct {
 	Folder URL `json:"folder"`
 
@@ -15587,6 +15766,7 @@ type WorkflowRequest struct {
 type WorkflowSchedule struct {
 	Minutes []int64 `json:"minutes"`
 
+	// The first and the last hour of between:. The first is after the last when it goes past midnight (#4818): the hours after midnight belong to the day before.
 	Hours [2]int64 `json:"hours"`
 
 	StartMinute int64 `json:"startMinute"`
@@ -15681,6 +15861,9 @@ type WorkflowSummary struct {
 	LastFiredBy *WorkflowCause `json:"lastFiredBy,omitzero"`
 
 	CooldownEndsAt *Date `json:"cooldownEndsAt,omitzero"`
+
+	// When a fire held outside the workflow's hours: can start (#4818): the first time its hours: are open once its cooldown is over. Absent while its hours: are open by then.
+	HoursOpenAt *Date `json:"hoursOpenAt,omitzero"`
 
 	HoldsAFire bool `json:"holdsAFire"`
 
