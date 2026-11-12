@@ -29,8 +29,10 @@ import AppKit
 ///     fine          .subheadline  11     .footnote     13
 ///     code          .body    mono 13     .subheadline mono 15
 ///
-/// Paper sets `title`, `reading`, `supporting` and `fine` in the system sans-serif.
-/// `code` stays in the system monospace.
+/// Paper v2 (#4975) sets `title`, `reading`, `supporting` and `fine` in Atkinson
+/// Hyperlegible Next and `code` in Atkinson Hyperlegible Mono on the Mac, at the same
+/// sizes and still relative to the platform's text styles. The phone keeps the system
+/// faces until #4992. `PaperFonts` registers the faces at launch.
 ///
 /// There is no `heading` step. A heading is `reading` with a weight on it, which is how
 /// `.headline` has always related to `.body` on Apple's platforms, and one fewer name
@@ -62,11 +64,11 @@ enum TextStep {
     var font: Font {
         #if os(macOS)
         switch self {
-        case .title: return .system(.title)
-        case .reading: return .system(.title3)
-        case .supporting: return .system(.body)
-        case .fine: return .subheadline
-        case .code: return .body.monospaced()
+        case .title: return .paperText(.title)
+        case .reading: return .paperText(.title3)
+        case .supporting: return .paperText(.body)
+        case .fine: return .paperText(.subheadline)
+        case .code: return .paperMono(.body)
         }
         #else
         switch self {
@@ -155,18 +157,65 @@ private struct ScaledGlyph: ViewModifier {
 }
 
 #if os(macOS)
+extension Font {
+    /// Atkinson Hyperlegible Next at a text style's size on this Mac, and relative to
+    /// that style, so it grows with the Mac's text size as `.system(style)` did.
+    static func paperText(_ style: Font.TextStyle) -> Font {
+        .custom(PaperFonts.text, size: TextStep.points(style), relativeTo: style)
+    }
+
+    /// Atkinson Hyperlegible Mono the same way, for `code`.
+    static func paperMono(_ style: Font.TextStyle) -> Font {
+        .custom(PaperFonts.mono, size: TextStep.points(style), relativeTo: style)
+    }
+}
+
+extension NSFont {
+    /// The AppKit side of `Font.paperText`, for the passage editor; the system face
+    /// when the font is not registered.
+    static func paper(_ style: NSFont.TextStyle) -> NSFont {
+        let size = NSFont.preferredFont(forTextStyle: style).pointSize
+        return NSFont(name: PaperFonts.text, size: size) ?? .preferredFont(forTextStyle: style)
+    }
+
+    /// The same for `code`.
+    static func paperMono(_ style: NSFont.TextStyle) -> NSFont {
+        let size = NSFont.preferredFont(forTextStyle: style).pointSize
+        return NSFont(name: PaperFonts.mono, size: size) ?? .monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+}
+
+extension TextStep {
+    /// A SwiftUI text style's size on this Mac, read from AppKit's same style.
+    static func points(_ style: Font.TextStyle) -> CGFloat {
+        let appKit: NSFont.TextStyle = switch style {
+        case .largeTitle: .largeTitle
+        case .title: .title1
+        case .title2: .title2
+        case .title3: .title3
+        case .headline: .headline
+        case .subheadline: .subheadline
+        case .callout: .callout
+        case .footnote: .footnote
+        case .caption: .caption1
+        case .caption2: .caption2
+        default: .body
+        }
+        return NSFont.preferredFont(forTextStyle: appKit).pointSize
+    }
+}
+
 extension TextStep {
     /// The same step for an AppKit text view, which takes an `NSFont` rather than a
     /// `Font`. Resolved here for the reason every other step is: this is the one place
     /// a step becomes a size.
     var nsFont: NSFont {
         switch self {
-        case .title: return .preferredFont(forTextStyle: .title1)
-        case .reading: return .preferredFont(forTextStyle: .title3)
-        case .supporting: return .preferredFont(forTextStyle: .body)
-        case .fine: return .preferredFont(forTextStyle: .subheadline)
-        case .code: return .monospacedSystemFont(ofSize: NSFont.preferredFont(forTextStyle: .body).pointSize,
-                                                  weight: .regular)
+        case .title: return .paper(.title1)
+        case .reading: return .paper(.title3)
+        case .supporting: return .paper(.body)
+        case .fine: return .paper(.subheadline)
+        case .code: return .paperMono(.body)
         }
     }
 
@@ -232,7 +281,11 @@ extension TextStep {
     }
 
     fileprivate static func sized(_ points: CGFloat, monospaced: Bool) -> Font {
+        #if os(macOS)
+        .custom(monospaced ? PaperFonts.mono : PaperFonts.text, fixedSize: points)
+        #else
         monospaced ? .system(size: points, design: .monospaced) : .system(size: points)
+        #endif
     }
 }
 
@@ -259,7 +312,7 @@ extension TextStep {
     static func heading(level: Int) -> Font {
         #if os(macOS)
         let style: Font.TextStyle = level <= 1 ? .title : level == 2 ? .title2 : .title3
-        return Font.system(style).weight(.semibold)
+        return Font.paperText(style).weight(.semibold)
         #else
         let style: Font.TextStyle = level <= 1 ? .title : level == 2 ? .title2 : .body
         let font = Font.system(style)

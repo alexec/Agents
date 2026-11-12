@@ -571,6 +571,11 @@ targets:
         optional: true
       - path: App/Resources/toolsets
         type: folder
+      # Paper v2's faces (#4975): Atkinson Hyperlegible Next and Mono, with their
+      # licence, in the bundle's fonts folder. PaperFonts registers them at launch.
+      - path: design/fonts
+        type: folder
+        buildPhase: resources
       # The web remote (071), as the script above left it. agents-control serves only what
       # its MANIFEST lists, and nothing when there is none.
       - path: Web/dist

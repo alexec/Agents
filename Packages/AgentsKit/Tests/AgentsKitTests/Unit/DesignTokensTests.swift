@@ -183,14 +183,17 @@ struct DesignTokensTests {
     }
 
     /// The text style a step draws in on one platform, from TypeScale's `font` switch:
-    /// `.system(.title3)` and `.body.monospaced()` are `.title3` and `.body`.
+    /// `.system(.title3)`, `.paperText(.title3)`, `.body.monospaced()` and
+    /// `.paperMono(.body)` are `.title3` and `.body`.
     static func styles(in block: Substring) -> [String: String] {
         var found: [String: String] = [:]
         for line in block.components(separatedBy: "\n") {
             guard let caseRange = line.range(of: "case ."), let returnRange = line.range(of: "return ") else { continue }
             let step = String(line[caseRange.upperBound...].prefix { $0.isLetter })
             var style = String(line[returnRange.upperBound...]).trimmingCharacters(in: .whitespaces)
-            style = style.replacingOccurrences(of: ".system(", with: "").replacingOccurrences(of: ".monospaced()", with: "")
+            for wrapper in [".system(", ".paperText(", ".paperMono(", ".monospaced()"] {
+                style = style.replacingOccurrences(of: wrapper, with: "")
+            }
             found[step] = String(style.prefix { $0 != ")" })
         }
         return found
