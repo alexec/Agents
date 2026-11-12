@@ -45,7 +45,10 @@ func TestAnAgentWritesAWorkflow(t *testing.T) {
 	if text != "1 workflow:\n- check: Every weekday on the half hour between 9am and 5pm, in a new agent, at most once every 2 hours [turned off: written by an agent, waiting for the person]" {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(7, "manage_workflows", map[string]any{"action": "enable", "id": "check"}); !isErr || !strings.HasPrefix(text, "Nothing was changed: check was written by an agent") {
+	// It is the person's to turn on: enable asks them (#4538), and nothing changes until they answer.
+	_, left := formHolds(t)
+	left()
+	if text, isErr := m.tool(7, "manage_workflows", map[string]any{"action": "enable", "id": "check"}); isErr || !strings.HasPrefix(text, "Nothing was changed yet: turning on the workflow check in ") {
 		t.Fatal(text)
 	}
 	if text, _ := m.tool(8, "manage_workflows", map[string]any{"action": "read", "id": "check"}); text != string(b) {

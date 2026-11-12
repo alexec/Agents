@@ -81,6 +81,7 @@ var appToolMethods = map[string]string{
 	"hang_up":                "calls/hangUp",
 	"manage_workflows":       "workflows/manage",
 	"manage_accounts":        "accounts/manage",
+	"manage_connectors":      "connectors/manage",
 	"lease_resource":         "resources/lease",
 	"release_resource":       "resources/release",
 	"list_resources":         "resources/list",

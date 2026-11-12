@@ -31,6 +31,17 @@ test("a secret's use has four answers, and a session's own secret no Always Appr
   assert.deepEqual(words.secretUseActions({ ...use, sessionOnly: true }), ["once", "session", "deny"]);
 });
 
+test("an agent asks to turn on a workflow or approve a connector, with Approve and Deny only (#4538)", () => {
+  const workflow = { name: "answer-a-sign-up-code", use: "workflow", place: "Agents" };
+  assert.equal(words.secretUseTitle(workflow), "Wants to turn on answer-a-sign-up-code");
+  assert.equal(words.secretUseWhere(workflow), "Workflow in Agents");
+  assert.deepEqual(words.secretUseActions(workflow), ["once", "deny"]);
+  const connector = { name: "email", use: "connector", place: "Agents", digest: "d1" };
+  assert.equal(words.secretUseTitle(connector), "Wants to approve email");
+  assert.equal(words.secretUseWhere(connector), "Connector in Agents");
+  assert.deepEqual(words.secretUseActions(connector), ["once", "deny"]);
+});
+
 test("another request is not a secret's use", () => {
   assert.equal(words.secretUseOf({ source: "question", kind: "decide", detail: {} }), undefined);
 });

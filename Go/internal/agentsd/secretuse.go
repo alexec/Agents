@@ -69,6 +69,9 @@ func secretUseWords(r wire.RequestSecretUse, id wire.UUID) string {
 	if r.Use == wire.SecretUseBrowser || r.Use == wire.SecretUseScreen {
 		return driveWaitWords(r, id)
 	}
+	if personChange(r.Use) {
+		return personChangeWaitWords(r, id)
+	}
 	if r.Use == wire.SecretUseAccount {
 		return "Nothing was read yet: the account " + r.Name + " has Ask before use, and a person has not yet approved your " + accountCall(r) + " of it. " +
 			"Wait with wait_for_event, where: {\"request\": \"" + string(id) + "\"}, then call manage_accounts again."
@@ -165,6 +168,9 @@ func (d *Daemon) afterSecretUse(agent wire.UUID, ask wire.RequestSecretUse, id w
 	if ask.Use == wire.SecretUseAccount {
 		return "", errAccountUseDenied{ask.Name}
 	}
+	if personChange(ask.Use) {
+		return "", errPersonChangeDenied{ask}
+	}
 	if ask.Use == wire.SecretUseBrowser || ask.Use == wire.SecretUseScreen {
 		return "", &Error{Code: CodeNotPermitted, Message: driveDeniedWords(ask.Use)}
 	}
@@ -200,7 +206,8 @@ func (d *Daemon) secretUseAllowed(agent wire.UUID, name string, use wire.SecretU
 	}
 	d.secretUseMu.Unlock()
 	// An account's Always Approve is its Ask before use turned off (accountuse.go), not a grant.
-	if use == wire.SecretUseAccount || d.isSessionSecret(agent, name) {
+	// Nor is a workflow's or a connector's Approve (#4538): it is the change itself, made once.
+	if use == wire.SecretUseAccount || personChange(use) || d.isSessionSecret(agent, name) {
 		return false
 	}
 	home := d.personalHome()
@@ -244,11 +251,13 @@ func (d *Daemon) openSecretUseRequest(agent wire.UUID, ask wire.RequestSecretUse
 	at := now()
 	asker := agent
 	title := map[wire.SecretUse]string{wire.SecretUseFill: "Fill " + ask.Name + " on " + ask.Place,
-		wire.SecretUseCi:      "Set " + ask.Name + " as a CI secret in " + ask.Place,
-		wire.SecretUseMCP:     "Send " + ask.Name + " to the MCP server " + ask.Place,
-		wire.SecretUseAccount: "Read the account " + ask.Name,
-		wire.SecretUseBrowser: "Use the browser on " + ask.Place,
-		wire.SecretUseScreen:  "Use the screen on " + ask.Place}[ask.Use]
+		wire.SecretUseCi:        "Set " + ask.Name + " as a CI secret in " + ask.Place,
+		wire.SecretUseMCP:       "Send " + ask.Name + " to the MCP server " + ask.Place,
+		wire.SecretUseAccount:   "Read the account " + ask.Name,
+		wire.SecretUseBrowser:   "Use the browser on " + ask.Place,
+		wire.SecretUseScreen:    "Use the screen on " + ask.Place,
+		wire.SecretUseWorkflow:  "Turn on the workflow " + ask.Name + " in " + ask.Place,
+		wire.SecretUseConnector: "Approve the connector " + ask.Name + " in " + ask.Place}[ask.Use]
 	if ask.App != nil && ask.Use == wire.SecretUseScreen {
 		title = "Use " + *ask.App + " through the screen on " + ask.Place
 	}
@@ -285,6 +294,9 @@ func (d *Daemon) answerSecretUse(rec wire.Request, a *wire.RequestSecretUseAnswe
 	}
 	if ask.Use == wire.SecretUseBrowser || ask.Use == wire.SecretUseScreen {
 		return d.answerDriveUse(rec, a, by)
+	}
+	if personChange(ask.Use) {
+		return d.answerPersonChange(rec, a, by)
 	}
 	if a.Action == secretUseHour {
 		return wire.RequestUpdate{}, Invalid("Approve for 1 Hour is for a terminal's request; this one takes once, session, always or deny.")

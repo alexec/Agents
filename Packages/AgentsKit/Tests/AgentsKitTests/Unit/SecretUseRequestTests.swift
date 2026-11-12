@@ -35,6 +35,16 @@ struct SecretUseRequestTests {
         #expect(browser.secretUse?.actions == [.once, .session, .always, .deny])
         let screen = try request(#"{"secretUse":{"name":"the screen","use":"screen","place":"Studio","app":"TextEdit"}}"#)
         #expect(screen.line(asker: nil) == "Screen: TextEdit on Studio")
+        // #4538: an agent asks to turn on its folder's workflow, or approve its folder's connector.
+        let workflow = try request(#"{"secretUse":{"name":"answer-a-sign-up-code","use":"workflow","place":"Agents"}}"#)
+        #expect(workflow.title(asker: "Sign up") == "Wants to turn on answer-a-sign-up-code")
+        #expect(workflow.line(asker: "Sign up") == "Sign up · Workflow in Agents")
+        #expect(workflow.secretUse?.actions == [.once, .deny])
+        let connector = try request(#"{"secretUse":{"name":"email","use":"connector","place":"Agents","digest":"d1"}}"#)
+        #expect(connector.title(asker: nil) == "Wants to approve email")
+        #expect(connector.line(asker: nil) == "Connector in Agents")
+        #expect(connector.secretUse?.digest == "d1")
+        #expect(connector.secretUse?.actions == [.once, .deny])
         #expect(NeedRequest.Action.allCases.map(\.word) == ["Approve", "Approve for This Session", "Always Approve", "Approve for 1 Hour", "Deny"])
     }
 

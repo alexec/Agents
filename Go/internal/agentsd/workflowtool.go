@@ -397,13 +397,19 @@ func (d *Daemon) manageWorkflows(caller wire.UUID, args map[string]json.RawMessa
 			return id + " is already turned off.", nil
 		}
 		if on && s.OffReason != nil {
+			// The person's to turn on: asked by a Needs you card (#4538), refused only where
+			// nobody answers.
+			var refusal error
 			switch *s.OffReason {
 			case wire.WorkflowOffReasonFile:
-				return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was changed: " + id + "'s file says `enabled: false`, so it stays off until the person turns it on from the folder page. Ask them to if it should run."}
+				refusal = &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was changed: " + id + "'s file says `enabled: false`, so it stays off until the person turns it on from the folder page. Ask them to if it should run."}
 			case wire.WorkflowOffReasonWrittenByAgent:
-				return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was changed: " + id + " was written by an agent, so it starts off until the person turns it on from its page. Ask them to if it should run."}
+				refusal = &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was changed: " + id + " was written by an agent, so it starts off until the person turns it on from its page. Ask them to if it should run."}
 			case wire.WorkflowOffReasonPerson:
-				return "", &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was changed: " + id + " was turned off by the person, so only they can turn it back on, from the folder page. Ask them to if it should run again."}
+				refusal = &Error{Code: wire.FailureWorkflowTurnedOffByPerson, Message: "Nothing was changed: " + id + " was turned off by the person, so only they can turn it back on, from the folder page. Ask them to if it should run again."}
+			}
+			if refusal != nil {
+				return d.enableForPerson(a.ID, folder, id, refusal)
 			}
 		}
 		got, err := d.enableWorkflow(wire.WorkflowEnableRequest{Folder: store.FolderURL(folder), WorkflowID: id, Enabled: on}, "agent")

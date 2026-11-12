@@ -11980,6 +11980,9 @@ type RequestSecretUse struct {
 	// For screen (#4264): the app drive_screen names in the call that asks.
 	App *string `json:"app,omitzero"`
 
+	// For connector (#4538): the server's entry digest when the agent asked. Approve approves only that entry: one changed since is refused, and the agent asks again.
+	Digest *string `json:"digest,omitzero"`
+
 	// The secret is the session's own (#3548): Always Approve is the same as Approve for This Session.
 	SessionOnly *bool `json:"sessionOnly,omitzero"`
 
@@ -12852,7 +12855,7 @@ type SecretTerminalValue struct {
 	Words *string `json:"words,omitzero"`
 }
 
-// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120). terminal (#4179) prints a secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163) is not a secret's use: manage_accounts reads an account with Ask before use; the request names the account, and Always Approve turns its Ask before use off. browser and screen (#4264) are not a secret's use either: an agent's lease of the browser or the screen on a machine whose Browser or Desktop control is ask; name is the browser or the screen, place the machine, app the app drive_screen names, and Always Approve sets the setting to always.
+// What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120). terminal (#4179) prints a secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163) is not a secret's use: manage_accounts reads an account with Ask before use; the request names the account, and Always Approve turns its Ask before use off. browser and screen (#4264) are not a secret's use either: an agent's lease of the browser or the screen on a machine whose Browser or Desktop control is ask; name is the browser or the screen, place the machine, app the app drive_screen names, and Always Approve sets the setting to always. workflow and connector (#4538) are not a secret's use either: an agent asks to turn on a workflow of its folder that is the person's to turn on (manage_workflows enable), or to approve a server waiting in its folder's .agents/mcp.json (manage_connectors approve); name is the workflow's id or the server's name, place the folder's name, digest the server's entry as the agent saw it. Their answers are once (Approve: agentsd makes the change as the person) and deny.
 type SecretUse string
 
 const SecretUseFill SecretUse = "fill"
@@ -12862,6 +12865,8 @@ const SecretUseTerminal SecretUse = "terminal"
 const SecretUseAccount SecretUse = "account"
 const SecretUseBrowser SecretUse = "browser"
 const SecretUseScreen SecretUse = "screen"
+const SecretUseWorkflow SecretUse = "workflow"
+const SecretUseConnector SecretUse = "connector"
 
 // control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was removed with secrets on it.
 type SecretsLeft struct {

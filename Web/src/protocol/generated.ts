@@ -11152,6 +11152,11 @@ export interface RequestSecretUse {
   /** For screen (#4264): the app drive_screen names in the call that asks. */
   app?: string;
   /**
+   * For connector (#4538): the server's entry digest when the agent asked. Approve approves only
+   * that entry: one changed since is refused, and the agent asks again.
+   */
+  digest?: string;
+  /**
    * The secret is the session's own (#3548): Always Approve is the same as Approve for This
    * Session.
    */
@@ -11966,7 +11971,12 @@ export interface SecretTerminalValue {
  * the account, and Always Approve turns its Ask before use off. browser and screen (#4264) are not
  * a secret's use either: an agent's lease of the browser or the screen on a machine whose Browser
  * or Desktop control is ask; name is the browser or the screen, place the machine, app the app
- * drive_screen names, and Always Approve sets the setting to always.
+ * drive_screen names, and Always Approve sets the setting to always. workflow and connector (#4538)
+ * are not a secret's use either: an agent asks to turn on a workflow of its folder that is the
+ * person's to turn on (manage_workflows enable), or to approve a server waiting in its folder's
+ * .agents/mcp.json (manage_connectors approve); name is the workflow's id or the server's name,
+ * place the folder's name, digest the server's entry as the agent saw it. Their answers are once
+ * (Approve: agentsd makes the change as the person) and deny.
  */
 export type SecretUse =
   | "fill"
@@ -11975,7 +11985,9 @@ export type SecretUse =
   | "terminal"
   | "account"
   | "browser"
-  | "screen";
+  | "screen"
+  | "workflow"
+  | "connector";
 
 /**
  * control/secretsLeft (#1760, FR-026): to the person's own clients, when one of their machines was
@@ -16622,7 +16634,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   RequestDetail: { required: [], optional: ["elicitation", "secretUse"] },
   RequestForge: { required: ["provider", "repo", "item", "number", "url", "label", "checklist", "seenAt"], optional: ["screenshots", "author", "updatedAt"] },
   RequestFormAnswer: { required: ["action"], optional: ["content"] },
-  RequestSecretUse: { required: ["name", "use", "place"], optional: ["call", "app", "sessionOnly", "needsSignature"] },
+  RequestSecretUse: { required: ["name", "use", "place"], optional: ["call", "app", "digest", "sessionOnly", "needsSignature"] },
   RequestSecretUseAnswer: { required: ["action"], optional: ["approval"] },
   RequestUpdate: { required: ["request"], optional: [] },
   RequestWaiter: { required: ["agent", "since"], optional: [] },
