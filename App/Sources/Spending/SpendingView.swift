@@ -41,7 +41,7 @@ struct SpendingView: View {
             .toolbar {
                 if reportsShown {
                     ToolbarItem {
-                        Button(ReportsLink.title, systemImage: "chart.bar.doc.horizontal") { openReports() }
+                        Button(ReportsLink.title, icon: "chart.bar.doc.horizontal") { openReports() }
                             .labelStyle(.titleAndIcon)
                             .help(ReportsLink.help)
                     }
