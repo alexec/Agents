@@ -27,20 +27,13 @@ const standingPages = 5
 // standingFields are the fields a standing block can say.
 var standingFields = []string{"labels", "any", "not", "milestone", "parent", "lanes"}
 
-// standingQuery is a standing block as read: the wire's query, and parent: none (#4335), which
-// takes only issues that are no other issue's sub-issue. The wire does not say parent yet.
-type standingQuery struct {
-	wire.ForgeStanding
-	noParent bool
-}
-
 // standingOf reads the standing block in an epic's body. A body with no block, a second block,
 // or an unknown or bad field gives a query with Error set.
-func standingOf(body string) standingQuery {
-	out := standingQuery{ForgeStanding: wire.ForgeStanding{Labels: []string{}, Any: []string{}, Not: []string{}, Lanes: 1}}
-	fail := func(format string, a ...any) standingQuery {
-		return standingQuery{ForgeStanding: wire.ForgeStanding{Labels: []string{}, Any: []string{}, Not: []string{}, Lanes: 1,
-			Error: new(fmt.Sprintf(format, a...))}}
+func standingOf(body string) wire.ForgeStanding {
+	out := wire.ForgeStanding{Labels: []string{}, Any: []string{}, Not: []string{}, Lanes: 1}
+	fail := func(format string, a ...any) wire.ForgeStanding {
+		return wire.ForgeStanding{Labels: []string{}, Any: []string{}, Not: []string{}, Lanes: 1,
+			Error: new(fmt.Sprintf(format, a...))}
 	}
 	var block []string
 	blocks, in := 0, false
@@ -98,7 +91,8 @@ func standingOf(body string) standingQuery {
 			if !strings.EqualFold(value, "none") {
 				return fail("the standing block's parent is %q; it is none", value)
 			}
-			out.noParent = true
+			// parent: none (#4335) takes only issues that are no other issue's sub-issue.
+			out.Parent = new("none")
 		case "lanes":
 			n, err := strconv.Atoi(value)
 			if err != nil || n < 1 {
@@ -124,7 +118,7 @@ func standingList(s string) []string {
 // standingMatches says the query takes i: an open issue that is not an epic, with the query's
 // labels and milestone. parent: none is said by standingParentless, as GitLab's and Forgejo's
 // lists do not read an issue's parent.
-func standingMatches(q standingQuery, i wire.ForgeItem) bool {
+func standingMatches(q wire.ForgeStanding, i wire.ForgeItem) bool {
 	if i.Node.Kind != lineage.KindIssue || i.State != "open" || deref(i.Level) == "epic" || hasLabel(i, "epic") {
 		return false
 	}
@@ -199,11 +193,11 @@ func (d *Daemon) standingPlan(ctx context.Context, method string, epic wire.Forg
 	}
 	q := standingOf(detail.Body)
 	if q.Error != nil {
-		return q.ForgeStanding, nil, nil
+		return q, nil, nil
 	}
 	if deref(epic.Folder) == "" {
 		q.Error = new("no folder on this machine is on the epic's repo")
-		return q.ForgeStanding, nil, nil
+		return q, nil, nil
 	}
 	list := wire.ForgeListRequest{Folder: epic.Folder, State: new("open"), Limit: new(int64(forgeListMost))}
 	if len(q.Labels) > 0 {
@@ -227,7 +221,7 @@ func (d *Daemon) standingPlan(ctx context.Context, method string, epic wire.Forg
 		list.Cursor = page.Cursor
 	}
 	standingOrder(items)
-	if q.noParent {
+	if q.Parent != nil {
 		if items, err = d.standingParentless(ctx, method, epic, items); err != nil {
 			return wire.ForgeStanding{}, nil, err
 		}
@@ -239,7 +233,7 @@ func (d *Daemon) standingPlan(ctx context.Context, method string, epic wire.Forg
 	if err := d.standingBlockers(ctx, method, epic, children); err != nil {
 		return wire.ForgeStanding{}, nil, err
 	}
-	return q.ForgeStanding, children, nil
+	return q, children, nil
 }
 
 // standingParentsMost is how many issues one read of their parents asks about, as GitLab's and

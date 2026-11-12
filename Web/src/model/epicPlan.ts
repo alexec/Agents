@@ -224,6 +224,7 @@ export function queryWords(standing: ForgeStanding): string {
   if (milestone.toLowerCase() === "none") parts.push("no milestone");
   else if (milestone.toLowerCase() === "any") parts.push("in a milestone");
   else if (milestone) parts.push(`milestone “${milestone}”`);
+  if (standing.parent === "none") parts.push("no parent");
   parts.push(standing.lanes === 1 ? "1 lane at a time" : `${standing.lanes} lanes at a time`);
   return parts.join(" · ");
 }
@@ -233,7 +234,7 @@ export function queryWords(standing: ForgeStanding): string {
 export function queryRestWords(standing: ForgeStanding): string {
   const parts: string[] = [];
   if (standing.any.length > 0) parts.push(`${standing.labels.length > 0 ? "and " : ""}${standing.any.join(" or ")}`);
-  // The words after the first part, the labels' (milestone, lanes and not), as queryWords says them.
+  // The words after the first part, the labels' (not, milestone, parent and lanes), as queryWords says them.
   parts.push(...queryWords(standing).split(" · ").slice(1));
   return parts.map((p) => `· ${p}`).join(" ");
 }
