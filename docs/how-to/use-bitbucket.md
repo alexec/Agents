@@ -207,6 +207,13 @@ here too:
 - `checks.failed`: a status of an open pull request's head commit is FAILED. Bitbucket
   Pipelines and any CI that sets a commit status count. `run.id` is the Pipelines build
   number, or 0 for another CI.
+- `run.completed`: a Pipelines run of any trigger finished (a push, a tag, a schedule, a
+  custom pipeline run by hand), whatever its result (`successful`, `failed`, `error`,
+  `stopped`, `expired`), as the github connector's. `pipeline` (a custom pipeline's name, or
+  a branch pattern), `branch` (a branch or tag, as `main` or `v0.16.0`) and `run` (a build
+  number) narrow it. A run again is a new event. `deploys` lists what it deployed: each of
+  its steps with `deployment:` that deployed, as
+  `bitbucket:<workspace/name>/<environment>/<build number>`. A step needs nothing more.
 - `pr.opened`, `pr.merged`, `pr.closed` (declined), `pr.conflicted` (a file of its diff is
   in conflict).
 - `review.requested` and `issue.assigned`: for you, the token's owner.
@@ -224,6 +231,11 @@ the members of the workspace instead.
   task) and its component are its labels: `label` filters by them, and `issue.labelled` is
   a kind or a component set to a new value.
 - **A repository with its issue tracker off has no issue events.**
+- **No `deploy.waiting`.** Bitbucket has no API to read or answer a deploy that waits (a
+  manual step, or Premium's deployment permissions), so a deploy that waits is answered on
+  Bitbucket only.
+- **`run.completed` reads the completed runs created in the 12 hours before a poll**, at
+  most 500, and a run's deploys from the repository's newest 50 deployments.
 - **Checks and conflicts are read for the 50 open pull requests updated last.** Bitbucket
   has no list of a repository's failed checks or conflicts, so each poll reads those.
 - **The Work pages read Bitbucket on each machine.** The list asks each repository for a

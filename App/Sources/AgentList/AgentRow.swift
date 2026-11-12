@@ -377,7 +377,16 @@ struct AgentRow: View {
                     .help(MuteWords.help(muted: agent.isMuted))
                 }
                 // The person's title, which the runtime's no longer replaces (#751).
+                // Each with the list's key (#4796), which works while the list has the keyboard.
                 Button("Rename…") { model.renaming = Renaming(id: agent.id) }
+                    .keyboardShortcut(ListKey.rename.shortcut)
+                // A question it asked, out of Needs you for an hour, as l does (#4796).
+                if let request = model.work.laterRequest(askedBy: agent.id) {
+                    Button(ListKey.laterWord) {
+                        Task { await model.deferRequest(request, ListKey.laterTime.params(id: request.id)) }
+                    }
+                    .keyboardShortcut(ListKey.later.shortcut)
+                }
                 // At the top of its folder whatever its state, or back among the rest (#180).
                 PinSessionButton(agent: agent)
                 // Branching leaves the original alone and carries the history so far.
@@ -388,6 +397,7 @@ struct AgentRow: View {
                         .disabled(isActing)
                 }
                 Button("Archive") { Task { await model.archive(agent.id, andLeave: true) } }
+                    .keyboardShortcut(ListKey.archive.shortcut)
                     .disabled(isActing)
                 // Deny an agent's ask to be archived (#773): the session stays.
                 if agent.asksToArchive {

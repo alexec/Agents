@@ -4299,6 +4299,11 @@ export interface Folder {
   pinned?: boolean;
   /** Absent is off (#2352). */
   prCostComment?: PRCostComment;
+  /**
+   * The project's working hours (#4821), for a workflow's hours: working and hours: not-working,
+   * from .agents/folder.json. Absent is 09:00-17:00, Mon-Fri. Never named.
+   */
+  workingHours?: WorkflowHours;
 }
 
 export interface FolderDetection {
@@ -12417,6 +12422,14 @@ export interface SetUnreadRequest {
   unread: boolean;
 }
 
+export interface SetWorkingHoursRequest {
+  folder: URLString;
+  /**
+   * Absent, or hours that limit nothing, takes the setting out: 09:00-17:00, Mon-Fri. Never named.
+   */
+  hours?: WorkflowHours;
+}
+
 /**
  * policy/setYours (#2957): the rules to save as your layer, at the revision this client last read.
  * Refused conflict when revision is not the current one, notKeeper on a machine that is not the
@@ -14461,7 +14474,18 @@ export interface WorkflowHours {
   days?: Weekday[];
   /** time-zone:, an IANA name. Absent is the person's timeZone setting, else the host's zone. */
   timeZone?: string;
+  /**
+   * hours: working or hours: not-working (#4821): the project's working hours
+   * (Folder.workingHours), or every time outside them. With it, between, days and timeZone are
+   * absent.
+   */
+  named?: WorkflowHoursName;
 }
+
+/** A named window in a workflow's hours: (#4821). */
+export type WorkflowHoursName =
+  | "working"
+  | "not-working";
 
 export type WorkflowLimit = "folder";
 
@@ -14925,6 +14949,7 @@ export interface Methods {
   "folders/setPRCostComment": { params: SetPRCostCommentRequest; result: FolderSummary };
   "folders/setPinned": { params: SetPinnedRequest; result: FolderSummary };
   "folders/setProject": { params: SetFolderProjectRequest; result: FolderSummary };
+  "folders/setWorkingHours": { params: SetWorkingHoursRequest; result: FolderSummary };
   "folders/unarchive": { params: FolderRequest; result: FolderSummary };
   "folders/undoGuardedChange": { params: GuardedChangeRequest; result: FolderSummary };
   "forge/add-child": { params: ForgeAddChildRequest; result: ForgeDone };
@@ -15363,6 +15388,7 @@ export const MethodTarget = {
   "folders/setPRCostComment": "host",
   "folders/setPinned": "host",
   "folders/setProject": "host",
+  "folders/setWorkingHours": "host",
   "folders/unarchive": "host",
   "folders/undoGuardedChange": "host",
   "forge/add-child": "host",
@@ -16054,7 +16080,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FindResult: { required: ["matches", "more"], optional: [] },
   FleetBoard: { required: ["machines"], optional: [] },
   FleetMachine: { required: ["host", "ownerName", "bot"], optional: ["running", "heardAt"] },
-  Folder: { required: ["folder", "addedAt"], optional: ["archivedAt", "helperLimits", "diskSpace", "pinned", "prCostComment"] },
+  Folder: { required: ["folder", "addedAt"], optional: ["archivedAt", "helperLimits", "diskSpace", "pinned", "prCostComment", "workingHours"] },
   FolderDetection: { required: ["enabled", "paths"], optional: [] },
   FolderHunk: { required: ["oldStart", "newStart", "noNewlineAtEnd", "lines"], optional: [] },
   FolderMCPServer: { required: ["name", "summary", "approval", "missingSecrets", "secretNames", "entryDigest"], optional: ["managed", "signIn", "views"] },
@@ -16711,6 +16737,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   SetProviderRequest: { required: ["runtimeID", "providerID"], optional: [] },
   SetSandboxRequest: { required: ["agentID"], optional: ["choice"] },
   SetUnreadRequest: { required: ["agentID", "unread"], optional: [] },
+  SetWorkingHoursRequest: { required: ["folder"], optional: ["hours"] },
   SetYourPolicyRequest: { required: ["rules", "revision"], optional: [] },
   SettleUntrustedYourPolicyRequest: { required: ["file", "revision", "sign"], optional: [] },
   SharedInstructions: { required: ["path", "exists", "reach"], optional: [] },
@@ -16893,7 +16920,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowClaim: { required: ["workflow", "trigger"], optional: [] },
   WorkflowClaimed: { required: ["won"], optional: [] },
   WorkflowEnableRequest: { required: ["folder", "workflowID", "enabled"], optional: [] },
-  WorkflowHours: { required: [], optional: ["between", "days", "timeZone"] },
+  WorkflowHours: { required: [], optional: ["between", "days", "timeZone", "named"] },
   WorkflowLimitSettings: { required: [], optional: ["total"] },
   WorkflowMCPClearMissedRequest: { required: ["folder", "workflowID", "name"], optional: ["server"] },
   WorkflowMuteRequest: { required: ["folder", "workflowID", "muted"], optional: [] },

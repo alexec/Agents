@@ -374,7 +374,7 @@ func TestEventsListGivesWhichArgumentsNameOne(t *testing.T) {
 		if hasMine != named[name] || hasFixes != named[name] {
 			t.Fatalf("%s: mine %v, fixes %v", name, hasMine, hasFixes)
 		}
-		if want := named[name] || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled"; hasAny != want {
+		if want := named[name] || name == "run.completed" || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled"; hasAny != want {
 			t.Fatalf("%s: any %v", name, hasAny)
 		}
 		if issue, ok := props["issue"].(map[string]any); ok {

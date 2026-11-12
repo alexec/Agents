@@ -424,6 +424,15 @@ private struct ProjectGeneralPane: View {
                         }
                     }
                 }
+                // The working hours a workflow's `hours: working` names (#4821); an older host has none.
+                if model.host(summary.host, has: Capability.foldersWorkingHours1) {
+                    settingsRow("Working hours") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            workingHours
+                            settingsNote(WorkflowHours.workingSentence(summary.folder.workingHours))
+                        }
+                    }
+                }
             }
             .appText(.supporting)
         }
@@ -513,6 +522,17 @@ private struct ProjectGeneralPane: View {
             try? await Task.sleep(for: .milliseconds(400))
             requests.folderSheet = .chooseFolder(machine)
         }
+    }
+
+    /// The project's working hours (#4821): From, To, the time zone and the days. Hours
+    /// that limit nothing take the setting out, so they are 09:00-17:00 Mon-Fri again.
+    private var workingHours: some View {
+        let current = summary.folder.workingHours ?? .working
+        return HoursWindowControls(current: current, whose: "the working") { chosen in
+            guard let chosen, chosen != current else { return }
+            Task { await model.setWorkingHours(chosen.limits ? chosen : nil, for: summary.key) }
+        }
+        .disabled(model.hosts.isOffline(summary.host))
     }
 
     /// What the host says on the folder's merged pull requests (#2352): off, the default, or

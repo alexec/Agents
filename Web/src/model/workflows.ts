@@ -755,6 +755,8 @@ function hoursDayWords(days: Weekday[]): string | null {
 
 /** WorkflowHours.sentence: "Runs 09:00–18:00, Mon–Fri", and the zone when it is not the viewer's. */
 export function hoursSentence(h: WorkflowHours, viewer = viewerZone()): string | null {
+  if (h.named === "working") return "Runs in working hours";
+  if (h.named === "not-working") return "Runs outside working hours";
   if (h.days !== undefined && h.days.length === 0) return "Never runs on its own: its hours name no day";
   let time: string | null = null;
   if (h.between !== undefined) {

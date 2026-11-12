@@ -256,6 +256,7 @@ public enum DaemonAPI {
         /// its `.agents/folder.json`. Not in `ConnectionRole.agentMethods`: an agent cannot
         /// choose to publish what its work cost.
         public static let foldersSetPRCostComment = "folders/setPRCostComment"
+        public static let foldersSetWorkingHours = "folders/setWorkingHours"
         /// A change to an app-owned file in `.agents` made outside the app (#502): what the
         /// file was and is, line by line; and the person's Keep (the change is used from
         /// now on) or Undo (the approved copy is written back). Not in
@@ -813,6 +814,16 @@ public enum DaemonAPI {
         public init(folder: URL, prCostComment: PRCostComment) {
             self.folder = folder
             self.prCostComment = prCostComment
+        }
+    }
+
+    /// A project's working hours (#4821); nil takes them out: 09:00-17:00, Mon-Fri.
+    public struct SetWorkingHoursRequest: Codable, Sendable {
+        public var folder: URL
+        public var hours: WorkflowHours?
+        public init(folder: URL, hours: WorkflowHours?) {
+            self.folder = folder
+            self.hours = hours
         }
     }
 

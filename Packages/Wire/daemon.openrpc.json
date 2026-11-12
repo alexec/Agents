@@ -4640,6 +4640,31 @@
       }
     },
     {
+      "name": "folders/setWorkingHours",
+      "x-capability": "folders.working-hours/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/SetWorkingHoursRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
       "name": "folders/unarchive",
       "x-capability": "folders/1",
       "tags": [

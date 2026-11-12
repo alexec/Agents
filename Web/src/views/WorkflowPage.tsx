@@ -285,7 +285,9 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
             )}
             <CooldownMenu summary={summary} disabled={locked} change={change} />
             <p class="quiet small">{cooldown ?? "No cooldown: every trigger runs it, one run at a time."}</p>
-            <HoursSetting summary={summary} disabled={locked} change={change} />
+            <HoursSetting summary={summary} disabled={locked} change={change}
+              named={store.has(host, Capability.foldersWorkingHours1)}
+              project={(store.folders.value[host] ?? []).find((f) => f.folder.folder === folder)?.folder.workingHours} />
             <p class="quiet small">{hoursSentence(workflow.hours)}</p>
             {workflow.mode !== "triggering" && (
               <>

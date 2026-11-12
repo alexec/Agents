@@ -178,10 +178,13 @@ struct CommandMenuAction {
     let item: CommandFinder.Item
     let perform: @MainActor () -> Void
 
-    init(_ title: String, key: KeyboardShortcut? = nil, keywords: [String] = [],
+    /// `listKey` is the session list's single key for it (#4796), shown after the menu's key:
+    /// `⌥⌘⌫ · E`.
+    init(_ title: String, key: KeyboardShortcut? = nil, listKey: ListKey? = nil, keywords: [String] = [],
          perform: @escaping @MainActor () -> Void) {
+        let keys = [key?.glyphs, listKey?.glyph].compactMap { $0 }
         item = CommandFinder.Item(id: "action:\(title)", kind: .action, title: title,
-                                shortcut: key?.glyphs ?? "", keywords: keywords)
+                                shortcut: keys.joined(separator: " · "), keywords: keywords)
         self.perform = perform
     }
 }

@@ -143,3 +143,18 @@ test("the Hours setting writes a whole hours:, as the window's does (#4820)", as
   assert.equal(h.halfHours.length, 48);
   assert.equal(h.clockText(h.halfHours.at(-1)), "23:30");
 });
+
+test("named hours choose and say the project's working hours (#4821)", async () => {
+  const h = await load("src/model/workflowHours.ts");
+  assert.equal(h.hoursChoice({ named: "not-working" }), "notWorking");
+  assert.equal(h.hoursChoice(h.workingHours), "some");
+  assert.equal(h.hoursChoice({}), "anyTime");
+  assert.deepEqual(h.chosenHours("working"), { named: "working" });
+  assert.deepEqual(h.chosenHours("some"), h.workingHours);
+  assert.deepEqual(h.chosenHours("some", { between: "08:00-16:00", timeZone: "Asia/Tokyo" }), { between: "08:00-16:00", timeZone: "Asia/Tokyo" });
+  assert.deepEqual(h.chosenHours("anyTime"), {});
+  assert.ok(h.limits({ named: "working" }));
+  assert.equal(h.hoursSentence({ named: "working" }),
+    "Starts only in working hours, as Project Settings sets them. A trigger outside them waits, and starts it once they open.");
+  assert.ok(h.workingSentence(undefined).startsWith("Working hours are 09:00–17:00, Mon–Fri (the default)."));
+});

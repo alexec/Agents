@@ -4764,6 +4764,9 @@ type Folder struct {
 
 	// Absent is off (#2352).
 	PrCostComment *PRCostComment `json:"prCostComment,omitzero"`
+
+	// The project's working hours (#4821), for a workflow's hours: working and hours: not-working, from .agents/folder.json. Absent is 09:00-17:00, Mon-Fri. Never named.
+	WorkingHours *WorkflowHours `json:"workingHours,omitzero"`
 }
 
 type FolderDetection struct {
@@ -13354,6 +13357,13 @@ type SetUnreadRequest struct {
 	Unread bool `json:"unread"`
 }
 
+type SetWorkingHoursRequest struct {
+	Folder URL `json:"folder"`
+
+	// Absent, or hours that limit nothing, takes the setting out: 09:00-17:00, Mon-Fri. Never named.
+	Hours *WorkflowHours `json:"hours,omitzero"`
+}
+
 // policy/setYours (#2957): the rules to save as your layer, at the revision this client last read. Refused conflict when revision is not the current one, notKeeper on a machine that is not the keeper, forbidden from the agent socket role, an MCP tool or a workflow (FR-010), and invalid when the rules fail policylayers.Validate.
 type SetYourPolicyRequest struct {
 	Rules PolicyRules `json:"rules"`
@@ -15745,7 +15755,16 @@ type WorkflowHours struct {
 
 	// time-zone:, an IANA name. Absent is the person's timeZone setting, else the host's zone.
 	TimeZone *string `json:"timeZone,omitzero"`
+
+	// hours: working or hours: not-working (#4821): the project's working hours (Folder.workingHours), or every time outside them. With it, between, days and timeZone are absent.
+	Named *WorkflowHoursName `json:"named,omitzero"`
 }
+
+// A named window in a workflow's hours: (#4821).
+type WorkflowHoursName string
+
+const WorkflowHoursNameWorking WorkflowHoursName = "working"
+const WorkflowHoursNameNotWorking WorkflowHoursName = "not-working"
 
 type WorkflowLimit string
 

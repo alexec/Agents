@@ -19,7 +19,8 @@ import {
 } from "../model/workflowSettings";
 import { cooldownWords } from "../model/workflows";
 import {
-  admits, clockText, dayName, endingAt, halfHours, hoursWindow, hoursZones, inZone, limits, shownDays, startingAt, toggling, workingHours,
+  admits, chosenHours, clockText, dayName, endingAt, halfHours, hoursChoice, hoursChoiceTitles, hoursWindow, hoursZones, inZone, shownDays,
+  startingAt, toggling, type HoursChoice,
 } from "../model/workflowHours";
 import { labelKey } from "../model/labels";
 import { OptionControl } from "./PromptMenus";
@@ -160,21 +161,40 @@ function knownZones(): string[] {
 }
 
 /**
- * When it may start (#4820): Any time, or a From and To time, days and a time zone, each
- * writing the whole `hours:` into the file, as the window's Hours control does. Any time
- * takes the key out.
+ * When it may start (#4820): Any time, the project's working hours or outside them (#4821),
+ * or a From and To time, days and a time zone, each writing the whole `hours:` into the
+ * file, as the window's Hours control does. Any time takes the key out. `named` is whether
+ * the host knows working hours.
  */
-export function HoursSetting({ summary, disabled, change }: {
-  summary: WorkflowSummary; disabled: boolean; change: (change: Change) => void;
+export function HoursSetting({ summary, disabled, change, named, project }: {
+  summary: WorkflowSummary; disabled: boolean; change: (change: Change) => void; named: boolean; project?: WorkflowHours | undefined;
 }) {
   const current: WorkflowHours = summary.workflow.hours ?? {};
   const write = (h: WorkflowHours | null) => { if (h) change({ hours: h }); };
-  const some = limits(current);
-  const window = hoursWindow(current);
+  const choice = hoursChoice(current);
+  const choices: HoursChoice[] = named || current.named !== undefined
+    ? ["anyTime", "working", "notWorking", "some"] : ["anyTime", "some"];
   const kind: ConfigOption = {
     id: "hours", name: "Hours", type: "select", currentValue: null,
-    options: [{ value: false, name: "Any time" }, { value: true, name: "Some hours" }],
+    options: choices.map((c) => ({ value: c, name: hoursChoiceTitles[c] })),
   };
+  return (
+    <>
+      <div class="menus" role="group" aria-label="Hours">
+        <OptionControl option={kind} value={choice} disabled={disabled}
+          onChange={(v) => { if (v !== choice) write(chosenHours(v as HoursChoice, project)); }} />
+        {choice === "some" && <HoursWindowMenus current={current} disabled={disabled} write={write} />}
+      </div>
+      {choice === "some" && <HoursDays current={current} disabled={disabled} whose="its" write={write} />}
+    </>
+  );
+}
+
+/** From, To and the time zone of a window of hours: a workflow's Some hours, and a project's working hours (#4821). */
+export function HoursWindowMenus({ current, disabled, write }: {
+  current: WorkflowHours; disabled: boolean; write: (h: WorkflowHours | null) => void;
+}) {
+  const window = hoursWindow(current);
   const from: ConfigOption = {
     id: "hours-from", name: "From", type: "select", currentValue: null,
     options: [{ value: null, name: "All day" }, ...halfHours.map((m) => ({ value: m, name: `From ${clockText(m)}` }))],
@@ -189,35 +209,33 @@ export function HoursSetting({ summary, disabled, change }: {
   };
   return (
     <>
-      <div class="menus" role="group" aria-label="Hours">
-        <OptionControl option={kind} value={some} disabled={disabled}
-          onChange={(v) => { if (v !== some) write(v === true ? workingHours : {}); }} />
-        {some && (
-          <>
-            <OptionControl option={from} value={window?.from ?? null} disabled={disabled}
-              onChange={(v) => write(startingAt(current, typeof v === "number" ? v : null))} />
-            {window && (
-              <OptionControl option={to} value={window.to} disabled={disabled}
-                onChange={(v) => { if (typeof v === "number") write(endingAt(current, v)); }} />
-            )}
-            <OptionControl option={zone} value={current.timeZone ?? null} disabled={disabled}
-              onChange={(v) => write(inZone(current, typeof v === "string" ? v : undefined))} />
-          </>
-        )}
-      </div>
-      {some && (
-        <div class="menus" role="group" aria-label="Days">
-          {shownDays.map((d) => {
-            const on = admits(current, d);
-            return (
-              <button key={d} class={`pill${on ? " on" : ""}`} aria-pressed={on} disabled={disabled}
-                title={on ? `Take ${dayName(d)} out of its hours` : `Put ${dayName(d)} in its hours`}
-                onClick={() => write(toggling(current, d))}>{dayName(d)}</button>
-            );
-          })}
-        </div>
+      <OptionControl option={from} value={window?.from ?? null} disabled={disabled}
+        onChange={(v) => write(startingAt(current, typeof v === "number" ? v : null))} />
+      {window && (
+        <OptionControl option={to} value={window.to} disabled={disabled}
+          onChange={(v) => { if (typeof v === "number") write(endingAt(current, v)); }} />
       )}
+      <OptionControl option={zone} value={current.timeZone ?? null} disabled={disabled}
+        onChange={(v) => write(inZone(current, typeof v === "string" ? v : undefined))} />
     </>
+  );
+}
+
+/** A button for each day of a window of hours. `whose` names them in the help: "its", "the working". */
+export function HoursDays({ current, disabled, whose, write }: {
+  current: WorkflowHours; disabled: boolean; whose: string; write: (h: WorkflowHours | null) => void;
+}) {
+  return (
+    <div class="menus" role="group" aria-label="Days">
+      {shownDays.map((d) => {
+        const on = admits(current, d);
+        return (
+          <button key={d} class={`pill${on ? " on" : ""}`} aria-pressed={on} disabled={disabled}
+            title={on ? `Take ${dayName(d)} out of ${whose} hours` : `Put ${dayName(d)} in ${whose} hours`}
+            onClick={() => write(toggling(current, d))}>{dayName(d)}</button>
+        );
+      })}
+    </div>
   );
 }
 

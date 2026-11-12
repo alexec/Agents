@@ -1574,6 +1574,12 @@ struct WebFixturesTests {
             ("working hours, shut, none held", WorkflowSummary(workflow: flow("office-hours", [.schedule(nightly)],
                 hours: WorkflowHours(between: "9-18", days: [.mon, .tue, .wed, .thu, .fri])),
                 hoursOpenAt: Self.base.addingTimeInterval(7200))),
+            // Named windows (#4821): the project's working hours, or outside them.
+            ("outside working hours, a trigger held", WorkflowSummary(workflow: flow("evening", [.schedule(nightly)],
+                hours: WorkflowHours(named: .notWorking)),
+                holdsAFire: true, hoursOpenAt: Self.base.addingTimeInterval(3600))),
+            ("in working hours", WorkflowSummary(workflow: flow("daytime", [.schedule(nightly)],
+                hours: WorkflowHours(named: .working)))),
             ("weekends, every hour", WorkflowSummary(workflow: flow("weekend", [.schedule(nightly)],
                 hours: WorkflowHours(days: [.sat, .sun, .wed], timeZone: Self.viewerZone.identifier)))),
             ("a server's event, from one server", WorkflowSummary(workflow: flow("red", [.serverEvent(

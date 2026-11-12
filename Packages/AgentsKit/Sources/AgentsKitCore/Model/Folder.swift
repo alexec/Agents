@@ -32,6 +32,10 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
     /// folder's own `.agents/folder.json`. Nil is off. Only ever in a summary. Set only by
     /// `folders/setPRCostComment`, which agents cannot call.
     public var prCostComment: PRCostComment?
+    /// The project's working hours (#4821), for a workflow's `hours: working` and `hours:
+    /// not-working`, from the folder's own `.agents/folder.json`. Nil is 09:00-17:00,
+    /// Mon-Fri. Only ever in a summary. Set only by `folders/setWorkingHours`.
+    public var workingHours: WorkflowHours?
 
     /// Keys a newer version wrote that this one does not know. Kept so that opening a
     /// record in an older build and saving it does not quietly delete them.
@@ -77,7 +81,7 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
 
     public init(folder: URL, archivedAt: Date? = nil, addedAt: Date = Date(), helperLimits: HelperLimits? = nil,
                 diskSpace: DiskThresholds? = nil, pinned: Bool? = nil, prCostComment: PRCostComment? = nil,
-                unknownFields: [String: JSONValue] = [:]) {
+                workingHours: WorkflowHours? = nil, unknownFields: [String: JSONValue] = [:]) {
         self.folder = Self.standardize(folder)
         self.archivedAt = archivedAt
         self.addedAt = addedAt
@@ -85,6 +89,7 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
         self.diskSpace = diskSpace
         self.pinned = pinned
         self.prCostComment = prCostComment
+        self.workingHours = workingHours
         self.unknownFields = unknownFields
     }
 
@@ -98,6 +103,7 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
         diskSpace = (try? c.decodeIfPresent(DiskThresholds.self, forKey: .diskSpace)) ?? nil
         pinned = (try? c.decodeIfPresent(Bool.self, forKey: .pinned)) ?? nil
         prCostComment = (try? c.decodeIfPresent(PRCostComment.self, forKey: .prCostComment)) ?? nil
+        workingHours = (try? c.decodeIfPresent(WorkflowHours.self, forKey: .workingHours)) ?? nil
         let known = Set(CodingKeys.allCases.map(\.stringValue))
         unknownFields = [:]
         if let extra = try? decoder.container(keyedBy: AnyKey.self) {
@@ -116,6 +122,7 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
         try c.encodeIfPresent(diskSpace, forKey: .diskSpace)
         try c.encodeIfPresent(pinned, forKey: .pinned)
         try c.encodeIfPresent(prCostComment, forKey: .prCostComment)
+        try c.encodeIfPresent(workingHours, forKey: .workingHours)
         if !unknownFields.isEmpty {
             var extra = encoder.container(keyedBy: AnyKey.self)
             for (key, value) in unknownFields {
@@ -125,7 +132,7 @@ public struct Folder: Codable, Hashable, Sendable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case folder, archivedAt, addedAt, helperLimits, diskSpace, pinned, prCostComment
+        case folder, archivedAt, addedAt, helperLimits, diskSpace, pinned, prCostComment, workingHours
     }
 
     struct AnyKey: CodingKey {

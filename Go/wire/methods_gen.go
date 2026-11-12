@@ -169,6 +169,7 @@ var CallFoldersSetHelperLimits = Method[SetHelperLimitsRequest, FolderSummary]{"
 var CallFoldersSetPRCostComment = Method[SetPRCostCommentRequest, FolderSummary]{"folders/setPRCostComment"}
 var CallFoldersSetPinned = Method[SetPinnedRequest, FolderSummary]{"folders/setPinned"}
 var CallFoldersSetProject = Method[SetFolderProjectRequest, FolderSummary]{"folders/setProject"}
+var CallFoldersSetWorkingHours = Method[SetWorkingHoursRequest, FolderSummary]{"folders/setWorkingHours"}
 var CallFoldersUnarchive = Method[FolderRequest, FolderSummary]{"folders/unarchive"}
 var CallFoldersUndoGuardedChange = Method[GuardedChangeRequest, FolderSummary]{"folders/undoGuardedChange"}
 var CallForgeAddChild = Method[ForgeAddChildRequest, ForgeDone]{"forge/add-child"}

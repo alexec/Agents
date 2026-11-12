@@ -375,10 +375,3 @@ func (in *Inbox) Person(space string) (Person, bool) {
 
 // Boot tells a cursor of this run from one of an earlier run.
 func (in *Inbox) Boot() string { return in.boot }
-
-// Failure is the last pull's failure, nil when it worked.
-func (in *Inbox) Failure() error {
-	in.mu.Lock()
-	defer in.mu.Unlock()
-	return in.failure
-}

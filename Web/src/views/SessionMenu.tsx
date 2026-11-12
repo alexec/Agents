@@ -21,6 +21,8 @@ import { Capability } from "../protocol/capabilities.generated";
 import { setShowsThoughts, showsThoughts, thoughtsItem } from "../model/thoughts";
 import { moveToMachine } from "./MoveToMachineDialog";
 import { ask } from "./MessageKinds";
+import { MenuKey } from "./ContextMenu";
+import { listKeyGlyph } from "../model/listKeys";
 
 export type Action = "carryOn" | "agents/stop" | "stopAll" | "agents/archive" | "agents/unarchive"
   | "markRead" | "markUnread" | "mute" | "unmute" | "rename" | "pin" | "unpin" | "fork" | "moveToMachine" | "delete" | "keep";
@@ -31,8 +33,8 @@ export type Action = "carryOn" | "agents/stop" | "stopAll" | "agents/archive" | 
  * while one of them can stop (#835); given a host that can move it, Move to Machine… (#3790).
  */
 export function sessionActions(agent: Agent, pinned?: boolean, started: readonly Agent[] = [], canMute = false, canMove = false)
-  : { action: Action; label: string; help: string }[] {
-  const found: { action: Action; label: string; help: string }[] = [];
+  : { action: Action; label: string; help: string; shortcut?: string }[] {
+  const found: { action: Action; label: string; help: string; shortcut?: string }[] = [];
   const holds = agent.state === "starting" || agent.state === "running" || agent.state === "waitingOnUser";
   // First, as the window's row menu has it (AgentRow's contextMenu); the strip in the chat has it too.
   if (openBlock(agent)) found.push({ action: "carryOn", label: carryOnLabel, help: carryOnHelp(agent) });
@@ -60,7 +62,8 @@ export function sessionActions(agent: Agent, pinned?: boolean, started: readonly
   }
   // The person's title, which the runtime's no longer replaces (#751), edited where it is shown.
   if (agent.state !== "archived") {
-    found.push({ action: "rename", label: "Rename…", help: "Give this session a title of your own" });
+    // With the list's key (#4796), as Archive's.
+    found.push({ action: "rename", label: "Rename…", help: "Give this session a title of your own", shortcut: listKeyGlyph.rename });
   }
   // At the top of its folder whatever its state, or back among the rest (#180).
   if (pinned !== undefined && agent.state !== "archived") {
@@ -80,7 +83,7 @@ export function sessionActions(agent: Agent, pinned?: boolean, started: readonly
     found.push({ action: "agents/unarchive", label: "Unarchive", help: "Unarchive this session" });
     found.push({ action: "delete", label: "Delete…", help: "Delete this session and its conversation for good" });
   } else {
-    found.push({ action: "agents/archive", label: "Archive", help: started.length > 0
+    found.push({ action: "agents/archive", label: "Archive", shortcut: listKeyGlyph.archive, help: started.length > 0
       ? "Archive this session and the sessions it started" : "Archive this session" });
     // An agent asked to have it archived (#584): the request denied, as Needs You's (#773).
     if (asksToArchive(agent)) {
@@ -234,13 +237,13 @@ export function SessionMenu({ store, host, agent, disabled, find, findsOnHost = 
               }}>{thoughtsItem(showsThoughts.value).label}</button>
           )}
           {sessionActions(agent, store.sessionPinsIn(host, folderPath(agent)).includes(agent.id), startedBy(store, host, agent),
-            store.has(host, Capability.mute1), canMoveOn(store, host)).map(({ action, label, help }) => (
+            store.has(host, Capability.mute1), canMoveOn(store, host)).map(({ action, label, help, shortcut }) => (
             <button key={action} role="menuitem" title={help}
               onClick={() => {
                 open.value = false;
                 if (inChat && action === "agents/archive") archiveAndLeave(store, host, agent);
                 else runSessionAction(store, host, agent, action, inChat);
-              }}>{label}</button>
+              }}>{label}{shortcut && <MenuKey keys={shortcut} />}</button>
           ))}
         </div>
       )}

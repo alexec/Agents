@@ -54,11 +54,6 @@ func SessionNode(topic, id string) wire.LineageNode {
 	return NodeOf(KindSession, wire.Ref{Provider: "agents", Type: "session", Topic: strings.ToLower(topic), ID: id})
 }
 
-// IsTracker says the ref is of a tracker with no repos: Linear, Jira or Azure Boards.
-func IsTracker(provider string) bool {
-	return provider == "linear" || provider == "jira" || provider == "azureboards"
-}
-
 // RepoNode is the rollup node of the repo or tracker a ref is in (KindRepo):
 // <provider>:repo:#<topic>, such as github:repo:#alexec/agents or linear:repo:#eng.
 func RepoNode(r wire.Ref) wire.LineageNode {
