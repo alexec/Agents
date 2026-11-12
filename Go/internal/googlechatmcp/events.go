@@ -10,6 +10,9 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/alexec/agents/Go/wire"
 )
 
 // The MCP events message.received and question.answered (#1016), polled only: `events/list` and
@@ -325,12 +328,23 @@ func (s *Events) Poll(_ context.Context, raw json.RawMessage) (map[string]any, *
 		if it.Kind == Answer {
 			name = AnswerEvent
 		}
-		out = append(out, map[string]any{
+		out = append(out, mcpevents.Enveloped(map[string]any{
 			"eventId": name + ":" + it.ID, "name": name, "timestamp": it.At.Format(time.RFC3339),
 			"data": dataOf(it), "sender": senderOf(it),
-		})
+		}, messageRef(it), ""))
 	}
 	return answer(out, next, more), nil
+}
+
+// messageRef is the ref of the message an event is about (#4728): the message that came, or
+// the question that was answered, as googlechat:message:spaces/<space>#<message>. Each
+// happens once to its message (a question takes only its first press), so there is no key.
+func messageRef(it Item) wire.Ref {
+	_, id, ok := strings.Cut(it.Message, "/messages/")
+	if !ok || id == "" || it.Space == "" {
+		return wire.Ref{}
+	}
+	return mcpevents.Ref("googlechat", "message", it.Space, id)
 }
 
 // eventsError is a failure as the events draft's error codes.

@@ -687,7 +687,7 @@ final class RemoteModel {
             case .multiplier:
                 // The Multiplier page (#4116), from its row under Status.
                 openActivity = newValue
-            case .spending, .tokens, .time,
+            case .spending, .tokens, .time, .velocity,
                  .folderMCPServers, .docs, .messages:
                 // Usage, a folder's connectors and Docs are Mac + web (#2798, #3321): the
                 // Remote opens none of them.
@@ -1661,6 +1661,10 @@ final class RemoteModel {
     }
 
     func setLabels(on id: UUID, add: [String] = [], remove: [String] = []) async -> Bool {
+        await optimistic(.labels(add: add, remove: remove), on: id) { await sendLabels(on: id, add: add, remove: remove) }
+    }
+
+    private func sendLabels(on id: UUID, add: [String], remove: [String]) async -> Bool {
         do {
             let request = DaemonAPI.SetLabelsRequest(agentID: id, add: add, remove: remove)
             let agent: Agent = try await client(for: request).call(DaemonAPI.Method.agentsSetLabels, request,
@@ -2054,13 +2058,18 @@ final class RemoteModel {
     /// of the session that asked. It stays open, in Later, until it comes back.
     @discardableResult
     func deferRequest(_ request: NeedRequest, _ later: NeedRequest.Later) async -> Bool {
-        await changeRequest(request, DaemonAPI.Method.requestsDefer, later.params(id: request.id))
+        let params = later.params(id: request.id)
+        return await work.changing(request, to: request.deferring(params)) {
+            await changeRequest(request, DaemonAPI.Method.requestsDefer, params)
+        }
     }
 
     /// Bring Back Now (#4235): out of Later, to the top of Needs you.
     @discardableResult
     func undeferRequest(_ request: NeedRequest) async -> Bool {
-        await changeRequest(request, DaemonAPI.Method.requestsUndefer, DaemonAPI.RequestsUndefer(id: request.id))
+        await work.changing(request, to: request.broughtBack) {
+            await changeRequest(request, DaemonAPI.Method.requestsUndefer, DaemonAPI.RequestsUndefer(id: request.id))
+        }
     }
 
     private func changeRequest(_ request: NeedRequest, _ method: String,
@@ -5006,6 +5015,11 @@ final class RemoteModel {
     /// quietly dropped (FR-033). An answer that cannot be delivered is not an answer.
     @discardableResult
     func answer(_ request: PermissionRequest, optionID: String) async -> Bool {
+        // The card goes at once, and comes back if the answer did not go (#4786).
+        await work.answering(request) { await sendAnswer(request, optionID: optionID) }
+    }
+
+    private func sendAnswer(_ request: PermissionRequest, optionID: String) async -> Bool {
         let host = work.agent(request.agentID)?.host ?? .mac
         guard !isStale(on: host) else {
             problem = notAnswering(host, "that could not be sent.")
@@ -5031,6 +5045,14 @@ final class RemoteModel {
     func answer(_ request: ElicitationRequest,
                 action: DaemonAPI.AnswerElicitationRequest.Action,
                 content: [String: JSONValue] = [:], reason: String? = nil) async -> Bool {
+        // The card goes at once, and comes back if the answer did not go (#4786).
+        await work.answering(request) {
+            await sendAnswer(request, action: action, content: content, reason: reason)
+        }
+    }
+
+    private func sendAnswer(_ request: ElicitationRequest, action: DaemonAPI.AnswerElicitationRequest.Action,
+                            content: [String: JSONValue], reason: String?) async -> Bool {
         let host = work.agent(request.agentID)?.host ?? .mac
         // An empty reason is No thanks (#4039).
         let reason = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -5589,7 +5611,9 @@ final class RemoteModel {
             problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
         }
     }
-    func unarchive(_ agentID: UUID) async { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
+    func unarchive(_ agentID: UUID) async {
+        await optimistic(.unarchive, on: agentID) { await act(DaemonAPI.Method.agentsUnarchive, agentID) }
+    }
 
     /// The archived session a menu's Delete… is asking about, until it is answered (#398).
     var askingToDelete: Agent?
@@ -5608,16 +5632,20 @@ final class RemoteModel {
     /// The person's title for a session (#751), kept by its host and told to every client.
     /// Empty, the runtime names it again.
     func rename(_ agentID: UUID, to title: String) async {
-        let host = work.agent(agentID)?.host ?? .mac
-        guard !isStale(on: host) else {
-            problem = notAnswering(host, "that could not be sent.")
-            return
-        }
-        do {
-            let request = DaemonAPI.RenameRequest(agentID: agentID, title: title)
-            try await client(for: request).call(DaemonAPI.Method.agentsRename, request)
-        } catch {
-            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+        await optimistic(.rename(title), on: agentID) {
+            let host = work.agent(agentID)?.host ?? .mac
+            guard !isStale(on: host) else {
+                problem = notAnswering(host, "that could not be sent.")
+                return false
+            }
+            do {
+                let request = DaemonAPI.RenameRequest(agentID: agentID, title: title)
+                try await client(for: request).call(DaemonAPI.Method.agentsRename, request)
+                return true
+            } catch {
+                problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+                return false
+            }
         }
     }
 
@@ -5673,17 +5701,21 @@ final class RemoteModel {
 
     /// Mute Notifications, or Unmute, from the row's menu or the chat's ··· (#2003).
     func setMuted(_ agentID: UUID, _ muted: Bool) async {
-        let host = work.agent(agentID)?.host ?? .mac
-        guard !isStale(on: host) else {
-            problem = notAnswering(host, "that could not be sent.")
-            return
-        }
-        do {
-            // The mark is kept by the agent's own host, which sends no push for it.
-            let request = DaemonAPI.SetMutedRequest(agentID: agentID, muted: muted)
-            try await client(for: request).call(DaemonAPI.Method.agentsSetMuted, request)
-        } catch {
-            problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+        await optimistic(.mute(muted), on: agentID) {
+            let host = work.agent(agentID)?.host ?? .mac
+            guard !isStale(on: host) else {
+                problem = notAnswering(host, "that could not be sent.")
+                return false
+            }
+            do {
+                // The mark is kept by the agent's own host, which sends no push for it.
+                let request = DaemonAPI.SetMutedRequest(agentID: agentID, muted: muted)
+                try await client(for: request).call(DaemonAPI.Method.agentsSetMuted, request)
+                return true
+            } catch {
+                problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+                return false
+            }
         }
     }
 
@@ -5698,6 +5730,22 @@ final class RemoteModel {
     @discardableResult
     private func act(_ act: AgentAct, on agentID: UUID, _ method: String,
                      _ request: some Encodable & Sendable) async -> Bool {
+        guard work.acting[agentID] == nil else { return false }
+        return await optimistic(act.write, on: agentID) { await self.sendAct(act, on: agentID, method, request) }
+    }
+
+    /// A change drawn on the agent's record at once, before its host answers (#4786):
+    /// the kit's one pending layer holds it and puts the record back when the call
+    /// fails, with one line that says what failed.
+    @discardableResult
+    private func optimistic(_ write: AgentWrite, on agentID: UUID, _ send: () async -> Bool) async -> Bool {
+        let sent = await work.optimistically(write, on: agentID, send)
+        if !sent, let said = problem { problem = write.failure(said) }
+        return sent
+    }
+
+    private func sendAct(_ act: AgentAct, on agentID: UUID, _ method: String,
+                         _ request: some Encodable & Sendable) async -> Bool {
         guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
             problem = "Your Mac is not answering, so that could not be sent."
             return false
@@ -5718,18 +5766,20 @@ final class RemoteModel {
         }
     }
 
-    private func act(_ method: String, _ agentID: UUID) async {
+    private func act(_ method: String, _ agentID: UUID) async -> Bool {
         guard !isStale(on: work.agent(agentID)?.host ?? .mac) else {
             problem = "Your Mac is not answering, so that could not be sent."
-            return
+            return false
         }
         do {
             // To the agent's own host: one on another of the control plane's hosts is not
             // the home host's to stop or archive (073).
             let request = DaemonAPI.AgentRequest(agentID: agentID)
             try await sendOnce(method, request)
+            return true
         } catch {
             problem = away(error, "that could not be sent.") ?? "That did not reach your Mac."
+            return false
         }
     }
 

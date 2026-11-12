@@ -243,3 +243,24 @@ func TestAssignedToMeIsRaisedWhoeverAssignedIt(t *testing.T) {
 	ids, _ := p.poll(0)
 	same(t, ids, []string{"issue.assigned:h9"})
 }
+
+// Each event names its issue as its subject, and a comment by its own id (#4728).
+func TestAnEventSaysItsSubjectAndKey(t *testing.T) {
+	f := &fakeLinear{}
+	opened := newPoller(t, f, "issue.opened", nil)
+	commented := newPoller(t, f, "issue.commented", nil)
+	opened.poll(0)
+	commented.poll(0)
+	f.add(Activity{ID: "id-ENG-2", At: at(1), Issue: issue("ENG-2", "ENG"), Kind: Opened})
+	f.add(Activity{ID: "c2", At: at(2), Issue: issue("ENG-2", "ENG"), Kind: Commented, By: member, CommentBody: "hi"})
+	_, result := opened.poll(0)
+	e := result["events"].([]any)[0].(map[string]any)
+	if e["subject"] != "linear:issue:eng#ENG-2" || e["key"] != nil {
+		t.Fatalf("opened: subject %v, key %v", e["subject"], e["key"])
+	}
+	_, result = commented.poll(0)
+	e = result["events"].([]any)[0].(map[string]any)
+	if e["subject"] != "linear:issue:eng#ENG-2" || e["key"] != "c2" {
+		t.Fatalf("commented: subject %v, key %v", e["subject"], e["key"])
+	}
+}

@@ -9,14 +9,14 @@ import Foundation
 /// holding several folders goes by the most careful of the settings those that set one
 /// chose: the highest line of each. When none sets one, the defaults.
 ///
-///     "diskSpace" : { "lowPercent" : 20, "criticalPercent" : 1 }
+///     "diskSpace" : { "lowPercent" : 10, "criticalPercent" : 1 }
 public struct DiskThresholds: Codable, Hashable, Sendable {
     /// Below this percent of the volume free is `low`: where the Free disk space workflow starts.
     public var lowPercent: Int?
     /// Below this percent free is `critical`: where writes start failing.
     public var criticalPercent: Int?
 
-    public static let defaultLowPercent = 20
+    public static let defaultLowPercent = 10
     public static let defaultCriticalPercent = 1
     /// The choices Folder Settings offers.
     public static let lowChoices = [5, 10, 20, 30, 50]

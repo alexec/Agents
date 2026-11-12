@@ -96,6 +96,8 @@ type Activity struct {
 	Label, State string
 	// CommentURL and CommentBody (clipped) for a comment.
 	CommentURL, CommentBody string
+	// Project is the project it is in, organization/project: its ref's topic (#4728).
+	Project string
 }
 
 func (a Activity) data() map[string]any {

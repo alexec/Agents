@@ -86,9 +86,10 @@ func TestAccountInfo(t *testing.T) {
 	t.Parallel()
 	s := &Service{}
 	addr := "agents@example.com"
-	s.noteAccountOps("ana", []wire.AccountOperation{{What: wire.AccountOperationWhatRead, Service: "GitLab.com", Address: &addr}}, 100)
+	lister, reader := wire.UUID("11111111-1111-1111-1111-111111111111"), wire.UUID("22222222-2222-2222-2222-222222222222")
+	s.noteAccountOps("ana", []wire.AccountOperation{{What: wire.AccountOperationWhatRead, Service: "GitLab.com", Address: &addr, Agent: &lister}}, 100)
 	s.noteSecretInfo("box", "ana", []wire.SecretOperation{
-		{Name: "GITLAB_TOKEN", What: wire.SecretOperationWhatRead, At: 200},
+		{Name: "GITLAB_TOKEN", What: wire.SecretOperationWhatRead, At: 200, Agent: &reader},
 		{Name: "CARD", What: wire.SecretOperationWhatReplaced, At: 300},
 	}, nil, false)
 	settings := wire.UserSettings{Accounts: json.RawMessage(`{"accounts":[
@@ -100,11 +101,11 @@ func TestAccountInfo(t *testing.T) {
 	if err := json.Unmarshal(settings.Accounts, &got); err != nil {
 		t.Fatal(err)
 	}
-	if a := got.Accounts[0].LastOp; a == nil || a.At != 100 || a.What != wire.AccountOperationWhatRead {
-		t.Fatalf("its own: %+v", a)
+	if a := got.Accounts[0].LastOp; a == nil || a.At != 100 || a.What != wire.AccountOperationWhatRead || a.Agent == nil || *a.Agent != lister {
+		t.Fatalf("its own, with the session that did it: %+v", a)
 	}
-	if a := got.Accounts[1].LastOp; a == nil || a.At != 200 {
-		t.Fatalf("its secret's read: %+v", a)
+	if a := got.Accounts[1].LastOp; a == nil || a.At != 200 || a.Agent == nil || *a.Agent != reader {
+		t.Fatalf("its secret's read, with the session that read it: %+v", a)
 	}
 	if a := got.Accounts[2].LastOp; a != nil {
 		t.Fatalf("a replace is no use, and a sent lastOp goes: %+v", a)

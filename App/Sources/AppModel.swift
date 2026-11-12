@@ -222,6 +222,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -248,6 +249,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -273,6 +275,7 @@ final class AppModel {
             statusSecretsPage = nil
             showsEvents = false
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -295,6 +298,7 @@ final class AppModel {
             showsEvents = false
             showsRuntimes = false
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -313,10 +317,34 @@ final class AppModel {
     var showsTime = false {
         didSet {
             guard showsTime, showsTime != oldValue else { return }
+            showsVelocity = false
             showsSpending = false
             showsEvents = false
             showsRuntimes = false
             statusSecretsPage = nil
+            showsTokens = false
+            machinePage = nil
+            showsWork = false
+            showsDocs = false
+            showsMessages = false
+            showsSummary = false
+            selection = nil
+            openWorkflow = nil
+            folderPage = nil
+            composing = false
+        }
+    }
+
+    /// Whether the window is showing Velocity: the pull requests that landed, over time (#4597).
+    /// A page like Time, and not persisted for the same reason.
+    var showsVelocity = false {
+        didSet {
+            guard showsVelocity, showsVelocity != oldValue else { return }
+            showsSpending = false
+            showsEvents = false
+            showsRuntimes = false
+            statusSecretsPage = nil
+            showsTime = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -340,6 +368,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             machinePage = nil
             showsWork = false
             showsDocs = false
@@ -366,6 +395,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             selection = nil
             openWorkflow = nil
@@ -388,6 +418,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             selection = nil
@@ -408,6 +439,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -430,6 +462,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -455,6 +488,7 @@ final class AppModel {
             showsRuntimes = false
             statusSecretsPage = nil
             showsTime = false
+            showsVelocity = false
             showsTokens = false
             machinePage = nil
             showsWork = false
@@ -537,6 +571,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -563,6 +598,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -614,6 +650,7 @@ final class AppModel {
             if showsSpending { return .spending }
             if showsTokens { return .tokens }
             if showsTime { return .time }
+            if showsVelocity { return .velocity }
             if showsWork { return .work(workPlace.kind) }
             if showsDocs { return .docs }
             if showsMessages { return .messages }
@@ -641,6 +678,7 @@ final class AppModel {
                 showsRuntimes = false
                 statusSecretsPage = nil
                 showsTime = false
+                showsVelocity = false
                 showsTokens = false
                 machinePage = nil
                 showsWork = false
@@ -667,6 +705,8 @@ final class AppModel {
                 showsTokens = true
             case .time:
                 showsTime = true
+            case .velocity:
+                showsVelocity = true
             case .work(let kind):
                 // The list's row: its list, or the place in it still open.
                 showWork(workPlace.kind == kind ? workPlace : WorkPlace(kind: kind))
@@ -695,6 +735,7 @@ final class AppModel {
                 showsRuntimes = false
                 statusSecretsPage = nil
                 showsTime = false
+                showsVelocity = false
                 showsTokens = false
                 machinePage = nil
                 showsWork = false
@@ -719,6 +760,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -735,6 +777,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -766,6 +809,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -1006,6 +1050,7 @@ final class AppModel {
         showsRuntimes = false
         statusSecretsPage = nil
         showsTime = false
+        showsVelocity = false
         showsTokens = false
         machinePage = nil
         showsWork = false
@@ -2448,6 +2493,15 @@ final class AppModel {
             }
         }
         return histories.isEmpty ? nil : .merged(histories)
+    }
+
+    /// The PRs that landed (#4597), for the Velocity page: this Mac's lineage alone, as the
+    /// Multiplier is (#4595, v1), since two hosts that worked on one PR would count it twice.
+    /// Nil when the host does not know the method, and the page keeps its progress wheel.
+    func velocityHistory() async -> VelocityHistory? {
+        guard let history = try? await macClient.call(DaemonAPI.Method.velocityHistory, Optional<String>.none,
+                                                    returning: VelocityHistory.self) else { return nil }
+        return .merged([history])
     }
 
     /// This Mac first, then every server that has said what it spends.
@@ -5998,10 +6052,12 @@ final class AppModel {
     }
 
     func setLabels(on id: UUID, add: [String] = [], remove: [String] = []) async {
-        await attempt(on: work.agent(id)?.host ?? .mac) {
-            try await self.client(forAgent: id).call(
-                DaemonAPI.Method.agentsSetLabels,
-                DaemonAPI.SetLabelsRequest(agentID: id, add: add, remove: remove))
+        await optimistic(.labels(add: add, remove: remove), on: id) {
+            await attempt(on: work.agent(id)?.host ?? .mac) {
+                try await self.client(forAgent: id).call(
+                    DaemonAPI.Method.agentsSetLabels,
+                    DaemonAPI.SetLabelsRequest(agentID: id, add: add, remove: remove))
+            }
         }
     }
 
@@ -6081,7 +6137,18 @@ final class AppModel {
     private func act(_ act: AgentAct, on id: UUID, _ call: () async throws -> Void) async -> Bool {
         guard work.begin(act, on: id) else { return false }
         defer { work.end(act, on: id) }
-        return await attempt(on: work.agent(id)?.host ?? .mac, call)
+        let host = work.agent(id)?.host ?? .mac
+        return await optimistic(act.write, on: id) { await attempt(on: host, call) }
+    }
+
+    /// A change drawn on the agent's record at once, before its host answers (#4786):
+    /// the kit's one pending layer holds it, and puts the record back when the call
+    /// fails, with one line that says what failed.
+    @discardableResult
+    private func optimistic(_ write: AgentWrite, on id: UUID, _ send: () async -> Bool) async -> Bool {
+        let sent = await work.optimistically(write, on: id, send)
+        if !sent, let said = problem { problem = write.failure(said) }
+        return sent
     }
 
     /// What is on its way to this agent, if anything: for the control that sent it to
@@ -6253,7 +6320,11 @@ final class AppModel {
     }
 
     func unarchive(_ id: UUID) async {
-        await attempt { try await self.client(forAgent: id).call(DaemonAPI.Method.agentsUnarchive, DaemonAPI.AgentRequest(agentID: id)) }
+        await optimistic(.unarchive, on: id) {
+            await attempt(on: work.agent(id)?.host ?? .mac) {
+                try await self.client(forAgent: id).call(DaemonAPI.Method.agentsUnarchive, DaemonAPI.AgentRequest(agentID: id))
+            }
+        }
     }
 
     /// Mark as Unread / Mark as Read, from the row's menu (#70).
@@ -6273,9 +6344,11 @@ final class AppModel {
 
     /// The person's title for a session (#751), or with an empty one the runtime's again.
     func rename(_ id: UUID, to title: String) async {
-        await attempt(on: work.agent(id)?.host ?? .mac) {
-            try await self.client(forAgent: id).call(DaemonAPI.Method.agentsRename,
-                                                     DaemonAPI.RenameRequest(agentID: id, title: title))
+        await optimistic(.rename(title), on: id) {
+            await attempt(on: work.agent(id)?.host ?? .mac) {
+                try await self.client(forAgent: id).call(DaemonAPI.Method.agentsRename,
+                                                         DaemonAPI.RenameRequest(agentID: id, title: title))
+            }
         }
     }
 
@@ -6288,9 +6361,11 @@ final class AppModel {
 
     /// Mute Notifications, or Unmute, from the row's or the Session menu (#2003).
     func setMuted(_ id: UUID, _ muted: Bool) async {
-        await attempt(on: work.agent(id)?.host ?? .mac) {
-            try await self.client(forAgent: id).call(DaemonAPI.Method.agentsSetMuted,
-                                                     DaemonAPI.SetMutedRequest(agentID: id, muted: muted))
+        await optimistic(.mute(muted), on: id) {
+            await attempt(on: work.agent(id)?.host ?? .mac) {
+                try await self.client(forAgent: id).call(DaemonAPI.Method.agentsSetMuted,
+                                                         DaemonAPI.SetMutedRequest(agentID: id, muted: muted))
+            }
         }
     }
 
@@ -6304,6 +6379,11 @@ final class AppModel {
     /// answer and not a second one (#86).
     @discardableResult
     func answer(_ request: PermissionRequest, optionID: String) async -> Bool {
+        // The card goes at once, and comes back if the answer did not go (#4786).
+        await work.answering(request) { await sendAnswer(request, optionID: optionID) }
+    }
+
+    private func sendAnswer(_ request: PermissionRequest, optionID: String) async -> Bool {
         let host = work.agent(request.agentID)?.host ?? .mac
         let sendID = UUID()
         if host != .mac {
@@ -7027,13 +7107,17 @@ final class AppModel {
     /// session that asked. It stays open, in Later, until it comes back.
     @discardableResult
     func deferRequest(_ request: NeedRequest, _ params: DaemonAPI.RequestsDefer) async -> Bool {
-        await changeRequest(request, DaemonAPI.Method.requestsDefer, params)
+        await work.changing(request, to: request.deferring(params)) {
+            await changeRequest(request, DaemonAPI.Method.requestsDefer, params)
+        }
     }
 
     /// Bring back now (#4234): out of Later, to the top of Needs you.
     @discardableResult
     func undeferRequest(_ request: NeedRequest) async -> Bool {
-        await changeRequest(request, DaemonAPI.Method.requestsUndefer, DaemonAPI.RequestsUndefer(id: request.id))
+        await work.changing(request, to: request.broughtBack) {
+            await changeRequest(request, DaemonAPI.Method.requestsUndefer, DaemonAPI.RequestsUndefer(id: request.id))
+        }
     }
 
     private func changeRequest(_ request: NeedRequest, _ method: String, _ params: some Encodable & Sendable) async -> Bool {
@@ -7054,14 +7138,15 @@ final class AppModel {
         let sendID = UUID()
         // An empty reason is No thanks (#4039).
         let reason = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let sent = await attempt {
+        // The card goes at once, and comes back if the answer did not go (#4786).
+        let sent = await work.answering(request) { await attempt {
             try await self.client(forAgent: request.agentID).call(DaemonAPI.Method.elicitationsAnswer,
                                        DaemonAPI.AnswerElicitationRequest(requestID: request.id,
                                                                           action: action,
                                                                           content: content,
                                                                           sendID: sendID,
                                                                           reason: reason?.isEmpty == false ? reason : nil))
-        }
+        } }
         await refreshElicitations()
         return sent
     }
