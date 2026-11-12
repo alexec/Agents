@@ -21,10 +21,18 @@ func TestDeclaringAResource(t *testing.T) {
 	var snap wire.LeaseSnapshot
 	json.Unmarshal(c.call(t, 1, "resources/snapshot", nil), &snap)
 	// The machine's own: the screen, the browser, the person's booking and capacity (#4579).
+	// The two named ones go by their display names, which differ from machine to machine.
+	named := map[string]string{}
+	for _, r := range snap.Resources[min(2, len(snap.Resources)):] {
+		key := string(r.Name)
+		if strings.HasPrefix(key, "person:") {
+			key = "person"
+		}
+		named[key] = r.DisplayName
+	}
 	if len(snap.Resources) != 4 || snap.Resources[0].Name != "screen" || snap.Resources[0].DisplayName != "Screen, mouse and keyboard" ||
 		snap.Resources[1].Name != "browser:agents" || snap.Resources[1].Kind != "browser" ||
-		!strings.HasPrefix(string(snap.Resources[2].Name), "person:") ||
-		snap.Resources[3].Name != "capacity" || snap.Resources[3].DisplayName != capacityDisplay() {
+		named["person"] == "" || named["capacity"] != capacityDisplay() {
 		t.Fatalf("%+v", snap)
 	}
 	two := int64(2)
