@@ -67,3 +67,40 @@ func TestMakeRepository(t *testing.T) {
 		t.Error("a/b was taken as a name")
 	}
 }
+
+// #4921: a public repository is made with private false, and as a template when asked; one
+// that is there is only read, and says whether it is private.
+func TestMakePublicRepository(t *testing.T) {
+	var made map[string]any
+	posts := 0
+	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		switch {
+		case r.URL.Path == "/user":
+			io.WriteString(w, `{"login":"someone","id":42}`)
+		case r.Method == http.MethodGet && r.URL.Path == "/repos/someone/old":
+			io.WriteString(w, `{"full_name":"someone/old","clone_url":"https://github.com/someone/old.git","private":true}`)
+		case r.Method == http.MethodPost && r.URL.Path == "/user/repos":
+			posts++
+			json.Unmarshal(body, &made)
+			w.WriteHeader(http.StatusCreated)
+			io.WriteString(w, `{"full_name":"someone/`+made["name"].(string)+`","clone_url":"https://github.com/someone/x.git","private":false}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	t.Cleanup(s.Close)
+	g := NewRealGitHub(s.URL, func() string { return "t" }, nil)
+	ctx := context.Background()
+
+	r, isNew, err := g.MakePublicRepository(ctx, "", "starter", "A starter", true)
+	if err != nil || !isNew || r.Private || r.FullName != "someone/starter" {
+		t.Fatalf("%+v %v %v", r, isNew, err)
+	}
+	if made["private"] != false || made["is_template"] != true || made["auto_init"] != false || made["description"] != "A starter" {
+		t.Errorf("made %v", made)
+	}
+	if r, isNew, err := g.MakePublicRepository(ctx, "someone", "old", "", false); err != nil || isNew || !r.Private || posts != 1 {
+		t.Fatalf("there: %+v %v %v, %d posts", r, isNew, err, posts)
+	}
+}
