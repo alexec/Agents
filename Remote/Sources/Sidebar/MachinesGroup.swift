@@ -69,7 +69,7 @@ struct RemoteMachineRow: View {
         let dot = MachineDot.of(row, online: !model.machineOffline(host), starting: model.hostsBeingStarted.contains(host))
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             MachineIconView(symbol: MachineIcon.symbol(isThisMac: host == .mac, row: row),
-                            icon: MachineIcon.of(dot, diskLow: model.diskWarns(host)))
+                            icon: MachineIcon.of(dot, diskLow: model.diskWarns(host), capacity: model.capacityLevel(host)))
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(name).lineLimit(1)

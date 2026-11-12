@@ -1,7 +1,7 @@
 // A machine's capacity in words (#4582), as AgentsKitCore's CapacityWords says it on the window's page: the load
 // and the level in the summary, a line that warns at near and full, and the starts that wait. The level and its
 // signals come from machine/usage (#4578).
-import type { CapacityLevel, MachineUsage } from "../protocol/generated";
+import type { CapacityLevel, MachineUsage, ResourceState } from "../protocol/generated";
 import { oneDecimal } from "./disk";
 
 /** "Load 2.4 per core", in the summary. */
@@ -52,4 +52,24 @@ export function detailWords(usage: MachineUsage): string | null {
 /** "2 starts queued": the sessions on the machine that wait for a place (#4377). null at none. */
 export function queuedWords(count: number): string | null {
   return count === 0 ? null : `${count} ${count === 1 ? "start" : "starts"} queued`;
+}
+
+/** "1 lease in line for the machine": the leases whose lines wait for the machine, not a holder (#4748). null at none. */
+export function leasesInLineWords(count: number): string | null {
+  return count === 0 ? null : `${count} ${count === 1 ? "lease" : "leases"} in line for the machine`;
+}
+
+/** How many wait in lines that wait for the machine, from the lease snapshot (#4748). */
+export function leasesInLine(resources: readonly ResourceState[]): number {
+  return resources.filter((r) => r.capacityWait).reduce((n, r) => n + r.line.length, 0);
+}
+
+/** A queued start the machine holds, at the foot of its chat (#4748): "◷ In line to start · this Mac is near capacity". */
+export function startLineWords(words: string): string {
+  return `\u25F7 In line to start \u00B7 ${words}`;
+}
+
+/** A resource's line on the machine's page when it waits for the machine (#4748). */
+export function heldForCapacityWords(words: string): string {
+  return `Held for capacity: ${words}`;
 }

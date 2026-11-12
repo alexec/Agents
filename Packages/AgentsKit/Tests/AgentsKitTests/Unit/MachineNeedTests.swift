@@ -79,4 +79,16 @@ struct MachineNeedTests {
                         runtime("OpenCode", .missing(lookedIn: []))]
         #expect(MachineNeed.most(row: row("online"), offline: false, runtimes: runtimes) == .signIn(["Claude", "Codex"]))
     }
+
+    /// Its capacity (#4748): after a low disk, before an update; amber at near, red at full.
+    @Test func aMachineNearOrAtCapacitySaysSo() {
+        #expect(MachineNeed.most(row: row("online"), offline: false, runtimes: [], capacity: .near) == .capacity(.near))
+        #expect(MachineNeed.most(row: row("needsUpdate"), offline: false, runtimes: [], capacity: .full) == .capacity(.full))
+        #expect(MachineNeed.most(row: row("online"), offline: false, runtimes: [], capacity: .ok) == nil)
+        #expect(MachineNeed.most(row: row("offline"), offline: true, runtimes: [], capacity: .full) == .offline)
+        #expect(MachineIcon.of(.online, diskLow: false, capacity: .near) == .attention)
+        #expect(MachineIcon.of(.online, diskLow: false, capacity: .full) == .failure)
+        #expect(MachineIcon.of(.online, diskLow: false, capacity: .ok) == .accent)
+        #expect(MachineIcon.of(.busy, diskLow: false, capacity: .full) == .busy)
+    }
 }

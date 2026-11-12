@@ -2461,6 +2461,14 @@ final class AppModel {
         work.replaceDisk(state)
     }
 
+    /// A machine's capacity level as it connects (#4748); capacity/changed says each move after.
+    /// A daemon too old to know the method leaves it unsaid.
+    func refreshCapacity(_ host: MachineRef) async {
+        guard let state = try? await client(for: host).call(DaemonAPI.Method.capacityState, Optional<String>.none,
+                                                            returning: DaemonAPI.CapacityState.self) else { return }
+        work.replaceCapacity(state, from: host)
+    }
+
     /// Report a Problem's issue (#3718), made by this Mac's host: the person's words, the
     /// versions and the log lines, with tokens and home folders cut out. Sends nothing.
     func problemReport(_ request: DaemonAPI.ProblemReportRequest) async throws -> DaemonAPI.ProblemReport {
@@ -4431,6 +4439,7 @@ final class AppModel {
         await refreshServerRuntimes(host)
         await refreshServerDisk(host)
         await refreshMoves(on: host)
+        await refreshCapacity(host)
         // And its retention settings (051).
         if let settings = work.retentionState?.settings {
             _ = try? await server.call(DaemonAPI.Method.retentionSet,
@@ -4574,6 +4583,7 @@ final class AppModel {
         async let hostedMCP: Void = refreshHostedMCP()
         async let mcpHealth: Void = refreshMCPHealth()
         async let disk: Void = refreshDisk()
+        async let capacity: Void = refreshCapacity(.mac)
         async let events: Void = refreshEvents()
         async let modes: Void = refreshModes()
         async let display: Void = refreshDisplayPreferences()
@@ -4585,7 +4595,7 @@ final class AppModel {
         async let summaries: Void = refreshSummaryPages()
         _ = await (popped, runtimes, accounts, workflows, pinned, requests, permissions,
                    elicitations, attention, resuming, cost, retention, clientPermissions, cloning, sending, bringing, moving, wake, leases, events, modes,
-                   transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, achievements, multiplier,
+                   transcript, runtimeStates, sandbox, person, disk, capacity, storeNotes, hostedMCP, mcpHealth, achievements, multiplier,
                    display, auto, dailySummary, summaries)
     }
 

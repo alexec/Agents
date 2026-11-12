@@ -66,6 +66,11 @@ private struct ResourceListRow: View {
                 Text("\(state.line.count) waiting: " + state.line.map { name($0.agentID) }.joined(separator: ", "))
                     .appText(.fine).foregroundStyle(.secondary)
             }
+            // A line that waits for the machine, not for a holder (#4748).
+            if let why = state.capacityWait {
+                Text(CapacityWords.heldForCapacity(why))
+                    .appText(.fine).foregroundStyle(.secondary)
+            }
         }
         .accessibilityElement(children: .combine)
     }

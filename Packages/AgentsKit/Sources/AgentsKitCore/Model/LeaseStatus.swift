@@ -25,6 +25,15 @@ public struct LeaseStatus: Equatable, Sendable {
         public var holder: UUID?
         public var until: Date?
         public var place: Int
+        /// Why the line waits for the machine, not for a holder (#4748): "this Mac is near
+        /// capacity". Nil when it waits for a holder.
+        public var capacityWait: String? = nil
+
+        /// Why it waits, after its name: "held by “Fix login” until 14:12", or the machine's
+        /// "this Mac is near capacity" (#4748).
+        public var reason: String {
+            capacityWait ?? "held by \(holderName)" + (until.map { " until \(LeaseWords.clock($0))" } ?? "")
+        }
     }
 
     public var holding: [Holding]
@@ -53,7 +62,8 @@ public struct LeaseStatus: Equatable, Sendable {
                 waiting.append(Waiting(
                     name: state.name, shortName: short, displayName: state.displayName,
                     holderName: LeaseWords.agentName(next.flatMap { titles[$0.holder] }),
-                    holder: next?.holder, until: next?.expiresAt, place: index + 1))
+                    holder: next?.holder, until: next?.expiresAt, place: index + 1,
+                    capacityWait: state.capacityWait))
             }
         }
         guard !holding.isEmpty || !waiting.isEmpty else { return nil }
@@ -86,13 +96,10 @@ public struct LeaseStatus: Equatable, Sendable {
             + waitingLines).joined(separator: ". ") + "."
     }
 
-    /// Each wait in full: "Waiting for build, held by “Fix login” until 14:12, 2nd in line".
+    /// Each wait in full: "Waiting for build, held by “Fix login” until 14:12, 2nd in line",
+    /// or "Waiting for build, this Mac is near capacity, 1st in line" (#4748).
     public var waitingLines: [String] {
-        waiting.map { wait in
-            "Waiting for \(wait.displayName), held by \(wait.holderName)"
-                + (wait.until.map { " until \(LeaseWords.clock($0))" } ?? "")
-                + ", \(LeaseWords.ordinal(wait.place)) in line"
-        }
+        waiting.map { "Waiting for \($0.displayName), \($0.reason), \(LeaseWords.ordinal($0.place)) in line" }
     }
 
     /// What it holds and nothing it waits for: a row's lease mark, now its waits are on
@@ -128,8 +135,6 @@ public struct LeaseStatus: Equatable, Sendable {
     }
 
     private static func waitingWords(_ wait: Waiting) -> String {
-        "Waiting for \(wait.shortName) \u{00B7} held by \(wait.holderName)"
-            + (wait.until.map { " until \(LeaseWords.clock($0))" } ?? "")
-            + " \u{00B7} \(LeaseWords.ordinal(wait.place))"
+        "Waiting for \(wait.shortName) \u{00B7} \(wait.reason) \u{00B7} \(LeaseWords.ordinal(wait.place))"
     }
 }

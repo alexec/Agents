@@ -180,3 +180,13 @@ test("a machine's need in words", () => {
     "Disk almost full: 1.8 GB free");
   assert.equal(machineNeedLine({ kind: "signIn", runtimes: ["Claude", "Codex"] }, row("online")), "Claude and Codex need sign-in");
 });
+
+test("a machine near or at capacity says so after a low disk (#4748)", () => {
+  const low = disk("Data", "low", 24_100_000_000);
+  assert.deepEqual(machineNeed(row("online"), true, [], [], "near"), { kind: "capacity", level: "near" });
+  assert.deepEqual(machineNeed(row("needsUpdate"), true, [], [], "full"), { kind: "capacity", level: "full" });
+  assert.deepEqual(machineNeed(row("online"), true, [], [low], "full"), { kind: "disk", alarm: low });
+  assert.equal(machineNeed(row("online"), true, [], [], "ok"), null);
+  assert.equal(machineNeedLine({ kind: "capacity", level: "near" }, row("online")), "Near capacity");
+  assert.equal(machineNeedLine({ kind: "capacity", level: "full" }, row("online")), "At capacity");
+});

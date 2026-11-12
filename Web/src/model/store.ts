@@ -13,7 +13,7 @@ import type {
   Agent, AgentRemovedNotification, ResumingNotification, BrowserFrame, BrowserPageState, DesktopControlLiveFrame, LiveFrame, LiveSource, ControlMachine, MachineRef, MachineWorkspace, ElicitationNotification, ElicitationRequest, EntryNotification,
   PermissionNotification, PermissionRequest, FolderSummary, HelperLimits, DiskThresholds, NotCommittedResponse, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
-  StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, MCPToolsAnswer, ConnectorToolLevel, DiskState, StoreNotes,
+  StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, MCPToolsAnswer, ConnectorToolLevel, DiskState, CapacityState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Achievements, Multiplier,
@@ -425,6 +425,8 @@ export class Work {
   readonly resuming = signal<Record<string, readonly string[]>>({});
   /** Each host's volumes low on space (#196), replaced whole by each disk/changed, never merged. */
   readonly disk = signal<Record<string, DiskState>>({});
+  /** Each host's capacity level (#4748), from capacity/state on connect and each capacity/changed: its row says it. */
+  readonly capacity = signal<Record<string, CapacityState>>({});
   /** The person's Mac's backups (#1810), for Settings ▸ Backups: null until it has said, or from a
    * host too old to keep backups, which leaves the section out. */
   readonly backups = signal<BackupState | null>(null);
@@ -783,6 +785,9 @@ export class Work {
         return true;
       case "disk/changed":
         this.disk.value = { ...this.disk.value, [host]: params as DiskState };
+        return true;
+      case "capacity/changed":
+        this.capacity.value = { ...this.capacity.value, [host]: params as CapacityState };
         return true;
       case "backups/changed":
         if (this.isMac(host)) this.backups.value = params as BackupState;
@@ -2018,6 +2023,10 @@ export class Store extends Work {
     void this.link.call("disk/state", {}, host).then((state) => {
       this.disk.value = { ...this.disk.value, [host]: state };
     }).catch(failed("disk/state"));
+    // A host from before #4748 doesn't know it: its row says nothing of its capacity.
+    void this.link.call("capacity/state", {}, host).then((state) => {
+      this.capacity.value = { ...this.capacity.value, [host]: state };
+    }).catch(failed("capacity/state"));
     // A host too old to know store/notes says nothing, as one with nothing to say.
     void this.link.call("store/notes", {}, host).then((state) => {
       this.storeNotes.value = { ...this.storeNotes.value, [host]: state.notes };

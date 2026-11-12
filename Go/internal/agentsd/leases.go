@@ -474,6 +474,9 @@ func (d *Daemon) leaseSnapshot() wire.LeaseSnapshot {
 			r.DisplayName = declared.DisplayName
 			places = declared.Holders
 		}
+		if why := d.capacityWait(name, e); why != "" {
+			r.CapacityWait = &why
+		}
 		if len(r.Holds) > 0 {
 			first := r.Holds[0]
 			r.Lease = &first

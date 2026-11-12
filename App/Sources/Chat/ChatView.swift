@@ -265,6 +265,7 @@ struct ChatView: View {
                 return Image(nsImage: image)
             },
             leaseStatus: { [model] agentID in model.work.leaseStatus(of: agentID) },
+            capacityStart: { [model] agent in model.work.capacityStartLine(agent) },
             // Resources at the resource, as the line names it (036 FR-011).
             openLease: { [model] name in model.showResources(at: name) },
             fromLine: { [model] sender in model.work.fromLine(sender) },

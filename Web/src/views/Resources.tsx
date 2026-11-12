@@ -8,6 +8,7 @@ import type { Store } from "../model/store";
 import type { Lease, ResourceState } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { resourcesHint } from "../model/onTheMac";
+import { heldForCapacityWords } from "../model/capacity";
 
 /** "14:05", twenty-four hours, as LeaseWords.clock says it to agents and the Mac. */
 function clock(at: number): string {
@@ -54,6 +55,8 @@ export function Resources({ store, host }: { store: Store; host: string }) {
         {state.line.length > 0 && (
           <p class="quiet small">{state.line.length} waiting: {state.line.map((m) => holderName(store, host, m.agentID)).join(", ")}</p>
         )}
+        {/* A line that waits for the machine, not for a holder (#4748). */}
+        {state.capacityWait && <p class="quiet small">{heldForCapacityWords(state.capacityWait)}</p>}
       </li>
     );
   };

@@ -62,6 +62,9 @@ func (d *Daemon) registerHost() {
 	On(d, wire.CallDiskState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.DiskState, error) {
 		return d.diskState(), nil
 	})
+	On(d, wire.CallCapacityState, func(ctx context.Context, c *Client, _ wire.Empty) (wire.CapacityState, error) {
+		return d.capacityState(), nil
+	})
 	On(d, wire.CallMachineUsage, func(ctx context.Context, c *Client, _ wire.Empty) (wire.MachineUsageState, error) {
 		return d.machineUsageState(ctx), nil
 	})

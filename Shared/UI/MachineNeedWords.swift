@@ -10,6 +10,7 @@ enum MachineNeedWords {
         case .offline, .stopped: OfflineWords.footLine(name: name, row: row)
         case .setupFailed: HostProblem.installFailed("").sentence(name: name, label: name)
         case .disk(let disk): DiskSpace.needWords(disk)
+        case .capacity(let level): CapacityWords.level(level) ?? ""
         case .update: row.map(UpdateWords.state) ?? "Needs an update"
         case .signIn(let runtimes):
             "\(ListFormatter.localizedString(byJoining: runtimes)) \(runtimes.count == 1 ? "needs" : "need") sign-in"

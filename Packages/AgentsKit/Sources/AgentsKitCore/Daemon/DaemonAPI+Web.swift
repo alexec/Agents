@@ -215,6 +215,7 @@ public extension DaemonAPI {
                 Row(Method.processesList, params: Empty.self, result: ProcessesState.self, kind: .hostRequest),
                 // A machine's page: its CPU, memory and disks (#3626).
                 Row(Method.machineUsage, params: Empty.self, result: MachineUsageState.self, kind: .hostRequest),
+                Row(Method.capacityState, params: Empty.self, result: CapacityState.self, kind: .hostRequest),
                 // Backups of the machine, in Settings (#1810).
                 Row(Method.backupsState, params: Empty.self, result: BackupState.self, kind: .hostRequest),
                 Row(Method.backupsConfigure, params: BackupSettings.self, result: BackupState.self, kind: .hostRequest),
@@ -732,6 +733,7 @@ public extension DaemonAPI {
                 Row(Notification.mcpHealthChanged, params: MCPHealthSnapshot.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.diskChanged, params: DiskState.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.capacityChanged, params: CapacityState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.backupsChanged, params: BackupState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.worktreesSized, params: WorktreesSized.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.achievementsChanged, params: Achievements.self, result: Empty.self, kind: .hostNotification),

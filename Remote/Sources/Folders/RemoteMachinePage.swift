@@ -156,8 +156,12 @@ struct RemoteMachinePage: View {
             if let disk = DiskSpace.headline(usage.disks, folders: []) {
                 Text(DiskSpace.summaryWords(disk)).foregroundStyle(Self.tint(disk.level).style(or: .primary))
             }
-            if let queued = CapacityWords.queued(model.work.agents.count { $0.host == host && $0.state == .queued }) {
-                Text(queued).foregroundStyle(.secondary)
+            // The starts that wait, and This Mac's leases that wait for the machine (#4748).
+            let leases = host == .mac ? CapacityWords.leasesInLine(model.work.leases?.resources ?? []) : 0
+            let waits = [CapacityWords.queued(model.work.agents.count { $0.host == host && $0.state == .queued }),
+                         CapacityWords.leasesInLine(leases)].compactMap { $0 }
+            if !waits.isEmpty {
+                Text(waits.joined(separator: " · ")).foregroundStyle(.secondary)
             }
         }
         .monospacedDigit()

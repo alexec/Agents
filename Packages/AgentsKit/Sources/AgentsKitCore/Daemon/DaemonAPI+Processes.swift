@@ -7,6 +7,13 @@ extension DaemonAPI.Method {
     public static let processesList = "processes/list"
     /// A machine's page (#3626): its CPU and memory now, and every disk its agents write to.
     public static let machineUsage = "machine/usage"
+    /// The machine's capacity level now (#4748), asked on connect.
+    public static let capacityState = "capacity/state"
+}
+
+extension DaemonAPI.Notification {
+    /// The machine's capacity level moved (#4748), so its rows say it with no page open.
+    public static let capacityChanged = "capacity/changed"
 }
 
 extension DaemonAPI {
@@ -15,6 +22,18 @@ extension DaemonAPI {
     /// half used).
     public enum CapacityLevel: String, Codable, Hashable, Sendable, CaseIterable {
         case ok, near, full
+    }
+
+    /// What capacity/state answers and capacity/changed carries (#4748): the level, and at
+    /// near and full the words "this Mac is near capacity".
+    public struct CapacityState: Codable, Hashable, Sendable {
+        public var level: CapacityLevel
+        public var words: String?
+
+        public init(level: CapacityLevel, words: String? = nil) {
+            self.level = level
+            self.words = words
+        }
     }
 
     /// The kernel's memory pressure (#4578).
