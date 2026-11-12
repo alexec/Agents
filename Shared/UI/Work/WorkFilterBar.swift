@@ -177,16 +177,17 @@ struct WorkFilterMenu<Option: Hashable>: View {
     }
 }
 
-/// Refresh, for the toolbar: an arrow that spins while a read runs, ⌘R on the Mac.
+/// Refresh, for the toolbar: the standard two-arrow circle, which turns about its own centre while a read
+/// runs, ⌘R on the Mac. A one-arrow `arrow.clockwise` read as Redo, and a `rotationEffect` on it turned
+/// about the frame, not the glyph, so it wobbled.
 struct WorkRefreshButton: View {
     var running = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "arrow.clockwise")
-                .rotationEffect(.degrees(running ? 360 : 0))
-                .animation(running ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: running)
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .symbolEffect(.rotate, isActive: running)
         }
         .help("Refresh")
         .accessibilityLabel("Refresh")
