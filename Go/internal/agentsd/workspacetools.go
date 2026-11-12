@@ -91,9 +91,31 @@ func (d *Daemon) askWorkspacesCtx(ctx context.Context, agent wire.UUID, method s
 }
 
 func (d *Daemon) agentWorkspaces(agent wire.UUID) (wire.AgentMachines, error) {
+	return d.agentWorkspacesWithin(agent, 0)
+}
+
+// cardCheckPatience is how long make_machine and delete_machine wait for the list they check
+// before the card (#4986): the control plane asks every provider for its options, and a slow
+// one (GitHub Codespaces) left the card no time inside the tool's limit.
+var cardCheckPatience = 25 * time.Second
+
+// agentWorkspacesWithin is agentWorkspaces that gives up after patience, or waits on d.ctx
+// when it is 0.
+func (d *Daemon) agentWorkspacesWithin(agent wire.UUID, patience time.Duration) (wire.AgentMachines, error) {
 	var listed wire.AgentMachines
-	out, err := d.askWorkspaces(agent, machinesForAgent, map[string]any{})
+	var out json.RawMessage
+	var err error
+	if patience > 0 {
+		out, err = d.askWorkspacesPatient(agent, machinesForAgent, map[string]any{}, patience)
+	} else {
+		out, err = d.askWorkspaces(agent, machinesForAgent, map[string]any{})
+	}
 	if err != nil {
+		var refused *Error
+		if patience > 0 && errors.As(err, &refused) && strings.Contains(refused.Message, context.DeadlineExceeded.Error()) {
+			return listed, &Error{Code: wire.FailureNotSupported, Message: "Nothing was done, and the person was not asked: " +
+				"the control plane did not list the machines within " + patience.String() + ". Call it again."}
+		}
 		return listed, err
 	}
 	if err := json.Unmarshal(out, &listed); err != nil {
@@ -115,7 +137,12 @@ func (d *Daemon) listMachines(agent wire.UUID, _ map[string]json.RawMessage) (st
 	if err != nil {
 		return "", err
 	}
-	return workspacesNote(listed), nil
+	note := workspacesNote(listed)
+	// A make that waits for the person's yes is no machine yet, but it is on its way (#4986).
+	for _, card := range d.cardsOpen(makeCardTitle) {
+		note += "\nWaiting for the person's yes, on " + card.who + "'s card: " + card.question + " Do not ask again."
+	}
+	return note, nil
 }
 
 // startMachine is start_machine.
@@ -158,6 +185,7 @@ func (d *Daemon) stopMachine(agent wire.UUID, args map[string]json.RawMessage) (
 
 // makeMachine is make_machine.
 func (d *Daemon) makeMachine(agent wire.UUID, args map[string]json.RawMessage) (string, error) {
+	since := time.Now()
 	given, err := named(args, "provider", "provider")
 	if err != nil {
 		return "", err
@@ -165,7 +193,7 @@ func (d *Daemon) makeMachine(agent wire.UUID, args map[string]json.RawMessage) (
 	// With no name, the control plane takes the person's next machine-N (#3972).
 	name := strings.TrimSpace(argString(args, "name"))
 	// Checked before the card: the person is never asked about what can't be done (#855).
-	listed, err := d.agentWorkspaces(agent)
+	listed, err := d.agentWorkspacesWithin(agent, cardCheckPatience)
 	if err != nil {
 		return "", err
 	}
@@ -203,7 +231,7 @@ func (d *Daemon) makeMachine(agent wire.UUID, args map[string]json.RawMessage) (
 	if len(choices) > 0 {
 		question += " (" + strings.Join(choices, ", ") + ")"
 	}
-	return d.personSaysYes(agent, d.agentWho(agent)+" wants to make a machine", question+"?", "Make it", func(yes bool) (string, error) {
+	return d.personSaysYesSince(since, agent, d.agentWho(agent)+makeCardTitle, question+"?", "Make it", func(yes bool) (string, error) {
 		if !yes {
 			return "Nothing was made: the person said no, or didn’t answer.", nil
 		}
@@ -230,11 +258,12 @@ func (d *Daemon) makeMachine(agent wire.UUID, args map[string]json.RawMessage) (
 
 // deleteMachine is delete_machine.
 func (d *Daemon) deleteMachine(agent wire.UUID, args map[string]json.RawMessage) (string, error) {
+	since := time.Now()
 	given, err := named(args, "host", "host")
 	if err != nil {
 		return "", err
 	}
-	listed, err := d.agentWorkspaces(agent)
+	listed, err := d.agentWorkspacesWithin(agent, cardCheckPatience)
 	if err != nil {
 		return "", err
 	}
@@ -254,7 +283,7 @@ func (d *Daemon) deleteMachine(agent wire.UUID, args map[string]json.RawMessage)
 	if !provider.CanDelete {
 		return "", Invalid("Nothing was deleted: %s runs on %s, which can’t delete machines.", host, provider.Name)
 	}
-	return d.personSaysYes(agent, d.agentWho(agent)+" wants to delete a machine",
+	return d.personSaysYesSince(since, agent, d.agentWho(agent)+" wants to delete a machine",
 		"Delete the machine "+host+" runs on, with everything on its disk, and remove the machine "+host+" with its agents?", "Delete it",
 		func(yes bool) (string, error) {
 			if !yes {
@@ -292,6 +321,19 @@ func (d *Daemon) agentWho(agent wire.UUID) string {
 // formHoldLimit keeps then (#4261): the call says so, and when the person answers, then
 // runs and its words come to the agent as a prompt. A no, or no answer, never says yes.
 func (d *Daemon) personSaysYes(agent wire.UUID, title, question, yes string, then func(yes bool) (string, error)) (string, error) {
+	return d.personSaysYesSince(time.Now(), agent, title, question, yes, then)
+}
+
+// personSaysYesSince is personSaysYes for a call that began at since (#4986): the card is held
+// only for what is left of formHoldLimit, so the checks before it and the hold end together
+// inside the tool's time limit. The same card open already is not asked again: the call says
+// it is still open, and the one answer does what it says once.
+func (d *Daemon) personSaysYesSince(since time.Time, agent wire.UUID, title, question, yes string, then func(yes bool) (string, error)) (string, error) {
+	for _, card := range d.cardsOpen(title) {
+		if card.agent == agent && card.question == question {
+			return yesStillOpen, nil
+		}
+	}
 	q, _ := json.Marshal([]map[string]any{{"id": "go", "prompt": question,
 		"options": []map[string]string{{"id": "yes", "label": yes}, {"id": "no", "label": "Don’t"}}}})
 	t, _ := json.Marshal(title)
@@ -306,7 +348,7 @@ func (d *Daemon) personSaysYes(agent wire.UUID, title, question, yes string, the
 			log.Printf("agent %s: card answer: %v", agent, err)
 		}
 	}
-	note, answered, err := d.askForm(agent, map[string]json.RawMessage{"title": t, "questions": q}, late)
+	note, answered, err := d.askForm(agent, map[string]json.RawMessage{"title": t, "questions": q}, late, formHoldLimit-time.Since(since))
 	if err != nil {
 		return "", err
 	}
@@ -320,6 +362,44 @@ func (d *Daemon) personSaysYes(agent wire.UUID, title, question, yes string, the
 // within formHoldLimit (#4261).
 const yesStillOpen = "The card is still open: nothing is done until the person answers it. When they say yes, it is done then, " +
 	"and you are started again with the result. End your turn (or go on with other work). Do not ask again."
+
+// makeCardTitle ends the title of make_machine's card, after the agent's name.
+const makeCardTitle = " wants to make a machine"
+
+// openCard is a question card open on this machine: its agent, the agent as the card names
+// it, and its one question.
+type openCard struct {
+	agent         wire.UUID
+	who, question string
+}
+
+// cardsOpen is every card open on this machine whose title ends with title (#4986), held or
+// left open, the oldest first.
+func (d *Daemon) cardsOpen(title string) []openCard {
+	type asked struct {
+		card openCard
+		at   wire.Date
+	}
+	var found []asked
+	for _, l := range d.everyLive() {
+		l.mu.Lock()
+		for _, pe := range l.elicitations {
+			m, form := pe.req.Message, pe.req.Mode.Form
+			if m == nil || form == nil || !strings.HasSuffix(*m, title) || len(form.Value.Properties) != 1 {
+				continue
+			}
+			question := deref(form.Value.Properties[0].Title)
+			found = append(found, asked{openCard{agent: l.id, who: strings.TrimSuffix(*m, title), question: question}, pe.req.AskedAt})
+		}
+		l.mu.Unlock()
+	}
+	sort.Slice(found, func(i, j int) bool { return found[i].at < found[j].at })
+	cards := make([]openCard, len(found))
+	for i, f := range found {
+		cards[i] = f.card
+	}
+	return cards
+}
 
 // workspaceProvider is the provider an agent named, by id or by name.
 func workspaceProvider(given string, listed wire.AgentMachines) *wire.AgentMachinesProvider {
