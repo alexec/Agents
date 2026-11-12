@@ -646,6 +646,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             isLive={i === rows.length - 1 && live} background={background}
             loadDetail={turnActions.loadDetail} loadEarlier={turnActions.loadEarlier} />
         ))}
+        {/* A prompt on its way (#4814): the person's bubble at once, dimmed until the host's own entry lands. */}
+        {agent && store.sendingTo(host, agent.id).map((going) => (
+          <div key={going.id} class="bubble sending" role="group" aria-label={`Sending: ${going.text}`}><p>{going.text}</p></div>
+        ))}
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} draftKey={`${host}|${session}`} />}
         {agent && <KeptBubbles store={store} kept={store.keptFor(host, agent.id)} />}
         {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). The one

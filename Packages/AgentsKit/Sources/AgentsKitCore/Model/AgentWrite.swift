@@ -16,6 +16,10 @@ public enum AgentWrite: Sendable, Hashable {
     case mute(Bool)
     /// A queued prompt sent into the running turn, by its id.
     case sendNow(UUID)
+    /// Move to a worktree or back to the folder (053), or with nil take back the move that
+    /// waits (#4814). Drawn as the move that waits: the host makes it at once between
+    /// turns, and its record then says where the agent is.
+    case move(MoveTarget?)
 
     /// The verb for the line that says what failed: "Could not archive".
     public var verb: String {
@@ -27,11 +31,15 @@ public enum AgentWrite: Sendable, Hashable {
         case .labels: return "change the labels"
         case .mute(let muted): return muted ? "mute" : "unmute"
         case .sendNow: return "send now"
+        case .move(let target): return target == nil ? "cancel the move" : "move"
         }
     }
 
     /// The one line a client shows when the call failed: what failed, then why.
-    public func failure(_ reason: String) -> String {
+    public func failure(_ reason: String) -> String { Self.failure(verb, reason) }
+
+    /// "Could not <verb> — <why>", for any change drawn before its answer (#4814).
+    public static func failure(_ verb: String, _ reason: String) -> String {
         let reason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
         let head = "Could not \(verb)"
         guard !reason.isEmpty else { return head + "." }
@@ -79,6 +87,8 @@ public enum AgentWrite: Sendable, Hashable {
             agent.isMuted = muted
         case .sendNow(let promptID):
             agent.queuedPrompts.removeAll { $0.id == promptID }
+        case .move(let target):
+            agent.pendingMove = target.map { PendingMove(target: $0, askedBy: .person, askedAt: now) }
         }
         return agent
     }
@@ -101,6 +111,10 @@ public enum AgentWrite: Sendable, Hashable {
                 && remove.allSatisfy { !held.contains(SessionLabelPolicy.key($0)) }
         case .mute(let muted): return agent.isMuted == muted
         case .sendNow(let promptID): return !agent.queuedPrompts.contains { $0.id == promptID }
+        case .move(let target):
+            // Waiting for the turn to end, or taken back. A move made at once is settled by
+            // the host's answer instead (`settleWrite(_:on:failed:done:)`).
+            return agent.pendingMove?.target == target
         }
     }
 }

@@ -72,6 +72,9 @@ struct ChatActions {
     var kept: @MainActor (UUID) -> [DaemonAPI.KeptRequest] = { _ in [] }
     var dropKept: @MainActor (DaemonAPI.KeptRequest) async -> Void = { _ in }
     var retryKept: @MainActor (DaemonAPI.KeptRequest) async -> Void = { _ in }
+    /// Prompts sent here and not yet in the transcript (#4814), by the agent's id: drawn
+    /// as the person's bubble at once, until the host's own entry lands.
+    var sending: @MainActor (UUID) -> [AgentsModel.SendingPrompt] = { _ in [] }
     /// A host's name, for the line under a kept prompt.
     var hostName: @MainActor (MachineRef) -> String = { $0.rawValue }
     /// A file shown with `show_file`, opened again from its card in the chat (#836): the

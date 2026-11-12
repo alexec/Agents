@@ -445,6 +445,10 @@ struct ChatTranscript: View {
     private func foot(_ column: ChatMetrics?) -> some View {
         VStack(spacing: 14) {
             VStack(alignment: .leading, spacing: 14) {
+                // Sent and on its way (#4814): the person's bubble at once, until its entry lands.
+                ForEach(actions.sending(agent.id)) { sending in
+                    SendingPromptRow(prompt: sending)
+                }
                 ForEach(agent.queuedPrompts) { queued in
                     QueuedPromptRow(prompt: queued, agentID: agent.id, canSendNow: canSendNow)
                 }
