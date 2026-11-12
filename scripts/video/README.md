@@ -36,7 +36,9 @@ of any group (below).
    corners cut, on a cobalt backdrop; the phone in Apple's iPhone bezel; the browser in a
    plain toolbar. The waits marked `fast` are cut
    to a few seconds. Each line starts at the marker the scene wrote when it said it. The
-   video ends on a card with the logo, and the Apple trademark line when an iPhone is shown.
+   video starts on a title card (the logo, the scene's `TITLE`, and "Loops · How to" for a
+   usage video) and ends on a card of the same look (the logo, **Loops**, the scene's docs
+   page), with the Apple trademark line when an iPhone is shown (#4965).
 
 4. **Check**: Whisper hears the finished video against its script, and a contact sheet of
    it (`~/.cache/agents-video/work/<id>/video-sheet.png`) is made to look at before the

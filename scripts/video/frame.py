@@ -26,6 +26,8 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from voice import duration
 
 W, H, FPS = 2560, 1440, 30
+# The title card's time on screen, with the fade into the scene; each fade's length (#4965).
+TITLE_SECONDS, FADE = 3.0, 0.8
 ASSETS = Path.home() / ".agents/video/assets"
 BEZEL = ASSETS / "iPhone 17 Pro - Silver - Portrait.png"
 # The bezel's screen, in its own pixels (1350×2760): the iPhone 17 Pro's 1206×2622 at 3×.
@@ -153,14 +155,36 @@ def browser_bar(width_px, path, url="localhost:8792"):
     return h
 
 
-def end_card(path, phone):
+GROUP_NAMES = {"usage": "How to", "marketing": "", "integration": "Integration"}
+
+
+def card(path, big, small, size=120):
+    """A card on the backdrop: the logo, a big line and a small one under it. The title card
+    and the end card share it, so the two match (#4965)."""
     img = Image.open(path.parent / "backdrop.png").convert("RGBA")
     logo = Image.open(LOGO).convert("RGBA")
     logo.thumbnail((300, 300))
     img.alpha_composite(logo, ((W - logo.width) // 2, H // 2 - logo.height - 40))
     d = ImageDraw.Draw(img)
-    d.text((W // 2, H // 2 + 50), "Loops", font=font(120, "Bold"), fill="white", anchor="mm")
-    d.text((W // 2, H // 2 + 160), "docs.agentloops.dev", font=font(52), fill=(220, 230, 255), anchor="mm")
+    d.text((W // 2, H // 2 + 50), big, font=font(size, "Bold"), fill="white", anchor="mm")
+    d.text((W // 2, H // 2 + 160), small, font=font(52), fill=(220, 230, 255), anchor="mm")
+    return img, d
+
+
+def title_card(path, scene):
+    """The first card: the video's title, and Loops with the scene's group (#4965)."""
+    group = GROUP_NAMES.get(getattr(scene, "GROUP", ""), "")
+    img, _ = card(path, getattr(scene, "TITLE", scene.ID), f"Loops · {group}" if group else "Loops")
+    img.convert("RGB").save(path)
+
+
+def docs_address(scene):
+    """The scene's docs page, as said on the end card: docs.agentloops.dev/<DOCS>."""
+    return "docs.agentloops.dev/" + getattr(scene, "DOCS", "").strip("/")
+
+
+def end_card(path, phone, scene=None):
+    img, d = card(path, "Loops", docs_address(scene).rstrip("/") if scene else "docs.agentloops.dev")
     if phone:
         d.text((W // 2, H - 60), TRADEMARK, font=font(26), fill=(190, 205, 240), anchor="mm")
     img.convert("RGB").save(path)
@@ -350,12 +374,15 @@ def compose(scene, takes, work, out_dir):
     graph.append("".join(f"[c{i}]" for i in range(len(segments))) + f"concat=n={len(segments)}:v=1:a=0[cut]")
     length = timeline(end)
 
-    # The scene fades in; the end card comes after, in a second pass (one graph that waits on
-    # the card while it renders the scene stalls).
-    end_card(art / "end.png", phone=layout == "mac+phone")
-    card = 3.0
-    graph.append(f"[cut]format=yuv420p,fps={FPS},settb=1/{FPS},fade=t=in:st=0:d=0.5[vout]")
-    total = length - 0.8 + card + 1
+    # The title card fades into the scene and the scene into the end card, in a second pass
+    # (one graph that waits on the cards while it renders the scene stalls). The scene's
+    # times move later by `lead`, the title card's time on screen before the fade ends.
+    end_card(art / "end.png", phone=layout == "mac+phone", scene=scene)
+    title_card(art / "title.png", scene)
+    card, title = 3.0, TITLE_SECONDS
+    lead = title - FADE
+    graph.append(f"[cut]format=yuv420p,fps={FPS},settb=1/{FPS}[vout]")
+    total = lead + length - FADE + card + 1
 
     # The narration, each line at its marker.
     cues, audio = [], []
@@ -389,6 +416,9 @@ def compose(scene, takes, work, out_dir):
             spans.append({"kind": "sound", "name": mark["sound"], "from": t, "to": t + duration(sound)})
             audio.append(f"[{i}:a]volume={mark.get('volume', 1):.3f},{MIXED},adelay={int(t * 1000)}:all=1[a{len(audio)}]")
     cues.sort()
+    # The captions are for the finished video, after the title card; sound.json is for
+    # scene.mov, which the sound test reads (sound.py), so its times stay the scene's.
+    final_cues = [(a + lead, b + lead, text) for a, b, text in cues]
     (work / "sound.json").write_text(json.dumps({"length": length, "spans": sorted(spans, key=lambda s: s["from"])}, indent=1))
     graph += audio
     if audio:
@@ -412,12 +442,16 @@ def compose(scene, takes, work, out_dir):
            "-t", f"{length:.3f}", *encode, "-c:a", "pcm_s16le", work / "scene.mov")
     ffmpeg("-loop", "1", "-framerate", str(FPS), "-t", f"{card + 1}", "-i", art / "end.png",
            *encode, work / "end.mp4")
-    ffmpeg("-i", work / "scene.mov", "-i", work / "end.mp4", "-filter_complex",
-           f"[0:v]settb=1/{FPS}[a];[1:v]settb=1/{FPS}[b];"
-           f"[a][b]xfade=transition=fade:duration=0.8:offset={length - 0.8:.3f}[v];[0:a]apad,atrim=0:{total:.3f}[s]",
+    ffmpeg("-loop", "1", "-framerate", str(FPS), "-t", f"{title}", "-i", art / "title.png",
+           *encode, work / "title.mp4")
+    ffmpeg("-i", work / "title.mp4", "-i", work / "scene.mov", "-i", work / "end.mp4", "-filter_complex",
+           f"[0:v]settb=1/{FPS}[t];[1:v]settb=1/{FPS}[a];[2:v]settb=1/{FPS}[b];"
+           f"[t][a]xfade=transition=fade:duration={FADE}:offset={lead:.3f}[ta];"
+           f"[ta][b]xfade=transition=fade:duration={FADE}:offset={lead + length - FADE:.3f}[v];"
+           f"[1:a]adelay={int(lead * 1000)}:all=1,apad,atrim=0:{total:.3f}[s]",
            "-map", "[v]", "-map", "[s]", *encode, "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", mp4)
-    write_vtt(cues, out_dir / f"{scene.ID}.vtt")
-    check_overlaps(cues)
+    write_vtt(final_cues, out_dir / f"{scene.ID}.vtt")
+    check_overlaps(final_cues)
     return mp4
 
 
