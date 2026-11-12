@@ -192,6 +192,8 @@ struct SidebarSessionRow: View {
         .accessibilityValue(agent.drawsUnread ? "unread" : "")
         .modifier(FoldAction(tree: tree, toggle: toggleFold))
         .tag(SidebarItem.session(agent.id))
+        // Its chat fetched while an iPad's pointer rests on it, so a tap draws it at once (#4795).
+        .prefetchesOnHover { [model, id = agent.id] in model.prefetch(id) }
         .contextMenu { AgentMenuItems(agent: agent) }
         // Out of the sidebar into a scene of its own, on an iPad (#888).
         .draggableToNewWindow(agent)

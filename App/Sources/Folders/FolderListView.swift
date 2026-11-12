@@ -870,6 +870,8 @@ struct SessionSidebarRow: View {
             .listRowInsets(.vertical, 2)
             .sidebarInk(.session(agent.id))
             .tag(SidebarItem.session(agent.id))
+            // Its chat fetched while the pointer rests on it, so a click draws it at once (#4795).
+            .prefetchesOnHover { [model, id = agent.id] in model.prefetch(id) }
             // A click on the session already open goes to its latest message, as opening it
             // does (#1349): the list hears no change of selection for it.
             .simultaneousGesture(TapGesture().onEnded {
