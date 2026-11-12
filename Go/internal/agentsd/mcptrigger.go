@@ -43,6 +43,10 @@ func mcpTriggerOf(name string, keys map[string]json.RawMessage) (mcpTrigger, boo
 	}
 	t := mcpTrigger{event: name, arguments: map[string]json.RawMessage{}}
 	for k, v := range keys {
+		// The envelope's keys are matched here, not sent to the server (#4730).
+		if busKeys[k] {
+			continue
+		}
 		if k != mcpServerKey {
 			t.arguments[k] = v
 			continue
@@ -66,6 +70,23 @@ func mcpTriggerOf(name string, keys map[string]json.RawMessage) (mcpTrigger, boo
 		for _, s := range t.servers {
 			if !serverNameRule.MatchString(s) {
 				return mcpTrigger{}, false
+			}
+		}
+	}
+	// A forge's repo and thing the envelope names, when the trigger's own keys do not.
+	if bus, _, ok := triggerBus(wire.WorkflowTrigger{Unrecognised: &wire.WorkflowTriggerStoredUnrecognised{Name: name, Keys: keys}}); ok && bus.wide() {
+		given := map[string][]string{}
+		for k := range t.arguments {
+			given[k] = nil
+		}
+		for k, vs := range bus.localWhere(given) {
+			if _, had := t.arguments[k]; had || len(vs) != 1 {
+				continue
+			}
+			if n, err := strconv.ParseInt(vs[0], 10, 64); err == nil {
+				t.arguments[k] = mustRaw(n)
+			} else {
+				t.arguments[k] = mustRaw(vs[0])
 			}
 		}
 	}

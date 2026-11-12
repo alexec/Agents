@@ -300,6 +300,9 @@ func secretUseWanted(u wire.RequestSecretUse) string {
 	if u.Use == wire.SecretUseTerminal {
 		return "Wants to print " + u.Name + " for " + u.Place + ". " + terminalCaveat
 	}
+	if u.Use == wire.SecretUseScreen && u.App != nil {
+		return "Wants to use the screen on " + u.Place + " to drive " + *u.App
+	}
 	return "Wants to use " + u.Name + " on " + u.Place
 }
 
@@ -763,6 +766,10 @@ func (d *Daemon) SetControl(tell func(method string, params any)) {
 // of offers dropped while it was down, so every live need is offered again, the stale ones
 // withdrawn, and the count said again.
 func (d *Daemon) ControlUplinkChanged(up bool) {
+	// The control plane holds this machine's bus subscriptions only while it is connected.
+	if up {
+		go d.sendBusSubscriptions(true)
+	}
 	if !up || d.tellControl.Load() == nil {
 		return
 	}

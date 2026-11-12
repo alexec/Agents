@@ -12,9 +12,25 @@ struct BrowserSettingsView: View {
     @State private var loaded = false
     @State private var clearing: String?
     @State private var asksClearAll = false
+    @State private var control: BrowserControlSettings?
 
     var body: some View {
         Form {
+            // Ask, Always Approve or Off (#4264). Not drawn for a daemon too old to know it.
+            if let control {
+                Section {
+                    Picker(DriveApprovalWords.browserLabel, selection: Binding(
+                        get: { control.mode },
+                        set: { mode in Task { if let saved = await model.setBrowserControl(mode) { self.control = saved } } })) {
+                        ForEach(DriveApproval.allCases) { Text($0.word).tag($0) }
+                    }
+                } header: {
+                    Text(DriveApprovalWords.browserHeader)
+                } footer: {
+                    Text(DriveApprovalWords.browserFooter(control.mode))
+                }
+                .paperListRow()
+            }
             Section {
                 if let state, state.installed {
                     if let problem = state.problem {
@@ -64,6 +80,7 @@ struct BrowserSettingsView: View {
         }
         .paperForm()
         .task {
+            control = await model.browserControl()
             state = await model.browserState()
             loaded = true
         }

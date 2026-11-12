@@ -1,25 +1,25 @@
-// Settings ▸ Machines ▸ Desktop control (#3004, US2): the off-by-default switch for drive_screen,
-// an agent driving another app's own screen, mouse and keyboard. Listed in ./sections.ts.
+// Settings ▸ Machines ▸ Desktop control (#3004, US2, #4264): Ask, Always Approve or Off for drive_screen, an
+// agent driving another app's own screen, mouse and keyboard. Listed in ./sections.ts.
 import { useEffect } from "preact/hooks";
+import type { DriveApproval } from "../../protocol/generated";
 import type { Store } from "../../model/store";
+import { driveApprovals, screenFooter, screenLabel, shownMode } from "../../model/driveApproval";
 
 export function DesktopControlSection({ store }: { store: Store }) {
   useEffect(() => store.loadDesktopControl(), [store]);
   const settings = store.desktopControl.value;
   if (!settings) return null;
+  const mode = shownMode(settings);
   return (
     <section aria-labelledby="settings-desktop-control">
       <h3 class="section-head" id="settings-desktop-control">Desktop control</h3>
       <label class="setting">
-        <span>Let an agent drive apps on this Mac</span>
-        <input type="checkbox" role="switch" checked={settings.enabled}
-          onChange={(e) => void store.setDesktopControlEnabled(e.currentTarget.checked)} />
+        <span>{screenLabel}</span>
+        <select value={mode} onChange={(e) => void store.setDesktopControl(e.currentTarget.value as DriveApproval)}>
+          {driveApprovals.map((m) => <option key={m.mode} value={m.mode}>{m.label}</option>)}
+        </select>
       </label>
-      <p class="hint">
-        {settings.enabled
-          ? "An agent can click, type and read the screen of any app on this Mac, not only the sandboxed browser. macOS will ask you to grant Agents the Accessibility permission the first time an agent tries."
-          : "Off by default. An agent cannot click, type or read the screen of any other app until you turn this on."}
-      </p>
+      <p class="hint">{screenFooter(mode)}</p>
     </section>
   );
 }

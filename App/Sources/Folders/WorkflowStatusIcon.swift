@@ -31,6 +31,8 @@ struct WorkflowStatusIcon: View {
         // A bot's workflow heard here (#2027).
         if !summary.runsHere { return "ear" }
         if summary.isRunning { return "circle.dotted" }
+        // A trigger held until its hours open (#4819).
+        if summary.waitsForItsHours { return "hourglass" }
         // Run only by hand (#432): nothing to wait for, and nothing wrong.
         if summary.workflow.runsOnlyByHand && summary.workflow.problem == nil { return "hand.tap" }
         if !summary.workflow.canFire { return "circle.dashed" }
@@ -49,6 +51,7 @@ struct WorkflowStatusIcon: View {
         if summary.needsAPerson { return "Needs attention" }
         if let bot = summary.hearsFor { return "Heard for \(bot)" }
         if summary.isRunning { return "Running" }
+        if summary.waitsForItsHours, let open = summary.hoursOpenSentence() { return open }
         if summary.workflow.runsOnlyByHand && summary.workflow.problem == nil { return "Runs by hand" }
         if !summary.workflow.canFire { return "Not yet supported" }
         return "Waiting for its trigger"

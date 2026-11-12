@@ -34,13 +34,13 @@ final class VoiceSpeaker {
         guard let format, var sentence = next() else { return }
         run += 1
         let thisRun = run
-        try await openOutput()
+        if !isTaped { try await openOutput() }
         defer { if thisRun == run { closeOutput() } }
         var samples = try await voice.audio(for: sentence)
         while thisRun == run {
             guard let buffer = Self.buffer(samples, format: format) else { return }
             onSentence(sentence)
-            let playing = try play(buffer)
+            let playing = try output(samples, buffer: buffer, said: sentence)
             // The next one is made while this one is heard.
             var following = next()
             var made: [Float]?
@@ -61,8 +61,8 @@ final class VoiceSpeaker {
     /// it; `stop()` stops it too.
     func play(_ samples: [Float]) async throws {
         guard let format, let buffer = Self.buffer(samples, format: format) else { return }
-        try await openOutput()
-        _ = try play(buffer)
+        if !isTaped { try await openOutput() }
+        _ = try output(samples, buffer: buffer, said: nil)
     }
 
     /// Stops at once, mid-word if it must.
@@ -70,6 +70,39 @@ final class VoiceSpeaker {
         run += 1
         player.stop()
         closeOutput()
+        #if DEBUG
+        taping?.cancel()
+        taping = nil
+        VoiceTape.current?.cut()
+        #endif
+    }
+
+    #if DEBUG
+    /// The wait for a sentence on a walk's tape (#4854), which `stop()` ends.
+    private var taping: Task<Void, Never>?
+    #endif
+
+    /// Whether a walk's tape takes the voice (#4854): the engine is not opened for it.
+    private var isTaped: Bool {
+        #if DEBUG
+        VoiceTape.current != nil
+        #else
+        false
+        #endif
+    }
+
+    /// Plays `buffer`, or on a walk's tape puts its samples there and waits as long as they
+    /// would play (#4854), so what is said and the phases move as in a real run.
+    private func output(_ samples: [Float], buffer: AVAudioPCMBuffer, said: String?) throws -> Task<Void, Never> {
+        #if DEBUG
+        if let tape = VoiceTape.current {
+            let end = tape.speak(samples, said: said)
+            let wait = Task { await tape.heard(until: end) }
+            taping = wait
+            return wait
+        }
+        #endif
+        return try play(buffer)
     }
 
     /// Plays `buffer`; the task ends once it has been heard, or the player was stopped.

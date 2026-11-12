@@ -12,6 +12,8 @@ import Foundation
 ///     {"cmd": "voice", "sendFails": true}               the prompts heard next do not go, until false
 ///     {"cmd": "voice", "refuse": true}                  the microphone as if refused: voice mode's alert
 ///     {"cmd": "voice", "voiceOver": true}               as if VoiceOver were on: its note and announcements
+///     {"cmd": "voice", "tape": "/tmp/…/voice"}          what it would play goes to a tape there (VoiceTape, #4854)
+///     {"cmd": "voice", "tape": ""}                      the tape ends: speech.wav is written
 @MainActor
 enum VoiceWalk {
     static func perform(_ request: [String: Any]) -> [String: Any] {
@@ -31,6 +33,14 @@ enum VoiceWalk {
         if let voiceOver = request["voiceOver"] as? Bool {
             voice.walkVoiceOver = voiceOver
         }
+        if let tape = request["tape"] as? String {
+            do {
+                try VoiceTape.start(tape)
+            } catch {
+                return ["ok": false, "error": "tape: \(error.localizedDescription)"]
+            }
+            voice.walkTapeChanged()
+        }
         if let heard = request["heard"] as? String {
             voice.walkHeard(heard)
         }
@@ -45,6 +55,7 @@ enum VoiceWalk {
             "said": voice.said,
             "announced": voice.announcements,
             "problem": voice.problem ?? "",
+            "tape": VoiceTape.current?.folder.path ?? "",
         ]
     }
 }

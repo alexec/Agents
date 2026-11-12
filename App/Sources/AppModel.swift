@@ -2326,13 +2326,28 @@ final class AppModel {
                                                         returning: DesktopControlSettings.self)
     }
 
-    /// The person turned desktop control on or off (#3004, US2, FR-004).
-    func setDesktopControlEnabled(_ on: Bool) async {
+    /// The person set desktop control: Ask, Always Approve or Off (#3004, US2, FR-004, #4264).
+    func setDesktopControl(_ mode: DriveApproval) async {
         await attempt {
             self.desktopControlSettings = try await self.macClient.call(DaemonAPI.Method.desktopControlSet,
-                                                                     DesktopControlSettings(enabled: on),
+                                                                     DesktopControlSettings(mode: mode),
                                                                      returning: DesktopControlSettings.self)
         }
+    }
+
+    /// Settings ▸ Browser's Ask, Always Approve or Off (#4264). Nil from a daemon too old to know it.
+    func browserControl() async -> BrowserControlSettings? {
+        try? await macClient.call(DaemonAPI.Method.browserControlState, DaemonAPI.Empty(), returning: BrowserControlSettings.self)
+    }
+
+    /// The person set the browser: Ask, Always Approve or Off (#4264).
+    func setBrowserControl(_ mode: DriveApproval) async -> BrowserControlSettings? {
+        var saved: BrowserControlSettings?
+        await attempt {
+            saved = try await self.macClient.call(DaemonAPI.Method.browserControlSet, BrowserControlSettings(mode: mode),
+                                                  returning: BrowserControlSettings.self)
+        }
+        return saved
     }
 
     /// Settings ▸ Browser (#3535): this Mac's browser, its sites with sign-ins and its
@@ -5314,8 +5329,11 @@ final class AppModel {
         // Only the latest load of this chat puts its answer on screen: it is loaded on
         // opening, on every reconnect and on its host's lists, and these overlap (#400).
         let load = work.beginTranscriptLoad()
-        // This device's copy of its end, drawn while the host's page is on its way (#4791).
-        Task { [localCopy] in await localCopy?.drawOpening(of: selection, load: load) }
+        // What was fetched for it under the pointer or beside the last one opened, at once
+        // (#4795); else this device's copy of its end, while the host's page is on its way (#4791).
+        if localCopy?.drawPrefetched(of: selection, load: load) != true {
+            Task { [localCopy] in await localCopy?.drawOpening(of: selection, load: load) }
+        }
         // Beside the transcript rather than before it: neither waits on the other.
         async let whole = loadWholeAgent(selection)
         // The chat's own host, both for the call and for the check that it is up: a
@@ -5353,6 +5371,8 @@ final class AppModel {
                 let dataIn = self.chatOpening.map { Perf.elapsed($0.timing) }
                 guard self.work.takeOpening(opening, load: load) else { return }
                 self.localCopy?.opened(selection, opening)
+                // The rows either side, which the arrow keys open next (#4795).
+                self.prefetchNeighbours(of: selection)
                 if let why = opening.turnsFailure { Self.chatLog.notice("turns of \(selection) did not load: \(why, privacy: .public)") }
                 if let started = self.chatOpening, started.agent == selection {
                     self.chatOpening = nil
@@ -5384,6 +5404,47 @@ final class AppModel {
             Self.chatLog.notice("record of \(selection) did not load from \(host.rawValue, privacy: .public)")
             work.failOpening("Its host has this session, but this Mac could not read its record.", load: load)
         }
+    }
+
+    /// A chat's opening page from its host, as `loadTranscript` reads it, for a prefetch.
+    private func fetchOpening(_ id: UUID) async throws -> ChatOpening.Loaded {
+        let client = client(for: host(ofAgent: id))
+        return try await ChatOpening.load(
+            turns: {
+                try await client.call(DaemonAPI.Method.agentsTurns, DaemonAPI.TurnsRequest.opening(id),
+                                      returning: TurnsPage.self)
+            },
+            transcript: { from, limit in
+                try await client.call(DaemonAPI.Method.agentsTranscript,
+                                      DaemonAPI.TranscriptRequest(agentID: id, limit: limit, from: from),
+                                      returning: TranscriptPage.self)
+            },
+            entry: { index in
+                try await client.call(DaemonAPI.Method.agentsTranscript,
+                                      DaemonAPI.TranscriptRequest.entry(index, of: id),
+                                      returning: TranscriptPage.self)
+            },
+            describe: { self.describe($0) })
+    }
+
+    /// Fetches a chat before it is opened (#4795): the row under the pointer, and the rows
+    /// beside the open one. Not the open one, and not one whose host is not answering.
+    func prefetch(_ id: UUID) {
+        guard id != selection, let agent = work.agent(id), !hostUnreachable(agent.host) else { return }
+        localCopy?.prefetched.prefetch(id) { [weak self] in
+            guard let self else { throw CancellationError() }
+            return try await self.fetchOpening(id)
+        }
+    }
+
+    /// The selected folder's live sessions, in the order its page and the sidebar draw
+    /// them: the list ⌥⌘↑ and ⌥⌘↓ step through.
+    var sessionsInFront: [UUID] {
+        AgentGroup.live.flatMap { agents(in: selectedFolderKey, group: $0) }.map(\.id)
+    }
+
+    private func prefetchNeighbours(of id: UUID) {
+        for neighbour in OpeningPrefetch.neighbours(of: id, in: sessionsInFront) { prefetch(neighbour) }
     }
 
     /// A session's transcript in a window of its own (#826), loaded as the main window's

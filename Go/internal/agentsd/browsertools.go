@@ -124,9 +124,14 @@ func browserToolNamed(called string) (string, bool) {
 	return best, best != ""
 }
 
-// offersBrowser is whether this host lists the browser tools: it has the machine's browser
-// and somewhere to install it.
-func (d *Daemon) offersBrowser() bool { return d.browser != nil && toolsHome != "" }
+// browserAvailable is whether this host has the machine's browser and somewhere to install it.
+func (d *Daemon) browserAvailable() bool { return d.browser != nil && toolsHome != "" }
+
+// offersBrowser is whether this host lists the browser tools: the browser is available, and
+// the person did not turn it off (#4264).
+func (d *Daemon) offersBrowser() bool {
+	return d.browserAvailable() && d.browserControlMode() != wire.DriveApprovalOff
+}
 
 // browserSession is one @playwright/mcp, connected: a test gives its own.
 type browserSession interface {
@@ -222,8 +227,11 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	if a == nil {
 		return failed(leaseNoCall)
 	}
-	if !d.offersBrowser() {
+	if !d.browserAvailable() {
 		return failed("The browser can't be installed on " + thisMachine() + ".")
+	}
+	if d.browserControlMode() == wire.DriveApprovalOff {
+		return failed(browserOffWords)
 	}
 	if name == handToPersonName && d.isBot() {
 		return failed(noOneAnswersWords)
@@ -253,6 +261,16 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 		var refusal string
 		if device, refusal = emulateDeviceCheck(args); refusal != "" {
 			return failed(refusal)
+		}
+	}
+	// On a machine a person uses, the lease waits on their Approve first (#4264).
+	if !d.holdsBrowser(agent) {
+		words, err := d.approveDrive(agent, wire.SecretUseBrowser, "")
+		if err != nil {
+			return failed(browserWords(err))
+		}
+		if words != "" {
+			return []any{map[string]any{"type": "text", "text": words}}, false, words
 		}
 	}
 	reply, err := d.leaseResource(agent, browserLeaseName)
@@ -468,6 +486,7 @@ func (d *Daemon) endBrowserSession(agent wire.UUID) {
 // still open (#3529) keeps the lease, so no other agent takes the page from the person;
 // the answer starts it again, and the lease's own length ends it if nobody answers.
 func (d *Daemon) endBrowserDrive(agent wire.UUID) {
+	d.forgetDriveDenial(agent, wire.SecretUseBrowser)
 	d.endBrowserSession(agent)
 	d.stopDrivingBrowser(agent)
 	if d.holdsBrowser(agent) && d.handOffOpen(agent) == nil {
