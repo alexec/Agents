@@ -378,8 +378,8 @@ A tag that already exists for this version means another release ran: end with
    failed: `git worktree remove --force ~/.agents/scratch/release-v<version>`.
 7. **Integration videos** (#1857): `scripts/video/make.sh --changed <the last tag> v<version>`
    lists the integration scenes whose integration this release changed. If it lists any,
-   run the `integration-videos` workflow with `manage_workflows run`, with those ids as
-   its note. Do not wait for it: it is not part of the gate, and its result is not in
+   run the `integration-videos` workflow with `manage_workflows run`, with the note
+   `release v<version>: <the ids>`, so each title names this release (#4962). Do not wait for it: it is not part of the gate, and its result is not in
    your report.
 
 ## 9. Close the finished milestones

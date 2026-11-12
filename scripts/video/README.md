@@ -83,7 +83,9 @@ changes, the same scene makes it again.
 - **Upload** (`upload.py`, #4836): the YouTube Data API v3, **private** always, on the
   `Loops` channel, to the playlist of the scene's `GROUP`: `Loops usage`, `Loops marketing` or
   `Loops integrations`, each made private the first time. The title is `<TITLE> — Loops
-  <version>` (`git describe`); the description gives the docs page (the scene's `DOCS`, a path
+  <x.y>`: the release being made (`LOOPS_RELEASE=v<version>`, which the release skill
+  passes), else the last tag with no count and hash (#4962). The description gives the full
+  `git describe`, the docs page (the scene's `DOCS`, a path
   on docs.agentloops.dev), the commit, the date and the scene file. The captions are the
   take's `<id>.vtt`, in English (`captions.insert`). The thumbnail is a frame of the take, at
   one of the contact sheet's two-second moments: the scene's `THUMBNAIL` second, or two
