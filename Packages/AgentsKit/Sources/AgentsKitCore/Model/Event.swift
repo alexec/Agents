@@ -96,8 +96,23 @@ public struct Event: Codable, Hashable, Sendable, Identifiable {
     /// actor the control plane gave the call's channel. None for what an agent, a
     /// workflow or the machine did.
     public var actor: DaemonAPI.AuditActor?
+    /// The envelope (#4728): the event's ref, its type, provider and topic, the ref of the
+    /// thing it happened to, and the machine that raised it. None on an event from before.
+    public var ref: String?
+    public var type: String?
+    public var provider: String?
+    public var topic: String?
+    public var subjectRef: WireRef?
+    public var producer: String?
 
     public var id: EventPosition { position }
+
+    enum CodingKeys: String, CodingKey {
+        case position, name, at, lastAt, count, scope, sentence, details, publisher, message, chainDepth,
+             consequences, actor, type, provider, topic, producer
+        case ref = "id"
+        case subjectRef = "subject"
+    }
 
     public init(position: EventPosition, name: String, at: Date, lastAt: Date? = nil, count: Int = 1,
                 scope: EventScope, sentence: String, details: [String: String] = [:],
@@ -116,6 +131,27 @@ public struct Event: Codable, Hashable, Sendable, Identifiable {
         self.chainDepth = chainDepth
         self.consequences = consequences
         self.actor = actor
+    }
+
+    /// An event on the bus that this machine's log does not have (#4732): its envelope, with
+    /// its type and subject for the sentence. Its position is the one the page gives it, below
+    /// zero, so it is never taken for one of the log's.
+    public init(bus event: DaemonAPI.BusEvent, position: EventPosition) {
+        let at = DaemonAPI.BusEvent.date(event.time) ?? Date()
+        self.init(position: position, name: event.type, at: at, scope: .mac,
+                  sentence: event.subject.map { "\(event.type) on \($0)" } ?? event.type)
+        ref = event.id
+        type = event.type
+        provider = event.provider
+        topic = event.topic
+        subjectRef = event.subject
+        producer = event.producer
+    }
+
+    /// The machine named in its producer ref, `agents:machine:#<machine>`.
+    public var producerMachine: String? {
+        guard let producer, !producer.isEmpty else { return nil }
+        return producer.split(separator: "#", maxSplits: 1).last.map(String.init)
     }
 
     public init(_ draft: EventDraft, position: EventPosition) {

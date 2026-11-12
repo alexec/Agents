@@ -1650,6 +1650,35 @@ export interface BusLeased {
 }
 
 /**
+ * bus/log's answer (#4732): envelopes of the caller's bus, newest first. Envelope only, as the bus
+ * keeps it: no data.
+ */
+export interface BusLogPage {
+  events: BusEvent[];
+  /** Where the next page back starts, as before; none when nothing older was read. */
+  next?: string;
+  /** Whether older envelopes are on the bus log. */
+  hasMore: boolean;
+}
+
+/**
+ * bus/log (#4732, spec 4724-event-bus, "The bus log"): a page of the caller's bus log, newest
+ * first, narrowed by the envelope's fields.
+ */
+export interface BusLogQuery {
+  /** The next of the page before: only envelopes older than it. */
+  before?: string;
+  /** At most this many; 100 when absent, never more than 500. */
+  limit?: number;
+  /** Only events of this provider (#4732): github, jira, agents and so on. */
+  provider?: string;
+  /** Only events of this type (#4732), noun.verbed, or noun.* for every type of that noun. */
+  type?: string;
+  /** Only events on this topic (#4732), such as a repo's full name; lower case. */
+  topic?: string;
+}
+
+/**
  * One producer lease (#4731): the machine that polls, until when, and whether it is the one that
  * asked. A machine that is not the holder stands by: it does not poll, and the control plane
  * delivers it what the holder's poll makes.
@@ -4045,6 +4074,11 @@ export interface EventsListRequest {
 export interface EventsPage {
   events: Event[];
   waiting: WaitingAgent[];
+  /**
+   * This machine's producer ref (#4732), agents:machine:#<machine>, as its own events say it: an
+   * event whose producer is another says which machine raised it.
+   */
+  producer?: string;
   hasMore: boolean;
 }
 
@@ -14809,6 +14843,7 @@ export interface Methods {
   "browser/watch": { params: BrowserWatchRequest; result: BrowserPageState };
   "browserControl/set": { params: BrowserControlSettings; result: BrowserControlSettings };
   "browserControl/state": { params: Empty; result: BrowserControlSettings };
+  "bus/log": { params: BusLogQuery; result: BusLogPage };
   "capacity/state": { params: Empty; result: CapacityState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
@@ -15245,6 +15280,7 @@ export const MethodTarget = {
   "browser/watch": "host",
   "browserControl/set": "host",
   "browserControl/state": "host",
+  "bus/log": "control",
   "capacity/state": "host",
   "changes/file": "host",
   "changes/list": "host",
@@ -15803,6 +15839,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BusEvent: { required: ["specversion", "id", "type", "provider", "topic", "source", "time", "producer"], optional: ["subject", "sealed", "poll"] },
   BusLease: { required: ["polls"], optional: ["release"] },
   BusLeased: { required: ["leases"], optional: [] },
+  BusLogPage: { required: ["events", "hasMore"], optional: ["next"] },
+  BusLogQuery: { required: [], optional: ["before", "limit", "provider", "type", "topic"] },
   BusProducerLease: { required: ["poll", "holder", "mine", "until"], optional: [] },
   BusPublish: { required: ["events"], optional: [] },
   BusPublished: { required: ["kept", "dropped"], optional: [] },
@@ -15987,7 +16025,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EventWait: { required: ["id", "patterns", "from", "since"], optional: ["deadline", "ending", "resumePromptID", "serverEvents", "forPerson"] },
   EventsChange: { required: ["waiting"], optional: ["event"] },
   EventsListRequest: { required: ["limit"], optional: ["before", "scope", "groups"] },
-  EventsPage: { required: ["events", "waiting", "hasMore"], optional: [] },
+  EventsPage: { required: ["events", "waiting", "hasMore"], optional: ["producer"] },
   FeatureUsage: { required: ["days", "features"], optional: ["since"] },
   FeatureUse: { required: ["method", "week", "quarter", "clients"], optional: ["lastUsed"] },
   FileCompletion: { required: ["label"], optional: ["insert", "detail"] },

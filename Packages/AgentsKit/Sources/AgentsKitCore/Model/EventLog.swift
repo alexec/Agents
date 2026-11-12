@@ -165,14 +165,35 @@ public struct EventFilter: Hashable, Sendable {
     public var scope: EventScope?
     /// Empty: every kind.
     public var groups: Set<EventGroup>
+    /// The envelope's provider, type and topic (#4732); nil: every one.
+    public var provider: String?
+    public var type: String?
+    public var topic: String?
 
-    public init(scope: EventScope? = nil, groups: Set<EventGroup> = []) {
+    public init(scope: EventScope? = nil, groups: Set<EventGroup> = [], provider: String? = nil,
+                type: String? = nil, topic: String? = nil) {
         self.scope = scope
         self.groups = groups
+        self.provider = provider
+        self.type = type
+        self.topic = topic
     }
 
     public func matches(_ event: Event) -> Bool {
         (scope == nil || event.scope == scope)
             && (groups.isEmpty || (event.subject.map { groups.contains($0.group) } ?? false))
+            && matchesEnvelope(event)
+    }
+
+    /// The provider, type and topic alone, as `bus/log` narrows the bus's events.
+    public func matchesEnvelope(_ event: Event) -> Bool {
+        (provider == nil || event.provider == provider)
+            && (type == nil || (event.type ?? event.name) == type)
+            && (topic == nil || event.topic == topic)
+    }
+
+    /// The same, for `bus/log`.
+    public func busLogQuery(before: String? = nil, limit: Int? = nil) -> DaemonAPI.BusLogQuery {
+        DaemonAPI.BusLogQuery(before: before, limit: limit, provider: provider, type: type, topic: topic)
     }
 }

@@ -558,6 +558,7 @@ var CallBotsMake = Method[BotMake, BotMade]{"bots/make"}
 var CallBotsSetCaps = Method[BotCaps, Empty]{"bots/setCaps"}
 var CallBotsStopRun = Method[BotStopRun, Empty]{"bots/stopRun"}
 var CallBusLease = Method[BusLease, BusLeased]{"bus/lease"}
+var CallBusLog = Method[BusLogQuery, BusLogPage]{"bus/log"}
 var CallBusPublish = Method[BusPublish, BusPublished]{"bus/publish"}
 var CallBusSubscribe = Method[BusSubscribe, BusSubscribed]{"bus/subscribe"}
 var CallClientsAnnounce = Method[ClientAnnounce, Admitted]{"clients/announce"}

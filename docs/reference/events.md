@@ -336,8 +336,12 @@ Mac's own control plane.
   from any machine, with a create-if-absent write in its store, so several copies of the
   control plane agree. It counts what it drops (`agents_control_bus_events_total`, by
   `result`: `kept`, `dropped`, `delivered`).
-- **The bus log** is the last 100,000 envelopes (with their sealed data) of each person's bus, for dedupe and the
-  Events page; the hourly sweep deletes the older ones.
+- **The bus log** is the last 100,000 envelopes (with their sealed data) of each person's bus,
+  for dedupe and the Events page; the hourly sweep deletes the older ones. A person's client
+  reads it with `bus/log` (#4732): envelopes only, without the sealed data, newest first, at
+  most 500 at a time (100 by default), narrowed by `provider`, `type` (a name or `noun.*`)
+  and `topic`; `next` is where the next page back starts (`before`). It reads at most 2,000
+  envelopes per call, so a narrow filter can answer with few events and a `next`.
 - **Deliver.** A machine says its subscriptions (`bus/subscribe`: `provider`, `type`, a name
   or `noun.*`, `topics` and `subject`) to the copy that holds it, again after each connect
   and a short time after each change. `wait_for_event` and a workflow's `on:` make them
@@ -565,19 +569,32 @@ it, so two machines can make two ids for one change.
 ## The Events page
 
 On the Mac, **Events** is a row at the foot of the sidebar, above **Resources** and
-**Spending**. It shows every event, newest first, grouped by day.
+**Spending**. It shows every event, newest first, grouped by day. It reads the person's
+bus as well as this Mac's log (#4732): an event on the bus log that this Mac's log does not
+have, another machine's, joins the list, by the time it happened. Such a row has no
+folder here, so a folder's filter leaves it out. The bus log is read again every 30
+seconds while the page is open.
 
-- **Filters**: a menu for all folders, this Mac or one folder, and a capsule for each
-  subject: **Agents**, **Workflows**, **Branches**, **Drop box** and **This Mac**.
-- **Each row** shows the time, what happened, and the event's name. Under it, what it led
+- **Filters**: on one line, a menu for all folders, this Mac or one folder, and a menu each
+  for the provider, the type and the topic, with every value the rows have (#4732); on
+  the next line, a capsule for each subject: **Agents**, **Workflows**, **Branches**,
+  **Drop box** and **This Mac**.
+- **Each row** shows the time, what happened, and the event's type, provider, topic and
+  where: its folder, This Mac, or **From** the machine that raised it. Under it, the
+  event's ref; right-click a row for **Copy Ref**. Under that, what it led
   to: **Woke** an agent, **Fired** a workflow, **Refused by** a workflow with the reason,
   or **Could not wake** an agent with the reason. A repeat shows a count, such as ×4.
 - **Click a row** to see every detail it carries. **Copy as trigger** copies it as a
   workflow's `on:` line, narrowed by the event's filters only: `branch` on a
   `branch.moved`, `why` on a `person.away` or `person.back`. Every other event is copied
-  as its name alone.
+  as its name alone. **Copy Ref** copies the event's ref; the detail also lists its ref,
+  provider, topic and subject.
 - **Waiting now**, at the top, lists every agent that is waiting for an event, what for
   and until when, with ✕ to end the wait. It is not shown when nobody is waiting.
+
+The web page's Events (Status ▸ Events) does the same: every host's log and the bus log,
+the provider, type and topic menus, the ref under each row, and **Copy ref** in a row's
+sheet.
 
 On the iPhone and iPad, **Events** is a row under the folder list. It shows the same rows
 and details, filtered by one menu. It has no subject capsules, no **Copy as trigger** and

@@ -272,3 +272,60 @@ func TestBusGivesEachMachineItsOwnSealedCopy(t *testing.T) {
 		}
 	}
 }
+
+// #4732: bus/log is the caller's bus, newest first, narrowed by provider, type and topic,
+// a page at a time.
+func TestBusLogPagesNewestFirstAndNarrows(t *testing.T) {
+	t.Parallel()
+	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
+	a := p.host("MAC-A").member.Host
+	ctx := context.Background()
+	at := time.Date(2026, 11, 11, 17, 0, 0, 0, time.UTC)
+	jira := wire.BusEvent{Specversion: "1.0", ID: "jira:issue:abc#ABC-9@issue.created", Type: "issue.created", Provider: "jira",
+		Topic: "abc", Source: "jira:abc", Time: "2026-11-11T17:00:00Z", Producer: "agents:machine:#linux-b"}
+	sealed := prMerged(1)
+	sealed.Sealed = []wire.BusSealedData{sealedCopy(a, 'a')}
+	for i, e := range []wire.BusEvent{sealed, jira, prMerged(2), prMerged(3)} {
+		if _, err := p.s.busPublish(ctx, a, wire.BusPublish{Events: []wire.BusEvent{e}}, at.Add(time.Duration(i)*time.Second)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	person := p.s.ownerOf(a)
+	ids := func(page wire.BusLogPage) string {
+		var out []string
+		for _, e := range page.Events {
+			out = append(out, e.ID[strings.LastIndexByte(e.ID, '#')+1:])
+		}
+		return strings.Join(out, " ")
+	}
+	two := int64(2)
+	first, err := p.s.busLog(ctx, person, wire.BusLogQuery{Limit: &two})
+	if err != nil || ids(first) != "3@pr.merged 2@pr.merged" || !first.HasMore || first.Next == nil {
+		t.Fatalf("%v %+v", err, first)
+	}
+	rest, _ := p.s.busLog(ctx, person, wire.BusLogQuery{Before: first.Next, Limit: &two})
+	if ids(rest) != "ABC-9@issue.created 1@pr.merged" || rest.HasMore || rest.Next != nil {
+		t.Fatalf("%+v", rest)
+	}
+	if rest.Events[1].Sealed != nil {
+		t.Fatalf("bus/log gave the sealed data: %+v", rest.Events[1])
+	}
+	for _, c := range []struct {
+		q    wire.BusLogQuery
+		want string
+	}{
+		{wire.BusLogQuery{Provider: str("jira")}, "ABC-9@issue.created"},
+		{wire.BusLogQuery{Type: str("pr.*")}, "3@pr.merged 2@pr.merged 1@pr.merged"},
+		{wire.BusLogQuery{Topic: str("Alexec/Agents"), Type: str("pr.merged")}, "3@pr.merged 2@pr.merged 1@pr.merged"},
+		{wire.BusLogQuery{Topic: str("abc"), Provider: str("github")}, ""},
+	} {
+		got, err := p.s.busLog(ctx, person, c.q)
+		if err != nil || ids(got) != c.want {
+			t.Errorf("%+v: %v %q, want %q", c.q, err, ids(got), c.want)
+		}
+	}
+	// Another person's bus is empty.
+	if other, _ := p.s.busLog(ctx, "someone-else", wire.BusLogQuery{}); len(other.Events) != 0 {
+		t.Fatalf("someone else reads %+v", other)
+	}
+}

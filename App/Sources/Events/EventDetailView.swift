@@ -10,6 +10,7 @@ struct EventDetailView: View {
     let scopeName: String
     let close: () -> Void
     @State private var copied = false
+    @State private var copiedRef = false
 
     private var trigger: String { EventPattern.matching(event).asTrigger }
 
@@ -45,12 +46,22 @@ struct EventDetailView: View {
                         copied = true
                     }
                     .help("Copies the lines a workflow's on: needs to run when this happens again")
+                    if let ref = event.ref {
+                        Button(copiedRef ? "Copied" : "Copy Ref") {
+                            EventsView.copy(ref)
+                            copiedRef = true
+                        }
+                        .help("Copies this event's ref, which a wait, a workflow or an agent can name")
+                    }
                 }
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .onChange(of: event.position) { copied = false }
+        .onChange(of: event.position) {
+            copied = false
+            copiedRef = false
+        }
     }
 
     private var rows: [(String, String)] {
@@ -58,6 +69,10 @@ struct EventDetailView: View {
             ("When", event.at.formatted(date: .abbreviated, time: .standard)),
             ("Where", scopeName),
         ]
+        if let ref = event.ref { rows.append(("Ref", ref)) }
+        if let provider = event.provider { rows.append(("Provider", provider)) }
+        if let topic = event.topic, !topic.isEmpty { rows.append(("Topic", topic)) }
+        if let subject = event.subjectRef { rows.append(("Subject", subject.description)) }
         if event.count > 1, let last = event.lastAt {
             rows.append(("Repeats", "\(event.count) times, last at \(LeaseWords.clock(last))"))
         }
@@ -65,7 +80,8 @@ struct EventDetailView: View {
         if let publisher = event.publisher { rows.append(("Published by", publisher.title)) }
         if let message = event.message { rows.append(("Message", message)) }
         for (key, value) in event.details.sorted(by: { $0.key < $1.key }) { rows.append((key, value)) }
-        rows.append(("Position", "\(event.position)"))
+        // A row from the bus log has no place in this Mac's log (#4732).
+        if event.position >= 0 { rows.append(("Position", "\(event.position)")) }
         return rows
     }
 

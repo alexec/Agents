@@ -28,8 +28,14 @@ struct EventsView: View {
     @State private var seenHead: EventPosition = 0
     /// Events, or Audit: who did what through the control plane (#996).
     @State private var pane: EventsPane = .events
+    /// The envelope's provider, type and topic (#4732); nil: every one.
+    @State private var provider: String?
+    @State private var type: String?
+    @State private var topic: String?
 
-    private var filter: EventFilter { EventFilter(scope: scope, groups: groups) }
+    private var filter: EventFilter {
+        EventFilter(scope: scope, groups: groups, provider: provider, type: type, topic: topic)
+    }
 
     /// The daemon sends pages already narrowed; narrowing here too keeps the list right
     /// in the moment between a capsule changing and its page arriving. Narrowed and cut
@@ -43,7 +49,23 @@ struct EventsView: View {
     }
 
     private var pickedEvent: Event? {
-        picked.flatMap { position in model.work.recentEvents.first { $0.position == position } }
+        picked.flatMap { position in
+            model.work.recentEvents.first { $0.position == position }
+                ?? model.work.busEvents.first { $0.position == position }
+        }
+    }
+
+    /// The machine that raised it, when that is not this Mac (#4732).
+    private func fromMachine(_ event: Event) -> String? {
+        guard let machine = event.producerMachine else { return nil }
+        if let here = model.work.eventsProducer { return event.producer == here ? nil : machine }
+        // A daemon too old to say its own: the bus's rows are the ones it does not have.
+        return event.position < 0 ? machine : nil
+    }
+
+    /// Where it happened: its folder or This Mac, or the machine that raised it.
+    private func placeName(_ event: Event) -> String {
+        fromMachine(event).map { "From \($0)" } ?? scopeName(event.scope)
     }
 
     var body: some View {
@@ -113,7 +135,7 @@ struct EventsView: View {
                                     .background { CardSlice(isFirst: isFirst, isLast: isLast) }
                             }
                         }
-                        if model.work.moreEvents {
+                        if model.work.moreEventsAnywhere {
                             Button("Show older") { Task { await model.loadOlderEvents() } }
                                 .buttonStyle(.plain)
                                 .appText(.fine)
@@ -150,13 +172,20 @@ struct EventsView: View {
             }
             if let pickedEvent {
                 Divider()
-                EventDetailView(event: pickedEvent, scopeName: scopeName(pickedEvent.scope)) { picked = nil }
+                EventDetailView(event: pickedEvent, scopeName: placeName(pickedEvent)) { picked = nil }
                     .frame(width: 300)
             }
         }
         .task(id: filter) {
             await model.refreshEvents(filter)
             seenHead = model.work.recentEvents.first?.position ?? 0
+            // Other machines' events come from the bus log, which tells no one when it
+            // grows: read it again while the page is open (#4732).
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(30))
+                if Task.isCancelled { break }
+                await model.refreshBusLog(filter)
+            }
         }
     }
 
@@ -170,7 +199,7 @@ struct EventsView: View {
     }
 
     private var emptyWords: String {
-        scope == nil && groups.isEmpty
+        scope == nil && groups.isEmpty && provider == nil && type == nil && topic == nil
             ? "Nothing has happened yet. Events appear here as agents, workflows and this Mac do things."
             : "Nothing like that has happened."
     }
@@ -179,49 +208,91 @@ struct EventsView: View {
         Button {
             picked = picked == event.position ? nil : event.position
         } label: {
-            EventRow(event: event, scopeName: scopeName(event.scope),
+            EventRow(event: event, scopeName: placeName(event),
                      openAgent: { model.openAgent($0) },
-                     openWorkflow: { model.showWorkflow(folder: $0, workflowID: $1) })
+                     openWorkflow: { model.showWorkflow(folder: $0, workflowID: $1) },
+                     showsEnvelope: true)
                 .padding(.horizontal, 14)
                 .background(picked == event.position ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear))
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            if let ref = event.ref {
+                Button("Copy Ref") { EventsView.copy(ref) }
+            }
+        }
         .id(event.position)
     }
 
     // MARK: Filters
 
+    /// The menus on one line and the kind chips on the next (#4732), so the detail beside the
+    /// list leaves both room.
     private var filters: some View {
-        HStack(spacing: 8) {
-            Menu {
-                Button("All") { scope = nil }
-                Button("This Mac") { scope = .mac }
-                Divider()
-                ForEach(model.folders, id: \.folder.folder) { summary in
-                    Button(summary.name) { scope = .folder(folder: summary.folder.folder) }
-                }
-            } label: {
-                Text(scope.map(scopeName) ?? "All folders").appText(.fine)
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            ForEach(EventGroup.allCases, id: \.self) { group in
-                let on = groups.contains(group)
-                Button {
-                    if on { groups.remove(group) } else { groups.insert(group) }
-                } label: {
-                    Text(group.title)
-                        .appText(.fine)
-                        .foregroundStyle(on ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(on ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear), in: Capsule())
-                        .paperRaised(in: Capsule())
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) { menus }
+            HStack(spacing: 8) { chips }
         }
+    }
+
+    @ViewBuilder private var menus: some View {
+        Menu {
+            Button("All") { scope = nil }
+            Button("This Mac") { scope = .mac }
+            Divider()
+            ForEach(model.folders, id: \.folder.folder) { summary in
+                Button(summary.name) { scope = .folder(folder: summary.folder.folder) }
+            }
+        } label: {
+            Text(scope.map(scopeName) ?? "All folders").appText(.fine)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+        envelopeMenu("All providers", values: \.provider, selection: $provider)
+        envelopeMenu("All types", values: { $0.type ?? $0.name }, selection: $type)
+        envelopeMenu("All topics", values: \.topic, selection: $topic)
+    }
+
+    @ViewBuilder private var chips: some View {
+        ForEach(EventGroup.allCases, id: \.self) { group in
+            let on = groups.contains(group)
+            Button {
+                if on { groups.remove(group) } else { groups.insert(group) }
+            } label: {
+                Text(group.title)
+                    .appText(.fine)
+                    .foregroundStyle(on ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(on ? AnyShapeStyle(.selection) : AnyShapeStyle(.clear), in: Capsule())
+                    .paperRaised(in: Capsule())
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// One of the envelope's menus (#4732): every value the held events have, and the one
+    /// picked, so a filter that hides them all can still be taken off.
+    private func envelopeMenu(_ all: String, values: (Event) -> String?, selection: Binding<String?>) -> some View {
+        let held = (model.work.recentEvents + model.work.busEvents).compactMap(values).filter { !$0.isEmpty }
+        let choices = Set(held + [selection.wrappedValue].compactMap { $0 }).sorted()
+        return Menu {
+            Button(all) { selection.wrappedValue = nil }
+            if !choices.isEmpty { Divider() }
+            ForEach(choices, id: \.self) { value in
+                Button(value) { selection.wrappedValue = value }
+            }
+        } label: {
+            Text(selection.wrappedValue ?? all).appText(.fine)
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    static func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
     }
 
     // MARK: Inside
@@ -242,6 +313,9 @@ struct EventsView: View {
         case .event(let position):
             scope = nil
             groups = []
+            provider = nil
+            type = nil
+            topic = nil
             picked = position
             proxy.scrollTo(position, anchor: .center)
         }
