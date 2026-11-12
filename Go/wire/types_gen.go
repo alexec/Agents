@@ -14781,6 +14781,9 @@ type UserSettings struct {
 	// The person's outside accounts (#3967), as an OutsideAccounts. The control plane refuses one with a value that looks like a secret.
 	Accounts JSONValue `json:"accounts,omitzero"`
 
+	// The person's time zone (#4818), as a UserTimeZone. Their Mac sets it from its own clock; a workflow's hours: with no time-zone: go by it.
+	TimeZone JSONValue `json:"timeZone,omitzero"`
+
 	// #2957, research R11: your layer, as a SignedYourPolicy. Only the keeper sets it (user/setPolicy); a client cannot (user/setSettings refuses this part).
 	Policy JSONValue `json:"policy,omitzero"`
 
@@ -14805,7 +14808,7 @@ type UserSettingsPart struct {
 	Value JSONValue `json:"value"`
 }
 
-// A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits, notices (#2859) and outside accounts (#3967) follow the person. Resources belong to each machine. policy (#2957) is set only by the keeper, through user/setPolicy; user/setSettings refuses it.
+// A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits, notices (#2859), outside accounts (#3967) and the time zone (#4818) follow the person. Resources belong to each machine. policy (#2957) is set only by the keeper, through user/setPolicy; user/setSettings refuses it.
 type UserSettingsPartName string
 
 const UserSettingsPartNameMcpServers UserSettingsPartName = "mcpServers"
@@ -14814,6 +14817,7 @@ const UserSettingsPartNameRuntimes UserSettingsPartName = "runtimes"
 const UserSettingsPartNameCostLimits UserSettingsPartName = "costLimits"
 const UserSettingsPartNameNotifications UserSettingsPartName = "notifications"
 const UserSettingsPartNameAccounts UserSettingsPartName = "accounts"
+const UserSettingsPartNameTimeZone UserSettingsPartName = "timeZone"
 const UserSettingsPartNamePolicy UserSettingsPartName = "policy"
 
 // user/suspended (#1002, FR-018): to each machine of a suspended person, at hello before its settings and within 5 seconds of a change; off: true ends it.
@@ -14825,6 +14829,12 @@ type UserSuspended struct {
 	Provider string `json:"provider"`
 
 	At Date `json:"at"`
+}
+
+// The timeZone part of user settings (#4818).
+type UserTimeZone struct {
+	// An IANA name, as TimeZone.identifier says it: Europe/London.
+	Identifier string `json:"identifier"`
 }
 
 // The PRs that landed in an hour or a day in one repository (#4596): merged is every PR the agents worked on that merged, merged reverts included; reverted is the merged reverts among them.
@@ -15287,6 +15297,8 @@ type Workflow struct {
 
 	Cooldown *float64 `json:"cooldown,omitzero"`
 
+	Hours *WorkflowHours `json:"hours,omitzero"`
+
 	Enabled *bool `json:"enabled,omitzero"`
 
 	Archived *bool `json:"archived,omitzero"`
@@ -15355,6 +15367,18 @@ type WorkflowEnableRequest struct {
 	WorkflowID string `json:"workflowID"`
 
 	Enabled bool `json:"enabled"`
+}
+
+// hours: (#4818): when a workflow may start, as the file says it. A fire outside it is held, and starts when it opens; Run now always runs.
+type WorkflowHours struct {
+	// As the file says it, "09:00-18:00"; it can go past midnight, "18:00-09:00". Absent is the whole day.
+	Between *string `json:"between,omitzero"`
+
+	// The days its window starts on. Absent is every day.
+	Days []Weekday `json:"days,omitzero"`
+
+	// time-zone:, an IANA name. Absent is the person's timeZone setting, else the host's zone.
+	TimeZone *string `json:"timeZone,omitzero"`
 }
 
 type WorkflowLimit string
@@ -15473,6 +15497,8 @@ type WorkflowRefusal struct {
 	DeniedHere *struct{} `json:"deniedHere,omitzero"`
 
 	CoolingDown *WorkflowRefusalCoolingDown `json:"coolingDown,omitzero"`
+
+	OutsideHours *WorkflowRefusalOutsideHours `json:"outsideHours,omitzero"`
 }
 
 type WorkflowRefusalChainTooDeep struct {
@@ -15507,6 +15533,10 @@ type WorkflowRefusalCoolingDown struct {
 	Until *Date `json:"until,omitzero"`
 }
 
+type WorkflowRefusalOutsideHours struct {
+	Until *Date `json:"until,omitzero"`
+}
+
 type WorkflowRemovedNotification struct {
 	Folder URL `json:"folder"`
 
@@ -15522,6 +15552,7 @@ type WorkflowRequest struct {
 type WorkflowSchedule struct {
 	Minutes []int64 `json:"minutes"`
 
+	// The first and the last hour of between:. The first is after the last when it goes past midnight (#4818): the hours after midnight belong to the day before.
 	Hours [2]int64 `json:"hours"`
 
 	StartMinute int64 `json:"startMinute"`
@@ -15616,6 +15647,9 @@ type WorkflowSummary struct {
 	LastFiredBy *WorkflowCause `json:"lastFiredBy,omitzero"`
 
 	CooldownEndsAt *Date `json:"cooldownEndsAt,omitzero"`
+
+	// When a fire held outside the workflow's hours: can start (#4818): the first time its hours: are open once its cooldown is over. Absent while its hours: are open by then.
+	HoursOpenAt *Date `json:"hoursOpenAt,omitzero"`
 
 	HoldsAFire bool `json:"holdsAFire"`
 

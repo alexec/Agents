@@ -13376,6 +13376,11 @@ export interface UserSettings {
    */
   accounts?: JSONValue;
   /**
+   * The person's time zone (#4818), as a UserTimeZone. Their Mac sets it from its own clock; a
+   * workflow's hours: with no time-zone: go by it.
+   */
+  timeZone?: JSONValue;
+  /**
    * #2957, research R11: your layer, as a SignedYourPolicy. Only the keeper sets it
    * (user/setPolicy); a client cannot (user/setSettings refuses this part).
    */
@@ -13403,9 +13408,9 @@ export interface UserSettingsPart {
 
 /**
  * A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers,
- * agent configuration, runtimes, cost limits, notices (#2859) and outside accounts (#3967) follow
- * the person. Resources belong to each machine. policy (#2957) is set only by the keeper, through
- * user/setPolicy; user/setSettings refuses it.
+ * agent configuration, runtimes, cost limits, notices (#2859), outside accounts (#3967) and the
+ * time zone (#4818) follow the person. Resources belong to each machine. policy (#2957) is set only
+ * by the keeper, through user/setPolicy; user/setSettings refuses it.
  */
 export type UserSettingsPartName =
   | "mcpServers"
@@ -13414,6 +13419,7 @@ export type UserSettingsPartName =
   | "costLimits"
   | "notifications"
   | "accounts"
+  | "timeZone"
   | "policy";
 
 /**
@@ -13425,6 +13431,12 @@ export interface UserSuspended {
   off?: boolean;
   provider: string;
   at: WireDate;
+}
+
+/** The timeZone part of user settings (#4818). */
+export interface UserTimeZone {
+  /** An IANA name, as TimeZone.identifier says it: Europe/London. */
+  identifier: string;
 }
 
 /**
@@ -13846,6 +13858,7 @@ export interface Workflow {
   unknownFields: Record<string, JSONValue>;
   settings: WorkflowSettings;
   cooldown?: number;
+  hours?: WorkflowHours;
   enabled?: boolean;
   archived?: boolean;
   whenDone?: WorkflowWhenDone;
@@ -13909,6 +13922,22 @@ export interface WorkflowEnableRequest {
   enabled: boolean;
 }
 
+/**
+ * hours: (#4818): when a workflow may start, as the file says it. A fire outside it is held, and
+ * starts when it opens; Run now always runs.
+ */
+export interface WorkflowHours {
+  /**
+   * As the file says it, "09:00-18:00"; it can go past midnight, "18:00-09:00". Absent is the whole
+   * day.
+   */
+  between?: string;
+  /** The days its window starts on. Absent is every day. */
+  days?: Weekday[];
+  /** time-zone:, an IANA name. Absent is the person's timeZone setting, else the host's zone. */
+  timeZone?: string;
+}
+
 export type WorkflowLimit = "folder";
 
 /**
@@ -13970,7 +13999,8 @@ export type WorkflowRefusal =
   | { settingRefused: { setting: string; detail: string } }
   | { awaitingApproval: Record<string, never> }
   | { deniedHere: Record<string, never> }
-  | { coolingDown: { until?: WireDate } };
+  | { coolingDown: { until?: WireDate } }
+  | { outsideHours: { until?: WireDate } };
 
 export interface WorkflowRemovedNotification {
   folder: URLString;
@@ -13984,6 +14014,10 @@ export interface WorkflowRequest {
 
 export interface WorkflowSchedule {
   minutes: number[];
+  /**
+   * The first and the last hour of between:. The first is after the last when it goes past midnight
+   * (#4818): the hours after midnight belong to the day before.
+   */
   hours: [number, number];
   startMinute: number;
   endMinute: number;
@@ -14058,6 +14092,11 @@ export interface WorkflowSummary {
   lastFiredAt?: WireDate;
   lastFiredBy?: WorkflowCause;
   cooldownEndsAt?: WireDate;
+  /**
+   * When a fire held outside the workflow's hours: can start (#4818): the first time its hours: are
+   * open once its cooldown is over. Absent while its hours: are open by then.
+   */
+  hoursOpenAt?: WireDate;
   holdsAFire: boolean;
   queued: number;
   offReason?: WorkflowOffReason;
@@ -16246,10 +16285,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserSecretRequest: { required: ["name"], optional: [] },
   UserSecretRow: { required: ["name", "updated", "machines"], optional: ["kind", "created", "hint", "lastOp", "backedUp", "leftOn", "version", "waiting", "needsApproval", "description"] },
   UserSecretSet: { required: ["name", "version", "values"], optional: ["kind", "needsApproval", "description"] },
-  UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "notifications", "accounts", "policy", "updated"] },
+  UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "notifications", "accounts", "timeZone", "policy", "updated"] },
   UserSettingsChanged: { required: [], optional: ["parts", "agentConfigFiles", "secrets"] },
   UserSettingsPart: { required: ["part", "value"], optional: [] },
   UserSuspended: { required: ["user", "provider", "at"], optional: ["off"] },
+  UserTimeZone: { required: ["identifier"], optional: [] },
   VelocityBucket: { required: ["merged", "reverted"], optional: [] },
   VelocityHistory: { required: ["hours", "days", "now"], optional: ["timeZone"] },
   ViewAsk: { required: ["server", "uri", "hash", "isNew"], optional: [] },
@@ -16286,13 +16326,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkTimelineRelease: { required: ["tag", "at", "repo"], optional: ["url"] },
   WorkTimelineRequest: { required: ["project", "from", "to"], optional: [] },
   WorkTimelineSegment: { required: [], optional: ["startedAt", "closedAt"] },
-  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "whenDone", "continueWhenBack", "muted", "runsOn"] },
+  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "hours", "enabled", "archived", "whenDone", "continueWhenBack", "muted", "runsOn"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: ["note"] },
   WorkflowApproveRequest: { required: ["folder", "workflowID", "digest"], optional: [] },
   WorkflowArchiveRequest: { required: ["folder", "workflowID", "archived"], optional: [] },
   WorkflowClaim: { required: ["workflow", "trigger"], optional: [] },
   WorkflowClaimed: { required: ["won"], optional: [] },
   WorkflowEnableRequest: { required: ["folder", "workflowID", "enabled"], optional: [] },
+  WorkflowHours: { required: [], optional: ["between", "days", "timeZone"] },
   WorkflowLimitSettings: { required: [], optional: ["total"] },
   WorkflowMCPClearMissedRequest: { required: ["folder", "workflowID", "name"], optional: ["server"] },
   WorkflowMuteRequest: { required: ["folder", "workflowID", "muted"], optional: [] },
@@ -16301,7 +16342,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort", "permissionRequests", "sandbox"] },
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "whenDone", "continueWhenBack", "runsOn"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "readyMadeUpdatedAt", "newerReadyMade", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "readyMadeUpdatedAt", "newerReadyMade", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "hoursOpenAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowWriteRequest: { required: ["workflowID", "content"], optional: [] },
   WorkflowsListRequest: { required: [], optional: ["folder", "scope"] },
   WorktreeRemovalRequest: { required: ["root", "confirmed", "folder"], optional: [] },

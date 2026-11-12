@@ -346,6 +346,11 @@ func parseWorkflow(text, id, folder string) wire.Workflow {
 						b.Cooldown = &c
 					}
 				}
+				if n, ok := m["hours"]; ok {
+					if h, err := parseHours(n); err == nil {
+						b.Hours = h
+					}
+				}
 				e, has := m["enabled"]
 				b.Enabled = flag(e, has)
 				a, has := m["archived"]
@@ -424,6 +429,13 @@ func parseWorkflow(text, id, folder string) wire.Workflow {
 			w.Cooldown = &c
 		}
 	}
+	if n, ok := m["hours"]; ok {
+		h, err := parseHours(n)
+		if err != nil {
+			return broken(failureMessage(err, ""))
+		}
+		w.Hours = h
+	}
 	for _, key := range []string{"enabled", "archived", "continue-when-back", "muted"} {
 		if n, ok := m[key]; ok {
 			t, _ := n.Text()
@@ -488,7 +500,7 @@ func parseWorkflow(text, id, folder string) wire.Workflow {
 	}
 	w.Settings = s
 	known := map[string]bool{"on": true, "agent": true, "name": true, "permission-mode": true, "runtime": true, "model": true,
-		"labels": true, "effort": true, "options": true, "enabled": true, "archived": true, "cooldown": true, "runs-on": true, "when-done": true,
+		"labels": true, "effort": true, "options": true, "enabled": true, "archived": true, "cooldown": true, "hours": true, "runs-on": true, "when-done": true,
 		"continue-when-back": true, "permission-requests": true, "sandbox": true}
 	for k, v := range m {
 		if !known[k] {
@@ -659,43 +671,19 @@ func parseSchedule(keys map[string]yamlnode.Node) (wire.WorkflowSchedule, error)
 	}
 	sort.Slice(s.Minutes, func(i, j int) bool { return s.Minutes[i] < s.Minutes[j] })
 	if b, ok := keys["between"].Text(); ok && b != "" {
-		halves := strings.SplitN(b, "-", 2)
-		bad := failure("\"" + b + "\" is not a range of times, like \"09:00-18:00\"")
-		if len(halves) != 2 {
-			return wire.WorkflowSchedule{}, bad
-		}
-		fh, fm, ok1 := clockTime(strings.TrimSpace(halves[0]))
-		th, tm, ok2 := clockTime(strings.TrimSpace(halves[1]))
-		if !ok1 || !ok2 || fh*60+fm > th*60+tm {
-			return wire.WorkflowSchedule{}, bad
+		fh, fm, th, tm, err := parseBetween(b)
+		if err != nil {
+			return wire.WorkflowSchedule{}, err
 		}
 		s.Hours, s.StartMinute, s.EndMinute = [2]int64{fh, th}, fm, tm
 	}
-	all := []wire.Weekday{wire.WeekdaySun, wire.WeekdayMon, wire.WeekdayTue, wire.WeekdayWed, wire.WeekdayThu, wire.WeekdayFri, wire.WeekdaySat}
-	s.Days = all
+	s.Days = allWeekdays
 	if n, ok := keys["days"]; ok {
-		named, _ := n.Values()
-		got := map[wire.Weekday]bool{}
-		for _, d := range named {
-			w := wire.Weekday(strings.ToLower(strings.TrimSpace(d)))
-			valid := false
-			for _, x := range all {
-				valid = valid || x == w
-			}
-			if !valid {
-				return wire.WorkflowSchedule{}, failure("\"" + d + "\" is not a day of the week")
-			}
-			got[w] = true
+		days, err := parseDays(n)
+		if err != nil {
+			return wire.WorkflowSchedule{}, err
 		}
-		if len(got) == 0 {
-			return wire.WorkflowSchedule{}, failure("`days:` names no days")
-		}
-		s.Days = nil
-		for _, x := range all {
-			if got[x] {
-				s.Days = append(s.Days, x)
-			}
-		}
+		s.Days = days
 	}
 	return s, nil
 }

@@ -130,6 +130,10 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
     /// when the cooldown ends, so a burst of triggers is one run with the last of them.
     /// `until` is when the cooldown ends, or `nil` while a run is going past it.
     case coolingDown(until: Date?)
+    /// Outside its `hours:` (#4818). Held, as a cooldown holds one: it starts once when they
+    /// open. `until` is when it can start, the first time its hours are open once its
+    /// cooldown is over; `nil` when its hours name no day.
+    case outsideHours(until: Date?)
 
     /// Said the way the app says a refusal everywhere else: a sentence, because an
     /// agent may be reading it and a person certainly is.
@@ -155,6 +159,9 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .coolingDown(let until?):
             return "it is cooling down until \(until.formatted(date: .omitted, time: .shortened)), and runs once then"
         case .coolingDown(nil): return "a run is still going, and it runs once more when that ends"
+        case .outsideHours(let until?):
+            return "it is outside its hours until \(until.formatted(date: .omitted, time: .shortened)), and runs once then"
+        case .outsideHours(nil): return "it is outside its hours, and its hours name no day"
         }
     }
 
@@ -180,6 +187,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         case .awaitingApproval: return "awaiting_approval"
         case .deniedHere: return "denied_here"
         case .coolingDown: return "cooling_down"
+        case .outsideHours: return "outside_hours"
         }
     }
 
@@ -189,7 +197,17 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         "chain_too_deep", "run_in_flight", "queued", "queue_full", "archived", "disabled", "over_limit",
         "unreadable", "trigger_not_supported", "agent_unavailable", "no_triggering_agent", "missed_while_closed",
         "folder_gone", "day_limit_reached", "setting_refused", "awaiting_approval", "denied_here", "cooling_down",
+        "outside_hours",
     ]
+
+    /// Held for later rather than refused: by its cooldown (#103) or outside its hours (#4818).
+    /// One run comes of it.
+    public var isHeld: Bool {
+        switch self {
+        case .coolingDown, .outsideHours: return true
+        default: return false
+        }
+    }
 
     /// Whether somebody has to do something, or whether this sorts itself out.
     ///
@@ -212,7 +230,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
         // is the same shape as a fire missed while the app was closed.
         case .runInFlight, .archived, .disabled, .triggerNotSupported, .agentUnavailable,
              .noTriggeringAgent, .missedWhileClosed, .dayLimitReached, .coolingDown,
-             .queued, .queueFull: return false
+             .outsideHours, .queued, .queueFull: return false
         // The person's own answer, as archiving is: nobody else has to act on it.
         case .deniedHere: return false
         }
@@ -228,7 +246,7 @@ public enum WorkflowRefusal: Codable, Hashable, Sendable {
              (.noTriggeringAgent, .noTriggeringAgent), (.missedWhileClosed, .missedWhileClosed),
              (.folderGone, .folderGone), (.dayLimitReached, .dayLimitReached),
              (.awaitingApproval, .awaitingApproval), (.deniedHere, .deniedHere),
-             (.coolingDown, .coolingDown), (.queued, .queued), (.queueFull, .queueFull):
+             (.coolingDown, .coolingDown), (.outsideHours, .outsideHours), (.queued, .queued), (.queueFull, .queueFull):
             return true
         // The ceiling only, not the number it stood at: raising it by one is not a
         // different reason to be past it.
@@ -277,7 +295,7 @@ public enum WorkflowOutcome: Codable, Hashable, Sendable {
         case .refused(let refusal, _, let repeats):
             let many = repeats > 1
             // Held, not dropped: it is going to run, and "did not run" would say otherwise.
-            if case .coolingDown = refusal {
+            if refusal.isHeld {
                 return many ? "Waiting — \(repeats) triggers held into one run, as \(refusal.message)"
                             : "Waiting — \(refusal.message)"
             }

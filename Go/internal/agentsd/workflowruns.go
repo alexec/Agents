@@ -87,6 +87,11 @@ func refusalWords(r wire.WorkflowRefusal) string {
 			return "it is cooling down until " + clock(*r.CoolingDown.Until) + ", and runs once then"
 		}
 		return "a run is still going, and it runs once more when that ends"
+	case r.OutsideHours != nil:
+		if r.OutsideHours.Until != nil {
+			return "it is outside its hours until " + clock(*r.OutsideHours.Until) + ", and runs once then"
+		}
+		return "it is outside its hours, and its hours name no day"
 	}
 	return ""
 }
@@ -99,7 +104,7 @@ func refusalCode(r wire.WorkflowRefusal) string {
 		"agent_unavailable": r.AgentUnavailable != nil, "no_triggering_agent": r.NoTriggeringAgent != nil,
 		"missed_while_closed": r.MissedWhileClosed != nil, "folder_gone": r.FolderGone != nil, "day_limit_reached": r.DayLimitReached != nil,
 		"setting_refused": r.SettingRefused != nil, "awaiting_approval": r.AwaitingApproval != nil, "denied_here": r.DeniedHere != nil,
-		"cooling_down": r.CoolingDown != nil} {
+		"cooling_down": r.CoolingDown != nil, "outside_hours": r.OutsideHours != nil} {
 		if set {
 			return code
 		}
@@ -262,6 +267,17 @@ func (d *Daemon) refusalLocked(fr fireRequest, f *workflowFile) *wire.WorkflowRe
 		n := d.workflowTotal()
 		return r(func(x *wire.WorkflowRefusal) { x.OverLimit = &wire.WorkflowRefusalOverLimit{Value: l, Allowed: &n} })
 	}
+	// Outside its hours (#4818), a fire is held for when they open; Run now always runs.
+	if !fr.byHand {
+		if win := d.windowLocked(w); !win.open(time.Now()) {
+			var until *wire.Date
+			if at, ok := d.heldStartLocked(w, st, win, time.Now()); ok {
+				u := wire.DateOf(at)
+				until = &u
+			}
+			return r(func(x *wire.WorkflowRefusal) { x.OutsideHours = &wire.WorkflowRefusalOutsideHours{Until: until} })
+		}
+	}
 	if w.Cooldown != nil && !fr.byHand {
 		if fr.depth > workflowChainLimit {
 			return r(func(x *wire.WorkflowRefusal) {
@@ -399,7 +415,7 @@ func (d *Daemon) fire(fr fireRequest) {
 		switch {
 		case refused.Queued != nil:
 			st.QueuedFires = append(st.QueuedFires, hf)
-		case refused.CoolingDown != nil:
+		case refused.CoolingDown != nil, refused.OutsideHours != nil:
 			st.HeldFire = &hf
 		}
 		d.saveRecordsLocked(false)
@@ -750,7 +766,7 @@ func (d *Daemon) recordOutcome(fr fireRequest, name string, o wire.WorkflowOutco
 		}
 	} else {
 		r := o.Refused.Value
-		if r.Disabled == nil && r.CoolingDown == nil && r.Queued == nil {
+		if r.Disabled == nil && r.CoolingDown == nil && r.OutsideHours == nil && r.Queued == nil {
 			d.raise(wire.EventDraft{Name: "workflow.refused", At: now(), Scope: scope, Sentence: "Workflow " + name + " did not run: " + refusalWords(r) + ".",
 				Details: map[string]string{"workflow": fr.id, "reason": refusalCode(r)}, ChainDepth: fr.depth + 1})
 		}
@@ -870,7 +886,8 @@ func (d *Daemon) releaseQueued(folder, id string) {
 	} else if st.HeldFire != nil {
 		cooled := f.wf.Cooldown == nil || st.LastFiredAt == nil ||
 			!st.LastFiredAt.Time().Add(time.Duration(*f.wf.Cooldown*float64(time.Second))).After(time.Now())
-		if cooled {
+		// Held by its cooldown, its hours or both (#4818): it starts when both allow it.
+		if cooled && d.windowLocked(f.wf).open(time.Now()) {
 			next, st.HeldFire = st.HeldFire, nil
 		}
 	}
@@ -1004,11 +1021,13 @@ func (d *Daemon) workflowTickOnce(at time.Time) {
 					}
 					continue
 				}
+				win := d.windowLocked(w)
 				for _, t := range w.Triggers {
 					if t.Schedule == nil {
 						continue
 					}
-					if due, ok := nextDue(t.Schedule.Value, *since); ok && !due.After(at) {
+					// A schedule fires only when its own window and hours: both allow it (#4818).
+					if due, ok := nextDue(t.Schedule.Value, *since); ok && !due.After(at) && win.open(due) {
 						fr := fireRequest{folder: folder, id: id, trigger: t, dueAt: &due}
 						if away {
 							missed = append(missed, fr)
