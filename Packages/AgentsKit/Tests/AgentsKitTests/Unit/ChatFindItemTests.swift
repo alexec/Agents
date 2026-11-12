@@ -6,17 +6,16 @@ struct ChatFindItemTests {
     @Test func anOldHostsChatKeepsTheItemGreyed() {
         let item = ChatFindItem.of(chatOpen: true, hostFinds: false)
         #expect(item == .needsUpdate)
-        #expect(item.isShown)
         #expect(!item.isEnabled)
     }
 
     @Test func aHostThatFindsHasTheItem() {
-        let item = ChatFindItem.of(chatOpen: true, hostFinds: true)
-        #expect(item.isShown && item.isEnabled)
+        #expect(ChatFindItem.of(chatOpen: true, hostFinds: true).isEnabled)
     }
 
-    @Test func noChatNoItem() {
-        #expect(ChatFindItem.of(chatOpen: false, hostFinds: true) == .hidden)
-        #expect(!ChatFindItem.of(chatOpen: false, hostFinds: false).isShown)
+    /// ⌘F is always Find in Chat (#4787): with no chat, greyed, not Find Session.
+    @Test func noChatGreysTheItem() {
+        #expect(ChatFindItem.of(chatOpen: false, hostFinds: true) == .noChat)
+        #expect(!ChatFindItem.of(chatOpen: false, hostFinds: false).isEnabled)
     }
 }
