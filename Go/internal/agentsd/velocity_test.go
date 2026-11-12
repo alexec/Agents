@@ -28,14 +28,14 @@ func TestVelocityHistoryCountsTheLandedPRs(t *testing.T) {
 	f := d.costLedgerLocked()
 	var nodes []wire.LineageCostNode
 	for _, n := range []wire.LineageCostNode{
-		pr("github:alexec/agents#1", "github:alexec/agents", merged, yesterday, "s1"),
-		pr("github:alexec/agents#2", "github:alexec/agents", merged, now, "s2"),
-		pr("github:alexec/agents#3", "github:alexec/agents", reverted, now, "s3"),
-		pr("github:alexec/other#4", "github:alexec/other", merged, now, "s4"),
-		pr("github:alexec/agents#5", "github:alexec/agents", merged, now),                           // no session
-		pr("github:alexec/agents#6", "github:alexec/agents", nil, now, "s6"),                        // still open
-		pr("github:alexec/agents#7", "github:alexec/agents", closed, now, "s7"),                     // closed
-		pr("github:alexec/agents#8", "github:alexec/agents", merged, now.AddDate(0, 0, -120), "s8"), // too old
+		pr("github:issue:alexec/agents#1", "github:alexec/agents", merged, yesterday, "s1"),
+		pr("github:issue:alexec/agents#2", "github:alexec/agents", merged, now, "s2"),
+		pr("github:issue:alexec/agents#3", "github:alexec/agents", reverted, now, "s3"),
+		pr("github:issue:alexec/other#4", "github:alexec/other", merged, now, "s4"),
+		pr("github:issue:alexec/agents#5", "github:alexec/agents", merged, now),                           // no session
+		pr("github:issue:alexec/agents#6", "github:alexec/agents", nil, now, "s6"),                        // still open
+		pr("github:issue:alexec/agents#7", "github:alexec/agents", closed, now, "s7"),                     // closed
+		pr("github:issue:alexec/agents#8", "github:alexec/agents", merged, now.AddDate(0, 0, -120), "s8"), // too old
 	} {
 		f.Nodes[costKey(n.Node)] = n
 		nodes = append(nodes, n)

@@ -103,7 +103,9 @@ public enum Pipeline {
         }
     }
 
-    private static func split(_ ref: String) -> (scheme: String, id: String) {
+    /// A ref's scheme and the rest, in the old form (#4800): the words and addresses are made from it.
+    private static func split(_ full: String) -> (scheme: String, id: String) {
+        let ref = WireRef.legacy(full)
         let parts = ref.split(separator: ":", maxSplits: 1)
         return parts.count == 2 ? (String(parts[0]), String(parts[1])) : ("", ref)
     }

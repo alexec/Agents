@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -110,20 +111,16 @@ func reviewPullOf(i wire.ForgeItem) (wire.ReviewPull, bool) {
 		}
 		labelled = labelled || l.Name == reviewLabel
 	}
-	// A ref is "github:owner/name#12", or "gitlab:group/project!12".
-	ref := i.Node.Ref
-	if at := strings.Index(ref, ":"); at >= 0 {
-		ref = ref[at+1:]
-	}
-	at := strings.LastIndexAny(ref, "#!")
-	if !labelled || at < 0 {
+	// A ref is "github:pr:owner/name#12", or "gitlab:mr:group/project#12".
+	r, ok := lineage.RefOf(i.Node)
+	if !labelled || !ok || r.Topic == "" {
 		return wire.ReviewPull{}, false
 	}
-	number, err := strconv.ParseInt(ref[at+1:], 10, 64)
+	number, err := strconv.ParseInt(r.ID, 10, 64)
 	if err != nil {
 		return wire.ReviewPull{}, false
 	}
-	return wire.ReviewPull{URL: wire.URL(*i.URL), Number: number, Title: i.Title, Repo: ref[:at],
+	return wire.ReviewPull{URL: wire.URL(*i.URL), Number: number, Title: i.Title, Repo: r.Topic,
 		Ref: new(i.Node.Ref), Author: i.Author, UpdatedAt: i.UpdatedAt}, true
 }
 

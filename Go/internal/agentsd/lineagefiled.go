@@ -181,8 +181,9 @@ func (d *Daemon) noteFiledIssues(id wire.UUID, issues []wire.LineageNode) {
 	if a == nil || a.Purpose != nil {
 		return
 	}
-	own, s := folderPath(a), sessionNode(id)
+	own := folderPath(a)
 	d.lineageDo(func() {
+		s := d.sessionNode(id)
 		for _, issue := range issues {
 			d.link(s, issue, lineage.RelOpens, lineage.SourceAgent)
 			repo, n, ok := issueOfNode(issue)

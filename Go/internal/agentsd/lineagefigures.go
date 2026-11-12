@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"context"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/lineage"
@@ -56,7 +55,7 @@ func (d *Daemon) addSessionFigures(out *wire.LineageFigures, parts []wire.Lineag
 	byRuntime := map[string]int64{}
 	for _, p := range parts {
 		for _, ref := range p.Sessions {
-			id, ok := strings.CutPrefix(ref, "session:")
+			id, ok := lineage.SessionID(ref)
 			if !ok || seen[id] {
 				continue
 			}

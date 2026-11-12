@@ -14,13 +14,13 @@ import (
 var t0 = time.Date(2026, 10, 29, 12, 0, 0, 0, time.UTC)
 
 func issue(n string) wire.LineageNode {
-	return wire.LineageNode{Kind: KindIssue, Ref: "github:alexec/Agents#" + n}
+	return wire.LineageNode{Kind: KindIssue, Ref: "github:issue:alexec/agents#" + n}
 }
 func pr(n string) wire.LineageNode {
-	return wire.LineageNode{Kind: KindPR, Ref: "github:alexec/Agents#" + n}
+	return wire.LineageNode{Kind: KindPR, Ref: "github:pr:alexec/agents#" + n}
 }
 func session(id string) wire.LineageNode {
-	return wire.LineageNode{Kind: KindSession, Ref: "session:" + id}
+	return wire.LineageNode{Kind: KindSession, Ref: "agents:session:#" + id}
 }
 
 func link(t *testing.T, s Store, from, to wire.LineageNode, rel string, at time.Time) wire.LineageLink {
@@ -177,8 +177,8 @@ func TestEndedLinksGoAfterKeepEnded(t *testing.T) {
 func TestOpenDropsMilestoneLinks(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "lineage.jsonl")
 	f := openAt(t, path, t0)
-	m := wire.LineageNode{Kind: removedKindMilestone, Ref: "github:alexec/Agents/milestone/15"}
-	release := wire.LineageNode{Kind: KindRelease, Ref: "github:alexec/Agents/release/v0.14.0"}
+	m := wire.LineageNode{Kind: removedKindMilestone, Ref: "github:milestone:alexec/agents#15"}
+	release := wire.LineageNode{Kind: KindRelease, Ref: "github:release:alexec/agents#v0.14.0"}
 	link(t, f, session("a"), issue("1"), RelWorksOn, t0)
 	link(t, f, issue("1"), m, RelPartOf, t0)
 	link(t, f, m, release, "shipped-in", t0)
@@ -215,7 +215,7 @@ func TestPruneDropsEndedLinksWhileOpen(t *testing.T) {
 	if got := f.Links(issue("1")).Links; len(got) != 1 || got[0].From != session("b") {
 		t.Fatalf("%+v", got)
 	}
-	if data, _ := os.ReadFile(path); strings.Contains(string(data), "session:a") {
+	if data, _ := os.ReadFile(path); strings.Contains(string(data), "agents:session:#a") {
 		t.Fatalf("the file still holds the dropped link: %s", data)
 	}
 }
@@ -252,7 +252,7 @@ func TestTheStoreIsBounded(t *testing.T) {
 func TestRefusesWhatIsNotANodeOrALink(t *testing.T) {
 	f := openAt(t, filepath.Join(t.TempDir(), "lineage.jsonl"), t0)
 	for _, r := range []wire.LineageLinkRequest{
-		{From: wire.LineageNode{Kind: "Issue", Ref: "github:a#1"}, To: issue("1"), Rel: RelFixes, Source: SourceAgent},
+		{From: wire.LineageNode{Kind: "Issue", Ref: "github:issue:a#1"}, To: issue("1"), Rel: RelFixes, Source: SourceAgent},
 		{From: wire.LineageNode{Kind: KindPR, Ref: "#1"}, To: issue("1"), Rel: RelFixes, Source: SourceAgent},
 		{From: pr("1"), To: issue("1"), Rel: "", Source: SourceAgent},
 		{From: pr("1"), To: issue("1"), Rel: RelFixes, Source: "by hand"},
@@ -355,7 +355,7 @@ func TestSessionStatesBounded(t *testing.T) {
 // A line from a newer build with a state this build does not know reads as stopped.
 func TestUnknownStateReadsAsStopped(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "lineage.jsonl")
-	line := `{"state":{"node":{"kind":"session","ref":"session:a"},"state":"dreaming"},"at":815054400}` + "\n"
+	line := `{"state":{"node":{"kind":"session","ref":"agents:session:#a"},"state":"dreaming"},"at":815054400}` + "\n"
 	if err := os.WriteFile(path, []byte(line), 0o644); err != nil {
 		t.Fatal(err)
 	}

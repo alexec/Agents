@@ -160,7 +160,7 @@ func TestForgeListsAzureDevOpsPullRequests(t *testing.T) {
 			item = &i
 		}
 	}
-	if item == nil || item.Node != (wire.LineageNode{Kind: "pr", Ref: "azuredevops:acme/web app/app#3"}) || deref(item.Folder) == "" ||
+	if item == nil || item.Node != (wire.LineageNode{Kind: "pr", Ref: "azuredevops:pr:acme/web app/app#3"}) || deref(item.Folder) == "" ||
 		item.Labels[0].Name != "ui" || item.UpdatedAt == 0 || deref(item.Review) != "approved" || deref(item.Mergeable) != "mergeable" ||
 		item.AutoMerge == nil || *item.AutoMerge || len(item.Assignees) != 0 || len(pulls.Errors) != 0 {
 		t.Fatalf("the Azure DevOps pull request: %+v in %+v", item, pulls)
@@ -188,7 +188,7 @@ func TestForgeListSaysAzureDevOpsIsNotConnected(t *testing.T) {
 func TestForgeReadsAnAzureDevOpsPullRequest(t *testing.T) {
 	_, c, ado, _ := azureDevOpsDaemon(t)
 	var pr wire.ForgeItemDetail
-	json.Unmarshal(c.call(t, 1, "forge/pull", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "pr", Ref: "azuredevops:acme/web app/app#3"}}), &pr)
+	json.Unmarshal(c.call(t, 1, "forge/pull", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "pr", Ref: "azuredevops:pr:acme/web app/app#3"}}), &pr)
 	if pr.Body != "The body." || deref(pr.Cursor) != "4" || len(pr.Comments) != 1 || pr.Comments[0].Bot == nil || deref(pr.Head) != "abc123" ||
 		len(pr.Checks) != 4 || *pr.FilesChanged != 2 || *pr.ReviewThreads != 1 || len(pr.MergeMethods) != 2 || pr.MergeMethods[0] != "squash" ||
 		deref(pr.Item.Checks) != "failing" || pr.Item.AutoMerge == nil || !*pr.Item.AutoMerge || pr.Start != nil {
@@ -198,9 +198,9 @@ func TestForgeReadsAnAzureDevOpsPullRequest(t *testing.T) {
 		t.Fatalf("Azure DevOps was asked %v", ado.items)
 	}
 	for i, n := range []wire.LineageNode{
-		{Kind: "pr", Ref: "azuredevops:acme/web app/app#404"},
-		{Kind: "pr", Ref: "azuredevops:kim/notes/notes#1"},
-		{Kind: "pr", Ref: "azuredevops:acme/app#1"},
+		{Kind: "pr", Ref: "azuredevops:pr:acme/web app/app#404"},
+		{Kind: "pr", Ref: "azuredevops:pr:kim/notes/notes#1"},
+		{Kind: "pr", Ref: "azuredevops:pr:acme/app#1"},
 	} {
 		if e := c.callError(t, 10+i, "forge/pull", wire.ForgeItemRequest{Node: n}); e == nil || !strings.Contains(e.Message, "forge/pull") {
 			t.Fatalf("%s: %v", n.Ref, e)
@@ -212,7 +212,7 @@ func TestForgeReadsAnAzureDevOpsPullRequest(t *testing.T) {
 // branch's first method, or completes on its own with auto; rerun runs each failed build once.
 func TestForgeWritesOnAnAzureDevOpsPullRequest(t *testing.T) {
 	_, c, ado, _ := azureDevOpsDaemon(t)
-	pr := wire.LineageNode{Kind: "pr", Ref: "azuredevops:acme/web app/app#3"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "azuredevops:pr:acme/web app/app#3"}
 	var done wire.ForgeDone
 	json.Unmarshal(c.call(t, 1, "forge/comment", wire.ForgeCommentRequest{Node: pr, Body: "LGTM"}), &done)
 	if deref(done.URL) != "https://dev.azure.com/c/1" {
@@ -265,12 +265,12 @@ func TestForgeWritesOnAnAzureDevOpsPullRequest(t *testing.T) {
 
 func TestAzureDevOpsOfNode(t *testing.T) {
 	for ref, want := range map[string]string{
-		"azuredevops:acme/web app/app#3": "acme/web app/app 3",
-		"azuredevops:a/b/c#0":            "",
-		"azuredevops:a/b#1":              "",
-		"azuredevops:a/b/c/d#1":          "",
-		"azuredevops:a//c#1":             "",
-		"bitbucket:a/b#1":                "",
+		"azuredevops:pr:acme/web app/app#3": "acme/web app/app 3",
+		"azuredevops:pr:a/b/c#0":            "",
+		"azuredevops:pr:a/b#1":              "",
+		"azuredevops:pr:a/b/c/d#1":          "",
+		"azuredevops:pr:a//c#1":             "",
+		"bitbucket:issue:a/b#1":             "",
 	} {
 		repo, n, ok := azureDevOpsOfNode(wire.LineageNode{Kind: "pr", Ref: ref})
 		got := ""
@@ -281,7 +281,7 @@ func TestAzureDevOpsOfNode(t *testing.T) {
 			t.Errorf("%s: %q, want %q", ref, got, want)
 		}
 	}
-	if _, _, ok := azureDevOpsOfNode(wire.LineageNode{Kind: "issue", Ref: "azuredevops:a/b/c#1"}); ok {
+	if _, _, ok := azureDevOpsOfNode(wire.LineageNode{Kind: "issue", Ref: "azuredevops:pr:a/b/c#1"}); ok {
 		t.Error("an issue on Azure Repos")
 	}
 }

@@ -124,9 +124,37 @@ type Store interface {
 	// Prune drops what is past the bounds now, not only at open or on a long append
 	// (#3649), and says how many links it dropped.
 	Prune() int
+	// Canon is a node as the store names it (#4800): the full ref form, and an agents node
+	// (a session, a workflow, a workflow's run) with the topic the store has for its id.
+	Canon(n wire.LineageNode) wire.LineageNode
 	// Close writes what is left and lets the file go.
 	Close() error
 }
+
+// Topics is the topic of an agents node whose old form did not say it (#4800): the project
+// repo of a session, by its id, or of a workflow, by its folder and name. "" when it is not
+// known. Open asks it only for the lines it reads in the old form.
+type Topics func(kind, id string) string
+
+// Full is a node in the full ref form (#4800, spec 4724-event-bus, "A ref"): a ref in the old
+// form is read through wire.RefFromLineage, with topic as the project of an agents node; a
+// form it does not know is kept as it is.
+func Full(n wire.LineageNode, topic string) wire.LineageNode {
+	if r, ok := wire.RefFromLineage(n.Kind, n.Ref, wire.RefContext{Topic: topic}); ok {
+		n.Ref = r.String()
+	}
+	return n
+}
+
+// ParseNode is a node's ref, parsed; ok is false for a ref that is not in the full form.
+func ParseNode(n wire.LineageNode) (wire.Ref, bool) {
+	r, err := wire.ParseRef(n.Ref)
+	return r, err == nil
+}
+
+// agentsKey is an agents node's identity: its type and id. Its topic is not part of it, so
+// a session written with its project and read without one is one node.
+func agentsKey(r wire.Ref) string { return r.Type + "#" + r.ID }
 
 var (
 	kindPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}$`)
@@ -147,7 +175,7 @@ func checkNode(n wire.LineageNode) error {
 		return fmt.Errorf("kind %q: want lower case letters, digits and -, such as issue or workflow-run", n.Kind)
 	}
 	if len(n.Ref) > maxRef || !refPattern.MatchString(n.Ref) {
-		return fmt.Errorf("ref %q: want <scheme>:<id>, such as github:alexec/Agents#123 or session:<agent id>", n.Ref)
+		return fmt.Errorf("ref %q: want provider:type:topic#id, such as github:issue:alexec/agents#123", n.Ref)
 	}
 	return nil
 }
@@ -200,17 +228,43 @@ type Files struct {
 	byNode map[wire.LineageNode][]int
 	// states is every change of state kept, oldest first; stateOf is the indexes in states
 	// of each node's changes.
-	states   []change
-	stateOf  map[wire.LineageNode][]int
-	appended int
-	file     *os.File
-	now      func() time.Time
+	states  []change
+	stateOf map[wire.LineageNode][]int
+	// agentsTopic is the topic of each agents node in links and states, by agentsKey.
+	agentsTopic map[string]string
+	appended    int
+	file        *os.File
+	now         func() time.Time
 }
 
 // Open reads path, keeping what it can: a line it cannot read is left out and the file set
 // aside beside it, and a torn last line is dropped.
-func Open(path string, now func() time.Time) *Files {
-	f := &Files{path: path, now: now}
+//
+// A line in the old ref form (before #4800) is read in the full form, topics saying the
+// project of an agents node, and the file is written again in it.
+func Open(path string, now func() time.Time) *Files { return OpenWith(path, now, nil) }
+
+// OpenWith is Open, with topics for the agents nodes of lines in the old form.
+func OpenWith(path string, now func() time.Time, topics Topics) *Files {
+	f := &Files{path: path, now: now, agentsTopic: map[string]string{}}
+	converted := false
+	full := func(n *wire.LineageNode) {
+		if _, ok := ParseNode(*n); ok {
+			if m := f.canonLocked(*n); m != *n {
+				*n, converted = m, true
+			}
+			f.noteTopic(*n)
+			return
+		}
+		topic := ""
+		if r, ok := wire.RefFromLineage(n.Kind, n.Ref, wire.RefContext{}); ok && r.Provider == "agents" && topics != nil {
+			topic = topics(n.Kind, r.ID)
+		}
+		if m := f.canonLocked(Full(*n, topic)); m != *n {
+			*n, converted = m, true
+		}
+		f.noteTopic(*n)
+	}
 	data, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		log.Printf("%s: %v; starting with no links", filepath.Base(path), err)
@@ -229,6 +283,18 @@ func Open(path string, now func() time.Time) *Files {
 			continue
 		}
 		bad := diskjson.Unmarshal(raw, &l) != nil
+		if !bad {
+			switch {
+			case l.Link != nil:
+				full(&l.Link.From)
+				full(&l.Link.To)
+			case l.End != nil:
+				full(&l.End.From)
+				full(&l.End.To)
+			case l.State != nil:
+				full(&l.State.Node)
+			}
+		}
 		switch {
 		case !bad && l.Link != nil && checkNode(l.Link.From) == nil && checkNode(l.Link.To) == nil:
 			// A rewritten file holds ended links whole.
@@ -263,7 +329,7 @@ func Open(path string, now func() time.Time) *Files {
 	}
 	f.links, f.states = links, states
 	f.appended = len(raws)
-	if f.prune() || unreadable > 0 {
+	if f.prune() || unreadable > 0 || converted {
 		f.rewrite()
 	} else {
 		f.index()
@@ -276,8 +342,10 @@ func (f *Files) index() {
 	f.active = map[key]int{}
 	f.byNode = map[wire.LineageNode][]int{}
 	f.stateOf = map[wire.LineageNode][]int{}
+	f.agentsTopic = map[string]string{}
 	for i, c := range f.states {
 		f.stateOf[c.node] = append(f.stateOf[c.node], i)
+		f.noteTopic(c.node)
 	}
 	for i, l := range f.links {
 		if l.EndedAt == nil {
@@ -287,7 +355,41 @@ func (f *Files) index() {
 		if l.To != l.From {
 			f.byNode[l.To] = append(f.byNode[l.To], i)
 		}
+		f.noteTopic(l.From)
+		f.noteTopic(l.To)
 	}
+}
+
+// noteTopic keeps the topic of n when it is an agents node the store has none for. Under mu.
+func (f *Files) noteTopic(n wire.LineageNode) {
+	if r, ok := ParseNode(n); ok && r.Provider == "agents" {
+		if _, known := f.agentsTopic[agentsKey(r)]; !known {
+			f.agentsTopic[agentsKey(r)] = r.Topic
+		}
+	}
+}
+
+// Canon is n in the full form, with the topic the store has for an agents node's id.
+func (f *Files) Canon(n wire.LineageNode) wire.LineageNode {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.canonLocked(n)
+}
+
+// canonLocked is Canon, under mu: a ref in the old form is read in the full form, and an
+// agents node takes the topic the store has for its id, so it is one node whatever topic it
+// is named with.
+func (f *Files) canonLocked(n wire.LineageNode) wire.LineageNode {
+	n = Full(n, "")
+	r, ok := ParseNode(n)
+	if !ok || r.Provider != "agents" {
+		return n
+	}
+	if topic, known := f.agentsTopic[agentsKey(r)]; known && topic != r.Topic {
+		r.Topic = topic
+		n.Ref = r.String()
+	}
+	return n
 }
 
 // removedKindMilestone is the kind of a forge milestone's node, which #3878 removed: prune
@@ -486,6 +588,7 @@ func (f *Files) Link(r wire.LineageLinkRequest, at time.Time) (wire.LineageLink,
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	r.From, r.To = f.canonLocked(r.From), f.canonLocked(r.To)
 	l := wire.LineageLink{From: r.From, To: r.To, Rel: r.Rel, Source: r.Source, At: wire.DateOf(at)}
 	k := keyOf(l)
 	if i, on := f.active[k]; on {
@@ -498,6 +601,8 @@ func (f *Files) Link(r wire.LineageLinkRequest, at time.Time) (wire.LineageLink,
 	if l.To != l.From {
 		f.byNode[l.To] = append(f.byNode[l.To], i)
 	}
+	f.noteTopic(l.From)
+	f.noteTopic(l.To)
 	if err := f.append(line{Link: &l}); err != nil {
 		// Not written, so not kept: the write failed before any rewrite.
 		f.links = f.links[:i]
@@ -510,6 +615,7 @@ func (f *Files) Link(r wire.LineageLinkRequest, at time.Time) (wire.LineageLink,
 func (f *Files) End(r wire.LineageEndRequest, at time.Time) ([]wire.LineageLink, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	r.From, r.To = f.canonLocked(r.From), f.canonLocked(r.To)
 	k := key{r.From, r.To, r.Rel}
 	i, on := f.active[k]
 	if !on {
@@ -533,6 +639,7 @@ func (f *Files) SetState(n wire.LineageNode, state wire.LineageSessionStateName,
 	}
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	n = f.canonLocked(n)
 	if s, ok := f.stateNow(n); ok && s.State == state {
 		return false, nil
 	}
@@ -540,6 +647,7 @@ func (f *Files) SetState(n wire.LineageNode, state wire.LineageSessionStateName,
 	i := len(f.states)
 	f.states = append(f.states, c)
 	f.stateOf[n] = append(f.stateOf[n], i)
+	f.noteTopic(n)
 	if err := f.append(line{State: &stateLine{n, state}, At: &c.At}); err != nil {
 		f.states = f.states[:i]
 		f.index()
@@ -570,6 +678,7 @@ func (f *Files) linksOf(n wire.LineageNode) []int {
 func (f *Files) Links(n wire.LineageNode) wire.LineageLinks {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	n = f.canonLocked(n)
 	idx := f.linksOf(n)
 	out := wire.LineageLinks{Links: make([]wire.LineageLink, 0, min(len(idx), MostAnswer))}
 	for _, i := range idx[:min(len(idx), MostAnswer)] {
@@ -599,7 +708,7 @@ func (f *Files) All() ([]wire.LineageLink, []wire.LineageStateChange) {
 func (f *Files) Walk(n wire.LineageNode, depth int) wire.LineageGraph {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return WalkOver(f.links, f.linksOf, f.stateNow, n, depth)
+	return WalkOver(f.links, f.linksOf, f.stateNow, f.canonLocked(n), depth)
 }
 
 // WalkOver is the graph within depth links of n, either way, over links: linksOf is the

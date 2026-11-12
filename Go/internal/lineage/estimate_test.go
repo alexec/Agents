@@ -9,8 +9,8 @@ import (
 )
 
 func past(n int, typ, level string, usd, cycle float64) Past {
-	return Past{Ref: "github:o/r#" + strconv.Itoa(n), Type: typ, Level: level,
-		Cost: wire.LineageCost{Cost: map[string]float64{"USD": usd}, OutputTokens: int64(usd * 1000), WorkingSeconds: usd * 60},
+	return Past{Ref: "github:issue:o/r#" + strconv.Itoa(n), Type: typ, Level: level,
+		Cost:  wire.LineageCost{Cost: map[string]float64{"USD": usd}, OutputTokens: int64(usd * 1000), WorkingSeconds: usd * 60},
 		Cycle: &cycle}
 }
 
@@ -20,7 +20,7 @@ func TestHistoryKeepsIssuesClosedByAMergedPR(t *testing.T) {
 	str := func(s string) *string { return &s }
 	date := func(d wire.Date) *wire.Date { return &d }
 	issue := func(n, state, level string) wire.LineageCostNode {
-		c := wire.LineageCostNode{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#" + n}, Banked: cost(1), FirstAt: date(100),
+		c := wire.LineageCostNode{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#" + n}, Banked: cost(1), FirstAt: date(100),
 			StartedAt: date(200), Resolved: &wire.LineageResolved{Title: n, State: str(state), Labels: []string{"bug"}}}
 		if level != "" {
 			c.Level = str(level)
@@ -28,20 +28,20 @@ func TestHistoryKeepsIssuesClosedByAMergedPR(t *testing.T) {
 		return c
 	}
 	pr := func(n, outcome string, fixes ...string) wire.LineageCostNode {
-		return wire.LineageCostNode{Node: wire.LineageNode{Kind: KindPR, Ref: "github:o/r#" + n}, Banked: cost(2), Fixes: fixes,
+		return wire.LineageCostNode{Node: wire.LineageNode{Kind: KindPR, Ref: "github:pr:o/r#" + n}, Banked: cost(2), Fixes: fixes,
 			Outcome: str(outcome), EndedAt: date(1000)}
 	}
 	h := History([]wire.LineageCostNode{
-		issue("1", "closed", "bug"), pr("2", OutcomeMerged, "github:o/r#1"), pr("3", OutcomeClosed, "github:o/r#1"),
-		issue("4", "open", ""), pr("5", OutcomeMerged, "github:o/r#4"),
-		issue("6", "closed", "epic"), pr("7", OutcomeMerged, "github:o/r#6"),
-		issue("8", "closed", ""), pr("9", OutcomeClosed, "github:o/r#8"),
+		issue("1", "closed", "bug"), pr("2", OutcomeMerged, "github:issue:o/r#1"), pr("3", OutcomeClosed, "github:issue:o/r#1"),
+		issue("4", "open", ""), pr("5", OutcomeMerged, "github:issue:o/r#4"),
+		issue("6", "closed", "epic"), pr("7", OutcomeMerged, "github:issue:o/r#6"),
+		issue("8", "closed", ""), pr("9", OutcomeClosed, "github:issue:o/r#8"),
 	})
 	if len(h) != 1 {
 		t.Fatalf("%+v", h)
 	}
 	p := h[0]
-	if p.Ref != "github:o/r#1" || p.Type != "bug" || p.Level != "bug" || p.Cost.Cost["USD"] != 5 || *p.Lead != 900 || *p.Cycle != 800 {
+	if p.Ref != "github:issue:o/r#1" || p.Type != "bug" || p.Level != "bug" || p.Cost.Cost["USD"] != 5 || *p.Lead != 900 || *p.Cycle != 800 {
 		t.Fatalf("%+v", p)
 	}
 }
@@ -57,7 +57,7 @@ func TestMatchesFallBack(t *testing.T) {
 	}
 	for _, c := range []struct {
 		typ, level, by string
-		n          int
+		n              int
 	}{
 		{"enhancement", "story", MatchedByLevel, 5},
 		{"enhancement", "task", MatchedByType, 5},
@@ -81,7 +81,7 @@ func TestEstimateIssue(t *testing.T) {
 	for i := 1; i <= 10; i++ {
 		h = append(h, past(i, "enhancement", "task", float64(i), float64(i*100)))
 	}
-	node := wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#99"}
+	node := wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#99"}
 	e := EstimateIssue(h, node, []string{"enhancement", "task"}, 1000)
 	if e.MatchedBy == nil || *e.MatchedBy != MatchedByLevel || e.Matches != 10 || e.ClosedIssues != 10 || *e.Level != "task" || *e.Type != "enhancement" {
 		t.Fatalf("%+v", e)
@@ -110,12 +110,12 @@ func TestEstimateEpic(t *testing.T) {
 	for i := range 6 {
 		h = append(h, past(i, "enhancement", "story", 2, 100))
 	}
-	closed := wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#50"}
+	closed := wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#50"}
 	nodes := []wire.LineageCostNode{{Node: closed, Banked: wire.LineageCost{Cost: map[string]float64{"USD": 7}}}}
 	child := func(n string, step int64, open bool) EpicChild {
-		return EpicChild{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#" + n}, Labels: []string{"enhancement", "story"}, Step: step, Open: open}
+		return EpicChild{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#" + n}, Labels: []string{"enhancement", "story"}, Step: step, Open: open}
 	}
-	epic := wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#40"}
+	epic := wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#40"}
 	kids := []EpicChild{child("43", 2, true), child("41", 1, true), child("42", 1, true), {Node: closed, Step: 1}}
 	e := EstimateEpic(h, nodes, epic, []string{"epic", "enhancement"}, kids, 0)
 	if *e.OpenChildren != 3 || *e.ClosedChildren != 1 || e.Spent.Cost["USD"] != 7 || e.Matches != 6 || e.MatchedBy != nil || *e.Level != "epic" {
@@ -128,7 +128,7 @@ func TestEstimateEpic(t *testing.T) {
 	if e.CycleTimeSeconds.Median != 200 || e.LandsAt.Median != 200 {
 		t.Fatalf("time %+v", e.CycleTimeSeconds)
 	}
-	if len(e.Children) != 3 || *e.Children[0].Step != 1 || *e.Children[2].Step != 2 || e.Children[2].Node.Ref != "github:o/r#43" {
+	if len(e.Children) != 3 || *e.Children[0].Step != 1 || *e.Children[2].Step != 2 || e.Children[2].Node.Ref != "github:issue:o/r#43" {
 		t.Fatalf("children %+v", e.Children)
 	}
 	// Spread the costs: the fixed seed gives the same estimate again.
@@ -155,7 +155,7 @@ func TestKeepAtTheStart(t *testing.T) {
 	late := past(6, "enhancement", "task", 1000, 1)
 	late.Merged = 300
 	h = append(h, late)
-	k := KeepIssue(h, wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9"}, []string{"enhancement", "task"}, 200)
+	k := KeepIssue(h, wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#9"}, []string{"enhancement", "task"}, 200)
 	if k.At != 200 || k.Matches != 6 || k.Cost["USD"] != 3.5 || *k.MatchedBy != MatchedByLevel || *k.WorkingSeconds != 210 {
 		t.Fatalf("%+v", k)
 	}
@@ -165,13 +165,13 @@ func TestKeepAtTheStart(t *testing.T) {
 	if k.CycleTimeSeconds == nil || k.CycleTimeSeconds.Median != 1 || k.LandsAt == nil || k.LandsAt.Median != 201 {
 		t.Fatalf("cycle %+v", k)
 	}
-	if k := KeepIssue(h, wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9"}, nil, 50); k.Matches != 0 || k.Cost != nil {
+	if k := KeepIssue(h, wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#9"}, nil, 50); k.Matches != 0 || k.Cost != nil {
 		t.Fatalf("%+v", k)
 	}
 	child := func(n string, open bool) EpicChild {
-		return EpicChild{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#" + n}, Labels: []string{"enhancement", "task"}, Open: open}
+		return EpicChild{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#" + n}, Labels: []string{"enhancement", "task"}, Open: open}
 	}
-	e := KeepEpic(h, wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#10"}, []string{"epic"},
+	e := KeepEpic(h, wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#10"}, []string{"epic"},
 		[]EpicChild{child("11", false), child("12", true)}, 200)
 	if e.MatchedBy != nil || e.Cost["USD"] < 2 || e.Cost["USD"] > 12 {
 		t.Fatalf("%+v", e)

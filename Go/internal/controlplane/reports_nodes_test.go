@@ -29,22 +29,22 @@ func TestReportsNodesListsEachKind(t *testing.T) {
 		return wire.LineageCostNode{Node: wire.LineageNode{Kind: kind, Ref: ref}, Sessions: sessions,
 			Banked: wire.LineageCost{Cost: map[string]float64{"USD": usd}, Turns: 1}, LastAt: wire.DateOf(now)}
 	}
-	issue := node("issue", "github:o/r#1", 1, "s1")
+	issue := node("issue", "github:issue:o/r#1", 1, "s1")
 	issue.FirstAt = at(10 * time.Hour)
 	// A milestone, as a host before #3878 sends it: no row adds it up.
-	issue.PartOf = []string{"github:o/r/milestone/1"}
+	issue.PartOf = []string{"github:milestone:o/r#1"}
 	issue.Resolved = &wire.LineageResolved{Title: "Old title", State: str("open")}
 	issue.LastAt = wire.DateOf(now.Add(-time.Hour))
-	merged := node("pr", "github:o/r#2", 4, "s1")
-	merged.Fixes, merged.Outcome, merged.EndedAt = []string{"github:o/r#1"}, str("merged"), at(time.Hour)
-	merged.PartOf = []string{"github:o/r/release/v1.0.0"}
-	closed := node("pr", "github:o/r#3", 3, "s2")
-	closed.Fixes, closed.Outcome, closed.EndedAt = []string{"github:o/r#1"}, str("closed"), at(2*time.Hour)
+	merged := node("pr", "github:issue:o/r#2", 4, "s1")
+	merged.Fixes, merged.Outcome, merged.EndedAt = []string{"github:issue:o/r#1"}, str("merged"), at(time.Hour)
+	merged.PartOf = []string{"github:release:o/r#v1.0.0"}
+	closed := node("pr", "github:issue:o/r#3", 3, "s2")
+	closed.Fixes, closed.Outcome, closed.EndedAt = []string{"github:issue:o/r#1"}, str("closed"), at(2*time.Hour)
 	// Only a PR names this issue.
-	named := node("pr", "github:o/r#5", 2)
-	named.Fixes = []string{"github:o/r#4"}
+	named := node("pr", "github:issue:o/r#5", 2)
+	named.Fixes = []string{"github:issue:o/r#4"}
 	// Bea's machine banked its own turns on the same issue, and resolved it later.
-	beaIssue := node("issue", "github:o/r#1", 2, "s3")
+	beaIssue := node("issue", "github:issue:o/r#1", 2, "s3")
 	beaIssue.Resolved = &wire.LineageResolved{Title: "Fix it", State: str("closed"), Labels: []string{"bug"}}
 
 	send := func(host string, work ...wire.LineageCostNode) {
@@ -71,22 +71,22 @@ func TestReportsNodesListsEachKind(t *testing.T) {
 		t.Fatalf("%+v", issues)
 	}
 	one := issues.Nodes[0]
-	if one.Node.Ref != "github:o/r#1" {
+	if one.Node.Ref != "github:issue:o/r#1" {
 		one = issues.Nodes[1]
 	}
 	// Own 1 + 2 (two machines); total adds both PRs; the closed PR is waste; s1 once.
 	if one.Cost.Own.Cost["USD"] != 3 || one.Cost.Total.Cost["USD"] != 10 || one.Cost.Waste.Cost["USD"] != 3 ||
 		one.Sessions != 3 || one.Resolved == nil || one.Resolved.Title != "Fix it" ||
-		one.Repo == nil || *one.Repo != "github:o/r" || one.LeadTimeSeconds == nil {
+		one.Repo == nil || *one.Repo != "github:repo:#o/r" || one.LeadTimeSeconds == nil {
 		t.Fatalf("%+v", one)
 	}
 	prs := list(admin, wire.ReportNodesQuery{Kind: "pr", Scope: org, Sort: new(wire.ReportNodesSortCost)})
-	if len(prs.Nodes) != 3 || prs.Nodes[0].Node.Ref != "github:o/r#2" || prs.Nodes[0].Outcome == nil ||
+	if len(prs.Nodes) != 3 || prs.Nodes[0].Node.Ref != "github:issue:o/r#2" || prs.Nodes[0].Outcome == nil ||
 		*prs.Nodes[0].Outcome != "merged" || prs.Unresolved != 3 {
 		t.Fatalf("%+v", prs)
 	}
 	if got := list(admin, wire.ReportNodesQuery{Kind: "pr", Scope: org, State: str("closed")}); len(got.Nodes) != 1 ||
-		got.Nodes[0].Node.Ref != "github:o/r#3" {
+		got.Nodes[0].Node.Ref != "github:issue:o/r#3" {
 		t.Fatalf("%+v", got)
 	}
 	// The merged PR and the issue it fixes, from both machines.
@@ -122,14 +122,14 @@ func TestReportsNodesFiltersSortsAndPages(t *testing.T) {
 	str := func(s string) *string { return &s }
 	var nodes []wire.LineageCostNode
 	for i := range 250 {
-		n := wire.LineageCostNode{Node: wire.LineageNode{Kind: "issue", Ref: fmt.Sprintf("github:o/r#%d", i)},
+		n := wire.LineageCostNode{Node: wire.LineageNode{Kind: "issue", Ref: fmt.Sprintf("github:issue:o/r#%d", i)},
 			Banked: wire.LineageCost{Cost: map[string]float64{"USD": float64(i % 7)}}, LastAt: wire.Date(i)}
 		if i%2 == 0 {
 			n.Resolved = &wire.LineageResolved{Title: "t", State: str("open"), Labels: []string{"Bug"}}
 		}
 		nodes = append(nodes, n)
 	}
-	nodes = append(nodes, wire.LineageCostNode{Node: wire.LineageNode{Kind: "issue", Ref: "github:o/rx#1"},
+	nodes = append(nodes, wire.LineageCostNode{Node: wire.LineageNode{Kind: "issue", Ref: "github:issue:o/rx#1"},
 		Banked: wire.LineageCost{Cost: map[string]float64{}}, LastAt: 1000})
 	page := func(q wire.ReportNodesQuery, order wire.ReportNodesSort, limit int) []wire.ReportNode {
 		t.Helper()
@@ -157,7 +157,7 @@ func TestReportsNodesFiltersSortsAndPages(t *testing.T) {
 		return nil
 	}
 	all := page(wire.ReportNodesQuery{Kind: "issue"}, wire.ReportNodesSortNewest, nodesPageMost)
-	if len(all) != 251 || all[0].Node.Ref != "github:o/rx#1" || all[1].Node.Ref != "github:o/r#249" {
+	if len(all) != 251 || all[0].Node.Ref != "github:issue:o/rx#1" || all[1].Node.Ref != "github:issue:o/r#249" {
 		t.Fatalf("%d %v", len(all), all[0].Node)
 	}
 	seen := map[string]bool{}
@@ -197,7 +197,7 @@ func TestReportsNodesFiltersSortsAndPages(t *testing.T) {
 	}
 	// No issue here has a merged PR, so none has a lead time: all of them, by ref.
 	if got := page(wire.ReportNodesQuery{Kind: "issue"}, wire.ReportNodesSortLeadTime, 100); len(got) != 251 ||
-		got[0].Node.Ref != "github:o/r#0" {
+		got[0].Node.Ref != "github:issue:o/r#0" {
 		t.Fatalf("leadTime: %d", len(got))
 	}
 }
@@ -210,10 +210,10 @@ func TestReportsNodesLeadTimeAndWasteSort(t *testing.T) {
 		return wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: ref}, Outcome: str(outcome),
 			Banked: wire.LineageCost{Cost: map[string]float64{"USD": usd}}, FirstAt: at(first), EndedAt: at(ended), LastAt: wire.Date(ended)}
 	}
-	open := wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:o/r#9"},
+	open := wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: "github:pr:o/r#9"},
 		Banked: wire.LineageCost{Cost: map[string]float64{"USD": 9}}, LastAt: 5}
-	nodes := []wire.LineageCostNode{pr("github:o/r#1", "merged", 1, 0, 100), pr("github:o/r#2", "merged", 2, 0, 50),
-		pr("github:o/r#3", "closed", 5, 0, 10), pr("github:o/r#4", "reverted", 1, 0, 20), open}
+	nodes := []wire.LineageCostNode{pr("github:pr:o/r#1", "merged", 1, 0, 100), pr("github:pr:o/r#2", "merged", 2, 0, 50),
+		pr("github:pr:o/r#3", "closed", 5, 0, 10), pr("github:pr:o/r#4", "reverted", 1, 0, 20), open}
 	refs := func(order wire.ReportNodesSort) []string {
 		var out []string
 		for _, r := range nodesPage(nodeRows(nodes, "pr"), wire.ReportNodesQuery{Kind: "pr"}, order, nil, 50).Nodes {
@@ -221,10 +221,10 @@ func TestReportsNodesLeadTimeAndWasteSort(t *testing.T) {
 		}
 		return out
 	}
-	if got := fmt.Sprint(refs(wire.ReportNodesSortLeadTime)); got != "[github:o/r#1 github:o/r#2 github:o/r#3 github:o/r#4 github:o/r#9]" {
+	if got := fmt.Sprint(refs(wire.ReportNodesSortLeadTime)); got != "[github:pr:o/r#1 github:pr:o/r#2 github:pr:o/r#3 github:pr:o/r#4 github:pr:o/r#9]" {
 		t.Fatal(got)
 	}
-	if got := fmt.Sprint(refs(wire.ReportNodesSortWaste)); got != "[github:o/r#3 github:o/r#4 github:o/r#1 github:o/r#2 github:o/r#9]" {
+	if got := fmt.Sprint(refs(wire.ReportNodesSortWaste)); got != "[github:pr:o/r#3 github:pr:o/r#4 github:pr:o/r#1 github:pr:o/r#2 github:pr:o/r#9]" {
 		t.Fatal(got)
 	}
 	merged := nodesPage(nodeRows(nodes, "pr"), wire.ReportNodesQuery{Kind: "pr", State: str("merged")}, wire.ReportNodesSortNewest, nil, 50)

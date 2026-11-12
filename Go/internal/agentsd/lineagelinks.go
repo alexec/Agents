@@ -56,6 +56,8 @@ type lineageLinker struct {
 	// otherHost is each folder in repos whose origin is on a host forgeOf does not name: it
 	// may be the connected Forgejo's, which can change.
 	otherHost map[string]bool
+	// topics is each folder's topic for its agents nodes (folderTopic), looked up once.
+	topics map[string]string
 }
 
 // forgeRepo is a repository on a forge, as lineage refs name it: forge github, gitlab, forgejo,
@@ -157,13 +159,36 @@ func (r forgeRepo) issue(n int) wire.LineageNode {
 		project, _, _ := strings.Cut(rest, "/")
 		return boardsNode(org+"/"+project, n)
 	}
-	return wire.LineageNode{Kind: lineage.KindIssue, Ref: r.forge + ":" + r.path + "#" + strconv.Itoa(n)}
+	return r.node(lineage.KindIssue, "issue", strconv.Itoa(n))
 }
 
 // pr is a pull request, or a merge request on GitLab.
 func (r forgeRepo) pr(n int) wire.LineageNode {
-	k, _ := kindOf(r.forge)
-	return wire.LineageNode{Kind: lineage.KindPR, Ref: r.forge + ":" + r.path + k.prMark + strconv.Itoa(n)}
+	return r.node(lineage.KindPR, wire.PullType(r.forge), strconv.Itoa(n))
+}
+
+// node is the node of kind for a thing of type typ in r, by its id (#4800):
+// <forge>:<type>:<path>#<id>, such as github:pr:alexec/agents#12.
+func (r forgeRepo) node(kind, typ, id string) wire.LineageNode {
+	return lineage.NodeOf(kind, wire.Ref{Provider: r.forge, Type: typ, Topic: r.path, ID: id})
+}
+
+// repoOfRef is the repo of a node's ref in the full form (or the old form, as lineage.RefOf
+// reads it), when it is on a forge forgeKinds names; its number is the ref's id, when it is
+// one.
+func repoOfRef(n wire.LineageNode) (forgeRepo, int, bool) {
+	r, ok := lineage.RefOf(n)
+	if !ok {
+		return forgeRepo{}, 0, false
+	}
+	if _, known := kindOf(r.Provider); !known || r.Topic == "" {
+		return forgeRepo{}, 0, false
+	}
+	num, err := strconv.Atoi(r.ID)
+	if err != nil || num <= 0 {
+		num = 0
+	}
+	return forgeRepo{r.Provider, r.Topic}, num, true
 }
 
 // forgeOf is the forge a remote is on: github.com, a host whose name says GitLab, codeberg.org
@@ -261,8 +286,62 @@ func prOfURL(raw string) (forgeRepo, int, bool) {
 	return ofURL(u.Host, strings.Trim(u.Path, "/"), true)
 }
 
-func sessionNode(id wire.UUID) wire.LineageNode {
-	return wire.LineageNode{Kind: lineage.KindSession, Ref: "session:" + string(id)}
+// sessionNode is a session's node (#4800), agents:session:<topic>#<id>, as the store names it:
+// the topic is its folder's repo (folderTopic). Not under the agent lock: the first look at a
+// folder asks git.
+func (d *Daemon) sessionNode(id wire.UUID) wire.LineageNode {
+	return d.lineage().Canon(lineage.SessionNode(d.agentsTopic(lineage.KindSession, string(id)), string(id)))
+}
+
+// agentsTopic is the topic of an agents node (#4800): the repo of the folder a session is in,
+// or a workflow (<folder>/<name>) is of; "" when it is not known. lineage.OpenWith asks it for
+// the lines in the old form.
+func (d *Daemon) agentsTopic(kind, id string) string {
+	switch kind {
+	case lineage.KindSession:
+		if a := d.Store.Agent(wire.UUID(id)); a != nil {
+			return d.folderTopic(folderPath(a))
+		}
+	case lineage.KindWorkflow:
+		if i := strings.LastIndex(id, "/"); i > 0 {
+			return d.folderTopic(id[:i])
+		}
+	}
+	return ""
+}
+
+// folderTopic is the topic of a folder's agents nodes: the path of its origin's repo, lower
+// case, as forgeOf reads it on a forge it knows (owner/repo), else the remote's path; "" with
+// no origin. It asks git once per folder, and never a forge, so it does not change with a
+// connection.
+func (d *Daemon) folderTopic(folder string) string {
+	d.repoMu.Lock()
+	t, ok := d.topics[folder]
+	d.repoMu.Unlock()
+	if ok {
+		return t
+	}
+	out, err := git(folder, "remote", "get-url", "origin")
+	if err != nil && !isDir(folder) {
+		return ""
+	}
+	if remote, ok := parseRemote(out); err == nil && ok {
+		if r := forgeOf(remote.host, remote.path); r.forge != "" {
+			t = r.path
+		} else {
+			t = repoPath(remote.path)
+		}
+	}
+	if strings.ContainsAny(t, ":#") {
+		t = ""
+	}
+	d.repoMu.Lock()
+	if d.topics == nil {
+		d.topics = map[string]string{}
+	}
+	d.topics[folder] = t
+	d.repoMu.Unlock()
+	return t
 }
 
 var (
@@ -310,9 +389,9 @@ func (d *Daemon) labelNode(folder, label string) (wire.LineageNode, bool) {
 // keyNode is the issue a key (ENG-4) names: on Jira when its project is one of jira, else on Linear.
 func keyNode(key string, jira []string) wire.LineageNode {
 	if project, _, _ := strings.Cut(key, "-"); slices.Contains(jira, project) {
-		return wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + key}
+		return jiraNode(key)
 	}
-	return wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + key}
+	return linearNode(key)
 }
 
 // jiraKeys are the keys of the Jira projects jira that text names, each once: a PR's title or
@@ -529,19 +608,23 @@ func (d *Daemon) noteLineage(before *wire.Agent, a wire.Agent) {
 	if len(added) == 0 && len(removed) == 0 && helper == nil && run == nil && workflow == nil && !archived {
 		return
 	}
-	s, folder := sessionNode(a.ID), folderPath(&a)
+	folder := folderPath(&a)
 	d.lineageDo(func() {
+		s := d.sessionNode(a.ID)
 		if helper != nil {
-			d.link(sessionNode(*helper), s, lineage.RelStarted, lineage.SourceHelper)
+			d.link(d.sessionNode(*helper), s, lineage.RelStarted, lineage.SourceHelper)
 		}
 		if workflow != nil || run != nil {
 			var wf wire.LineageNode
 			if workflow != nil {
-				wf = wire.LineageNode{Kind: lineage.KindWorkflow, Ref: "workflow:" + folder + "/" + *workflow}
+				wf = lineage.NodeOf(lineage.KindWorkflow,
+					wire.Ref{Provider: "agents", Type: "workflow", Topic: d.folderTopic(folder), ID: folder + "/" + *workflow})
+				wf = d.lineage().Canon(wf)
 			}
 			switch {
 			case run != nil:
-				r := wire.LineageNode{Kind: lineage.KindWorkflowRun, Ref: "run:" + string(*run)}
+				r := d.lineage().Canon(lineage.NodeOf(lineage.KindWorkflowRun,
+					wire.Ref{Provider: "agents", Type: "workflow-run", Topic: d.folderTopic(folder), ID: string(*run)}))
 				d.link(r, s, lineage.RelStarted, lineage.SourceHelper)
 				if workflow != nil {
 					d.link(r, wf, lineage.RelPartOf, lineage.SourceHelper)
@@ -609,7 +692,7 @@ func (d *Daemon) lineagePRStarted(e wire.Event, session wire.UUID) {
 	if !ok {
 		return
 	}
-	d.lineageDo(func() { d.link(sessionNode(session), repo.pr(n), lineage.RelWorksOn, lineage.SourceHelper) })
+	d.lineageDo(func() { d.link(d.sessionNode(session), repo.pr(n), lineage.RelWorksOn, lineage.SourceHelper) })
 }
 
 // lineageEvent makes the links a raised event says: pr.opened, pr.merged and pr.closed,
@@ -656,7 +739,7 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 		for _, id := range sessions {
 			// The same branch name in another repo is another branch.
 			if a := d.Store.Agent(id); a != nil && d.folderRepo(folderPath(a)) == repo {
-				d.link(sessionNode(id), pr, lineage.RelOpens, lineage.SourceBranch)
+				d.link(d.sessionNode(id), pr, lineage.RelOpens, lineage.SourceBranch)
 			}
 		}
 		// A PR closed without a merge links its issues too, and the links end below: it fixed
@@ -677,10 +760,10 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 		// is never on the Jira site, so this is the way its cost reaches the Jira issue.
 		if jira := d.folderJiraProjects(d.repoFolder(repo)); len(jira) > 0 {
 			for _, key := range jiraKeys(p.PR.Title, jira) {
-				d.link(pr, wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + key}, lineage.RelFixes, lineage.SourcePRBody)
+				d.link(pr, jiraNode(key), lineage.RelFixes, lineage.SourcePRBody)
 			}
 			for _, key := range jiraKeys(p.PR.Branch, jira) {
-				d.link(pr, wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + key}, lineage.RelFixes, lineage.SourceBranch)
+				d.link(pr, jiraNode(key), lineage.RelFixes, lineage.SourceBranch)
 			}
 		}
 		// AB#12 in its title or branch, a work item of its repo's folder's first Azure Boards

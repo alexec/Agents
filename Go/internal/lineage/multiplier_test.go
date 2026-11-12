@@ -17,10 +17,10 @@ func multiplierNodes(now time.Time, merged, reverted int) []wire.LineageCostNode
 			Sessions: []string{"s1"}})
 	}
 	for i := range merged {
-		add("github:o/r#"+string(rune('a'+i)), OutcomeMerged)
+		add("github:issue:o/r#"+string(rune('a'+i)), OutcomeMerged)
 	}
 	for i := range reverted {
-		add("github:o/r#rev"+string(rune('a'+i)), OutcomeReverted)
+		add("github:issue:o/r#rev"+string(rune('a'+i)), OutcomeReverted)
 	}
 	return nodes
 }
@@ -93,15 +93,15 @@ func TestMergesLeavesOut(t *testing.T) {
 	old, recent := wire.DateOf(now.Add(-8*24*time.Hour)), wire.DateOf(now.Add(-time.Hour))
 	pr := func(ref string) wire.LineageNode { return wire.LineageNode{Kind: KindPR, Ref: ref} }
 	nodes := []wire.LineageCostNode{
-		{Node: pr("github:o/r#1"), Outcome: &merged, EndedAt: &recent, Sessions: []string{"s"}},
-		{Node: pr("github:o/r#2"), Outcome: &merged, EndedAt: &recent},
-		{Node: pr("github:o/r#3"), Outcome: &merged, EndedAt: &old, Sessions: []string{"s"}},
-		{Node: pr("github:o/r#4"), Outcome: &closed, EndedAt: &recent, Sessions: []string{"s"}},
-		{Node: pr("github:o/r#5"), Sessions: []string{"s"}},
-		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#6"}, Outcome: &merged, EndedAt: &recent, Sessions: []string{"s"}},
+		{Node: pr("github:issue:o/r#1"), Outcome: &merged, EndedAt: &recent, Sessions: []string{"s"}},
+		{Node: pr("github:issue:o/r#2"), Outcome: &merged, EndedAt: &recent},
+		{Node: pr("github:issue:o/r#3"), Outcome: &merged, EndedAt: &old, Sessions: []string{"s"}},
+		{Node: pr("github:issue:o/r#4"), Outcome: &closed, EndedAt: &recent, Sessions: []string{"s"}},
+		{Node: pr("github:issue:o/r#5"), Sessions: []string{"s"}},
+		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#6"}, Outcome: &merged, EndedAt: &recent, Sessions: []string{"s"}},
 	}
 	got := Merges(nodes, since)
-	if len(got) != 1 || got[pr("github:o/r#1")] != (Merge{At: recent}) {
+	if len(got) != 1 || got[pr("github:issue:o/r#1")] != (Merge{At: recent}) {
 		t.Fatalf("merges %v", got)
 	}
 	// A merge kept goes out of the range as time goes on.
@@ -124,7 +124,7 @@ func TestBestWeekOf(t *testing.T) {
 	merges := map[wire.LineageNode]Merge{}
 	add := func(at time.Time, reverted bool) {
 		n++
-		merges[wire.LineageNode{Kind: KindPR, Ref: "github:o/r#" + string(rune('a'+n))}] = Merge{At: wire.DateOf(at), Reverted: reverted}
+		merges[wire.LineageNode{Kind: KindPR, Ref: "github:pr:o/r#" + string(rune('a'+n))}] = Merge{At: wire.DateOf(at), Reverted: reverted}
 	}
 	// This week: 2 merged.
 	add(time.Date(2026, 11, 2, 0, 30, 0, 0, london), false)

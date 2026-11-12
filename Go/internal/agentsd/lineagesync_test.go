@@ -21,7 +21,7 @@ func TestLineageSyncSendsWhatChanged(t *testing.T) {
 	a := seeded(t, d, folder, nil)
 	// A new record: lineage records its state (#4274).
 	d.noteLineage(nil, a)
-	issue := wire.LineageNode{Kind: lineage.KindIssue, Ref: "github:alexec/agents#7"}
+	issue := wire.LineageNode{Kind: lineage.KindIssue, Ref: "github:issue:alexec/agents#7"}
 	d.link(sessionNode(a.ID), issue, lineage.RelWorksOn, lineage.SourcePerson)
 	d.lineageSettle(2 * time.Second)
 
@@ -86,7 +86,7 @@ func TestLineageSyncSendsWhatChanged(t *testing.T) {
 	}
 
 	// A control plane with no copy: every link again, the first with reset.
-	pr := wire.LineageNode{Kind: lineage.KindPR, Ref: "github:alexec/agents#9"}
+	pr := wire.LineageNode{Kind: lineage.KindPR, Ref: "github:pr:alexec/agents#9"}
 	d.link(sessionNode(a.ID), pr, lineage.RelOpens, lineage.SourceAgent)
 	mu.Lock()
 	full = true

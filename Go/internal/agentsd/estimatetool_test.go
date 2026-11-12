@@ -13,14 +13,14 @@ func TestEstimateWordsSaysTheEstimateAgainstTheActual(t *testing.T) {
 	level := "epic"
 	open, closed := int64(0), int64(3)
 	e := wire.LineageEstimate{
-		Node: wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#3557"}, Level: &level,
+		Node: wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#3557"}, Level: &level,
 		OpenChildren: &open, ClosedChildren: &closed,
 		Kept:   &wire.LineageEstimateKept{Matches: 12, Cost: map[string]float64{"USD": 5.57}, WorkingSeconds: &work},
 		Actual: &wire.LineageCost{Cost: map[string]float64{"USD": 6.17}, WorkingSeconds: 2*3600 + 40*60},
 	}
 	got := estimateWords(e)
 	for _, want := range []string{
-		"github:alexec/agents#3557 (epic)",
+		"github:issue:alexec/agents#3557 (epic)",
 		"Children: 0 open, 3 closed.",
 		"Closed. Estimated $5.57, 3h 14m of work; actual $6.17, 2h 40m of work.",
 		"No open children, so nothing is left to estimate.",
@@ -35,7 +35,7 @@ func TestEstimateWordsSaysTheEstimateAgainstTheActual(t *testing.T) {
 func TestEstimateWordsSaysTheFigures(t *testing.T) {
 	by := "level"
 	e := wire.LineageEstimate{
-		Node: wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#7"}, MatchedBy: &by, Matches: 31, ClosedIssues: 80,
+		Node: wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#7"}, MatchedBy: &by, Matches: 31, ClosedIssues: 80,
 		Cost:           map[string]wire.LineageEstimateRange{"USD": {Median: 3.2, P10: 1.1, P90: 9.8}},
 		WorkingSeconds: &wire.LineageEstimateRange{Median: 7800, P10: 1800, P90: 21600},
 	}
@@ -57,8 +57,8 @@ func TestEstimateWordsSaysTheFigures(t *testing.T) {
 // A ref is taken as it is; a bare word is not an issue.
 func TestEstimateNodeTakesARef(t *testing.T) {
 	d := &Daemon{}
-	n, err := d.estimateNode("", "linear:ENG-4")
-	if err != nil || n.Ref != "linear:ENG-4" || n.Kind != "issue" {
+	n, err := d.estimateNode("", "linear:issue:eng#ENG-4")
+	if err != nil || n.Ref != "linear:issue:eng#ENG-4" || n.Kind != "issue" {
 		t.Fatalf("%+v %v", n, err)
 	}
 	if _, err := d.estimateNode("", "soon"); err == nil {

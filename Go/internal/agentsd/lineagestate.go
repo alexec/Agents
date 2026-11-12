@@ -49,8 +49,9 @@ func (d *Daemon) noteSessionState(before *wire.Agent, a wire.Agent) {
 
 // recordSessionState writes a session's state, off the caller's thread, at the time now.
 func (d *Daemon) recordSessionState(id wire.UUID, state wire.LineageSessionStateName) {
-	s, at := sessionNode(id), nowFunc()
+	at := nowFunc()
 	d.lineageDo(func() {
+		s := d.sessionNode(id)
 		if _, err := d.lineage().SetState(s, state, at); err != nil {
 			log.Printf("lineage: %s %s: %v", s.Ref, state, err)
 		}

@@ -17,6 +17,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -147,9 +148,9 @@ func docsMachine() string {
 // docRefPrefix is the ref of folder's docs up to their path.
 func (d *Daemon) docRefPrefix(folder string) string {
 	if r := d.folderRepo(folder); r.path != "" {
-		return r.forge + ":" + r.path + "/doc/"
+		return r.forge + ":doc:" + r.path + "#"
 	}
-	return "folder:" + docsMachine() + "/" + filepath.Base(folder) + "/doc/"
+	return "folder:doc:" + strings.ToLower(docsMachine()+"/"+filepath.Base(folder)) + "#"
 }
 
 // docFile is a doc of a folder: its path in it, when it changed, and its size.
@@ -515,6 +516,8 @@ func (d *Daemon) docsReadIn(ctx context.Context, src docsSources, r wire.DocsRea
 	}
 	for _, f := range src.folders {
 		prefix := d.docRefPrefix(f)
+		// A ref from before #4800 is in the old form, <forge>:<repo>/doc/<path>.
+		r.Ref = lineage.FullRefText(lineage.KindDoc, r.Ref, "")
 		if len(r.Ref) <= len(prefix) || !strings.EqualFold(r.Ref[:len(prefix)], prefix) {
 			continue
 		}

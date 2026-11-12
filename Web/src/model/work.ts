@@ -12,6 +12,7 @@ import { lineageUrl } from "./lineage";
 import { timeWords } from "./time";
 import { folderPathOf } from "./projectSettings";
 import { ago } from "./connectorSetup";
+import { legacyRef } from "../protocol/ref";
 
 /** Work's lists, in the order of its tabs, by the lineage kind each holds. */
 export type WorkKind = "issue" | "pr" | "release";
@@ -71,6 +72,7 @@ export interface WorkRow {
 /** The repo or tracker of a ref: "github:alexec/Agents" of "github:alexec/Agents#12", the team "linear:ENG" of
  * "linear:ENG-4" (#3311), "jira" of "jira:PROJ-1". */
 export function repoOf(ref: string): string {
+  ref = legacyRef(ref);
   const scheme = /^([a-z][a-z0-9-]*):(.*)$/.exec(ref);
   if (!scheme) return ref;
   const [, forge, id = ""] = scheme;
@@ -83,6 +85,7 @@ export function repoOf(ref: string): string {
 /** "alexec/Agents" of "github:alexec/Agents", for a row's repo column; "Linear · ENG" of a Linear team (#3311); a tracker
  * (jira, #3260) by its own name; "Azure Boards · acme/web" of an Azure Boards project (#3815). */
 export function repoName(repo: string): string {
+  repo = legacyRef(repo);
   if (repo.startsWith("linear:")) return `Linear · ${repo.slice("linear:".length)}`;
   if (repo.startsWith("azureboards:")) return `Azure Boards · ${repo.slice("azureboards:".length)}`;
   return repo.includes(":") ? repo.replace(/^[a-z][a-z0-9-]*:/, "") : forgeTitle[repo] ?? repo;
@@ -90,12 +93,14 @@ export function repoName(repo: string): string {
 
 /** An issue's or PR's number in its repo, for Newest; 0 for one without. */
 export function refNumber(ref: string): number {
+  ref = legacyRef(ref);
   const m = /[#!-](\d+)$/.exec(ref);
   return m ? Number(m[1]) : 0;
 }
 
 /** "#12", "!45", "ENG-4" or "v0.14.0": a row's short name in its repo. */
 export function shortRef(ref: string): string {
+  ref = legacyRef(ref);
   const m = /([#!]\d+)$/.exec(ref) ?? /\/release\/(.+)$/.exec(ref);
   return m ? m[1]! : nodeName({ kind: "", ref });
 }
@@ -135,7 +140,7 @@ export function forgeRow(item: ForgeItem, host: string, lineage?: ReportNode): W
 }
 
 /** A lineage node's repo: lineage says "linear" for every Linear issue, Work its team (#3311). */
-const repoOfNode = (n: ReportNode) => n.repo && n.repo !== "linear" ? n.repo : repoOf(n.node.ref);
+const repoOfNode = (n: ReportNode) => n.repo && n.repo !== "linear" ? legacyRef(n.repo) : repoOf(n.node.ref);
 
 /** A row lineage alone knows: a release, named by its tag until the forge names it (#4426), or an item no forge listed. */
 export function lineageRow(n: ReportNode): WorkRow {
@@ -360,7 +365,7 @@ export function openOnWords(ref: string): string {
 
 /** "GitHub" of "github:alexec/Agents#12", by the ref's forge; "the forge" of one it does not know. */
 export function forgeName(ref: string): string {
-  const forge = /^([a-z][a-z0-9-]*):/.exec(ref)?.[1] ?? "";
+  const forge = /^([a-z][a-z0-9-]*):/.exec(legacyRef(ref))?.[1] ?? "";
   return forgeTitle[forge] ?? "the forge";
 }
 
@@ -369,7 +374,7 @@ export const forgesWithoutPRLabels = new Set(["bitbucket"]);
 
 /** Whether the item's page offers Labels: not on a pull request of a forge whose pull requests have none (#3881). */
 export function takesLabels(node: Pick<LineageNode, "kind" | "ref">): boolean {
-  const forge = /^([a-z][a-z0-9-]*):/.exec(node.ref)?.[1] ?? "";
+  const forge = /^([a-z][a-z0-9-]*):/.exec(legacyRef(node.ref))?.[1] ?? "";
   return !(node.kind === "pr" && forgesWithoutPRLabels.has(forge));
 }
 

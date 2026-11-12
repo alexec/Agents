@@ -52,6 +52,19 @@ id       = any text (the first "#" ends the topic; the id can hold "#" and "/")
 | A mail | `email:message:alex@example.com#<message-id>` |
 | A session | `agents:session:alexec/agents#7f3c…` |
 | A machine | `agents:machine:#mac-mini` |
+| A release | `github:release:alexec/agents#v1.2.0` |
+| A milestone (a node only in files from before #3878) | `github:milestone:alexec/agents#3` |
+| A commit | `github:commit:alexec/agents#36a5616` |
+| A file of a repo | `github:file:alexec/agents#Go/wire/ref.go` |
+| A doc of a repo | `github:doc:alexec/agents#specs/4724-event-bus/spec.md` |
+| A doc of a folder with no forge | `folder:doc:mac-mini/scratch#docs/a.md`; on this machine's disk only, `file:doc:#/Users/me/scratch/docs/a.md` |
+| A docs page | `web:doc:www.notion.so#/acme/Design-abc123` |
+| A GitLab pipeline, an Azure Pipelines build | `gitlab:run:group/repo#9`, `azuredevops:run:org/project/repo#9` |
+| A TestFlight build, an App Store version | `testflight:deploy:com.example.app#812`, `appstore:deploy:com.example.app#1.2.0` |
+| A deploy target | `testflight:target:#com.example.app` |
+| A Sentry issue, a Better Stack incident | `sentry:issue:acme#12345`, `betterstack:incident:#987` |
+| A workflow, a workflow's run | `agents:workflow:alexec/agents#/Users/me/agents/nightly`, `agents:workflow-run:alexec/agents#<run id>` |
+| A repo or tracker (a cost rollup's node) | `github:repo:#alexec/agents`, `linear:repo:#eng`, `folder:repo:#scratch` |
 
 - **The topic of a ref is the topic of its events** (below), so a ref says where to
   subscribe.
@@ -63,8 +76,18 @@ id       = any text (the first "#" ends the topic; the id can hold "#" and "/")
   full form.
 - **One package** parses and formats refs (`Packages/Wire` type `Ref`, Go `wire.Ref`, the
   generated TypeScript), so the daemon, the control plane and the clients agree.
-- **Lineage moves to it.** Lineage node refs are written in the full form; a reader takes
-  the old form for one release.
+- **Lineage moves to it (#4800).** Lineage node refs are written in the full form; a reader takes
+  the old form for one release (`wire.RefFromLineage`, `refFromLineage` in the web page,
+  `WireRef(lineageKind:ref:)` in AgentsKit). A machine's `lineage.jsonl`, cost ledger and
+  comment file are read in the full form when they open, and its next send to the control
+  plane is a whole one. The control plane reads both forms from machines on an older release.
+- **A session is one node whatever its topic.** A session's topic is its folder's origin
+  repo; a client that does not know it writes `agents:session:#<id>`, and the store names it
+  with the topic it has for that id. The same holds for a workflow and a workflow's run.
+
+Decided: a thing that is itself a space (a machine, a repo, a deploy target) has an empty
+topic and its name as its id, as `agents:machine:#mac-mini` has; every CI run is type `run`,
+on any forge. Alex can overrule.
 
 Decided: `provider:type:topic#id`, because the existing `<scheme>:<path>#n` form cannot
 say the type of a thing whose id holds `/` (a branch) and cannot be split from the right;

@@ -4,6 +4,7 @@ import type { LineageCost, LineageNode, ReportValue, ReportValueRow } from "../p
 import { money } from "./limits";
 import { timeWords } from "./time";
 import { tokenWords } from "./usage";
+import { legacyRef } from "../protocol/ref";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -19,7 +20,8 @@ export const spent = (c: LineageCost) => Object.values(c.cost).some((v) => v > 0
 /** An issue's, a PR's or a release's name without its tracker: "alexec/agents#12", "ENG-4",
  * "alexec/agents release v0.14.0" (#3023). */
 export function nodeName(n: LineageNode): string {
-  const [, id = n.ref] = /^[a-z][a-z0-9-]*:(.*)$/.exec(n.ref) ?? [];
+  const ref = legacyRef(n.ref);
+  const [, id = ref] = /^[a-z][a-z0-9-]*:(.*)$/.exec(ref) ?? [];
   const release = /^(.*)\/release\/(.+)$/.exec(id);
   return release ? `${release[1]} release ${release[2]}` : id;
 }
@@ -28,8 +30,9 @@ export function nodeName(n: LineageNode): string {
  * tracker whose address the ref does not say. */
 export function nodeUrl(n: LineageNode): string | undefined {
   const github = "https://github.com/";
-  if (!n.ref.startsWith("github:")) return undefined;
-  const id = n.ref.slice("github:".length);
+  const ref = legacyRef(n.ref);
+  if (!ref.startsWith("github:")) return undefined;
+  const id = ref.slice("github:".length);
   const release = /^(.*?)\/release\/(.*)$/.exec(id);
   if (release) return `${github}${release[1]}/releases/tag/${release[2]}`;
   const issue = /^([^#]*)#(\d+)$/.exec(id);

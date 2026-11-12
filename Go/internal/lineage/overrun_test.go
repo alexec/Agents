@@ -9,8 +9,8 @@ import (
 // #4529: an open epic's spend is its own and its children's, with their PRs, against the
 // estimate kept on its node; Passed is the highest threshold reached.
 func TestOverrunOfAnEpic(t *testing.T) {
-	epic := wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#1"}
-	child := wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#2"}
+	epic := wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#1"}
+	child := wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#2"}
 	pr := wire.LineageNode{Kind: KindPR, Ref: "github:o/r!3"}
 	usd := func(v float64) wire.LineageCost { return wire.LineageCost{Cost: map[string]float64{"USD": v}} }
 	epicLevel, parent := "epic", epic.Ref
@@ -18,7 +18,7 @@ func TestOverrunOfAnEpic(t *testing.T) {
 		{Node: epic, Level: &epicLevel, Banked: usd(10), Estimate: &wire.LineageEstimateKept{Cost: map[string]float64{"USD": 50}}},
 		{Node: child, Parent: &parent, Banked: usd(20)},
 		{Node: pr, Fixes: []string{child.Ref}, Banked: usd(75)},
-		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:o/r#9"}, Banked: usd(500)},
+		{Node: wire.LineageNode{Kind: KindIssue, Ref: "github:issue:o/r#9"}, Banked: usd(500)},
 	}
 	o, ok := OverrunOf(nodes, epic)
 	if !ok || o.Spent != 105 || o.Estimate != 50 || o.Passed != 2 || o.Currency != "USD" {

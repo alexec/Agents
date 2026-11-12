@@ -56,9 +56,9 @@ func (linearForge) Caps() forgeCaps {
 	}
 }
 
-// Owns is linear:ENG-12, an issue.
+// Owns is linear:issue:eng#ENG-12, an issue.
 func (linearForge) Owns(node wire.LineageNode) (forgeRef, bool) {
-	identifier, ok := strings.CutPrefix(node.Ref, "linear:")
+	identifier, ok := keyOfIssue(node, "linear")
 	if !ok || node.Kind != lineage.KindIssue || !linearLabel.MatchString(identifier) {
 		return forgeRef{}, false
 	}
@@ -163,7 +163,7 @@ func (l linearForge) Item(ctx context.Context, r forgeRef, cursor string) (wire.
 	out.Start = linearStart(out.Item)
 	out.Children = []wire.ForgeLinked{}
 	for _, c := range p.Children {
-		out.Children = append(out.Children, wire.ForgeLinked{Node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + c.Identifier},
+		out.Children = append(out.Children, wire.ForgeLinked{Node: linearNode(c.Identifier),
 			Title: c.Title, State: c.State, URL: optional(c.URL)})
 	}
 	// Linear has no pull requests: a linked one is GitHub's or GitLab's, from an attachment (#4626).
@@ -304,12 +304,12 @@ func (l linearForge) SetBlockedBy(ctx context.Context, r, blocker forgeRef, bloc
 
 // linearNode is a Linear issue's node.
 func linearNode(identifier string) wire.LineageNode {
-	return wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + identifier}
+	return keyedIssue("linear", identifier)
 }
 
 // linearStart is the new-agent form for a Linear issue, labelled with its identifier (ENG-12).
 func linearStart(i wire.ForgeItem) *wire.ForgeStart {
-	identifier := strings.TrimPrefix(i.Node.Ref, "linear:")
+	identifier, _ := keyOfIssue(i.Node, "linear")
 	return &wire.ForgeStart{Prompt: fmt.Sprintf("%s: %s\n\nWork on this Linear issue: %s", identifier, i.Title, deref(i.URL)),
 		Labels: []string{identifier}, Worktree: optional(identifier + " " + i.Title)}
 }

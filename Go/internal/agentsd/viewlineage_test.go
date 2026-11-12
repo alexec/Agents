@@ -14,22 +14,22 @@ import (
 // #2941: a page's address is its issue or pull request, as lineage refs name it.
 func TestNodeOfURL(t *testing.T) {
 	for raw, want := range map[string]string{
-		"https://github.com/alexec/Agents/issues/7":                   "issue github:alexec/agents#7",
-		"https://github.com/alexec/Agents/pull/9/files":               "pr github:alexec/agents#9",
-		"https://gitlab.com/group/sub/project/-/issues/3":             "issue gitlab:group/sub/project#3",
-		"https://gitlab.example.com/group/project/-/merge_requests/4": "pr gitlab:group/project!4",
-		"https://linear.app/acme/issue/eng-4/fix-the-walk":            "issue linear:ENG-4",
-		"https://acme.atlassian.net/browse/proj-12":                   "issue jira:PROJ-12",
-		"https://jira.example.com/browse/OPS-3?focusedCommentId=1":    "issue jira:OPS-3",
+		"https://github.com/alexec/Agents/issues/7":                   "issue github:issue:alexec/agents#7",
+		"https://github.com/alexec/Agents/pull/9/files":               "pr github:pr:alexec/agents#9",
+		"https://gitlab.com/group/sub/project/-/issues/3":             "issue gitlab:issue:group/sub/project#3",
+		"https://gitlab.example.com/group/project/-/merge_requests/4": "pr gitlab:mr:group/project#4",
+		"https://linear.app/acme/issue/eng-4/fix-the-walk":            "issue linear:issue:eng#ENG-4",
+		"https://acme.atlassian.net/browse/proj-12":                   "issue jira:issue:proj#PROJ-12",
+		"https://jira.example.com/browse/OPS-3?focusedCommentId=1":    "issue jira:issue:ops#OPS-3",
 		"https://github.com/browse/ENG-1":                             "",
 		"https://acme.atlassian.net/browse/PROJ":                      "",
 		"https://github.com/alexec/Agents/-/issues/7":                 "",
 		"https://example.com/a/b/issues/7":                            "",
-		"https://codeberg.org/kim/Notes/issues/3":                     "issue forgejo:kim/notes#3",
-		"https://codeberg.org/kim/notes/pulls/4":                      "pr forgejo:kim/notes#4",
+		"https://codeberg.org/kim/Notes/issues/3":                     "issue forgejo:issue:kim/notes#3",
+		"https://codeberg.org/kim/notes/pulls/4":                      "pr forgejo:pr:kim/notes#4",
 		"https://forgejo.example.com/kim/notes/-/issues/3":            "",
-		"https://bitbucket.org/walkalex/App/issues/7/fix-the-walk":    "issue bitbucket:walkalex/app#7",
-		"https://bitbucket.org/walkalex/app/pull-requests/8":          "pr bitbucket:walkalex/app#8",
+		"https://bitbucket.org/walkalex/App/issues/7/fix-the-walk":    "issue bitbucket:issue:walkalex/app#7",
+		"https://bitbucket.org/walkalex/app/pull-requests/8":          "pr bitbucket:pr:walkalex/app#8",
 		"javascript:alert(1)":                                         "",
 		"":                                                            "",
 	} {
@@ -131,7 +131,7 @@ func TestOnlyOurServersViewsAskForLineage(t *testing.T) {
 		StructuredContent lineageView `json:"structuredContent"`
 		IsError           bool        `json:"isError"`
 	}
-	if json.Unmarshal(raw, &r) != nil || r.IsError || r.StructuredContent.Ref != "github:alexec/agents#7" {
+	if json.Unmarshal(raw, &r) != nil || r.IsError || r.StructuredContent.Ref != "github:issue:alexec/agents#7" {
 		t.Fatalf("%s", raw)
 	}
 	raw, _ = d.lineageViewResult(server("linear-mcp"), json.RawMessage(`{"url":"https://example.com"}`))
@@ -160,7 +160,7 @@ func TestAJiraIssuesLineageReadsItsKeysSessions(t *testing.T) {
 	var r struct {
 		StructuredContent lineageView `json:"structuredContent"`
 	}
-	if json.Unmarshal(raw, &r) != nil || r.StructuredContent.Ref != "jira:PROJ-12" || len(r.StructuredContent.Sessions) != 1 ||
+	if json.Unmarshal(raw, &r) != nil || r.StructuredContent.Ref != "jira:issue:proj#PROJ-12" || len(r.StructuredContent.Sessions) != 1 ||
 		r.StructuredContent.Sessions[0].Title != "Fix PROJ-12" {
 		t.Fatalf("%s", raw)
 	}
@@ -172,14 +172,14 @@ func TestRefURL(t *testing.T) {
 	for _, c := range []struct {
 		kind, ref, base, want string
 	}{
-		{"pr", "github:o/r#9", "", "https://github.com/o/r/pull/9"},
-		{"issue", "gitlab:g/p#3", "", "https://gitlab.com/g/p/-/issues/3"},
-		{"pr", "gitlab:g/p!4", "https://gitlab.example.com", "https://gitlab.example.com/g/p/-/merge_requests/4"},
-		{"issue", "forgejo:kim/notes#3", "https://codeberg.org", "https://codeberg.org/kim/notes/issues/3"},
-		{"pr", "forgejo:kim/notes#4", "https://codeberg.org", "https://codeberg.org/kim/notes/pulls/4"},
-		{"pr", "forgejo:kim/notes#4", "", ""},
-		{"issue", "bitbucket:o/r#1", "", "https://bitbucket.org/o/r/issues/1"},
-		{"pr", "bitbucket:o/r#2", "https://bitbucket.org", "https://bitbucket.org/o/r/pull-requests/2"},
+		{"pr", "github:issue:o/r#9", "", "https://github.com/o/r/pull/9"},
+		{"issue", "gitlab:issue:g/p#3", "", "https://gitlab.com/g/p/-/issues/3"},
+		{"pr", "gitlab:mr:g/p#4", "https://gitlab.example.com", "https://gitlab.example.com/g/p/-/merge_requests/4"},
+		{"issue", "forgejo:issue:kim/notes#3", "https://codeberg.org", "https://codeberg.org/kim/notes/issues/3"},
+		{"pr", "forgejo:issue:kim/notes#4", "https://codeberg.org", "https://codeberg.org/kim/notes/pulls/4"},
+		{"pr", "forgejo:issue:kim/notes#4", "", ""},
+		{"issue", "bitbucket:issue:o/r#1", "", "https://bitbucket.org/o/r/issues/1"},
+		{"pr", "bitbucket:issue:o/r#2", "https://bitbucket.org", "https://bitbucket.org/o/r/pull-requests/2"},
 		{"issue", "azurerepos:o/p/r#1", "https://dev.azure.com", ""},
 	} {
 		if got := refURL(wire.LineageNode{Kind: c.kind, Ref: c.ref}, c.base); got != c.want {

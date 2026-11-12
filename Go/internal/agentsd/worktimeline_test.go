@@ -75,7 +75,7 @@ func TestWorkTimelineForecastsTheOpenEpics(t *testing.T) {
 		{Tag: "v1", PublishedAt: stamp(-5), URL: "u1"}, {Tag: "v0", PublishedAt: stamp(-24 * 9)}}}
 	// A session worked on the first open child: it started then, though no PR closes it yet.
 	first := forgeRepo{"github", "alexec/agents"}.issue(open.Children[2].Number)
-	d.lineage().Link(wire.LineageLinkRequest{From: wire.LineageNode{Kind: lineage.KindSession, Ref: "session:A"}, To: first,
+	d.lineage().Link(wire.LineageLinkRequest{From: wire.LineageNode{Kind: lineage.KindSession, Ref: "agents:session:#A"}, To: first,
 		Rel: lineage.RelWorksOn, Source: lineage.SourceStart}, now.Add(-8*time.Hour))
 
 	req := wire.WorkTimelineRequest{Project: "p1", From: wire.DateOf(now.Add(-24 * time.Hour)), To: wire.DateOf(now.Add(24 * time.Hour))}
@@ -88,7 +88,7 @@ func TestWorkTimelineForecastsTheOpenEpics(t *testing.T) {
 	}
 	got := map[int]wire.WorkTimelineEpic{}
 	for _, e := range tl.Epics {
-		n, _ := strconv.Atoi(e.Item.Node.Ref[len("github:alexec/agents#"):])
+		n, _ := strconv.Atoi(e.Item.Node.Ref[len("github:issue:alexec/agents#"):])
 		got[n] = e
 	}
 	if len(got) != 2 || got[20].Item.Title == "" || got[23].Item.Title == "" {
