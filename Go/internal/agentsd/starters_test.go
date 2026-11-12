@@ -33,7 +33,7 @@ func starterTemplate(t *testing.T, repo string, files map[string]string) {
 		{"-C", work, "init", "-q", "--initial-branch=main"},
 		{"-C", work, "add", "-A"},
 		{"-C", work, "-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "template"},
-		{"init", "-q", "--bare", bare},
+		{"init", "-q", "--bare", "--initial-branch=main", bare},
 		{"-C", work, "push", "-q", bare, "main"},
 	} {
 		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
