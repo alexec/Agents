@@ -1,6 +1,6 @@
 # Paper, version 2: the design system (#4926)
 
-**Status:** spike, 2026-11-12. Epic #4925. No product code: this spec, a contact sheet and the stories.
+**Status:** approved by Alex, 2026-11-12 ([review](https://github.com/alexec/Agents/pull/4933#pullrequestreview-5879624654)). Epic #4925. No product code: this spec, a contact sheet and the stories.
 **Clients:** none in the spike. The build is Core: the Mac window, the Remote and the web page.
 
 ## What Alex asked for
@@ -157,15 +157,15 @@ The web page must not clip when a person sets 0.12em letter spacing and 0.16em w
 - Decided: one icon set, Lucide at a 1.5 stroke, on all three clients, because the clients draw different icons today and Lucide is the one set that meets the library rule. Alex can overrule.
 - Decided: the colour, state-line, depth, radius and spacing tokens above, because each passes WCAG AA and follows the principles. Alex can overrule.
 - Decided: no setting to turn the face off, because one clear look is simpler. Alex can overrule.
-- **Alex's choice (pending):** the contact sheet as a whole, including the face (Atkinson Hyperlegible Next is proposed).
+- **Alex approved** the contact sheet as a whole, including the face (Atkinson Hyperlegible Next and Mono), with a review on PR #4933 on 2026-11-12.
 
 ## Stories (Core: Mac, Remote, web)
 
-These are filed as sub-issues of #4925 after Alex approves the sheet. Each is blocked by #4926. Story 1 goes first; stories 2, 3 and 4 follow it and can run at the same time.
+These are filed as sub-issues of #4925. Each is blocked by #4926. Story 1 goes first; stories 2, 3 and 4 follow it and can run at the same time.
 
-1. **Paper v2 tokens:** colour, state lines, depth, radius and reading spacing (`design/tokens.json`, `Paper.swift`, `StateTint.swift`, `paper.css`, contrast pairs in `DesignTokensTests`).
-2. **The face:** Atkinson Hyperlegible Next and Mono on the three clients (`design/fonts/`, `TypeScale.swift`, `Web/assets/fonts`, acknowledgements).
-3. **One icon set:** Lucide on the three clients (`design/icons.json`, `scripts/design.sh icons`, an asset catalogue, the web's glyphs replaced).
-4. **The components to the sheet:** buttons, fields, badges, notices, menus, the session row, the question card and the prompt bar drawn as the contact sheet shows, on the three clients.
+1. **#4974, Paper v2 tokens:** colour, state lines, depth, radius and reading spacing (`design/tokens.json`, `Paper.swift`, `StateTint.swift`, `paper.css`, contrast pairs in `DesignTokensTests`).
+2. **#4975, the face:** Atkinson Hyperlegible Next and Mono on the three clients (`design/fonts/`, `TypeScale.swift`, `Web/assets/fonts`, acknowledgements).
+3. **#4976, one icon set:** Lucide on the three clients (`design/icons.json`, `scripts/design.sh icons`, an asset catalogue, the web's glyphs replaced).
+4. **#4977, the components to the sheet:** buttons, fields, badges, notices, menus, the session row, the question card and the prompt bar drawn as the contact sheet shows, on the three clients.
 
 The docs site and www take the colours and the face from story 1's and story 2's generated CSS.
