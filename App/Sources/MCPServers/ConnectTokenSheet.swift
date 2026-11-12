@@ -2,9 +2,9 @@ import AgentsKitCore
 import AppKit
 import SwiftUI
 
-/// The one token sheet (#3802): Connect Forgejo (#3752), Connect Bitbucket (#3785) and Connect
-/// Azure DevOps, the Connect GitLab sheet's Access token way alone, for a provider with no
-/// device page. Its one field beside the token (Forgejo's address, Bitbucket's Atlassian email,
+/// The one token sheet (#3802): Connect Forgejo (#3752) and Connect Bitbucket (#3785), the
+/// Connect GitLab sheet's Access token way alone, for a provider with no device page. Connect
+/// Azure DevOps has a sheet of its own since its Microsoft Entra sign-in (#3921). Its one field beside the token (Forgejo's address, Bitbucket's Atlassian email,
 /// Azure DevOps's organization) and the token, which the host checks with the provider and
 /// keeps. The token goes to the host only.
 struct ConnectTokenSheet: View {

@@ -2291,6 +2291,12 @@ export interface ConnectionProviderRequest {
    * agents://oauth/callback (the Mac and the Remote).
    */
   origin?: string;
+  /**
+   * For connections/sign-in to Azure DevOps (#3921): the organization the Microsoft Entra sign-in
+   * is for, such as dev.azure.com/acme. Entra's token reaches every organization the account is in;
+   * the host checks this one and keeps it, as a personal access token's.
+   */
+  url?: string;
 }
 
 /**
@@ -15320,7 +15326,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ConnectionBotStartRequest: { required: [], optional: ["origin", "public"] },
   ConnectionDisconnectAnswer: { required: [], optional: ["error"] },
   ConnectionEmailRequest: { required: ["server", "user", "password"], optional: [] },
-  ConnectionProviderRequest: { required: ["provider"], optional: ["origin"] },
+  ConnectionProviderRequest: { required: ["provider"], optional: ["origin", "url"] },
   ConnectionSignIn: { required: ["flowID", "provider", "status", "grant", "verificationURL", "expiresAt"], optional: ["userCode", "installURL", "connection", "message"] },
   ConnectionSignInCompleteRequest: { required: ["flowID", "state"], optional: ["code", "error"] },
   ConnectionSignInFlowRequest: { required: ["flowID"], optional: [] },

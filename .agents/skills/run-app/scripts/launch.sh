@@ -150,6 +150,9 @@ if [ "${FAKE_AZURE_DEVOPS:-0}" = 1 ]; then
   # agentsd moves this secrets.env into its sealed store at start and deletes it (#4177).
   mkdir -p "$PERSONAL/.agents-secrets"
   printf 'AZURE_DEVOPS_URL=%s\nAZURE_DEVOPS_TOKEN=walk\n' "$AZURE_DEVOPS_URL" >>"$PERSONAL/.agents-secrets/secrets.env"
+  # The fixture's fake Microsoft Entra too (#3921): Connect Azure DevOps ▸ Microsoft Entra signs in
+  # to it with a scratch Entra app id; GET $AZURE_DEVOPS_URL/_walk/entra/approve approves the code.
+  EXTRA_ENV+=(AGENTS_TEST_ENTRA_URL="$AZURE_DEVOPS_URL" AGENTS_AZURE_DEVOPS_CLIENT_ID=walk-entra-app)
   chmod 600 "$PERSONAL/.agents-secrets/secrets.env"
 fi
 

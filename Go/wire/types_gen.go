@@ -2603,6 +2603,9 @@ type ConnectionProviderRequest struct {
 
 	// For connections/sign-in from the web page: the page's origin. The hand-back page sends the code to this origin only, by postMessage. Without it, the hand-back page sends the code to agents://oauth/callback (the Mac and the Remote).
 	Origin *string `json:"origin,omitzero"`
+
+	// For connections/sign-in to Azure DevOps (#3921): the organization the Microsoft Entra sign-in is for, such as dev.azure.com/acme. Entra's token reaches every organization the account is in; the host checks this one and keeps it, as a personal access token's.
+	URL *string `json:"url,omitzero"`
 }
 
 // A sign-in under way on the host (#1335, #1343). The host keeps the secrets (the device code, the PKCE verifier); a client shows the code or opens the address, and waits.

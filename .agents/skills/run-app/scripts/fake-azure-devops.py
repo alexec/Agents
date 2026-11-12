@@ -21,6 +21,12 @@ azureboardsmcp fake_test.go). Scratch data only, kept in memory: a walk makes no
   title) and 5 (a squash with no such title, by pullrequestquery on its lastMergeCommit); the
   cost comment, posted in a closed thread and edited (a comment's PATCH).
 
+- A fake Microsoft Entra (#3921) at the same address: the device flow under
+  /organizations/oauth2/v2.0/ (devicecode, then token), which says authorization_pending until
+  the walk approves the code with GET /_walk/entra/approve (or /_walk/entra/decline), then an
+  access token shaped as a JWT, which the organization takes as a bearer token, and a refresh
+  token. launch.sh points the host at it (AGENTS_TEST_ENTRA_URL) with a scratch Entra app id.
+
 run-app starts it with `launch.sh --fake-azure-devops` and gives the host a scratch
 AGENTS_PERSONAL_HOME whose secrets (a .agents-secrets/secrets.env that the host moves into
 its sealed store at start, #4177) say
@@ -67,6 +73,9 @@ TAGS = ["checkout", "mobile", "payments", "ux"]
 PAYMENTS = PROJECT + "\\Payments"
 KIM = {"id": "u-kim", "displayName": "Kim Lee", "uniqueName": "kim@example.com", "descriptor": "aad.a2lt"}
 SAM = {"id": "u-sam", "displayName": "Sam Ortiz", "uniqueName": "sam@example.com", "descriptor": "aad.c2Ft"}
+# The fake Entra's device flow (#3921): one code at a time, approved or declined by the walk.
+ENTRA = {"answer": "authorization_pending", "n": 0}
+ENTRA_ACCESS = "eyJhbGciOiJub25lIn0.eyJzdWIiOiJ1LWtpbSJ9.d2Fsaw"
 BOT = {"id": "u-bot", "displayName": "Project Collection Build Service (acme)", "uniqueName": "Build\\acme", "descriptor": "svc.YnVpbGQ"}
 
 
@@ -253,9 +262,39 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"null")
 
+    def entra(self, method, path):
+        """The fake Microsoft Entra (#3921): True when it answered, None when path is not its own."""
+        if method == "GET" and path in ("/_walk/entra/approve", "/_walk/entra/decline"):
+            ENTRA["answer"] = "ok" if path.endswith("approve") else "authorization_declined"
+            self.answer({"answer": ENTRA["answer"]})
+            return True
+        if method != "POST" or not path.startswith("/organizations/oauth2/v2.0/"):
+            return None
+        n = int(self.headers.get("Content-Length") or 0)
+        form = {k: v[0] for k, v in parse_qs(self.rfile.read(n).decode()).items()}
+        if path.endswith("/devicecode"):
+            ENTRA["answer"] = "authorization_pending"
+            self.answer({"device_code": "walk-device", "user_code": "WALKCODE", "verification_uri": "https://microsoft.com/devicelogin",
+                         "expires_in": 900, "interval": 1, "message": "To sign in, use a web browser."})
+            return True
+        if form.get("grant_type") == "refresh_token":
+            ENTRA["n"] += 1
+            self.answer({"access_token": ENTRA_ACCESS, "refresh_token": f"walk-refresh-{ENTRA['n']}", "expires_in": 3600})
+            return True
+        if ENTRA["answer"] != "ok":
+            self.answer({"error": ENTRA["answer"], "error_description": "AADSTS70016: pending."}, 400)
+            return True
+        self.answer({"access_token": ENTRA_ACCESS, "refresh_token": "walk-refresh-0", "expires_in": 3600,
+                     "token_type": "Bearer", "scope": form.get("scope", "")})
+        return True
+
     def route(self, method):
         u = urlparse(self.path)
         path, q = unquote(u.path), parse_qs(u.query)
+        if path.startswith("/organizations/") or path.startswith("/_walk/"):
+            if self.entra(method, path) is None:
+                self.answer({"error": "invalid_request", "error_description": f"the fake Entra has no {method} {path}"}, 404)
+            return
         project = f"/acme/{PROJECT}/_apis/wit/".lower()
         lower = path.lower()
         auth = self.headers.get("Authorization", "")

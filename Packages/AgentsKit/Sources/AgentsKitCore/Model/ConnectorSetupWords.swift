@@ -372,6 +372,10 @@ public enum ConnectorSetupWords {
             let ends = c.expiresAt.map { " \u{00B7} " + tokenEnds($0, now: now) } ?? ""
             return c.byToken == true ? GitHubTokens.personal + ends : GitHubTokens.app
         }
+        if c.provider == .azuredevops {
+            return [c.workspace, c.byToken == true ? AzureDevOps.how : AzureDevOps.entraHow].compactMap { $0 }
+                .joined(separator: " \u{00B7} ")
+        }
         let how = c.expiresAt.map { "Access token \u{00B7} " + tokenEnds($0, now: now) }
             ?? tokenHow(c.provider) ?? (c.byToken == true ? Jira.tokenWay : "OAuth \u{00B7} renews by itself")
         return [c.workspace, how].compactMap { $0 }.joined(separator: " \u{00B7} ")
@@ -404,7 +408,8 @@ public enum ConnectorSetupWords {
         switch p {
         case .forgejo: Forgejo.how
         case .bitbucket: Bitbucket.how
-        case .azuredevops: AzureDevOps.how
+        // A host before #3921 sends no byToken for a token: it had no Entra sign-in.
+        case .azuredevops: nil
         default: nil
         }
     }
@@ -683,7 +688,8 @@ public enum ConnectorSetupWords {
 
     /// Connect Azure DevOps (#3802): a personal access token on one organization of
     /// dev.azure.com or one collection of an Azure DevOps Server, as the azuredevops and
-    /// azureboards servers take it. No device page for Agents, so the sheet has one way in.
+    /// azureboards servers take it; or, on dev.azure.com, a sign-in with Microsoft Entra
+    /// (#3921), Entra's device page, which the host renews by itself.
     public enum AzureDevOps {
         public static let name = "Azure DevOps"
         public static let letters = "AZ"
@@ -707,10 +713,27 @@ public enum ConnectorSetupWords {
         public static let choose = "The token ends on the date you gave it. You can take it back in User settings \u{25B8} Personal access tokens, or with Disconnect on Connectors."
         /// The connection's note after its organization: how it signs in.
         public static let how = "Personal access token"
+        /// An Entra sign-in's note after its organization (#3921).
+        public static let entraHow = "Microsoft Entra \u{00B7} renews by itself"
+
+        /// The sheet's two ways in (#3921): a token, which works today on every Azure DevOps,
+        /// first; Microsoft Entra, which needs an Entra app on the machine, second.
+        public static let tokenWay = "Personal access token"
+        public static let signInWay = "Microsoft Entra"
+        public static let signInIntro = "Sign in with your work or school Microsoft account. Give the organization, then type the code that Agents shows on Microsoft's sign-in page. Microsoft Entra is for dev.azure.com only."
+        public static let signInChoose = "Agents renews the sign-in by itself. You can take it back with Disconnect on Connectors."
+        public static let signInButton = "Sign In with Microsoft"
+        public static let starting = "Asking Microsoft for a code\u{2026}"
+        public static let openAgain = "Open the Microsoft Page Again"
+        /// Where the device page is, in the sheet's waiting line.
+        public static let site = "Microsoft's sign-in page"
         public static let disconnectNote = "Disconnect deletes the machine's token. Every folder's Azure DevOps slots wait for a connection again. Azure DevOps's and Azure Boards' events stop until you connect again or set AZURE_DEVOPS_TOKEN. To revoke it too, go to User settings \u{25B8} Personal access tokens in the organization."
 
         /// The organization Connect Again\u{2026} opens with: the connection's.
         public static func again(_ c: DaemonAPI.Connection) -> String { c.workspace ?? "" }
+
+        /// Whether Connect Again\u{2026} opens on the Entra way: the connection was not a token.
+        public static func againWithEntra(_ c: DaemonAPI.Connection) -> Bool { c.byToken != true }
 
         /// Where the person makes a token in the organization at address: its User settings
         /// \u{25B8} Personal access tokens (dev.azure.com's own when no organization is given).
@@ -920,8 +943,9 @@ public enum ConnectorSetupWords {
         // Email has no device page: the sheet never shows this.
         case .email: ""
         case .atlassian: Jira.site
-        // Forgejo, Bitbucket and Azure DevOps have no device page either.
-        case .forgejo, .bitbucket, .azuredevops: ""
+        // Forgejo and Bitbucket have no device page either.
+        case .forgejo, .bitbucket: ""
+        case .azuredevops: AzureDevOps.site
         }
     }
 

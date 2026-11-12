@@ -3,7 +3,6 @@ package azuredevopsmcp
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/connections"
 )
 
 // RealAzureDevOps reads Azure DevOps's REST API (7.1) as the person, with the personal access
@@ -118,8 +119,9 @@ func (f *RealAzureDevOps) do(ctx context.Context, method, path string, body any)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	// A personal access token is the password of Basic, with no user.
-	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(":"+token)))
+	// A personal access token is the password of Basic, with no user; an Entra sign-in's
+	// access token is a bearer token (#3921).
+	req.Header.Set("Authorization", connections.AzureDevOpsAuthorization(token))
 	req.Header.Set("User-Agent", "agents-azuredevops-mcp")
 	res, err := f.Client.Do(req)
 	if err != nil {
