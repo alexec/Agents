@@ -22,20 +22,23 @@ import (
 // #3878 removed a milestone's panel (Released in, Finished in) and a release's Milestones
 // finished: Work has no milestones now.
 //
+// A repo's figures (#4552) are its rollup's, as a release's, and its delivery figures
+// (lineage.DeliveryOf): the release tags' times are their links', as the lead time's.
+//
 // Decided: one read for the panel, on this machine's totals as lineage/cost is, not the
 // control plane's reports/nodes, because the pages ask the host that has the folder, and
 // reports/nodes is a person's scope across machines, for Reports (#3224).
 
 func (d *Daemon) registerLineageFigures() {
 	On(d, wire.CallLineageFigures, func(_ context.Context, _ *Client, r wire.LineageNodeRequest) (wire.LineageFigures, error) {
-		if r.Node.Kind != lineage.KindRelease {
-			return wire.LineageFigures{}, Invalid("lineage/figures: a release, not a %s", r.Node.Kind)
+		if r.Node.Kind != lineage.KindRelease && r.Node.Kind != lineage.KindRepo {
+			return wire.LineageFigures{}, Invalid("lineage/figures: a release or a repo, not a %s", r.Node.Kind)
 		}
 		return d.lineageFigures(r.Node), nil
 	})
 }
 
-// lineageFigures is lineage/figures for a release.
+// lineageFigures is lineage/figures for a release or a repo.
 func (d *Daemon) lineageFigures(of wire.LineageNode) wire.LineageFigures {
 	d.lineageSettle(2 * time.Second)
 	d.workMu.Lock()
@@ -45,7 +48,37 @@ func (d *Daemon) lineageFigures(of wire.LineageNode) wire.LineageFigures {
 	rollup := lineage.Rollup(nodes, of)
 	out := wire.LineageFigures{Node: of, Cost: rollup.Total, Runtimes: []wire.LineageRuntimeCount{}, Limited: rollup.Limited}
 	d.addSessionFigures(&out, rollup.Parts)
+	if of.Kind == lineage.KindRepo {
+		delivery := lineage.DeliveryOf(nodes, of.Ref, d.releaseTimes(nodes, of.Ref), nowFunc())
+		out.Delivery = &delivery
+		return out
+	}
 	out.LeadTimeSeconds = leadTimeTo(d.lineage().Links(of).Links, of, rollup.Parts)
+	return out
+}
+
+// releaseTimes is the tag time of each release in repo that a node is part of, by ref: its
+// earliest link's, as linkRelease puts them at the tag's commit time.
+func (d *Daemon) releaseTimes(nodes []wire.LineageCostNode, repo string) map[string]wire.Date {
+	out := map[string]wire.Date{}
+	seen := map[string]bool{}
+	for _, n := range nodes {
+		for _, ref := range n.PartOf {
+			if seen[ref] || !lineage.IsReleaseRef(ref) {
+				continue
+			}
+			seen[ref] = true
+			release := wire.LineageNode{Kind: lineage.KindRelease, Ref: ref}
+			if lineage.RepoOf(release) != repo {
+				continue
+			}
+			for _, l := range d.lineage().Links(release).Links {
+				if t, ok := out[ref]; l.To == release && (!ok || l.At < t) {
+					out[ref] = l.At
+				}
+			}
+		}
+	}
 	return out
 }
 

@@ -698,6 +698,8 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 		if e.Name == "pr.merged" {
 			// Its cost, on the PR (#2352).
 			d.prMerged(repo, n, pr)
+			// Its files and the PR it reverts, for the delivery figures (#4552).
+			d.askPRFacts(repo, n, pr)
 		}
 		if e.Name == "pr.opened" {
 			return

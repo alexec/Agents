@@ -5325,6 +5325,16 @@ export interface LineageCostNode {
    * lands.
    */
   forecast?: LineageForecastKept;
+  /**
+   * A merged PR's files, by path, at most 100, as the forge said them when it merged (#4552), for
+   * the rework rate. Dropped 60 days after its merge.
+   */
+  files?: string[];
+  /**
+   * The PR a merged revert reverts, by ref, from its body's "Reverts owner/repo#n" (#4552), for the
+   * recovery time.
+   */
+  reverts?: string;
 }
 
 /**
@@ -5346,6 +5356,72 @@ export interface LineageCostRollup {
   failedChecks: number;
   parts: LineageCostNode[];
   limited?: boolean;
+}
+
+/**
+ * A repo's delivery figures (#4552, epic #4551), from this machine's totals: the four DORA keys,
+ * DORA 2025's rework rate and flow efficiency, over the windowDays (28) before at, each with a
+ * weekly series. A week is 7 days back from at, not a calendar week. A figure says how many it is
+ * made from; one made from none has no value. band is where a value falls among DORA 2024's
+ * clusters, a reference from teams of people, not a grade; rework rate and flow efficiency have
+ * none.
+ */
+export interface LineageDelivery {
+  since: WireDate;
+  at: WireDate;
+  windowDays: number;
+  /**
+   * Lead time for changes, in seconds: from the first work on an issue to the first release tag
+   * that carries a merged PR that fixes it; the median, and p90. Counted by the tag's time.
+   */
+  leadTime: LineageDeliveryFigure;
+  /** Release tags a week (#3023), 0 for none, as is each week's; count is the tags. */
+  deploymentFrequency: LineageDeliveryFigure;
+  /**
+   * Failures over merged PRs, 0 to 1, by merge time. A failure is a merged revert (a PR whose title
+   * starts with Revert), or a merged PR that fixes, by any lineage link, a priority:high bug filed
+   * within 7 days after a release tag in its repo. count is the merged PRs.
+   */
+  changeFailureRate: LineageDeliveryFigure;
+  /**
+   * Failed deployment recovery time, in seconds, the median: a revert's merge less the merge of the
+   * PR it reverts, or a fix's merge less its bug's filing. Counted by the recovery's merge.
+   */
+  recoveryTime: LineageDeliveryFigure;
+  /**
+   * DORA 2025's rework rate, 0 to 1: the share of merged PRs, of those with their files known, that
+   * change a file another PR merged in the 21 days before changed. count is the PRs with their
+   * files known.
+   */
+  reworkRate: LineageDeliveryFigure;
+  /**
+   * The agents' working time on a closed issue and its PRs over its cycle time, at most 1, the
+   * median. Counted by its last merge.
+   */
+  flowEfficiency: LineageDeliveryFigure;
+}
+
+/**
+ * One delivery figure (#4552): value over the window, absent when made from none; p90 for lead
+ * time; count is what it is made from; weeks is the 4 weeks, oldest first; band is DORA 2024's.
+ */
+export interface LineageDeliveryFigure {
+  value?: number;
+  p90?: number;
+  count: number;
+  weeks: LineageDeliveryWeek[];
+  /** elite, high, medium or low. The list is open. */
+  band?: string;
+}
+
+/**
+ * A week of a delivery figure (#4552): the 7 days from since; value as the figure's, absent when
+ * made from none.
+ */
+export interface LineageDeliveryWeek {
+  since: WireDate;
+  value?: number;
+  count: number;
 }
 
 /**
@@ -5496,12 +5572,14 @@ export interface LineageEstimateRequest {
 }
 
 /**
- * lineage/figures (#4427): a release's Lineage panel on its Work page, from this machine's totals.
- * cost is its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its
- * parts, each once; running is how many of them run now (starting, running or waiting on the
- * person). runtimes is the runtimes of the sessions this machine has, the most sessions first.
+ * lineage/figures (#4427): a release's Lineage panel on its Work page, from this machine's totals;
+ * or (#4552) a repo's (kind repo, ref as LineageCostNode.repo), with its delivery figures. cost is
+ * its rollup's total, as lineage/cost's. sessions is how many sessions worked on it and its parts,
+ * each once; running is how many of them run now (starting, running or waiting on the person).
+ * runtimes is the runtimes of the sessions this machine has, the most sessions first.
  * leadTimeSeconds is from the first work on its parts to its tag (#3878 removed the milestone
- * figures). limited says the rollup had more parts than it counts. Another kind of node is refused.
+ * figures). limited says the rollup had more parts than it counts. delivery is a repo's only.
+ * Another kind of node is refused.
  */
 export interface LineageFigures {
   node: LineageNode;
@@ -5511,6 +5589,7 @@ export interface LineageFigures {
   runtimes: LineageRuntimeCount[];
   leadTimeSeconds?: number;
   limited?: boolean;
+  delivery?: LineageDelivery;
 }
 
 /**
@@ -5822,6 +5901,11 @@ export interface LineageResolved {
   title: string;
   state?: string;
   labels?: string[];
+  /**
+   * When the forge says the issue or PR was made (#4552): a bug's filing, for the change failure
+   * rate.
+   */
+  createdAt?: WireDate;
 }
 
 /** A runtime of lineage/figures' sessions, and how many of them it ran (#4427). */
@@ -15571,15 +15655,18 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageChanged: { required: ["host", "states"], optional: ["links"] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "milestone", "endedAt", "resolved", "sessions", "estimate", "forecast"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "milestone", "endedAt", "resolved", "sessions", "estimate", "forecast", "files", "reverts"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
+  LineageDelivery: { required: ["since", "at", "windowDays", "leadTime", "deploymentFrequency", "changeFailureRate", "recoveryTime", "reworkRate", "flowEfficiency"], optional: [] },
+  LineageDeliveryFigure: { required: ["count", "weeks"], optional: ["value", "p90", "band"] },
+  LineageDeliveryWeek: { required: ["since", "count"], optional: ["value"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
   LineageEstimate: { required: ["node", "closedIssues", "matches"], optional: ["type", "level", "step", "matchedBy", "cost", "inputTokens", "outputTokens", "workingSeconds", "leadTimeSeconds", "cycleTimeSeconds", "landsAt", "openChildren", "closedChildren", "spent", "children", "kept", "actual", "loaded", "overhead"] },
   LineageEstimateDates: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateKept: { required: ["at", "matches"], optional: ["matchedBy", "cost", "costP10", "costP90", "outputTokens", "outputTokensP10", "outputTokensP90", "workingSeconds", "workingSecondsP10", "workingSecondsP90", "cycleTimeSeconds", "landsAt"] },
   LineageEstimateRange: { required: ["median", "p10", "p90"], optional: [] },
   LineageEstimateRequest: { required: ["node"], optional: ["startAt"] },
-  LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["leadTimeSeconds", "limited"] },
+  LineageFigures: { required: ["node", "cost", "sessions", "running", "runtimes"], optional: ["leadTimeSeconds", "limited", "delivery"] },
   LineageForecast: { required: ["at", "windowDays", "landings", "burn", "serviceLevels"], optional: ["node", "milestone", "lands", "noForecast", "toComplete", "kept", "spend", "overhead", "assumes", "whatIf"] },
   LineageForecastAssumes: { required: ["lanes", "peakLanes", "runtimes"], optional: [] },
   LineageForecastBurn: { required: ["credentialKey", "window", "used", "at", "resetsAt", "lasts"], optional: ["runsOutAt"] },
@@ -15599,7 +15686,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
   LineageOverhead: { required: ["windowDays", "linked", "unlinked", "uncounted"], optional: ["currency", "unlinkedRatio", "epicRatio"] },
-  LineageResolved: { required: ["title"], optional: ["state", "labels"] },
+  LineageResolved: { required: ["title"], optional: ["state", "labels", "createdAt"] },
   LineageRuntimeCount: { required: ["runtimeID", "sessions"], optional: [] },
   LineageSessionIssue: { required: ["node"], optional: ["title"] },
   LineageSessionMatch: { required: ["agentID", "on"], optional: [] },

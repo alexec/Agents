@@ -67,6 +67,10 @@ type costLedgerBook struct {
 	multiplierMerges map[wire.LineageNode]lineage.Merge
 	// milestoneChecked is when spend last made each milestone's forecast (#4654), by its key.
 	milestoneChecked map[string]time.Time
+	// prFactsSlots holds a place for each merged PR's facts being asked (#4552); prFactsLookup,
+	// when set, is asked in place of forgePRFacts.
+	prFactsSlots  chan struct{}
+	prFactsLookup prFactsLookup
 }
 
 func costKey(n wire.LineageNode) string { return n.Kind + "\t" + n.Ref }
@@ -499,12 +503,19 @@ func (d *Daemon) saveCostLocked() {
 }
 
 // pruneCost drops the nodes banked longer ago than costNodeKeep, then the oldest past
-// costNodesKept. The control plane keeps what it was sent.
+// costNodesKept, and a PR's files lineage.FilesKeep after it ended. The control plane keeps what it was sent.
 func pruneCost(f *costLedgerFile, now time.Time) {
 	oldest := wire.DateOf(now.Add(-costNodeKeep))
+	filesOldest := wire.DateOf(now.Add(-lineage.FilesKeep))
 	for k, c := range f.Nodes {
 		if c.LastAt < oldest {
 			delete(f.Nodes, k)
+			continue
+		}
+		// A PR's files are for the rework rate only (#4552): kept while it can count.
+		if len(c.Files) > 0 && c.EndedAt != nil && *c.EndedAt < filesOldest {
+			c.Files = nil
+			f.Nodes[k] = c
 		}
 	}
 	if over := len(f.Nodes) - costNodesKept; over > 0 {

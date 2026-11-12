@@ -293,9 +293,11 @@ type forgeIssueOrPR struct {
 	State    string            `json:"state"`
 	MergedAt *string           `json:"merged_at"`
 	Labels   []json.RawMessage `json:"labels"`
+	// CreatedAt is GitHub's and GitLab's both (#4552).
+	CreatedAt string `json:"created_at"`
 }
 
-// resolvedOf is a node's title, state and labels from the forge's own JSON for it, an object.
+// resolvedOf is a node's title, state, labels and when it was made from the forge's own JSON for it, an object.
 // state is normalized to open, closed or merged: GitLab's issues say "opened" for open, and a
 // GitHub pull
 // request's own state says only open or closed, merged_at telling merged apart from closed.
@@ -323,6 +325,10 @@ func resolvedOf(kind string, out []byte) (wire.LineageResolved, error) {
 	r := wire.LineageResolved{Title: j.Title, Labels: labels}
 	if state != "" {
 		r.State = &state
+	}
+	if t, err := time.Parse(time.RFC3339, j.CreatedAt); err == nil {
+		at := wire.DateOf(t)
+		r.CreatedAt = &at
 	}
 	return r, nil
 }
