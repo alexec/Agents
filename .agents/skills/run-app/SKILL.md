@@ -416,6 +416,7 @@ $S/walk.py remote set "What to say" "Push it"    # the prompt
 $S/walk.py remote key escape                     # put the keyboard away
 $S/walk.py remote scroll --by -600               # as a drag: a following transcript lets go
 $S/walk.py remote press "#BackButton"
+$S/walk.py remote press "New Folder"; $S/walk.py remote press "Add Folder…"   # a toolbar Menu, then its item (#4381)
 $S/walk.py remote shot /tmp/remote.png
 $S/remote.sh down                                # quits and uninstalls it, shuts the simulator down
 ```

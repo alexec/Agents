@@ -88,10 +88,13 @@ struct WalkAX {
 
     // MARK: acting
 
-    /// A tap, as VoiceOver's double tap makes one: the element's own activation, else a
-    /// control's action, else a collection's row selected through its delegate.
+    /// A tap, as VoiceOver's double tap makes one: a menu opened or its item run, else the
+    /// element's own activation, else a control's action, else a collection's row selected
+    /// through its delegate.
     func press() -> Bool {
         if object.accessibilityTraits.contains(.notEnabled) { return false }
+        // A `Menu`'s button, and a row of the menu it opened (#4381).
+        if WalkMenu.open(object) || WalkMenu.run(object) { return true }
         if let control = object as? UIControl, control.isEnabled {
             control.sendActions(for: .primaryActionTriggered)
             control.sendActions(for: .touchUpInside)
