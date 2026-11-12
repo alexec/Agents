@@ -1,21 +1,6 @@
 import AgentsKitCore
 import SwiftUI
 
-/// One action in the ⌘K command menu (#4787): its row, and what choosing it does. The menu bar
-/// makes them, as it knows each action's state and key; the window adds the sessions, folders,
-/// issues and pull requests (`CommandMenuItems`).
-struct CommandMenuAction {
-    let item: CommandFinder.Item
-    let perform: @MainActor () -> Void
-
-    init(_ title: String, key: KeyboardShortcut? = nil, keywords: [String] = [],
-         perform: @escaping @MainActor () -> Void) {
-        item = CommandFinder.Item(id: "action:\(title)", kind: .action, title: title,
-                                shortcut: key?.glyphs ?? "", keywords: keywords)
-        self.perform = perform
-    }
-}
-
 /// The keys of the menu bar's items that the command menu lists too, in one place, so the
 /// shortcut a row shows is the menu's own.
 enum MenuKeys {
@@ -77,26 +62,19 @@ enum CommandMenuItems {
 
     private static func folderID(_ key: FolderKey) -> String { "\(key.host)|\(key.folder.path)" }
 
-    /// The rows the Work list of a kind has read, as items; none before it is read.
     static func workItems(_ model: AppModel, _ kind: WorkList.Kind) -> [CommandFinder.Item] {
-        model.workLists[kind].all.map { row in
-            CommandFinder.Item(id: "\(kind == .pr ? "pr" : "issue"):\(row.node.ref)", kind: kind == .pr ? .pr : .issue,
-                             title: row.title, detail: ReportValueWords.name(.init(kind: "", ref: WorkList.repo(of: row.node.ref))),
-                             ref: WorkList.shortRef(row.node.ref))
-        }
+        CommandMenuWork.items(model.workLists, kind)
     }
 
-    /// The repos the read issues and PRs are from, for a ref typed that no item has.
-    static func repos(_ model: AppModel) -> [String] {
-        var seen = Set<String>()
-        return (model.workLists[.issue].all + model.workLists[.pr].all)
-            .map { WorkList.repo(of: $0.node.ref) }
-            .filter { seen.insert($0).inserted }
-    }
+    static func repos(_ model: AppModel) -> [String] { CommandMenuWork.repos(model.workLists) }
 
     /// What choosing an item that is not an action does: open it.
     static func open(_ item: CommandFinder.Item, _ model: AppModel) {
-        let (prefix, rest) = split(item.id)
+        if let place = CommandMenuWork.place(of: item) {
+            model.showWork(place)
+            return
+        }
+        let (prefix, rest) = CommandMenuID.split(item.id)
         switch prefix {
         case "session":
             if let id = UUID(uuidString: rest) { model.openAgent(id) }
@@ -104,18 +82,9 @@ enum CommandMenuItems {
             if let summary = model.foldersInListOrder.first(where: { folderID($0.key) == rest }) {
                 model.showFolder(summary.key)
             }
-        case "issue":
-            model.showWork(WorkPlace(kind: .issue, ref: rest))
-        case "pr":
-            model.showWork(WorkPlace(kind: .pr, ref: rest))
         default:
             break
         }
-    }
-
-    private static func split(_ id: String) -> (String, String) {
-        guard let colon = id.firstIndex(of: ":") else { return (id, "") }
-        return (String(id[..<colon]), String(id[id.index(after: colon)...]))
     }
 }
 
