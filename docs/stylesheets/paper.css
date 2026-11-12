@@ -1,0 +1,135 @@
+/* The docs site on the design system (#4605, #4600): Material's variables, as Zensical's
+   modern theme reads them, set from the tokens in tokens.css (made from design/tokens.json by
+   scripts/design.sh gen). Edit a colour, radius or font there, not here: this file only says
+   which token each part of Material's layout takes.
+
+   One block for both schemes: tokens.css gives every --paper-* token its light value under
+   [data-md-color-scheme="default"] and its dark value under [data-md-color-scheme="slate"], so a
+   var() here follows the scheme the reader picks. The selector is the same weight as the
+   theme's own, and this file loads after it. */
+
+:root,
+[data-md-color-scheme="default"],
+[data-md-color-scheme="slate"] {
+  /* The page: Paper's ground and ink. */
+  --md-default-bg-color: var(--paper-ground);
+  --md-default-bg-color--light: color-mix(in srgb, var(--paper-ground) 54%, transparent);
+  --md-default-bg-color--lighter: color-mix(in srgb, var(--paper-ground) 26%, transparent);
+  --md-default-bg-color--lightest: color-mix(in srgb, var(--paper-ground) 7%, transparent);
+  --md-default-fg-color: var(--paper-ink);
+  --md-default-fg-color--light: color-mix(in srgb, var(--paper-ink) 62%, transparent);
+  --md-default-fg-color--lighter: color-mix(in srgb, var(--paper-ink) 34%, transparent);
+  --md-default-fg-color--lightest: var(--paper-rule);
+
+  /* The header and the tabs: the paper ground, not a coloured bar. */
+  --md-primary-fg-color: var(--paper-ground);
+  --md-primary-fg-color--light: var(--paper-ground);
+  --md-primary-fg-color--dark: var(--paper-ground);
+  --md-primary-bg-color: var(--paper-ink);
+  --md-primary-bg-color--light: color-mix(in srgb, var(--paper-ink) 62%, transparent);
+
+  /* The cobalt: links, focus, the search's highlight, the controls. */
+  --md-accent-fg-color: var(--accent);
+  --md-accent-fg-color--transparent: color-mix(in srgb, var(--accent) 10%, transparent);
+  --md-accent-bg-color: var(--paper-on-fill);
+  --md-accent-bg-color--light: color-mix(in srgb, var(--paper-on-fill) 70%, transparent);
+
+  /* Prose. */
+  --md-typeset-color: var(--paper-ink);
+  --md-typeset-a-color: var(--accent);
+  --md-typeset-mark-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  --md-typeset-table-color: var(--paper-rule);
+  --md-typeset-table-color--light: var(--paper-wash);
+  --md-typeset-kbd-color: var(--paper-raised);
+  --md-typeset-kbd-accent-color: var(--paper-wash);
+  --md-typeset-kbd-border-color: var(--paper-rule);
+
+  /* Code: set into the page, as the app's wells. */
+  --md-code-bg-color: var(--paper-well);
+  --md-code-bg-color--light: color-mix(in srgb, var(--paper-well) 90%, transparent);
+  --md-code-bg-color--lighter: color-mix(in srgb, var(--paper-well) 54%, transparent);
+  --md-code-fg-color: var(--paper-ink);
+  --md-code-hl-color: var(--accent);
+  --md-code-hl-color--light: color-mix(in srgb, var(--accent) 10%, transparent);
+  --md-code-hl-comment-color: var(--code-comment);
+  --md-code-hl-keyword-color: var(--code-keyword);
+  --md-code-hl-string-color: var(--code-string);
+  --md-code-hl-number-color: var(--code-number);
+  --md-code-hl-constant-color: var(--code-keyword);
+  --md-code-hl-function-color: var(--code-function);
+  --md-code-hl-special-color: var(--code-type);
+  --md-code-hl-name-color: var(--paper-ink);
+  --md-code-hl-variable-color: var(--code-property);
+  --md-code-hl-operator-color: var(--code-punctuation);
+  --md-code-hl-punctuation-color: var(--code-punctuation);
+  --md-code-hl-generic-color: var(--code-comment);
+
+  /* Admonitions sit on the raised paper. Each type's own hue is in Material's CSS, not a
+     variable, so the borders and icons keep Material's colours. */
+  --md-admonition-fg-color: var(--paper-ink);
+  --md-admonition-bg-color: var(--paper-raised);
+
+  /* The footer: the sidebar's shade, one deeper than the page. */
+  --md-footer-fg-color: var(--paper-ink);
+  --md-footer-fg-color--light: color-mix(in srgb, var(--paper-ink) 62%, transparent);
+  --md-footer-fg-color--lighter: color-mix(in srgb, var(--paper-ink) 34%, transparent);
+  --md-footer-bg-color: var(--paper-sidebar);
+  --md-footer-bg-color--dark: var(--paper-sidebar);
+
+  /* Mermaid diagrams. */
+  --md-mermaid-font-family: var(--font-text);
+  --md-mermaid-edge-color: var(--paper-ink);
+  --md-mermaid-node-bg-color: var(--paper-well);
+  --md-mermaid-node-fg-color: var(--paper-ink);
+  --md-mermaid-label-bg-color: var(--paper-ground);
+  --md-mermaid-label-fg-color: var(--paper-ink);
+
+  /* Shadows: short and neutral, as the app's. */
+  --md-shadow-z1: 0 0.1rem 0.3rem var(--paper-shadow);
+  --md-shadow-z2: 0 0.2rem 0.5rem var(--paper-shadow), 0 0 0.05rem var(--paper-rule);
+  --md-shadow-z3: 0 0.4rem 1.5rem var(--paper-shadow), 0 0 0.05rem var(--paper-rule);
+}
+
+/* The type: the system's sans and mono, as the app. theme.font is false in mkdocs.yml, so
+   nothing is loaded from the network. */
+body {
+  --md-text-font-family: var(--font-text);
+  --md-code-font-family: var(--font-mono);
+}
+
+/* The header: the paper ground with a hairline under it. */
+.md-header {
+  background-color: color-mix(in srgb, var(--paper-ground) 88%, transparent);
+  box-shadow: 0 1px 0 var(--paper-rule);
+}
+
+.md-header--shadow {
+  box-shadow: 0 1px 0 var(--paper-rule), var(--md-shadow-z1);
+}
+
+/* The slate scheme draws headings in pure white; Paper draws them in its ink. */
+[data-md-color-scheme="slate"] .md-header__title,
+[data-md-color-scheme="slate"] .md-typeset h1,
+[data-md-color-scheme="slate"] .md-typeset h2,
+[data-md-color-scheme="slate"] .md-typeset h3,
+[data-md-color-scheme="slate"] .md-typeset h4,
+[data-md-color-scheme="slate"] .md-typeset h5,
+[data-md-color-scheme="slate"] .md-typeset h6 {
+  color: var(--paper-ink);
+}
+
+/* A selection, as the app draws it. */
+::selection {
+  background-color: var(--paper-selection);
+}
+
+/* The radii: the app's card radius on code and admonitions, the control radius on kbd. */
+.md-typeset pre > code,
+.md-typeset .admonition,
+.md-typeset details {
+  border-radius: var(--radius-card);
+}
+
+.md-typeset kbd {
+  border-radius: var(--radius-control);
+}
