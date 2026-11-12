@@ -1170,6 +1170,12 @@ final class AppModel {
         #if DEBUG
         openFromLaunchArguments()
         WalkNotify.model = work
+        WalkNotify.also = { [weak self] method, params in
+            guard method == DaemonAPI.Notification.moveChanged,
+                  let change = try? params?.decode(DaemonAPI.MoveNotification.self) else { return false }
+            self?.moveChanged(change)
+            return true
+        }
         #endif
     }
     /// Every host the control plane has besides this Mac's, each with a client of its own

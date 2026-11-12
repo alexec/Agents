@@ -353,6 +353,12 @@ final class RemoteModel {
         pictures = PhonePictures(files: files)
         #if DEBUG
         WalkNotify.model = work
+        WalkNotify.also = { [weak self] method, params in
+            guard method == DaemonAPI.Notification.moveChanged,
+                  let change = try? params?.decode(DaemonAPI.MoveNotification.self) else { return false }
+            self?.moveChanged(change)
+            return true
+        }
         #endif
         // From the start, not once connected: a banner tapped to launch or wake the app
         // arrives before then, and was dropped (#1045).
