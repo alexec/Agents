@@ -469,8 +469,9 @@ button.link {
    only the turns near the view. A turn never drawn takes 240px; one drawn keeps its own height when
    it leaves the view (`auto`), so the scroll bar and the held turn stay put. Every turn stays in the
    page, so Find, a jump to an entry, the held turn (Chat.tsx, #2310) and a screen reader still read it.
-   A turn that grows as it comes into view resizes, and the chat holds the reader's turn as for any growth. */
-.transcript > .turn { content-visibility: auto; contain-intrinsic-block-size: auto 240px; }
+   A turn that grows as it comes into view resizes, and the chat holds the reader's turn as for any growth.
+   The transcript is a flex column: a turn never shrinks, or one not drawn would shrink to nothing. */
+.transcript > .turn { content-visibility: auto; contain-intrinsic-block-size: auto 240px; flex-shrink: 0; }
 /* Plain text you click, flush with the turn's edge: no capsule, no padding (#758). */
 .steps-control {
   align-self: flex-start;

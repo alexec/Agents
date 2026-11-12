@@ -13,6 +13,8 @@ test("each turn of the transcript is drawn only near the view, and keeps the hei
   assert.ok(rule, "a .transcript > .turn rule");
   assert.match(rule[1], /content-visibility:\s*auto/);
   assert.match(rule[1], /contain-intrinsic-block-size:\s*auto \d+px/);
+  // In the transcript's flex column a turn not drawn would otherwise shrink to nothing.
+  assert.match(rule[1], /flex-shrink:\s*0/);
 });
 
 test("a turn is a child of the transcript, so the rule reaches it", () => {
