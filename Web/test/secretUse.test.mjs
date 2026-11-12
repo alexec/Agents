@@ -54,3 +54,12 @@ test("a terminal's agents-secret has no session: once, for 1 hour or deny, and i
   assert.deepEqual(words.secretUseActions(use).map((a) => words.secretUseWords[a]), ["Approve", "Approve for 1 Hour", "Deny"]);
   assert.equal(words.secretUseWhere(use), "Terminal: zsh · Agents cannot tell a terminal from an agent outside its session.");
 });
+
+test("a session's secret uses are its chat's cards, Later's too; another's, a question's and a terminal's are not (#4918)", () => {
+  const use = { name: "T", use: "fill", place: "a.com" };
+  const first = { ...request(use), id: "1", askedBy: "S" };
+  const later = { ...request(use), id: "2", askedBy: "S", deferred: { atMac: true } };
+  const list = [first, { source: "question", kind: "decide", detail: {}, id: "3", askedBy: "S" },
+    { ...request(use), id: "4", askedBy: "T" }, { ...request({ ...use, use: "terminal" }), id: "5" }, later];
+  assert.deepEqual(words.secretUsesAskedBy(list, "S").map((r) => r.id), ["1", "2"]);
+});

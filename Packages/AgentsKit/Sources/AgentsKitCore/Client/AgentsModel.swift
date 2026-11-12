@@ -2658,6 +2658,14 @@ public final class AgentsModel {
         return permissions.first { $0.agentID == agentID }
     }
 
+    /// The uses of a secret with Ask before use that this agent waits on (#4918), oldest first,
+    /// Later's too: each is a card in its chat as well as a row in Needs You. A terminal's
+    /// (#4179) has no session, so it is in none.
+    public func secretUses(askedBy agentID: UUID?) -> [NeedRequest] {
+        guard let agentID else { return [] }
+        return requests.filter { $0.askedBy == agentID && $0.secretUse != nil }
+    }
+
     /// The form this agent is waiting on, if there is one.
     public func elicitation(for agentID: UUID?) -> ElicitationRequest? {
         guard let agentID else { return nil }

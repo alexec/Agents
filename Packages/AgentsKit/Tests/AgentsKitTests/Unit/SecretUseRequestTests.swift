@@ -53,6 +53,25 @@ struct SecretUseRequestTests {
         #expect(sent["answer"]?["secretUse"]?["action"]?.stringValue == "hour")
     }
 
+    /// #4918: a session's own secret uses are cards in its chat, Later's too; another
+    /// session's, another kind of request and a terminal's (no session) are not.
+    @MainActor @Test func aSessionsSecretUsesAreItsChatCards() throws {
+        let asking = UUID()
+        func ask(_ source: String, by agent: UUID?, at: TimeInterval) throws -> NeedRequest {
+            NeedRequest(id: UUID(), kind: .approve, source: source, title: "Fill T on a.com",
+                        detail: try JSONValue.parse(Data(#"{"secretUse":{"name":"T","use":"fill","place":"a.com"}}"#.utf8)),
+                        folder: URL(filePath: "/tmp/work/api"), askedBy: agent, askedAt: Date(timeIntervalSince1970: at))
+        }
+        let first = try ask("secretUse", by: asking, at: 1)
+        var later = try ask("secretUse", by: asking, at: 2)
+        later.deferred = .init(atMac: true, at: Date())
+        let model = AgentsModel()
+        model.replaceRequests([later, try ask("question", by: asking, at: 3), try ask("secretUse", by: UUID(), at: 4),
+                               try ask("secretUse", by: nil, at: 5), first])
+        #expect(model.secretUses(askedBy: asking).map(\.id) == [first.id, later.id])
+        #expect(model.secretUses(askedBy: nil).isEmpty)
+    }
+
     @Test func anotherRequestKeepsItsOwnTitle() throws {
         let question = try request("{}", source: "question")
         #expect(question.secretUse == nil)

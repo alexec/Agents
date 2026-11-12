@@ -146,7 +146,7 @@ struct SmartFold: View {
 }
 
 /// One request to the person under Needs You (#3864): a click opens the session that asked
-/// it, where its card takes the answer. A secret's use (#4017) has no card: its menu has Allow
+/// it, where its card takes the answer. A secret's use (#4017) has a card too (#4918); its menu has Allow
 /// Once, Approve for This Session, Always Approve and Deny, Approve is a leading swipe and Deny a
 /// trailing one, as an approval's row has (#3763). A terminal's agents-secret (#4179) has no
 /// session to open: its menu has Approve, Approve for 1 Hour and Deny, and its grey line says
