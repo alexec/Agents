@@ -47,6 +47,12 @@
   --forge-draft: light-dark(#6e7781, #8b949e);
   /* A check still running; an agent that waits on the person. */
   --forge-waiting: light-dark(#9a6700, #d29922);
+  /* Under a notice in the forge's amber. */
+  --forge-waiting-wash: light-dark(#fff8c5, #2f2a1a);
+  /* The edge of a notice in the forge's amber. */
+  --forge-waiting-rule: light-dark(#d4a72c, #6b5a1e);
+  /* The near-black disc under a connector's letters (GH, GL) in its set-up sheet. */
+  --forge-mark: light-dark(#212121, #212121);
   /* An open badge; the merge button. */
   --forge-fill-open: light-dark(#1f883d, #238636);
   /* A merged or closed badge. */

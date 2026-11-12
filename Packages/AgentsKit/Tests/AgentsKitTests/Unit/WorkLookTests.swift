@@ -26,7 +26,7 @@ struct WorkLookTests {
         #expect(labels.count == WorkLook.Glyph.allCases.count)
         #expect(WorkLook.Glyph.prMerged.accessibilityLabel == "Merged pull request")
         #expect(WorkLook.Glyph.prMerged.tone == .purple)
-        #expect(WorkLook.Glyph.prClosed.tone.light == 0xCF222E)
+        #expect(WorkLook.Glyph.prClosed.tone == .red)
     }
 
     @Test func ages() {

@@ -94,7 +94,7 @@ struct DesignTokensTests {
     }
 
     /// What is wrong with a colour token whose Swift home holds its light and dark apart, in a
-    /// `switch` (`WorkLook.Tone`) or a dictionary (`InkValues`); nil when they agree.
+    /// dictionary (`InkValues`); nil when they agree.
     static func splitMismatch(_ token: Token, file: String, key: String, light: Substring?, dark: Substring?) -> [String] {
         guard let want = token.fields["$value"] as? String, let wantDark = token.string("dev.agentloops.dark") else {
             return ["design/tokens.json: \(token.path) has no light and dark value"]
@@ -107,12 +107,10 @@ struct DesignTokensTests {
         return []
     }
 
-    @Test("Paper's, StateTint's, WorkLook's and the code inks' colours are the tokens'")
+    @Test("Paper's, StateTint's and the code inks' colours are the tokens'")
     func colours() throws {
         let paper = try Self.source("Shared/UI/Paper.swift")
         let tints = try Self.source("Shared/UI/StateTint.swift")
-        let workLook = try Self.source("Packages/AgentsKit/Sources/AgentsKitCore/Model/WorkLook.swift")
-        let actions = try Self.source("Shared/UI/Work/WorkItemActions.swift")
         let inks = try Self.source("Packages/CodeText/Sources/CodeText/InkValues.swift")
         var wrong: [String] = []
         var checked = 0
@@ -125,22 +123,11 @@ struct DesignTokensTests {
             if swift.hasPrefix("none:") { continue }          // the web page's alone; the words say why
             let parts = swift.split(separator: ".").map(String.init)
             switch parts.first {
-            case "WorkLook":
-                let file = "Packages/AgentsKit/Sources/AgentsKitCore/Model/WorkLook.swift"
-                wrong += Self.splitMismatch(token, file: file, key: "case .\(parts.last ?? swift)",
-                                            light: Self.block(workLook, from: "public var light: UInt32 {", to: "public var dark"),
-                                            dark: Self.block(workLook, from: "public var dark: UInt32 {", to: "\n        }"))
-                checked += 1
-                continue
             case "InkValues":
                 let file = "Packages/CodeText/Sources/CodeText/InkValues.swift"
                 wrong += Self.splitMismatch(token, file: file, key: ".\(parts.last ?? swift)",
                                             light: Self.block(inks, from: "static let light: [CodeRole: UInt32] = [", to: "]"),
                                             dark: Self.block(inks, from: "static let dark: [CodeRole: UInt32] = [", to: "]"))
-                checked += 1
-                continue
-            case "WorkItemActions":
-                wrong += Self.colourMismatch(token, file: "Shared/UI/Work/WorkItemActions.swift", name: parts.last ?? swift, text: actions)
                 checked += 1
                 continue
             default: break
@@ -161,7 +148,7 @@ struct DesignTokensTests {
             let token = try #require(byPath[path])
             wrong += Self.colourMismatch(token, file: "Shared/UI/Paper.swift", name: name, text: paper)
         }
-        #expect(checked >= 27, "the scan found \(checked) colours; it should find every Paper, StateTint, WorkLook and InkValues one")
+        #expect(checked >= 34, "the scan found \(checked) colours; it should find every Paper, StateTint and InkValues one")
         #expect(wrong.isEmpty, "\(wrong.joined(separator: "\n"))")
     }
 

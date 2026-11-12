@@ -309,7 +309,7 @@ struct WorkMergeBox: View {
     // MARK: Glyphs and colours
 
     /// Amber: waiting on a person or a run, as GitHub draws it.
-    static let amber = Color(light: 0x9A6700, dark: 0xD29922)
+    static let amber = Paper.forgeWaiting
 
     static func tint(_ sign: WorkLook.MergeSign) -> Color? {
         switch sign {

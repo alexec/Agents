@@ -79,7 +79,7 @@ struct WorkErrorStrip: View {
         if !lines.isEmpty {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(Color(light: 0x9A6700, dark: 0xD29922))
+                    .foregroundStyle(Paper.forgeWaiting)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(lines, id: \.self) { Text($0).lineLimit(1).truncationMode(.tail).help($0) }
@@ -92,8 +92,8 @@ struct WorkErrorStrip: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(RoundedRectangle(cornerRadius: Paper.Radius.control).fill(Color(light: 0xFFF8C5, dark: 0x2F2A1A)))
-            .overlay(RoundedRectangle(cornerRadius: Paper.Radius.control).strokeBorder(Color(light: 0xD4A72C, dark: 0x6B5A1E)))
+            .background(RoundedRectangle(cornerRadius: Paper.Radius.control).fill(Paper.forgeWaitingWash))
+            .overlay(RoundedRectangle(cornerRadius: Paper.Radius.control).strokeBorder(Paper.forgeWaitingRule))
         }
     }
 }
