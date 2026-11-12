@@ -95,6 +95,30 @@ func TestAWorkflowFileOnDiskIsToldAtOnce(t *testing.T) {
 	}
 }
 
+// A reader that scans between the write and the watch's look (workflows/list, the host
+// status tick) took the new file in, and the watch then told nothing (#4750).
+func TestAWorkflowFileAReaderScannedFirstIsStillTold(t *testing.T) {
+	folder := canonical(t.TempDir())
+	d, c := watched(t, folder)
+	// The watch's own look is the one this test makes, after the reader's.
+	d.stopFolderWatches()
+	os.MkdirAll(workflowsFolder(folder), 0o755)
+	os.WriteFile(filepath.Join(workflowsFolder(folder), "pulled.md"), []byte("---\nname: Pulled\non: agent.finished\n---\nGo.\n"), 0o644)
+	d.workflowSummaries("")
+	d.rescanWorkflows(folder)
+	deadline := time.After(5 * time.Second)
+	for {
+		select {
+		case line := <-c.out:
+			if strings.Contains(line, wire.NotifyWorkflowChanged.Name) && strings.Contains(line, `"pulled"`) {
+				return
+			}
+		case <-deadline:
+			t.Fatal("no workflow/changed for a file a reader scanned first")
+		}
+	}
+}
+
 // The drop box has no event of its own (#3796): a file into it is a file.added, and a
 // trigger narrows to one of its folders with paths.
 func TestADropboxArrivalIsAFileAddedOnlyWhereItsPathsSay(t *testing.T) {
