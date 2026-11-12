@@ -9,7 +9,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useMemo } from "preact/hooks";
 import type { ApprovalAction, GuardedChangeReading } from "../protocol/generated";
 import type { Store } from "../model/store";
-import { actionWord, approvalID, explanations, kindWords, notePlaceholder, sendNoteLabel } from "../model/approvals";
+import { actionWord, explanations, kindWords, notePlaceholder, sendNoteLabel } from "../model/approvals";
 import { shortAgo } from "../model/activity";
 import { describe } from "../model/errors";
 import { hunkRows, type FileDiffRow } from "../model/fileDiff";
@@ -45,8 +45,8 @@ export function readingCounts(reading: GuardedChangeReading): { added: number; r
 export function ReviewPage({ store, host, folder, folderName, id, down }: {
   store: Store; host: string; folder: string; folderName: string; id: string; down: boolean;
 }) {
-  const summary = (store.folders.value[host] ?? []).find((p) => p.folder.folder === folder);
-  const approval = summary?.approvals?.find((a) => approvalID(a) === id);
+  // Found while its answer is on its way too (#4814): its row has gone, and the page stays to say a refusal.
+  const approval = store.approvalShown(host, folder, id);
   const reading = useSignal<GuardedChangeReading | null>(null);
   const loaded = useSignal(false);
   const busy = useSignal(false);

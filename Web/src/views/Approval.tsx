@@ -7,7 +7,6 @@ import type { Approval as ApprovalItem, ApprovalAction } from "../protocol/gener
 import type { Store } from "../model/store";
 import { actionWord, approvalID, approvalLine } from "../model/approvals";
 import { shortAgo } from "../model/activity";
-import { describe } from "../model/errors";
 import { fromWireDate } from "../protocol/dates";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { go } from "../route";
@@ -86,8 +85,8 @@ export function ApprovalRow({ store, host, folder, approval, place, down, chosen
 }) {
   const since = approval.since === undefined ? undefined : fromWireDate(approval.since);
   const open = () => go({ host, folder: folder, review: approvalID(approval) });
-  const answer = (action: ApprovalAction) => () => void store.answerApproval(host, folder, approval, action, approval.digest)
-    .catch((error) => store.say(describe(error)));
+  // The row goes at once; a refusal brings it back, said as "Could not approve — …" (#4814).
+  const answer = (action: ApprovalAction) => () => void store.settleApproval(host, folder, approval, action);
   const menu = (): MenuItem[] => [
     { label: "Review…", run: open },
     ...(approval.actions.includes("approve") ? [{ label: actionWord(approval.kind, "approve"), disabled: down, run: answer("approve") }] : []),

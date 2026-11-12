@@ -3,10 +3,21 @@
 // archived, or a deploy held by a GitHub environment's reviewers (#3587); and a workflow that
 // failed (#989), to fix or dismiss. The words are the window's and the Remote's, Approval (AgentsKitCore/Model/Approval.swift).
 import type { Approval, ApprovalAction, ApprovalKind } from "../protocol/generated";
+import { failureLine } from "./pendingWrites";
 
 /** Approval.id: one item within its folder. */
 export function approvalID(approval: Approval): string {
   return `${approval.kind}:${approval.key}`;
+}
+
+/** The verb for the line that says an answer did not go (#4814): "Could not approve". */
+export function approvalVerb(action: ApprovalAction): string {
+  return action === "requestChanges" ? "request changes" : action;
+}
+
+/** "Could not approve — <why>": an answer drawn at once whose call failed (#4814). */
+export function approvalFailure(action: ApprovalAction, reason: string): string {
+  return failureLine(approvalVerb(action), reason);
 }
 
 /** Approval.kindWord: the kind in a person's words, as a row's grey line leads with it. */
