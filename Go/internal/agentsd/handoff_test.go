@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/alexec/agents/Go/wire"
 )
@@ -108,9 +107,8 @@ func TestDoneGivesThePageBack(t *testing.T) {
 // A hand-off the person takes longer over than a tool call may wait: the agent ends its
 // turn, keeps the browser, and is started again with the answer.
 func TestAHandOffLeftOpenKeepsTheBrowser(t *testing.T) {
-	was := formHoldLimit
-	formHoldLimit = 300 * time.Millisecond
-	defer func() { formHoldLimit = was }()
+	_, left := formHolds(t)
+	left() // the call must outlast its hold
 	m, c, d, id := handOffSetUp(t)
 	inTurn(d, id)
 	if r := m.browserTool(2, "hand_to_person", captcha); r.IsError || replyText(r) != handOffStillOpen {

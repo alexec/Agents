@@ -29,6 +29,10 @@ import UIKit
 ///                                   button's fill; `Color.accentColor`, from the asset
 ///     issue     #0E6B82   #6CC6DB   a session label naming an issue, `#12` (#2958)
 ///     pull      #7442B8   #B79AF0   a session label naming a pull request, `P#12` (#2958)
+///     forge…    GitHub's  own       an item's state on its forge (Work; #4618), below
+///
+/// `design/tokens.json` holds every value here, and `DesignTokensTests` fails when one
+/// differs. Code's ink is `Packages/CodeText/Sources/CodeText/InkValues.swift`'s.
 enum Paper {
     static let ground = Color(light: 0xF7F8F9, dark: 0x1C1D20)
     static let sidebar = Color(light: 0xF0F1F3, dark: 0x161719)
@@ -44,6 +48,26 @@ enum Paper {
     /// state tints, so a label never reads as a session needing someone or failing.
     static let issue = Color(light: 0x0E6B82, dark: 0x6CC6DB)
     static let pull = Color(light: 0x7442B8, dark: 0xB79AF0)
+
+    /// An item's state on its forge, in GitHub's own colours (`specs/4328-work-look/parts.md`,
+    /// `design/tokens.json`'s `color.forge`): the forge's state, not the app's, which is
+    /// `StateTint`'s. Work draws them; the glyph or the words always go with the colour.
+    static let forgeOpen = Color(light: 0x1A7F37, dark: 0x3FB950)
+    static let forgeDone = Color(light: 0x8250DF, dark: 0xA371F7)
+    static let forgeDraft = Color(light: 0x6E7781, dark: 0x8B949E)
+    static let forgeClosed = Color(light: 0xCF222E, dark: 0xF85149)
+    /// The forge's amber: an item that waits on someone, a check that still runs.
+    static let forgeWaiting = Color(light: 0x9A6700, dark: 0xD29922)
+    /// A notice in the amber: its fill and its edge.
+    static let forgeWaitingWash = Color(light: 0xFFF8C5, dark: 0x2F2A1A)
+    static let forgeWaitingRule = Color(light: 0xD4A72C, dark: 0x6B5A1E)
+    /// The near-black disc under a connector's letters (GH, GL) in its set-up sheet.
+    static let forgeMark = Color(light: 0x212121, dark: 0x212121)
+    /// A state chip's fill under white words, GitHub's state label, as the web page draws it.
+    static let forgeFillOpen = Color(light: 0x1F883D, dark: 0x238636)
+    static let forgeFillDone = Color(light: 0x8250DF, dark: 0x8957E5)
+    static let forgeFillClosed = Color(light: 0xCF222E, dark: 0xDA3633)
+    static let forgeFillDraft = Color(light: 0x59636E, dark: 0x6E7681)
 
     /// Corner radii: control (chips, rail), card (rows, wells).
     enum Radius {

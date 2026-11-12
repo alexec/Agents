@@ -28,7 +28,8 @@
 
 ROOT `remote` walks the Remote in the walk simulator (#1182; `remote.sh up` first): the same
 verbs, less menu, size, fold, unfold and click; `key return|delete|escape|TEXT` types into
-the field being typed in.
+the field being typed in. `press` on a `Menu`'s button (a toolbar's +) opens its menu, and
+`press ITEM` then runs that item of the open menu, as a finger's taps do (#4381).
 
 TEXT `=Send` is the whole label only; `#id` is an accessibility identifier. Add `--first` to
 act on the first match rather than the innermost. Everything happens in the window's own

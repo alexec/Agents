@@ -1,6 +1,7 @@
 /// The palette's numbers, in the package so `swift test` can check them (041 SC-007).
 ///
-/// `Shared/UI/CodeInk.swift` turns these into colours; this file is the one to change.
+/// `Shared/UI/CodeInk.swift` turns these into colours. `design/tokens.json`'s `color.code` holds
+/// the same values, and `DesignTokensTests` fails when they differ: change both (#4618).
 /// Every value is checked by `PaletteContrastTests`: at least 4.5:1 against the page and the
 /// well it sits on, light and dark, and nothing that reads as red, which the app keeps for
 /// something having gone wrong (035 FR-013).

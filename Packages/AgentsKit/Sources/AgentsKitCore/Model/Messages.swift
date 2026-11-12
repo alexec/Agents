@@ -63,7 +63,7 @@ public extension DaemonAPI {
         }
     }
 
-    /// One message of a conversation. `text` is outside content: drawn as plain text, never as markup.
+    /// One message of a conversation. `text` is outside content: drawn as Markdown that loads nothing (no HTML, no image from the network).
     struct MessagingMessage: Codable, Sendable, Hashable, Identifiable {
         public var id: String
         public var conversation: String

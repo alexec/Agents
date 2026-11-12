@@ -431,6 +431,9 @@ type AgentMachinesMachine struct {
 	HostState *string `json:"hostState,omitzero"`
 
 	Cost *string `json:"cost,omitzero"`
+
+	// Why it failed, on a make that failed (#4706).
+	Reason *string `json:"reason,omitzero"`
 }
 
 type AgentMachinesProvider struct {
@@ -1658,6 +1661,13 @@ type CapReached struct {
 
 	Until Date `json:"until"`
 }
+
+// A machine's capacity (#4578): ok; near (load per core above 1.5, or memory pressure warn); or full (load per core above 2.5, memory pressure critical, or swap more than half used). It rises at once, and falls only after two looks under its line.
+type CapacityLevel string
+
+const CapacityLevelOk CapacityLevel = "ok"
+const CapacityLevelNear CapacityLevel = "near"
+const CapacityLevelFull CapacityLevel = "full"
 
 // An approval of an MCP server or skill (#2019, M5): for a group, or for one person.
 type CatalogApproval struct {
@@ -7821,7 +7831,7 @@ type MachineUpdate struct {
 	Trust *string `json:"trust,omitzero"`
 }
 
-// processes/list (#3453): the whole machine's CPU and memory now.
+// processes/list (#3453): the whole machine's CPU and memory now; and its capacity (#4578), as the last capacity look (every 15 s) found it. The capacity fields are absent until the first look.
 type MachineUsage struct {
 	// Every core together, 0 to 100, since the last ask, or over half a second when there was none in the last minute.
 	CpuPercent float64 `json:"cpuPercent"`
@@ -7833,6 +7843,19 @@ type MachineUsage struct {
 
 	// Bytes the machine has.
 	MemoryTotal int64 `json:"memoryTotal"`
+
+	// The 1-minute load average divided by the cores: the run queue per core (#4578).
+	LoadPerCore *float64 `json:"loadPerCore,omitzero"`
+
+	// The 5-minute load average divided by the cores.
+	LoadPerCore5 *float64 `json:"loadPerCore5,omitzero"`
+
+	MemoryPressure *MemoryPressure `json:"memoryPressure,omitzero"`
+
+	// Swap in use, 0 to 100; 0 when the machine has none.
+	SwapUsedPercent *float64 `json:"swapUsedPercent,omitzero"`
+
+	Capacity *CapacityLevel `json:"capacity,omitzero"`
 }
 
 // machine/usage (#3626): a machine's page. Its CPU and memory now, as processes/list has them, and every disk its agents write to, ok ones too, as the last disk look (every minute) found them.
@@ -8058,6 +8081,13 @@ type MarketplacesListRequest struct {
 	Destination *SkillDestination `json:"destination,omitzero"`
 }
 
+// The kernel's memory pressure (#4578): macOS kern.memorystatus_vm_pressure_level, or Linux PSI memory (warn when some avg10 is 10% or more, critical when full avg10 is 10% or more).
+type MemoryPressure string
+
+const MemoryPressureNormal MemoryPressure = "normal"
+const MemoryPressureWarn MemoryPressure = "warn"
+const MemoryPressureCritical MemoryPressure = "critical"
+
 type MessageSender struct {
 	AgentID UUID `json:"agentID"`
 
@@ -8202,7 +8232,7 @@ type MessagingListRequest struct {
 	Unread *bool `json:"unread,omitzero"`
 }
 
-// One message in read_messages' structuredContent (#4338). text is outside content: the result says so (untrusted), and a client draws it as plain text, never as markup. thread is the id of the message that starts its thread; absent when it is in no thread. link is the message on the service's own site or app.
+// One message in read_messages' structuredContent (#4338). text is outside content: the result says so (untrusted), and a client draws it as Markdown that loads nothing: no HTML, no image from the network, and only http, https and mailto links. thread is the id of the message that starts its thread; absent when it is in no thread. link is the message on the service's own site or app.
 type MessagingMessage struct {
 	ID string `json:"id"`
 
@@ -9835,6 +9865,8 @@ type PolicyHelpers struct {
 	MostRunning *int64 `json:"mostRunning,omitzero"`
 
 	MostNotArchived *int64 `json:"mostNotArchived,omitzero"`
+
+	MostQueued *int64 `json:"mostQueued,omitzero"`
 }
 
 // Which machine signs your layer (#2957, research R4): the Mac's host, or the first machine of yours that saved one, when you have no Mac.
@@ -9954,6 +9986,7 @@ const PolicyRuleNameBudgetsPerAgentTokens PolicyRuleName = "budgets.perAgentToke
 const PolicyRuleNameBudgetsDailyTokens PolicyRuleName = "budgets.dailyTokens"
 const PolicyRuleNameHelpersMostRunning PolicyRuleName = "helpers.mostRunning"
 const PolicyRuleNameHelpersMostNotArchived PolicyRuleName = "helpers.mostNotArchived"
+const PolicyRuleNameHelpersMostQueued PolicyRuleName = "helpers.mostQueued"
 const PolicyRuleNameWorkflowsMostOn PolicyRuleName = "workflows.mostOn"
 const PolicyRuleNameNoticeLimitsBurst PolicyRuleName = "noticeLimits.burst"
 const PolicyRuleNameNoticeLimitsWaitMinutes PolicyRuleName = "noticeLimits.waitMinutes"

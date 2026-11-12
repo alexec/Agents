@@ -164,11 +164,12 @@ export function budgetWords(b: PolicyBudgets): string | null {
   return parts.length === 0 ? null : parts.join(", ");
 }
 
-/** "At most 3 running and 10 not archived in a folder"; null when neither is set. */
-export function helperWords(h: { mostRunning?: number; mostNotArchived?: number }): string | null {
+/** "At most 3 running and 10 in total in a folder"; null when none is set. */
+export function helperWords(h: { mostRunning?: number; mostQueued?: number; mostNotArchived?: number }): string | null {
   const parts: string[] = [];
   if (h.mostRunning !== undefined) parts.push(`${h.mostRunning} running`);
-  if (h.mostNotArchived !== undefined) parts.push(`${h.mostNotArchived} not archived`);
+  if (h.mostQueued !== undefined) parts.push(`${h.mostQueued} queued`);
+  if (h.mostNotArchived !== undefined) parts.push(`${h.mostNotArchived} in total`);
   return parts.length === 0 ? null : `At most ${parts.join(" and ")} in a folder`;
 }
 

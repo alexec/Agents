@@ -50,7 +50,14 @@ struct WorkStateIcon: View {
 }
 
 extension WorkLook.Tone {
-    var color: Color { Color(light: light, dark: dark) }
+    var color: Color {
+        switch self {
+        case .green: Paper.forgeOpen
+        case .purple: Paper.forgeDone
+        case .grey: Paper.forgeDraft
+        case .red: Paper.forgeClosed
+        }
+    }
 }
 
 /// A person's avatar (#4391, parts.md section 6): the forge's picture (#4363), read through the

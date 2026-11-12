@@ -37,7 +37,9 @@
 #   go/             Go/scripts/go.sh's and scripts/lint.sh's: gopath/ (modules), gocache/
 #                   (Go's build cache) and lint/ (golangci-lint's). Bounded by prune on its
 #                   own, so a large Go cache never costs the Swift one (#1796).
-#   npm/            scripts/lint.sh's Biome download
+#   npm/            npm's cache for a Node tool run by hand (Knip); lint.sh's once
+#   lint-tools/<t>-<v>/  scripts/lint.sh's pinned macOS linters (#4709); prune takes a
+#                   version not used in a week
 #   in-use/<pid>    the folders the build with that pid uses; prune keeps them
 #   pruned, prune.log  when the last prune behind a build ran, and what it did
 #
@@ -208,7 +210,7 @@ auto_prune() {
 usage_report() {
 	local d
 	echo "$CACHE"
-	for d in cas packages checkouts swiftpm linux go npm; do
+	for d in cas packages checkouts swiftpm linux go npm lint-tools; do
 		[ -d "$CACHE/$d" ] && echo "  $d $(gb "$CACHE/$d") GB"
 	done
 	echo "  total $(gb "$CACHE") GB"
@@ -267,6 +269,7 @@ prune() {
 		echo "removing $d (unused a week)"; rm -rf "$d"
 	done
 	unused_week "$CACHE/linux" | while IFS= read -r d; do echo "removing $d (unused a week)"; rm -rf "$d"; done
+	unused_week "$CACHE/lint-tools" | while IFS= read -r d; do echo "removing $d (unused a week)"; rm -rf "$d"; done
 	total=$(swift_kb)
 	while IFS= read -r d; do
 		[ "$total" -gt "$kb" ] || break

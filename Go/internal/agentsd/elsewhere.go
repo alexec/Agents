@@ -428,14 +428,6 @@ func (d *Daemon) waitThere(name string, caller wire.UUID) (*wire.Agent, error) {
 
 // messageThere is message_session to a session caller started on another machine.
 func (d *Daemon) messageThere(me *wire.Agent, s *startedThere, text string, replace bool) (string, error) {
-	if s.Ended != nil && s.Ended.Finished != nil {
-		d.countProject(s.Folder)
-		running, _, _ := d.helperLimitsIn(s.Folder)
-		if r := len(d.runningHelpers(s.Folder)); int64(r) >= running {
-			return "", refusedMessage(fmt.Sprintf("waking %s would take a running place, and %s already has %d of %d sessions "+
-				"started by sessions running. Send it once one finishes; wait with wait_for_event on agent.ended, naming them in agent.", quotedTitle(&s.Title), scopeWords(s.Folder), r, running))
-		}
-	}
 	if !replace && !d.spendMessage(me.ID) {
 		return "", refusedMessage(fmt.Sprintf("this session has sent %d messages in the last hour, the most it may.", messagesPerHour))
 	}
@@ -576,7 +568,7 @@ func (d *Daemon) fromStarter(r wire.SessionCall) (wire.SessionCallReply, error) 
 func (d *Daemon) archiveForStarter(t *wire.Agent) string {
 	name := quotedTitle(t.Title)
 	may := d.agentsMayArchive(folderPath(t))
-	if may && !helperRunning(t) {
+	if may && !helperBusy(t) {
 		d.archiveBy(t.ID, wire.AgentArchivedReasonByAgent)
 		return "Archived " + name + ", freeing its place; the person can unarchive it."
 	}

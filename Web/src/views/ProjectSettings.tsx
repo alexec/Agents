@@ -13,7 +13,7 @@ import { go } from "../route";
 import { policyItem } from "../model/policyLayers";
 import { prCostCommentChoices, prCostCommentHelp, prCostCommentTitle, prCostCommentWords } from "../model/prCostComment";
 import {
-  diskChoices, diskDefaults, folderPanes, folderPathOf, helperDefaults, projectPanes, projectSettingsWords, queuedChoices,
+  diskChoices, diskDefaults, folderPanes, folderPathOf, helperDefaults, projectPanes, projectSettingsWords, helpersNow, helpersNote,
   removeQuestion, withDiskLine, withLimit, writtenIn, type FolderPane, type ProjectPane,
 } from "../model/projectSettings";
 import { Modal } from "./Modal";
@@ -142,22 +142,11 @@ export function ProjectSettingsModal({ store, host, folder, summary, down, close
     </dl>
   </>;
 
-  const queued = limits?.queued ?? helperDefaults.queued;
   const workAtOnce = <dl class="settings-grid">
     <dt>Helpers</dt>
     <dd>
-      <p class="sheet-note">How many run and stay unarchived is set in Agents ▸ Policy, or for this project in Policy. They
-        count across all the project's folders, on every machine. A lead doesn't count; the sessions it starts do.</p>
-    </dd>
-    <dt>Helpers queued</dt>
-    <dd>
-      <select aria-label="Helpers queued" disabled={off} value={String(queued)}
-        onChange={(e) => void setLimits(withLimit(limits, "queued", Number((e.currentTarget as HTMLSelectElement).value),
-          helperDefaults.queued))}>
-        {queuedChoices(queued).map((n) => <option key={n} value={String(n)}>{n === helperDefaults.queued ? `${n} (default)` : n}</option>)}
-      </select>
-      <p class="sheet-note">How many more sessions that other sessions started may wait to start, oldest first, when a place
-        frees. Agents can't change this. Saved in .agents/folder.json.</p>
+      {helpersNow(limits)}
+      <p class="sheet-note">{helpersNote}</p>
     </dd>
     <dt>Allowance spent</dt>
     <dd>

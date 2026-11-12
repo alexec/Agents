@@ -238,7 +238,12 @@ struct WorkFeaturesPane: View {
 
     #if os(iOS)
     @Environment(\.horizontalSizeClass) private var sizeClass
-    private var compact: Bool { sizeClass == .compact }
+    @State private var width: CGFloat = 0
+    /// The phone's layout (note 14) on a phone, and on an iPad whose detail is under 700 points,
+    /// as the other Work pages (`WorkSidePanel.narrowUnder`); the wide one from 700 points on.
+    private var compact: Bool {
+        sizeClass == .compact || (width > 0 && width < WorkSidePanel<EmptyView>.narrowUnder)
+    }
     #else
     private let compact = false
     #endif
@@ -261,6 +266,9 @@ struct WorkFeaturesPane: View {
             #endif
             content
         }
+        #if os(iOS)
+        .onGeometryChange(for: CGFloat.self, of: \.size.width) { width = $0 }
+        #endif
         // Refresh in the toolbar (⌘R); the Remote has it as a bar button and pull to refresh (Features note 7).
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -292,36 +300,37 @@ struct WorkFeaturesPane: View {
             // placeholder epic lines and a placeholder child under each; no spinner in the middle.
             List {
                 ForEach(Self.loadingLines, id: \.self) { line in
-                    placeholder(indent: line.indent, wide: line.wide)
+                    placeholder(indent: indent(line.level), wide: line.wide)
                 }
             }
             .listStyle(.inset).disabled(true)
         }
     }
 
-    /// A placeholder line: its place in the list, its indent, and whether it is the wide one.
+    /// A placeholder line: its place in the list, its level (0 a feature, 1 an epic, 2 a child),
+    /// and whether it is the wide one.
     private struct Placeholder: Hashable {
         var at: Int
-        var indent: CGFloat
+        var level: Int
         var wide: Bool
     }
 
     /// Two placeholder epic lines, each with a placeholder child under it, from `at` on.
     private static func epicLines(from at: Int) -> [Placeholder] {
-        [Placeholder(at: at, indent: epicIndent, wide: true), Placeholder(at: at + 1, indent: childIndent, wide: false),
-         Placeholder(at: at + 2, indent: epicIndent, wide: false), Placeholder(at: at + 3, indent: childIndent, wide: true)]
+        [Placeholder(at: at, level: 1, wide: true), Placeholder(at: at + 1, level: 2, wide: false),
+         Placeholder(at: at + 2, level: 1, wide: false), Placeholder(at: at + 3, level: 2, wide: true)]
     }
 
     /// The first read's lines (state 9): five features, the first two with their epic lines.
     private static let loadingLines: [Placeholder] = (0 ..< 5).flatMap { i -> [Placeholder] in
-        let feature = Placeholder(at: i * 10, indent: 0, wide: i.isMultiple(of: 2))
+        let feature = Placeholder(at: i * 10, level: 0, wide: i.isMultiple(of: 2))
         return i < 2 ? [feature] + epicLines(from: i * 10 + 1) : [feature]
     }
 
     /// An open feature's placeholder lines while its epics are read, with ids of its own.
     private func epicPlaceholders(_ key: String) -> some View {
         ForEach(Self.epicLines(from: 0).map { ("\(key) \($0.at)", $0) }, id: \.0) { _, line in
-            placeholder(indent: line.indent, wide: line.wide)
+            placeholder(indent: indent(line.level), wide: line.wide)
         }
     }
 
@@ -342,8 +351,14 @@ struct WorkFeaturesPane: View {
         .accessibilityHidden(true)
     }
 
-    private static let epicIndent: CGFloat = 40
-    private static let childIndent: CGFloat = 72
+    /// The indents: an epic's line under its feature, a child's under its epic, and the words
+    /// under a child, which line up with a child's number. A phone's are narrower (the board's
+    /// 14 and 28 points, note 14).
+    private var epicIndent: CGFloat { compact ? 14 : 40 }
+    private var childIndent: CGFloat { compact ? 28 : 72 }
+    private var wordsIndent: CGFloat { compact ? 48 : 72 }
+
+    private func indent(_ level: Int) -> CGFloat { [0, epicIndent, childIndent][min(level, 2)] }
 
     /// The approvals as the labels a lane gives its pull request: *P#45*.
     private var approvals: Set<String> { Set(state.approvals.map { "P" + WorkList.shortRef($0) }) }
@@ -417,7 +432,7 @@ struct WorkFeaturesPane: View {
         .help(isOpen ? "Fold \(group.words)" : "Show \(group.words)")
     }
 
-    private static let attention = Color(light: 0x9A6700, dark: 0xD29922)
+    private static let attention = Paper.forgeWaiting
 
     // MARK: Counting
 
@@ -485,7 +500,7 @@ struct WorkFeaturesPane: View {
                 if let barWords {
                     HStack(spacing: 10) {
                         bar(tally ?? .init(done: max(feature.epics - feature.open, 0), notStarted: feature.open))
-                            .frame(width: compact ? 60 : 120)
+                            .frame(width: compact ? 90 : 120)
                         if !compact {
                             Text(barWords).appText(.supporting).monospacedDigit()
                                 .foregroundStyle(.secondary).frame(minWidth: 110, alignment: .trailing)
@@ -507,15 +522,14 @@ struct WorkFeaturesPane: View {
 
     /// "2 epics · 4 in flight · ⚠ P#45 waits for your approval", in the attention colour in Needs you.
     private func featureLine(_ words: String, needs: String?) -> some View {
-        WrappingHStack(spacing: 4) {
-            Text(words).monospacedDigit().foregroundStyle(needs == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Self.attention))
-            if let needs {
-                Text("·").foregroundStyle(Self.attention)
-                Label(needs, systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(Self.attention).fontWeight(.semibold)
-            }
-        }
-        .appText(.supporting)
+        // One text, so on a phone the words wrap as a line does, not as a column beside the glyph.
+        let start = Text(words).monospacedDigit()
+        let line = needs.map {
+            Text("\(start) · \(Text("\(Image(systemName: "exclamationmark.triangle")) \($0)").fontWeight(.semibold))")
+        } ?? start
+        return line
+            .foregroundStyle(needs == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Self.attention))
+            .appText(.supporting)
     }
 
     /// The three-part bar (note 4): done (purple), in flight (green), not started (the grey well).
@@ -529,11 +543,11 @@ struct WorkFeaturesPane: View {
     private func opened(_ feature: DaemonAPI.ForgeFeature, shown: WorkFeatures.Opened?) -> some View {
         let key = feature.name.lowercased()
         if let lines = state.itemErrors[key], !lines.isEmpty {
-            WorkErrorStrip(lines: lines).padding(.leading, Self.epicIndent).listRowSeparator(.hidden)
+            WorkErrorStrip(lines: lines).padding(.leading, epicIndent).listRowSeparator(.hidden)
         }
         if let shown {
             if shown.epics.isEmpty, shown.loose.isEmpty {
-                Text(WorkFeatures.nothingOpen).appText(.supporting).foregroundStyle(.secondary).padding(.leading, Self.epicIndent)
+                Text(WorkFeatures.nothingOpen).appText(.supporting).foregroundStyle(.secondary).padding(.leading, epicIndent)
                     .listRowSeparator(.hidden)
             }
             ForEach(shown.epics, id: \.node.ref) { epic($0) }
@@ -572,7 +586,7 @@ struct WorkFeaturesPane: View {
         let lead = model.workLead(of: epic.node)
         let tally = tally(epic)
         let place = state.places[epic.node.ref].flatMap { WorkFeatures.whereWords($0) }
-        return open(epic, indent: Self.epicIndent) {
+        return open(epic, indent: epicIndent) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "chart.pie")
                     .foregroundStyle(epic.state == "open" ? WorkLook.Tone.green.color : WorkLook.Tone.purple.color)
@@ -580,14 +594,18 @@ struct WorkFeaturesPane: View {
                 if compact {
                     VStack(alignment: .leading, spacing: 2) {
                         epicTitle(epic, place: nil).lineLimit(2)
-                        HStack(spacing: 10) {
-                            if let place { Text(place).foregroundStyle(.secondary) }
+                        // *step 2 of 3 · ● lead working*, the lead in its own colour.
+                        HStack(spacing: 4) {
+                            if let place {
+                                Text(place).foregroundStyle(.secondary)
+                                Text("·").foregroundStyle(.secondary).accessibilityHidden(true)
+                            }
                             epicLead(lead)
                         }
                         .appText(.supporting)
                     }
                     Spacer(minLength: 8)
-                    bar(tally).frame(width: 60)
+                    bar(tally).frame(width: 90)
                         .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
                 } else {
                     epicTitle(epic, place: place).lineLimit(1).truncationMode(.tail)
@@ -638,7 +656,7 @@ struct WorkFeaturesPane: View {
         } label: {
             linkText(words: words, link: link)
                 .appText(.supporting).foregroundStyle(.tertiary)
-                .padding(.leading, Self.childIndent).padding(.vertical, 1)
+                .padding(.leading, wordsIndent).padding(.vertical, 1)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -656,7 +674,7 @@ struct WorkFeaturesPane: View {
 
     private func quiet(_ words: String) -> some View {
         Text(words).appText(.supporting).foregroundStyle(.tertiary)
-            .padding(.leading, Self.childIndent).padding(.vertical, 1)
+            .padding(.leading, wordsIndent).padding(.vertical, 1)
             .listRowSeparator(.hidden)
     }
 
@@ -685,7 +703,8 @@ struct WorkFeaturesPane: View {
             .help("Open \(WorkList.shortRef(line.item.node.ref))'s page")
             if !compact { childWords(line, needs: needs).layoutPriority(-1) }
             Spacer(minLength: 8)
-            if let pr = line.pr {
+            // On a phone the pull request is in the words, and the child's page has it (note 14).
+            if !compact, let pr = line.pr {
                 Button {
                     model.showWork(WorkPlace(kind: .pr, ref: pr.node.ref))
                 } label: {
@@ -699,7 +718,7 @@ struct WorkFeaturesPane: View {
                 .help("Open P\(WorkList.shortRef(pr.node.ref))'s page")
             }
         }
-        .padding(.leading, Self.childIndent).padding(.vertical, 1)
+        .padding(.leading, childIndent).padding(.vertical, 1)
         .listRowSeparator(.hidden)
     }
 
@@ -722,13 +741,17 @@ struct WorkFeaturesPane: View {
     /// A child's mark: the warning glyph for Needs you, a green dot for Working.
     @ViewBuilder
     private func mark(_ flight: WorkFeatures.Flight) -> some View {
-        if flight == .needsYou {
-            Image(systemName: "exclamationmark.triangle").foregroundStyle(Self.attention).imageScale(.small)
-                .accessibilityLabel("Needs you")
-        } else {
-            Circle().fill(WorkLook.Tone.green.color).frame(width: 8, height: 8)
-                .accessibilityLabel("Working")
+        // One width for both marks, so the numbers and titles line up.
+        Group {
+            if flight == .needsYou {
+                Image(systemName: "exclamationmark.triangle").foregroundStyle(Self.attention).imageScale(.small)
+                    .accessibilityLabel("Needs you")
+            } else {
+                Circle().fill(WorkLook.Tone.green.color).frame(width: 8, height: 8)
+                    .accessibilityLabel("Working")
+            }
         }
+        .frame(width: 14)
     }
 
     // MARK: Issues with no epic
@@ -739,7 +762,7 @@ struct WorkFeaturesPane: View {
         if !items.isEmpty {
             let lines = WorkFeatures.inFlight(items, work: work, approvals: approvals)
             Text(WorkFeatures.looseHeading).appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
-                .padding(.leading, Self.epicIndent).padding(.top, 4)
+                .padding(.leading, epicIndent).padding(.top, 4)
                 .listRowSeparator(.hidden)
             ForEach(lines, id: \.item.node.ref) { childRow($0) }
             if items.count > lines.count {

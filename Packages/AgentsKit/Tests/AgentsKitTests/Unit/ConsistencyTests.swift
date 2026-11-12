@@ -65,7 +65,7 @@ struct ConsistencyTests {
     /// here rather than hidden.
     private static let colourAllowList: [(file: String, contains: String, why: String)] = [
         (file: "Shared/UI/Paper.swift", contains: "static let accent = Color.accentColor",
-         why: "the theme's accent, the icon's violet (#156): links, focus, a picked control; views say `Paper.accent`"),
+         why: "the theme's accent, the icon's cobalt (#156, #695): links, focus, a picked control; views say `Paper.accent`"),
         (file: "Shared/UI/Chat/TranscriptRows.swift", contains: "foregroundStyle(Color.accentColor)",
          why: "a file a tool call touched, drawn on a phone as the system draws a link (FR-006b, 033)"),
         (file: "Shared/UI/Page/CursorFlag.swift", contains: "Color(nsColor: .controlAccentColor)",
@@ -76,6 +76,10 @@ struct ConsistencyTests {
          why: "Agent Configuration draws what a runtime gets, and the chosen row, in the accent, as its approved frames do (054)"),
         (file: "Shared/UI/Work/WorkTimelineView.swift", contains: "static let palette: [Color]",
          why: "Work ▸ Timeline colours each epic by its feature from the system colours (#4173); a feature is not a state"),
+        (file: "Shared/UI/Work/WorkStateIcon.swift", contains: "case .green: Paper.forgeOpen",
+         why: "`WorkLook.Tone`'s case, the forge's green, put on its Paper token (#4618): the forge's state, not a state of the app's"),
+        (file: "Shared/UI/Work/WorkStateIcon.swift", contains: "case .red: Paper.forgeClosed",
+         why: "`WorkLook.Tone`'s case, the forge's red, put on its Paper token (#4618)"),
         (file: "Shared/UI/Work/WorkTimelineView.swift", contains: "static let nowRed = Color.red",
          why: "Work ▸ Timeline draws Now as a red line with its time in a red pill, as Calendar does (#4173)"),
     ]
@@ -108,6 +112,74 @@ struct ConsistencyTests {
             goes on the allow-list in ConsistencyTests with its reason.
             \(violations.joined(separator: "\n"))
             """)
+    }
+
+    /// The files where a colour's value is written (#4618): `design/tokens.json` holds each of
+    /// them, and `DesignTokensTests` checks them against it.
+    private static let colourValueFiles: Set<String> = ["Shared/UI/Paper.swift", "Shared/UI/StateTint.swift"]
+
+    /// Sites allowed to write a colour's value outside the token files, each with its reason.
+    private static let colourValueAllowList: [(file: String, contains: String, why: String)] = [
+        (file: "Shared/UI/Huddle.swift", contains: "static let outline = Color(red:",
+         why: "the Blob's outline, the app icon's own colour, which `scripts/design.sh marks` draws every mark in (#4615)"),
+        (file: "Shared/UI/Huddle.swift", contains: "static let backFill = Color(red:",
+         why: "the back Blobs' fill, as the marks draw it (#4615)"),
+        (file: "Shared/UI/Huddle.swift", contains: "static let ink = Color(red:",
+         why: "the Blob's face, as the marks draw it (#4615)"),
+        (file: "Shared/UI/Work/WorkTimelineView.swift", contains: "static let nowGrey = Color(white:",
+         why: "Work ▸ Timeline's own canvas, white before Now and navy after it, not the appearance (Alex, 2026-11-10, #4173)"),
+        (file: "Shared/UI/Work/WorkTimelineView.swift", contains: "static let navy = Color(red:",
+         why: "Work ▸ Timeline's night ground, after Now (Alex, 2026-11-10, #4173)"),
+        (file: "Shared/UI/Work/WorkTimelineView.swift", contains: "var ink: Color { night ?",
+         why: "Work ▸ Timeline's words, by day and by night on its own canvas (#4173)"),
+        (file: "Shared/UI/Work/WorkTimelineView.swift", contains: "var faint: Color { night ?",
+         why: "Work ▸ Timeline's faint words, by day and by night on its own canvas (#4173)"),
+        (file: "Shared/UI/Work/WorkTimelineView.swift", contains: "stroke(&gc, trunkPath,",
+         why: "Work ▸ Timeline's releases line by day, on its own canvas (#4173)"),
+    ]
+
+    /// A colour made from numbers: `Color(light: 0x…, dark: 0x…)`, `Color(red: 0.1, …)`,
+    /// `Color(white: 0.5)`, their AppKit and UIKit forms and `Color(.sRGB, …)`. A colour made
+    /// from a value worked out at run time (`Color(red: rgb.r, …)`) is not one.
+    static var colourValue: Regex<Substring> { #/\b(?:NS|UI)?Color\((?:(?:light|red|white|srgbRed|calibratedRed|calibratedWhite|deviceRed|deviceWhite|displayP3Red|hue):\s*[0-9.]|\.(?:sRGB|sRGBLinear|displayP3),)/# }
+
+    @Test func noCallSiteWritesAColourValue() async throws {
+        var violations: [String] = []
+        var scanned = 0
+        for source in try Self.sources(under: ["App/Sources", "Remote/Sources", "Shared/UI"]) {
+            guard !Self.colourValueFiles.contains(source.path) else { continue }
+            scanned += 1
+            for (index, line) in source.lines.enumerated() {
+                let code = Self.code(line)
+                guard code.contains(Self.colourValue) else { continue }
+                if Self.colourValueAllowList.contains(where: { source.path.hasSuffix($0.file) && code.contains($0.contains) }) {
+                    continue
+                }
+                violations.append("\(Self.at(source, index)): \(code.trimmingCharacters(in: .whitespaces))")
+            }
+        }
+        #expect(scanned > 50, "too few sources were read; the repository root is wrong")
+        #expect(violations.isEmpty, """
+            A colour's value is written at a call site. Every colour the apps draw is a token: \
+            add it to design/tokens.json and to `Paper` (or `StateTint` for a state), then use \
+            `Paper.<name>`. `DesignTokensTests` then checks it. A colour that genuinely is not a \
+            token goes on `colourValueAllowList` in ConsistencyTests with its reason.
+            \(violations.joined(separator: "\n"))
+            """)
+    }
+
+    /// The scan bites: each form of a colour's value is found, and a colour worked out at
+    /// run time, a token or a comment is not.
+    @Test func aColourValueIsFound() {
+        for line in ["Color(light: 0x9A6700, dark: 0xD29922)", "Color(red: 0x1f / 255, green: 0, blue: 0)",
+                     "Color(white: 0.13)", "Color(red: 0.05, green: 0.08, blue: 0.16)", "NSColor(srgbRed: 1, green: 0, blue: 0, alpha: 1)",
+                     "UIColor(white: 0.5, alpha: 1)", "Color(.sRGB, red: 1, green: 0, blue: 0)", "Color(hue: 0.5, saturation: 1, brightness: 1)"] {
+            #expect(Self.code(line).contains(Self.colourValue), "not found: \(line)")
+        }
+        for line in ["Color(red: r, green: g, blue: b)", "Color(red: $0.r, green: $0.g, blue: $0.b)",
+                     "Paper.forgeWaiting", "Color(light: light, dark: dark)", "x // Color(white: 0.5)"] {
+            #expect(!Self.code(line).contains(Self.colourValue), "found: \(line)")
+        }
     }
 
     // MARK: 2. Type scale (FR-025)

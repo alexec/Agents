@@ -57,6 +57,8 @@ test("the card's chip and lines are the window's", () => {
   const hosts = [{ id: "h1", name: "box" }];
   assert.equal(w.workspaceLine({ id: "a", name: "a", state: "running", host: "h1", cost: "$4/mo" }, hosts), "Running · linked to box · $4/mo");
   assert.equal(w.workspaceLine({ id: "a", name: "a", state: "stopped" }, hosts), "Stopped · not joined");
+  // A make that failed says why (#4706).
+  assert.equal(w.workspaceLine({ id: "f", name: "f", state: "failed", reason: "The quota is reached." }, hosts), "Failed · The quota is reached.");
 });
 
 test("Carried by offers the person's online machines that can carry it, their Mac first (#3496)", () => {

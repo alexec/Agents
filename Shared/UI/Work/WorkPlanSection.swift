@@ -216,7 +216,7 @@ struct WorkPlanSection: View {
             Image(systemName: "exclamationmark.triangle")
                 // The state's own glyph, larger than any text step: a marked decorative glyph.
                 .font(.system(size: 22))
-                .foregroundStyle(Color(light: 0x9A6700, dark: 0xD29922))
+                .foregroundStyle(Paper.forgeWaiting)
                 .accessibilityHidden(true)
             Text("Could not read the plan").fontWeight(.semibold)
             Text(words).appText(.supporting).foregroundStyle(.secondary).multilineTextAlignment(.center).textSelection(.enabled)
@@ -623,7 +623,7 @@ private struct WorkPlanRow<BlockedBy: View>: View {
     private var tint: Color {
         switch mark {
         case .working: WorkLook.Tone.green.color
-        case .attention: Color(light: 0x9A6700, dark: 0xD29922)
+        case .attention: Paper.forgeWaiting
         case .blocked: WorkLook.Tone.red.color
         case .done, .waiting: .secondary
         }
@@ -662,7 +662,7 @@ struct WorkLeadState: View {
 
     private var color: Color {
         switch state {
-        case .waitingOnUser: Color(light: 0x9A6700, dark: 0xD29922)
+        case .waitingOnUser: Paper.forgeWaiting
         case .starting, .running: WorkLook.Tone.green.color
         default: Color.secondary.opacity(0.5)
         }

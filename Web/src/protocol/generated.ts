@@ -462,6 +462,8 @@ export interface AgentMachinesMachine {
   host?: string;
   hostState?: string;
   cost?: string;
+  /** Why it failed, on a make that failed (#4706). */
+  reason?: string;
 }
 
 export interface AgentMachinesProvider {
@@ -1486,6 +1488,16 @@ export interface CapReached {
   capUSD: number;
   until: WireDate;
 }
+
+/**
+ * A machine's capacity (#4578): ok; near (load per core above 1.5, or memory pressure warn); or
+ * full (load per core above 2.5, memory pressure critical, or swap more than half used). It rises
+ * at once, and falls only after two looks under its line.
+ */
+export type CapacityLevel =
+  | "ok"
+  | "near"
+  | "full";
 
 /** An approval of an MCP server or skill (#2019, M5): for a group, or for one person. */
 export interface CatalogApproval {
@@ -7022,7 +7034,10 @@ export interface MachineUpdate {
   trust?: string;
 }
 
-/** processes/list (#3453): the whole machine's CPU and memory now. */
+/**
+ * processes/list (#3453): the whole machine's CPU and memory now; and its capacity (#4578), as the
+ * last capacity look (every 15 s) found it. The capacity fields are absent until the first look.
+ */
 export interface MachineUsage {
   /**
    * Every core together, 0 to 100, since the last ask, or over half a second when there was none in
@@ -7034,6 +7049,14 @@ export interface MachineUsage {
   memoryUsed: number;
   /** Bytes the machine has. */
   memoryTotal: number;
+  /** The 1-minute load average divided by the cores: the run queue per core (#4578). */
+  loadPerCore?: number;
+  /** The 5-minute load average divided by the cores. */
+  loadPerCore5?: number;
+  memoryPressure?: MemoryPressure;
+  /** Swap in use, 0 to 100; 0 when the machine has none. */
+  swapUsedPercent?: number;
+  capacity?: CapacityLevel;
 }
 
 /**
@@ -7218,6 +7241,15 @@ export interface MarketplacesListRequest {
   destination?: SkillDestination;
 }
 
+/**
+ * The kernel's memory pressure (#4578): macOS kern.memorystatus_vm_pressure_level, or Linux PSI
+ * memory (warn when some avg10 is 10% or more, critical when full avg10 is 10% or more).
+ */
+export type MemoryPressure =
+  | "normal"
+  | "warn"
+  | "critical";
+
 export interface MessageSender {
   agentID: UUID;
   title: string;
@@ -7375,9 +7407,9 @@ export interface MessagingListRequest {
 
 /**
  * One message in read_messages' structuredContent (#4338). text is outside content: the result says
- * so (untrusted), and a client draws it as plain text, never as markup. thread is the id of the
- * message that starts its thread; absent when it is in no thread. link is the message on the
- * service's own site or app.
+ * so (untrusted), and a client draws it as Markdown that loads nothing: no HTML, no image from the
+ * network, and only http, https and mailto links. thread is the id of the message that starts its
+ * thread; absent when it is in no thread. link is the message on the service's own site or app.
  */
 export interface MessagingMessage {
   id: string;
@@ -8916,6 +8948,7 @@ export interface PolicyFolderWithRules {
 export interface PolicyHelpers {
   mostRunning?: number;
   mostNotArchived?: number;
+  mostQueued?: number;
 }
 
 /**
@@ -9043,6 +9076,7 @@ export type PolicyRuleName =
   | "budgets.dailyTokens"
   | "helpers.mostRunning"
   | "helpers.mostNotArchived"
+  | "helpers.mostQueued"
   | "workflows.mostOn"
   | "noticeLimits.burst"
   | "noticeLimits.waitMinutes"
@@ -14992,7 +15026,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AgentConfigFiles: { required: ["files"], optional: ["updated"] },
   AgentMachines: { required: ["providers"], optional: ["hosts"] },
   AgentMachinesHost: { required: ["name", "state"], optional: [] },
-  AgentMachinesMachine: { required: ["id", "name", "state"], optional: ["host", "hostState", "cost"] },
+  AgentMachinesMachine: { required: ["id", "name", "state"], optional: ["host", "hostState", "cost", "reason"] },
   AgentMachinesProvider: { required: ["id", "name", "canMake", "canDelete", "workspaces"], optional: ["options"] },
   AgentRemovedNotification: { required: ["agentID"], optional: [] },
   AgentRequest: { required: ["agentID"], optional: [] },
@@ -15538,7 +15572,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineTunnel: { required: ["up"], optional: ["problem"] },
   MachineTunnelChanged: { required: ["name", "tunnel"], optional: ["host"] },
   MachineUpdate: { required: ["host", "destination"], optional: ["key", "trust"] },
-  MachineUsage: { required: ["cpuPercent", "cpuCount", "memoryUsed", "memoryTotal"], optional: [] },
+  MachineUsage: { required: ["cpuPercent", "cpuCount", "memoryUsed", "memoryTotal"], optional: ["loadPerCore", "loadPerCore5", "memoryPressure", "swapUsedPercent", "capacity"] },
   MachineUsageState: { required: ["machine", "disks"], optional: [] },
   MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   MachineUserSettings: { required: ["user", "settings", "secrets"], optional: ["waiting"] },
@@ -15689,7 +15723,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   PolicyFolderRequest: { required: ["folder"], optional: [] },
   PolicyFolderState: { required: ["rules"], optional: ["pending", "invalid"] },
   PolicyFolderWithRules: { required: ["folder", "name", "count"], optional: [] },
-  PolicyHelpers: { required: [], optional: ["mostRunning", "mostNotArchived"] },
+  PolicyHelpers: { required: [], optional: ["mostRunning", "mostNotArchived", "mostQueued"] },
   PolicyKeeper: { required: ["host", "name"], optional: [] },
   PolicyKept: { required: [], optional: ["policy", "rev", "machines"] },
   PolicyLayerRef: { required: ["kind", "name"], optional: ["folder"] },

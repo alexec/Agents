@@ -242,7 +242,9 @@ function capitalized(word: string): string { return word.slice(0, 1).toUpperCase
 /** The grey line under a workspace, as the window's workspaceLine. */
 export function workspaceLine(workspace: MachineInfo, hosts: readonly ControlMachine[]): string {
   const parts = [capitalized(workspace.state)];
-  parts.push(workspace.host ? `linked to ${hosts.find((h) => h.id === workspace.host)?.name ?? "a machine"}` : "not joined");
+  // A make that failed says why (#4706), in place of "not joined".
+  const failed = workspace.state === "failed" && workspace.reason ? workspace.reason : null;
+  parts.push(workspace.host ? `linked to ${hosts.find((h) => h.id === workspace.host)?.name ?? "a machine"}` : failed ?? "not joined");
   if (workspace.cost) parts.push(workspace.cost);
   return parts.join(" · ");
 }

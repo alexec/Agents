@@ -470,7 +470,7 @@ targets:
       # window starts no agent program" stays a rule in its code (the daemon owns agents),
       # but no sandbox enforces it now.
       - path: App/Sources
-      # Its icon, the menu bar mark (both drawn by design/logo/blob/final/make.sh) and its
+      # Its icon, the menu bar mark (both drawn by scripts/design.sh marks) and its
       # Acknowledgements. servers and toolsets are folders of their own, below.
       - path: App/Resources
         excludes:

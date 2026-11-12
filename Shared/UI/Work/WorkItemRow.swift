@@ -144,7 +144,7 @@ struct WorkChecksGlyph: View {
             switch checks {
             case .passing: Image(systemName: "checkmark").foregroundStyle(WorkLook.Tone.green.color)
             case .failing: Image(systemName: "xmark").foregroundStyle(WorkLook.Tone.red.color)
-            case .running: Image(systemName: "circle.fill").imageScale(.small).foregroundStyle(Color(light: 0x9A6700, dark: 0xD29922))
+            case .running: Image(systemName: "circle.fill").imageScale(.small).foregroundStyle(Paper.forgeWaiting)
             }
         }
         .appText(.fine)

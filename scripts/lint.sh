@@ -1,14 +1,23 @@
 #!/bin/bash
 # The linters (#1224): each one fast, with a fix mode, and only its bug and security rules on.
 #
-#   scripts/lint.sh [linter…]         lint the whole tree; every linter when none is named
+#   scripts/lint.sh [linter…]         lint the whole tree; with none named, every linter (on a
+#                                     Mac, those for the branch's files: below)
+#   scripts/lint.sh --all             every linter, on a Mac too
 #   scripts/lint.sh --fix [linter…]   run each linter's fix mode first, then lint
-#   scripts/lint.sh --tools DIR TOOL…  put pinned Linux x86_64 binaries in DIR (CI): shellcheck,
-#                                     ruff, golangci-lint, govulncheck (needs Go), biome, swiftlint, jscpd
+#   scripts/lint.sh --tools DIR TOOL…  put the pinned binaries in DIR (CI): shellcheck, ruff,
+#                                     golangci-lint, govulncheck (needs Go), biome, swiftlint, jscpd;
+#                                     Linux x86_64 on Linux, macOS arm64 on a Mac
 #
 # Linters: shell (shellcheck), zsh (zsh -n), python (ruff), go (golangci-lint), govulncheck,
 # web (biome lint), swift (SwiftLint), dupes (jscpd), checks (our own text checks). Their rules are in
 # .shellcheckrc, ruff.toml, Go/.golangci.yml, Web/biome.json and .swiftlint.yml.
+#
+# On a Mac (not CI) with no linter named, only the linters for the files the branch changes
+# since its merge base with origin/main, committed or not, run (#4710): go and govulncheck for
+# Go/ or Packages/Wire/, swift for *.swift or .swiftlint.yml, web for Web/, python for *.py or
+# ruff.toml, shell and zsh for a shell file or .shellcheckrc; checks and dupes always. A change
+# to this script runs every one. It says which it skipped. CI runs every linter.
 #
 # A linter is "required" or "report". A required one is clean on main, and a finding fails
 # this script. A report one prints its findings and exits 0: its old findings are listed in
@@ -21,9 +30,13 @@
 # only report. One run, not a second with only those two: the second would load every
 # package again, which is the slow part even when the cache is warm.
 #
-# On Linux a linter on the PATH is run as it is (CI, after --tools). Otherwise, as on a Mac,
-# it runs in a pinned container, so nothing is installed on the Mac: Docker must be running.
-# Go's caches are Go/scripts/go.sh's, in ~/Library/Caches/Agents-build/go.
+# Every linter runs on the host, never in a container (#4709). On Linux a linter on the PATH
+# is run as it is (CI, after --tools). On a Mac each one is the pinned macOS binary in
+# ~/Library/Caches/Agents-build/lint-tools/<tool>-<version>/, which lint.sh gets with
+# --tools the first time; govulncheck is built with the Mac's Go, and zsh is the Mac's own.
+# Go's caches are Go/scripts/go.sh's, in ~/Library/Caches/Agents-build/go; golangci-lint's is
+# go/lint there. On a Mac, golangci-lint and govulncheck read the Go files as CI's lint job
+# does: GOOS=linux, GOARCH=amd64, cgo off.
 set -u
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -36,9 +49,8 @@ GOVULNCHECK=1.9.0
 BIOME=2.5.15
 SWIFTLINT=0.65.1
 JSCPD=5.4.2
-GO_IMAGE=golang:1.26
 ZSH=5.9
-NODE=$(cat Web/.node-version)
+CACHE=${AGENTS_BUILD_CACHE:-$HOME/Library/Caches/Agents-build}
 
 REQUIRED=" shell zsh checks "
 ALL="shell zsh python go govulncheck web swift dupes checks"
@@ -49,25 +61,38 @@ if [ "${1:-}" = --tools ]; then
 	mkdir -p "$dir" && cd "$dir" || exit 1
 	set -e
 	gh=https://github.com
+	mac=0
+	[ "$(uname -s)" = Darwin ] && mac=1
 	for t in "$@"; do
 		[ -x "$t" ] && continue
 		case $t in
 		shellcheck)
-			curl -sSfL "$gh/koalaman/shellcheck/releases/download/v$SHELLCHECK/shellcheck-v$SHELLCHECK.linux.x86_64.tar.xz" |
+			a=linux.x86_64; [ $mac = 1 ] && a=darwin.aarch64
+			curl -sSfL "$gh/koalaman/shellcheck/releases/download/v$SHELLCHECK/shellcheck-v$SHELLCHECK.$a.tar.xz" |
 				tar -xJ --strip-components=1 "shellcheck-v$SHELLCHECK/shellcheck" ;;
 		ruff)
-			curl -sSfL "$gh/astral-sh/ruff/releases/download/$RUFF/ruff-x86_64-unknown-linux-musl.tar.gz" |
-				tar -xz --strip-components=1 ruff-x86_64-unknown-linux-musl/ruff ;;
+			a=x86_64-unknown-linux-musl; [ $mac = 1 ] && a=aarch64-apple-darwin
+			curl -sSfL "$gh/astral-sh/ruff/releases/download/$RUFF/ruff-$a.tar.gz" |
+				tar -xz --strip-components=1 "ruff-$a/ruff" ;;
 		golangci-lint)
-			curl -sSfL "$gh/golangci/golangci-lint/releases/download/v$GOLANGCI/golangci-lint-$GOLANGCI-linux-amd64.tar.gz" |
-				tar -xz --strip-components=1 "golangci-lint-$GOLANGCI-linux-amd64/golangci-lint" ;;
-		govulncheck) GOBIN=$PWD go install "golang.org/x/vuln/cmd/govulncheck@v$GOVULNCHECK" ;;
-		biome) curl -sSfLo biome "$gh/biomejs/biome/releases/download/@biomejs/biome@$BIOME/biome-linux-x64" && chmod +x biome ;;
+			a=linux-amd64; [ $mac = 1 ] && a=darwin-arm64
+			curl -sSfL "$gh/golangci/golangci-lint/releases/download/v$GOLANGCI/golangci-lint-$GOLANGCI-$a.tar.gz" |
+				tar -xz --strip-components=1 "golangci-lint-$GOLANGCI-$a/golangci-lint" ;;
+		govulncheck) GOBIN=$PWD "$root/Go/scripts/go.sh" install "golang.org/x/vuln/cmd/govulncheck@v$GOVULNCHECK" ;;
+		biome)
+			a=linux-x64; [ $mac = 1 ] && a=darwin-arm64
+			curl -sSfLo biome "$gh/biomejs/biome/releases/download/@biomejs/biome@$BIOME/biome-$a" && chmod +x biome ;;
 		swiftlint)
-			curl -sSfLo swiftlint.zip "$gh/realm/SwiftLint/releases/download/$SWIFTLINT/swiftlint_linux_amd64.zip"
-			unzip -qo swiftlint.zip swiftlint-static && mv swiftlint-static swiftlint && rm swiftlint.zip ;;
+			if [ $mac = 1 ]; then
+				curl -sSfLo swiftlint.zip "$gh/realm/SwiftLint/releases/download/$SWIFTLINT/portable_swiftlint.zip"
+				unzip -qo swiftlint.zip swiftlint && rm swiftlint.zip
+			else
+				curl -sSfLo swiftlint.zip "$gh/realm/SwiftLint/releases/download/$SWIFTLINT/swiftlint_linux_amd64.zip"
+				unzip -qo swiftlint.zip swiftlint-static && mv swiftlint-static swiftlint && rm swiftlint.zip
+			fi ;;
 		jscpd)
-			curl -sSfL "$gh/kucherenko/jscpd/releases/download/v$JSCPD/jscpd-linux-x64-gnu.tar.gz" |
+			a=linux-x64-gnu; [ $mac = 1 ] && a=darwin-arm64
+			curl -sSfL "$gh/kucherenko/jscpd/releases/download/v$JSCPD/jscpd-$a.tar.gz" |
 				tar -xz --strip-components=0 jscpd ;;
 		*) echo "lint.sh: no tool $t" >&2; exit 2 ;;
 		esac
@@ -76,37 +101,111 @@ if [ "${1:-}" = --tools ]; then
 fi
 
 fix=0
-[ "${1:-}" = --fix ] && { fix=1; shift; }
-linters=${*:-$ALL}
+all=0
+while [ $# -gt 0 ]; do
+	case $1 in
+	--fix) fix=1 ;;
+	--all) all=1 ;;
+	*) break ;;
+	esac
+	shift
+done
 
-docker_ok() { command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; }
+# changed_linters: the linters for the files this branch changes since its merge base with
+# origin/main, committed or not; every one when that cannot be told or this script changed.
+changed_linters() {
+	local base f line want=" checks dupes " l out=
+	base=$(git merge-base origin/main HEAD 2>/dev/null) || { echo "$ALL"; return; }
+	while IFS= read -r f; do
+		[ -n "$f" ] || continue
+		case $f in
+		scripts/lint.sh) echo "$ALL"; return ;;
+		Go/* | Packages/Wire/*) want="$want go govulncheck " ;;
+		esac
+		case $f in
+		*.swift | .swiftlint.yml) want="$want swift " ;;
+		Web/*) want="$want web " ;;
+		*.py | ruff.toml) want="$want python " ;;
+		*.sh | *.bash | *.zsh | .shellcheckrc) want="$want shell zsh " ;;
+		*)
+			# An executable script with no extension: its first line says sh or zsh.
+			if [ -f "$f" ] && [ -x "$f" ]; then
+				IFS= read -r line <"$f" || line=
+				case $line in '#!'*sh*) want="$want shell zsh " ;; esac
+			fi ;;
+		esac
+	done < <({ git diff --name-only "$base"; git ls-files --others --exclude-standard; } | sort -u)
+	for l in $ALL; do
+		case "$want" in *" $l "*) out="$out $l" ;; esac
+	done
+	echo "${out# }"
+}
 
-# native NAME: run NAME as it is, on Linux with it on the PATH.
-native() { [ "$(uname -s)" = Linux ] && command -v "$1" >/dev/null 2>&1; }
+if [ $# -gt 0 ]; then
+	linters=$*
+elif [ "$all" = 0 ] && [ "$(uname -s)" = Darwin ] && [ -z "${CI:-}" ]; then
+	linters=$(changed_linters)
+	skipped=
+	for l in $ALL; do
+		case " $linters " in *" $l "*) ;; *) skipped="$skipped $l" ;; esac
+	done
+	[ -n "$skipped" ] && echo "lint.sh: only the linters for this branch's files ($linters); skipped:$skipped. --all runs every one."
+else
+	linters=$ALL
+fi
 
-# tool LINTER: the program it runs; checks needs no container.
+# tool LINTER: the program it runs; zsh and checks need none of ours.
 tool() {
 	case $1 in
 	shell) echo shellcheck ;; python) echo ruff ;; go) echo golangci-lint ;;
-	web) echo biome ;; swift) echo swiftlint ;; dupes) echo jscpd ;; *) echo "$1" ;;
+	web) echo biome ;; swift) echo swiftlint ;; dupes) echo jscpd ;; govulncheck) echo govulncheck ;;
+	*) ;;
 	esac
 }
 
-# box IMAGE CMD…: CMD in IMAGE, the repository at /repo and the working folder kept.
-box() {
-	local image=$1
-	shift
-	docker run --rm -v "$root":/repo -w "/repo${PWD#"$root"}" "$image" "$@"
+# version TOOL: the version this script pins.
+version() {
+	case $1 in
+	shellcheck) echo "$SHELLCHECK" ;; ruff) echo "$RUFF" ;; golangci-lint) echo "$GOLANGCI" ;;
+	govulncheck) echo "$GOVULNCHECK" ;; biome) echo "$BIOME" ;; swiftlint) echo "$SWIFTLINT" ;;
+	jscpd) echo "$JSCPD" ;;
+	esac
 }
 
-# gobox IMAGE CMD…: as box, with Go/scripts/go.sh's caches.
-gobox() {
-	local image=$1 cache="${AGENTS_BUILD_CACHE:-$HOME/Library/Caches/Agents-build}/go"
-	shift
-	mkdir -p "$cache/gopath" "$cache/gocache" "$cache/lint"
-	docker run --rm -v "$root":/repo -v "$cache/gopath":/go -v "$cache/gocache":/root/.cache/go-build \
-		-v "$cache/lint":/root/.cache/golangci-lint -w /repo/Go "$image" "$@"
+# have TOOL: make TOOL runnable. On Linux it is on the PATH (CI). On a Mac it is the pinned
+# binary in the cache, got the first time, its folder put first on the PATH.
+have() {
+	[ -n "$1" ] || return 0
+	if [ "$(uname -s)" != Darwin ]; then
+		command -v "$1" >/dev/null 2>&1
+		return
+	fi
+	local dir tmp
+	dir="$CACHE/lint-tools/$1-$(version "$1")"
+	if [ ! -x "$dir/$1" ]; then
+		echo "== getting $1 $(version "$1") into $dir"
+		# Got beside it, then renamed: two lanes may get it at once.
+		mkdir -p "$dir" && tmp=$(mktemp -d "$CACHE/lint-tools/.get.XXXXXX") || return 1
+		"$root/scripts/lint.sh" --tools "$tmp" "$1" >&2 && mv -f "$tmp/$1" "$dir/$1"
+		rm -rf "$tmp"
+		[ -x "$dir/$1" ] || return 1
+	fi
+	touch "$dir" # scripts/build-cache.sh prune takes a version not used in a week
+	case ":$PATH:" in *":$dir:"*) ;; *) PATH="$dir:$PATH" ;; esac
 }
+
+# Go's caches on a Mac: Go/scripts/go.sh's, and golangci-lint's beside them.
+if [ "$(uname -s)" = Darwin ] && [ -z "${CI:-}" ]; then
+	mkdir -p "$CACHE/go/gopath" "$CACHE/go/gocache" "$CACHE/go/lint"
+	export GOPATH="${GOPATH:-$CACHE/go/gopath}" GOMODCACHE="${GOMODCACHE:-$CACHE/go/gopath/pkg/mod}" \
+		GOCACHE="${GOCACHE:-$CACHE/go/gocache}" GOLANGCI_LINT_CACHE="${GOLANGCI_LINT_CACHE:-$CACHE/go/lint}" \
+		GOTOOLCHAIN="${GOTOOLCHAIN:-go$(awk '$1 == "go" { print $2; exit }' Go/go.mod)}" # as Go/scripts/go.sh
+	PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:/usr/local/go/bin"
+	# The files CI's lint job reads, on Linux: not the _darwin.go ones in their place.
+	golinux=(env GOOS=linux GOARCH=amd64 CGO_ENABLED=0)
+else
+	golinux=()
+fi
 
 # tracked FILTER: tracked files whose first line (or name) says FILTER: sh or zsh.
 tracked() {
@@ -132,17 +231,10 @@ tracked() {
 run_shell() {
 	local files
 	files=$(tracked sh)
-	if native shellcheck; then
-		# shellcheck disable=SC2086 # one path per line, none with spaces
-		[ "$fix" = 1 ] && shellcheck -S warning -f diff $files | git apply
-		# shellcheck disable=SC2086
-		shellcheck -S warning -f gcc $files
-	else
-		# shellcheck disable=SC2086
-		[ "$fix" = 1 ] && box "koalaman/shellcheck:v$SHELLCHECK" -S warning -f diff $files | git apply
-		# shellcheck disable=SC2086
-		box "koalaman/shellcheck:v$SHELLCHECK" -S warning -f gcc $files
-	fi
+	# shellcheck disable=SC2086 # one path per line, none with spaces
+	[ "$fix" = 1 ] && shellcheck -S warning -f diff $files | git apply
+	# shellcheck disable=SC2086
+	shellcheck -S warning -f gcc $files
 }
 
 run_zsh() {
@@ -151,38 +243,29 @@ run_zsh() {
 		for f in $(tracked zsh); do zsh -n "$f" 2>&1 || status=1; done
 		return $status
 	fi
+	# CI's Linux runner has no zsh: the pinned zsh container there. A Mac has zsh.
+	[ "$(uname -s)" = Linux ] && command -v docker >/dev/null 2>&1 ||
+		{ echo "lint.sh: no zsh on the PATH" >&2; return 1; }
 	# shellcheck disable=SC2016,SC2046 # $f is the container's; one path per line, none with spaces
-	box "zshusers/zsh:$ZSH" zsh -c 'rc=0; for f in "$@"; do zsh -n "$f" || rc=1; done; exit $rc' zsh $(tracked zsh)
+	docker run --rm -v "$root":/repo -w /repo "zshusers/zsh:$ZSH" \
+		zsh -c 'rc=0; for f in "$@"; do zsh -n "$f" || rc=1; done; exit $rc' zsh $(tracked zsh)
 }
 
 run_python() {
-	if native ruff; then
-		[ "$fix" = 1 ] && ruff check --fix --quiet .
-		ruff check --no-cache --output-format concise .
-	else
-		[ "$fix" = 1 ] && box "ghcr.io/astral-sh/ruff:$RUFF" check --fix --quiet .
-		box "ghcr.io/astral-sh/ruff:$RUFF" check --no-cache --output-format concise .
-	fi
+	[ "$fix" = 1 ] && ruff check --fix --quiet .
+	ruff check --no-cache --output-format concise .
 }
 
 run_go() {
 	local args=(run --max-issues-per-linter 0 --max-same-issues 0 --show-stats=false
 		--output.text.print-issued-lines=false ./...)
 	[ "$fix" = 1 ] && args=("${args[@]}" --fix)
-	if native golangci-lint; then
-		(cd Go && golangci-lint "${args[@]}")
-	else
-		gobox "golangci/golangci-lint:v$GOLANGCI" golangci-lint "${args[@]}"
-	fi | sed 's|^|Go/|'
+	(cd Go && ${golinux[@]+"${golinux[@]}"} golangci-lint "${args[@]}") | sed 's|^|Go/|'
 	return "${PIPESTATUS[0]}"
 }
 
 run_govulncheck() {
-	if native govulncheck; then
-		(cd Go && govulncheck ./...)
-	else
-		gobox "$GO_IMAGE" go run "golang.org/x/vuln/cmd/govulncheck@v$GOVULNCHECK" ./...
-	fi
+	(cd Go && ${golinux[@]+"${golinux[@]}"} govulncheck ./...)
 }
 
 # Biome's github reporter, turned into path:line:col: lines with the path from the root.
@@ -190,13 +273,7 @@ run_web() {
 	local args=(lint --max-diagnostics=none --reporter=github)
 	[ "$fix" = 1 ] && args=("${args[@]}" --write)
 	cd Web || return 1
-	if native biome; then
-		biome "${args[@]}" .
-	else
-		mkdir -p "$HOME/Library/Caches/Agents-build/npm"
-		docker run --rm -v "$root":/repo -v "$HOME/Library/Caches/Agents-build/npm":/root/.npm -w /repo/Web \
-			"node:$NODE" npx -y --loglevel=error "@biomejs/biome@$BIOME" "${args[@]}" .
-	fi 2>&1 | sed -nE 's#^::(error|warning) title=([^,]*),file=([^,]*),line=([0-9]+)[^:]*,col=([0-9]+)[^:]*::(.*)#Web/\3:\4:\5: \1: \6 (\2)#p' |
+	biome "${args[@]}" . 2>&1 | sed -nE 's#^::(error|warning) title=([^,]*),file=([^,]*),line=([0-9]+)[^:]*,col=([0-9]+)[^:]*::(.*)#Web/\3:\4:\5: \1: \6 (\2)#p' |
 		sed -E 's#^Web/(/repo/Web/|'"$root"'/Web/|\./)?#Web/#'
 	local status=${PIPESTATUS[0]}
 	cd "$root" || return 1
@@ -204,13 +281,8 @@ run_web() {
 }
 
 run_swift() {
-	if native swiftlint; then
-		[ "$fix" = 1 ] && swiftlint --fix --quiet
-		swiftlint lint --quiet
-	else
-		[ "$fix" = 1 ] && box "ghcr.io/realm/swiftlint:$SWIFTLINT" --fix --quiet
-		box "ghcr.io/realm/swiftlint:$SWIFTLINT" lint --quiet
-	fi | sed -E "s#^(/repo/|$root/)##"
+	[ "$fix" = 1 ] && swiftlint --fix --quiet
+	swiftlint lint --quiet | sed -E "s#^(/repo/|$root/)##"
 	return "${PIPESTATUS[0]}"
 }
 
@@ -218,15 +290,8 @@ run_dupes() {
 	local out log status
 	out=$(mktemp -d "$root/.agents/reviews/.jscpd-lint.XXXXXX") || return 1
 	log="$out/run.log"
-	if native jscpd; then
-		jscpd --reporters json --output "$out" >"$log" 2>&1
-		status=$?
-	else
-		local relative_out=${out#"$root/"}
-		docker run --rm -v "$root":/src -w /src \
-			"ghcr.io/kucherenko/jscpd:$JSCPD" --reporters json --output "$relative_out" >"$log" 2>&1
-		status=$?
-	fi
+	jscpd --reporters json --output "$out" >"$log" 2>&1
+	status=$?
 	if [ -f "$out/jscpd-report.json" ]; then
 		python3 scripts/jscpd-report.py "$out/jscpd-report.json"
 	else
@@ -250,6 +315,8 @@ run_checks() {
 	python3 scripts/check-deploy-bounds.py --selftest || status=1
 	python3 scripts/check-deploy-bounds.py || status=1
 	python3 scripts/wire-compat.py --selftest || status=1
+	sh scripts/design.sh selftest || status=1
+	sh scripts/design.sh check || status=1
 	python3 -m unittest discover -s .agents/skills/ship-app/scripts -p 'test_*.py' -q || status=1
 	sh scripts/version.sh --selftest || status=1
 	bash scripts/build-cache-test.sh || status=1
@@ -275,8 +342,8 @@ for linter in $linters; do
 	case "$REQUIRED" in *" $linter "*) mode=required ;; esac
 	# unused and ineffassign fail; the rest of this one run only reports (#2162).
 	[ "$linter" = go ] && mode="unused, ineffassign required"
-	if [ "$linter" != checks ] && ! native "$(tool "$linter")" && ! docker_ok; then
-		echo "== $linter: skipped, as it is not on the PATH and Docker is not running"
+	if ! have "$(tool "$linter")"; then
+		echo "== $linter: skipped, as $(tool "$linter") is not on the PATH and could not be got"
 		continue
 	fi
 	echo "== $linter ($mode)"

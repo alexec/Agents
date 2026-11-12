@@ -9,7 +9,7 @@
 #   scripts/wire.sh compat  fail when what a caller sends changed since the last release tag
 #                           with the same x-capability (#4095; scripts/wire-compat.py)
 #
-# Go runs through Go/scripts/go.sh, in a container on the Mac: lease "build" first. A change
+# Go runs through Go/scripts/go.sh, the Mac's own Go (#4709): lease "build" first. A change
 # to a type changes the schema, runs `gen`, and commits all three files; a conflict in one of
 # them is settled by running `gen` again, never by hand.
 set -eu

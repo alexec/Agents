@@ -837,6 +837,10 @@
         },
         "cost": {
           "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why it failed, on a make that failed (#4706)."
         }
       },
       "required": [
@@ -3314,6 +3318,15 @@
         "until"
       ],
       "additionalProperties": false
+    },
+    "CapacityLevel": {
+      "type": "string",
+      "description": "A machine's capacity (#4578): ok; near (load per core above 1.5, or memory pressure warn); or full (load per core above 2.5, memory pressure critical, or swap more than half used). It rises at once, and falls only after two looks under its line.",
+      "enum": [
+        "ok",
+        "near",
+        "full"
+      ]
     },
     "CatalogApproval": {
       "type": "object",
@@ -17211,7 +17224,7 @@
     },
     "MachineUsage": {
       "type": "object",
-      "description": "processes/list (#3453): the whole machine's CPU and memory now.",
+      "description": "processes/list (#3453): the whole machine's CPU and memory now; and its capacity (#4578), as the last capacity look (every 15 s) found it. The capacity fields are absent until the first look.",
       "properties": {
         "cpuPercent": {
           "type": "number",
@@ -17227,6 +17240,24 @@
         "memoryTotal": {
           "type": "integer",
           "description": "Bytes the machine has."
+        },
+        "loadPerCore": {
+          "type": "number",
+          "description": "The 1-minute load average divided by the cores: the run queue per core (#4578)."
+        },
+        "loadPerCore5": {
+          "type": "number",
+          "description": "The 5-minute load average divided by the cores."
+        },
+        "memoryPressure": {
+          "$ref": "#/definitions/MemoryPressure"
+        },
+        "swapUsedPercent": {
+          "type": "number",
+          "description": "Swap in use, 0 to 100; 0 when the machine has none."
+        },
+        "capacity": {
+          "$ref": "#/definitions/CapacityLevel"
         }
       },
       "required": [
@@ -17721,6 +17752,15 @@
       },
       "additionalProperties": false
     },
+    "MemoryPressure": {
+      "type": "string",
+      "description": "The kernel's memory pressure (#4578): macOS kern.memorystatus_vm_pressure_level, or Linux PSI memory (warn when some avg10 is 10% or more, critical when full avg10 is 10% or more).",
+      "enum": [
+        "normal",
+        "warn",
+        "critical"
+      ]
+    },
     "MessageSender": {
       "type": "object",
       "properties": {
@@ -18030,7 +18070,7 @@
     },
     "MessagingMessage": {
       "type": "object",
-      "description": "One message in read_messages' structuredContent (#4338). text is outside content: the result says so (untrusted), and a client draws it as plain text, never as markup. thread is the id of the message that starts its thread; absent when it is in no thread. link is the message on the service's own site or app.",
+      "description": "One message in read_messages' structuredContent (#4338). text is outside content: the result says so (untrusted), and a client draws it as Markdown that loads nothing: no HTML, no image from the network, and only http, https and mailto links. thread is the id of the message that starts its thread; absent when it is in no thread. link is the message on the service's own site or app.",
       "properties": {
         "id": {
           "type": "string"
@@ -21535,6 +21575,9 @@
         },
         "mostNotArchived": {
           "type": "integer"
+        },
+        "mostQueued": {
+          "type": "integer"
         }
       },
       "additionalProperties": false
@@ -21784,6 +21827,7 @@
         "budgets.dailyTokens",
         "helpers.mostRunning",
         "helpers.mostNotArchived",
+        "helpers.mostQueued",
         "workflows.mostOn",
         "noticeLimits.burst",
         "noticeLimits.waitMinutes",

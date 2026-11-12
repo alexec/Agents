@@ -287,7 +287,7 @@ struct ConnectorMark: View {
             .font(.system(size: 13, weight: .bold))
             .foregroundStyle(filled ? Color.white : Paper.accent)
             .frame(width: 34, height: 34)
-            .background(filled ? AnyShapeStyle(Color(white: 0.13)) : AnyShapeStyle(Paper.accent.opacity(0.15)), in: Circle())
+            .background(filled ? AnyShapeStyle(Paper.forgeMark) : AnyShapeStyle(Paper.accent.opacity(0.15)), in: Circle())
             .accessibilityHidden(true)
     }
 }

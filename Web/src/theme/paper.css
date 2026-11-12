@@ -1,84 +1,27 @@
-/* The Paper palette (071 FR-020): the Mac window's own, from Shared/UI/Paper.swift and
-   Shared/UI/StateTint.swift, and the accent from the AccentColor asset. Light and dark follow the system, as the window does. Keep the
-   values in step with those files; nothing else in the web remote names a colour.
+/* The Paper palette (071 FR-020): the Mac window's own. Its values are in tokens.css, which
+   scripts/design.sh gen makes from design/tokens.json (#4602), the one source that
+   Shared/UI/Paper.swift, StateTint.swift and the AccentColor asset are tested against
+   (DesignTokensTests). Light and dark follow the system, as the window does; nothing else
+   in the web remote names a colour.
 
    Crisp paper (#326): cool near-white in the light, a neutral charcoal in the dark, and
    hairlines that carry the crispness rather than the tint. The paper is still the
    accent's home: the icon's cobalt (#695, was #156's violet) clears 5.6:1 on the ground
-   and 5.3:1 on the well. Nothing is drawn in the accent on a selection, where it would be
-   4.4:1 in the light and 4.9:1 in the dark. */
+   and 5.3:1 on the well, and in the dark 7.7:1 on the ground and 6.3:1 on the well; white
+   can't read on the dark cobalt, so what is drawn on it is the ground. Nothing is drawn in
+   the accent on a selection, where it would be 4.4:1 in the light and 4.9:1 in the dark.
 
-:root {
-  color-scheme: light dark;
+   The three tints, and only Needs you is drawn in colour in a list (FR-018), each clear
+   4.5:1 on the ground and the well. A session label's hue is by what it names (#2958), an
+   issue or a pull request, not a tint, so a label never reads as a state.
 
-  /* The page every column sits on. */
-  --paper-ground: #f7f8f9;
-  /* The folders column, one shade deeper. */
-  --paper-sidebar: #f0f1f3;
-  /* What floats: the prompt bar, cards, menus. */
-  --paper-raised: #ffffff;
-  /* What is set into the page: code, your own message. */
-  --paper-well: #f0f2f4;
-  /* A row under the pointer, a picked item. */
-  --paper-wash: #e7eaee;
-  /* Hairlines between rows, and round raised things. */
-  --paper-rule: #dde1e6;
-  /* Text, and the prominent button's fill. */
-  --paper-ink: #1c1d20;
-  --paper-selection: #d8dee6;
-  /* Soft and short: paper lifted a little off the desk. Neutral, so the lift reads as
-     lift and not as a smudge. */
-  --paper-shadow: rgb(32 36 42 / 10%);
-  /* The app icon's cobalt (#156, #695): links, focus, controls and the prominent button's fill,
-     as the window's AccentColor. The numbers are against the cool ground. */
-  --accent: #1f5fc8;
-  accent-color: var(--accent);
+   Work's states are the forge's own hues (--forge-*, #4608), code is in the window's inks
+   (--code-*, InkValues), and the Timeline has its own plot (--timeline-*). What stays data
+   is the forge's: a label's own colour, and an avatar's hue from its name.
 
-  /* The three tints, and only Needs you is drawn in colour in a list (FR-018). Mixed for a
-     neutral ground rather than a warm one, each clearing 4.5:1 on the ground and the well. */
-  --tint-attention: #ba4a13;
-  --tint-failure: #b4232b;
-  --tint-vouched: #2d765c;
+   The system's own fonts; nothing is loaded from anywhere (FR-034). Every font-size, and the
+   marks drawn beside text, is in rem, so the page follows the browser's own font size and
+   zoom (#1034): 1rem is the root's size, 112.5% of the browser's (18px at its default,
+   #2135). */
 
-  /* A session label's hue by what it names (#2958, Paper.issue and Paper.pull): an issue
-     and a pull request, not the tints, so a label never reads as a state. */
-  --label-issue: #0e6b82;
-  --label-pull: #7442b8;
-
-  --radius-control: 7px;
-  --radius-card: 10px;
-  --radius-floating: 16px;
-
-  /* The system's own fonts; nothing is loaded from anywhere (FR-034). One sans-serif for
-     everything a person reads, as the window's Paper type scale has it since #326
-     (Shared/UI/TypeScale.swift), and one monospace for code. */
-  --font-text: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
-
-  /* Every font-size, and the marks drawn beside text, is in rem, so the page follows the
-     browser's own font size and zoom (#1034): 1rem is the root's size, 112.5% of the
-     browser's (18px at its default, #2135). */
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper-ground: #1c1d20;
-    --paper-sidebar: #161719;
-    --paper-raised: #26282c;
-    --paper-well: #2a2d31;
-    --paper-wash: #33363b;
-    --paper-rule: #3a3e44;
-    --paper-ink: #e8eaed;
-    --paper-selection: #3a3e44;
-    --paper-shadow: rgb(0 0 0 / 10%);
-    /* Light enough for text on dark paper (7.7:1 on the ground, 6.3:1 on the well); white
-       can't read on it, so what is drawn on it is the ground, at 7.7:1. */
-    --accent: #7fb0ff;
-
-    --tint-attention: #f0a06b;
-    --tint-failure: #f08086;
-    --tint-vouched: #8bc6a7;
-    --label-issue: #6cc6db;
-    --label-pull: #b79af0;
-  }
-}
+@import "./tokens.css";

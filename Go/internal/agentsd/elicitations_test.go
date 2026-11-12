@@ -13,6 +13,20 @@ import (
 // Ports ElicitationTests and ElicitationSchemaTests: a form is held, answered from any
 // client, refused when the answer does not fit, and taken down by a stop or the runtime.
 
+// formHolds sets formHoldLimit for one test (#4659) and puts it back at the end. answered holds
+// a call for a minute, for a call the test answers while it is held, so a slow runner does not
+// end its hold first (#4569); left holds a call 300 ms, for a call that must outlast its hold.
+// It starts as answered. Set it only while no call is in flight.
+func formHolds(t *testing.T) (answered, left func()) {
+	t.Helper()
+	was := formHoldLimit
+	t.Cleanup(func() { formHoldLimit = was })
+	answered = func() { formHoldLimit = time.Minute }
+	left = func() { formHoldLimit = 300 * time.Millisecond }
+	answered()
+	return answered, left
+}
+
 // callError sends a call and is the error it answers with, or fails when it answers.
 func (c *conn) callError(t *testing.T, id int, method string, params any) *Error {
 	t.Helper()

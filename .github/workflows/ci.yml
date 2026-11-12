@@ -46,6 +46,7 @@ jobs:
       agentskit: ${{ steps.test-selection.outputs.agentskit }}
       codetext: ${{ steps.test-selection.outputs.codetext }}
       go: ${{ steps.test-selection.outputs.go }}
+      marks: ${{ steps.marks.outputs.marks }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -65,6 +66,20 @@ jobs:
             base=$(git merge-base "origin/$DEFAULT_BRANCH" HEAD || true)
           fi
           bash scripts/select-test-suites.sh "$base" | tee -a "$GITHUB_OUTPUT"
+
+      # The `marks` job (#4615) starts only when a mark, its source or this file changed; with
+      # no base to compare against it starts anyway.
+      - name: Did a mark change
+        id: marks
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          marks=run
+          if [[ -n "$BASE_SHA" ]] && git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
+            git diff --name-only "$BASE_SHA" HEAD | grep -qE '^(design/logo/blob/final/|scripts/design\.sh$|App/Resources/Assets\.xcassets/|Remote/Resources/Assets\.xcassets/AppIcon|Web/assets/|docs/assets/|docs/favicon\.ico$|www/assets/|\.github/workflows/ci\.yml$)' || marks=skip
+          fi
+          echo "marks=$marks" | tee -a "$GITHUB_OUTPUT"
 
   # The test job ran the Xcode builds and the package builds and tests one after the
   # other, and they share nothing: a run that touched both took 20–24 minutes on its own
@@ -703,6 +718,21 @@ jobs:
         run: go vet ./...
       - name: Test
         run: TMPDIR=$(cd "$RUNNER_TEMP" && pwd -P) go test ./...
+
+  # The Blob's marks (#4615): every icon, favicon and touch icon is what `scripts/design.sh
+  # marks` makes from the one source in design/logo/blob/final/. It renders with AppKit, so it
+  # runs on the macOS 27 image that a Mac renders the same as.
+  marks:
+    needs: select
+    if: ${{ always() && !cancelled() && (needs.select.result != 'success' || needs.select.outputs.marks != 'skip') }}
+    runs-on: xcode-27
+    timeout-minutes: 10
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@v6
+      - name: Every mark is what the Blob source makes
+        run: scripts/design.sh marks --check
 
   # The web remote (071, D7, research R8): a build with the pinned Node, then tsc, the lint
   # that keeps agent output inert, the licence list and the web tests, which hold the build to

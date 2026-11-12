@@ -10,7 +10,19 @@ extension DaemonAPI.Method {
 }
 
 extension DaemonAPI {
-    /// The whole machine's CPU and memory now.
+    /// A machine's capacity (#4578): ok; near (load per core above 1.5, or memory pressure
+    /// warn); or full (load per core above 2.5, memory pressure critical, or swap more than
+    /// half used).
+    public enum CapacityLevel: String, Codable, Hashable, Sendable, CaseIterable {
+        case ok, near, full
+    }
+
+    /// The kernel's memory pressure (#4578).
+    public enum MemoryPressure: String, Codable, Hashable, Sendable, CaseIterable {
+        case normal, warn, critical
+    }
+
+    /// The whole machine's CPU and memory now, and its capacity as the last look found it.
     public struct MachineUsage: Codable, Hashable, Sendable {
         /// Every core together, 0 to 100.
         public var cpuPercent: Double
@@ -18,12 +30,27 @@ extension DaemonAPI {
         /// Bytes in use, and the bytes the machine has.
         public var memoryUsed: Int64
         public var memoryTotal: Int64
+        /// The 1- and 5-minute load averages per core (#4578); nil before the first look.
+        public var loadPerCore: Double?
+        public var loadPerCore5: Double?
+        /// nil when the kernel does not say.
+        public var memoryPressure: MemoryPressure?
+        /// Swap in use, 0 to 100.
+        public var swapUsedPercent: Double?
+        public var capacity: CapacityLevel?
 
-        public init(cpuPercent: Double, cpuCount: Int, memoryUsed: Int64, memoryTotal: Int64) {
+        public init(cpuPercent: Double, cpuCount: Int, memoryUsed: Int64, memoryTotal: Int64,
+                    loadPerCore: Double? = nil, loadPerCore5: Double? = nil, memoryPressure: MemoryPressure? = nil,
+                    swapUsedPercent: Double? = nil, capacity: CapacityLevel? = nil) {
             self.cpuPercent = cpuPercent
             self.cpuCount = cpuCount
             self.memoryUsed = memoryUsed
             self.memoryTotal = memoryTotal
+            self.loadPerCore = loadPerCore
+            self.loadPerCore5 = loadPerCore5
+            self.memoryPressure = memoryPressure
+            self.swapUsedPercent = swapUsedPercent
+            self.capacity = capacity
         }
     }
 

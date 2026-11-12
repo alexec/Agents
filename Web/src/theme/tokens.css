@@ -1,0 +1,148 @@
+/* Made by scripts/design.sh gen from design/tokens.json (#4602). Do not edit: change the
+   JSON and run gen again. */
+
+:root {
+  color-scheme: light dark;
+  /* The page every column sits on. */
+  --paper-ground: #f7f8f9;
+  /* The folders column, one shade deeper. */
+  --paper-sidebar: #f0f1f3;
+  /* What floats: the prompt bar, cards, menus. */
+  --paper-raised: #ffffff;
+  /* What is set into the page: code, your own message. */
+  --paper-well: #f0f2f4;
+  /* A row under the pointer, a picked item. */
+  --paper-wash: #e7eaee;
+  /* Hairlines between rows, and round raised things. */
+  --paper-rule: #dde1e6;
+  /* Text, and the prominent button's fill. */
+  --paper-ink: #1c1d20;
+  /* A selection. Nothing is drawn in the accent on it. */
+  --paper-selection: #d8dee6;
+  /* Under a raised thing: short and neutral, paper lifted a little off the desk. */
+  --paper-shadow: rgb(32 36 42 / 10%);
+  /* The app icon's cobalt: links, focus, controls and the prominent button's fill. */
+  --accent: #1f5fc8;
+  accent-color: var(--accent);
+  /* Needs you; the only tint drawn in a list. */
+  --tint-attention: #ba4a13;
+  /* Failed. */
+  --tint-failure: #b4232b;
+  /* Approved, done: an ending the app can vouch for. */
+  --tint-vouched: #2d765c;
+  /* A label naming an issue, #12. */
+  --label-issue: #0e6b82;
+  /* A label naming a pull request, P#12. */
+  --label-pull: #7442b8;
+  /* What is drawn on a filled mark: a state's badge, a swipe's action. */
+  --paper-on-fill: #ffffff;
+  /* Behind a sheet or a viewer, mixed with transparent to the strength it needs. */
+  --paper-scrim: #000000;
+  /* Open; a check that passed; running. */
+  --forge-open: #1a7f37;
+  /* A closed issue, a merged pull request. */
+  --forge-done: #8250df;
+  /* A pull request closed unmerged; a check that failed; changes asked for. */
+  --forge-closed: #cf222e;
+  /* A draft, an issue not planned. */
+  --forge-draft: #6e7781;
+  /* A check still running; an agent that waits on the person. */
+  --forge-waiting: #9a6700;
+  /* Under a notice in the forge's amber. */
+  --forge-waiting-wash: #fff8c5;
+  /* The edge of a notice in the forge's amber. */
+  --forge-waiting-rule: #d4a72c;
+  /* The near-black disc under a connector's letters (GH, GL) in its set-up sheet. */
+  --forge-mark: #212121;
+  /* An open badge; the merge button. */
+  --forge-fill-open: #1f883d;
+  /* A merged or closed badge. */
+  --forge-fill-done: #8250df;
+  /* A closed pull request's badge. */
+  --forge-fill-closed: #cf222e;
+  /* A draft's or a not planned issue's badge. */
+  --forge-fill-draft: #59636e;
+  /* A comment, in italic. */
+  --code-comment: #64707a;
+  /* A keyword, true, false, null. */
+  --code-keyword: #2b4c8c;
+  /* A string. */
+  --code-string: #4e6420;
+  /* A number. */
+  --code-number: #7a3e7a;
+  /* A type. */
+  --code-type: #1f6a6a;
+  /* A function. */
+  --code-function: #5b4bb5;
+  /* A property. */
+  --code-property: #52627a;
+  /* Punctuation and operators. */
+  --code-punctuation: #5e6470;
+  /* The plot behind the lines. */
+  --timeline-plot: #ffffff;
+  /* The axis's marks. */
+  --timeline-faint: #8c8c8c;
+  /* The trunk every feature leaves from. */
+  --timeline-trunk: #999999;
+  /* A release's ring on the trunk. */
+  --timeline-release: #000000;
+  /* The Now line. */
+  --timeline-now: #8c8c8c;
+  /* Chips, the rail, inputs. */
+  --radius-control: 7px;
+  /* Rows, wells, cards. */
+  --radius-card: 10px;
+  /* Sheets, menus, the prompt bar (web). */
+  --radius-floating: 16px;
+  /* The system's sans-serif, for everything a person reads. Nothing is loaded from the network. */
+  --font-text: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  /* The system's monospace, for code. */
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper-ground: #1c1d20;
+    --paper-sidebar: #161719;
+    --paper-raised: #26282c;
+    --paper-well: #2a2d31;
+    --paper-wash: #33363b;
+    --paper-rule: #3a3e44;
+    --paper-ink: #e8eaed;
+    --paper-selection: #3a3e44;
+    --paper-shadow: rgb(0 0 0 / 10%);
+    --accent: #7fb0ff;
+    --tint-attention: #f0a06b;
+    --tint-failure: #f08086;
+    --tint-vouched: #8bc6a7;
+    --label-issue: #6cc6db;
+    --label-pull: #b79af0;
+    --paper-on-fill: #ffffff;
+    --paper-scrim: #000000;
+    --forge-open: #3fb950;
+    --forge-done: #a371f7;
+    --forge-closed: #f85149;
+    --forge-draft: #8b949e;
+    --forge-waiting: #d29922;
+    --forge-waiting-wash: #2f2a1a;
+    --forge-waiting-rule: #6b5a1e;
+    --forge-mark: #212121;
+    --forge-fill-open: #238636;
+    --forge-fill-done: #8957e5;
+    --forge-fill-closed: #da3633;
+    --forge-fill-draft: #6e7681;
+    --code-comment: #a3adb8;
+    --code-keyword: #8fb0e8;
+    --code-string: #a9c27a;
+    --code-number: #d5a3d5;
+    --code-type: #7cc4c0;
+    --code-function: #b3a6f0;
+    --code-property: #bac5d7;
+    --code-punctuation: #a9b2bd;
+    --timeline-plot: #0d1429;
+    --timeline-faint: #999999;
+    --timeline-trunk: #e7e8ea;
+    --timeline-release: #ffffff;
+    --timeline-now: #8c8c8c;
+  }
+}

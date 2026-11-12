@@ -1,6 +1,6 @@
 ---
 name: ship-app
-description: Build main and install Agents Host, the Mac window, and the Remote on Alex's paired iPhone and iPad. The Mac install runs by default; use --no-mac to skip it. A merge wave does not run this. Not for testing a change. That is run-app, on a scratch root.
+description: Build main and install Agents Host, the Mac window, and the Remote on Alex's paired iPhone and iPad, and, with --control-plane, deploy main to the live control plane (control.agentloops.dev). The Mac install runs by default; use --no-mac to skip it. A merge wave does not run this. Not for testing a change. That is run-app, on a scratch root.
 ---
 
 # Ship main to the real app and devices
@@ -28,6 +28,34 @@ carries them and a stale one cannot join. It is Go (#1314) and takes seconds.
 instead of 20s. `--build-only` builds in the checkout
 the script is in (run a worktree's copy to build that worktree), checks the products,
 and stops: nothing is installed or relaunched. Use it to prove a change to this script.
+
+## The live control plane (#4712)
+
+`--control-plane` also deploys the checkout to the live control plane,
+control.agentloops.dev, on Google Cloud. It is off by default. Give it when Alex asks
+for the control plane to be deployed or shipped, or for main on everything. Alex
+approved its restart for a ship with `--control-plane` (2026-11-11). To deploy only the
+control plane, give `--control-plane --no-mac --no-devices`.
+
+The script runs `deploy/gcp/up.sh` in the checkout that ships, before the Mac restart:
+- On a release tag (`scripts/version.sh` says `X.Y.Z`), the VM pulls that release's image.
+- On any other commit, `--build` builds the image here, for linux/amd64, from the
+  checkout, and copies it to the VM. This needs Docker with buildx running on this Mac.
+
+It acts as `~/.agents/secrets/gcp-agents-control.json` and keeps the store, the APNs key
+and the firewall. It refuses a checkout with uncommitted changes. Lease "build" for 60
+minutes for a ship with `--control-plane`: the image build is one more build.
+
+The log is `$LOGS/control-plane.log`. When it ends, the script prints the version that the
+control plane serves (`agents-control <version> (go)`), which `up.sh` checks. A failed
+deploy does not stop the Mac or the devices, but the script exits 1. Then never roll back
+the store and never run `deploy/gcp/down.sh`: file a `bug` with `priority:high`, the step
+and its first error (never a secret), as the release skill's step 5 says. After it, check
+from this Mac that `curl -fsS https://control.agentloops.dev/healthz` says `ok`.
+
+A release deploys its own version (the release skill, step 5). A ship with
+`--control-plane` between releases puts a `-dev` version there, which the next release
+replaces.
 
 ## What it builds
 

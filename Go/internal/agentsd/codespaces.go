@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/codespacessh"
+	"github.com/alexec/agents/Go/internal/workspacecommands"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -112,7 +113,10 @@ func (g *githubCodespaces) Create(ctx context.Context, repository, name string) 
 			Ref string `json:"ref"`
 		} `json:"git_status"`
 	}
-	body := map[string]string{"display_name": name, "ref": repo.DefaultBranch}
+	// GitHub's maximum idle timeout, as the codespaces-api preset sets (#4636): GitHub counts no
+	// background process, such as agentsd, as use.
+	body := map[string]any{"display_name": name, "ref": repo.DefaultBranch,
+		"idle_timeout_minutes": workspacecommands.CodespaceIdleTimeout}
 	data, _ := json.Marshal(body)
 	if err := g.request(ctx, http.MethodPost, "/repos/"+path+"/codespaces", data, &result); err != nil {
 		return wire.ConnectorCodespace{}, err

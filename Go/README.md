@@ -33,7 +33,7 @@ stay as they are.
 
 ## Building and testing
 
-On the Mac, Go runs in a `golang` container (Go is not installed here); the caches are in
+On the Mac, Go is the Mac's own (`brew install go`), not a container (#4709); the caches are in
 `~/Library/Caches/Agents-build/go`. Lease "build" first.
 
 ```sh
@@ -82,7 +82,7 @@ build added kept whole), the copies' own messages, and the JSON-RPC envelope.
 
 **On a Mac (#1312, #1314).** Agents Host carries `Contents/Helpers/agents-control`
 (`scripts/go-control.sh`) and `Contents/Helpers/agentsd` (`scripts/go-agentsd.sh`), both Go:
-its build fails with no Docker running and no Go. The host's launch agent runs `Agents Host
+its build fails with no Go. The host's launch agent runs `Agents Host
 --launch-daemon`, which becomes `agentsd`; the control plane's runs `--launch-control`, which
 hands over the key and becomes `agents-control`. The Swift ones, and the
 `daemonImplementation` and `controlImplementation` settings that picked them, went in #1314.

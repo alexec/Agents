@@ -37,11 +37,15 @@ func TestMain(m *testing.M) {
 		<-f.conn.Done()
 		return
 	}
+	// A test's writes are not synced to the disk: on a Mac each sync costs about 4 ms (#4709).
+	store.SyncWrites = false
 	// The sealed-secret tests are the Mac's path on every system; a test of the Linux release
 	// layer turns it on for its daemon (releaseOn).
 	releaseLayerHere = false
 	// The machine's memory pressure does not move a test's warm pool (#4514).
 	pressureNow = func() string { return "" }
+	// Nor does the load of the machine a test runs on raise machine.busy (#4578).
+	capacitySampler = func(context.Context) capacitySample { return capacitySample{} }
 	// No test asks the person's gh about merged pull requests unless it says so.
 	findGH = func() string { return "" }
 	// Nor asks the forge for an issue's parent (#3582): a test sets issueLookup.

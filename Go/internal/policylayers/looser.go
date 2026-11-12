@@ -27,6 +27,7 @@ func LooserRules(approved, next wire.PolicyRules) []wire.PolicyRuleName {
 		{wire.PolicyRuleNameBudgetsDailyTokens, looserScalar(budgetDailyTokens(approved), budgetDailyTokens(next), NumberTighterIsLess)},
 		{wire.PolicyRuleNameHelpersMostRunning, looserScalar(helpersMostRunning(approved), helpersMostRunning(next), NumberTighterIsLess)},
 		{wire.PolicyRuleNameHelpersMostNotArchived, looserScalar(helpersMostNotArchived(approved), helpersMostNotArchived(next), NumberTighterIsLess)},
+		{wire.PolicyRuleNameHelpersMostQueued, looserScalar(helpersMostQueued(approved), helpersMostQueued(next), NumberTighterIsLess)},
 		{wire.PolicyRuleNameWorkflowsMostOn, looserScalar(workflowsMostOn(approved), workflowsMostOn(next), NumberTighterIsLess)},
 		{wire.PolicyRuleNameNoticeLimitsBurst, looserScalar(noticeBurst(approved), noticeBurst(next), NumberTighterIsLess)},
 		{wire.PolicyRuleNameNoticeLimitsWaitMinutes, looserScalar(noticeWaitMinutes(approved), noticeWaitMinutes(next), NumberTighterIsMore)},
@@ -64,7 +65,8 @@ var ruleTitles = map[wire.PolicyRuleName]string{
 	wire.PolicyRuleNameBudgetsDaily:              "Per day",
 	wire.PolicyRuleNameBudgetsDailyTokens:        "Tokens per day",
 	wire.PolicyRuleNameHelpersMostRunning:        "Helpers running in each project",
-	wire.PolicyRuleNameHelpersMostNotArchived:    "Helpers not archived in each project",
+	wire.PolicyRuleNameHelpersMostNotArchived:    "Helpers in total in each project",
+	wire.PolicyRuleNameHelpersMostQueued:         "Helpers queued in each project",
 	wire.PolicyRuleNameWorkflowsMostOn:           "Workflows turned on in each folder",
 	wire.PolicyRuleNameNoticeLimitsBurst:         "Notices in a burst",
 	wire.PolicyRuleNameNoticeLimitsWaitMinutes:   "Wait after a burst",
@@ -178,6 +180,14 @@ func helpersMostNotArchived(r wire.PolicyRules) *float64 {
 		return nil
 	}
 	v := float64(*r.Helpers.MostNotArchived)
+	return &v
+}
+
+func helpersMostQueued(r wire.PolicyRules) *float64 {
+	if r.Helpers == nil || r.Helpers.MostQueued == nil {
+		return nil
+	}
+	v := float64(*r.Helpers.MostQueued)
 	return &v
 }
 
