@@ -99,6 +99,17 @@ extension AgentsModel {
         return true
     }
 
+    /// The open chat resumed from the end it holds (#4794): one page asked `from` it, laid
+    /// after it, in place of the whole opening. The page when it was laid on; nil when nothing
+    /// is held, the page did not come, `load` is no longer the latest, or the page leaves a
+    /// gap. The caller then opens the chat whole, as before.
+    public func resumeTranscript(load: Int,
+                                 transcript: (_ from: Int, _ limit: Int) async throws -> TranscriptPage) async -> TranscriptPage? {
+        guard let end = transcriptEnd, let page = try? await transcript(end, ChatOpening.wholeTurn),
+              takeResumed(page, load: load) else { return nil }
+        return page
+    }
+
     /// The opening page did not come. Said only while `load` is the latest: a newer
     /// load is already on its way, and its answer is the one that counts.
     public func failOpening(_ reason: String, load: Int) {

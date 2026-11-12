@@ -14848,6 +14848,7 @@ export interface Methods {
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
   "changes/list": { params: ChangesListRequest; result: ChangesList };
   "changes/undoTurn": { params: UndoTurnRequest; result: UndoTurnResult };
+  "client/catchUp": { params: CatchUpRequest; result: CatchUpSnapshot };
   "clientPermissions/set": { params: ClientPermissionSettings; result: ClientPermissionSettings };
   "clientPermissions/state": { params: Empty; result: ClientPermissionSettings };
   "clients/forgetSelf": { params: Empty; result: Empty };
@@ -15285,6 +15286,7 @@ export const MethodTarget = {
   "changes/file": "host",
   "changes/list": "host",
   "changes/undoTurn": "host",
+  "client/catchUp": "host",
   "clientPermissions/set": "host",
   "clientPermissions/state": "host",
   "clients/forgetSelf": "control",

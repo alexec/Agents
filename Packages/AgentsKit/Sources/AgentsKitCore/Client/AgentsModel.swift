@@ -205,6 +205,12 @@ public final class AgentsModel {
     /// The machines whose folders and sessions on screen are this device's copy (#4791),
     /// drawn before their host answered. A host's own list takes its machine out.
     public private(set) var drawnFromCopy: Set<MachineRef> = []
+    /// Each host's point in its order of changes, as its last catch-up said (#4794).
+    @ObservationIgnored private var listPoints: [MachineRef: DaemonAPI.ListRevision] = [:]
+    /// How many entries the open chat's host had when it last gave a page of it (#4794):
+    /// every entry from here on was written after, so a reconnect asks `from` here. Nil
+    /// when no page of the open chat is held.
+    @ObservationIgnored public private(set) var transcriptEnd: Int?
     /// Whether the open chat is this device's copy, until its host's page lands (#4791).
     public private(set) var transcriptFromCopy = false
     /// A host listed a machine's agents or folders (#4791): the local copy writes them.
@@ -1251,6 +1257,8 @@ public final class AgentsModel {
         let held = byID.filter { $0.value.host == host }
         let stamped = listed.map { var agent = $0.keepingLists(of: held[$0.id]); agent.host = host; return agent }
         refile(byID.values.filter { $0.host != host }.map { hostRecords[$0.id] ?? $0 } + stamped, heard: stamped.map(\.id))
+        // A host let go of: its point goes too, so nothing resumes onto an empty list (#4794).
+        if listed.isEmpty { listPoints[host] = nil }
         drawnFromCopy.remove(host)
         onListed?(host)
     }
@@ -1271,6 +1279,8 @@ public final class AgentsModel {
         replaceFolders(machine.folders, from: machine.host)
         replaceAgents(machine.agents, from: machine.host)
         drawnFromCopy.insert(machine.host)
+        // The host's first catch-up asks only for what changed since the copy (#4794).
+        listPoints[machine.host] = machine.point
     }
 
     /// What an offline host last listed (#962), for a client that started while it was down:
@@ -1282,6 +1292,34 @@ public final class AgentsModel {
     }
 
     public func holdsFolders(of host: MachineRef) -> Bool { folders.contains { $0.host == host } }
+
+    /// Where a host's sessions held here are in its order of changes (#4794): what the next
+    /// catch-up asks `changedSince`. Nil when nothing says, and the client asks for all.
+    public func listPoint(of host: MachineRef) -> DaemonAPI.ListRevision? { listPoints[host] }
+
+    /// A host's catch-up said where its list is (#4794). Nil from a host that predates it:
+    /// the next one asks for all again.
+    public func notePoint(_ changes: DaemonAPI.AgentChanges?, of host: MachineRef) {
+        listPoints[host] = changes?.point
+    }
+
+    /// What changed on a host since the point held (#4794), in place of its whole list: each
+    /// changed record filed, each removed one let go, and the new point kept. An archived one
+    /// that is not held stays out, as a lean `agent/changed` of one does: a client holds the
+    /// live sessions and the archived ones on screen. What the copy drew is the host's now.
+    public func takeChanges(_ changed: [Agent], _ changes: DaemonAPI.AgentChanges, from host: MachineRef) {
+        for agent in changed {
+            let held = byID[agent.id]
+            guard held != nil || agent.state != .archived else { continue }
+            var stamped = agent.keepingLists(of: held)
+            stamped.host = host
+            file(stamped)
+        }
+        forget(changes.removed.filter { byID[$0]?.host == host })
+        listPoints[host] = changes.point
+        drawnFromCopy.remove(host)
+        onListed?(host)
+    }
 
     /// Down to the budget, never taking the terminal just written to.
     private func dropOldTerminalOutput() {
@@ -1772,7 +1810,10 @@ public final class AgentsModel {
         return LocalCopy.Transcript(
             session: session,
             turns: TurnsPage(turns: turns, firstTurn: firstTurn, openStart: openTurnStart, firstPrompt: firstPrompt),
-            page: TranscriptPage(firstIndex: firstEntryIndex, total: firstEntryIndex + entries.count, entries: entries),
+            // The host's count, not this one's: a reconnect resumes from it (#4794), and an
+            // entry heard but never written would count past it.
+            page: TranscriptPage(firstIndex: firstEntryIndex, total: transcriptEnd ?? firstEntryIndex + entries.count,
+                                 entries: entries),
             ask: leadAsk)
     }
 
@@ -1792,11 +1833,30 @@ public final class AgentsModel {
         entries = Self.entriesKeepingLatest(page.entries + (heardSincePage ?? []))
         heardSincePage = nil
         transcriptFromCopy = false
+        transcriptEnd = page.total
         firstEntryIndex = page.firstIndex
         hasMoreBefore = page.firstIndex > openTurnStart
         leadAsk = page.firstIndex > openTurnStart ? ask.flatMap { TranscriptItem.entry($0).isPersonsAsk ? $0 : nil } : nil
         transcriptLoadFailure = nil
         refold()
+    }
+
+    /// The entries written since the open chat's last page (#4794), asked `from:
+    /// transcriptEnd`, laid after what is held, with what was heard meanwhile: the chat as
+    /// it would be had it heard them live. False, and nothing changed, when `load` is not the
+    /// latest or the page does not start where the held one ended (more was written than
+    /// one page holds, or the transcript is not the one held); the chat then opens whole.
+    @discardableResult
+    public func takeResumed(_ page: TranscriptPage, load: Int) -> Bool {
+        guard isLatestTranscriptLoad(load), let end = transcriptEnd, page.firstIndex == end, page.total >= end
+        else { return false }
+        entries = Self.entriesKeepingLatest(entries + page.entries + (heardSincePage ?? []))
+        heardSincePage = nil
+        transcriptFromCopy = false
+        transcriptEnd = page.total
+        transcriptLoadFailure = nil
+        refold()
+        return true
     }
 
     private static func entriesKeepingLatest(_ entries: [TranscriptEntry]) -> [TranscriptEntry] {
@@ -1828,6 +1888,7 @@ public final class AgentsModel {
     public func clearTranscript() {
         entries = []
         transcriptFromCopy = false
+        transcriptEnd = nil
         // A chat chosen is a page on its way.
         heardSincePage = []
         transcriptLoadFailure = nil
