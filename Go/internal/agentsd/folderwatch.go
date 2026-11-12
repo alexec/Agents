@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"log"
+	"maps"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -276,7 +277,8 @@ func (d *Daemon) folderFilesChanged(folder string, paths []string) {
 func (d *Daemon) rescanWorkflows(folder string) {
 	d.workflowMu.Lock()
 	d.scanLocked()
-	before := d.workflowTold[folder]
+	// A copy: tellWorkflow writes the told map under the lock while this ranges (#4839).
+	before := maps.Clone(d.workflowTold[folder])
 	after := workflowDigests(d.workflowFiles[folder])
 	d.workflowMu.Unlock()
 	var told []string
