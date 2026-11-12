@@ -25,10 +25,12 @@ import (
 // request id where a line has them. A level drops the lines below it. Either way no line
 // holds a code, a bearer token or a token=, secret= or password= value: they are cut out.
 type Log struct {
-	mu    sync.Mutex
-	file  *rolllog.File
-	json  bool
-	level slog.Level
+	mu   sync.Mutex
+	file *rolllog.File
+	// copied: the lines go to standard error as well as the file (Copy).
+	copied bool
+	json   bool
+	level  slog.Level
 	// to takes the lines instead of standard error, when set: for tests.
 	to io.Writer
 }
@@ -75,6 +77,25 @@ func (l *Log) Take(file string, limit int64) {
 		l.file.Close()
 	}
 	l.file = f
+	l.copied = false
+}
+
+// Copy writes every line to file too, rolled at limit, and still to standard error (#4747):
+// in a container, whose own log a recreate deletes, the file on a volume keeps the lines
+// from before a redeploy, and `docker logs` and a log shipper still see them. What the
+// runtime writes itself (a panic) goes only to standard error.
+func (l *Log) Copy(file string, limit int64) error {
+	f, err := rolllog.Open(file, limit, false)
+	if err != nil {
+		return err
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.file != nil {
+		l.file.Close()
+	}
+	l.file, l.copied = f, true
+	return nil
 }
 
 // Taken says whether lines go to a file.
@@ -140,12 +161,15 @@ func (l *Log) emit(at time.Time, level slog.Level, msg string, attrs []slog.Attr
 		}
 		text = stamped(b.String(), at)
 	}
-	switch {
-	case l.file != nil:
+	if l.file != nil {
 		l.file.Write([]byte(text))
-	case l.to != nil:
+		if !l.copied {
+			return
+		}
+	}
+	if l.to != nil {
 		io.WriteString(l.to, text)
-	default:
+	} else {
 		os.Stderr.WriteString(text)
 	}
 }
