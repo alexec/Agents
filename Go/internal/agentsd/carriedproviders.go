@@ -26,6 +26,8 @@ type carriedProviders struct {
 	held  map[string]*carriedConnection
 	store *providers.Secrets
 	home  string
+	// The codespaces this machine keeps awake while their machines work (#4637).
+	awake awake
 }
 
 // carriedConnection is a provider's server, as the record it was made from says.
@@ -249,6 +251,7 @@ func (c *carriedProviders) keep(request wire.ProviderSecretsKeep) wire.ProviderC
 // forget is providers/forget.
 func (c *carriedProviders) forget(provider string) wire.ProviderCarried {
 	c.end(provider)
+	c.awake.forget(provider)
 	if err := c.store.Remove(provider); err != nil {
 		return carriedError("This machine could not delete the provider's secrets.")
 	}
@@ -269,8 +272,18 @@ func (d *Daemon) installProgress(name, step string) {
 func (c *carriedProviders) ssh(request wire.ProviderSSH, progress func(name, step string)) wire.ProviderCarried {
 	token := c.store.Values(string(request.Provider))[workspacecommands.GitHubSecret]
 	codespace := deref(request.Codespace)
+	if request.Op == "letSleep" && codespace != "" {
+		// Its token can have gone, with the provider: the session ends all the same.
+		c.awake.letSleep(codespace)
+		return wire.ProviderCarried{}
+	}
 	if token == "" || codespace == "" {
 		return carriedError("This machine has no GitHub token for that codespace.")
+	}
+	if request.Op == "keepAwake" {
+		// Held here, after this answer, until a letSleep or its lease ends (#4637).
+		c.awake.keepAwake(string(request.Provider), codespace, token)
+		return wire.ProviderCarried{}
 	}
 	installer := &hostinstall.Installer{
 		Log:      func(format string, args ...any) { log.Printf(format, args...) },

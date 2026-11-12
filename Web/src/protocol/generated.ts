@@ -9694,13 +9694,14 @@ export interface ProviderRuntimes {
 
 /**
  * providers/ssh (#3398): the machine that carries a codespaces provider starts a codespace's
- * agentsd over ssh (`start`), reads its host key (`hostKey`), or installs Agents in it with a host
- * code from the control plane (`install`, #3497), with the token it keeps. Its result is
- * ProviderSSHResult.
+ * agentsd over ssh (`start`), reads its host key (`hostKey`), installs Agents in it with a host
+ * code from the control plane (`install`, #3497), or holds an ssh session to it that GitHub counts
+ * as use while its machine works (`keepAwake`, renewed each few minutes, and `letSleep`, #4637),
+ * with the token it keeps. Its result is ProviderSSHResult.
  */
 export interface ProviderSSH {
   provider: ProviderID;
-  op: "start" | "hostKey" | "install";
+  op: "start" | "hostKey" | "install" | "keepAwake" | "letSleep";
   /**
    * install's host code: the codespace runs the control plane's install.sh with it, from the
    * address and pin it names.
