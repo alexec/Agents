@@ -59,6 +59,7 @@ public enum Capability {
     public static let elicitations1 = "elicitations/1"
     public static let eventsAudit1 = "events.audit/1"
     public static let eventsBus1 = "events.bus/1"
+    public static let eventsLeases1 = "events.leases/1"
     public static let eventsTeam1 = "events.team/1"
     public static let events1 = "events/1"
     public static let features1 = "features/1"
@@ -691,6 +692,7 @@ public enum Capability {
         "bots/make": "bots/1",
         "bots/setCaps": "bots/1",
         "bots/stopRun": "bots/1",
+        "bus/lease": "events.leases/1",
         "bus/publish": "events.bus/1",
         "bus/subscribe": "events.bus/1",
         "clients/announce": "clients/1",

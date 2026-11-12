@@ -1737,6 +1737,35 @@ type BusEvent struct {
 
 	// The event's data (at most 256 KB), sealed by the machine that raised it to each machine of its person's lock (#4825). In bus/deliver, only the copy for the machine it goes to. None when the data is larger, or the machine has no lock.
 	Sealed []BusSealedData `json:"sealed,omitzero"`
+
+	// The producer lease of the poll that made it (#4731), when a machine polled a server for it: a hash of the folder's project, the server's name, the event and its filters, the same on every machine. The control plane delivers it to the machines that stand by on that poll. Not part of the event's identity.
+	Poll *string `json:"poll,omitzero"`
+}
+
+// bus/lease (#4731, spec 4724-event-bus, "The bus", step 6): the polls a machine is about to make, at most 100, each asking for its producer lease or renewing it, and the leases it lets go (its Mac goes to sleep, a subscription ended). The control plane gives each lease to one machine at a time, for 5 minutes from its last renewal.
+type BusLease struct {
+	// The polls' keys (BusEvent.poll), each 1 to 128 bytes.
+	Polls []string `json:"polls"`
+
+	// The keys of the leases this machine lets go. One another machine holds is left as it is.
+	Release []string `json:"release,omitzero"`
+}
+
+// bus/lease's answer (#4731): who holds each poll's lease now, in the order asked.
+type BusLeased struct {
+	Leases []BusProducerLease `json:"leases"`
+}
+
+// One producer lease (#4731): the machine that polls, until when, and whether it is the one that asked. A machine that is not the holder stands by: it does not poll, and the control plane delivers it what the holder's poll makes.
+type BusProducerLease struct {
+	Poll string `json:"poll"`
+
+	// The holder's machine id on the control plane.
+	Holder string `json:"holder"`
+
+	Mine bool `json:"mine"`
+
+	Until string `json:"until"`
 }
 
 // bus/publish (#4729): events a machine recorded, at most 100 at a time, oldest first. Best effort: one not sent when it happened is never sent later.

@@ -344,6 +344,19 @@ Mac's own control plane.
   A new event goes at once (`bus/deliver`) to each other machine of the person with a
   subscription that matches it. That machine records it in its own log once (an id it
   already has is dropped) and never publishes it again.
+- **Producer leases (#4731).** Only one of a person's machines polls each server's poll: a
+  folder's project, the server's name, the event and its filters, hashed (`poll` on the
+  envelope), so the same on every machine. Before each poll the machine asks for the poll's
+  lease, or renews it (`bus/lease`); the lease lasts 5 minutes from the last renewal. The
+  holder polls; another machine stands by: it does not poll, and the control plane delivers
+  it each event of that poll, which it records as its own subscription's, so its waits wake.
+  The holder lets its leases go when its Mac goes to sleep, a subscription ends or stops, or
+  agentsd stops, so another machine takes over at its next poll (10 seconds to 5 minutes);
+  one that goes offline loses them after 5 minutes. A machine that takes over polls from
+  now: what happened in between is missed. A folder with no project, or a control plane
+  without `events.leases/1`, has no lease. Until the bus carries `data` (#4825), only a
+  subscription that waits alone hold stands by: one that a workflow or Archive when merged
+  holds needs the event's data, so it always polls, and takes the lease when it is free.
 - **Best effort.** Usually once, sometimes never, rarely twice. There is no resend and no
   backfill: an event sent while the control link is down is not sent later, and a machine
   that is not connected misses what is delivered meanwhile. A consumer treats an event as

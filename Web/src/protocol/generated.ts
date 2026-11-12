@@ -1598,6 +1598,44 @@ export interface BusEvent {
    * data is larger, or the machine has no lock.
    */
   sealed?: BusSealedData[];
+  /**
+   * The producer lease of the poll that made it (#4731), when a machine polled a server for it: a
+   * hash of the folder's project, the server's name, the event and its filters, the same on every
+   * machine. The control plane delivers it to the machines that stand by on that poll. Not part of
+   * the event's identity.
+   */
+  poll?: string;
+}
+
+/**
+ * bus/lease (#4731, spec 4724-event-bus, "The bus", step 6): the polls a machine is about to make,
+ * at most 100, each asking for its producer lease or renewing it, and the leases it lets go (its
+ * Mac goes to sleep, a subscription ended). The control plane gives each lease to one machine at a
+ * time, for 5 minutes from its last renewal.
+ */
+export interface BusLease {
+  /** The polls' keys (BusEvent.poll), each 1 to 128 bytes. */
+  polls: string[];
+  /** The keys of the leases this machine lets go. One another machine holds is left as it is. */
+  release?: string[];
+}
+
+/** bus/lease's answer (#4731): who holds each poll's lease now, in the order asked. */
+export interface BusLeased {
+  leases: BusProducerLease[];
+}
+
+/**
+ * One producer lease (#4731): the machine that polls, until when, and whether it is the one that
+ * asked. A machine that is not the holder stands by: it does not poll, and the control plane
+ * delivers it what the holder's poll makes.
+ */
+export interface BusProducerLease {
+  poll: string;
+  /** The holder's machine id on the control plane. */
+  holder: string;
+  mine: boolean;
+  until: string;
 }
 
 /**
@@ -15615,7 +15653,10 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BudgetRequestList: { required: ["requests"], optional: [] },
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   BusDelivery: { required: ["event", "subscriptions"], optional: [] },
-  BusEvent: { required: ["specversion", "id", "type", "provider", "topic", "source", "time", "producer"], optional: ["subject", "sealed"] },
+  BusEvent: { required: ["specversion", "id", "type", "provider", "topic", "source", "time", "producer"], optional: ["subject", "sealed", "poll"] },
+  BusLease: { required: ["polls"], optional: ["release"] },
+  BusLeased: { required: ["leases"], optional: [] },
+  BusProducerLease: { required: ["poll", "holder", "mine", "until"], optional: [] },
   BusPublish: { required: ["events"], optional: [] },
   BusPublished: { required: ["kept", "dropped"], optional: [] },
   BusSealedData: { required: ["machine", "sealed"], optional: [] },

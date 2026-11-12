@@ -1,8 +1,10 @@
 package agentsd
 
 import (
+	"context"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
@@ -89,6 +91,10 @@ func (d *Daemon) machineChanged(c machineChange) {
 	switch {
 	case c.kind == "sleep":
 		draft.Name, draft.Sentence = "mac.sleep", "This Mac went to sleep."
+		// Another machine polls while this one sleeps (#4731).
+		ctx, cancel := context.WithTimeout(d.ctx, 3*time.Second)
+		d.releaseProducerLeases(ctx)
+		cancel()
 	case c.kind == "wake":
 		draft.Name, draft.Sentence = "mac.wake", "This Mac woke up."
 	case c.kind == "away" && locked:
