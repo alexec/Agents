@@ -323,7 +323,8 @@ def describe(scene):
     changed = " (with changes not committed)" if git("status", "--porcelain", "--untracked-files=no") else ""
     name = getattr(scene, "TITLE", scene.ID)
     group = getattr(scene, "GROUP", "")
-    lines = [*getattr(scene, "LINES", {}).values()]
+    from voice import plain  # a line's words, without its directions (#4964)
+    lines = [plain(line) for line in getattr(scene, "LINES", {}).values()]
     description = "\n".join([
         f"{name}, in Loops {version}.",
         "",

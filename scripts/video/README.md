@@ -18,11 +18,17 @@ of any group (below).
 
 ## What it does
 
-1. **Voice** (`voice.py`): each line of the scene is said by Chatterbox's default voice,
-   in two takes (exaggeration 0.65 and 0.85). Whisper (`mlx-whisper`) checks each take
-   against the script, and a take with more than one word in ten wrong is not used. A
-   usage video takes the calmer take, a marketing video the livelier one. The takes are
-   kept in `~/.cache/agents-video/voice`, so a line that has not changed is not said again.
+1. **Voice** (`voice.py`): each line of the scene is said by Kokoro's built-in voice
+   **Heart** (Apache-2.0, through `mlx-audio`; Alex, 2026-11-12, #4964), from a directed
+   script: a line is plain words, or a small part of SSML, the standard markup for a
+   synthetic voice: `<break time="500ms"/>` a pause, `<prosody rate="90%">` slower,
+   `<emphasis>` a stressed word, and a tone (`style="calm|warm|bright"` on `<speak>`). Kokoro
+   has no stress or tone, so those marks change only the pace; they stay in the script for
+   the person who reads it. Each phrase between pauses is said on its own, the pauses are
+   silence, and the scene waits 0.9 s after each line. Whisper (`mlx-whisper`) hears each
+   line, and a line with more than one word in ten wrong stops the take. The phrases are
+   kept in `~/.cache/agents-video/voice`, so a phrase that has not changed is not said again.
+   `python3 scripts/video/voice.py` tests the markup.
 2. **Recording** (`make.py`): run-app launches a scratch set-up on `/tmp/run-vid-<id>`,
    never the live app, with the window opened from outside the checkout so that its
    title names no worktree. The window is recorded through its **walk socket** (#1172):
@@ -205,7 +211,8 @@ run-app skill's "A silent clip" says when and how to put it on a PR.
 ## What it needs
 
 - `ffmpeg` (Homebrew), `uv`, Node and Chrome. The first run makes
-  `~/.cache/agents-video/venv` with Chatterbox and mlx-whisper.
+  `~/.cache/agents-video/venv` with mlx-audio (Kokoro), misaki, spaCy's small English
+  model and mlx-whisper.
 - Apple's iPhone 17 Pro bezel (Silver, portrait) from
   [Apple Design Resources](https://developer.apple.com/design/resources/), in
   `~/.agents/video/assets/`. Its licence lets it be shown in our videos but not given
