@@ -78,6 +78,10 @@ function pruneFolderKeys(host: string, folders: readonly string[]): void {
 export { folderKey } from "./groups";
 
 /** DaemonAPI.SandboxWillNotStart, a start's refusal when its runtime's sandbox will not start, with its sentence. */
+/** What New Machine makes, as its sheet has it (#4634). */
+export interface NewMachineDraft { provider: string; name: string; options: Record<string, JSONValue> }
+/** The New Machine sheet up (#4634): on a provider (none for the default one), or again on a refused make's choices. */
+export interface NewMachineAsk { provider?: string; again?: NewMachineDraft; problem?: string }
 export interface SandboxWillNotStart { runtimeID: string; detail: string; offOffered: boolean; message: string }
 
 function isSandboxRefusal(data: unknown): data is Omit<SandboxWillNotStart, "message"> {
@@ -1194,8 +1198,9 @@ export class Work {
   readonly hostsBeingStarted = signal<readonly string[]>([]);
   /** The machines New Machine is making (#3974), by name; "" while the control plane has not named it yet. */
   readonly machinesMaking = signal<readonly string[]>([]);
-  /** A New Machine the provider refused (#3979): its reason, with Try Again on the provider it asked. */
-  readonly makeFailed = signal<{ reason: string; provider: string | undefined } | null>(null);
+  /** The New Machine sheet (#4634), or null while it is shut: on a provider (the default one when none), or opened
+   * again on the choices of a make the provider refused, with its reason. */
+  readonly newMachineAsk = signal<NewMachineAsk | null>(null);
 
   /** Prompts and starts the control plane keeps for a stopped workspace (#691 US3), every host's. */
   readonly kept = signal<readonly KeptRequest[]>([]);
@@ -2671,22 +2676,27 @@ export class Store extends Work {
     }
   }
 
-  /** New Machine (#3974): the default provider makes `machine-N` with the options used last on it, with no
-   * questions; New Machine on names another provider, which is then the default (#3979). Its row says Making
-   * until the machine joins; a make that fails says the provider's reason, with Try Again. */
-  async makeMachine(provider?: string): Promise<void> {
-    this.makeFailed.value = null;
+  /** New Machine (#3974, #4634): the sheet, on the default provider or the one New Machine on names, with every
+   * field on what New Machine would make (the options used last there, else its first choices). Make confirms it. */
+  newMachine(provider?: string): void {
+    this.newMachineAsk.value = provider ? { provider } : {};
+  }
+
+  /** Make on the New Machine sheet (#4634): the sheet has closed, and the machine's row says Making until it joins.
+   * A make the provider refuses opens the sheet again on the same choices, with the provider's reason. */
+  async makeMachine(draft: NewMachineDraft): Promise<void> {
     const making = "";
     this.machinesMaking.value = [...this.machinesMaking.value, making];
     const drop = (name: string) => {
       const at = this.machinesMaking.value.indexOf(name);
       if (at >= 0) this.machinesMaking.value = this.machinesMaking.value.filter((_, i) => i !== at);
     };
+    const refused = (problem: string) => { this.newMachineAsk.value = { provider: draft.provider, again: draft, problem }; };
     try {
-      const made = await this.link.call("providers/create", provider ? { id: provider as ProviderID } : {});
+      const made = await this.link.call("providers/create", { id: draft.provider as ProviderID, name: draft.name, options: draft.options });
       drop(making);
       if (made.workspace.state === "failed") {
-        this.makeFailed.value = { reason: made.workspace.reason || `Could not make ${made.workspace.name}.`, provider };
+        refused(made.workspace.reason || `Could not make ${made.workspace.name}.`);
         return;
       }
       this.machinesMaking.value = [...this.machinesMaking.value, made.workspace.name];
@@ -2694,7 +2704,7 @@ export class Store extends Work {
       setTimeout(() => drop(made.workspace.name), 10 * 60_000);
     } catch (error) {
       drop(making);
-      this.makeFailed.value = { reason: describe(error), provider };
+      refused(describe(error));
     }
   }
 

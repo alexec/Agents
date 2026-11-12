@@ -53,9 +53,9 @@ test("Delete names the worktrees with work not pushed (#3979)", () => {
 
 test("New Machine names the default once there are two providers (#3979)", () => {
   const p = (id, extra = {}) => ({ id, name: id.toUpperCase(), capabilities: ["create"], ...extra });
-  assert.deepEqual(m.newMachineItems([p("do")]), [{ label: "New Machine" }]);
+  assert.deepEqual(m.newMachineItems([p("do")]), [{ label: "New Machine…" }]);
   assert.deepEqual(m.newMachineItems([p("do"), p("docker", { default: true }), p("ro", { capabilities: [] })]),
-    [{ label: "New Machine (DOCKER)" }, { label: "New Machine on DO", provider: "do" }]);
+    [{ label: "New Machine (DOCKER)…" }, { label: "New Machine on DO…", provider: "do" }]);
 });
 
 test("a machine being made has a row until one of its name joins", () => {

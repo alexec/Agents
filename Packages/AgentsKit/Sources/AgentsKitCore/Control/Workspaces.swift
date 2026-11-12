@@ -527,9 +527,22 @@ public extension DaemonAPI {
 
     /// `providers/options`: a flat JSON Schema object of strings, integers, booleans and
     /// enums with titles. An enum's `x-costs` may name each value's cost, for the confirmation.
+    ///
+    /// With it, what New Machine would make (#4634): the provider it is for (the default one
+    /// when none was asked for), the `values` the form starts with (the options used last
+    /// there, over each field's default or first choice), and the next `machine-N`. An older
+    /// control plane leaves them out.
     struct ProviderOptions: Codable, Sendable, Hashable {
         public var schema: JSONValue
-        public init(schema: JSONValue) { self.schema = schema }
+        public var id: ProviderID?
+        public var values: JSONValue?
+        public var name: String?
+        public init(schema: JSONValue, id: ProviderID? = nil, values: JSONValue? = nil, name: String? = nil) {
+            self.schema = schema
+            self.id = id
+            self.values = values
+            self.name = name
+        }
     }
 
     /// `providers/create`.

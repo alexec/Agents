@@ -81,8 +81,9 @@ final class AppModel {
     /// A send refused because the agent's folder has gone (#119), with the ways on. Said
     /// in the window's alert instead of `problem`, and the words stay in the bar.
     var folderGone: FolderGoneAsk?
-    /// A New Machine the provider refused (#3979), said in the window's alert with Try Again.
-    var makeFailed: MachineMakeFailure?
+    /// The New Machine sheet (#4634), or nil while it is shut. A make the provider refused
+    /// opens it again on its choices, with the reason.
+    var newMachineAsk: NewMachineAsk?
     /// The machine providers New Machine can use, as the control plane last listed them for
     /// this person (#3979): the Machines header's New Machine on ▸.
     private(set) var machineProviders: [DaemonAPI.ProviderSummary] = []
@@ -3980,28 +3981,51 @@ final class AppModel {
         }
     }
 
-    /// New Machine (#3973): the default provider makes `machine-N` with its defaults, with no
-    /// questions (#3972); New Machine on ▸ names the provider, which is then the default
-    /// (#3979). Either takes the options used last on that provider. A make that fails says
-    /// the provider's reason, with Try Again.
-    func newMachine(on provider: ProviderID? = nil) async {
-        guard let controlRequests else { return }
-        // A row at once (#4610), until the list says the machine is joining or the make failed.
-        machinesBeingMade += 1
-        defer { machinesBeingMade -= 1 }
+    /// New Machine (#3973, #4634): the sheet, on the default provider or the one New
+    /// Machine on ▸ names, with every field on what New Machine would make (the options
+    /// used last there, else its first choices) and the next `machine-N`. Make confirms it.
+    func newMachine(on provider: ProviderID? = nil) {
+        newMachineAsk = NewMachineAsk(provider: provider)
+    }
+
+    /// The New Machine sheet's form (#4634): the provider's schema and the values to start with.
+    func newMachineForm(_ provider: ProviderID?) async -> Result<DaemonAPI.ProviderOptions, NewMachineRefusal> {
+        guard let controlRequests else { return .failure(.init("The control plane can’t be reached.")) }
         do {
-            let made = try await controlRequests.call(DaemonAPI.Method.providersCreate, DaemonAPI.ProviderRequest(id: provider),
-                                                      returning: DaemonAPI.ProviderCreated.self)
-            if made.workspace.state == "failed" {
-                makeFailed = MachineMakeFailure(reason: made.workspace.reason ?? "\(made.workspace.name) could not be made.",
-                                                provider: provider)
-            }
+            return .success(try await controlRequests.call(DaemonAPI.Method.providersOptions, DaemonAPI.ProviderRequest(id: provider),
+                                                           returning: DaemonAPI.ProviderOptions.self))
         } catch let error as JSONRPCError {
-            makeFailed = MachineMakeFailure(reason: HostProblem.controlRefusal(error), provider: provider)
+            return .failure(.init(HostProblem.controlRefusal(error)))
         } catch {
-            problem = "The control plane can’t be reached, so no machine can be made."
+            return .failure(.init("The control plane can’t be reached, so no machine can be made."))
         }
-        await loadMachineProviders()
+    }
+
+    /// Make on the New Machine sheet (#4634): the sheet closes at once and a *Making…* row
+    /// takes over (#4610). A make the provider refuses opens the sheet again on the same
+    /// choices, with the provider's reason, to change one and try again.
+    func makeMachine(_ draft: NewMachineDraft) {
+        guard let controlRequests else { return }
+        machinesBeingMade += 1
+        Task {
+            defer { machinesBeingMade -= 1 }
+            var refused: String?
+            do {
+                let made = try await controlRequests.call(
+                    DaemonAPI.Method.providersCreate,
+                    DaemonAPI.ProviderCreate(id: draft.provider, name: draft.name, options: .object(draft.values)),
+                    returning: DaemonAPI.ProviderCreated.self)
+                if made.workspace.state == "failed" {
+                    refused = made.workspace.reason ?? "\(made.workspace.name) could not be made."
+                }
+            } catch let error as JSONRPCError {
+                refused = HostProblem.controlRefusal(error)
+            } catch {
+                refused = "The control plane can’t be reached, so no machine can be made."
+            }
+            if let refused { newMachineAsk = NewMachineAsk(provider: draft.provider, again: draft, problem: refused) }
+            await loadMachineProviders()
+        }
     }
 
     /// The machines New Machine made that have not joined yet (#4610): a *Making…* row each

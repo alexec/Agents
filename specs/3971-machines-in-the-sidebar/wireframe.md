@@ -39,7 +39,7 @@ A machine provider is to its machines as an agent (runtime) is to its sessions. 
 | Sessions | Machines |
 |---|---|
 | A runtime (Claude, Codex…) runs them | A provider (DigitalOcean, Docker, Codespaces…) makes them |
-| New Session: no form, a default name | New Machine: no form, the name `machine-N` |
+| New Session: no form, a default name | New Machine: a sheet with the defaults chosen, Make confirms it (#4634; it was no form) |
 | A status dot and a grey line | A status dot and a grey line |
 | Swipe: Pin, Archive | Swipe: Start or Stop, Delete or Remove |
 | Right-click: the session menu | Right-click: the machine menu |
@@ -88,7 +88,9 @@ There are two kinds of machine:
 - **Click** opens the machine's page, as today (`MachinePage`). That page lists the sessions the machine hosts.
 - **Double-click on the name** renames it, as for a session.
 
-## 2. New Machine, with no questions
+## 2. New Machine
+
+**Changed (Alex, 2026-11-10, #4634):** New Machine no longer makes a machine at once. The `+`, New Machine, New Machine on ▸ and File ▸ New Machine… open a sheet: the provider (a picker with two or more), the name (`machine-N`, editable) and every field of the provider's form, each on the value below, with a choice's cost when the provider gives one. **Make** makes it and closes the sheet, and the Making row takes over; Cancel makes nothing. A make the provider refuses opens the sheet again on the same choices, with the reason. `providers/options` returns the values and the name, so every client starts on the same ones. The agent tool `make_machine` still makes with no questions. The menus and the rules below for the name, the provider and the options are unchanged.
 
 ```
  right-click "Machines"                  right-click with two or more providers
@@ -101,7 +103,7 @@ There are two kinds of machine:
                                        └──────────────────────────────── └────────────────┘
 ```
 
-One click makes the machine. The row appears at once in the Making state:
+Make on the sheet makes the machine. The row appears at once in the Making state:
 
 ```
 │   ☁️ machine-4                    ◐    │
@@ -113,7 +115,7 @@ One click makes the machine. The row appears at once in the Making state:
 - **Options** (size, region, image): the ones used last on that provider; with no last ones, the provider's defaults (the first choice of each field).
 - **Clone these folders:** nothing. You add a folder to a machine later, as today.
 - **With no provider yet:** the menu shows `New Machine…` with three dots. It opens Add Provider, the one form we cannot skip (an account and a token). After that, the machine is made with no more questions.
-- **When the make fails** (quota, token): the row stays, red, `Could not make: <provider's reason>`. Its menu has Try Again and Delete.
+- **When the make fails** (quota, token): the sheet opens again on the same choices with the provider's reason (#4634).
 - **Register a Machine…** opens today's Add a Machine sheet, without the provider tab: ssh, a code command, or another Mac. Registering needs an address or a code, so it has a form.
 
 ## 3. Swipe
@@ -214,7 +216,7 @@ It stays as today, tier mac+web (#2798): no Machines group; the offline strip ke
 
 Decided: each one below, because it is the recommended option and easy to undo. Alex can overrule.
 
-- The **last-used provider and options** make the new machine. When there are two or more providers, a submenu lets you pick one, with no form.
+- The **last-used provider and options** are what the New Machine sheet starts on (#4634). When there are two or more providers, a submenu opens the sheet on another.
 - A **failed make** stays as a red row with Try Again and Delete, so the reason does not get lost.
 - **Full swipe** starts or stops, but never deletes. Delete always confirms.
 - **The icon** (cloud or server) shows ephemeral or registered.

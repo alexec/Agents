@@ -18,6 +18,7 @@ import { NewFolderDialog } from "./NewFolder";
 import { DropboxDialog } from "./DropboxDialog";
 import { ReportProblemDialog } from "./ReportProblemDialog";
 import { MoveToMachineDialog } from "./MoveToMachineDialog";
+import { NewMachineSheet } from "./NewMachineSheet";
 import { GitLendDialog } from "./GitLend";
 import { ExportImportDialog } from "./ExportImport";
 import { Alerts, Toasts } from "./MessageKinds";
@@ -85,6 +86,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       {/* The page's banners, under its toolbar (docs/reference/design-system.md, "Messages"). */}
       {down && <Banner session={session} />}
       <OrgPolicyStrip store={store} />
+      {store.newMachineAsk.value && <NewMachineSheet key={JSON.stringify(store.newMachineAsk.value)} store={store} ask={store.newMachineAsk.value} />}
       {section === "overview" ? <div class="columns overview-columns console" aria-busy={down}><Overview store={store} down={down} /></div>
         : section !== "agents" ? <SectionPage store={store} section={section} down={down} /> : <div class="columns with-sidebar" aria-busy={down}>
         <Sidebar session={session} store={store} linkDown={down} />

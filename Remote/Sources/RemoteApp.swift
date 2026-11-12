@@ -290,15 +290,17 @@ struct RemoteView: View {
         } message: {
             Text(model.problem ?? "")
         }
-        // New Machine the provider could not make (#4034): its reason, with Try Again.
-        .alert("Could not make a machine",
-               isPresented: Binding(get: { model.makeFailed != nil && model.problem == nil },
-                                    set: { if !$0 { model.makeFailed = nil } }),
-               presenting: model.makeFailed) { failure in
-            Button("Try Again") { Task { await model.newMachine(on: failure.provider) } }
-            Button("OK", role: .cancel) {}
-        } message: { failure in
-            Text(failure.reason)
+        // New Machine (#4634): the defaults chosen, Make to confirm; a refused make opens it again.
+        .sheet(item: Binding(get: { model.newMachineAsk }, set: { model.newMachineAsk = $0 })) { ask in
+            NavigationStack {
+                NewMachineSheet(providers: model.machineProviders, provider: ask.provider, again: ask.again,
+                                problem: ask.problem, load: { await model.newMachineForm($0) }) { draft in
+                    model.makeMachine(draft)
+                    return nil
+                }
+            }
+            // A refused make's ask is new: a sheet of its own, with its reason and choices.
+            .id(ask.id)
         }
         // Delete from a session's menu (#398), asked here: the menu is gone by now.
         .confirmationDialog(DeletionWords.confirmTitle(model.askingToDelete?.title),

@@ -57,6 +57,8 @@ export interface FormField {
   choices?: string[];
   value: string;
   description?: string;
+  /** What each choice costs, when the provider says (`x-costs`). */
+  costs?: Record<string, string>;
 }
 
 /** The form's fields, but `repository`, which the repository fills. */
@@ -68,8 +70,29 @@ export function formFields(schema: JSONValue | undefined): FormField[] {
       value: p["default"] === undefined ? "" : String(p["default"]) };
     if (Array.isArray(p["enum"])) field.choices = p["enum"].map(String);
     if (typeof p["description"] === "string") field.description = p["description"];
+    const costs = p["x-costs"];
+    if (costs && typeof costs === "object" && !Array.isArray(costs)) {
+      field.costs = Object.fromEntries(Object.entries(costs).filter(([, c]) => typeof c === "string")) as Record<string, string>;
+    }
     return field;
   });
+}
+
+/** The fields on the values New Machine would make with (#4634): `providers/options`' `values`, the options used
+ * last on the provider over its first choices. A field the values leave out keeps its default, or its first choice. */
+export function withValues(fields: readonly FormField[], values: JSONValue | undefined): FormField[] {
+  const given = values && typeof values === "object" && !Array.isArray(values) ? values as Record<string, JSONValue> : {};
+  return fields.map((f) => {
+    const v = given[f.key];
+    if (v !== undefined && v !== null) return { ...f, value: String(v) };
+    return f.choices && !f.value && f.choices[0] !== undefined ? { ...f, value: f.choices[0] } : f;
+  });
+}
+
+/** A choice as the form shows it: with its cost when the provider names one. */
+export function choiceLabel(field: FormField, choice: string): string {
+  const cost = field.costs?.[choice];
+  return cost ? `${choice} — ${cost}` : choice;
 }
 
 /** What the provider makes a machine from when no repository is given, such as Codespaces' blank template (#4260). */

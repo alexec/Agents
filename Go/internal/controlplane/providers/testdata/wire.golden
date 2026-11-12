@@ -8,7 +8,7 @@ machines/setMachineOptions
 {"ID":"devbox01","State":"online","Workspace":{"provider":"<provider>","providerName":"DigitalOcean","workspace":"agents-devbox","workspaceName":"agents-devbox","workspaceState":"stopped","hostState":"stopped","canStart":true,"canStop":false,"startWhenUsed":true,"stopWhenIdleMinutes":30,"current":true,"startForSchedules":true,"tellsSchedule":false}}
 
 providers/options
-{"schema":{"properties":{"size":{"enum":["small","big"],"title":"Size","type":"string","x-costs":{"big":"$0.05/hour","small":"$0.01/hour"}}},"type":"object"}}
+{"schema":{"properties":{"size":{"enum":["small","big"],"title":"Size","type":"string","x-costs":{"big":"$0.05/hour","small":"$0.01/hour"}}},"type":"object"},"id":"<provider>","values":{"size":"small"},"name":"machine-1"}
 
 machines/listKept
 {"kept":[]}

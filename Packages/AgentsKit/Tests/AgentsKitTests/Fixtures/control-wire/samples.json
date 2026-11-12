@@ -276,7 +276,12 @@
   "ProviderOptions": {
     "schema": {
       "k": "v"
-    }
+    },
+    "id": "digitalocean-x7k2",
+    "values": {
+      "k": "v"
+    },
+    "name": "name"
   },
   "ProviderCreate": {
     "id": "digitalocean-x7k2",

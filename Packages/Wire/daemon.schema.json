@@ -23314,10 +23314,22 @@
     },
     "ProviderOptions": {
       "type": "object",
-      "description": "providers/options: the New Machine form, a JSON Schema.",
+      "description": "providers/options: the New Machine form, a JSON Schema, with what New Machine would make (#4634). With no `id`, the person's default provider.",
       "properties": {
         "schema": {
           "$ref": "#/definitions/JSONValue"
+        },
+        "id": {
+          "$ref": "#/definitions/ProviderID",
+          "description": "The provider the form is for: the one asked for, or else the person's default."
+        },
+        "values": {
+          "$ref": "#/definitions/JSONValue",
+          "description": "The values the form starts with: the options the person made a machine with last on this provider, over each field's `default` or else the first of its `enum`."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name New Machine would give: the person's next `machine-N`. Not kept until a make uses it."
         }
       },
       "required": [
@@ -23327,7 +23339,7 @@
     },
     "ProviderRequest": {
       "type": "object",
-      "description": "providers/remove, providers/refresh, providers/options.",
+      "description": "providers/remove, providers/refresh, providers/options (with no `id`, the default provider).",
       "properties": {
         "id": {
           "$ref": "#/definitions/ProviderID"

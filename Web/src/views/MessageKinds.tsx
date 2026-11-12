@@ -47,15 +47,7 @@ function shownToast(store: Store): ToastShown | null {
       close: () => { if (store.archiveUndo.value?.key === undo.key) store.archiveUndo.value = null; },
     };
   }
-  // A New Machine the provider refused (#3979), with Try Again on the same provider.
-  const failed = store.makeFailed.value;
-  if (failed) {
-    return {
-      key: `made-${failed.provider ?? ""}-${failed.reason}`, tone: "failure", words: `Could not make the machine: ${failed.reason}`,
-      name: "problem", actions: [{ words: "Try Again", run: () => void store.makeMachine(failed.provider) }],
-      close: () => { store.makeFailed.value = null; },
-    };
-  }
+  // A New Machine the provider refused opens its sheet again with the reason (#4634), not a toast.
   const problem = store.problem.value;
   if (problem) return { key: `problem-${problem}`, tone: "failure", words: problem, name: "problem", close: () => store.dismissProblem() };
   return null;
