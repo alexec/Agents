@@ -5,6 +5,7 @@ import type { ComponentChildren } from "preact";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { ForgeLabel } from "../protocol/generated";
+import { MessageBanner } from "./MessageKinds";
 import { avatarHue, chipColours, labelScope, stateGlyph, stateGlyphWords, type StateGlyph } from "../model/work";
 
 const glyphPaths: Record<StateGlyph, ComponentChildren> = {
@@ -221,13 +222,12 @@ export function ErrorStrip({ lines, retry, middle, title, also }: {
 }) {
   if (lines.length === 0) return null;
   return (
-    <div class={`work-error${middle ? " middle" : ""}`} role="alert">
-      <span class="mark" aria-hidden="true">⚠</span>
-      <span class="words">{title && <span class="strong">{title}</span>}{lines.map((l) => <span key={l}>{l}</span>)}</span>
-      <span class="buttons">
-        <button type="button" onClick={retry}>Try again</button>
-        {also && <button type="button" onClick={also.run}>{also.words}</button>}
-      </span>
-    </div>
+    // A banner of the list (docs/reference/design-system.md, "Messages"): a failure, with a red ✕, not the amber wash.
+    <MessageBanner tone="failure" name={`work-error${middle ? " middle" : ""}`} actions={<>
+      <button type="button" onClick={retry}>Try again</button>
+      {also && <button type="button" onClick={also.run}>{also.words}</button>}
+    </>}>
+      {title && <span class="strong">{title}</span>}{lines.map((l) => <span key={l}>{l}</span>)}
+    </MessageBanner>
   );
 }

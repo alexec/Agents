@@ -20,7 +20,7 @@ import { ReportProblemDialog } from "./ReportProblemDialog";
 import { MoveToMachineDialog } from "./MoveToMachineDialog";
 import { GitLendDialog } from "./GitLend";
 import { ExportImportDialog } from "./ExportImport";
-import { Problem } from "./Errors";
+import { Alerts, Toasts } from "./MessageKinds";
 import { FilesPane } from "./FilesPane";
 import { WorkflowPage } from "./WorkflowPage";
 import { PinnedPage } from "./Pins";
@@ -82,7 +82,6 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
   return (
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
       {down && <Banner session={session} />}
-      <Problem store={store} />
       <OrgPolicyStrip store={store} />
       <NavBar store={store} session={session} />
       {section === "overview" ? <div class="columns overview-columns console" aria-busy={down}><Overview store={store} down={down} /></div>
@@ -126,6 +125,9 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <ExportImportDialog store={store} />
       <ContextMenu />
       <AchievementCard store={store} />
+      {/* The one toast and the alerts (#4740), over everything the page shows. */}
+      <Toasts store={store} />
+      <Alerts />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { Capability } from "../protocol/capabilities.generated";
 import { continueButton, continueCancelLabel, continueHelp, continueLine, offersContinue, resetsAt } from "../model/continueWhenBack";
 import { continueOn } from "../model/levels";
 import { go } from "../route";
+import { MessageBanner } from "./MessageKinds";
 
 export function ContinueStrip({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent | undefined; disabled: boolean }) {
   // An Auto session's next runtime (#2658, FR-022): its button continues there, by press only.
@@ -24,9 +25,9 @@ export function ContinueStrip({ store, host, agent, disabled }: { store: Store; 
   if (!agent || !(offersContinue(agent) || agent.continueWhenBack) || !store.has(host, Capability.chatContinueWhenBack1)) return null;
   const line = continueLine(agent);
   const nextName = next.value ? (store.runtimes.value[host] ?? []).find((r) => r.runtime.id === next.value)?.runtime.name ?? next.value : undefined;
+  // A banner of the chat (docs/reference/design-system.md, "Messages"): neutral, a status.
   return (
-    <div class="continue-strip" role="status">
-      {line && <span class="what">{line}</span>}
+    <MessageBanner tone="neutral" name="continue-strip" actions={<>
       {!line && nextName && (
         <button disabled={disabled} onClick={() => void store.continueInNew(host, agent.id, true).then((id) => {
           if (id) go({ host, folder: agent.cwd, session: id });
@@ -36,6 +37,8 @@ export function ContinueStrip({ store, host, agent, disabled }: { store: Store; 
         ? <button disabled={disabled} onClick={() => void store.continueWhenBack(host, agent.id, false)}>{continueCancelLabel}</button>
         : <button disabled={disabled} title={continueHelp} onClick={() => void store.continueWhenBack(host, agent.id, true)}>
           ↻ {continueButton(resetsAt(store.runtimeAllowances.value[host], agent.runtimeID))}</button>}
-    </div>
+    </>}>
+      {line}
+    </MessageBanner>
   );
 }

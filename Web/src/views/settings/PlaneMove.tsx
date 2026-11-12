@@ -8,6 +8,7 @@ import { describe } from "../../model/errors";
 import { flowButtons, isBad, keepsOpen, lineMark, memberState, planeMoveWords as words, showsNote, stepTitle } from "../../model/planeMove";
 import type { Store } from "../../model/store";
 import { Modal } from "../Modal";
+import { MessageBanner, ask as askAlert } from "../MessageKinds";
 
 export function PlaneMoveSection({ store, down }: { store: Store; down: boolean }) {
   const report = store.planeMoveReport.value;
@@ -16,9 +17,9 @@ export function PlaneMoveSection({ store, down }: { store: Store; down: boolean 
     setProblem(null);
     store.askPlaneMove(address === undefined ? { action } : { action, address }).catch((error) => setProblem(describe(error)));
   };
-  const press = (row: PlaneMoveRow) => {
+  const press = async (row: PlaneMoveRow) => {
     if (!row.action) return;
-    if (row.confirm && !window.confirm(`${words.confirmTitle}\n\n${row.confirm}`)) return;
+    if (row.confirm && !await askAlert(`${words.confirmTitle}\n\n${row.confirm}`)) return;
     ask(row.action);
   };
   if (!report) return null;
@@ -38,7 +39,7 @@ export function PlaneMoveSection({ store, down }: { store: Store; down: boolean 
         </div>
       ))}
       <p class="hint">On {report.mac}.</p>
-      {(problem ?? report.problem) && <p class="hint failure" role="alert">{problem ?? report.problem}</p>}
+      {(problem ?? report.problem) && <MessageBanner tone="failure">{problem ?? report.problem}</MessageBanner>}
       {report.flow && <PlaneMoveDialog flow={report.flow} down={down} ask={ask} />}
     </section>
   );

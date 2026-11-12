@@ -8,6 +8,7 @@ import type { CatalogApproval, CatalogKind, CatalogRequest, CatalogUsage } from 
 import { approvalFor, takeBackQuestion, approvalsFoot, approvalsTitle, askFoot, askTitle, itemWords, kindNames, mineWords, noApprovals, noUsage,
   requestWords, usageFoot, usageTitle, usersWords, withGovernanceRequest } from "../model/governance";
 import { failedWords } from "../model/console";
+import { MessageBanner, ask } from "./MessageKinds";
 
 /** A person's ask, and their own requests of the last 30 days. Nothing from a control plane before them. */
 export function GovernanceAsk({ store, down }: { store: Store; down: boolean }) {
@@ -59,7 +60,7 @@ export function GovernanceAsk({ store, down }: { store: Store; down: boolean }) 
           <input type="text" class="wide" aria-label="Why" placeholder="To review pull requests" value={why.value} disabled={down || busy.value}
             onInput={(e) => { why.value = (e.currentTarget as HTMLInputElement).value; }} />
         </label>
-        {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+        {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
         <div class="sheet-actions">
           <button type="submit" class="prominent" disabled={down || busy.value || name.value.trim() === ""}>Ask</button>
         </div>
@@ -95,7 +96,7 @@ export function GovernanceRequests({ store, down }: { store: Store; down: boolea
   return (
     <section aria-labelledby="requests-governance">
       <h3 class="section-head" id="requests-governance">MCP Servers and Skills</h3>
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       <ul class="request-list">
         {list.map((r) => (
           <li key={r.id} class="request">
@@ -141,7 +142,7 @@ export function CataloguePage({ store, down }: { store: Store; down: boolean }) 
       problem.value = failedWords(error);
     }
   };
-  if (problem.value) return <p class="hint" role="alert">{problem.value}</p>;
+  if (problem.value) return <MessageBanner tone="failure">{problem.value}</MessageBanner>;
   if (!usage.value || !approvals.value) return <p class="hint">Loading…</p>;
   return (
     <>
@@ -172,8 +173,8 @@ export function CataloguePage({ store, down }: { store: Store; down: boolean }) 
               <li key={`${a.kind}/${a.name}/${a.group ?? ""}/${a.user ?? ""}`} class="request">
                 <span>{kindNames[a.kind]} <span class="strong">{a.name}</span>, for {approvalFor(a)}. <span class="quiet small">Approved by {a.by}.</span></span>
                 <span class="request-actions">
-                  <button type="button" class="destructive" disabled={down} onClick={() => {
-                    if (window.confirm(takeBackQuestion(a.kind, a.name, approvalFor(a)))) void revoke(a);
+                  <button type="button" class="destructive" disabled={down} onClick={async () => {
+                    if (await ask(takeBackQuestion(a.kind, a.name, approvalFor(a)))) void revoke(a);
                   }}>Take Back…</button>
                 </span>
               </li>

@@ -8,6 +8,7 @@ import type { Store } from "../../model/store";
 import { describe } from "../../model/errors";
 import { browserWords, clearSiteWords, cookiesWords, downloadWords, sitesNote } from "../../model/browserSettings";
 import { useSettingsMachine } from "./SettingsMachine";
+import { ask } from "../MessageKinds";
 
 const states = signal<Record<string, BrowserState | null>>({});
 const clearing = signal(false);
@@ -26,7 +27,7 @@ export function BrowserSection({ store, down }: { store: Store; down: boolean })
   if (state === null) return null;
   const clear = async (site?: string) => {
     if (!host) return;
-    if (site === undefined && !window.confirm(`${browserWords.clearAllQuestion} ${browserWords.clearAllDetail}`)) return;
+    if (site === undefined && !await ask(`${browserWords.clearAllQuestion} ${browserWords.clearAllDetail}`)) return;
     clearing.value = true;
     try {
       const cleared = await store.link.call("browser/clear", site === undefined ? {} : { site }, host);

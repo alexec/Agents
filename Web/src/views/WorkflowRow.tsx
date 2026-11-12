@@ -15,6 +15,7 @@ import { fromWireDate } from "../protocol/dates";
 import { shortAgo } from "../model/activity";
 import { isWorkflowMuted, muteLabel, muteMark, mutedHelp, mutedWords, unmuteLabel, workflowMuteHelp } from "../model/mute";
 import { Capability } from "../protocol/capabilities.generated";
+import { ask } from "./MessageKinds";
 
 export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pinnedAt, place }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean; chosen: boolean; onPick: () => void;
@@ -137,8 +138,8 @@ function workflowMenu(store: Store, host: string, summary: WorkflowSummary, disa
     mute: () => void store.setWorkflowMuted(host, summary, true),
     unmute: () => void store.setWorkflowMuted(host, summary, false),
     archive: () => void store.setWorkflowArchived(host, summary, true),
-    delete: () => {
-      if (confirm(`Delete “${summary.workflow.name}”? Its file is removed from disk.\n\nThe file can be restored from the folder's git history.`)) {
+    delete: async () => {
+      if (await ask(`Delete “${summary.workflow.name}”? Its file is removed from disk.\n\nThe file can be restored from the folder's git history.`)) {
         void store.deleteWorkflow(host, summary);
       }
     },

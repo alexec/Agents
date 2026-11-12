@@ -18,6 +18,7 @@ import { fromWireDate } from "../protocol/dates";
 import { when } from "../model/orgPolicy";
 import { JoinRequests } from "./JoinRequest";
 import { GovernanceRequests } from "./Governance";
+import { MessageBanner } from "./MessageKinds";
 
 /** M8: the audit, every machine's names from the fleet, and a person to narrow it to. */
 export function AuditPage({ store, down }: { store: Store; down: boolean }) {
@@ -66,7 +67,7 @@ export function RequestsPage({ store, down }: { store: Store; down: boolean }) {
   const none = requestCount(store) === 0;
   return (
     <div class="requests">
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       {none && <p class="hint">{noRequests}</p>}
       {joins.length > 0 && (
         <section aria-labelledby="requests-joins">
@@ -177,7 +178,7 @@ function BudgetRequests({ store, down }: { store: Store; down: boolean }) {
   return (
     <section aria-labelledby="requests-budgets">
       <h3 class="section-head" id="requests-budgets">{budgetsTitle}</h3>
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       <ul class="request-list">
         {list.map((r) => {
           const usd = Number(amount(r));

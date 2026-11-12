@@ -226,6 +226,10 @@ The client stories (#4600) move each pattern to its kind. Inline error text in a
 On the web, the fallbacks `--tint-success` and `--danger`, which no token declares, become
 `--tint-vouched` and `--tint-failure`.
 
+On the web, the kinds are components in `Web/src/views/MessageKinds.tsx` (#4740): `MessageBanner`,
+the one toast (`Toasts`), and `ask`, which asks a choice in the page's own `<dialog>` in place of
+`window.confirm`. Their tones, times and button words are in `Web/src/model/messageKinds.ts`.
+
 ## Where each surface reads it
 
 | Surface | Reads | How it stays the same as `design/tokens.json` |

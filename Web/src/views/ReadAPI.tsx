@@ -7,6 +7,7 @@ import type { Store } from "../model/store";
 import type { ReadAPI, ReadTokenMade } from "../protocol/generated";
 import { failedWords } from "../model/console";
 import { curlLine, noTokens, otlpLine, revokeQuestion, otlpOff, otlpTitle, shownOnce, tokenLine, tokensFoot, tokensTitle } from "../model/readApi";
+import { MessageBanner, ask } from "./MessageKinds";
 
 export function ReadAPIPage({ store, down }: { store: Store; down: boolean }) {
   const state = useSignal<ReadAPI | null>(null);
@@ -49,7 +50,7 @@ export function ReadAPIPage({ store, down }: { store: Store; down: boolean }) {
     <>
       <section aria-labelledby="read-api-tokens">
         <h3 class="section-head" id="read-api-tokens">{tokensTitle}</h3>
-        {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+        {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
         <p class="small">Reads from <code>{now.url}</code></p>
         {made.value && (
           <div class="read-token-made" role="status">
@@ -69,7 +70,7 @@ export function ReadAPIPage({ store, down }: { store: Store; down: boolean }) {
                 <span><span class="strong">{t.name}</span><br /><span class="quiet small">{tokenLine(t)}</span></span>
                 {!t.revoked && (
                   <span class="request-actions">
-                    <button type="button" class="destructive" disabled={down || busy.value} onClick={() => { if (window.confirm(revokeQuestion(t.name))) void revoke(t.id); }}>Revoke…</button>
+                    <button type="button" class="destructive" disabled={down || busy.value} onClick={async () => { if (await ask(revokeQuestion(t.name))) void revoke(t.id); }}>Revoke…</button>
                   </span>
                 )}
               </li>

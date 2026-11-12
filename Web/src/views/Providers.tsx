@@ -14,6 +14,7 @@ import { Modal } from "./Modal";
 import { MachineDialog } from "./MachineDialog";
 import { makers } from "../model/machineFromRepository";
 import { adminsOnly, providerLine as groupLine } from "../model/teamGroups";
+import { ask } from "./MessageKinds";
 
 const time = (at: Date) => at.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
@@ -72,7 +73,7 @@ function ProviderCard({ store, provider, say, edit, link, install }: {
   const [making, setMaking] = useState(false);
   const setGroup = async (group: string) => say(await store.providers.setGroup(provider.id, group || null));
   const remove = async () => {
-    if (!window.confirm(`${words.removeTitle(provider.name)} ${words.removeNote}`)) return;
+    if (!await ask(`${words.removeTitle(provider.name)} ${words.removeNote}`)) return;
     say(await store.providers.remove(provider.id));
   };
   return (
@@ -122,13 +123,13 @@ function WorkspaceRow({ store, provider, workspace, hosts, say, link, install }:
     if (!host) return;
     let answer = await store.providers.stop(host.id);
     if (answer && typeof answer === "object") {
-      if (!window.confirm(answer.question)) return;
+      if (!await ask(answer.question)) return;
       answer = await store.providers.stop(host.id, true);
     }
     say(typeof answer === "string" ? answer : null);
   };
   const unlink = async () => {
-    if (!host || !window.confirm(`Unlink ${host.name} from ${workspace.name}? ${provider.name} can no longer start or stop it.`)) return;
+    if (!host || !await ask(`Unlink ${host.name} from ${workspace.name}? ${provider.name} can no longer start or stop it.`)) return;
     say(await store.providers.unlink(host.id));
   };
   const setIdle = async (minutes: number) => { if (host) say(await store.providers.setIdle(host.id, minutes)); };

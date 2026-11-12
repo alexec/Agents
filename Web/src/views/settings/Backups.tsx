@@ -7,6 +7,7 @@ import { backupDetail, backupEveries, backupKeeps, backupTarget, backupTargets, 
 import { fromWireDate } from "../../protocol/dates";
 import { Capability } from "../../protocol/capabilities.generated";
 import type { BackupEvery, BackupRestoreResult, BackupSettings, BackupState, BackupTarget } from "../../protocol/generated";
+import { ask } from "../MessageKinds";
 
 /** Backups (#1810): how often, how many kept, where, Back Up Now, and Restore for each backup there. The
  * Mac's folder is its disk, so it is chosen on the Mac. A server's page draws the same (#1815). */
@@ -22,7 +23,7 @@ function BackupsView({ state, onMac, title, id, configure, make, restore }: {
 }) {
   const [said, setSaid] = useState<string | null>(null);
   const restoreOne = async (backupID: string, confirmWords: string) => {
-    if (!confirm(`${confirmWords}\n\n${restoreMessage}`)) return;
+    if (!await ask(`${confirmWords}\n\n${restoreMessage}`)) return;
     setSaid(null);
     const result = await restore(backupID);
     if (result) setSaid(restoredWords(result));

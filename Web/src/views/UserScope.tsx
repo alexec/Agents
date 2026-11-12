@@ -15,6 +15,7 @@ import { SecretInfoLine } from "./SecretInfoLine";
 import { AskBeforeUseCheck } from "./AskBeforeUse";
 import { Modal } from "./Modal";
 import { SecretDescriptionField } from "./SecretDescription";
+import { ask } from "./MessageKinds";
 
 function sentence(error: unknown): string {
   if (error instanceof CallFailed && error.code === methodNotFound) return "This control plane does not keep settings for you yet. Update it.";
@@ -196,7 +197,7 @@ export function SecretsSection({ store, down }: { store: Store; down: boolean })
   const addingCard = useSignal(false);
   const replacing = useSignal<UserSecretRow | null>(null);
   const remove = async (name: string) => {
-    if (!window.confirm(`Remove ${name}? It is taken out of the sealed store on every machine of yours.`)) return;
+    if (!await ask(`Remove ${name}? It is taken out of the sealed store on every machine of yours.`)) return;
     try {
       await store.link.call("user/removeSecret", { name });
     } catch (error) {

@@ -20,6 +20,7 @@ import { addMachineWords, whereAgentsRun } from "../model/addMachine";
 import { Modal } from "./Modal";
 import { AddMachineDialog } from "./AddMachineDialog";
 import { AgentsBotRow } from "./AgentsBot";
+import { ask } from "./MessageKinds";
 
 function why(e: unknown): string {
   if (e && typeof e === "object" && "message" in e) return String((e as { message: unknown }).message);
@@ -832,7 +833,7 @@ export function YourConnections({ store, host }: { store: Store; host: string })
   };
   useEffect(() => { void load(); }, [host]);
   const disconnect = async (c: Connection) => {
-    if (!window.confirm(`Disconnect ${words.connectionTitle(c)}? ${words.disconnectNoteFor(c.provider)}`)) return;
+    if (!await ask(`Disconnect ${words.connectionTitle(c)}? ${words.disconnectNoteFor(c.provider)}`)) return;
     try {
       const answer = await store.link.call("connections/disconnect", { provider: c.provider }, host);
       setProblem(answer.error);
