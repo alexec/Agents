@@ -417,7 +417,7 @@ struct ChatTranscript: View {
                             .transition(.opacity)
                     }
                 }
-                .animation(.easeOut(duration: 0.15), value: canScroll && !isFollowing)
+                .animation(ResponseMotion.response, value: canScroll && !isFollowing)
             }
         }
     }
@@ -719,11 +719,11 @@ struct ChatTranscript: View {
 
     /// The line gone to, lit for a moment so the eye finds it (#2860).
     private func light(_ id: UUID) {
-        withAnimation(.easeIn(duration: 0.2)) { highlightedEntry = id }
+        withAnimation(ResponseMotion.response) { highlightedEntry = id }
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(2))
             guard highlightedEntry == id else { return }
-            withAnimation(.easeOut(duration: 0.6)) { highlightedEntry = nil }
+            withAnimation(ResponseMotion.response) { highlightedEntry = nil }
         }
     }
 

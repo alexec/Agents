@@ -447,7 +447,7 @@ struct RemoteChatView: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { formHeight = $0 }
         // The scene's toast floats above it (#4737).
         .liftsRemoteToasts()
-        .animation(.snappy(duration: 0.2), value: isQuestionUp)
+        .animation(ResponseMotion.snappy, value: isQuestionUp)
     }
 
     private var isQuestionUp: Bool {

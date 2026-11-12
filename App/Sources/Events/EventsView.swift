@@ -135,7 +135,7 @@ struct EventsView: View {
                     let newCount = unseen(shown.events)
                     if newCount > 0 {
                         Button("\(newCount) new") {
-                            withAnimation { proxy.scrollTo(Self.top, anchor: .top) }
+                            withAnimation(ResponseMotion.response) { proxy.scrollTo(Self.top, anchor: .top) }
                         }
                         .buttonStyle(.plain)
                         .appText(.fine)

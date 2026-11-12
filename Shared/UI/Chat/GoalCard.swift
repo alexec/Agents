@@ -19,7 +19,7 @@ struct GoalCard: View {
         if let goal = agent.goal {
             VStack(alignment: .leading, spacing: 0) {
                 Button {
-                    withAnimation(.easeOut(duration: 0.15)) { isExpanded.toggle() }
+                    withAnimation(ResponseMotion.response) { isExpanded.toggle() }
                 } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {

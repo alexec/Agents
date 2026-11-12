@@ -209,7 +209,7 @@ struct MachinePage: View {
     /// This Mac's page is asked; the leases may arrive after the page does.
     private func scroll(_ proxy: ScrollViewProxy) {
         guard host == .mac, let asked = model.resourcesAsked, model.leases != nil else { return }
-        withAnimation {
+        withAnimation(ResponseMotion.response) {
             if let name = asked.name, model.leases?.resources.contains(where: { $0.name == name }) == true {
                 proxy.scrollTo(name, anchor: .top)
             } else {

@@ -39,7 +39,7 @@ struct ShellTabs: View {
                     }
                 }
                 .onChange(of: front) { _, front in
-                    withAnimation { reader.scrollTo(front) }
+                    withAnimation(ResponseMotion.response) { reader.scrollTo(front) }
                 }
             }
             Button(action: open) {

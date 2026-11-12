@@ -532,7 +532,7 @@ private struct ThoughtLine: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Button {
-                withAnimation(.easeOut(duration: 0.15)) { isExpanded.toggle() }
+                withAnimation(ResponseMotion.response) { isExpanded.toggle() }
             } label: {
                 Text(TranscriptItem.thoughtLine(text))
                     .appText(.reading)
@@ -836,7 +836,7 @@ private struct ToolCallLine: View {
                 .accessibilityHint("Shows every call in this run")
         } else if hasDetail {
             Button {
-                withAnimation(.easeOut(duration: 0.15)) { isExpanded.toggle() }
+                withAnimation(ResponseMotion.response) { isExpanded.toggle() }
             } label: {
                 line
             }

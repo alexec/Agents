@@ -91,7 +91,7 @@ struct ElicitationSheet: View {
         // In the chat column, at the end of the conversation, as on the Mac
         // (033, #723).
         .chatColumn()
-        .animation(.snappy(duration: 0.2), value: chosen)
+        .animation(ResponseMotion.snappy, value: chosen)
         .onChange(of: request.id) { _, _ in because = nil }
     }
 

@@ -30,7 +30,7 @@ struct CurrentPlanStrip: View {
         if let plan = agent.planInForce {
             VStack(alignment: .leading, spacing: 0) {
                 Button {
-                    withAnimation(.easeOut(duration: 0.15)) { isExpanded.toggle() }
+                    withAnimation(ResponseMotion.response) { isExpanded.toggle() }
                 } label: {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {

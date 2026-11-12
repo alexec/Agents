@@ -21,8 +21,8 @@ struct StaleBanner: View {
             if !model.needsPairing, !model.isStale { OrgPolicyStrip(state: model.policyState) }
         }
         .remoteBannerGround()
-        .animation(.easeOut(duration: 0.2), value: model.isStale)
-        .animation(.easeOut(duration: 0.2), value: model.needsPairing)
+        .animation(ResponseMotion.response, value: model.isStale)
+        .animation(ResponseMotion.response, value: model.needsPairing)
     }
 
     @ViewBuilder
@@ -71,6 +71,6 @@ extension View {
     func markedStale(_ isStale: Bool) -> some View {
         disabled(isStale)
             .opacity(isStale ? 0.55 : 1)
-            .animation(.default, value: isStale)
+            .animation(ResponseMotion.response, value: isStale)
     }
 }
