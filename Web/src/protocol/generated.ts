@@ -16,6 +16,13 @@ export type WireDate = number & { readonly __brand: "WireDate" };
 export type URLString = string & { readonly __brand: "URLString" };
 export type MachineRef = string & { readonly __brand: "MachineRef" };
 export type ProviderID = string & { readonly __brand: "ProviderID" };
+/**
+ * A ref (#4727, spec 4724-event-bus): one thing, as provider:type:topic#id, such as
+ * github:pr:alexec/agents#4702 or agents:machine:#mac-mini. Provider, type and topic are lower
+ * case; the first # ends the topic, and the id keeps its case and can hold # and /. Always the full
+ * form on the wire; a short form (#123, P#123, owner/repo#123) is input only.
+ */
+export type Ref = string & { readonly __brand: "Ref" };
 /** ResourceName (Model/Lease.swift): the name, trimmed and lower-cased, as a single string. */
 export type ResourceName = string & { readonly __brand: "ResourceName" };
 
