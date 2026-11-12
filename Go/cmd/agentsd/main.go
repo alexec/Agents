@@ -142,6 +142,7 @@ func main() {
 		join(ctx, cl, d)
 	}
 	log.Printf("agentsd %s on %s, root %s", buildinfo.String(), platform(), cl.root)
+	d.WaitForMembership()
 	// The restart itself, for a wait or a workflow that names it (#1219), and from now on
 	// a word once a minute that this host is alive.
 	d.SayRestarted()
@@ -387,6 +388,7 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 	// The needs it shows nowhere go to the control plane, offered again on each return (#1367).
 	up.OnChange = func(connected bool, problem string) {
 		writeJoinStatus(loc.Root, connected, problem)
+		d.ControlAnswered(connected, false)
 		safe.Go("attention uplink", func() { d.ControlUplinkChanged(connected) })
 		if connected {
 			d.ShareBotKey()
@@ -395,6 +397,7 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 	// A machine the person removed keeps no key of their bot's (#3950).
 	up.OnRefused = func(reason string) {
 		if reason == controllink.Forgotten {
+			d.ControlAnswered(false, true)
 			d.BotMachineRemoved()
 		}
 	}
@@ -409,6 +412,9 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 	d.SetControl(up.Tell)
 	d.SetControlAsk(up.Ask)
 	d.SetControlCapabilities(up.ControlCapabilities)
+	// Its agents and workflows wait for the first answer: a host the control plane forgot
+	// starts none (#4985). The last run's answer counts until then.
+	d.AwaitMembership(strings.HasSuffix(joinProblem(loc.Root), controllink.Refuse(controllink.Forgotten).Error()))
 	safe.Go("uplink", func() {
 		// A panic in the uplink would leave the host up but offline: dial again.
 		for ctx.Err() == nil && safe.Catch("uplink", func() { up.Run(ctx) }) != nil {

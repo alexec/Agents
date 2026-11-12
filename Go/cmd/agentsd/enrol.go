@@ -77,6 +77,18 @@ func refusedForGood(err error) (string, bool) {
 // and the control plane beside it, which show its problem while it keeps failing.
 const joinStatusFile = "control-join.json"
 
+// joinProblem is the problem the last run's control-join.json says, or "".
+func joinProblem(root string) string {
+	var said struct {
+		Problem *string `json:"problem"`
+	}
+	b, err := os.ReadFile(filepath.Join(root, joinStatusFile))
+	if err != nil || json.Unmarshal(b, &said) != nil || said.Problem == nil {
+		return ""
+	}
+	return *said.Problem
+}
+
 // writeJoinStatus is HostJoinFile.write: the uplink's state and why its last dial failed,
 // so a host refused for ever says why where a person looks (#1996). Dates without
 // fractions, as Swift's ISO 8601 decoder reads them.
