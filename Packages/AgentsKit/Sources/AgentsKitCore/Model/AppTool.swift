@@ -37,6 +37,10 @@ public enum AppTool {
     /// The person's outside accounts, Settings ▸ You ▸ Accounts (#3967): list, add and import.
     public static let manageAccounts = "manage_accounts"
 
+    /// This folder's connectors, its `.agents/mcp.json` (#4538): list, and approve, which asks
+    /// the person with a Needs you card.
+    public static let manageConnectors = "manage_connectors"
+
     /// Ask the person a question or a short form and wait for the answer. The
     /// fallback for runtimes whose own ask tool never reaches the model, and the
     /// only channel on runtimes that have none. It was `ask_form` until #2298. Antigravity's
@@ -169,7 +173,7 @@ public enum AppTool {
 
     /// Every tool the app's MCP server serves.
     public static let all: [String] = [
-        finishTurn, showFile, notify, manageWorkflows, manageAccounts, askQuestion, askSecret, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
+        finishTurn, showFile, notify, manageWorkflows, manageAccounts, manageConnectors, askQuestion, askSecret, suggestNextPrompt, hangUp, startSession, stopSession, archiveSession,
         leaseResource, releaseResource, listResources, waitForEvent,
         cancelWait, listSessions, readSession,
         setSessionLabels, moveWorktree, messageSession, cancelMessage,

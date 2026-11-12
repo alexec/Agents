@@ -201,7 +201,7 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
     /// The row's title: what is asked. A secret's use (#4017) names the secret first, as its
     /// banner does, so a narrow sidebar cuts the place and not the name.
     public func title(asker: String?) -> String {
-        secretUse.map { "Wants to \($0.use == "account" ? "read" : "use") \($0.name)" } ?? title
+        secretUse.map(\.title) ?? title
     }
 
     /// A terminal's `agents-secret NAME` (#4179): a secret's use with no session.
@@ -219,7 +219,9 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         /// fill (fill_secret), ci (set_ci_secret), mcp (an HTTP MCP server's header, #4120),
         /// terminal (`agents-secret NAME` with no session's grant, #4179), account (a
         /// manage_accounts read of an account with Ask before use, #4163), or browser and screen
-        /// (an agent's lease of the browser or the screen on a machine that asks, #4264).
+        /// (an agent's lease of the browser or the screen on a machine that asks, #4264), or
+        /// workflow and connector (an agent asks to turn on its folder's workflow or approve its
+        /// folder's connector, #4538: `place` is then the folder's name).
         public var use: String
         public var name: String
         /// The page's domain for a fill, owner/repo for CI, the server's name for MCP, the
@@ -236,8 +238,11 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         /// For screen (#4264): the app drive_screen names. `name` is then "the screen", and
         /// `place` the machine.
         public var app: String?
+        /// For connector (#4538): the server's entry digest when the agent asked. Approve
+        /// approves only that entry.
+        public var digest: String?
 
-        public init(name: String, use: String, place: String, sessionOnly: Bool? = nil, needsSignature: Bool? = nil, call: String? = nil, app: String? = nil) {
+        public init(name: String, use: String, place: String, sessionOnly: Bool? = nil, needsSignature: Bool? = nil, call: String? = nil, app: String? = nil, digest: String? = nil) {
             self.name = name
             self.use = use
             self.place = place
@@ -245,6 +250,18 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
             self.needsSignature = needsSignature
             self.call = call
             self.app = app
+            self.digest = digest
+        }
+
+        /// The row's title (#4017): the secret first, as its banner says it. A workflow or a
+        /// connector (#4538) names the change the agent asks the person to make.
+        public var title: String {
+            switch use {
+            case "workflow": "Wants to turn on \(name)"
+            case "connector": "Wants to approve \(name)"
+            case "account": "Wants to read \(name)"
+            default: "Wants to use \(name)"
+            }
         }
 
         /// Whether `action` goes signed: it allows the use, on a machine that asks for a signature.
@@ -264,6 +281,8 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
             case "account": "Account: manage_accounts \(call ?? "get")"
             case "browser": "Browser on \(place)"
             case "screen": app.map { "Screen: \($0) on \(place)" } ?? "Screen on \(place)"
+            case "workflow": "Workflow in \(place)"
+            case "connector": "Connector in \(place)"
             default: "Fill on \(place)"
             }
         }
@@ -275,6 +294,8 @@ public struct NeedRequest: Codable, Sendable, Hashable, Identifiable {
         /// terminal's are once, for 1 hour and deny (#4179).
         public var actions: [Action] {
             if isTerminal { return [.once, .hour, .deny] }
+            // A workflow's or a connector's (#4538): the change is made once, by Approve.
+            if use == "workflow" || use == "connector" { return [.once, .deny] }
             return sessionOnly == true ? [.once, .session, .deny] : [.once, .session, .always, .deny]
         }
     }

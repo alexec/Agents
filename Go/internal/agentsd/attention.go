@@ -303,12 +303,22 @@ func secretUseWanted(u wire.RequestSecretUse) string {
 	if u.Use == wire.SecretUseScreen && u.App != nil {
 		return "Wants to use the screen on " + u.Place + " to drive " + *u.App
 	}
+	if u.Use == wire.SecretUseWorkflow {
+		return "Wants to turn on the workflow " + u.Name + " in " + u.Place
+	}
+	if u.Use == wire.SecretUseConnector {
+		return "Wants to approve the connector " + u.Name + " in " + u.Place
+	}
 	return "Wants to use " + u.Name + " on " + u.Place
 }
 
 // secretUseAnswers is NeedRequest.SecretUse.actions: the row's answers, as the banner's
 // buttons. A session's own secret has no Always Approve: it is the same as for this session.
 func secretUseAnswers(u wire.RequestSecretUse) []wire.QuickAnswer {
+	if personChange(u.Use) {
+		return []wire.QuickAnswer{{Kind: wire.QuickAnswerKindChoice, ID: secretUseOnce, Title: "Approve"},
+			{Kind: wire.QuickAnswerKindChoice, ID: secretUseDeny, Title: "Deny", IsDestructive: true}}
+	}
 	if u.Use == wire.SecretUseTerminal {
 		return []wire.QuickAnswer{{Kind: wire.QuickAnswerKindChoice, ID: secretUseOnce, Title: "Approve"},
 			{Kind: wire.QuickAnswerKindChoice, ID: secretUseHour, Title: "Approve for 1 Hour"},

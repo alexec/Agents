@@ -312,6 +312,7 @@ func toolsBrief(browser, screen, bot, github bool) string {
 		"- docs_search, then docs_read: find the docs for your work, in this folder and its docs connectors.",
 		"- estimate_issue: say what an issue or an epic will cost and take.",
 		"- manage_accounts: my outside accounts (gitlab.com, AWS…): find one before you make one, and add the one you make.",
+		"- manage_connectors: this folder's connectors (.agents/mcp.json). approve asks me to approve one that waits, as manage_workflows enable asks me to turn on a workflow that is mine to turn on: wait for my answer, never click Approve for me.",
 		"- agents-secret NAME, a command on your PATH: the value of one of my secrets that does not ask before use, for your own command, " +
 			"as in NAME=\"$(agents-secret NAME)\" your-command; never print it. agentsd records each read. " +
 			"A secret with Ask before use is refused: use the tool that puts it where it goes for you.",
@@ -337,7 +338,8 @@ func toolsBrief(browser, screen, bot, github bool) string {
 				"For a secret with Ask before use it waits on my approval; when it names a request, wait for it with wait_for_event, then call it again.",
 			"- generate_secret: make a new account's password, save it as one of my secrets and type it into the field. Never make a password yourself.",
 			"- capture_secret: save a value the page shows once (an app password, an API token) as one of my secrets. Never read it with browser_snapshot first.",
-			"- pair_web_page: open the app's web page in the browser, paired as me, for a step only the web page does (Connectors, Settings). Never ask me for a pairing code.")
+			"- pair_web_page: open the app's web page in the browser, paired as me, for a step only the web page does (Connectors, Settings). Never ask me for a pairing code. "+
+				"Never approve a connector or turn on a workflow there for me: manage_connectors and manage_workflows ask me.")
 		if !bot {
 			lines = append(lines, "- "+handToPersonName+": give me one step on the page that only I can do, such as a CAPTCHA or a sign-in.")
 		}
