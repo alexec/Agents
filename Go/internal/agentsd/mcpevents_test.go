@@ -38,6 +38,9 @@ type eventsServer struct {
 	notConnected int
 	// refused is whether polls after c1 are refused for good (#2491).
 	refused bool
+	// internal is how many polls after c1 answer a -32603, as a DNS lookup that failed for
+	// a moment does on the GitHub server (#4419).
+	internal int
 	// props, when set, are pr.merged's arguments in place of repo and pr; more are other
 	// events it offers.
 	props map[string]any
@@ -91,6 +94,14 @@ func newEventsServer(t *testing.T) *eventsServer {
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": *m.ID, "error": map[string]any{
 					"code": -32012, "message": "this token may not read alexec/Agents", "data": map[string]any{"reason": "no access"}}})
+				return
+			}
+			if cursor == "c1" && s.internal > 0 {
+				s.internal--
+				s.mu.Unlock()
+				w.Header().Set("Content-Type", "application/json")
+				json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": *m.ID, "error": map[string]any{
+					"code": -32603, "message": "dial tcp: lookup api.github.com: no such host"}})
 				return
 			}
 			if cursor == "c1" && s.notConnected > 0 {
@@ -738,6 +749,162 @@ func TestAWaitEndsWhenItsServerStopsSending(t *testing.T) {
 	}
 	if w := d.Store.Agent(a.ID).EventWait; w != nil && w.Ending == nil {
 		t.Fatalf("the wait is still open: %+v", w)
+	}
+}
+
+// #4419: a server's own call that failed for a moment (-32603, a DNS lookup) is tried
+// again, as a lost connection is; it used to stop the subscription for good, and every wait
+// on it was told the server stopped sending.
+func TestAServerErrorIsTriedAgain(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	ci := newEventsServer(t)
+	a := seeded(t, d, t.TempDir(), nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	serverHome(t, d, ci.URL)
+	quickPolls(d)
+	d.StartMCPEvents()
+	answered := make(chan string, 1)
+	go func() {
+		text, _ := m.tool(2, "wait_for_event", map[string]any{"events": "pr.merged", "where": map[string]any{"pr": 5}, "until_minutes": 10})
+		answered <- text
+	}()
+	waitFor(t, "the first poll", func() bool { return ci.polled("c1") })
+	ci.mu.Lock()
+	ci.internal = 2
+	ci.queued = []map[string]any{{"eventId": "w1", "name": "pr.merged", "data": map[string]any{"pr": map[string]any{"number": 5}}}}
+	ci.mu.Unlock()
+	select {
+	case text := <-answered:
+		if !strings.Contains(text, "pr.merged happened at ") {
+			t.Fatal(text)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the wait was never answered")
+	}
+	ci.mu.Lock()
+	defer ci.mu.Unlock()
+	if ci.internal != 0 {
+		t.Fatalf("%d errors not polled", ci.internal)
+	}
+}
+
+// #4419: a stop ends the waits it was polled for, once. A wait made after it, on the same
+// subscription (held by another session's wait meanwhile), polls again and gets events; it
+// is not told the old stop.
+func TestAWaitAfterAStopPollsAgain(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	ci := newEventsServer(t)
+	work := t.TempDir()
+	a := seeded(t, d, work, nil)
+	b := seeded(t, d, work, nil)
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	mb := appClient(t, d, b.ID)
+	mb.post("initialize", map[string]any{}, 1)
+	serverHome(t, d, ci.URL)
+	quickPolls(d)
+	d.StartMCPEvents()
+	answered := make(chan string, 4)
+	go func() {
+		text, _ := m.tool(2, "wait_for_event", map[string]any{"events": "pr.merged", "where": map[string]any{"pr": 5}, "until_minutes": 10})
+		answered <- text
+	}()
+	waitFor(t, "the first poll", func() bool { return ci.polled("c1") })
+	// b also hears the app's own events, so the stop leaves its wait open and it holds the
+	// stopped subscription.
+	bText := make(chan string, 1)
+	go func() {
+		text, _ := mb.tool(3, "wait_for_event", map[string]any{"events": []string{"pr.merged", "request.opened"}, "where": map[string]any{"pr": 5}, "until_minutes": 10})
+		bText <- text
+	}()
+	defer func() {
+		select {
+		case text := <-bText:
+			t.Log("b: " + text)
+		default:
+		}
+	}()
+	waitFor(t, "b holds the subscription", func() bool {
+		d.mcpEvMu.Lock()
+		defer d.mcpEvMu.Unlock()
+		for _, s := range d.mcpSubs {
+			if containsUUID(s.waits, b.ID) {
+				return true
+			}
+		}
+		return false
+	})
+	ci.mu.Lock()
+	ci.refused = true
+	ci.mu.Unlock()
+	select {
+	case text := <-answered:
+		if !strings.Contains(text, "the server stopped sending it") {
+			t.Fatal(text)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the wait was never told its server stopped")
+	}
+	ci.mu.Lock()
+	ci.refused = false
+	ci.mu.Unlock()
+	go func() {
+		text, _ := m.tool(4, "wait_for_event", map[string]any{"events": "pr.merged", "where": map[string]any{"pr": 5}, "until_minutes": 10})
+		answered <- text
+	}()
+	waitFor(t, "the new wait holds the subscription", func() bool {
+		w := d.Store.Agent(a.ID).EventWait
+		return w != nil && w.Ending == nil
+	})
+	d.kickMCPEvents()
+	waitFor(t, "the subscription polls again", func() bool {
+		d.mcpEvMu.Lock()
+		defer d.mcpEvMu.Unlock()
+		for id, s := range d.mcpSubs {
+			if containsUUID(s.waits, a.ID) && d.mcpLives[id].state == wire.MCPTriggerStatusStateActive {
+				return true
+			}
+		}
+		return false
+	})
+	ci.mu.Lock()
+	ci.queued = []map[string]any{{"eventId": "w2", "name": "pr.merged", "data": map[string]any{"pr": map[string]any{"number": 5}}}}
+	ci.mu.Unlock()
+	select {
+	case text := <-answered:
+		if strings.Contains(text, "stopped sending") || !strings.Contains(text, "pr.merged happened at ") {
+			t.Fatal(text)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("the new wait was never answered")
+	}
+}
+
+// #4419: a stop does not end a wait that replaced the one it was polled for.
+func TestAStopLeavesAReplacingWait(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	now := wire.DateOf(time.Now())
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) {
+		a.EventWait = &wire.EventWait{ID: store.NewUUID(), Since: now, Deadline: &now,
+			Patterns:     []wire.EventPattern{{Name: "pr.merged", Filters: map[string]string{}}},
+			ServerEvents: []wire.WaitServerEvent{{Trigger: wire.MCPEventTrigger{Event: "pr.merged"}, Servers: []string{"github"}}}}
+	})
+	s := &mcpSubscription{id: "x", waits: []wire.UUID{a.ID}, waitIDs: []wire.UUID{store.NewUUID()}}
+	d.mcpEvMu.Lock()
+	if d.mcpSubs == nil {
+		d.mcpSubs, d.mcpLives = map[string]*mcpSubscription{}, map[string]mcpLive{}
+	}
+	d.mcpSubs["x"] = s
+	d.mcpLives["x"] = mcpLive{state: wire.MCPTriggerStatusStateStopped, stoppedWaits: s.waitIDs}
+	d.mcpEvMu.Unlock()
+	d.endWaitsOnStoppedServers(s)
+	got := d.Store.Agent(a.ID)
+	if got.EventWait == nil || got.EventWait.Ending != nil || len(got.QueuedPrompts) != 0 {
+		t.Fatalf("the replacing wait was ended: %+v, %d prompts", got.EventWait, len(got.QueuedPrompts))
 	}
 }
 

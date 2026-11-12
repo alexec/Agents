@@ -158,7 +158,7 @@
   border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-raised); color: inherit; font: inherit; }
 .with-sidebar .archived-day .subhead { margin-top: 14px; }
 .with-sidebar .archived-rows.stale { opacity: 0.55; }
-.with-sidebar .archived-stale { margin: 6px 8px; border: none; border-radius: 8px; }
+.with-sidebar .archived-stale { margin: 6px 8px; }
 .with-sidebar .archived-middle { flex: 1; display: flex; flex-direction: column; justify-content: center; }
 .with-sidebar .archived-glyph { font-size: 2rem; opacity: 0.45; }
 .with-sidebar .archived-footer { display: flex; align-items: center; gap: 12px; padding: 14px 8px 8px; font-size: 0.75rem; }

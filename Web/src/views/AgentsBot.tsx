@@ -5,6 +5,7 @@ import type { Store } from "../model/store";
 import type { ConnectionBot, ConnectionBotStart } from "../protocol/generated";
 import { botCallback, botKeyOn, botNote, botWords } from "../model/connectorSetup";
 import { Modal } from "./Modal";
+import { ask } from "./MessageKinds";
 
 function why(e: unknown): string {
   if (e && typeof e === "object" && "message" in e) return String((e as { message: unknown }).message);
@@ -32,7 +33,7 @@ export function AgentsBotRow({ store, host }: { store: Store; host: string }) {
   };
   useEffect(() => { void load(); }, [host]);
   const forget = async () => {
-    if (!window.confirm(`${botWords.removeTitle} ${botWords.removeMessage}`)) return;
+    if (!await ask(`${botWords.removeTitle} ${botWords.removeMessage}`)) return;
     try {
       await store.link.call("connections/bot/remove", {}, host);
       if (bot?.appURL) openOut(bot.appURL);

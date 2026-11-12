@@ -10,11 +10,11 @@ import (
 )
 
 // Bring back from ‹host›… (#1473), the reverse of Send to ‹host›… (#1123): the host packs
-// its branches with folders/sendPack, less the commits this Mac has, the window carries the
-// parts here with folders/receiveUpload, and folders/bringBack moves this Mac's branches
-// forward to the host's. It never overwrites work done here: a branch with commits of its
-// own, or uncommitted changes where a branch that moves is checked out, stops it before
-// anything is changed. The host's uncommitted changes come back as a patch only when asked.
+// its branches with folders/sendPack, less the commits this Mac has, this host reads the
+// parts through the control plane (folderbringback.go, #4640; the window carried them
+// before), and folders/bringBack moves this Mac's branches forward to the host's. It never
+// overwrites work done here: a branch with commits of its own, or uncommitted changes where
+// a branch that moves is checked out, stops it before anything is changed. The host's uncommitted changes come back as a patch only when asked.
 
 func (d *Daemon) bringBack(r wire.BringBackRequest) (wire.BringBack, error) {
 	done := wire.BringBack{Moved: []string{}}

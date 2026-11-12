@@ -11,6 +11,7 @@ import {
   domainsFoot, domainsTitle, isOutside, list, organisationsFoot, organisationsTitle, paneFoot, paneTitle, providerTitle,
   removeMessage, removeTitle, row, signInsFoot, signInsNone, signInsTitle,
 } from "../model/signIn";
+import { ask } from "./MessageKinds";
 
 /** Control plane ▸ Sign-ins: this person's sign-ins, each outside one with Remove. */
 export function SignInsSection({ store, down }: { store: Store; down: boolean }) {
@@ -19,7 +20,7 @@ export function SignInsSection({ store, down }: { store: Store; down: boolean })
   const failure = store.peopleFailure.value;
   const problem = failure ? describe(failure) : null;
   const remove = async (signIn: SignIn) => {
-    if (!signIn.account || !window.confirm(`${removeTitle(signIn)} ${removeMessage}`)) return;
+    if (!signIn.account || !await ask(`${removeTitle(signIn)} ${removeMessage}`)) return;
     try {
       // The change comes back as control/peopleChanged.
       await store.link.call("signIn/removeFromMe", { provider: signIn.provider, account: signIn.account });

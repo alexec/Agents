@@ -20,7 +20,7 @@ import { ReportProblemDialog } from "./ReportProblemDialog";
 import { MoveToMachineDialog } from "./MoveToMachineDialog";
 import { GitLendDialog } from "./GitLend";
 import { ExportImportDialog } from "./ExportImport";
-import { Problem } from "./Errors";
+import { Alerts, Toasts } from "./MessageKinds";
 import { FilesPane } from "./FilesPane";
 import { WorkflowPage } from "./WorkflowPage";
 import { PinnedPage } from "./Pins";
@@ -81,10 +81,10 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
   }, [shown?.at, r.session]);
   return (
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
-      {down && <Banner session={session} />}
-      <Problem store={store} />
-      <OrgPolicyStrip store={store} />
       <NavBar store={store} session={session} />
+      {/* The page's banners, under its toolbar (docs/reference/design-system.md, "Messages"). */}
+      {down && <Banner session={session} />}
+      <OrgPolicyStrip store={store} />
       {section === "overview" ? <div class="columns overview-columns console" aria-busy={down}><Overview store={store} down={down} /></div>
         : section !== "agents" ? <SectionPage store={store} section={section} down={down} /> : <div class="columns with-sidebar" aria-busy={down}>
         <Sidebar session={session} store={store} linkDown={down} />
@@ -126,6 +126,9 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <ExportImportDialog store={store} />
       <ContextMenu />
       <AchievementCard store={store} />
+      {/* The one toast and the alerts (#4740), over everything the page shows. */}
+      <Toasts store={store} />
+      <Alerts />
     </div>
   );
 }

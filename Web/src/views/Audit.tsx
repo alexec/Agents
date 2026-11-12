@@ -10,6 +10,7 @@ import { fromWireDate, toWireDate } from "../protocol/dates";
 import { CallFailed } from "../wire/link";
 import { clock } from "../model/rowLines";
 import { auditCSV, call, choices, csvExportName, days, empty, exportName, kept, older as olderCount, place, shorterMessage, shorterTitle, who } from "../model/audit";
+import { ask } from "./MessageKinds";
 
 const page = 200;
 
@@ -100,11 +101,11 @@ export function AuditPane({ store, hostName, people: given }: { store: Store; ho
             {shown.admin ? (
               <>
                 <select aria-label="How long the audit is kept" title="How long the control plane keeps who did what"
-                  value={String(shown.days)} onChange={(e) => {
+                  value={String(shown.days)} onChange={async (e) => {
                     // A shorter time asks first (#2067); Cancel puts the menu back.
                     const select = e.currentTarget as HTMLSelectElement;
                     const n = Number(select.value);
-                    if (n < shown.days && !window.confirm(`${shorterTitle(n)}\n\n${shorterMessage(shown.days, n, user.value ? null : olderCount(shown, n))}`)) {
+                    if (n < shown.days && !await ask(`${shorterTitle(n)}\n\n${shorterMessage(shown.days, n, user.value ? null : olderCount(shown, n))}`)) {
                       select.value = String(shown.days);
                       return;
                     }

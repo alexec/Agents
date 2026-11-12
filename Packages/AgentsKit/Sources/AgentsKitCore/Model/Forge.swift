@@ -746,21 +746,24 @@ public extension DaemonAPI {
 
     /// A standing epic's query (#3659, #3661), as the daemon read it from the epic's body: the
     /// issue has all of `labels`, one of `any` and none of `not`; `milestone` is none, any or a
-    /// name; `lanes` its lead runs at once. `error` says why there is no query.
+    /// name; `parent` is none for only issues that are no other issue's sub-issue (#4335, #4348);
+    /// `lanes` its lead runs at once. `error` says why there is no query.
     struct ForgeStanding: Codable, Sendable, Hashable {
         public var labels: [String]
         public var any: [String]
         public var not: [String]
         public var milestone: String?
+        public var parent: String?
         public var lanes: Int
         public var error: String?
 
         public init(labels: [String] = [], any: [String] = [], not: [String] = [], milestone: String? = nil,
-                    lanes: Int = 1, error: String? = nil) {
+                    parent: String? = nil, lanes: Int = 1, error: String? = nil) {
             self.labels = labels
             self.any = any
             self.not = not
             self.milestone = milestone
+            self.parent = parent
             self.lanes = lanes
             self.error = error
         }

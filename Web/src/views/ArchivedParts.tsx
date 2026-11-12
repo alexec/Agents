@@ -5,6 +5,7 @@ import type { ComponentChildren } from "preact";
 import { loadingMore as loadingMoreWords, staleStrip, type ArchivedState } from "../model/archivedPage";
 import { BackToList } from "./BackToList";
 import { EmptyState, PlaceholderRows } from "./WorkParts";
+import { MessageBanner } from "./MessageKinds";
 
 export function ArchivedFrame({ kind, title, folderName, filterLabel, filter, onFilter, state, empty, noMatch, children }: {
   kind: "sessions" | "workflows"; title: string; folderName: string; filterLabel: string;
@@ -40,7 +41,7 @@ export function ArchivedFrame({ kind, title, folderName, filterLabel, filter, on
 
 /** Its machine is not answering: over the rows last read, or alone with none. */
 function StaleStrip() {
-  return <div class="offline-strip archived-stale" role="status"><span class="dot" aria-hidden="true" /><span class="words">{staleStrip}</span></div>;
+  return <MessageBanner tone="neutral" name="archived-stale">{staleStrip}</MessageBanner>;
 }
 
 /** The foot of an Archived page: how many, and Load more while the host has more; a spinner and

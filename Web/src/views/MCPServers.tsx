@@ -16,6 +16,7 @@ import { ConnectorSetupSection } from "./ConnectorSetup";
 import { go } from "../route";
 import { Capability } from "../protocol/capabilities.generated";
 import { hostNeedsUpdate } from "../model/capabilities";
+import { ask } from "./MessageKinds";
 
 /** One host's servers from one file: the person's (no folder) or a folder's. */
 export function MCPServersList({ store, host, folder }: { store: Store; host: string; folder?: string }) {
@@ -39,7 +40,7 @@ export function MCPServersList({ store, host, folder }: { store: Store; host: st
   const machine = store.isMac(host) ? undefined : store.hosts.value.find((h) => h.id === host)?.name ?? host;
   const remove = async (name: string) => {
     const inFolder = folder !== undefined;
-    if (!window.confirm(`Remove ${name}? ${removesWords(name, inFolder, machine)}${inFolder ? ` ${removesCommitted}` : ""}`)) return;
+    if (!await ask(`Remove ${name}? ${removesWords(name, inFolder, machine)}${inFolder ? ` ${removesCommitted}` : ""}`)) return;
     const why = await store.removeConnector(host, name, folder);
     if (why === undefined) setRemoveProblem(undefined);
     else setRemoveProblem(store.hostIsOnline(host) ? notRemoved(name, why) : notRemovedOffline(name, machine ?? "This Mac"));

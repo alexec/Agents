@@ -109,6 +109,7 @@ type Daemon struct {
 	mcpEventsBook
 	mergeArchiveBook
 	restartBook
+	adoptedBook
 	machineBook
 	hostStatusBook
 	elsewhereBook
@@ -196,6 +197,8 @@ func New(ctx context.Context, root string) (*Daemon, error) {
 	// raise an event that wakes one, so its wake says so.
 	d.noteRestart()
 	d.resumeEventWaits()
+	// The background processes the last host's runtimes left running (#4577).
+	d.adoptBackground()
 	// A lease's line and the waits for it agree again (#2361).
 	d.reconcileLineWaits()
 	d.resumeBlocks()
@@ -361,6 +364,8 @@ func (d *Daemon) Shutdown() {
 	// No turn starts, and nothing new follows one; the turns stopped here record their
 	// endings and what follows them before the files they write are closed (#1272).
 	d.closeAfterTurns()
+	// What the runtimes leave running is watched again after the restart (#4577).
+	d.handBackgroundOver()
 	d.stopAll()
 	d.waitAfterTurns(afterTurnLimit)
 	d.noteCutOffAgents(stoppedAt)

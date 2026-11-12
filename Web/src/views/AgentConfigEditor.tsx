@@ -8,6 +8,7 @@ import { machineKeepsItsOwn, machineOnly } from "../model/settingsMachine";
 import { useSettingsMachine } from "./settings/SettingsMachine";
 import { MarketplacePersonasSection } from "./PersonaCatalog";
 import { Capability } from "../protocol/capabilities.generated";
+import { ask } from "./MessageKinds";
 
 export type AgentConfigKind = "skills" | "personas" | "workflows";
 const kinds: AgentConfigKind[] = ["skills", "personas", "workflows"];
@@ -93,7 +94,7 @@ export function AgentConfigEditor({ store, host, folder, kind, down, open, onUns
   }
   async function save(remove: boolean) {
     if (!selected) return;
-    if (remove && !confirm(`Delete ${selected}?`)) return;
+    if (remove && !await ask(`Delete ${selected}?`)) return;
     setBusy(true);
     const error = await store.saveAgentConfigEditorFile(host, folder, kind, selected, content, remove);
     setBusy(false);

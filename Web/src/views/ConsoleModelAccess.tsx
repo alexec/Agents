@@ -14,6 +14,7 @@ import { fingerprintWords, heldWords, kindName, kinds, modelAccessFoot, needsVen
   runtimesFor, secretFields, settingFields, vendorNames, vendorsFor, waitingWords, whoWords } from "../model/orgAccounts";
 import { routeIDFrom, sealedFor } from "../model/orgSealing";
 import type { RouteForm } from "../model/orgAccounts";
+import { MessageBanner, ask } from "./MessageKinds";
 
 /** What the page is doing: the list, adding or editing a route, or replacing one's key. */
 type Open = { kind: "list" } | { kind: "edit"; kept: OrgRouteKept | null; form: RouteForm } | { kind: "replace"; kept: OrgRouteKept; secrets: Record<string, string> };
@@ -77,8 +78,8 @@ export function ModelAccessPage({ store, down }: { store: Store; down: boolean }
     const result = await store.link.call("orgRoutes/check", { id: kept.route.id });
     return `${kept.route.name}: ${result.words}`;
   });
-  const remove = (kept: OrgRouteKept) => {
-    if (!window.confirm(`Remove ${kept.route.name}?\n\nEach machine deletes its key, and the sessions on it stop at their next turn. Members fall back to their own sign-in where the policy allows it.`)) return;
+  const remove = async (kept: OrgRouteKept) => {
+    if (!await ask(`Remove ${kept.route.name}?\n\nEach machine deletes its key, and the sessions on it stop at their next turn. Members fall back to their own sign-in where the policy allows it.`)) return;
     void run(async () => {
       await store.link.call("orgRoutes/remove", { id: kept.route.id, rev: kept.rev });
       await load();
@@ -86,11 +87,11 @@ export function ModelAccessPage({ store, down }: { store: Store; down: boolean }
     });
   };
   const shown = list.value;
-  if (!shown) return problem.value ? <p class="hint" role="alert">{problem.value}</p> : <p class="hint">Loading…</p>;
+  if (!shown) return problem.value ? <MessageBanner tone="failure">{problem.value}</MessageBanner> : <p class="hint">Loading…</p>;
   const now = open.value;
   return (
     <div class="model-access">
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       {said.value && <p class="quiet small" role="status">{said.value}</p>}
       {now.kind === "edit" && (
         <RouteEditor form={now.form} kept={now.kept} groups={groups.value} busy={busy.value || down}

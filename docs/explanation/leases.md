@@ -42,6 +42,24 @@ You see it in the inspector's **Agent Browser** pane, or the web page's **Agent 
 tab (#3528): its newest tab, live, while the pane is open. You can click, scroll, type
 and paste in it at any time, and an address typed in its bar starts it.
 
+Every machine also offers `capacity`, **Capacity of this Mac** (#4579). Agents lease it
+before heavy work that no declared resource names: a long test suite, a Chromium, a
+simulator, a script that builds. It has no count. It follows the machine's level (ok,
+near or full, from load per core and memory pressure; #4578, #4583): a lease is granted
+at ok and goes in line at near and full. A resource named `build` follows the level in
+the same way, as well as its count. So an agent that leases `build` needs nothing more.
+
+- While the machine is near or full, a new `capacity` or `build` lease goes in line,
+  also when a place is free. The reply says why: "This Mac is near capacity (load 2.4
+  per core). You are 1st in line." The agent ends its turn, and `lease.granted` starts
+  it again.
+- The agents that hold a lease keep it, and can extend it.
+- When the level is ok again, the line gets one grant for each look at the machine
+  (each 15 seconds), the oldest first. Thus a burst does not make the machine full again
+  at once.
+- The person's booking, the browser, the screen and the simulators are not compute.
+  They do not wait for the machine.
+
 The screen lease is now actually acquired by a shipped tool (#3004): `drive_screen` takes
 it the first time an agent drives an app through its own screen, mouse and keyboard, and
 lets it go when the agent's turn ends or you press **Stop**.

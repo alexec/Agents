@@ -3,8 +3,9 @@ import SwiftUI
 
 /// Bring back from ‹host›… (#1473), the reverse of Send to ‹host›… (#1123): a host's
 /// branches come back into the repository at `folder` on this Mac, forward only. `from` is
-/// this Mac's host, which takes them in, since the window is sandboxed and reads no
-/// repository itself.
+/// this Mac's host, which brings them back itself, through the control plane (#4640), since
+/// the window is sandboxed and reads no repository itself. The window only starts it and
+/// shows its row.
 struct BringBackFromHostRequest: Identifiable, Hashable {
     let folder: URL
     let from: MachineRef
@@ -13,26 +14,144 @@ struct BringBackFromHostRequest: Identifiable, Hashable {
 }
 
 extension AppModel {
-    /// Has `host` pack `branches` of its copy at `source`, less the commits this Mac has,
-    /// with its uncommitted changes when `includeChanges`, and has this Mac's host `from`
-    /// take them into the repository at `folder`. Each part goes through the window.
-    func bringBack(_ folder: URL, from: MachineRef, host: MachineRef, source: URL, branches: [String], includeChanges: Bool,
-                   patchOn: String?, progress: @escaping @MainActor (String) -> Void) async throws -> DaemonAPI.BringBack {
-        let label = hosts.label(host)
-        let mac = client(for: from), there = client(for: host)
-        let here = try await receiveState(at: folder.path, on: from)
-        progress("Making the bundle on \(label)…")
-        let pack = try await there.callWhileAnswering(
-            DaemonAPI.Method.foldersSendPack,
-            DaemonAPI.SendPackRequest(folder: source, branches: branches, leavingOut: here.heads, includeChanges: includeChanges),
-            checkingEvery: .seconds(10)).decode(DaemonAPI.SendPack.self)
-        let (bundle, patch) = try await relay(pack, from: there, to: mac, verb: "Bringing back", progress: progress)
-        progress("Bringing it into this Mac's repository…")
-        return try await mac.callWhileAnswering(
-            DaemonAPI.Method.foldersBringBack,
-            DaemonAPI.BringBackRequest(folder: folder, bundle: bundle, patch: patch, patchOn: patch == nil ? nil : patchOn,
-                                       branches: pack.commits),
-            checkingEvery: .seconds(10)).decode(DaemonAPI.BringBack.self)
+    /// Starts bringing back what `request` names into this Mac's host `from`, which brings
+    /// it back itself, through the control plane (#4640): it answers once it has checked the
+    /// machine, and `bringBack/changed` says how it goes. The window is free the whole time,
+    /// and closing it stops nothing.
+    func startBringBack(_ request: DaemonAPI.BringBackFromRequest, from: MachineRef) async throws {
+        let summary = try await client(for: from).call(DaemonAPI.Method.foldersBringBackFrom, request,
+                                                        returning: DaemonAPI.BringBackSummary.self)
+        // A small bring-back can end before its answer comes: its row is there already.
+        if let i = bringBacks.firstIndex(where: { $0.id == summary.id }) {
+            bringBacks[i].request = request
+            bringBacks[i].from = from
+        } else {
+            bringBacks.append(FolderBringBack(state: DaemonAPI.BringBackNotification(bringBack: summary),
+                                              request: request, from: from))
+        }
+    }
+
+    /// Brings back again what a bring-back that stopped asked for.
+    func retryBringBack(_ bringBack: FolderBringBack) async {
+        guard let request = bringBack.request else { return }
+        bringBacks.removeAll { $0.id == bringBack.id }
+        do {
+            try await startBringBack(request, from: bringBack.from)
+        } catch {
+            var stopped = bringBack
+            stopped.state.problem = describe(error)
+            bringBacks.append(stopped)
+        }
+    }
+
+    /// Takes a bring-back that ended out of the Folders column.
+    func putAwayBringBack(_ bringBack: FolderBringBack) {
+        bringBacks.removeAll { $0.id == bringBack.id }
+    }
+
+    /// A `bringBack/changed`: the row goes a part further, or says what it did or why it
+    /// stopped.
+    func bringBackChanged(_ change: DaemonAPI.BringBackNotification) {
+        if let i = bringBacks.firstIndex(where: { $0.id == change.bringBack.id }) {
+            bringBacks[i].state = change
+        } else {
+            bringBacks.append(FolderBringBack(state: change, request: nil, from: .mac))
+        }
+    }
+
+    /// The bring-backs this Mac's host is making, for a window that connects mid-way. Those
+    /// that ended stay, until they are put away.
+    func refreshBringBacks() async {
+        guard let running = try? await client(for: .mac).call(DaemonAPI.Method.foldersBringingBack,
+                                                   returning: [DaemonAPI.BringBackNotification].self) else { return }
+        let known = Dictionary(bringBacks.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        bringBacks = bringBacks.filter(\.state.finished)
+            + running.map { FolderBringBack(state: $0, request: known[$0.bringBack.id]?.request,
+                                            from: known[$0.bringBack.id]?.from ?? .mac) }
+    }
+}
+
+/// A bring-back in the Folders column (#4640): how it goes, and, when this window started it,
+/// what Retry asks for again and into which host.
+struct FolderBringBack: Identifiable, Hashable {
+    var state: DaemonAPI.BringBackNotification
+    var request: DaemonAPI.BringBackFromRequest?
+    var from: MachineRef
+    var id: UUID { state.bringBack.id }
+}
+
+/// A bring-back under way (#4640), as a send's row is (#4613): the folder, and how far the
+/// branches are on their way back. Once it ends it says what moved, or why it stopped (with
+/// Retry), and × puts it away.
+struct BringingBackRow: View {
+    @Environment(AppModel.self) private var model
+    let bringBack: FolderBringBack
+
+    private var name: String { bringBack.state.bringBack.folder.lastPathComponent }
+    private var machine: String { bringBack.state.bringBack.machineName }
+
+    private var line: String {
+        let s = bringBack.state
+        guard s.total >= 1_000_000 else { return "Bringing back from \(machine)…" }
+        return "Bringing back from \(machine): \(s.read.formatted(.byteCount(style: .file))) of \(s.total.formatted(.byteCount(style: .file)))…"
+    }
+
+    /// What a bring-back that went well did.
+    private func doneLine(_ result: DaemonAPI.BringBack) -> String {
+        var lines = [result.moved.isEmpty ? "This Mac already had every commit from \(machine)."
+                                          : "Brought back from \(machine): \(result.moved.formatted(.list(type: .and))) moved forward."]
+        if result.applied { lines.append("The uncommitted changes from \(machine) are in \(name).") }
+        return lines.joined(separator: " ")
+    }
+
+    var body: some View {
+        if bringBack.state.finished {
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(name)
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                    if let problem = bringBack.state.problem {
+                        Text(problem)
+                            .appText(.fine).tinted(.failure)
+                            .lineLimit(3)
+                            .help(problem)
+                    } else if let result = bringBack.state.result {
+                        Text(doneLine(result))
+                            .appText(.fine).foregroundStyle(.secondary)
+                            .lineLimit(3)
+                            .help(doneLine(result))
+                    }
+                }
+                Spacer(minLength: 4)
+                if bringBack.state.problem != nil, bringBack.request != nil {
+                    Button("Retry") { Task { await model.retryBringBack(bringBack) } }
+                        .buttonStyle(.link)
+                        .appText(.fine)
+                }
+                Button { model.putAwayBringBack(bringBack) } label: { Image(systemName: "xmark") }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Put away")
+                    .accessibilityLabel("Put away")
+            }
+        } else {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(name)
+                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                    Text(line)
+                        .appText(.fine)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                ProgressView().controlSize(.small)
+            }
+            .help("\(bringBack.state.bringBack.source) on \(machine)")
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Bringing \(name) back from \(bringBack.state.bringBack.source) on \(machine)")
+        }
     }
 }
 
@@ -60,7 +179,6 @@ struct BringBackSheet: View {
     @State private var source = ""
     @State private var progress: String?
     @State private var problem: String?
-    @State private var done: String?
 
     private var label: String { model.hosts.label(request.host) }
     private var name: String { request.folder.lastPathComponent }
@@ -76,43 +194,31 @@ struct BringBackSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Bring back \(name) from \(label)")
                 .appText(.reading).fontWeight(.semibold)
-            if done == nil {
-                LabeledContent("Folder on \(label)") {
-                    TextField("~/\(name)", text: $source)
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit { Task { await check() } }
-                }
-                Text(stateLine)
-                    .appText(.fine).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let there { form(there) }
+            LabeledContent("Folder on \(label)") {
+                TextField("~/\(name)", text: $source)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { Task { await check() } }
             }
+            Text(stateLine)
+                .appText(.fine).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            if let there { form(there) }
             if let problem {
                 Text(problem)
                     .appText(.fine).tinted(.failure)
-                    .fixedSize(horizontal: false, vertical: true)
-            } else if let done {
-                Text(done).appText(.supporting)
                     .fixedSize(horizontal: false, vertical: true)
             } else if let progress {
                 Text(progress).appText(.fine).foregroundStyle(.secondary)
             }
             HStack {
                 Spacer()
-                if done != nil {
-                    Button("Done") { dismiss() }
-                        .buttonStyle(.paperProminent)
-                        .keyboardShortcut(.defaultAction)
-                } else {
-                    Button("Cancel", role: .cancel) { dismiss() }
-                        .buttonStyle(.paper)
-                        .keyboardShortcut(.cancelAction)
-                        .disabled(progress != nil)
-                    Button("Bring Back") { Task { await bringBack() } }
-                        .buttonStyle(.paperProminent)
-                        .keyboardShortcut(.defaultAction)
-                        .disabled(!canBringBack)
-                }
+                Button("Cancel", role: .cancel) { dismiss() }
+                    .buttonStyle(.paper)
+                    .keyboardShortcut(.cancelAction)
+                Button("Bring Back") { Task { await bringBack() } }
+                    .buttonStyle(.paperProminent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(!canBringBack)
             }
         }
         .padding(20)
@@ -203,20 +309,19 @@ struct BringBackSheet: View {
         }
     }
 
+    /// Starts the bring-back on this Mac's host and closes: the row under the folders says
+    /// how it goes (#4640). Only a refusal before it starts stays here.
     private func bringBack() async {
         guard let there, let state else { return }
         problem = nil
         progress = "Checking \(label)…"
         do {
-            let result = try await model.bringBack(
-                request.folder, from: request.from, host: request.host, source: state.folder,
-                branches: there.branches.filter(chosen.contains), includeChanges: includeChanges && changesCanCome,
-                patchOn: there.current) { progress = $0 }
-            progress = nil
-            var lines = [result.moved.isEmpty ? "This Mac already had every commit."
-                                              : "Moved forward: \(result.moved.formatted(.list(type: .and)))."]
-            if result.applied { lines.append("The uncommitted changes from \(label) are in \(name).") }
-            done = lines.joined(separator: " ")
+            try await model.startBringBack(
+                DaemonAPI.BringBackFromRequest(folder: request.folder, machine: request.host.rawValue, machineName: label,
+                                               source: state.folder.path, branches: there.branches.filter(chosen.contains),
+                                               includeChanges: includeChanges && changesCanCome),
+                from: request.from)
+            dismiss()
         } catch {
             progress = nil
             problem = model.describe(error)

@@ -7,6 +7,7 @@ import type { ForgeLogins } from "../../protocol/generated";
 import { CallFailed } from "../../wire/link";
 import { methodNotFound } from "../../model/errors";
 import { forgeLoginFields, forgeLoginsFooter, forgeLoginsNotSaved, forgeLoginsTitle, loginsChanged, loginsToSave, myLogins } from "../../model/forgeLogins";
+import { MessageBanner } from "../MessageKinds";
 
 export function ForgeLoginsSection({ store, down }: { store: Store; down: boolean }) {
   // Null until people/forViews answers, so a save before then cannot clear what is kept.
@@ -50,7 +51,7 @@ export function ForgeLoginsSection({ store, down }: { store: Store; down: boolea
             onChange={() => void save()} />
         </label>
       ))}
-      {problem.value && <p class="hint failure" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       <p class="hint">{forgeLoginsFooter}</p>
     </section>
   );

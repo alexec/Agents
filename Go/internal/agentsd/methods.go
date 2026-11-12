@@ -37,6 +37,7 @@ func (d *Daemon) register() {
 	d.registerReceive()
 	d.registerSend()
 	d.registerFolderSend()
+	d.registerFolderBringBack()
 	d.registerExports()
 	d.registerBringBack()
 	d.registerLeases()

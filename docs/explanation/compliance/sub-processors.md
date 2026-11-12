@@ -79,6 +79,24 @@ Docker. Sign-up with Apple, Google or GitHub reads the provider's id for you onc
 login, for GitHub), and then forgets the token. It asks Apple and Google for no email
 address and no name ([Privacy](../../privacy.md#the-hosted-service)).
 
+The hosted service uses these two only when its operator turns them on. Without their keys,
+it calls neither:
+
+| Company | Service | What it gets | Where | Terms |
+| --- | --- | --- | --- | --- |
+| Cloudflare | Turnstile, the check that you are a person on the sign-up page (`AGENTS_HOSTED_TURNSTILE_SITE_KEY`) | Your browser loads its script from `challenges.cloudflare.com`, which sees your browser and its IP address. The service then sends Cloudflare the check's token and your IP address. | Cloudflare's global network | [Cloudflare DPA](https://www.cloudflare.com/cloudflare-customer-dpa/) |
+| Stripe | Billing: Checkout, the customer portal and its webhook (`AGENTS_HOSTED_STRIPE_KEY`) | The account's id and the price. Stripe asks you for your card and your email address on its own pages, and keeps them. The account keeps only Stripe's customer and subscription ids. | Stripe, Inc. (United States) | [Stripe DPA](https://stripe.com/legal/dpa) |
+
+## Not sub-processors
+
+- **Google Fonts.** This docs site loads no web font (`font: false` in `mkdocs.yml`, #4605),
+  so your browser does not call `fonts.googleapis.com` or `fonts.gstatic.com`.
+- **YouTube.** The web site at `agentloops.dev` embeds no video yet: its frames are only
+  comments in `www/index.html`. When a video goes in, it uses the
+  `youtube-nocookie.com` frame, which your browser loads from Google only when the page
+  shows it. That frame then goes in the table above. The videos that the Agents folder
+  uploads are under [Privacy](../../privacy.md#videos-on-youtube).
+
 ## Delivering the apps
 
 | Company | Service | What it gets |

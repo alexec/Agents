@@ -1,5 +1,7 @@
-body { font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1d1d1f; background: #f4f1ea; margin: 0; }
+/* The hand-back pages on Paper (#4617). Name colours and fonts only by the tokens in
+   tokens.css, which scripts/design.sh gen makes from design/tokens.json; its dark is there too. */
+body { font: var(--type-reading)/1.5 var(--font-text); color: var(--paper-ink); background: var(--paper-ground); margin: 0; }
 main { max-width: 28rem; margin: 18vh auto 0; padding: 0 1.5rem; }
-h1 { font-size: 1.25rem; margin: 0 0 0.5rem; }
-a { color: #2b4f86; }
-@media (prefers-color-scheme: dark) { body { color: #f2f2f2; background: #1c1c1e; } a { color: #8fb1ea; } }
+h1 { font-size: var(--type-title); margin: 0 0 0.5rem; }
+a { color: var(--accent); }
+button { font: inherit; padding: .5rem 1rem; border-radius: var(--radius-control); border: 1px solid var(--accent); background: var(--accent); color: var(--paper-ground); cursor: pointer; }

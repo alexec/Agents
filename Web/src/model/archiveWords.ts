@@ -18,8 +18,7 @@ export function archiveLine(agent: Agent): string | null {
   return asksToArchive(agent) ? archiveMark : null;
 }
 
-/** Undo after Archive (#1534): how long Undo is offered, in milliseconds (ArchiveUndo.seconds). */
-export const undoMillis = 5000;
+/** Undo after Archive (#1534): a toast with Undo, for 8 seconds (messageKinds.undoToastMillis, #4740). */
 export const undoLabel = "Undo";
 
 /** ArchiveUndo.line: "Archived “Fix the parser”", and that it stays stopped when Archive stopped it. */

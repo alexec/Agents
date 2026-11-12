@@ -12,16 +12,18 @@ import { changed, editPolicy, foot, none, resumeAll, resumeMessage, resumeTitle,
   stopMessage, stopTitle, stoppedBy, stoppedStrip, title, viewOf } from "../../model/orgPolicy";
 import { fromOrganisation, mineLine, noRoutes, routesFoot, routeWaiting, routesTitle } from "../../model/orgAccounts";
 import { GovernanceAsk } from "../Governance";
+import { MessageBanner, ask } from "../MessageKinds";
 
 /** The red strip while the kill switch is on, and the time it went on. */
 export function StoppedStrip({ policy }: { policy: OrgPolicy | undefined }) {
   const stop = policy?.stopAll;
   if (!stop?.on) return null;
   return (
-    <p class="policy-stopped" role="alert">
+    // A banner of every page (docs/reference/design-system.md, "Messages"): neutral, set by the organisation.
+    <MessageBanner tone="neutral" name="policy-stopped">
       <strong>{stoppedStrip}</strong> <span class="small">{stoppedBy(stop, fromWireDate(stop.at), new Date())}</span>
       {stop.note && <><br /><span class="small">{stop.note}</span></>}
-    </p>
+    </MessageBanner>
   );
 }
 
@@ -36,7 +38,7 @@ export function KillSwitch({ store, policy, down, changedTo }: { store: Store; p
       // The running agents each machine last listed; the question asks without them when this fails.
       running = await store.link.call("console/fleet", {}).then((b) => runningAgents(b.machines), () => undefined);
     }
-    if (!window.confirm(on ? `${resumeTitle}\n\n${resumeMessage}` : `${stopTitle}\n\n${stopMessage(running)}`)) return;
+    if (!await ask(on ? `${resumeTitle}\n\n${resumeMessage}` : `${stopTitle}\n\n${stopMessage(running)}`)) return;
     busy.value = true;
     try {
       const kept = await store.link.call("policy/stopAll", { on: !on });
@@ -83,7 +85,7 @@ export function PolicySection({ store, down }: { store: Store; down: boolean }) 
   return (
     <section aria-labelledby="settings-policy">
       <h3 class="section-head" id="settings-policy">{title}</h3>
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       {!view && !problem.value && <p class="hint">Loading…</p>}
       {view && (
         <>

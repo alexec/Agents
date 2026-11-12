@@ -13,6 +13,9 @@ surface looks for them:
     www/tokens.css                  agentloops.dev
     docs/stylesheets/tokens.css     the docs site (Material's slate scheme is the dark)
     Go/internal/forgepages/tokens.css   the forge connector pages, as light-dark() pairs
+    Go/internal/paperpage/tokens.css    the hosted sign-in pages, the connector sign-in loopback page
+                                        and the org OIDC page, inlined in each (#4617)
+    deploy/site/www/oauth/tokens.css    the OAuth hand-back pages (#4617)
 
 and the token tables on the docs' design-system page (#4604), docs/reference/design-system.md:
 gen writes each table between its `<!-- design.sh gen: NAME -->` and `<!-- /design.sh gen -->`
@@ -103,6 +106,9 @@ OUTPUTS = {
     "www/tokens.css": {"groups": ("color", "radius", "font", "type"), "dark": "media"},
     "docs/stylesheets/tokens.css": {"groups": ("color", "radius", "font", "type"), "dark": "material"},
     "Go/internal/forgepages/tokens.css": {"groups": ("color", "radius", "font", "type"), "dark": "light-dark"},
+    # Pages a person opens in any browser, so the dark is a media query, not light-dark() (#4617).
+    "Go/internal/paperpage/tokens.css": {"groups": ("color", "radius", "font", "type"), "dark": "media"},
+    "deploy/site/www/oauth/tokens.css": {"groups": ("color", "radius", "font", "type"), "dark": "media"},
 }
 
 

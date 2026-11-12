@@ -10,36 +10,30 @@ struct ContinueWhenBackStrip: View {
     @State private var next: String?
 
     var body: some View {
-        HStack(spacing: 8) {
-            if let line = ContinueWhenBackWords.line(agent) {
-                Label(line, systemImage: ContinueWhenBackWords.symbol)
-                    .foregroundStyle(.secondary)
-                Spacer(minLength: 0)
+        // Neutral (#4737): the chat carries on by itself, or will when asked.
+        let line = ContinueWhenBackWords.line(agent)
+        let words = line ?? ContinueWhenBackWords.paused
+        PaneBanner(tone: .neutral, symbol: ContinueWhenBackWords.symbol, words) {
+            if line != nil {
                 Button(ContinueWhenBackWords.cancel) {
                     Task { await model.cancelContinue(agent.id) }
                 }
                 .help("This chat no longer carries on by itself")
             } else {
-                Spacer(minLength: 0)
                 if let next {
                     Button(LevelWords.continueOn(PromptWords.runtimeName(next))) {
                         Task { await model.continueInNew(agent.id, onAuto: true) }
                     }
                     .help("Starts a session on \(PromptWords.runtimeName(next)) that reads this one and carries on, with the same values.")
                 }
-                Button {
+                Button(ContinueWhenBackWords.button(resetsAt: model.runtimeAllowances?.resetsAt(agent.runtimeID))) {
                     Task { await model.continueWhenBack(agent.id) }
-                } label: {
-                    Label(ContinueWhenBackWords.button(resetsAt: model.runtimeAllowances?.resetsAt(agent.runtimeID)),
-                          systemImage: ContinueWhenBackWords.symbol)
                 }
                 .help(ContinueWhenBackWords.help)
             }
         }
-        .buttonStyle(.paper)
-        .appText(.fine)
         .chatColumn()
-        .padding(.vertical, 8)
+        .padding(.top, 8)
         .task(id: agent.id) {
             next = await model.autoPreview(for: agent)?.runtimeID.flatMap { $0 == agent.runtimeID ? nil : $0 }
         }

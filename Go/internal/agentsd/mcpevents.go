@@ -62,8 +62,10 @@ type mcpSubscription struct {
 	arguments                      map[string]json.RawMessage
 	// workflows are the ids of the workflows whose triggers make it, sorted.
 	workflows []string
-	// waits are the agents whose open waits hold it (#577), sorted.
-	waits []wire.UUID
+	// waits are the agents whose open waits hold it (#577), sorted; waitIDs are those
+	// waits' own ids, sorted, so a stop ends only the waits it was polled for (#4419).
+	waits   []wire.UUID
+	waitIDs []wire.UUID
 	// archives is whether Archive a session when its pull request merges holds it (#2886).
 	archives bool
 	pool     string
@@ -90,8 +92,21 @@ type mcpLive struct {
 	state   wire.MCPTriggerStatusState
 	failure *wire.MCPTriggerFailure
 	retryAt *wire.Date
-	// stoppedFor is set when it stopped: it starts again only when its fingerprint changes.
-	stoppedFor string
+	// stoppedFor is set when it stopped: it starts again only when its fingerprint changes,
+	// or a wait that was not open when it stopped holds it (stoppedWaits, #4419).
+	stoppedFor   string
+	stoppedWaits []wire.UUID
+}
+
+// holdsNewWait is whether a stopped subscription is held by a wait made after it stopped:
+// that wait is owed a poll of its own, as the server may be back.
+func (l mcpLive) holdsNewWait(s *mcpSubscription) bool {
+	for _, w := range s.waitIDs {
+		if !containsUUID(l.stoppedWaits, w) {
+			return true
+		}
+	}
+	return false
 }
 
 // mcpListing is a server's events as last listed; events nil when it offers none.
@@ -374,10 +389,14 @@ func (d *Daemon) addMCPWaits(wanted map[string]*mcpSubscription, servers func(fo
 							s.waits = append(s.waits, sw.agent)
 							sort.Slice(s.waits, func(i, j int) bool { return s.waits[i] < s.waits[j] })
 						}
+						if !containsUUID(s.waitIDs, sw.wait) {
+							s.waitIDs = append(s.waitIDs, sw.wait)
+							sort.Slice(s.waitIDs, func(i, j int) bool { return s.waitIDs[i] < s.waitIDs[j] })
+						}
 						continue
 					}
 					wanted[id] = &mcpSubscription{id: id, key: key, folder: sw.folder, server: name, event: def.Name,
-						arguments: nt.arguments, waits: []wire.UUID{sw.agent}, pool: f.server.pool(), source: f.server,
+						arguments: nt.arguments, waits: []wire.UUID{sw.agent}, waitIDs: []wire.UUID{sw.wait}, pool: f.server.pool(), source: f.server,
 						fingerprint: def.wireText() + "\n" + f.server.entry}
 				}
 			}
@@ -883,7 +902,8 @@ func (d *Daemon) applyMCPSubscriptionsLocked(ctx context.Context, wanted map[str
 		before := d.mcpSubs[id]
 		d.mcpSubs[id] = s
 		live, hasLive := d.mcpLives[id]
-		restart := before == nil || (hasLive && live.state == wire.MCPTriggerStatusStateStopped && live.stoppedFor != s.fingerprint) ||
+		stopped := hasLive && live.state == wire.MCPTriggerStatusStateStopped
+		restart := before == nil || (stopped && (live.stoppedFor != s.fingerprint || live.holdsNewWait(s))) ||
 			before.pool != s.pool
 		if !restart {
 			continue
@@ -979,6 +999,12 @@ func (d *Daemon) runMCPSubscription(ctx context.Context, id string) {
 				failures++
 				wait = max(mcpBackoff(failures), time.Duration(failed.retryAfterMs)*time.Millisecond)
 				d.retryMCP(id, s, failed, wait)
+			case "internal":
+				// The server's own call failed (a DNS lookup, GitHub down for a moment): the
+				// next poll may work, so it is tried again, never stopped for good (#4419).
+				failures++
+				wait = mcpBackoff(failures)
+				d.retryMCP(id, s, failed, wait)
 			case "unsupported":
 				if failed.reason == "schema_changed" {
 					// The arguments are checked again against the new list.
@@ -1058,7 +1084,7 @@ func (d *Daemon) retryMCP(id string, s *mcpSubscription, e *mcpEventsError, wait
 	switch e.kind {
 	case "needsSignIn":
 		code = wire.MCPTriggerFailureCodeNeedsSignIn
-	case "exhausted":
+	case "exhausted", "internal":
 		code = wire.MCPTriggerFailureCodeServerError
 	}
 	since := now()
@@ -1075,7 +1101,8 @@ func (d *Daemon) retryMCP(id string, s *mcpSubscription, e *mcpEventsError, wait
 
 func (d *Daemon) stopMCP(id string, s *mcpSubscription, code wire.MCPTriggerFailureCode, message string) {
 	d.setMCPLive(id, mcpLive{state: wire.MCPTriggerStatusStateStopped, stoppedFor: s.fingerprint,
-		failure: &wire.MCPTriggerFailure{Code: code, Message: message, Since: now()}})
+		stoppedWaits: append([]wire.UUID(nil), s.waitIDs...),
+		failure:      &wire.MCPTriggerFailure{Code: code, Message: message, Since: now()}})
 	log.Printf("mcp events: %s %s stopped (%s)", s.server, s.event, code)
 	d.endWaitsOnStoppedServers(s)
 }
@@ -1083,11 +1110,14 @@ func (d *Daemon) stopMCP(id string, s *mcpSubscription, code wire.MCPTriggerFail
 // endWaitsOnStoppedServers ends each wait that s holds once every subscription the wait
 // holds has stopped, with their reasons (#2491): nothing can wake it any more, and it
 // would sit until its until_minutes. A wait that also hears the app's own events stays.
+// Only the waits s was polled for end, once each (#4419): one that replaced them since, or
+// a subscription that stopped before the wait was made, is not this stop's to end.
 func (d *Daemon) endWaitsOnStoppedServers(s *mcpSubscription) {
 	ended := false
 	for _, agent := range s.waits {
 		a := d.Store.Agent(agent)
-		if a == nil || a.EventWait == nil || a.EventWait.Ending != nil || len(a.EventWait.ServerEvents) == 0 {
+		if a == nil || a.EventWait == nil || a.EventWait.Ending != nil || len(a.EventWait.ServerEvents) == 0 ||
+			!containsUUID(s.waitIDs, a.EventWait.ID) {
 			continue
 		}
 		w := a.EventWait
@@ -1103,14 +1133,14 @@ func (d *Daemon) endWaitsOnStoppedServers(s *mcpSubscription) {
 		d.mcpEvMu.Lock()
 		ids := make([]string, 0, len(d.mcpSubs))
 		for id, other := range d.mcpSubs {
-			if containsUUID(other.waits, agent) {
+			if containsUUID(other.waitIDs, w.ID) {
 				ids = append(ids, id)
 			}
 		}
 		sort.Strings(ids)
 		for _, id := range ids {
 			l := d.mcpLives[id]
-			if l.state != wire.MCPTriggerStatusStateStopped {
+			if l.state != wire.MCPTriggerStatusStateStopped || !containsUUID(l.stoppedWaits, w.ID) {
 				allStopped = false
 				break
 			}

@@ -6,6 +6,7 @@ import type { Store } from "../model/store";
 import { budgetFoot, budgetRows, line, markTitle, refusalLine, runtimeName, startsNothing } from "../model/orgPolicy";
 import { money } from "../model/limits";
 import { StoppedStrip } from "./settings/Policy";
+import { MessageBanner } from "./MessageKinds";
 
 /** Its layer's title (Set by your organisation, you or this folder), with the rule's words under it. Nothing without a mark. */
 export function OrgPolicyLine({ mark }: { mark: PolicySetBy | undefined }) {
@@ -40,7 +41,7 @@ export function OrgPolicyStrip({ store }: { store: Store }) {
   if (stopped) return <StoppedStrip policy={stopped} />;
   const refused = states.find((s) => s.refusal)?.refusal;
   if (!refused) return null;
-  return <p class="policy-stopped" role="alert"><strong>{refusalLine(refused)}</strong></p>;
+  return <MessageBanner tone="neutral" name="policy-stopped"><strong>{refusalLine(refused)}</strong></MessageBanner>;
 }
 
 /** The organisation's budgets beside the person's own limits on Cost (#998, FR-016): the lower is used. */

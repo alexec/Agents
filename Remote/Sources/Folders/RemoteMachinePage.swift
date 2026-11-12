@@ -2,7 +2,7 @@ import AgentsKitCore
 import SwiftUI
 
 /// One machine's page (#4034), as the window's (#3626) and the web page's: a summary first,
-/// its CPU, memory and worst disk on one line (#3743), then its disks, then the runtimes
+/// its CPU, load and capacity (#4582), memory and worst disk (#3743), then its disks, then the runtimes
 /// installed there (#3629), with Sign In… and Update (#4035), and This Mac's resources (#4027).
 /// Read with `machine/usage` as it opens and every few seconds while it is open, never
 /// otherwise. Its worktrees and processes, its settings, and another machine's resources,
@@ -140,16 +140,36 @@ struct RemoteMachinePage: View {
         host != .mac && status.signIn != nil && status.needsSignIn && model.host(host, has: Capability.runtimesSignIn1)
     }
 
-    /// "Is this machine OK?" in one line (#3743): CPU, memory and the worst disk, in its tint.
+    /// "Is this machine OK?" (#3743): CPU, the load and the level (#4582), memory and the worst
+    /// disk, each in its tint; above them at near and full, why; under them, the starts that wait.
     private func summary(_ usage: DaemonAPI.MachineUsageState) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("CPU \(ProcessWords.machineCPU(usage.machine)) · Memory \(ProcessWords.machineMemory(usage.machine))")
+            if let warning = CapacityWords.warning(usage.machine, name: name) {
+                Text(warning).foregroundStyle(Self.tint(usage.machine.capacity).style(or: .primary))
+            }
+            Text("CPU \(ProcessWords.machineCPU(usage.machine))"
+                + (usage.machine.loadPerCore.map { " · \(CapacityWords.load($0))" } ?? "")
+                + " · Memory \(ProcessWords.machineMemory(usage.machine))")
+            if let level = CapacityWords.level(usage.machine.capacity) {
+                Text(level).foregroundStyle(Self.tint(usage.machine.capacity).style(or: .primary))
+            }
             if let disk = DiskSpace.headline(usage.disks, folders: []) {
                 Text(DiskSpace.summaryWords(disk)).foregroundStyle(Self.tint(disk.level).style(or: .primary))
+            }
+            if let queued = CapacityWords.queued(model.work.agents.count { $0.host == host && $0.state == .queued }) {
+                Text(queued).foregroundStyle(.secondary)
             }
         }
         .monospacedDigit()
         .accessibilityElement(children: .combine)
+    }
+
+    private static func tint(_ level: DaemonAPI.CapacityLevel?) -> StateTint {
+        switch level {
+        case .ok, nil: .none
+        case .near: .attention
+        case .full: .failure
+        }
     }
 
     private static func tint(_ level: DiskLevel) -> StateTint {

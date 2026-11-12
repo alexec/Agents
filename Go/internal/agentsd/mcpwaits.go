@@ -453,6 +453,7 @@ func (d *Daemon) startMCPWait(check mcpWaitCheck) {
 // waitingOnServers is every open wait's server events, by agent, for the subscriptions.
 type serverWait struct {
 	agent  wire.UUID
+	wait   wire.UUID
 	folder string
 	events []wire.WaitServerEvent
 }
@@ -464,7 +465,7 @@ func (d *Daemon) serverWaits() []serverWait {
 		if w == nil || w.Ending != nil || len(w.ServerEvents) == 0 {
 			continue
 		}
-		out = append(out, serverWait{agent: a.ID, folder: folderPath(&a), events: w.ServerEvents})
+		out = append(out, serverWait{agent: a.ID, wait: w.ID, folder: folderPath(&a), events: w.ServerEvents})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].agent < out[j].agent })
 	return out

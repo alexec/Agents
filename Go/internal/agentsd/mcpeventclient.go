@@ -79,8 +79,9 @@ type mcpPollResult struct {
 // mcpEventsError is MCPEventsError: what went wrong asking a server for events, as the
 // draft's codes and the transport say it.
 type mcpEventsError struct {
-	// kind is notFound, forbidden, exhausted, unsupported, invalidParams, serverError,
-	// needsSignIn, transport or timedOut.
+	// kind is notFound, forbidden, exhausted, unsupported, invalidParams, internal,
+	// serverError, needsSignIn, transport or timedOut. internal is a -32603: the server's
+	// own call failed, as a DNS lookup does for a moment (#4419), so it is tried again.
 	kind         string
 	message      string
 	reason       string
@@ -122,6 +123,8 @@ func mcpEventsErrorOf(err error) *mcpEventsError {
 			e.kind, e.reason = "unsupported", data.Reason
 		case -32602:
 			e.kind = "invalidParams"
+		case -32603:
+			e.kind = "internal"
 		default:
 			e.kind = "serverError"
 		}
@@ -161,6 +164,8 @@ func (e *mcpEventsError) logWord() string {
 		return "unreachable"
 	case "timedOut":
 		return "timed out"
+	case "internal":
+		return "server error"
 	}
 	return e.kind
 }
@@ -413,6 +418,8 @@ func mcpEventsWords(e *mcpEventsError, server string) string {
 		return server + " wants a sign-in first."
 	case "exhausted":
 		return server + " asked to be asked less often."
+	case "internal":
+		return server + " answered with an error" + mcpTheirWords(e.message) + " Trying again."
 	}
 	return server + " answered with an error."
 }

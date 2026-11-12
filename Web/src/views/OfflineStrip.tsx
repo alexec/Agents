@@ -9,6 +9,7 @@ import type { ControlMachine, DiskAlarm, MachineWorkspace, RuntimeStatus } from 
 import { fromWireDate } from "../protocol/dates";
 import type { Store } from "../model/store";
 import { headline, needWords } from "../model/disk";
+import { MessageBanner } from "./MessageKinds";
 
 /** What a workspace host's strip says while it is stopped, starting or failed to start, or null
  *  when the ordinary offline line says it (OfflineWords.workspaceLine). */
@@ -129,16 +130,15 @@ export function OfflineStrip({ store, host }: { store: Store; host: string }) {
   const at = since ? new Date(since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null;
   const row = store.hosts.value.find((h) => h.id === host);
   const strip = offlineStrip(host, row, at, store.macHostID.value);
+  // A banner of the pane (docs/reference/design-system.md, "Messages"): neutral, because the person need not act.
   return (
-    <p class="offline-strip" role="status">
-      {strip.starting ? <span class="spinner" aria-hidden="true" /> : <span class="dot" aria-hidden="true" />}
-      <span class="words">{strip.line}</span>
-      {strip.since !== null ? <Elapsed since={strip.since} />
-        : strip.start ? (
-          <button type="button" disabled={store.hostsBeingStarted.value.includes(host)}
-            aria-label={`Start ${row?.name ?? "this machine"}`} onClick={() => void store.startHost(host)}>Start</button>
-        ) : null}
-    </p>
+    <MessageBanner tone="neutral" name="offline-strip" busy={strip.starting} actions={strip.since !== null ? <Elapsed since={strip.since} />
+      : strip.start ? (
+        <button type="button" disabled={store.hostsBeingStarted.value.includes(host)}
+          aria-label={`Start ${row?.name ?? "this machine"}`} onClick={() => void store.startHost(host)}>Start</button>
+      ) : undefined}>
+      {strip.line}
+    </MessageBanner>
   );
 }
 

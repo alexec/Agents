@@ -119,6 +119,7 @@ type leaseState struct {
 	leaseTick *time.Timer
 	// personHolder is who holds the person's booking (#4268), read by the needs.
 	personHolder atomic.Pointer[wire.UUID]
+	capacityState
 }
 
 func resourceName(given string) (wire.ResourceName, bool) {
@@ -168,6 +169,7 @@ func (d *Daemon) loadLeases() []leaseEvent {
 	if b, err := os.ReadFile(d.resourcesFile()); err == nil {
 		diskjson.Unmarshal(b, &d.declared)
 	}
+	d.noteCapacityLine()
 	var events []leaseEvent
 	for _, r := range d.declared {
 		events = append(events, d.setRules(r.Name, rulesOf(r))...)
@@ -211,20 +213,26 @@ func (d *Daemon) leaveNotice(n leaseNotice, agent wire.UUID) {
 	d.book.Notices[string(agent)] = append(d.book.Notices[string(agent)], n)
 }
 
-// handOn gives free places to the line, first come first served.
+// handOn gives free places to the line, first come first served. A compute resource's
+// line waits while the machine is near or full, and is served one a look after (#4579).
 func (d *Daemon) handOn(name wire.ResourceName, e *leaseEntry) []leaseEvent {
 	var events []leaseEvent
-	for !e.full() && len(e.Line) > 0 {
-		next := e.Line[0]
-		e.Line = e.Line[1:]
-		length, _ := e.Rules.length(next.Minutes)
-		t := now()
-		l := wire.Lease{Resource: name, DisplayName: e.DisplayName, Holder: next.AgentID, GrantedAt: t,
-			ExpiresAt: wire.DateOf(t.Time().Add(length))}
-		e.Leases = append(e.Leases, l)
-		events = append(events, leaseEvent{granted: true, lease: l, waiter: &next})
+	for !e.full() && len(e.Line) > 0 && !d.heldByCapacity(name, e) {
+		events = append(events, d.grantNext(name, e))
 	}
 	return events
+}
+
+// grantNext gives the first in e's line a place.
+func (d *Daemon) grantNext(name wire.ResourceName, e *leaseEntry) leaseEvent {
+	next := e.Line[0]
+	e.Line = e.Line[1:]
+	length, _ := e.Rules.length(next.Minutes)
+	t := now()
+	l := wire.Lease{Resource: name, DisplayName: e.DisplayName, Holder: next.AgentID, GrantedAt: t,
+		ExpiresAt: wire.DateOf(t.Time().Add(length))}
+	e.Leases = append(e.Leases, l)
+	return leaseEvent{granted: true, lease: l, waiter: &next}
 }
 
 func (d *Daemon) setRules(name wire.ResourceName, rules leaseRules) []leaseEvent {
@@ -488,6 +496,11 @@ func (d *Daemon) leaseSnapshot() wire.LeaseSnapshot {
 		rows = append(rows, row(b, "browser", browser.DisplayName, false, nil))
 		drawn[b] = true
 	}
+	// The machine's capacity (#4579): named, so a client from before it reads it as any other.
+	if !drawn[capacityResource] {
+		rows = append(rows, row(capacityResource, "named", capacityDisplay(), false, nil))
+		drawn[capacityResource] = true
+	}
 	// The person's booking (#4268): named, so a client from before it reads it as any other.
 	if p, display := d.personLease(); !drawn[p] {
 		rows = append(rows, row(p, "named", display, false, nil))
@@ -526,7 +539,7 @@ func declaredProblem(r wire.DeclaredResource) string {
 	case strings.TrimSpace(r.DisplayName) == "":
 		return "Give it a name."
 	case r.Name == "screen" || strings.HasPrefix(string(r.Name), "simulator:") || strings.HasPrefix(string(r.Name), "browser:") ||
-		isPersonLease(r.Name):
+		isPersonLease(r.Name) || r.Name == capacityResource:
 		return r.DisplayName + " is found on the Mac by itself; choose another name."
 	case strings.TrimSpace(r.Description) == "":
 		return "Say what it is for, so agents know when to take it."

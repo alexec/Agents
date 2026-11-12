@@ -1,5 +1,5 @@
 // Machines ▸ <machine> (#3626): one machine's page, the place to go for its status, as the window's MachinePage.
-// A summary first (#3743): its CPU, memory and worst disk on one line. Then the detail, most of it closed until the
+// A summary first (#3743): its CPU, load and capacity (#4582), memory and worst disk on one line. Then the detail, most of it closed until the
 // person opens it: the disk that matters with the others folded, a row per folder's worktrees (#3627), the runtimes
 // installed there (#3629), resources only when one is declared or held, and its processes (#3453). Read with
 // machine/usage when it opens and every few seconds while it is open and the tab is seen.
@@ -8,6 +8,7 @@ import type { Store } from "../model/store";
 import { hostAnswers, hostHas } from "../model/capabilities";
 import { diskLine, freeWords, headline, levelWords, summaryWords } from "../model/disk";
 import { cpuWords, machineCPUWords, machineMemoryWords } from "../model/processes";
+import { detailWords, levelClass as capacityClass, levelWords as capacityWords, loadWords, queuedWords, warningWords } from "../model/capacity";
 import { Capability } from "../protocol/capabilities.generated";
 import type { DiskAlarm, MachineUsageState } from "../protocol/generated";
 import { go } from "../route";
@@ -52,6 +53,10 @@ export function MachinePage({ store, host }: { store: Store; host: string }) {
   const top = headline(disks, (store.worktreeLists.value[host] ?? []).map((g) => decodeURIComponent(new URL(g.folder, "file:///").pathname)));
   const shownDisks = disks.filter((d) => d.level !== "ok" || d === top);
   const otherDisks = disks.filter((d) => !shownDisks.includes(d));
+  // The level and why at near and full, and the starts that wait for a place (#4582, #4377).
+  const warning = usage ? warningWords(usage.machine, name) : null;
+  const level = usage ? capacityWords(usage.machine.capacity) : null;
+  const queued = queuedWords((store.agents.value[host] ?? []).filter((a) => a.state === "queued").length);
   const diskRow = (disk: DiskAlarm) => (
     <div class="setting" key={disk.reading.mount} title={disk.level === "ok" ? disk.reading.mount : `${disk.reading.mount}: ${diskLine(disk)}`}>
       <span>{disk.reading.volume}</span>
@@ -74,13 +79,19 @@ export function MachinePage({ store, host }: { store: Store; host: string }) {
               {!usage && <p class="hint">{failure ?? "Loading…"}</p>}
               {usage && (
                 <>
+                  {warning && <p class={`machine-capacity ${capacityClass(usage.machine.capacity)}`} role="status">{warning}</p>}
                   <div class="setting machine-summary" title={machineCPUWords(usage.machine)}>
                     <span>
-                      CPU {cpuWords(usage.machine.cpuPercent)} · Memory {machineMemoryWords(usage.machine)}
+                      CPU {cpuWords(usage.machine.cpuPercent)}
+                      {usage.machine.loadPerCore != null && <span title={detailWords(usage.machine) ?? undefined}>
+                        {" · "}{loadWords(usage.machine.loadPerCore)}</span>}
+                      {level && <> · <span class={capacityClass(usage.machine.capacity)}>{level}</span></>}
+                      {" · "}Memory {machineMemoryWords(usage.machine)}
                       {top && <> · <span class={levelClass(top)} title={top.level === "ok" ? top.reading.volume : diskLine(top)}>
                         {summaryWords(top)}</span></>}
                     </span>
                   </div>
+                  {queued && <p class="hint">{queued}</p>}
                   {failure && <p class="hint">{failure}</p>}
                 </>
               )}

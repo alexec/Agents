@@ -39,15 +39,16 @@ try {
   const removes = await page.eval(`[...document.querySelectorAll("dialog.sheet[open] .project-folders button")].filter((b) => b.textContent === "Remove…").length`);
   check(removes === 2, `Remove… on each folder: ${removes}`);
   await page.shot(`${out}/web-project-general.png`);
-  // A headless page draws no confirm(), so it is answered here, and what it asked is kept.
-  await page.eval(`window.confirm = (m) => { window.asked = m; return true; }`);
   // The other folder leaves: the one the dialog was opened on stays, with the project.
   await page.eval(`[...[...document.querySelectorAll("dialog.sheet[open] .project-folders li")]
     .find((li) => !li.querySelector(".path").textContent.endsWith("/" + ${js(folderName)})).querySelectorAll("button")]
     .find((b) => b.textContent === "Remove…").click()`);
-  await page.waitFor(`${rows}.length === 1`, 10_000);
-  const asked = await page.eval(`window.asked`);
+  // The page's own alert (#4740): what it asked is read, and Remove is pressed.
+  await page.waitFor(`document.querySelector("dialog.message-alert[open]")`, 10_000);
+  const asked = await page.eval(`[...document.querySelectorAll("dialog.message-alert[open] h2, dialog.message-alert[open] p")].map((e) => e.textContent).join("\\n\\n")`);
   check(/^Remove .* from this project\?\n\nIt gets a project of its own, named after it\./.test(asked ?? ""), `it asked: ${js(asked)}`);
+  await page.eval(`[...document.querySelectorAll("dialog.message-alert[open] button")].find((b) => b.textContent === "Remove").click()`);
+  await page.waitFor(`${rows}.length === 1`, 10_000);
   await sleep(600);
   const left = await page.eval(`${rows}.length`);
   check(left === 1, `the project's folders after: ${left}`);
