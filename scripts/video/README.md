@@ -88,14 +88,18 @@ changes, the same scene makes it again.
   take's `<id>.vtt`, in English (`captions.insert`). The thumbnail is a frame of the take, at
   one of the contact sheet's two-second moments: the scene's `THUMBNAIL` second, or two
   fifths in (`thumbnails.set`; a channel that is not verified yet cannot set one, so the log
-  says so and YouTube picks one). A new take replaces the old one in its playlist: the old
+  says so and YouTube picks one; Loops is not verified yet, #4961). A playlist made a moment
+  before is 404 to YouTube for a few seconds: the calls on it wait and ask again (#4838). A new take replaces the old one in its playlist: the old
   video is made private and taken out of the playlist, never deleted. The local files are
   deleted after a good upload. `upload.py --self-test` proves each call against a fake API. The OAuth client in
   `~/.agents/secrets/youtube-client.json` is the agents' Google account's (Loops Agents, Cloud
   project `loops-videos`, In production; #4837), and its refresh token is
-  `youtube-token.json`. To sign in again, `upload.py --sign-in --no-browser` prints the consent
+  `youtube-token.json`. The sign-in asks for `youtube.force-ssl`: plain `youtube` has no
+  captions (#4838), and `--preflight` fails a token without it. To sign in again, `upload.py --sign-in --no-browser` prints the consent
   address; open it in the agents' own Chrome profile (`chrome-profile-google`, which keeps the
-  Google sign-in), never the app's browser, which Google refuses. Without a sign-in the video
+  Google sign-in; start it without `--incognito`), never the app's browser, which Google
+  refuses. The app is not verified by Google, so the consent first shows "Google hasn't
+  verified this app": Advanced ▸ Go to Loops videos. Without a sign-in the video
   stays in `out/` and the log says why.
 - **Its walk hand-off.** A walk's Connect Linear sheet opens no authentication session (that
   is Safari's sheet, on the person's screen): it writes the flow and its address to

@@ -57,8 +57,9 @@ DOCS = "https://docs.agentloops.dev/"
 # The contact sheet takes a frame every two seconds (make.contact_sheet): the thumbnail is
 # one of those moments.
 SHEET_EVERY = 2
-# Upload, playlists and a video's privacy: the one scope that has all three.
-SCOPE = "https://www.googleapis.com/auth/youtube"
+# Upload, playlists, a video's privacy and captions: the one scope that has all four.
+# `youtube` alone has no captions.insert (403 insufficientPermissions, #4838).
+SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl"
 API = "https://www.googleapis.com/youtube/v3"
 UPLOAD = "https://www.googleapis.com/upload/youtube/v3/videos"
 CAPTIONS = "https://www.googleapis.com/upload/youtube/v3/captions"
@@ -152,6 +153,7 @@ def sign_in(browser=True):
 
 
 def access_token():
+    """An access token, and the scopes the sign-in gave."""
     if not TOKEN.exists():
         raise NotSignedIn("not signed in to YouTube: Alex runs `scripts/video/upload.py --sign-in` (#1793, What Alex does)")
     c = client()
@@ -159,9 +161,10 @@ def access_token():
     if not refresh:
         # A copy of the client file in its place (seen 2026-10-21) is not a sign-in.
         raise NotSignedIn(f"{TOKEN} has no refresh token: Alex runs `scripts/video/upload.py --sign-in` (#1856, What Alex does)")
-    return post_form(c.get("token_uri", "https://oauth2.googleapis.com/token"), {
+    answer = post_form(c.get("token_uri", "https://oauth2.googleapis.com/token"), {
         "refresh_token": refresh, "client_id": c["client_id"], "client_secret": c.get("client_secret", ""),
-        "grant_type": "refresh_token"})["access_token"]
+        "grant_type": "refresh_token"})
+    return answer["access_token"], set(answer.get("scope", "").split())
 
 
 # --- the API -----------------------------------------------------------------------------
@@ -177,7 +180,8 @@ class YouTube:
     fake replaces."""
 
     def __init__(self, token=None):
-        self.token = token or access_token()
+        self.token, self.scopes = (token, {SCOPE}) if token else access_token()
+        self.waits = (5, 10, 20, 30)  # seconds, while a new playlist is 404
 
     def send(self, method, url, data=None, headers=None, timeout=120):
         """One request: the answer's headers and body. Fails with APIError on an HTTP error."""
@@ -203,6 +207,18 @@ class YouTube:
             if not answer.get("nextPageToken"):
                 return
             query["pageToken"] = answer["nextPageToken"]
+
+    def settled(self, call, *args):
+        """`call(*args)`, again after a wait while it is 404: YouTube answers 404
+        (playlistNotFound) for a playlist made a few seconds before (#4838)."""
+        for wait in (*self.waits, None):
+            try:
+                return call(*args)
+            except APIError as error:
+                if error.code != 404 or wait is None:
+                    raise
+                log(f"YouTube does not know the playlist yet (404): again in {wait} s")
+                time.sleep(wait)
 
     def channel(self):
         """The signed-in channel's title, or None when the sign-in has no channel."""
@@ -252,7 +268,9 @@ class YouTube:
 
 
 def check_channel(yt):
-    """Why the sign-in cannot upload, or None: it must be the Loops channel's."""
+    """Why the sign-in cannot upload, or None: it must be the Loops channel's, with SCOPE."""
+    if SCOPE not in yt.scopes:
+        return f"the YouTube sign-in lacks {SCOPE} (captions need it): sign in again with `scripts/video/upload.py --sign-in`"
     title = yt.channel()
     if title is None:
         return "the YouTube sign-in has no channel"
@@ -342,13 +360,13 @@ def upload(scene, mp4, yt=None):
             log(f"not uploaded, {mp4} is kept: {why}")
             return None
     playlist = yt.playlist(title, about)
-    older = []
-    for item in yt.pages("playlistItems", {"part": "snippet", "playlistId": playlist, "maxResults": 50}):
-        if marker(scene.ID) in item["snippet"].get("description", ""):
-            older.append((item["id"], item["snippet"]["resourceId"]["videoId"]))
+    older = [(item["id"], item["snippet"]["resourceId"]["videoId"])
+             for item in yt.settled(lambda: list(yt.pages("playlistItems", {
+                 "part": "snippet", "playlistId": playlist, "maxResults": 50})))
+             if marker(scene.ID) in item["snippet"].get("description", "")]
     log(f"uploading {mp4.name} ({mp4.stat().st_size // 1_000_000} MB), private, to {title!r}")
     video = yt.upload(mp4, describe(scene))
-    yt.call("POST", "playlistItems", {"part": "snippet"}, {"snippet": {
+    yt.settled(yt.call, "POST", "playlistItems", {"part": "snippet"}, {"snippet": {
         "playlistId": playlist, "position": 0, "resourceId": {"kind": "youtube#video", "videoId": video}}})
     for item, old in older:
         yt.call("PUT", "videos", {"part": "status"}, {"id": old, "status": {"privacyStatus": "private"}})
@@ -376,13 +394,17 @@ def upload(scene, mp4, yt=None):
 class FakeYouTube(YouTube):
     """Answers as the API does, from state in memory, and keeps every request."""
 
-    def __init__(self, channel=CHANNEL, thumbnails=True):
+    def __init__(self, channel=CHANNEL, thumbnails=True, unknown_for=0, scopes=(SCOPE,)):
         self.token = "fake"
+        self.scopes = scopes
+        self.waits = (0, 0, 0, 0)
         self.requests = []
         self.playlists, self.items, self.videos = {}, {}, {}
         self.captions_of, self.thumbnails = {}, {}
         self.channel_title, self.thumbnails_allowed = channel, thumbnails
         self.n = 0
+        self.unknown_for = unknown_for  # playlistItems calls that 404 after a playlist is made
+        self.unknown = {}
 
     def new_id(self, kind):
         self.n += 1
@@ -402,7 +424,13 @@ class FakeYouTube(YouTube):
         if path.endswith("/youtube/v3/playlists") and method == "POST":
             made = self.new_id("PL")
             self.playlists[made] = body
+            self.unknown[made] = self.unknown_for
             return answer({"id": made})
+        if path.endswith("/playlistItems") and method in ("GET", "POST"):
+            playlist = query.get("playlistId") or body["snippet"]["playlistId"]
+            if self.unknown.get(playlist):
+                self.unknown[playlist] -= 1
+                raise APIError(method, url, 404, b'{"error": {"errors": [{"reason": "playlistNotFound"}]}}')
         if path.endswith("/playlistItems") and method == "GET":
             return answer({"items": [{"id": i, "snippet": {**self.videos[v["snippet"]["resourceId"]["videoId"]]["snippet"],
                                                            "resourceId": v["snippet"]["resourceId"]}}
@@ -515,10 +543,16 @@ def self_test():
         assert made in bare.captions_of and not bare.thumbnails
         print("ok: a channel that cannot set a thumbnail still gets the video and its captions")
 
+        slow = FakeYouTube(unknown_for=2)
+        made = upload(scene("u4", "usage"), take("u4"), slow)
+        assert [i["snippet"]["resourceId"]["videoId"] for i in slow.items.values()] == [made], slow.items
+        print("ok: a playlist YouTube does not know yet (404) is asked again")
+
         assert check_channel(FakeYouTube()) is None
         assert "not 'Loops'" in check_channel(FakeYouTube(channel="Someone else"))
         assert "no channel" in check_channel(FakeYouTube(channel=None))
-        print("ok: --preflight takes only the Loops channel's sign-in")
+        assert "lacks" in check_channel(FakeYouTube(scopes=("https://www.googleapis.com/auth/youtube",)))
+        print("ok: --preflight takes only the Loops channel's sign-in, with the captions scope")
         assert not [r for r in yt.requests if r[0] == "DELETE" and "/videos" in r[1]], "a video was deleted"
         print("self-test passed")
     finally:
