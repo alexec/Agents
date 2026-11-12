@@ -162,6 +162,9 @@ permission, and the screen may be locked.
 heard, the reply spoken, voice mode off. A Remote's marks name SystemSoundIDs, which have no
 file on the Mac: they are left out, with a warning.
 
+To put such a take on a PR, inline with its sound, see the run-app skill's "A clip with
+sound" (#4856): `pr-clip.sh` makes it 720p and under 10 MB, and the app's browser uploads it.
+
 
 
 - `ffmpeg` (Homebrew), `uv`, Node and Chrome. The first run makes

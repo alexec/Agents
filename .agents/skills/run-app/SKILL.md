@@ -482,7 +482,8 @@ the pictures, not the walk, so take a set that shows the change as a person meet
 - **Only scratch data.** The repo is public: a scratch root and the fake runtime, never a
   real name, path, token, session or Alex's own windows. Read each PNG before you push it.
 - **Not a video.** Screenshots are easier to review. Voice mode is the exception: Alex
-  tests it on the installed Mac app, because a scratch app has no microphone or speech.
+  tests it on the installed Mac app, because a scratch app has no microphone or speech,
+  and a PR whose change is a sound gets a clip with sound as well (below).
 
 Put them on the PR with `pr-shots.sh`. It commits them to the orphan branch `screenshots`
 as `pr-<n>/<file>` (so `main` gets no images and you need no worktree), takes away that
@@ -495,6 +496,33 @@ $S/pr-shots.sh 2850 /tmp/run-mychange-shots/*.png > /tmp/run-mychange-shots/body
 Put the lines under `## Screenshots` in the PR body (`gh pr edit <n> --body-file`). When Alex
 asks for changes, take the whole set again and run it again: Alex sees only the new set.
 The shots go with the root in "When you are done"; keep them under `/tmp/run-<slug>-*`.
+
+### A clip with sound (#4856)
+
+A PR whose change is a sound (voice mode's speech or its sounds) also gets a short MP4 with
+sound, which plays inline in the PR beside its screenshots. Every other PR keeps the silent
+clip (#4094). A walk plays nothing out loud, so the sound comes from voice mode's tape
+(#4854):
+
+1. **Make the take** with a scene that calls `v.tape()`: `scripts/video/make.sh voice-tape`
+   (or a scene of your own, `scripts/video/README.md`, "Voice mode's sound"), under the
+   "build" lease. It writes `~/Movies/agents-video/out/<id>.mp4` and a contact sheet. Read the
+   sheet before you go on: the file is public once it is uploaded, so only scratch data.
+2. **Open the PR in the app's browser:** `browser_navigate` to the PR's address. This first
+   `browser_*` call makes the browser tools' output folder, the only place they upload from.
+3. **Make the clip** there: `$S/pr-clip.sh ~/Movies/agents-video/out/<id>.mp4 browser`. It
+   makes it at most 720p and 30 s, checks that it has a sound track and is under GitHub's
+   10 MB, and prints its path. `browser` takes the one folder in
+   `~/Library/Caches/com.alexecollins.agents/browser/output/`; when there is more than one, it
+   stops, and you give the folder.
+4. **Upload it as `alexec`:** `browser_snapshot`, `browser_click` on **Paste, drop, or click to
+   add files** under the new comment's box, then `browser_file_upload` with the path. When the
+   upload ends, the box holds a `https://github.com/user-attachments/assets/<id>` link: read
+   it with `browser_evaluate` (the box's `value`), then empty the box and do not post the
+   comment. Only a person's github.com sign-in can upload: the agents' bot (#3926) has none,
+   and the REST API has no upload for attachments.
+5. **Put the link on a line of its own** under `## Screenshots` in the PR body
+   (`gh pr edit <n> --body-file`). The body can be the bot's. `browser_close` when done.
 
 ## When you are done
 
