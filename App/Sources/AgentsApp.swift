@@ -21,6 +21,8 @@ struct AgentsApp: App {
         CrashHook.install()
         // And the next hang names its stack (#237).
         HangReporter.install()
+        // Paper v2's faces (#4975), before the first window draws in them.
+        PaperFonts.register()
         // The defaults of scratch copies that have gone (#1029).
         Task.detached(priority: .utility) { WindowDefaults.sweep() }
         #if DEBUG

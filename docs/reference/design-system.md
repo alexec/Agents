@@ -141,8 +141,8 @@ spacing, from the British Dyslexia Association's style guide and WCAG 1.4.12.
 <!-- design.sh gen: font -->
 | Token | CSS | Stack | For |
 |---|---|---|---|
-| text | `--font-text` | `-apple-system, BlinkMacSystemFont, system-ui, sans-serif` | The system's sans-serif, for everything a person reads. Nothing is loaded from the network. |
-| mono | `--font-mono` | `ui-monospace, SF Mono, Menlo, monospace` | The system's monospace, for code. |
+| text | `--font-text` | `Atkinson Hyperlegible Next, -apple-system, BlinkMacSystemFont, system-ui, sans-serif` | Atkinson Hyperlegible Next (SIL OFL 1.1, design/fonts/), for everything a person reads; the system's sans-serif where it is not loaded. Nothing is loaded from another origin (#4975). |
+| mono | `--font-mono` | `Atkinson Hyperlegible Mono, ui-monospace, SF Mono, Menlo, monospace` | Atkinson Hyperlegible Mono (SIL OFL 1.1, design/fonts/), for code; the system's monospace where it is not loaded. |
 <!-- /design.sh gen -->
 
 ## Type

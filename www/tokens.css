@@ -117,10 +117,10 @@
   --radius-floating: 16px;
   /* A state badge: round ends. */
   --radius-pill: 99px;
-  /* The system's sans-serif, for everything a person reads. Nothing is loaded from the network. */
-  --font-text: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-  /* The system's monospace, for code. */
-  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  /* Atkinson Hyperlegible Next (SIL OFL 1.1, design/fonts/), for everything a person reads; the system's sans-serif where it is not loaded. Nothing is loaded from another origin (#4975). */
+  --font-text: "Atkinson Hyperlegible Next", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  /* Atkinson Hyperlegible Mono (SIL OFL 1.1, design/fonts/), for code; the system's monospace where it is not loaded. */
+  --font-mono: "Atkinson Hyperlegible Mono", ui-monospace, "SF Mono", Menlo, monospace;
   /* A page's title. */
   --type-title: 1.375rem;
   /* Prose: what everything is read at unless there is a reason otherwise. */
