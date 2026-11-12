@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The daemon's forge reads (#3803, after Bitbucket's in #3786): the pull requests of many
@@ -278,7 +280,7 @@ func (f *RealAzureDevOps) read(ctx context.Context, repo, status string, filter 
 }
 
 func updated(i Item) time.Time {
-	t, _ := parseTime(i.UpdatedAt)
+	t, _ := mcpevents.ParseTime(i.UpdatedAt)
 	return t
 }
 
@@ -536,8 +538,8 @@ func (f *RealAzureDevOps) ItemPage(ctx context.Context, repo string, number int,
 		}
 	}
 	slices.SortStableFunc(all, func(a, b Comment) int {
-		ta, _ := parseTime(a.At)
-		tb, _ := parseTime(b.At)
+		ta, _ := mcpevents.ParseTime(a.At)
+		tb, _ := mcpevents.ParseTime(b.At)
 		return ta.Compare(tb)
 	})
 	d.Comments = len(all)

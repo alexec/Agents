@@ -165,7 +165,7 @@ func eventsList() map[string]any { return mcpevents.List(events) }
 
 // MARK: Polling
 
-// candidate is something that may be raised: its id, its time (in timeLayout), and its data,
+// candidate is something that may be raised: its id, its time (in mcpevents.TimeLayout), and its data,
 // looked up only once it is taken; nil data skips it, though the cursor still moves past it.
 type candidate = mcpevents.Candidate
 
@@ -177,7 +177,7 @@ const (
 type pollParams = mcpevents.Params
 
 // polls is how it polls, with Azure DevOps's times and errors.
-var polls = mcpevents.Poller{NextPollMs: nextPollMs, Normalize: normalized, Fail: eventsError}
+var polls = mcpevents.Poller{NextPollMs: nextPollMs, Normalize: mcpevents.Normalized, Fail: eventsError}
 
 // Events answers events/list and events/poll over an Azure DevOps.
 type Events struct {
@@ -274,7 +274,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 }
 
 func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidate, Listed, error)) (map[string]any, *rpcError) {
-	return polls.Poll(e.Name, p, func() string { return timeString(s.now().Truncate(time.Second)) },
+	return polls.Poll(e.Name, p, func() string { return mcpevents.TimeString(s.now().Truncate(time.Second)) },
 		func(since string) ([]candidate, mcpevents.Listed, error) {
 			found, listed, err := find(since)
 			return found, mcpevents.Listed{Truncated: listed.Truncated, Newest: listed.Newest}, err
@@ -296,7 +296,7 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 	if strings.HasPrefix(name, "issue.") {
 		root = "issue" // issue.assigned (#2034)
 	}
-	return polls.Diff(name, key, p, func() string { return timeString(s.now()) }, func() ([]mcpevents.State, error) {
+	return polls.Diff(name, key, p, func() string { return mcpevents.TimeString(s.now()) }, func() ([]mcpevents.State, error) {
 		all, err := states()
 		var out []mcpevents.State
 		for _, st := range all {
@@ -375,7 +375,7 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		for _, c := range comments {
 			// Trust is the commenter's; mine only narrows the pull request (#3797).
 			m := c.PR
-			if at := normalized(c.At); at != "" && (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) &&
+			if at := mcpevents.Normalized(c.At); at != "" && (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) &&
 				a.closesOne(m) && a.byMe(m, yours) && (a.anyone || c.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d:%d:%d", repo, c.PR.Number, c.ThreadID, c.ID), Time: at,
 					Data:    func() (map[string]any, error) { return c.data(), nil },
@@ -391,7 +391,7 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		// The newest failed build's time is in its id: run again and failed again, it is new.
 		var list []candidate
 		for _, d := range failed {
-			if at := normalized(d.At); at != "" && wanted(d.PR, d.Trusted) {
+			if at := mcpevents.Normalized(d.At); at != "" && wanted(d.PR, d.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("checks.failed:%s:%s:%s", repo, d.HeadSHA, at), Time: at,
 					Data:    func() (map[string]any, error) { return d.json(), nil },
 					Subject: prRef(repo, d.PR.Number), Key: d.HeadSHA + ":" + at})
@@ -406,7 +406,7 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		// One a build or a status, at its time: a build run again that passes again is a new one.
 		var list []candidate
 		for _, d := range passed {
-			if at := normalized(d.At); at != "" && wanted(d.PR, d.Trusted) {
+			if at := mcpevents.Normalized(d.At); at != "" && wanted(d.PR, d.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("checks.passed:%s:%s:%s:%s", repo, d.HeadSHA, d.Key, at), Time: at,
 					Data:    func() (map[string]any, error) { return d.json(), nil },
 					Subject: prRef(repo, d.PR.Number), Key: d.HeadSHA + ":" + d.Key + ":" + at})
@@ -421,7 +421,7 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 	var list []candidate
 	if name == "pr.merged" {
 		for _, m := range merged {
-			if at := normalized(m.MergedAt); wanted(m.PR, m.Trusted) && at != "" {
+			if at := mcpevents.Normalized(m.MergedAt); wanted(m.PR, m.Trusted) && at != "" {
 				list = append(list, candidate{EventID: fmt.Sprintf("pr.merged:%s:%d", repo, m.PR.Number), Time: at,
 					Subject: prRef(repo, m.PR.Number),
 					Data: func() (map[string]any, error) {
@@ -433,7 +433,7 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 	}
 	// Its close time in the id: a pull request reopened and closed again is a new event.
 	for _, c := range closed {
-		if at := normalized(c.ClosedAt); wanted(c.PR, c.Trusted) && at != "" {
+		if at := mcpevents.Normalized(c.ClosedAt); wanted(c.PR, c.Trusted) && at != "" {
 			list = append(list, candidate{EventID: fmt.Sprintf("pr.closed:%s:%d:%s", repo, c.PR.Number, at), Time: at,
 				Subject: prRef(repo, c.PR.Number), Key: at,
 				Data: func() (map[string]any, error) {

@@ -2800,13 +2800,17 @@ final class AppModel {
 
     /// The person's display choices (#1033): this Mac's host keeps them, and the window's
     /// defaults mirror them so every view reads them where it always did.
-    @ObservationIgnored lazy var displayMirror = DisplayPreferenceMirror(defaults: WindowDefaults.store) { [weak self] changes in
-        self?.sendDisplayPreferences(changes)
-    }
+    /// A change shows at once; one the host did not take goes back, and says so (#4814).
+    @ObservationIgnored lazy var displayMirror = makeDisplayMirror()
 
-    private func sendDisplayPreferences(_ changes: DaemonAPI.DisplayPreferences) {
-        Task { _ = try? await macClient.call(DaemonAPI.Method.preferencesSet, changes,
-                                         returning: DaemonAPI.DisplayPreferences.self) }
+    private func makeDisplayMirror() -> DisplayPreferenceMirror {
+        DisplayPreferenceMirror(defaults: WindowDefaults.store) { [weak self] changes in
+            guard let self else { throw CancellationError() }
+            return try await macClient.call(DaemonAPI.Method.preferencesSet, changes, returning: DaemonAPI.DisplayPreferences.self)
+        } failed: { [weak self] error in
+            guard let self else { return }
+            problem = DisplayPreferenceMirror.failure(describe(error))
+        }
     }
 
     func refreshDisplayPreferences() async {
@@ -3377,21 +3381,29 @@ final class AppModel {
                         for key: FolderKey) async -> String? {
         var answer = ApprovalAnswer(approval, in: key.folder, action: action, note: note)
         answer.digest = digest ?? approval.digest
-        do {
-            var summary = try await client(for: key.host).call(
-                DaemonAPI.Method.approvalsAnswer, answer, returning: DaemonAPI.FolderSummary.self)
-            summary.host = key.host
-            upsert(summary)
-            return nil
-        } catch {
-            return describe(error)
+        var why: String?
+        // Out of its list at once, and back if the answer did not go (#4814).
+        await work.answering(approval, in: key) {
+            do {
+                var summary = try await client(for: key.host).call(
+                    DaemonAPI.Method.approvalsAnswer, answer, returning: DaemonAPI.FolderSummary.self)
+                summary.host = key.host
+                upsert(summary)
+                return true
+            } catch {
+                why = describe(error)
+                return false
+            }
         }
+        return why
     }
 
     /// Approve or Deny from a row's menu, of the version the row shows; a refusal is the
     /// window's problem to say, as there is no sheet to say it in.
     func settleApproval(_ approval: Approval, _ action: Approval.Action, for key: FolderKey) async {
-        if let why = await answerApproval(approval, action, digest: approval.digest, note: nil, for: key) { problem = why }
+        if let why = await answerApproval(approval, action, digest: approval.digest, note: nil, for: key) {
+            problem = approval.failure(action, why)
+        }
     }
 
     /// Deny a session's ask to be archived (#773): the mark goes and the session stays.
@@ -4777,10 +4789,25 @@ final class AppModel {
             // Live only, a page at a time (#164, #165). Archived agents come a folder at a
             // time when its Archived fold opens, or by search; the ones already here (an
             // open fold, the chat being read) are kept, and the live copy wins.
-            let listed = try await self.client.listAgents(DaemonAPI.ListRequest(includeArchived: false, lean: true))
-            let live = Set(listed.map(\.id))
-            let archived = self.work.agents.filter { $0.host == .mac && $0.state == .archived && !live.contains($0.id) }
-            self.work.replaceAgents(listed + archived, from: .mac)
+            //
+            // Only what changed since the point held (#4794): the last catch-up's, or the copy's
+            // at launch. A host that cannot say what changed since then sends all, and a host
+            // that predates it sends no point, so the next one asks for all again.
+            let lean = DaemonAPI.ListRequest(includeArchived: false, lean: true)
+            var asked = lean
+            asked.changedSince = self.work.listPoint(of: .mac)
+            let snapshot = try await self.client.catchUp(.init(agents: asked))
+            if let changes = snapshot.agentChanges, !changes.all, asked.changedSince != nil {
+                self.work.takeChanges(snapshot.agents, changes, from: .mac)
+            } else {
+                // All of them: a full first page means more, a page at a time (#164).
+                let listed = lean.next(after: snapshot.agents) == nil ? snapshot.agents
+                    : try await self.client.listAgents(lean)
+                let live = Set(listed.map(\.id))
+                let archived = self.work.agents.filter { $0.host == .mac && $0.state == .archived && !live.contains($0.id) }
+                self.work.replaceAgents(listed + archived, from: .mac)
+                self.work.notePoint(snapshot.agentChanges, of: .mac)
+            }
             self.hasLoadedAgents = true
             self.weighGetStarted()
             Perf.sinceLaunch("first-list")
@@ -5363,8 +5390,10 @@ final class AppModel {
         let load = work.beginTranscriptLoad()
         // What was fetched for it under the pointer or beside the last one opened, at once
         // (#4795); else this device's copy of its end, while the host's page is on its way (#4791).
-        if localCopy?.drawPrefetched(of: selection, load: load) != true {
-            Task { [localCopy] in await localCopy?.drawOpening(of: selection, load: load) }
+        // Awaited when nothing of the chat is held, so a reconnect or a launch can resume from
+        // the copy's end (#4794): a read of one small file, not a wait on the host.
+        if localCopy?.drawPrefetched(of: selection, load: load) != true, work.transcriptEnd == nil {
+            await localCopy?.drawOpening(of: selection, load: load)
         }
         // Beside the transcript rather than before it: neither waits on the other.
         async let whole = loadWholeAgent(selection)
@@ -5376,6 +5405,19 @@ final class AppModel {
         var gone = false
         let loaded = await attempt(on: host, quietWhenDown: true) {
             let client = self.client(for: host)
+            // What was written since the end held (#4794), one page from it, in place of the
+            // whole opening; a page that leaves a gap, or no answer, opens it whole.
+            if let resumed = await self.work.resumeTranscript(load: load, transcript: { from, limit in
+                try await client.call(DaemonAPI.Method.agentsTranscript,
+                                      DaemonAPI.TranscriptRequest(agentID: selection, limit: limit, from: from),
+                                      returning: TranscriptPage.self)
+            }) {
+                if let started = self.chatOpening, started.agent == selection {
+                    self.chatOpening = nil
+                    Perf.endWhenDrawn(started.timing, "resumed, \(resumed.entries.count) entries")
+                }
+                return
+            }
             do {
                 // A few turns rather than a full page: a screen holds two or three, the
                 // rest come as the reader nears the top, and fifty replies were a quarter
@@ -5815,16 +5857,29 @@ final class AppModel {
 
     /// Move an agent, or with no target take back the move that is waiting (053). Made
     /// at once when it is between turns; otherwise when its turn ends.
+    ///
+    /// Drawn at once as the move that waits (#4814): the Worktree choice shows it chosen
+    /// before the host answers, and goes back to where it was when the move is refused.
     func move(_ agent: Agent, to target: MoveTarget?) async {
         moveProblems[agent.id] = nil
+        let write = AgentWrite.move(target)
+        let pending = work.beginWrite(write, on: agent.id)
         do {
-            _ = try await client(forAgent: agent.id).call(DaemonAPI.Method.agentsMove,
-                                                          DaemonAPI.MoveRequest(agentID: agent.id, target: target),
-                                                          returning: DaemonAPI.MoveAnswer.self)
+            let answer = try await client(forAgent: agent.id).call(DaemonAPI.Method.agentsMove,
+                                                                   DaemonAPI.MoveRequest(agentID: agent.id, target: target),
+                                                                   returning: DaemonAPI.MoveAnswer.self)
+            // Made now, or nothing to do: the host's record says where it is.
+            work.settleWrite(pending, on: agent.id, failed: false, done: answer.when != .afterTurn)
+            if var moved = answer.agent, answer.when == .now {
+                moved.host = agent.host
+                work.upsert(moved)
+            }
         } catch let error as JSONRPCError {
-            moveProblems[agent.id] = error.message
+            work.settleWrite(pending, on: agent.id, failed: true)
+            moveProblems[agent.id] = write.failure(error.message)
         } catch {
-            moveProblems[agent.id] = "Could not move: \(error.localizedDescription)"
+            work.settleWrite(pending, on: agent.id, failed: true)
+            moveProblems[agent.id] = write.failure(error.localizedDescription)
         }
         await loadAgentWorktrees(of: agent)
     }
@@ -6040,6 +6095,15 @@ final class AppModel {
     @discardableResult
     /// `voice`: sent from voice mode (#2322), so the reply is short and fit to be heard.
     func send(_ text: String, attachments: [Attachment] = [], to agentID: UUID? = nil, voice: Bool = false) async -> Bool {
+        // In the chat at once, as the person's bubble, until the host's entry lands (#4814).
+        let target = agentID ?? selection
+        let drawn = target.flatMap { work.beginSending(text, to: $0) }
+        let sent = await deliver(text, attachments: attachments, to: agentID, voice: voice)
+        if let target { work.endSending(drawn, to: target, sent: sent) }
+        return sent
+    }
+
+    private func deliver(_ text: String, attachments: [Attachment], to agentID: UUID?, voice: Bool) async -> Bool {
         // The main window's chat, or the one in a window of its own that sent it (#826).
         guard let selection = agentID ?? selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
         let host = host(ofAgent: selection)

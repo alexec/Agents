@@ -4,7 +4,6 @@ import (
 	"context"
 	"regexp"
 	"strings"
-	"time"
 )
 
 // What the events read from GitHub, as CIWatcher's GitHub.swift has it (#383). RealGitHub
@@ -445,36 +444,3 @@ func isFailed(conclusion string) bool {
 }
 
 func isSucceeded(conclusion string) bool { return strings.EqualFold(conclusion, "success") }
-
-// timeLayout is how the events draft carries a time: ISO 8601 in UTC with milliseconds, which
-// sorts as text in time order.
-const timeLayout = "2006-01-02T15:04:05.000Z"
-
-func timeString(t time.Time) string { return t.UTC().Format(timeLayout) }
-
-func parseTime(text string) (time.Time, bool) {
-	t, err := time.Parse(time.RFC3339Nano, text)
-	return t, err == nil
-}
-
-// normalized is text in timeLayout, or "" when it is not a time.
-func normalized(text string) string {
-	t, ok := parseTime(text)
-	if !ok {
-		return ""
-	}
-	return timeString(t)
-}
-
-// before says whether a is earlier than b; a time that is not one is earliest of all.
-func before(a, b string) bool {
-	ta, oka := parseTime(a)
-	tb, okb := parseTime(b)
-	switch {
-	case !oka:
-		return okb
-	case !okb:
-		return false
-	}
-	return ta.Before(tb)
-}

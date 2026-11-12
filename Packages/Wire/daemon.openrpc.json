@@ -2357,6 +2357,11 @@
     {
       "name": "client/catchUp",
       "x-capability": "client/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "paramStructure": "by-name",
       "params": [
         {

@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 var measure = flag.Bool("measure", false, "run the measurements")
@@ -23,7 +25,7 @@ func TestMeasureLabelledRequestsPerPoll(t *testing.T) {
 		agent.poll()
 		f.set(func() {
 			for i := 1; i <= n; i++ {
-				updated := timeString(start.Add(time.Duration(i) * time.Millisecond))
+				updated := mcpevents.TimeString(start.Add(time.Duration(i) * time.Millisecond))
 				f.issues = append(f.issues, issueObj(i, dev, obj{"updated_at": updated, "labels": []string{"bug"}}))
 				f.labelled[i] = []obj{{"id": i, "action": "add", "created_at": updated, "user": dev, "label": obj{"name": "bug"}}}
 			}

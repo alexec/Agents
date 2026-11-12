@@ -17,6 +17,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // A fake GitLab over HTTP (no account, #1629): the REST API v4 paths the server reads and
@@ -108,7 +110,9 @@ var (
 	path  = regexp.MustCompile(`^/api/v4/projects/group%2Fapp(?:/(.*))?$`)
 )
 
-func at(minutes int) string { return timeString(start.Add(time.Duration(minutes) * time.Minute)) }
+func at(minutes int) string {
+	return mcpevents.TimeString(start.Add(time.Duration(minutes) * time.Minute))
+}
 
 func (f *fakeGitLab) set(fn func()) {
 	f.mu.Lock()

@@ -2037,20 +2037,28 @@ final class RemoteModel {
                         for key: FolderKey) async -> String? {
         var answer = ApprovalAnswer(approval, in: key.folder, action: action, note: note)
         answer.digest = digest ?? approval.digest
-        do {
-            var summary: DaemonAPI.FolderSummary = try await client(for: answer).call(
-                DaemonAPI.Method.approvalsAnswer, answer, returning: DaemonAPI.FolderSummary.self)
-            summary.host = key.host
-            work.upsert(summary)
-            return nil
-        } catch {
-            return sentence(for: error)
+        var why: String?
+        // Out of its list at once, and back if the answer did not go (#4814).
+        await work.answering(approval, in: key) {
+            do {
+                var summary: DaemonAPI.FolderSummary = try await client(for: answer).call(
+                    DaemonAPI.Method.approvalsAnswer, answer, returning: DaemonAPI.FolderSummary.self)
+                summary.host = key.host
+                work.upsert(summary)
+                return true
+            } catch {
+                why = sentence(for: error)
+                return false
+            }
         }
+        return why
     }
 
     /// Approve or Deny from a row's long press, of the version the row shows.
     func settleApproval(_ approval: Approval, _ action: Approval.Action, for key: FolderKey) async {
-        if let why = await answerApproval(approval, action, digest: approval.digest, note: nil, for: key) { problem = why }
+        if let why = await answerApproval(approval, action, digest: approval.digest, note: nil, for: key) {
+            problem = approval.failure(action, why)
+        }
     }
 
     /// A person's answer to a secret's use (#4017), from its Needs you row or its banner: to
@@ -3465,7 +3473,11 @@ final class RemoteModel {
     private func refreshSnapshot(with parts: Set<CatchUpPart>) async -> DaemonAPI.CatchUpSnapshot? {
         let snapshot: DaemonAPI.CatchUpSnapshot
         do {
-            snapshot = try await client.catchUp(.init(parts: CatchUpPart.allCases.filter(parts.contains)))
+            // Only what changed since the point held (#4794): the last catch-up's, or the copy's
+            // at launch. A host that cannot say what changed since then sends the first page.
+            var asked = DaemonAPI.CatchUpRequest.firstPage
+            asked.changedSince = work.listPoint(of: .mac)
+            snapshot = try await client.catchUp(.init(agents: asked, parts: CatchUpPart.allCases.filter(parts.contains)))
         } catch {
             note("catch-up: the snapshot failed: \(error)")
             return nil
@@ -3473,7 +3485,15 @@ final class RemoteModel {
         work.replaceFolders(snapshot.folders, from: .mac)
         pruneFolderDefaults(of: .mac, listed: snapshot.folders)
         startHostMoved()
-        takeLiveAgents(snapshot.agents, page: DaemonAPI.CatchUpRequest.firstPage)
+        if let changes = snapshot.agentChanges, !changes.all {
+            work.takeChanges(snapshot.agents, changes, from: .mac)
+            // A first page's worth held means there may be more, a folder at a time.
+            let live = work.agents.lazy.filter { $0.host == .mac && $0.state != .archived }.count
+            moreLiveAgents = moreLiveAgents || live >= DaemonAPI.CatchUpRequest.firstPage.pageSize
+        } else {
+            takeLiveAgents(snapshot.agents, page: DaemonAPI.CatchUpRequest.firstPage)
+            work.notePoint(snapshot.agentChanges, of: .mac)
+        }
         work.replacePermissions(snapshot.permissions)
         work.replaceElicitations(snapshot.elicitations)
         work.replaceAttention(snapshot.attention)
@@ -4679,13 +4699,17 @@ final class RemoteModel {
     /// on each runtime's own current mode.
     /// The person's display choices (#1033), kept on the Mac. This device's defaults mirror
     /// them, so every view reads them where it always did.
-    @ObservationIgnored lazy var displayMirror = DisplayPreferenceMirror(defaults: .standard) { [weak self] changes in
-        self?.sendDisplayPreferences(changes)
-    }
+    /// A change shows at once; one the Mac did not take goes back, and says so (#4814).
+    @ObservationIgnored lazy var displayMirror = makeDisplayMirror()
 
-    private func sendDisplayPreferences(_ changes: DaemonAPI.DisplayPreferences) {
-        Task { _ = try? await client.call(DaemonAPI.Method.preferencesSet, changes,
-                                         returning: DaemonAPI.DisplayPreferences.self) }
+    private func makeDisplayMirror() -> DisplayPreferenceMirror {
+        DisplayPreferenceMirror(defaults: .standard) { [weak self] changes in
+            guard let self else { throw CancellationError() }
+            return try await client.call(DaemonAPI.Method.preferencesSet, changes, returning: DaemonAPI.DisplayPreferences.self)
+        } failed: { [weak self] error in
+            guard let self else { return }
+            problem = DisplayPreferenceMirror.failure(sentence(for: error))
+        }
     }
 
     /// A Mac too old to know the method leaves this device's own choices as they are.
@@ -4851,8 +4875,21 @@ final class RemoteModel {
         let load = work.beginTranscriptLoad()
         // What was fetched for it under the pointer or beside the last one opened, at once
         // (#4795); else this device's copy of its end, while the Mac's page is on its way (#4791).
-        if localCopy?.drawPrefetched(of: selection, load: load) != true {
-            Task { [localCopy] in await localCopy?.drawOpening(of: selection, load: load) }
+        // Awaited when nothing of the chat is held, so a reconnect or a launch can resume from
+        // the copy's end (#4794): a read of one small file, not a wait on the Mac.
+        if localCopy?.drawPrefetched(of: selection, load: load) != true, work.transcriptEnd == nil {
+            await localCopy?.drawOpening(of: selection, load: load)
+        }
+        // What was written since the end held (#4794), one page from it, in place of the whole
+        // opening; a page that leaves a gap, or no answer, opens it whole.
+        if await work.resumeTranscript(load: load, transcript: { from, limit in
+            let request = DaemonAPI.TranscriptRequest(agentID: selection, limit: limit, from: from)
+            return try await self.client(for: request).call(DaemonAPI.Method.agentsTranscript, request,
+                                                            returning: TranscriptPage.self)
+        }) != nil {
+            guard await whole.value, self.selection == selection else { return }
+            lookedForSelection = selection
+            return
         }
         let turnsRequest = DaemonAPI.TurnsRequest.opening(selection)
         let pageSize = firstPageSize
@@ -5239,6 +5276,14 @@ final class RemoteModel {
     /// the phone (029): nothing the runtime cannot take, and nothing too big for the link.
     /// `voice`: sent from voice mode (#2322), so the reply is short and fit to be heard.
     func send(_ what: String, attachments: [Attachment] = [], to agentID: UUID, voice: Bool = false) async -> Bool {
+        // In the chat at once, as the person's bubble, until the host's entry lands (#4814).
+        let drawn = work.beginSending(what, to: agentID)
+        let sent = await deliver(what, attachments: attachments, to: agentID, voice: voice)
+        work.endSending(drawn, to: agentID, sent: sent)
+        return sent
+    }
+
+    private func deliver(_ what: String, attachments: [Attachment], to agentID: UUID, voice: Bool) async -> Bool {
         let host = work.agent(agentID)?.host ?? .mac
         // A stopped workspace that starts when used: kept by the control plane (#691 US3).
         if host != .mac, isStale(on: host), startsWhenUsed(host) {

@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // RealLinear reads Linear's GraphQL API with a personal API key (Linear ▸ Settings ▸ Security
@@ -391,7 +393,7 @@ func (l *RealLinear) changed(ctx context.Context, kind Kind, team, since string)
 	for _, n := range out.Issues.Nodes {
 		i := n.gqlIssue.issue()
 		for _, h := range n.History.Nodes {
-			if !before(h.CreatedAt, since) {
+			if !mcpevents.Before(h.CreatedAt, since) {
 				by := person(h.Actor, h.BotActor)
 				switch kind {
 				case Labelled:
@@ -413,17 +415,4 @@ func (l *RealLinear) changed(ctx context.Context, kind Kind, team, since string)
 		}
 	}
 	return items, out.Issues.PageInfo.HasNextPage, nil
-}
-
-// before says whether a is earlier than b; a time that is not one is earliest of all.
-func before(a, b string) bool {
-	ta, oka := parseTime(a)
-	tb, okb := parseTime(b)
-	switch {
-	case !oka:
-		return okb
-	case !okb:
-		return false
-	}
-	return ta.Before(tb)
 }

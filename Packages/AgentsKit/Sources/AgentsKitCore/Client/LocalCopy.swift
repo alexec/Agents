@@ -25,11 +25,16 @@ public actor LocalCopy {
         public var host: MachineRef
         public var folders: [DaemonAPI.FolderSummary]
         public var agents: [Agent]
+        /// Where `agents` are in the host's order of changes (#4794), so a launch asks only
+        /// for what changed since. Nil from a copy made before it, or a host that predates it.
+        public var point: DaemonAPI.ListRevision?
 
-        public init(host: MachineRef, folders: [DaemonAPI.FolderSummary], agents: [Agent]) {
+        public init(host: MachineRef, folders: [DaemonAPI.FolderSummary], agents: [Agent],
+                    point: DaemonAPI.ListRevision? = nil) {
             self.host = host
             self.folders = folders
             self.agents = agents
+            self.point = point
         }
     }
 

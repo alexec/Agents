@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"os/exec"
 	"strings"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The reads that prove a repository's set-up on Forgejo (#3752), as the gitlab server's
@@ -67,7 +69,7 @@ func (f *RealForgejo) LastChecks(ctx context.Context, repo string) (*Newest, err
 	}
 	n := &Newest{Title: "Checks on " + info.DefaultBranch, Outcome: checksOutcome(c.State)}
 	for _, s := range c.Statuses {
-		if n.At == "" || before(n.At, s.UpdatedAt) {
+		if n.At == "" || mcpevents.Before(n.At, s.UpdatedAt) {
 			n.At, n.URL = s.UpdatedAt, s.TargetURL
 		}
 	}

@@ -2,10 +2,8 @@ package googlechatmcp
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -23,17 +21,11 @@ import (
 // anyone else. The names are the slack server's (Go/internal/slackmcp), so one workflow can
 // listen to both chat servers.
 
-// rpcError is a JSON-RPC error answer.
-type rpcError struct {
-	Code    int            `json:"code"`
-	Message string         `json:"message"`
-	Data    map[string]any `json:"data,omitempty"`
-}
-
-func (e *rpcError) Error() string { return e.Message }
+// rpcError is a JSON-RPC error answer: its code, message and optional data.
+type rpcError = mcpevents.Error
 
 func invalidParams(format string, args ...any) *rpcError {
-	return &rpcError{Code: -32602, Message: fmt.Sprintf(format, args...)}
+	return mcpevents.InvalidParams(format, args...)
 }
 
 const (
@@ -231,22 +223,13 @@ type cursor struct {
 }
 
 func (c cursor) encoded() string {
-	data, _ := json.Marshal(c)
-	return base64.RawURLEncoding.EncodeToString(data)
+	return mcpevents.EncodeCursor(c)
 }
 
 func decodeCursor(raw json.RawMessage) (cursor, *rpcError) {
-	refused := invalidParams("cursor is not one this server gave")
-	var text string
-	if err := json.Unmarshal(raw, &text); err != nil {
-		return cursor{}, refused
-	}
-	data, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(text, "="))
-	if err != nil {
-		return cursor{}, refused
-	}
+	refused := mcpevents.RefusedCursor()
 	var c cursor
-	if json.Unmarshal(data, &c) != nil || c.Boot == "" {
+	if !mcpevents.DecodeCursor(raw, &c) || c.Boot == "" {
 		return cursor{}, refused
 	}
 	return c, nil
@@ -255,17 +238,11 @@ func decodeCursor(raw json.RawMessage) (cursor, *rpcError) {
 // MARK: Polling
 
 const (
-	maxEvents = 100
 	// nextPollMs is short: the inbox is in memory, so a poll costs Google nothing.
 	nextPollMs = 3000
 )
 
-type pollParams struct {
-	Name      string          `json:"name"`
-	Arguments json.RawMessage `json:"arguments"`
-	Cursor    json.RawMessage `json:"cursor"`
-	MaxEvents *int            `json:"maxEvents"`
-}
+type pollParams = mcpevents.Params
 
 // Events answers events/poll over an Inbox, whose loop it starts with Context.
 type Events struct {
@@ -280,7 +257,7 @@ func (s *Events) Poll(_ context.Context, raw json.RawMessage) (map[string]any, *
 		return nil, invalidParams("params must be an object")
 	}
 	if _, ok := kindOf(p.Name); !ok {
-		return nil, &rpcError{Code: -32011, Message: fmt.Sprintf("no event %s; this server offers %s", p.Name, strings.Join(EventNames(), " and "))}
+		return nil, mcpevents.NoEvent(p.Name, EventNames())
 	}
 	a, bad := checkArgs(p.Name, p.Arguments)
 	if bad != nil {
@@ -290,16 +267,12 @@ func (s *Events) Poll(_ context.Context, raw json.RawMessage) (map[string]any, *
 		return nil, eventsError(err)
 	}
 	s.Inbox.Start(s.Context)
-	limit := 50
-	if p.MaxEvents != nil {
-		limit = *p.MaxEvents
-	}
-	limit = min(maxEvents, max(1, limit))
+	limit := p.Limit()
 	boot, head := s.Inbox.Head()
 	answer := func(events []any, c cursor, more bool) map[string]any {
 		return map[string]any{"events": events, "cursor": c.encoded(), "truncated": false, "hasMore": more, "nextPollMs": nextPollMs}
 	}
-	if len(p.Cursor) == 0 || string(p.Cursor) == "null" {
+	if p.FirstPoll() {
 		return answer([]any{}, cursor{Boot: boot, Seq: head}, false), nil
 	}
 	c, bad := decodeCursor(p.Cursor)

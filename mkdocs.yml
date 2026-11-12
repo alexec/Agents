@@ -106,6 +106,7 @@ nav:
       - how-to/back-up-and-restore.md
       - how-to/back-up-a-control-plane.md
       - how-to/release-agents-host.md
+      - how-to/keep-the-performance-budgets.md
       - how-to/fix-agents-host-not-starting.md
       - how-to/add-a-folder.md
       - how-to/start-in-a-worktree.md

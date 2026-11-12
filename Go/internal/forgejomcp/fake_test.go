@@ -14,6 +14,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // A fake Forgejo over HTTP (no account, #1753): the REST API v1 paths the server reads and
@@ -291,7 +293,7 @@ func (f *fakeForgejo) serve(w http.ResponseWriter, r *http.Request) {
 		out := []obj{}
 		for _, i := range f.issues {
 			if (q.Get("state") == "all" || i["state"] == q.Get("state")) &&
-				(q.Get("since") == "" || !before(i["updated_at"].(string), q.Get("since"))) &&
+				(q.Get("since") == "" || !mcpevents.Before(i["updated_at"].(string), q.Get("since"))) &&
 				(q.Get("assigned_by") == "" || assigned(i, q.Get("assigned_by"))) &&
 				(q.Get("labels") == "" || labelled(i, q.Get("labels"))) {
 				out = append(out, i)
@@ -309,7 +311,7 @@ func (f *fakeForgejo) serve(w http.ResponseWriter, r *http.Request) {
 	case p == "/api/v1/repos/acme/app/issues/comments":
 		out := []obj{}
 		for _, c := range f.comments {
-			if !before(c["updated_at"].(string), q.Get("since")) {
+			if !mcpevents.Before(c["updated_at"].(string), q.Get("since")) {
 				out = append(out, c)
 			}
 		}

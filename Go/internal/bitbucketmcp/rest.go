@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // RealBitbucket reads Bitbucket Cloud's REST API 2.0 as the person, with the token Token
@@ -222,7 +224,7 @@ func (b *RealBitbucket) get(ctx context.Context, path string, shared bool, into 
 // time the thing at path changed at, so what is shared is never older than what the caller
 // has seen.
 func (b *RealBitbucket) getAsOf(ctx context.Context, path, asOf string, into any) error {
-	body, err := b.shared(path+" "+normalized(asOf), func() ([]byte, error) { return b.do(ctx, http.MethodGet, path, nil) })
+	body, err := b.shared(path+" "+mcpevents.Normalized(asOf), func() ([]byte, error) { return b.do(ctx, http.MethodGet, path, nil) })
 	if err != nil {
 		return err
 	}
@@ -331,11 +333,11 @@ func newest[T any](ctx context.Context, b *RealBitbucket, path, since, asOf stri
 			return nil, Listed{}, err
 		}
 		for _, item := range list.Values {
-			if since != "" && before(at(item), since) {
+			if since != "" && mcpevents.Before(at(item), since) {
 				return items, listed, nil
 			}
 			items = append(items, item)
-			listed = listed.saw(at(item))
+			listed = listed.Saw(at(item))
 		}
 		if list.Next == "" {
 			return items, listed, nil
@@ -803,7 +805,7 @@ func (b *RealBitbucket) ClosedPRs(ctx context.Context, repo, since string) ([]Me
 		if err != nil {
 			return nil, nil, Listed{}, err
 		}
-		if before(at, since) {
+		if mcpevents.Before(at, since) {
 			continue
 		}
 		trusted, err := b.trustedPR(ctx, repo, p)
@@ -853,7 +855,7 @@ func (b *RealBitbucket) FailedChecks(ctx context.Context, repo, since string) ([
 			if s.State != "FAILED" {
 				continue
 			}
-			if at := normalized(s.UpdatedOn); at > d.At {
+			if at := mcpevents.Normalized(s.UpdatedOn); at > d.At {
 				d.At = at
 			}
 			d.Failed = append(d.Failed, Check{Name: s.title(), URL: s.URL})
@@ -867,8 +869,8 @@ func (b *RealBitbucket) FailedChecks(ctx context.Context, repo, since string) ([
 		if len(d.Failed) == 0 {
 			continue
 		}
-		listed = listed.saw(d.At)
-		if d.At == "" || before(d.At, since) {
+		listed = listed.Saw(d.At)
+		if d.At == "" || mcpevents.Before(d.At, since) {
 			continue
 		}
 		if d.Trusted, err = b.trustedPR(ctx, repo, p); err != nil {
@@ -882,7 +884,7 @@ func (b *RealBitbucket) FailedChecks(ctx context.Context, repo, since string) ([
 // issuesSince are the repository's issues updated at or after since, newest first; none when
 // it has no issue tracker.
 func (b *RealBitbucket) issuesSince(ctx context.Context, repo, since string) ([]issueJSON, Listed, error) {
-	path := fmt.Sprintf("%s/issues?%s&sort=-updated_on", repoPath(repo), bbql("updated_on>="+normalized(since)))
+	path := fmt.Sprintf("%s/issues?%s&sort=-updated_on", repoPath(repo), bbql("updated_on>="+mcpevents.Normalized(since)))
 	items, listed, err := newest(ctx, b, path, since, "", func(i issueJSON) string { return i.UpdatedOn })
 	if err != nil && noTracker(err) {
 		return nil, Listed{}, nil
@@ -899,7 +901,7 @@ func (b *RealBitbucket) IssueActivity(ctx context.Context, repo string, kind Iss
 	for _, i := range items {
 		switch kind {
 		case IssueOpened:
-			if before(i.CreatedOn, since) {
+			if mcpevents.Before(i.CreatedOn, since) {
 				continue
 			}
 			trusted, err := b.trusted(ctx, repo, i.Reporter)
@@ -924,7 +926,7 @@ func (b *RealBitbucket) IssueActivity(ctx context.Context, repo string, kind Iss
 						}
 					}
 				} else if ch, ok := c.Changes["state"]; ok && closedStates[ch.New] && !closedStates[ch.Old] {
-					found = append(found, IssueActivity{ID: strconv.Itoa(i.ID) + ":" + normalized(c.CreatedOn)})
+					found = append(found, IssueActivity{ID: strconv.Itoa(i.ID) + ":" + mcpevents.Normalized(c.CreatedOn)})
 				}
 				if len(found) == 0 {
 					continue

@@ -254,7 +254,7 @@ func (c cursor) encoded() string { return mcpevents.Cursor(c).Encoded() }
 
 // MARK: Polling
 
-// candidate is something that may be raised: its id, its time (in timeLayout), and its data,
+// candidate is something that may be raised: its id, its time (in mcpevents.TimeLayout), and its data,
 // looked up only once it is taken; nil data skips it, though the cursor still moves past it.
 type candidate = mcpevents.Candidate
 
@@ -268,7 +268,7 @@ const (
 type pollParams = mcpevents.Params
 
 // polls is how it polls, with GitHub's times and errors.
-var polls = mcpevents.Poller{NextPollMs: nextPollMs, Normalize: normalized, Fail: eventsError}
+var polls = mcpevents.Poller{NextPollMs: nextPollMs, Normalize: mcpevents.Normalized, Fail: eventsError}
 
 // Events answers events/list and events/poll over a GitHub.
 type Events struct {
@@ -391,7 +391,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 // older than GitHub keeps.
 func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidate, bool, error)) (map[string]any, *rpcError) {
 	now := s.now()
-	result, bad := polls.Poll(e.Name, p, func() string { return timeString(now) },
+	result, bad := polls.Poll(e.Name, p, func() string { return mcpevents.TimeString(now) },
 		func(since string) ([]candidate, mcpevents.Listed, error) {
 			found, truncated, err := find(since)
 			return found, mcpevents.Listed{Truncated: truncated}, err
@@ -400,7 +400,7 @@ func (s *Events) poll(e event, p pollParams, find func(since string) ([]candidat
 		return result, bad
 	}
 	c, _ := polls.Decode(p.Cursor)
-	if sinceTime, _ := parseTime(c.Since); sinceTime.Before(now.Add(-historyDays * 24 * time.Hour)) {
+	if sinceTime, _ := mcpevents.ParseTime(c.Since); sinceTime.Before(now.Add(-historyDays * 24 * time.Hour)) {
 		result["truncated"] = true
 	}
 	return result, nil
@@ -424,7 +424,7 @@ func (s *Events) pollDiff(_ context.Context, name, key string, a args, p pollPar
 	if strings.HasPrefix(name, "issue.") {
 		root = "issue" // issue.assigned (#2034)
 	}
-	return polls.Diff(name, key, p, func() string { return timeString(s.now()) }, func() ([]mcpevents.State, error) {
+	return polls.Diff(name, key, p, func() string { return mcpevents.TimeString(s.now()) }, func() ([]mcpevents.State, error) {
 		all, err := states()
 		var out []mcpevents.State
 		for _, st := range all {
@@ -473,7 +473,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 					continue
 				}
 			}
-			at := normalized(it.At)
+			at := mcpevents.Normalized(it.At)
 			if at == "" {
 				continue
 			}
@@ -503,7 +503,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 			if a.label != "" && it.Label != a.label {
 				continue
 			}
-			at := normalized(it.At)
+			at := mcpevents.Normalized(it.At)
 			if at == "" {
 				continue
 			}
@@ -520,7 +520,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		}
 		var list []candidate
 		for _, c := range comments {
-			at := normalized(c.At)
+			at := mcpevents.Normalized(c.At)
 			if at == "" || (a.pr != 0 && c.PR.Number != a.pr) || (a.branch != "" && c.PR.Branch != a.branch) ||
 				!(a.mine || a.anyone || c.Trusted) || !a.closesOne(c.PR) || !a.byMe(c.PR, yours) {
 				continue
@@ -539,7 +539,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		// Every comment is a candidate, so the cursor moves past the ones left out (P20261031-1).
 		var list []candidate
 		for _, c := range comments {
-			at := normalized(c.At)
+			at := mcpevents.Normalized(c.At)
 			if at == "" {
 				continue
 			}
@@ -561,7 +561,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		}
 		var list []candidate
 		for _, r := range reviews {
-			at := normalized(r.At)
+			at := mcpevents.Normalized(r.At)
 			if at == "" || (a.pr != 0 && r.PR.Number != a.pr) || (a.branch != "" && r.PR.Branch != a.branch) ||
 				!(a.anyone || r.Trusted) || !a.closesOne(r.PR) || !a.byMe(r.PR, yours) {
 				continue
@@ -579,7 +579,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		}
 		var list []candidate
 		for _, w := range waiting {
-			at := normalized(w.Run.Run.UpdatedAt)
+			at := mcpevents.Normalized(w.Run.Run.UpdatedAt)
 			if at == "" || (!a.anyone && !w.Run.Trusted) {
 				continue
 			}
@@ -596,7 +596,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 		}
 		var list []candidate
 		for _, r := range runs {
-			at := normalized(r.Run.UpdatedAt)
+			at := mcpevents.Normalized(r.Run.UpdatedAt)
 			if at == "" {
 				continue
 			}
@@ -633,7 +633,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 	var list []candidate
 	if name == "pr.merged" {
 		for _, m := range merged {
-			if at := normalized(m.MergedAt); wanted(m.PR, m.Trusted) && at != "" {
+			if at := mcpevents.Normalized(m.MergedAt); wanted(m.PR, m.Trusted) && at != "" {
 				list = append(list, candidate{EventID: fmt.Sprintf("pr.merged:%s:%d", repo, m.PR.Number), Time: at,
 					Subject: prRef(repo, m.PR.Number),
 					Data: func() (map[string]any, error) {
@@ -645,7 +645,7 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 	}
 	// Its close time in the id: a PR reopened and closed again is a new event.
 	for _, c := range closed {
-		if at := normalized(c.ClosedAt); wanted(c.PR, c.Trusted) && at != "" {
+		if at := mcpevents.Normalized(c.ClosedAt); wanted(c.PR, c.Trusted) && at != "" {
 			list = append(list, candidate{EventID: fmt.Sprintf("pr.closed:%s:%d:%s", repo, c.PR.Number, c.ClosedAt), Time: at,
 				Subject: prRef(repo, c.PR.Number), Key: c.ClosedAt,
 				Data: func() (map[string]any, error) {
@@ -681,7 +681,7 @@ func checkRunCandidates(ctx context.Context, gh GitHub, name string, a args, you
 	}
 	var list []candidate
 	for _, ref := range runs {
-		at := normalized(ref.UpdatedAt)
+		at := mcpevents.Normalized(ref.UpdatedAt)
 		if at == "" {
 			continue
 		}

@@ -49,6 +49,8 @@ something particular done.
 - [Release Agents](release-agents-host.md): publish the Mac's Developer ID download on
   GitHub and the iPhone and iPad app on TestFlight by tagging main, and set up the signing
   secrets once.
+- [Keep the performance budgets](keep-the-performance-budgets.md): the bytes and calls CI
+  holds on each pull request, the times this Mac measures at night, and the phone's check.
 - [Fix Agents when it won't start](fix-agents-host-not-starting.md): see why a login
   item isn't running, Repair it, send diagnostics with a report, and remove Agents.
 
