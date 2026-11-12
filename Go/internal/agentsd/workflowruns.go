@@ -374,6 +374,11 @@ func (d *Daemon) fire(fr fireRequest) {
 		d.workflowMu.Unlock()
 		return
 	}
+	// So are a host's that its control plane forgot, or that does not know yet (#4985).
+	if d.notAMember() || d.membershipUnknown() {
+		d.workflowMu.Unlock()
+		return
+	}
 	// A bot's machine at the bot's spend cap starts no work (#1761, FR-033), and a runs-on:
 	// workflow runs once per trigger across the bot's machines (FR-034), by the trigger's
 	// scope (#2011, FR-035).
@@ -996,6 +1001,11 @@ func (d *Daemon) workflowClock(stop <-chan struct{}) {
 }
 
 func (d *Daemon) workflowTickOnce(at time.Time) {
+	// A start that waits for its membership ticks once it is known: the schedules due
+	// meanwhile fire then, as the last tick's time says (#4985).
+	if d.membershipUnknown() {
+		return
+	}
 	d.noteDay()
 	d.workflowMu.Lock()
 	rec := d.recordsLocked()

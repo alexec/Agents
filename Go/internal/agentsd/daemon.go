@@ -136,6 +136,7 @@ type Daemon struct {
 	liveTileState
 	worktreeState
 	recoveryState
+	forgottenState
 	backupState
 	folderState
 	installBook

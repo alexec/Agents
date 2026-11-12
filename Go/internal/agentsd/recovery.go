@@ -2,6 +2,7 @@ package agentsd
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"sync"
 	"time"
@@ -172,6 +173,12 @@ func wordsAboutTheRestart(was wire.AgentState) string {
 // PickUpAfterRestart picks the interrupted agents back up, once the host serves: every one
 // said to be resuming at once, then two at a time, most recent first.
 func (d *Daemon) PickUpAfterRestart() {
+	// A host that its control plane forgot picks nobody up (#4985): they stay on the
+	// list for a start that is a member again.
+	if d.notAMember() {
+		log.Printf("not a member: %d interrupted agents are not picked up", d.interruptedCount())
+		return
+	}
 	d.resumeMu.Lock()
 	var ids []wire.UUID
 	for id := range d.interrupted {
@@ -202,6 +209,12 @@ func (d *Daemon) PickUpAfterRestart() {
 	})
 }
 
+func (d *Daemon) interruptedCount() int {
+	d.resumeMu.Lock()
+	defer d.resumeMu.Unlock()
+	return len(d.interrupted)
+}
+
 func (d *Daemon) leaveTheQueue(id wire.UUID) {
 	d.resumeMu.Lock()
 	was := d.resuming[id]
@@ -224,6 +237,11 @@ func (d *Daemon) pickUp(id wire.UUID) {
 	defer d.pickedUp(id)
 	a := d.Store.Agent(id)
 	if !ok || a == nil || !mayBePickedUp(a) {
+		return
+	}
+	// A lane whose pull request landed or closed while the host was down is left (#4985).
+	if why, ended := d.prEnded(a); ended {
+		d.record(id, runtimeNote("Not picked back up: "+why+". Send it a message to pick it up yourself."))
 		return
 	}
 	d.change(id, func(a *wire.Agent) {
