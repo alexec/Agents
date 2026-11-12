@@ -354,6 +354,52 @@ public enum MessagesList {
         return s.identity
     }
 
+    // MARK: The sidebar row's grey line (#4934)
+
+    /// The event a messaging connector raises for a message (Slack, Google Chat, WhatsApp).
+    public static let receivedEvent = "message.received"
+
+    /// The newest `message.received` and what came of it, for the row's line.
+    public struct LastConsequence: Sendable, Hashable {
+        public var at: Date
+        /// "woke Fix login bug", "started triage", or "nothing woke".
+        public var words: String
+
+        public init(at: Date, words: String) {
+            self.at = at
+            self.words = words
+        }
+    }
+
+    /// The newest `message.received` in `events` (every machine's, in any order) and what it did: the session it
+    /// woke, else the workflow it started, else "nothing woke", which is the case a person looks into. Nil when
+    /// there is none.
+    public static func lastConsequence(_ events: [Event]) -> LastConsequence? {
+        guard let newest = events.filter({ $0.name == receivedEvent }).max(by: { $0.latest < $1.latest }) else { return nil }
+        var words = "nothing woke"
+        for consequence in newest.consequences {
+            if case .woke(_, let title) = consequence { words = "woke \(title)"; break }
+            if case .fired(let workflow, _, _) = consequence, words == "nothing woke" { words = "started \(workflow)" }
+        }
+        return LastConsequence(at: newest.latest, words: words)
+    }
+
+    /// The unread messages of every machine's conversations, each conversation once; nil when no conversation
+    /// gives a count, so the line leaves it out.
+    public static func unreadTotal(_ lists: [HostConversations]) -> Int? {
+        let counts = merged(lists).compactMap(\.conversation.unread)
+        return counts.isEmpty ? nil : counts.reduce(0, +)
+    }
+
+    /// The Messages row's grey line: "12 unread · woke Fix login bug 4 min ago". A count of 0 or none is left out;
+    /// nil when there is nothing to say, so the row has no line.
+    public static func statusLine(unread: Int?, last: LastConsequence?, now: Date = Date()) -> String? {
+        var parts: [String] = []
+        if let unread, unread > 0 { parts.append("\(unread) unread") }
+        if let last { parts.append("\(last.words) \(StatusSecretsWords.ago(last.at, now: now))") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     /// An SF Symbol for a service.
     public static func symbol(_ source: String) -> String {
         switch source {

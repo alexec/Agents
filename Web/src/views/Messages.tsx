@@ -13,7 +13,7 @@ import { hostAnswers } from "../model/capabilities";
 import { channelName } from "../model/channelLinks";
 import { ago } from "../model/connectorSetup";
 import {
-  inThread, leaveThread, mergeConversations, messagesProblems, messagesSources, noConnector, noConnectorIn, noConversations, noMachine,
+  inThread, lastConsequence, leaveThread, mergeConversations, messagesStatusLine, unreadTotal, messagesProblems, messagesSources, noConnector, noConnectorIn, noConversations, noMachine,
   noMessages, noUnread, outside, replyInThread, replyLabel, replyPlaceholder, replyText, send, senderName, sending, sentAs, setUp,
   sourceGlyph, unreadWords, type HostConversations, type MessagesRow,
 } from "../model/messages";
@@ -54,6 +54,43 @@ function useLists(store: Store) {
   }, [hostKey, asked.value, unreadOnly.value]);
 }
 
+/** How often the grey line is read again: the count asks every messaging connector over MCP. */
+const statusEvery = 60_000;
+
+/** The grey line at the head of Messages (#4934), as the window's sidebar row: the unread count, and what the newest
+ * message.received woke ("12 unread · woke Fix login bug 4 min ago"), across every machine. Read on a timer; the count
+ * is left out while it fails. No machine that reads messages: no line. */
+function MessagesStatusLine({ store }: { store: Store }) {
+  const unread = useSignal<number | undefined>(undefined);
+  const now = useSignal(Date.now());
+  const hosts = messagesHosts(store);
+  const hostKey = hosts.map((h) => h.id).join(",");
+  useEffect(() => {
+    let current = true;
+    const read = async () => {
+      const ids = messagesHosts(store).map((h) => h.id);
+      const got = await Promise.all(ids.map(async (host): Promise<HostConversations | null> => {
+        try {
+          const list = await store.link.call("messages/conversations", { limit: 50, unread: true }, host);
+          return { host, name: host, conversations: list.conversations, errors: [] };
+        } catch { return null; }
+      }));
+      await Promise.all(ids.map((host) => store.loadEvents(host)));
+      if (!current) return;
+      const answered = got.filter((l): l is HostConversations => l !== null);
+      unread.value = answered.length ? unreadTotal(answered) ?? 0 : undefined;
+      now.value = Date.now();
+    };
+    void read();
+    const timer = setInterval(() => { void read(); }, statusEvery);
+    return () => { current = false; clearInterval(timer); };
+  }, [hostKey]);
+  if (hosts.length === 0) return null;
+  const events = hosts.flatMap((h) => store.events.value[h.id]?.events ?? []);
+  const line = messagesStatusLine(unread.value, lastConsequence(events), now.value);
+  return line ? <p class="hint quiet small messages-status" role="status">{line}</p> : null;
+}
+
 export function MessagesList({ store }: { store: Store }) {
   useLists(store);
   const more = useSignal(false);
@@ -75,6 +112,7 @@ export function MessagesList({ store }: { store: Store }) {
 
   return (
     <div class="work-list messages-list">
+      <MessagesStatusLine store={store} />
       <div class="work-filters" role="group" aria-label="Filters">
         <label>Source <select value={source.value} onChange={(e) => { source.value = (e.target as HTMLSelectElement).value; }}>
           <option value="">All</option>

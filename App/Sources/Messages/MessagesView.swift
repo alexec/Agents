@@ -382,3 +382,69 @@ private struct MessageRow: View {
         .padding(.vertical, 4)
     }
 }
+
+/// The sidebar's Messages row (#4934): the title, and under it in grey the unread count and what the newest
+/// `message.received` woke, as the Summary and Events rows have a line ("12 unread · woke Fix login bug 4 min ago").
+/// The count asks every messaging connector over MCP, so it is read on a timer, and left out while it fails;
+/// the events are each machine's newest page. No machine that reads messages: no line.
+struct MessagesRow: View {
+    @Environment(AppModel.self) private var model
+    @State private var unread: Int?
+    @State private var last: MessagesList.LastConsequence?
+
+    /// How often the line is read again.
+    static let every: Duration = .seconds(60)
+
+    var body: some View {
+        let machines = model.messagesMachines
+        // The time ago moves on between reads.
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            let line = machines.isEmpty ? nil : MessagesList.statusLine(unread: unread, last: last, now: context.date)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack { Text(MessagesList.title).foregroundStyle(.primary); Spacer() }
+                if let line {
+                    Text(line).appText(.fine).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            .accessibilityValue(line ?? "")
+        }
+        .task(id: machines.map(\.id.rawValue)) {
+            while !Task.isCancelled {
+                await read(machines)
+                try? await Task.sleep(for: Self.every)
+            }
+        }
+    }
+
+    private func read(_ machines: [(id: MachineRef, name: String)]) async {
+        guard !machines.isEmpty else { unread = nil; last = nil; return }
+        let model = model
+        var lists: [MessagesList.HostConversations] = []
+        var events: [Event] = []
+        await withTaskGroup(of: (MessagesList.HostConversations?, [Event]).self) { group in
+            for machine in machines {
+                group.addTask {
+                    async let list = try? model.messages(DaemonAPI.Method.messagesConversations,
+                                                         DaemonAPI.MessagesConversationsRequest(limit: 50, unread: true),
+                                                         returning: DaemonAPI.MessagesConversations.self, on: machine.id)
+                    async let page = try? model.client(for: machine.id).call(DaemonAPI.Method.eventsList,
+                                                                              DaemonAPI.EventsListRequest(),
+                                                                              returning: DaemonAPI.EventsPage.self)
+                    let conversations = await list
+                    return (conversations.map { .init(host: machine.id, name: machine.name, conversations: $0.conversations) },
+                            await page?.events ?? [])
+                }
+            }
+            for await (list, page) in group {
+                if let list { lists.append(list) }
+                events += page
+            }
+        }
+        // This Mac first, so its copy of a conversation is the one counted, as the page keeps it.
+        lists.sort { a, b in
+            (machines.firstIndex { $0.id == a.host } ?? 0) < (machines.firstIndex { $0.id == b.host } ?? 0)
+        }
+        unread = lists.isEmpty ? nil : MessagesList.unreadTotal(lists) ?? 0
+        last = MessagesList.lastConsequence(events)
+    }
+}

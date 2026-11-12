@@ -202,7 +202,8 @@ struct FolderListView: View {
                         .appText(.supporting).sidebarInk(.summary).tag(SidebarItem.summary)
                 }
                 // Messages (#4344): the messaging connectors' conversations, the last row above Work.
-                HStack { Text(MessagesList.title).foregroundStyle(.primary); Spacer() }
+                // Under it in grey, the unread count and what the last message woke (#4934).
+                MessagesRow()
                     .help(MessagesList.sidebarHelp)
                     .activityIcon("bubble.left.and.bubble.right")
                     .appText(.supporting).sidebarInk(.messages).tag(SidebarItem.messages)

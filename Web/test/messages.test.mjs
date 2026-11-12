@@ -52,3 +52,26 @@ test("the reply field (#4345) sends trimmed text and says who it goes as", () =>
   assert.equal(m.replyText(" \n "), undefined);
   assert.equal(m.sentAs("the Slack bot @agents"), "Sent as the Slack bot @agents, not as an agent.");
 });
+
+test("the line at the head of Messages says the unread and what the last message woke (#4934)", () => {
+  const ref = Date.UTC(2001, 0, 1);
+  const now = ref + 10_000_000_000;
+  const event = (position, name, at, consequences = []) => ({ position, name, at, count: 1, scope: { mac: {} }, sentence: "",
+    details: {}, chainDepth: 0, consequences });
+  const woke = event(1, "message.received", 9_999_760, [{ fired: { workflowID: "triage", folder: "/p" } },
+    { woke: { agentID: "a", title: "Fix login bug" } }]);
+  const last = m.lastConsequence([woke, event(2, "agent.started", 9_999_990)]);
+  assert.deepEqual(last, { at: ref + 9_999_760_000, words: "woke Fix login bug" });
+  assert.equal(m.messagesStatusLine(12, last, now), "12 unread · woke Fix login bug 4 min ago");
+  assert.equal(m.lastConsequence([event(3, "message.received", 1, [{ fired: { workflowID: "triage", folder: "/p" } }])]).words, "started triage");
+  const nothing = event(4, "message.received", 9_999_880, [{ refused: { workflowID: "triage", folder: "/p", reason: { disabled: {} } } }]);
+  assert.equal(m.messagesStatusLine(0, m.lastConsequence([woke, nothing]), now), "nothing woke 2 min ago");
+  assert.equal(m.messagesStatusLine(undefined, undefined, now), undefined);
+  assert.equal(m.messagesStatusLine(3, undefined, now), "3 unread");
+  const lists = [
+    { host: "mac", name: "This Mac", conversations: [item("slack", "C1", "2026-11-10T08:00:00Z", 2), item("email", "t1")], errors: [] },
+    { host: "box", name: "Box", conversations: [item("slack", "C1", "2026-11-10T08:00:00Z", 2), item("slack", "C2", "2026-11-10T09:00:00Z", 5)], errors: [] },
+  ];
+  assert.equal(m.unreadTotal(lists), 7);
+  assert.equal(m.unreadTotal([{ host: "mac", name: "This Mac", conversations: [item("email", "t")], errors: [] }]), undefined);
+});
