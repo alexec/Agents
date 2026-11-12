@@ -1349,7 +1349,13 @@ func eventStreamFrame(payload string) []byte {
 }
 
 // SC-005: the relay adds under 5 ms to the first byte at the 95th percentile.
+// It measures wall time, so it skips under -race (#4680): the race detector slows the
+// relay several times, and on a shared machine that alone goes past 5 ms. CI's
+// go-darwin job runs it without -race.
 func TestTheRelayIsQuick(t *testing.T) {
+	if raceEnabled {
+		t.Skip("measures wall time; the race detector slows it (#4680)")
+	}
 	root := t.TempDir()
 	d, _, public := orgMachine(t, root, newControlKeys(t))
 	p := newFakeProvider(t)
