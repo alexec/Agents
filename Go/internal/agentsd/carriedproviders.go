@@ -53,7 +53,8 @@ func (d *Daemon) carried() *carriedProviders {
 }
 
 // carriedMethods are the asks askedProvider answers on channel 0, which no client can send:
-// said in machine/hello as providers.carry/1, so the control plane asks only a host that has them.
+// said in machine/hello as providers.carry/1 and, for providers/ssh keepAwake (#4637), /2,
+// so the control plane asks only a host that has them.
 var carriedMethods = []string{wire.CallProvidersCarry.Name, wire.CallProvidersForget.Name,
 	wire.CallProvidersKeepSecrets.Name, wire.CallProvidersSSH.Name}
 

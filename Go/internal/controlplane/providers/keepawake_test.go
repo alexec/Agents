@@ -3,6 +3,8 @@ package providers
 import (
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/wire"
 )
 
 // A carried codespace's machine that works is kept awake by the machine that carries its
@@ -59,6 +61,26 @@ func TestACarriedCodespaceIsKeptAwakeWhileItsMachineWorks(t *testing.T) {
 	time.Sleep(20 * time.Millisecond)
 	if got := len(sshAsks(h, "letSleep")); got != 2 {
 		t.Errorf("let sleep %d times", got)
+	}
+}
+
+// A carrying machine from before providers.carry/2 has no keepAwake, so it is not asked.
+func TestAnOlderCarryingMachineIsNotAskedToKeepAwake(t *testing.T) {
+	h := newHarness(t, func(o *harnessOptions) {
+		o.workspaces = []MachineInfo{{ID: "fuzzy-space", Name: "fuzzy", State: "running", SSH: new("cs.fuzzy-space.main")}}
+	})
+	out := h.must(MethodProvidersAdd, map[string]any{"name": "Codespaces", "kind": "commands",
+		"commands": map[string]any{"preset": "codespaces-api"}, "secrets": map[string]string{"GITHUB_TOKEN": "ghp_test"}})
+	h.link(string(out.(ProviderSummary).ID), devbox, "fuzzy-space")
+	h.router.mu.Lock()
+	h.router.lacks = map[string]bool{carrier + " " + wire.CapProvidersCarry2: true}
+	h.router.mu.Unlock()
+	h.router.setOnline(devbox, true)
+	h.providers.Heard(devbox, MachineStatus{Idle: false, Running: []string{"a1"}})
+	h.providers.keepAwake(time.Now())
+	time.Sleep(20 * time.Millisecond)
+	if got := sshAsks(h, "keepAwake"); len(got) != 0 {
+		t.Fatalf("%v", got)
 	}
 }
 

@@ -34,6 +34,8 @@ type fakeRouter struct {
 	// each, or what asking says.
 	asked  []delivered
 	asking func(host, method string, params json.RawMessage) json.RawMessage
+	// lacks: capabilities a host does not say, "host capability".
+	lacks map[string]bool
 }
 
 type delivered struct {
@@ -154,7 +156,11 @@ func (r *fakeRouter) asks() []delivered {
 	return append([]delivered{}, r.asked...)
 }
 
-func (r *fakeRouter) HostCan(string, string) bool { return true }
+func (r *fakeRouter) HostCan(host, capability string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return !r.lacks[host+" "+capability]
+}
 
 // row is a machines/list row, as far as the tests read it.
 type row struct {

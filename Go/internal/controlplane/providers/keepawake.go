@@ -48,7 +48,8 @@ func (p *Providers) keepAwake(now time.Time) {
 		}
 		destination := p.sshDestination(*link, host)
 		r := p.carriedCodespace(*link, destination)
-		if r == nil {
+		// A carrying machine from before providers.carry/2 has no keepAwake.
+		if r == nil || !p.router.HostCan(*r.Machine, wire.CapProvidersCarry2) {
 			continue
 		}
 		want[host] = keptAwake{host: host, provider: r.ID, machine: *r.Machine, codespace: link.Workspace,

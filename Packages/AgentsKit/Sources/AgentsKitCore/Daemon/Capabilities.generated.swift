@@ -154,6 +154,7 @@ public enum Capability {
     public static let projectsSessions1 = "projects.sessions/1"
     public static let projects1 = "projects/1"
     public static let providersCarry1 = "providers.carry/1"
+    public static let providersCarry2 = "providers.carry/2"
     public static let providers1 = "providers/1"
     public static let providers2 = "providers/2"
     public static let readapi1 = "readapi/1"
@@ -485,7 +486,7 @@ public enum Capability {
         "providers/carry": "providers.carry/1",
         "providers/forget": "providers.carry/1",
         "providers/keepSecrets": "providers.carry/1",
-        "providers/ssh": "providers.carry/1",
+        "providers/ssh": "providers.carry/2",
         "relay/grant": "relay/1",
         "relay/offer": "relay/1",
         "reports/features": "features/1",
