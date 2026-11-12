@@ -35,7 +35,7 @@ PROMPT = ("In Forecast.swift, the Celsius conversions multiply by 9/5; they shou
 
 
 def setup(v):
-    folder = v.project("weather-app", {"Forecast.swift": FORECAST, "README.md": "# Weather\n"})
+    folder = v.add_folder("weather-app", {"Forecast.swift": FORECAST, "README.md": "# Weather\n"})
     agent = v.start(folder, PROMPT)
     v.wait_state(agent, states=("finished", "idle", "done"), timeout=300)
     v.tidy()

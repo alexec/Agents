@@ -123,7 +123,7 @@ def keychain_access(v):
 
 # --- the set-up ----------------------------------------------------------------------------
 def setup(v):
-    folder = v.project("shop", {
+    folder = v.add_folder("shop", {
         "README.md": "# Shop\n\nA small shop front.\n",
         ".agents/mcp.json": json.dumps({"mcpServers": {"linear": {"command": "linear-mcp", "hosted": True}}}, indent=2) + "\n",
         ".agents/pins.json": json.dumps({"pins": [{"pinned_by": {"person": True}, "title": "Linear issues",

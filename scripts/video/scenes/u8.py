@@ -18,7 +18,7 @@ PROMPTS = [
 
 
 def setup(v):
-    v.folder = v.project("weather-app", {
+    v.folder = v.add_folder("weather-app", {
         "settings.py": "THEME = 'light'\n",
         "report.py": "def report(days):\n    return [d.summary() for d in days]\n",
     })

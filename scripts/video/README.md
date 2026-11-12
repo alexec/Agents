@@ -42,10 +42,14 @@ and marketing videos; `--upload` uploads an integration video (below).
    video is kept.
 
 Real Claude agents run in the scenes, on scratch folders: a few cents a video. On camera
-the person is called Sam (`launch.sh --person`), and the scratch root says it has 500 GB
-free, so the real disk is never shown. A scratch agent still reads the person's own
-`~/.claude/CLAUDE.md`: each folder tells it never to name an instructions file, and a
-take whose window shows the person's name or their own instructions fails.
+the person is called Sam (`launch.sh --person`), and the scratch machine is "Sam's Mac"
+(`HOST_NAME`). Its join card (the machine lock) is approved and the recovery key skipped
+before the recording starts. The scratch root asks to say it has 500 GB free, but the Go
+host does not read that yet (#4851): the machine's row shows the real disk. A scene's
+`GET_STARTED = True` keeps the Get started card, which is otherwise put away. A scratch
+agent still reads the person's own `~/.claude/CLAUDE.md`: each folder tells it never to
+name an instructions file, and a take whose window shows the person's name or their own
+instructions fails.
 
 ## Integration videos (#1793)
 
@@ -114,7 +118,7 @@ recording starts, and `run(v)` is the recording. `v` is the `Video` in `make.py`
 
 | Call | What it does |
 |---|---|
-| `v.folder(name, files)` | a committed Git folder under the root, added to the app |
+| `v.add_folder(name, files)` | a committed Git folder under the root, added to the app |
 | `v.start(folder, prompt)` | a real agent, as **New Session** would start it |
 | `v.select(text)`, `v.press(text)`, `v.unfold(text)` | the window's accessibility tree, read in its own process |
 | `v.type(field, text)`, `v.key("return")`, `v.menu(menu, item)` | keys and menu items, sent in the window's process |
@@ -149,7 +153,7 @@ menu and anything outside the window are not.
 | # | Video | Scene | Made |
 |---|---|---|---|
 | A2 | Answer from anywhere | `a2.py` | yes |
-| U1 | Your first agent | `u1.py` | yes |
+| U1 | Your first agent | `u1.py` | yes (again 2026-11-11, #4835) |
 | U3 | Answer a question | `u3.py` | yes |
 | U4 | Read an agent's changes | `u4.py` | yes |
 | U5 | Follow a live document | `u5.py` | yes |
