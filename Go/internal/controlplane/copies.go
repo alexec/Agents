@@ -61,7 +61,7 @@ func keepsList(method string, params json.RawMessage) bool {
 		if string(asked["lean"]) != "true" || !off("includeArchived") || !off("archivedOnly") {
 			return false
 		}
-		for _, k := range []string{"folder", "startedByWorkflow", "agentID", "after", "query"} {
+		for _, k := range []string{"folder", "startedByWorkflow", "agentID", "after", "query", "changedSince"} {
 			if !absent(k) {
 				return false
 			}

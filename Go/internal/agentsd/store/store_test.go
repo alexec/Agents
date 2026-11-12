@@ -75,6 +75,7 @@ func TestARootSwiftWroteOpens(t *testing.T) {
 	json.Unmarshal(before, &x)
 	json.Unmarshal(after, &y)
 	delete(y, "madeInRoot") // stamped: the root had no id, so its records are its own
+	delete(y, "revision")   // its place in this host's order of changes (#4785)
 	for k, v := range x {
 		if vb, _ := json.Marshal(v); string(vb) != mustJSON(y[k]) {
 			t.Errorf("%s was %s, now %s", k, vb, mustJSON(y[k]))

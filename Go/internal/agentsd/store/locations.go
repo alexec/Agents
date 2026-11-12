@@ -122,3 +122,8 @@ func (l Locations) Summaries() string { return filepath.Join(l.Cache, "archived-
 func (l Locations) Turns(id string) string {
 	return filepath.Join(l.Cache, "turns", strings.ToUpper(id)+".jsonl")
 }
+
+// Revisions is the host's order of changes to its records (#4785): its epoch, the
+// revisions put by, and the records removed lately. In the root, not the cache: losing it
+// sends every client the whole list again.
+func (l Locations) Revisions() string { return filepath.Join(l.Root, "revisions.json") }

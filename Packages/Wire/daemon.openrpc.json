@@ -10866,6 +10866,10 @@
         "code": -32064,
         "message": "providersNeedOneCopy"
       },
+      "revisionGone": {
+        "code": -32105,
+        "message": "revisionGone"
+      },
       "runtimeNotFound": {
         "code": -32001,
         "message": "runtimeNotFound"

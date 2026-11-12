@@ -10,6 +10,10 @@ import Foundation
 /// throughout.
 public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public var id: UUID
+    /// Where this record's last change is in its host's order of changes (#4785): a client
+    /// asks for what changed since with `ListRequest.changedSince`. Nil from a host that
+    /// predates it.
+    public var revision: Int?
     public var runtimeID: String
     public var cwd: URL
     public var title: String?
@@ -304,6 +308,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
+        revision = try? c.decodeIfPresent(Int.self, forKey: .revision)
         runtimeID = try c.decode(String.self, forKey: .runtimeID)
         cwd = try c.decode(URL.self, forKey: .cwd)
         title = try c.decodeIfPresent(String.self, forKey: .title)
@@ -456,6 +461,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     public func encode(to encoder: any Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
+        try c.encodeIfPresent(revision, forKey: .revision)
         try c.encode(runtimeID, forKey: .runtimeID)
         try c.encode(cwd, forKey: .cwd)
         try c.encodeIfPresent(title, forKey: .title)
@@ -538,7 +544,7 @@ public struct Agent: Codable, Hashable, Sendable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
-        case id, runtimeID, cwd, title, labels, state, runtimeSessionID, runtimeKeepsCopy, startOptions
+        case id, revision, runtimeID, cwd, title, labels, state, runtimeSessionID, runtimeKeepsCopy, startOptions
         case advertisedOptions, availableCommands, createdAt, lastActivityAt, browserUsedAt, isUnread, isMuted, reportSeenAt
         case endedReason, archivedReason
         case usage, lastTurnUsage, costToDate, costCeiling, tokensToDate, tokenCeiling, plans, additionalDirectories, mcpServers

@@ -166,7 +166,7 @@ func (d *Daemon) register() {
 	})
 
 	On(d, wire.CallAgentsList, func(ctx context.Context, c *Client, r wire.ListRequest) ([]wire.Agent, error) {
-		return d.listAgents(r), nil
+		return d.agentsList(r)
 	})
 	On(d, wire.CallAgentsStart, func(ctx context.Context, c *Client, r wire.StartRequest) (wire.UUID, error) {
 		// An agent on another machine asked for it (#2887): its labels are an agent's.
@@ -514,6 +514,15 @@ func archivedOrder(a *wire.Agent) wire.Date {
 	return a.LastActivityAt
 }
 
+// agentsList is agents/list: a point the store cannot vouch for is refused (#4785), and the
+// client asks for the whole list.
+func (d *Daemon) agentsList(r wire.ListRequest) ([]wire.Agent, error) {
+	if r.ChangedSince != nil && !d.Store.Vouches(*r.ChangedSince) {
+		return nil, &Error{Code: wire.FailureRevisionGone, Message: "This host cannot say what changed since then. Ask for the whole list."}
+	}
+	return d.listAgents(r), nil
+}
+
 // listAgents is agents/list: newest activity first, a page after a cursor. An archived-only
 // list is newest archived first (#2153), as the Archive shows it, so the page holds the ones
 // put away last.
@@ -525,8 +534,12 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 		return []wire.Agent{}
 	}
 	limit := int64(-1)
-	if r.Limit != nil && *r.Limit > 0 {
+	if r.Limit != nil && *r.Limit > 0 && r.ChangedSince == nil {
 		limit = *r.Limit
+	}
+	after := r.After
+	if r.ChangedSince != nil {
+		after = nil
 	}
 	out := []wire.Agent{}
 	query := ""
@@ -536,12 +549,19 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 	read := 0
 	issue := d.issueSearchOf(query)
 	projects := projectsOfFolders{}
-	// A list with no archived agent in it reads only the live records (#4510).
-	agents := d.Store.LiveAgents()
-	if r.IncludeArchived || r.ArchivedOnly {
+	var agents []wire.Agent
+	switch {
+	// Only what changed since (#4785), every one and archived ones too, whatever the list
+	// asked: a client sees a session archived or brought back. No page.
+	case r.ChangedSince != nil:
+		agents = d.Store.AgentsChangedSince(r.ChangedSince.Revision)
+	case r.IncludeArchived || r.ArchivedOnly:
 		agents = d.Store.Agents()
+	// A list with no archived agent in it reads only the live records (#4510).
+	default:
+		agents = d.Store.LiveAgents()
 	}
-	if r.ArchivedOnly {
+	if r.ArchivedOnly && r.ChangedSince == nil {
 		sort.SliceStable(agents, func(i, j int) bool {
 			if a, b := archivedOrder(&agents[i]), archivedOrder(&agents[j]); a != b {
 				return a > b
@@ -551,7 +571,7 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 	}
 	for _, a := range agents {
 		archived := a.State == wire.AgentStateArchived
-		if archived && !r.IncludeArchived && !r.ArchivedOnly || r.ArchivedOnly && !archived {
+		if r.ChangedSince == nil && (archived && !r.IncludeArchived && !r.ArchivedOnly || r.ArchivedOnly && !archived) {
 			continue
 		}
 		if r.Folder != nil && folderPath(&a) != store.FolderPath(*r.Folder) {
@@ -564,10 +584,10 @@ func (d *Daemon) listAgents(r wire.ListRequest) []wire.Agent {
 		if r.Project != nil && projects.of(&a) != *r.Project {
 			continue
 		}
-		if c := r.After; c != nil && !r.ArchivedOnly && (a.LastActivityAt > c.LastActivityAt || a.LastActivityAt == c.LastActivityAt && a.ID <= c.ID) {
+		if c := after; c != nil && !r.ArchivedOnly && (a.LastActivityAt > c.LastActivityAt || a.LastActivityAt == c.LastActivityAt && a.ID <= c.ID) {
 			continue
 		}
-		if c := r.After; c != nil && r.ArchivedOnly {
+		if c := after; c != nil && r.ArchivedOnly {
 			at := c.LastActivityAt
 			if c.ArchivedAt != nil {
 				at = *c.ArchivedAt
