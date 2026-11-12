@@ -8,12 +8,13 @@ marketing ones when the change matters.
 scripts/video/make.sh u1 u3          # build, then make each video in turn
 scripts/video/make.sh a2 --no-build  # with the last build in build/DD
 scripts/video/make.sh u4 --compose-only   # put the last recording together again
-scripts/video/make.sh i-linear --upload   # an integration video, made, checked and uploaded
+scripts/video/make.sh u1 --upload         # any video, made, checked and uploaded (private)
+python3 scripts/video/upload.py --self-test   # every upload call, against a fake YouTube
 ```
 
 Each video is written to `~/Movies/agents-video/out/<id>.mp4`, 2560×1440 at 30 fps, with
-its captions in `<id>.vtt`. The videos go on YouTube, never in git. Alex uploads the usage
-and marketing videos; `--upload` uploads an integration video (below).
+its captions in `<id>.vtt`. The videos go on YouTube, never in git; `--upload` uploads a video
+of any group (below).
 
 ## What it does
 
@@ -75,11 +76,17 @@ changes, the same scene makes it again.
   3. After every take, kept or not, the scene's `revoke(v)` revokes what it made, and each
      token is asked of the provider again: one that is not refused (401) fails the take, and
      the log says to revoke it by hand.
-- **Upload** (`upload.py`): the YouTube Data API v3, **private**, to the playlist `Agents
-  integrations`. The title names the integration and the app version (`git describe`); the
-  description gives the commit, the date and the scene file. A new take replaces the old one in
-  the playlist: the old video is made private and taken out of the playlist, never deleted.
-  The local file is deleted after a good upload. Until Alex's steps on #1793 are done (the
+- **Upload** (`upload.py`, #4836): the YouTube Data API v3, **private** always, on the
+  `Loops` channel, to the playlist of the scene's `GROUP`: `Loops usage`, `Loops marketing` or
+  `Loops integrations`, each made private the first time. The title is `<TITLE> — Loops
+  <version>` (`git describe`); the description gives the docs page (the scene's `DOCS`, a path
+  on docs.agentloops.dev), the commit, the date and the scene file. The captions are the
+  take's `<id>.vtt`, in English (`captions.insert`). The thumbnail is a frame of the take, at
+  one of the contact sheet's two-second moments: the scene's `THUMBNAIL` second, or two
+  fifths in (`thumbnails.set`; a channel that is not verified yet cannot set one, so the log
+  says so and YouTube picks one). A new take replaces the old one in its playlist: the old
+  video is made private and taken out of the playlist, never deleted. The local files are
+  deleted after a good upload. `upload.py --self-test` proves each call against a fake API. Until Alex's steps on #1793 are done (the
   OAuth client in `~/.agents/secrets/youtube-client.json`, then `upload.py --sign-in`; with
   `--no-browser` it only prints the consent address, for an agent to open in the Safari MCP), the
   video stays in `out/` and the log says why.
@@ -101,14 +108,15 @@ whose rows in `docs/reference/integrations.md` (the rows whose first cell names 
 `TITLE`) have a path in their Where cell that the release changed.
 
 Before each take, `make.sh --preflight <id>` checks what needs Alex's hands: the YouTube
-refresh token works (`channels?mine=true`), and the scene's video Chrome profile has the
+refresh token works and is the `Loops` channel's (`channels?mine=true`), the scene's `GROUP`
+has a playlist, and the scene's video Chrome profile has the
 site's sign-in cookie and lands signed in when the site is opened. Each failure puts one
 line on Alex's list on #1793 (once) and exits 3, so the workflow skips that video and goes
 on with the others.
 
 ## A scene
 
-`scenes/<id>.py` has `LINES` (the narration), `GROUP` (`usage`, `marketing` or `integration`), `LAYOUT`
+`scenes/<id>.py` has `LINES` (the narration), `GROUP` (`usage`, `marketing` or `integration`), `TITLE`, `DOCS` (its docs page), `LAYOUT`
 (`mac`, `mac+phone` or `mac+browser`), and two functions: `setup(v)` runs before the
 recording starts, and `run(v)` is the recording. `v` is the `Video` in `make.py`:
 

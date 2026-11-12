@@ -29,6 +29,7 @@ from pathlib import Path
 GROUP = "integration"
 INTEGRATION = "linear"
 TITLE = "Linear"
+DOCS = "how-to/use-linear-issues/"  # the docs page, on docs.agentloops.dev (upload.py)
 LAYOUT = "mac+browser"
 BROWSER = (1280, 800)
 # The bar is drawn once for the whole take, which shows linear.app and the scratch web page.

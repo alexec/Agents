@@ -5,6 +5,7 @@ import re
 GROUP = "usage"
 LAYOUT = "mac"
 TITLE = "Follow a live document"
+DOCS = "how-to/follow-a-live-document/"  # the docs page, on docs.agentloops.dev (upload.py)
 WINDOW = (1360, 820)
 
 LINES = {

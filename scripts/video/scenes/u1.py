@@ -3,6 +3,7 @@ want, answer the agent, watch its steps and its reply."""
 GROUP = "usage"
 LAYOUT = "mac"
 TITLE = "Your first agent"
+DOCS = "tutorials/first-agent/"  # the docs page, on docs.agentloops.dev (upload.py)
 
 LINES = {
     "intro": "This is Agents. Here's how to start your first agent.",

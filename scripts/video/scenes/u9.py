@@ -3,6 +3,7 @@ browser in the same step, and the page has the same sidebar."""
 GROUP = "usage"
 LAYOUT = "mac+browser"
 TITLE = "Use Agents in a browser"
+DOCS = "how-to/use-agents-in-a-browser/"  # the docs page, on docs.agentloops.dev (upload.py)
 BROWSER = (1200, 760)
 WINDOW = (1180, 740)
 
