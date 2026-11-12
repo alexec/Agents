@@ -14,6 +14,10 @@ surface looks for them:
     docs/stylesheets/tokens.css     the docs site (Material's slate scheme is the dark)
     Go/internal/forgepages/tokens.css   the forge connector pages, as light-dark() pairs
 
+and the token tables on the docs' design-system page (#4604), docs/reference/design-system.md:
+gen writes each table between its `<!-- design.sh gen: NAME -->` and `<!-- /design.sh gen -->`
+lines and leaves the rest of the page as it is.
+
 Our own code rather than Style Dictionary: every output needs a format of its own (the
 web page's must stay byte-equal to what paper.css held, the docs' dark follows Material's
 scheme attribute), so a library would only read the JSON, and it would bring a Node
@@ -131,9 +135,102 @@ def render(source, spec):
     return "".join(out)
 
 
+# The docs page whose token tables gen writes (#4604).
+PAGE = "docs/reference/design-system.md"
+MARK_START = "<!-- design.sh gen: {} -->"
+MARK_END = "<!-- /design.sh gen -->"
+
+
+def cell(text):
+    return text.replace("|", "\\|")
+
+
+def swatch(token, dark=False):
+    """A colour as the page shows it: the hex, and its alpha when it has one."""
+    extensions = token.get("$extensions", {})
+    value = extensions.get(DARK) if dark else token["$value"]
+    if value is None:
+        return "—"
+    alpha = extensions.get(ALPHA)
+    return f"`{value}`" + (f" at {round(alpha * 100)}%" if alpha is not None else "")
+
+
+def size(token):
+    value = token["$value"]
+    if isinstance(value, dict):
+        return f"`{value['value']:g}{value['unit']}`"
+    return f"`{value}`"
+
+
+def code(text):
+    return f"`{text}`" if text else "—"
+
+
+def tables(source):
+    """The page's tables, by the name in their marker line."""
+    found = tokens(source)
+
+    def group(head):
+        return [(path, token) for path, token, kind in found if path[0] == head]
+
+    colour = ["| Token | CSS | Swift | Light | Dark | For |", "|---|---|---|---|---|---|"]
+    for path, token in group("color"):
+        swift = token.get("$extensions", {}).get("dev.agentloops.swift")
+        colour.append(f"| {'.'.join(path[1:])} | `{name(path)}` | {code(swift)} | {swatch(token)} | "
+                      f"{swatch(token, dark=True)} | {cell(token.get('$description', ''))} |")
+    shape = ["| Token | CSS | Swift | Value | For |", "|---|---|---|---|---|"]
+    for path, token in group("radius"):
+        swift = token.get("$extensions", {}).get("dev.agentloops.swift")
+        shape.append(f"| {'.'.join(path[1:])} | `{name(path)}` | {code(swift)} | {size(token)} | "
+                     f"{cell(token.get('$description', ''))} |")
+    fonts = ["| Token | CSS | Stack | For |", "|---|---|---|---|"]
+    for path, token in group("font"):
+        stack = ", ".join(token["$value"])
+        fonts.append(f"| {'.'.join(path[1:])} | `{name(path)}` | `{stack}` | {cell(token.get('$description', ''))} |")
+    steps = ["| Step | CSS | Mac | iPhone and iPad | Web | For |", "|---|---|---|---|---|---|"]
+    for path, token in group("type"):
+        extensions = token.get("$extensions", {})
+        steps.append(f"| {'.'.join(path[1:])} | `{name(path)}` | {code(extensions.get('dev.agentloops.mac'))} | "
+                     f"{code(extensions.get('dev.agentloops.ios'))} | {size(token)} | "
+                     f"{cell(token.get('$description', ''))} |")
+    return {"colour": colour, "shape": shape, "font": fonts, "type": steps}
+
+
+def splice(text, blocks):
+    """The page with each marked block replaced by its table; a marker gen does not know, or a
+    start with no end, is an error."""
+    lines = text.split("\n")
+    out = []
+    i = 0
+    seen = set()
+    while i < len(lines):
+        line = lines[i]
+        out.append(line)
+        i += 1
+        if not line.startswith("<!-- design.sh gen: "):
+            continue
+        key = line[len("<!-- design.sh gen: "):-len(" -->")]
+        if key not in blocks or line != MARK_START.format(key):
+            raise ValueError(f"{PAGE}: no table named {key!r}")
+        end = next((j for j in range(i, len(lines)) if lines[j] == MARK_END), None)
+        if end is None:
+            raise ValueError(f"{PAGE}: {line} has no {MARK_END}")
+        out += blocks[key]
+        out.append(MARK_END)
+        seen.add(key)
+        i = end + 1
+    missing = sorted(set(blocks) - seen)
+    if missing:
+        raise ValueError(f"{PAGE}: no marker for {', '.join(missing)}")
+    return "\n".join(out)
+
+
 def outputs():
     source = json.loads(SOURCE.read_text(encoding="utf-8"))
-    return {path: render(source, spec) for path, spec in OUTPUTS.items()}
+    made = {path: render(source, spec) for path, spec in OUTPUTS.items()}
+    page = ROOT / PAGE
+    made[PAGE] = splice(page.read_text(encoding="utf-8"), tables(source))
+    return made
 
 
 def selftest():
@@ -157,6 +254,20 @@ def selftest():
     assert "@media" not in pairs, pairs
     docs = render(source, OUTPUTS["docs/stylesheets/tokens.css"])
     assert '[data-md-color-scheme="slate"] {\n  --paper-ground: #000000;' in docs, docs
+    blocks = tables(source)
+    assert "| ground | `--paper-ground` | — | `#ffffff` | `#000000` |  |" in blocks["colour"], blocks
+    assert "| shadow | `--paper-shadow` | — | `#20242a` at 10% | `#000000` at 10% |  |" in blocks["colour"], blocks
+    assert "| card | `--radius-card` | — | `10px` |  |" in blocks["shape"], blocks
+    page = "# P\n<!-- design.sh gen: colour -->\nold\n<!-- /design.sh gen -->\nafter\n"
+    small = {"colour": ["| new |"]}
+    assert splice(page, small) == "# P\n<!-- design.sh gen: colour -->\n| new |\n<!-- /design.sh gen -->\nafter\n"
+    assert splice(splice(page, small), small) == splice(page, small)
+    for bad in ("<!-- design.sh gen: colour -->\nold\n", "<!-- design.sh gen: nope -->\n<!-- /design.sh gen -->\n", "x\n"):
+        try:
+            splice(bad, small)
+        except ValueError:
+            continue
+        raise AssertionError(bad)
     print("design.py: selftest passed")
 
 
@@ -169,7 +280,12 @@ def main(argv):
         print("usage: scripts/design.sh gen | check", file=sys.stderr)
         return 2
     stale = []
-    for path, text in outputs().items():
+    try:
+        made = outputs()
+    except ValueError as error:
+        print(f"design.sh: {error}", file=sys.stderr)
+        return 1
+    for path, text in made.items():
         target = ROOT / path
         current = target.read_text(encoding="utf-8") if target.exists() else None
         if current == text:

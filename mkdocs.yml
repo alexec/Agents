@@ -182,6 +182,7 @@ nav:
       - reference/ssh-options.md
       - reference/get-started-checklist.md
       - reference/charts-and-diagrams.md
+      - reference/design-system.md
       - reference/remote-gestures.md
       - reference/keyboard-shortcuts.md
       - reference/feature-matrix.md
