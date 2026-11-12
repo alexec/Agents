@@ -43,9 +43,18 @@ and measures against the `night` budgets:
 - the host's answers, with `scripts/perf-budgets.py`;
 - the Mac window's cold start, first list, project switch and chat open, with
   `scripts/perf-window.sh`;
-- the web page's first list, session open and long transcript, from the page's own
-  `performance` marks (`agents:first-list`, `agents:session-open`), with
-  `Web/test/walk/budgets.mjs`;
+- the web page's first list, session open, long transcript and send to echo, from the
+  page's own `performance` marks (`agents:first-list`, `agents:session-open`,
+  `agents:send` to `agents:echo`), with `Web/test/walk/budgets.mjs`. The send goes to a
+  session of the stand-in runtime (`scripts/fake-acp-runtime.py`, as `grok`), first on the
+  PATH of a scratch login shell that the host is given. The run checks `runtimes/list`
+  first and stops when the host's `grok` is another one: it never prompts a real runtime;
+- the calls the Mac window and the Remote (in the walk simulator, paired with the scratch
+  root) make before their first list, against `night.counts` (#4891). The host counts them
+  per connection and says so in its log, `first list: mac after 1 calls: daemon/ping`
+  (`Go/internal/agentsd/firstlist.go`). Neither app has a test that runs its model against
+  a fake host, so these are counted at night and not on each pull request. `--no-remote`
+  leaves the Remote out;
 - the tests marked `.perfBudget`, with `scripts/perf-tests.sh`.
 
 The report goes to `~/.agents/reviews/performance-nightly/<date>.md`. When a time is over

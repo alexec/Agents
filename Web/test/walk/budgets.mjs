@@ -2,7 +2,11 @@
 // in headless Chrome with a throwaway profile, against the `night.web` budgets in
 // scripts/perf-budgets.json. scripts/perf-nightly.sh runs it on a seeded scratch root.
 //
-//   node Web/test/walk/budgets.mjs <ROOT> <WEB_URL> <browser code> <host> <folder URL> <session id> <long transcript id> [runs]
+//   node Web/test/walk/budgets.mjs <ROOT> <WEB_URL> <browser code> <host> <folder URL> <session id> <long transcript id> <echo session id> [runs]
+//
+// The echo session runs the stand-in runtime (scripts/fake-acp-runtime.py), never a real one:
+// each run sends it a prompt from the prompt bar and times `agents:send` to `agents:echo`, the
+// prompt's own entry coming back (#4891).
 //
 // ROOT is the run-app root whose scratch window approves this browser into the machine lock
 // (#3490), as the other walks have it do (walk.py … press "=Compare Digits", then "=Approve"), with
@@ -16,9 +20,9 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { launch } from "./cdp.mjs";
 
-const [root, webURL, code, host, folder, sessionID, longID, runsArg] = process.argv.slice(2);
-if (!root || !webURL || !code || !host || !folder || !sessionID || !longID) {
-  console.error("usage: budgets.mjs <ROOT> <WEB_URL> <browser code> <host> <folder URL> <session id> <long transcript id> [runs]");
+const [root, webURL, code, host, folder, sessionID, longID, echoID, runsArg] = process.argv.slice(2);
+if (!root || !webURL || !code || !host || !folder || !sessionID || !longID || !echoID) {
+  console.error("usage: budgets.mjs <ROOT> <WEB_URL> <browser code> <host> <folder URL> <session id> <long transcript id> <echo session id> [runs]");
   process.exit(2);
 }
 const runs = Number(runsArg ?? 5);
@@ -53,19 +57,38 @@ try {
     const e = performance.getEntriesByName(${JSON.stringify(`agents:${name}`)}, ${JSON.stringify(kind)}).at(-1);
     return e ? (${JSON.stringify(kind)} === "mark" ? e.startTime : e.duration) : -1;
   })()`);
+  // How many of a measure the page has: one more is the next one in.
+  const measures = (name) => page.eval(`performance.getEntriesByName(${JSON.stringify(`agents:${name}`)}, "measure").length`);
   // Opens the session by its address, and waits for its chat; the measure's length, or -1.
-  const open = async (id) => {
-    const before = await page.eval(`performance.getEntriesByName("agents:session-open", "measure").length`);
+  const show = async (id) => {
+    const before = await measures("session-open");
     await page.eval(`location.hash = ${JSON.stringify(`#/h/${encodeURIComponent(host)}/p/${encodeURIComponent(folder)}/s/${encodeURIComponent(id)}`)}`);
     const came = await page.waitFor(`performance.getEntriesByName("agents:session-open", "measure").length > ${before}`, 30_000)
       .then(() => true, () => false);
-    if (!came) return -1;
-    const took = await markAt("session-open", "measure");
+    return came ? markAt("session-open", "measure") : -1;
+  };
+  const open = async (id) => {
+    const took = await show(id);
+    await page.eval(`location.hash = "#/agents"`);
+    return took;
+  };
+  // Sends a prompt from the prompt bar, as a person does, and waits for its echo; -1 when none came.
+  const sendToEcho = async (id, n) => {
+    if (await show(id) < 0) return -1;
+    const before = await measures("echo");
+    await page.focus(".foot textarea");
+    await page.type(`Echo ${n}`);
+    await page.key("Enter");
+    const came = await page.waitFor(`performance.getEntriesByName("agents:echo", "measure").length > ${before}`, 30_000)
+      .then(() => true, () => false);
+    const took = came ? await markAt("echo", "measure") : -1;
+    // The stand-in's reply comes after: let the turn end, so the next send's first entry is its own.
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     await page.eval(`location.hash = "#/agents"`);
     return took;
   };
 
-  const times = { "first list": [], "open a session": [], "open a long transcript": [] };
+  const times = { "first list": [], "open a session": [], "open a long transcript": [], "send to echo": [] };
   for (let i = 0; i < runs; i++) {
     await page.goto("about:blank");
     await page.goto(url);
@@ -73,6 +96,7 @@ try {
     times["first list"].push(await markAt("first-list", "mark"));
     times["open a session"].push(await open(sessionID));
     times["open a long transcript"].push(await open(longID));
+    times["send to echo"].push(await sendToEcho(echoID, i));
   }
 
   const median = (values) => {

@@ -1,18 +1,23 @@
 #!/bin/bash
 # The night's performance times (#4784): on a seeded scratch root on this Mac, the host's
 # answers (scripts/perf-budgets.py), the window's cold start, first list, project switch and
-# chat open (scripts/perf-window.sh), and the web page's first list, session open and long
-# transcript (Web/test/walk/budgets.mjs), and the .perfBudget tests (scripts/perf-tests.sh), each against the `night` budgets in
-# scripts/perf-budgets.json. A run over budget files a `feature:performance` issue with the
+# chat open (scripts/perf-window.sh), the web page's first list, session open, long transcript
+# and send to echo (Web/test/walk/budgets.mjs), the calls the Mac window and the Remote make
+# before their first list (the host's `first list:` lines, #4891), and the .perfBudget tests
+# (scripts/perf-tests.sh), each against the `night` budgets in scripts/perf-budgets.json. A run over budget files a `feature:performance` issue with the
 # numbers, or comments on the one still open. The Performance budgets workflow runs it.
 #
-#   scripts/perf-nightly.sh [--no-build] [--no-issue] [--keep]
+#   scripts/perf-nightly.sh [--no-build] [--no-issue] [--keep] [--no-remote]
 #
+# --no-remote leaves the Remote out: no simulator build, and its count is not measured.
 # --keep leaves the scratch set-up up at the end, to look at; take it down with
 # .agents/skills/run-app/scripts/stop.sh /tmp/run-perf-night.
 #
-# Run it on a quiet Mac, under the "build" lease: a time measured beside a build measures the
-# build. It builds Agents (Debug) with run-app's launch.sh, unless --no-build, and takes the
+# Run it on a quiet Mac, under the "build" lease and the "Agents Walk simulator" lease: a time
+# measured beside a build measures the build. The send to echo goes to a session of the stand-in
+# runtime (scripts/fake-acp-runtime.py, as `grok`), first on the PATH of a scratch login shell
+# the host is given: a seeded session's runtime is the real Claude, which the run never prompts,
+# and the run stops when the host would start any other `grok`. It builds Agents (Debug) with run-app's launch.sh, unless --no-build, and takes the
 # scratch set-up down at the end, also when a step fails. The report goes to
 # ~/.agents/reviews/performance-nightly/<date>.md. The window's switches and chat opens need
 # Accessibility permission for the process that runs this; without it only its cold start is
@@ -25,12 +30,14 @@ ROOT="/tmp/run-$SLUG"
 BUILD=1
 ISSUE=1
 KEEP=0
+REMOTE=1
 for arg in "$@"; do
   case "$arg" in
     --no-build) BUILD=0 ;;
     --no-issue) ISSUE=0 ;;
     --keep) KEEP=1 ;;
-    *) echo "usage: perf-nightly.sh [--no-build] [--no-issue] [--keep]" >&2; exit 2 ;;
+    --no-remote) REMOTE=0 ;;
+    *) echo "usage: perf-nightly.sh [--no-build] [--no-issue] [--keep] [--no-remote]" >&2; exit 2 ;;
   esac
 done
 
@@ -43,7 +50,12 @@ REPORT="$REPORTS/$DAY.md"
 
 # A set-up a run before left behind.
 [ -e "$ROOT" ] && "$RUNAPP/stop.sh" "$ROOT" >/dev/null 2>&1
-finish() { [ "$KEEP" = 1 ] || "$RUNAPP/stop.sh" "$ROOT" >/dev/null 2>&1 || true; rm -rf "$OUT"; }
+finish() {
+  [ "$KEEP" = 1 ] && return
+  [ "$REMOTE" = 1 ] && "$RUNAPP/remote.sh" down >/dev/null 2>&1
+  "$RUNAPP/stop.sh" "$ROOT" >/dev/null 2>&1 || true
+  rm -rf "$OUT"
+}
 trap finish EXIT
 
 # The seeded root (perf-budgets.py's): 41 live sessions in `work`, a 100k-entry transcript among
@@ -62,13 +74,39 @@ record["title"] = "Long transcript 100k"
 json.dump(record, open(sys.argv[1], "w"))
 PY
 
-flags=(--slug "$SLUG" --seeded)
+# The stand-in runtime, as `grok`, first on the PATH of the host's login shell: the host finds a
+# runtime on `$SHELL -lc` (.agents/memory/fake-runtime-needs-a-scratch-shell.md).
+"$REPO/scripts/install-fake-runtimes.sh" "$OUT/fake" >/dev/null
+cat >"$OUT/shell" <<SH
+#!/bin/zsh
+if [ "\$1" = "-lc" ]; then
+  export PATH="$OUT/fake:\$(/bin/zsh -lc 'printf %s "\$PATH"')"
+  exec /bin/zsh -c "\$2"
+fi
+exec /bin/zsh "\$@"
+SH
+chmod +x "$OUT/shell"
+
+flags=(--slug "$SLUG" --seeded --env "SHELL=$OUT/shell")
 [ "$BUILD" = 1 ] || flags+=(--no-build)
 "$RUNAPP/launch.sh" "${flags[@]}" >"$OUT/launch.txt" 2>&1 || { cat "$OUT/launch.txt" >&2; echo "perf-nightly: launch failed" >&2; exit 1; }
 WEB_URL=$(sed -n 's/^WEB_URL=//p' "$OUT/launch.txt")
 python3 "$RUNAPP/rpc.py" "$ROOT" call folders/add "{\"folder\": \"file://$ROOT/work\"}" >/dev/null
 python3 "$RUNAPP/rpc.py" "$ROOT" call folders/add "{\"folder\": \"file://$ROOT/big\"}" >/dev/null
 sleep 5
+
+# The session the page sends to: the stand-in's, and never a real runtime's.
+FAKE=$(python3 "$RUNAPP/rpc.py" "$ROOT" call runtimes/list | python3 -c '
+import json, sys
+for r in json.load(sys.stdin):
+    if r["runtime"]["id"] == "grok":
+        print(r["availability"].get("available", {}).get("path", ""))')
+if [ "$FAKE" != "$OUT/fake/grok" ]; then
+  echo "perf-nightly: the host's grok is ${FAKE:-missing}, not the stand-in at $OUT/fake/grok; nothing is sent" >&2
+  exit 1
+fi
+ECHOID=$(python3 "$RUNAPP/rpc.py" "$ROOT" call agents/start "{\"runtimeID\": \"grok\", \"cwd\": \"file://$ROOT/work\", \"prompt\": \"Ready\"}" \
+  | python3 -c 'import json, sys; print(json.load(sys.stdin))')
 
 over=0
 "$REPO/scripts/perf-budgets.py" "$ROOT" --markdown >"$OUT/host.md" 2>&1 || over=1
@@ -77,7 +115,52 @@ HOSTAPP="$REPO/build/DD/Build/Products/Debug/Agents.app"
 CODE=$("$HOSTAPP/Contents/Helpers/agents-control" code --client --browser --home "$ROOT/control" 2>/dev/null | tail -1)
 SESSION=$(grep -l '"Seeded live agent 20"' "$ROOT"/agents/*/agent.json | head -1 | xargs dirname | xargs basename)
 HOSTID=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["host"])' "$ROOT/control-host.json")
-node "$REPO/Web/test/walk/budgets.mjs" "$ROOT" "$WEB_URL" "$CODE" "$HOSTID" "file://$ROOT/work/" "$SESSION" "$LONG" >"$OUT/web.txt" 2>&1 || over=1
+node "$REPO/Web/test/walk/budgets.mjs" "$ROOT" "$WEB_URL" "$CODE" "$HOSTID" "file://$ROOT/work/" "$SESSION" "$LONG" "$ECHOID" >"$OUT/web.txt" 2>&1 || over=1
+
+# The calls before the first list (#4891): the most any connection of the client made, from the
+# host's `first list: <client> after <n> calls: …` lines (Go/internal/agentsd/firstlist.go).
+calls() { grep -o "first list: $1 after [0-9]* calls: .*" "$ROOT/logs/daemon.log" | sort -t' ' -k5,5n | tail -1; }
+if [ "$REMOTE" = 1 ]; then
+  SIMAPP="$REPO/build/DD-sim/Build/Products/Debug-iphonesimulator/Agents.app"
+  if [ "$BUILD" = 1 ]; then
+    "$REPO/scripts/build-cache.sh" xcodebuild -scheme Remote -destination 'generic/platform=iOS Simulator' \
+      -derivedDataPath "$REPO/build/DD-sim" -skipPackagePluginValidation build >"$OUT/remote-build.txt" 2>&1 \
+      || echo "perf-nightly: the Remote's build failed (tail $OUT/remote-build.txt)" >&2
+  fi
+  PHONE=$("$HOSTAPP/Contents/Helpers/agents-control" code --client --home "$ROOT/control" 2>/dev/null | tail -1)
+  if [ -d "$SIMAPP" ] && "$RUNAPP/remote.sh" up "$SIMAPP" -- -pair "$PHONE" >"$OUT/remote.txt" 2>&1; then
+    # The phone into the machine lock: the scratch window approves it, as budgets.mjs has it do.
+    # Its first catch-up is refused until then, and a refused call is never counted.
+    for _ in $(seq 1 15); do
+      grep -q "Agents Walk was added to the lock" "$ROOT/control/control.log" && break
+      for label in "=Compare Digits" "=Approve"; do
+        python3 "$RUNAPP/walk.py" "$ROOT" press "$label" >/dev/null 2>&1
+      done
+      sleep 2
+    done
+    # Opened again as a member of the lock, keeping its pairing: this connection is the one counted.
+    [ -n "$(calls remote)" ] || "$RUNAPP/remote.sh" up "$SIMAPP" >>"$OUT/remote.txt" 2>&1
+    for _ in $(seq 1 30); do
+      [ -n "$(calls remote)" ] && break
+      sleep 2
+    done
+  fi
+fi
+{
+  for client in mac remote; do
+    budget=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["night"]["counts"][sys.argv[2] + ".callsBeforeFirstList"])' "$REPO/scripts/perf-budgets.json" "$client")
+    line=$(calls "$client")
+    n=$(echo "$line" | awk '{print $5}')
+    if [ "$client" = remote ] && [ "$REMOTE" = 0 ]; then
+      echo "skip $client: calls before the first list not measured (--no-remote; budget $budget)"
+    elif [ -z "$n" ] || [ "$n" -gt "$budget" ]; then
+      echo "OVER $client: calls before the first list ${n:--} (budget $budget): ${line#*calls: }"
+      over=1
+    else
+      echo "ok   $client: calls before the first list $n (budget $budget): ${line#*calls: }"
+    fi
+  done
+} >"$OUT/calls.txt"
 # The tests marked .perfBudget (#225), held to their times only on a quiet Mac.
 "$REPO/scripts/perf-tests.sh" >"$OUT/tests.txt" 2>&1 || over=1
 
@@ -94,6 +177,12 @@ node "$REPO/Web/test/walk/budgets.mjs" "$ROOT" "$WEB_URL" "$CODE" "$HOSTID" "fil
   echo
   echo '```'
   cat "$OUT/mac.txt"
+  echo '```'
+  echo
+  echo "## Calls before the first list"
+  echo
+  echo '```'
+  cat "$OUT/calls.txt"
   echo '```'
   echo
   echo "## The web page"
