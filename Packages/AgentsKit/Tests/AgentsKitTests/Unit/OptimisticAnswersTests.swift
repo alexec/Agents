@@ -141,7 +141,7 @@ struct OptimisticAnswersTests {
     // MARK: Display choices
 
     @Test func aChoiceTheHostRefusedGoesBackAndSaysSo() async throws {
-        let defaults = try #require(UserDefaults(suiteName: "OptimisticAnswersTests-\(UUID())"))
+        let defaults = MemoryDefaults()
         let key = DisplayPreference.showsActivity
         var failures: [String] = []
         let mirror = DisplayPreferenceMirror(defaults: defaults) { _ in
