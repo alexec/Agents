@@ -125,6 +125,9 @@ test("a standing epic's query in words", () => {
   assert.equal(p.queryWords(q({ labels: ["ui"], any: ["bug", "polish"], milestone: "any" })),
     "Open issues labelled ui, and bug or polish · in a milestone · 1 lane at a time");
   assert.equal(p.queryWords(q({})), "Open issues · 1 lane at a time");
+  assert.equal(p.queryWords(q({ labels: ["enhancement"], milestone: "none", parent: "none" })),
+    "Open issues labelled enhancement · no milestone · no parent · 1 lane at a time");
+  assert.equal(p.queryRestWords(q({ labels: ["enhancement"], milestone: "none", parent: "none" })), "· no milestone · no parent · 1 lane at a time");
   assert.equal(p.queryRestWords(q({ labels: ["bug"], milestone: "none" })), "· no milestone · 1 lane at a time");
   assert.equal(p.queryRestWords(q({ any: ["polish", "competitor"], not: ["wontfix"], lanes: 2 })), "· polish or competitor · not wontfix · 2 lanes at a time");
 });

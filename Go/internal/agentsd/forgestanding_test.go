@@ -20,10 +20,10 @@ func TestStandingOfReadsTheBlock(t *testing.T) {
 		t.Fatalf("query: %+v", q)
 	}
 	if q := standingOf("```standing\nlanes: 2\nmilestone: Projects\n```"); q.Error != nil || q.Lanes != 2 || deref(q.Milestone) != "Projects" ||
-		q.Labels == nil || q.Any == nil || q.Not == nil || q.noParent {
+		q.Labels == nil || q.Any == nil || q.Not == nil || q.Parent != nil {
 		t.Fatalf("query: %+v", q)
 	}
-	if q := standingOf("```standing\nlabels: enhancement\nParent: None\n```"); q.Error != nil || !q.noParent {
+	if q := standingOf("```standing\nlabels: enhancement\nParent: None\n```"); q.Error != nil || deref(q.Parent) != "none" {
 		t.Fatalf("parent: none: %+v", q)
 	}
 	for body, want := range map[string]string{

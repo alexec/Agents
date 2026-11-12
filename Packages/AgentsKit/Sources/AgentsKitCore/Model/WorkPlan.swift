@@ -227,12 +227,13 @@ public enum WorkPlan {
         case "any": parts.append("in a milestone")
         default: parts.append("milestone “\(standing.milestone ?? "")”")
         }
+        if standing.parent?.lowercased() == "none" { parts.append("no parent") }
         parts.append(standing.lanes == 1 ? "1 lane at a time" : "\(standing.lanes) lanes at a time")
         return parts.joined(separator: " · ")
     }
 
     /// A standing epic's query after its labels, which show as chips (epic.md note 17): "· no
-    /// milestone · 1 lane at a time", "· or polish, competitor · not wontfix · 2 lanes at a time".
+    /// milestone · no parent · 1 lane at a time", "· or polish, competitor · not wontfix · 2 lanes at a time".
     public static func queryRestWords(_ standing: DaemonAPI.ForgeStanding) -> String {
         var parts: [String] = []
         if !standing.any.isEmpty { parts.append((standing.labels.isEmpty ? "" : "and ") + standing.any.joined(separator: " or ")) }

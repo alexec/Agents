@@ -4732,15 +4732,17 @@ export type ForgeReviewerState =
 /**
  * A standing epic's query (#3659, #3661), as the daemon read it from the standing block in the
  * epic's body. labels: the issue has all of them; any: at least one of them; not: none of them;
- * milestone: none, any or a milestone's name. lanes is how many lanes its lead runs at once, 1 when
- * the block does not say. error says why there is no query: no block, a second block, or an unknown
- * or bad field; with an error, the plan has no children.
+ * milestone: none, any or a milestone's name; parent: none, only issues that are no other issue's
+ * sub-issue (#4335, #4348). lanes is how many lanes its lead runs at once, 1 when the block does
+ * not say. error says why there is no query: no block, a second block, or an unknown or bad field;
+ * with an error, the plan has no children.
  */
 export interface ForgeStanding {
   labels: string[];
   any: string[];
   not: string[];
   milestone?: string;
+  parent?: "none";
   lanes: number;
   error?: string;
 }
@@ -15379,7 +15381,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ForgeReleases: { required: ["releases"], optional: ["none", "errors"] },
   ForgeReleasesRequest: { required: [], optional: ["folder", "limit"] },
   ForgeReviewer: { required: ["login", "state"], optional: ["avatar"] },
-  ForgeStanding: { required: ["labels", "any", "not", "lanes"], optional: ["milestone", "error"] },
+  ForgeStanding: { required: ["labels", "any", "not", "lanes"], optional: ["milestone", "parent", "error"] },
   ForgeStart: { required: ["prompt", "labels"], optional: ["worktree"] },
   ForgeTransition: { required: ["id", "name"], optional: ["category"] },
   FoundFolder: { required: ["folder", "exists", "isRepository", "isFolder"], optional: ["typed"] },
