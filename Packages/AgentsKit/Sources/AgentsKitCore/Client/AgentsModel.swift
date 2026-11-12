@@ -202,6 +202,16 @@ public final class AgentsModel {
     /// load used to leave it blank without a word.
     public private(set) var transcriptLoadFailure: TranscriptLoadFailure?
 
+    /// The machines whose folders and sessions on screen are this device's copy (#4791),
+    /// drawn before their host answered. A host's own list takes its machine out.
+    public private(set) var drawnFromCopy: Set<MachineRef> = []
+    /// Whether the open chat is this device's copy, until its host's page lands (#4791).
+    public private(set) var transcriptFromCopy = false
+    /// A host listed a machine's agents or folders (#4791): the local copy writes them.
+    @ObservationIgnored public var onListed: ((MachineRef) -> Void)?
+    /// The chat being read is left (#4791): what it showed, so the local copy keeps its end.
+    @ObservationIgnored public var onLeavingChat: ((LocalCopy.Transcript) -> Void)?
+
     /// The latest load of the open chat's first page. A chat is loaded from more than
     /// one place at once (opening it, a reconnect, a host's lists), and only the last
     /// one asked for may put its answer on screen: an older answer landing after it
@@ -268,6 +278,7 @@ public final class AgentsModel {
     public var watching: UUID? {
         didSet {
             guard watching != oldValue else { return }
+            if let oldValue, let left = shownTranscript(of: oldValue) { onLeavingChat?(left) }
             shown.id = watching
             clearTranscript()
             // A chat opens at its end, whatever the last one was left at.
@@ -1228,11 +1239,26 @@ public final class AgentsModel {
         let held = byID.filter { $0.value.host == host }
         let stamped = listed.map { var agent = $0.keepingLists(of: held[$0.id]); agent.host = host; return agent }
         refile(byID.values.filter { $0.host != host }.map { hostRecords[$0.id] ?? $0 } + stamped, heard: stamped.map(\.id))
+        drawnFromCopy.remove(host)
+        onListed?(host)
     }
 
     public func replaceFolders(_ listed: [DaemonAPI.FolderSummary], from host: MachineRef) {
         let stamped = listed.map { var summary = $0; summary.host = host; return summary }
         folders = (folders.filter { $0.host != host } + stamped).sorted(by: SidebarOrder.byAdded)
+        onListed?(host)
+    }
+
+    /// A machine as this device last kept it (#4791), drawn before its host answers: taken
+    /// only when nothing of that machine is held, so a host's own list always wins.
+    public func takeCopy(_ machine: LocalCopy.Machine) {
+        guard !holdsFolders(of: machine.host), !agents.contains(where: { $0.host == machine.host }) else { return }
+        let listed = onListed
+        onListed = nil
+        defer { onListed = listed }
+        replaceFolders(machine.folders, from: machine.host)
+        replaceAgents(machine.agents, from: machine.host)
+        drawnFromCopy.insert(machine.host)
     }
 
     /// What an offline host last listed (#962), for a client that started while it was down:
@@ -1676,6 +1702,31 @@ public final class AgentsModel {
         return transcriptLoads
     }
 
+    /// The open chat's end as this device kept it (#4791), drawn while `load` is the latest
+    /// and nothing of the chat is on screen yet. What is heard meanwhile is still laid over
+    /// the host's page when it lands; the host's page always replaces the copy.
+    @discardableResult
+    public func takeCopiedOpening(_ copy: LocalCopy.Transcript, load: Int) -> Bool {
+        guard isLatestTranscriptLoad(load), copy.session == watching, entries.isEmpty, turns.isEmpty else { return false }
+        let heard = heardSincePage
+        replaceTurns(with: copy.turns)
+        replaceTranscript(with: copy.page, ask: copy.ask)
+        heardSincePage = heard
+        transcriptFromCopy = true
+        return true
+    }
+
+    /// What the chat on screen holds of `session`, as a copy to keep: nil when it holds
+    /// nothing of it, or only the copy it was drawn from.
+    public func shownTranscript(of session: UUID) -> LocalCopy.Transcript? {
+        guard shown.id == session, !transcriptFromCopy, !entries.isEmpty || !turns.isEmpty else { return nil }
+        return LocalCopy.Transcript(
+            session: session,
+            turns: TurnsPage(turns: turns, firstTurn: firstTurn, openStart: openTurnStart, firstPrompt: firstPrompt),
+            page: TranscriptPage(firstIndex: firstEntryIndex, total: firstEntryIndex + entries.count, entries: entries),
+            ask: leadAsk)
+    }
+
     /// Whether `load` is still the latest asked for, and so the one to show.
     public func isLatestTranscriptLoad(_ load: Int) -> Bool { load == transcriptLoads }
 
@@ -1691,6 +1742,7 @@ public final class AgentsModel {
         // notification is the newer copy of that entry.
         entries = Self.entriesKeepingLatest(page.entries + (heardSincePage ?? []))
         heardSincePage = nil
+        transcriptFromCopy = false
         firstEntryIndex = page.firstIndex
         hasMoreBefore = page.firstIndex > openTurnStart
         leadAsk = page.firstIndex > openTurnStart ? ask.flatMap { TranscriptItem.entry($0).isPersonsAsk ? $0 : nil } : nil
@@ -1726,6 +1778,7 @@ public final class AgentsModel {
 
     public func clearTranscript() {
         entries = []
+        transcriptFromCopy = false
         // A chat chosen is a page on its way.
         heardSincePage = []
         transcriptLoadFailure = nil

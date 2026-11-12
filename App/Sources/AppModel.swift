@@ -24,6 +24,9 @@ final class AppModel {
     /// half typed, and what it has cost since it opened. None of that is the daemon's
     /// and none of it is the phone's.
     let work = AgentsModel()
+    /// This window's local copy (#4791): sessions and chat ends kept in its root's Caches,
+    /// drawn at launch before the host answers. The host always wins.
+    @ObservationIgnored private(set) var localCopy: LocalCopyKeeper?
 
     private(set) var runtimes: [RuntimeStatus] = []
     /// The start-up sheet offering to install what is missing (048). Raised once per
@@ -1194,6 +1197,10 @@ final class AppModel {
 
     init() {
         userScope.lock = lock
+        let localCopy = LocalCopyKeeper(copy: .mac(), work: work)
+        self.localCopy = localCopy
+        // At once, so the sidebar and a chat restored at launch draw before the host answers.
+        Task { await localCopy.drawMachines() }
         // On `controlLink` itself, not a link of its own (#445): a second connection that
         // nothing else knew of was never let go of, so a wedged one stayed for good.
         if let controlLink { client = DaemonClient(link: hostLink(.mac, through: controlLink), machine: .mac) }
@@ -5306,6 +5313,8 @@ final class AppModel {
         // Only the latest load of this chat puts its answer on screen: it is loaded on
         // opening, on every reconnect and on its host's lists, and these overlap (#400).
         let load = work.beginTranscriptLoad()
+        // This device's copy of its end, drawn while the host's page is on its way (#4791).
+        Task { [localCopy] in await localCopy?.drawOpening(of: selection, load: load) }
         // Beside the transcript rather than before it: neither waits on the other.
         async let whole = loadWholeAgent(selection)
         // The chat's own host, both for the call and for the check that it is up: a
@@ -5342,6 +5351,7 @@ final class AppModel {
                 guard self.selection == selection else { return }
                 let dataIn = self.chatOpening.map { Perf.elapsed($0.timing) }
                 guard self.work.takeOpening(opening, load: load) else { return }
+                self.localCopy?.opened(selection, opening)
                 if let why = opening.turnsFailure { Self.chatLog.notice("turns of \(selection) did not load: \(why, privacy: .public)") }
                 if let started = self.chatOpening, started.agent == selection {
                     self.chatOpening = nil
