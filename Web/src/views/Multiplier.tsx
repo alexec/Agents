@@ -24,7 +24,7 @@ function darkScheme(): boolean {
 }
 
 /** The host whose Multiplier and achievements are drawn: this Mac's, as on the window. */
-function pageHost(store: Store): string | undefined {
+export function pageHost(store: Store): string | undefined {
   const macID = store.macHostID.value;
   return store.hosts.value.some((h) => h.id === macID) ? macID : store.hosts.value[0]?.id;
 }

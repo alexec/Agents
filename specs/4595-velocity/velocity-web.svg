@@ -1,0 +1,119 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="760" viewBox="0 0 1240 760" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+<defs><filter id="shadow" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.18"/></filter></defs>
+<rect width="1240" height="760" fill="#E7EAEE"/>
+<text x="24.0" y="34.0" font-size="15" fill="#1C1D20" font-weight="600">The web page: Reports ▸ Usage with a fourth tab, Velocity</text>
+<text x="24.0" y="54.0" font-size="12" fill="#5B616B" >Month, wide (1100 px). The narrow page stacks as Usage's other tabs do. Real data, as the Mac board's, from gh on 2026-11-10.</text>
+<g filter="url(#shadow)"><rect x="24" y="76" width="1192" height="640" rx="8" fill="#F7F8F9"/></g>
+<rect x="24.0" y="76.0" width="1192.0" height="44.0" rx="8" fill="#FFFFFF"/>
+<path d="M24.0 120.0L1216.0 120.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="48.0" y="104.0" font-size="13" fill="#5B616B" >Overview</text>
+<text x="131.6" y="104.0" font-size="13" fill="#5B616B" >Agents</text>
+<text x="200.8" y="104.0" font-size="13" fill="#5B616B" >Work</text>
+<text x="255.6" y="104.0" font-size="13" fill="#5B616B" >Docs</text>
+<text x="310.4" y="104.0" font-size="13" fill="#5B616B" >Messages</text>
+<text x="394.0" y="104.0" font-size="13" fill="#5B616B" >Machines</text>
+<text x="477.6" y="104.0" font-size="13" fill="#5B616B" >Workflows</text>
+<text x="568.4" y="104.0" font-size="13" fill="#1C1D20" font-weight="600">Reports</text>
+<rect x="566.4" y="117.0" width="54.4" height="2.0" rx="0" fill="#0A6CDB"/>
+<text x="644.8" y="104.0" font-size="13" fill="#5B616B" >Requests</text>
+<text x="728.4" y="104.0" font-size="13" fill="#5B616B" >People</text>
+<text x="797.6" y="104.0" font-size="13" fill="#5B616B" >Status</text>
+<text x="866.8" y="104.0" font-size="13" fill="#5B616B" >Settings</text>
+<text x="48.0" y="158.0" font-size="11" fill="#5B616B" font-weight="600">Reports</text>
+<text x="48.0" y="182.0" font-size="13" fill="#1C1D20" >Spend</text>
+<text x="48.0" y="206.0" font-size="13" fill="#1C1D20" >Outcomes</text>
+<text x="48.0" y="230.0" font-size="13" fill="#1C1D20" >Time</text>
+<text x="48.0" y="254.0" font-size="13" fill="#1C1D20" >Value</text>
+<text x="48.0" y="278.0" font-size="13" fill="#1C1D20" >Runtimes</text>
+<text x="48.0" y="302.0" font-size="13" fill="#1C1D20" >Adoption</text>
+<text x="48.0" y="326.0" font-size="13" fill="#1C1D20" >Workflows</text>
+<text x="48.0" y="350.0" font-size="13" fill="#1C1D20" >Features</text>
+<text x="48.0" y="380.0" font-size="11" fill="#5B616B" font-weight="600">Yours</text>
+<text x="48.0" y="404.0" font-size="13" fill="#1C1D20" >Multiplier</text>
+<rect x="40.0" y="412.0" width="160.0" height="26.0" rx="6" fill="#EEF0F3"/>
+<text x="48.0" y="428.0" font-size="13" fill="#1C1D20" font-weight="600">Usage</text>
+<text x="48.0" y="458.0" font-size="11" fill="#5B616B" font-weight="600">Records</text>
+<text x="48.0" y="482.0" font-size="13" fill="#1C1D20" >Audit</text>
+<text x="48.0" y="512.0" font-size="11" fill="#5B616B" font-weight="600">Saved</text>
+<text x="48.0" y="536.0" font-size="13" fill="#1C1D20" >Saved Views</text>
+<path d="M224.0 120.0L224.0 716.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="256.0" y="170.0" font-size="22" fill="#1C1D20" font-weight="700">Usage</text>
+<rect x="256.0" y="188.0" width="56.0" height="28.0" rx="6" fill="none"/>
+<text x="284.0" y="207.0" font-size="13" fill="#5B616B" text-anchor="middle">Cost</text>
+<rect x="318.0" y="188.0" width="72.0" height="28.0" rx="6" fill="none"/>
+<text x="354.0" y="207.0" font-size="13" fill="#5B616B" text-anchor="middle">Tokens</text>
+<rect x="396.0" y="188.0" width="56.0" height="28.0" rx="6" fill="none"/>
+<text x="424.0" y="207.0" font-size="13" fill="#5B616B" text-anchor="middle">Time</text>
+<rect x="458.0" y="188.0" width="88.0" height="28.0" rx="6" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+<text x="502.0" y="207.0" font-size="13" fill="#1C1D20" font-weight="600" text-anchor="middle">Velocity</text>
+<circle cx="562.0" cy="202.0" r="9" fill="#B35900"/>
+<text x="562.0" y="206.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">10</text>
+<text x="256.0" y="250.0" font-size="12" fill="#5B616B" >Range</text>
+<rect x="306.0" y="234.0" width="110.0" height="24.0" rx="6" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+<text x="316.0" y="251.0" font-size="13" fill="#1C1D20" >Month</text>
+<text x="404.0" y="251.0" font-size="13" fill="#5B616B" >⌄</text>
+<circle cx="436.0" cy="246.0" r="9" fill="#B35900"/>
+<text x="436.0" y="250.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">11</text>
+<text x="256.0" y="292.0" font-size="11" fill="#5B616B" font-weight="600">PRS A DAY</text>
+<text x="256.0" y="322.0" font-size="26" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">64 PRs</text>
+<text x="256.0" y="342.0" font-size="13" fill="#5B616B" >12 Oct – 10 Nov 2026</text>
+<path d="M256.0 470.0L900.0 470.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="906.0" y="474.0" font-size="11" fill="#8A9099" >75</text>
+<path d="M256.0 374.0L900.0 374.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="906.0" y="378.0" font-size="11" fill="#8A9099" >150</text>
+<path d="M256.0 566.0L900.0 566.0" stroke="#C7CCD3" stroke-width="1"/>
+<rect x="259.2" y="470.0" width="15.0" height="96.0" rx="2" fill="#0A6CDB"/>
+<text x="266.7" y="581.0" font-size="11" fill="#8A9099" text-anchor="middle">12</text>
+<rect x="280.7" y="509.7" width="15.0" height="56.3" rx="2" fill="#0A6CDB"/>
+<rect x="302.2" y="541.7" width="15.0" height="24.3" rx="2" fill="#0A6CDB"/>
+<rect x="323.6" y="507.1" width="15.0" height="58.9" rx="2" fill="#0A6CDB"/>
+<rect x="345.1" y="399.6" width="15.0" height="166.4" rx="2" fill="#0A6CDB"/>
+<rect x="366.6" y="496.9" width="15.0" height="69.1" rx="2" fill="#0A6CDB"/>
+<rect x="388.0" y="498.2" width="15.0" height="67.8" rx="2" fill="#0A6CDB"/>
+<rect x="409.5" y="452.1" width="15.0" height="113.9" rx="2" fill="#0A6CDB"/>
+<text x="417.0" y="581.0" font-size="11" fill="#8A9099" text-anchor="middle">19</text>
+<rect x="431.0" y="417.5" width="15.0" height="148.5" rx="2" fill="#0A6CDB"/>
+<rect x="452.4" y="399.6" width="15.0" height="166.4" rx="2" fill="#0A6CDB"/>
+<rect x="473.9" y="376.6" width="15.0" height="189.4" rx="2" fill="#0A6CDB"/>
+<rect x="495.4" y="499.4" width="15.0" height="66.6" rx="2" fill="#0A6CDB"/>
+<rect x="516.8" y="518.6" width="15.0" height="47.4" rx="2" fill="#0A6CDB"/>
+<rect x="538.3" y="558.3" width="15.0" height="7.7" rx="2" fill="#0A6CDB"/>
+<rect x="559.8" y="546.8" width="15.0" height="19.2" rx="2" fill="#0A6CDB"/>
+<text x="567.3" y="581.0" font-size="11" fill="#8A9099" text-anchor="middle">26</text>
+<rect x="581.2" y="450.8" width="15.0" height="115.2" rx="2" fill="#0A6CDB"/>
+<rect x="602.7" y="563.4" width="15.0" height="2.6" rx="2" fill="#0A6CDB"/>
+<rect x="624.2" y="504.6" width="15.0" height="61.4" rx="2" fill="#0A6CDB"/>
+<rect x="645.6" y="484.1" width="15.0" height="81.9" rx="2" fill="#0A6CDB"/>
+<rect x="667.1" y="507.1" width="15.0" height="58.9" rx="2" fill="#0A6CDB"/>
+<rect x="688.6" y="481.5" width="15.0" height="84.5" rx="2" fill="#0A6CDB"/>
+<rect x="710.0" y="525.0" width="15.0" height="41.0" rx="2" fill="#0A6CDB"/>
+<text x="717.5" y="581.0" font-size="11" fill="#8A9099" text-anchor="middle">2</text>
+<rect x="731.5" y="513.5" width="15.0" height="52.5" rx="2" fill="#0A6CDB"/>
+<rect x="753.0" y="495.6" width="15.0" height="70.4" rx="2" fill="#0A6CDB"/>
+<rect x="774.4" y="503.3" width="15.0" height="62.7" rx="2" fill="#0A6CDB"/>
+<rect x="795.9" y="467.4" width="15.0" height="98.6" rx="2" fill="#0A6CDB"/>
+<rect x="817.4" y="415.0" width="15.0" height="151.0" rx="2" fill="#0A6CDB"/>
+<rect x="838.8" y="470.0" width="15.0" height="96.0" rx="2" fill="#0A6CDB"/>
+<rect x="860.3" y="476.4" width="15.0" height="89.6" rx="2" fill="#0A6CDB"/>
+<text x="867.8" y="581.0" font-size="11" fill="#8A9099" text-anchor="middle">9</text>
+<rect x="881.8" y="464.9" width="15.0" height="101.1" rx="2" fill="#0A6CDB"/>
+<path d="M256.0 483.8L900.0 483.8" stroke="#5B616B" stroke-width="1" stroke-dasharray="4 3"/>
+<circle cx="958.0" cy="376.0" r="9" fill="#B35900"/>
+<text x="958.0" y="380.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">12</text>
+<text x="256.0" y="616.0" font-size="13" fill="#1C1D20" >alexec/Agents</text>
+<text x="900.0" y="616.0" font-size="13" fill="#1C1D20" text-anchor="end" font-variant-numeric="tabular-nums">1,925</text>
+<text x="256.0" y="638.0" font-size="13" fill="#1C1D20" >alexec/agents-walk</text>
+<text x="900.0" y="638.0" font-size="13" fill="#1C1D20" text-anchor="end" font-variant-numeric="tabular-nums">1</text>
+<text x="256.0" y="666.0" font-size="11" fill="#5B616B" >No reverts.</text>
+<circle cx="356.0" cy="662.0" r="9" fill="#B35900"/>
+<text x="356.0" y="666.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">13</text>
+<rect x="996.0" y="292.0" width="190.0" height="120.0" rx="8" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+<text x="1008.0" y="312.0" font-size="11" fill="#5B616B" font-weight="600">Empty</text>
+<text x="1008.0" y="338.0" font-size="11" fill="#5B616B" font-weight="600">PRS A DAY</text>
+<text x="1008.0" y="364.0" font-size="22" fill="#1C1D20" font-weight="600">0 PRs</text>
+<text x="1008.0" y="392.0" font-size="12" fill="#5B616B" >No pull requests landed</text>
+<text x="1008.0" y="406.0" font-size="12" fill="#5B616B" >in this range.</text>
+<circle cx="1176.0" cy="302.0" r="9" fill="#B35900"/>
+<text x="1176.0" y="306.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">14</text>
+<text x="24.0" y="740.0" font-size="12" fill="#5B616B" font-weight="600">The URL #/r/usage opens Cost as now; #/a/velocity goes to the Velocity tab, as #/a/time goes to Time.</text>
+</svg>

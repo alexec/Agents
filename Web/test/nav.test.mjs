@@ -98,6 +98,7 @@ test("an address from before #2141 opens its page's new place", async () => {
       "#/console/policy": { nav: "settings", section: "policy" }, "#/console/readApi": { nav: "settings", section: "readApi" },
       "#/a/runtimes": { nav: "status", section: "runtimes" }, "#/a/mcp": { nav: "settings", section: "mcp" },
       "#/a/events": { nav: "status", section: "events" }, "#/a/achievements": { nav: "reports", section: "multiplier" },
+      "#/a/velocity": { nav: "reports", section: "usage" },
       "#/a/tokens": { nav: "reports", section: "usage" },
     };
     for (const [old, now] of Object.entries(moved)) {
@@ -105,6 +106,8 @@ test("an address from before #2141 opens its page's new place", async () => {
       assert.equal(r.isOldAddress(old), true, old);
     }
     assert.equal(r.usageAsked.value, "tokens", "Usage opens on the pane the old address named");
+    r.parseRoute("#/a/velocity");
+    assert.equal(r.usageAsked.value, "velocity", "#/a/velocity opens Usage on Velocity (#4598)");
     assert.equal(r.isOldAddress("#/reports/spend"), false);
     assert.equal(r.isOldAddress("#/machines/runtimes"), true, "Runtimes went to Status (#3631, #3998)");
     assert.equal(r.isOldAddress("#/machines/mcp"), true, "Connectors went to Settings ▸ You (#3632, #3998)");

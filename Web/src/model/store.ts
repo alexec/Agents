@@ -16,7 +16,7 @@ import type {
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, MCPToolsAnswer, ConnectorToolLevel, DiskState, StoreNotes,
   CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
-  GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, Achievements, Multiplier,
+  GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, VelocityHistory, Achievements, Multiplier,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ConnectAnotherRequest, ConnectReport, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, WakeSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
@@ -4054,6 +4054,8 @@ export class Store extends Work {
   readonly usage = signal<Record<string, UsageHistory>>({});
   /** Where the time of running chats went, by host (#852), for the Time page. */
   readonly time = signal<Record<string, TimeHistory>>({});
+  /** Each host's velocity/history (#4598): the PRs that landed, by hour and day, by repository. */
+  readonly velocity = signal<Record<string, VelocityHistory>>({});
 
   /** Finds a consequence's session by id when it is not already among the loaded rows. */
   async loadEventAgent(host: string, agentID: string): Promise<Agent | undefined> {
@@ -4123,6 +4125,12 @@ export class Store extends Work {
   async loadTime(host: string): Promise<void> {
     const history = await this.link.call("time/history", {}, host).catch(() => null);
     if (history) this.time.value = { ...this.time.value, [host]: history };
+  }
+
+  /** A host too old to know the method leaves the Velocity page loading. */
+  async loadVelocity(host: string): Promise<void> {
+    const history = await this.link.call("velocity/history", {}, host).catch(() => null);
+    if (history) this.velocity.value = { ...this.velocity.value, [host]: history };
   }
 }
 

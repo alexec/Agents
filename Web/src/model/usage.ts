@@ -152,11 +152,14 @@ function add(into: UsageBucket, b: UsageBucket): void {
 
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 
-export function usageChart(history: UsageHistory, range: UsageRange, metric: UsageMetric): UsageChart {
-  const now = stampDate(history.now) ?? new Date();
+/** One bar's place: its stamp, its start, and the tier keys it adds up. */
+export interface UsageSlot { stamp: string; start: Date; keys: string[] }
+
+/** A range's bars, counted back from the host's now: an hour each in D, a day in W and M, a week in 3M. */
+export function usageSlots(nowStamp: string, range: UsageRange): UsageSlot[] {
+  const now = stampDate(nowStamp) ?? new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const slots: { stamp: string; start: Date; keys: string[] }[] = [];
-  const tier = range === "D" ? history.hours : history.days;
+  const slots: UsageSlot[] = [];
   if (range === "D") {
     for (let hour = 0; hour < 24; hour++) {
       const start = new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour);
@@ -175,7 +178,12 @@ export function usageChart(history: UsageHistory, range: UsageRange, metric: Usa
       slots.push({ stamp: keys[0]!, start, keys });
     }
   }
+  return slots;
+}
 
+export function usageChart(history: UsageHistory, range: UsageRange, metric: UsageMetric): UsageChart {
+  const slots = usageSlots(history.now, range);
+  const tier = range === "D" ? history.hours : history.days;
   const merged = emptyBucket();
   const byRuntime: Record<string, UsageBucket> = {};
   const daysWithData = new Set<string>();
