@@ -37,9 +37,6 @@ public struct WakeSettings: Codable, Hashable, Sendable {
         self.backgroundHours = min(max(backgroundHours, Self.backgroundRange.lowerBound), Self.backgroundRange.upperBound)
     }
 
-    /// The grace as a duration. Zero is the hold ending when the work does.
-    public var graceInterval: TimeInterval { TimeInterval(graceHours) * 3_600 }
-
     public static func clamp(_ value: Int) -> Int {
         min(max(value, hours.lowerBound), hours.upperBound)
     }

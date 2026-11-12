@@ -320,94 +320,9 @@ public enum WorkflowOutcome: Codable, Hashable, Sendable {
 }
 
 extension Workflow {
-    /// How deep a chain is allowed to get before a fire is refused.
-    ///
-    /// A fixed three, and deliberately not settable per workflow or per folder. The
-    /// limit exists to stop a runaway, and a runaway able to raise its own limit is not
-    /// stopped by it.
-    public static let chainDepthLimit = 3
-
-    /// How many triggers may wait while a run is going (#422). Fixed, like the chain
-    /// limit: ten runs back to back is already an afternoon of one workflow.
+    /// How many triggers may wait while a run is going (#422). Fixed: ten runs back to
+    /// back is already an afternoon of one workflow.
     public static let queueLimit = 10
-
-
-    /// Whether this workflow may fire, and why not when it may not.
-    ///
-    /// Pure: workflow, its state, the proposed depth, the clock. No file system, no
-    /// actor, no clock of its own. That is what makes every refusal rule a table test
-    /// rather than something needing a daemon to demonstrate — and if a refusal ever
-    /// needs one, the decision has leaked out of here and belongs back.
-    ///
-    /// `settingRefused` is the one refusal this function does not and cannot raise, and
-    /// that is deliberate rather than an omission. Whether a runtime offers the mode a
-    /// file names is not a fact about the workflow: it is a fact about a live session
-    /// with that runtime, which only exists once one has been started. Asking it here
-    /// would mean either starting a process from a pure function or answering from
-    /// `OptionCache`, which is a remembered answer and can be wrong in the permissive
-    /// direction. So it is raised in the start path instead, where the runtime has
-    /// actually said what it offers.
-    public func refusalIfBlocked(isRunning: Bool, depth: Int,
-                                 isArchived: Bool = false,
-                                 isDisabled: Bool = false,
-                                 overLimit: WorkflowLimit? = nil,
-                                 totalLimit: Int = WorkflowLimit.defaultTotal,
-                                 dayLimitReached: Bool = false,
-                                 folderExists: Bool = true,
-                                 triggeringAgentIsUsable: Bool? = nil,
-                                 lastStartedAt: Date? = nil,
-                                 now: Date = Date(),
-                                 byHand: Bool = false,
-                                 queued: Int = 0) -> WorkflowRefusal? {
-        // First, and ahead even of a file that cannot be read: somebody has already
-        // said they do not want this one, and that answers every other question.
-        if isArchived { return .archived }
-        // Next, for the same reason. Run now passes `false`: trying a workflow you have
-        // turned off is what turning it off rather than archiving it is for.
-        if isDisabled { return .disabled }
-        if case .unreadable(let detail) = problem { return .unreadable(detail) }
-        if !folderExists { return .folderGone }
-        // After the file's own problems, because "this one is broken" is the more
-        // useful thing to hear about a broken file, and before the rest, because no
-        // amount of unpausing will help.
-        if let overLimit { return .overLimit(overLimit, allowed: overLimit.allowed(total: totalLimit)) }
-        // After archived and paused, and after the file's own problems: a workflow
-        // the person put away is refused for that reason, not for the budget. It
-        // does not pause the workflow or alter its schedule — it refused one fire
-        // and will try again when it is next due.
-        if dayLimitReached { return .dayLimitReached }
-        // A cooldown holds the fire rather than dropping it (#103), so what would refuse
-        // it for good is asked first: a chain too deep is not made any shallower by
-        // waiting. Run now is a person deciding to run it, and is not held.
-        if cooldown != nil, !byHand {
-            if depth > Self.chainDepthLimit { return .chainTooDeep(depth: Self.chainDepthLimit) }
-            if let end = cooldownEnds(after: lastStartedAt, now: now) { return .coolingDown(until: end) }
-            if isRunning { return .coolingDown(until: nil) }
-        }
-        // Queued rather than refused (#422), after the chain limit for the reason the
-        // cooldown asks it first: waiting makes no chain shallower. `queued` counts the
-        // ones already waiting, which go first even between two runs. Run now is a
-        // person watching, and is told rather than made to wait.
-        if isRunning || (queued > 0 && !byHand) {
-            if byHand { return .runInFlight }
-            if depth > Self.chainDepthLimit { return .chainTooDeep(depth: Self.chainDepthLimit) }
-            return queued >= Self.queueLimit ? .queueFull(limit: Self.queueLimit) : .queued
-        }
-        if depth > Self.chainDepthLimit { return .chainTooDeep(depth: Self.chainDepthLimit) }
-        if let problem {
-            switch problem {
-            case .triggerNotSupported(let name), .unsupportedMode(let name):
-                return .triggerNotSupported(name: name)
-            case .unreadable(let detail):
-                return .unreadable(detail)
-            }
-        }
-        if mode == .triggering {
-            guard let usable = triggeringAgentIsUsable else { return .noTriggeringAgent }
-            guard usable else { return .agentUnavailable }
-        }
-        return nil
-    }
 }
 
 /// One firing of one workflow, while it is in flight.

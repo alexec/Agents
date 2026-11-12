@@ -63,27 +63,6 @@ public enum DeletionWords {
     public static let folderConfirmMessage = "Every session in it is deleted, with its conversation and record, "
         + "and the folder leaves the list. Its folder and files are not touched. This cannot be undone."
 
-    public static let folderNotArchived = "Only an archived folder can be deleted. Archive it first."
-
-    /// A session in it is still going: what stops the whole folder being deleted.
-    public static let folderLive = "It is still working. Stop it first."
-
-    /// Why a folder's Delete is refused: the sessions that hold it, and why.
-    public static func folderRefusal(_ titles: [String?], because: String) -> String {
-        let named = titles.map { title -> String in
-            guard let title = title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty else {
-                return "a session"
-            }
-            return "\u{201C}\(title)\u{201D}"
-        }
-        let who = named.count == 1 ? named[0] : named.dropLast().joined(separator: ", ") + " and " + named.last!
-        let first = who.prefix(1).uppercased() + who.dropFirst()
-        return "\(first) cannot be deleted. \(because)"
-    }
-
-    /// What names an agent that has been deleted: a pin, a starter, an event.
-    public static let deletedSession = "a deleted session"
-
     // MARK: Settings
 
     public static func settingsSummary(archivedCount: Int, archivedBytes: Int,
@@ -97,16 +76,4 @@ public enum DeletionWords {
     public static func confirmSettings(count: Int, bytes: Int) -> String {
         "This deletes \(agents(count)) now and frees \(size(bytes)). Their conversations are deleted and cannot be brought back."
     }
-}
-
-/// Archive… on a folder's menu, asked first on the phone and the page (#668). The page's
-/// copy is in `Web/src/views/Sidebar.tsx`.
-public enum FolderArchiveWords {
-    /// "Archive “devbox:Agents”?".
-    public static func confirmTitle(_ label: String) -> String {
-        "Archive \u{201C}\(label)\u{201D}?"
-    }
-
-    public static let confirmMessage = "It moves to Archived folders with its sessions, and its workflows stop. "
-        + "Unarchive returns it. Its folder and files are not touched."
 }

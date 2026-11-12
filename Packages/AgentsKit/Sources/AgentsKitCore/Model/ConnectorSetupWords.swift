@@ -189,8 +189,6 @@ public enum ConnectorSetupWords {
         public static let googleDriveNote = "A Google Drive connector."
         public static let catalogueNote = "Any other connector that can search and read docs."
         public static let noneNote = "Skip: agents won't look for docs here."
-        /// The web page has no catalogue: the connectors are added on the Mac.
-        public static let addOnTheMac = "Confluence, Notion, Google Drive and other docs connectors: add them on the Mac, in Add Connector\u{2026}."
 
         /// The catalogue's search for each choice.
         public static let confluenceSearch = "atlassian"
@@ -305,18 +303,6 @@ public enum ConnectorSetupWords {
 
     public static func workflowsLead(_ events: DaemonAPI.ConnectorEvents) -> String {
         events.workflows.isEmpty ? "No workflow here starts on them yet." : "Now usable by"
-    }
-
-    /// The Tasks slot's way to Linear (#1682): the connection first, then its connector.
-    public static let connectLinear = "Connect Linear\u{2026}"
-
-    /// The Tasks slot's way to Jira (#3304): the Atlassian connection first, then its connector.
-    public static let connectJira = "Connect Jira\u{2026}"
-
-    /// The Tasks slot's other trackers, on the Remote and the web page, which have no catalogue.
-    public static func otherTrackers(linearConnected: Bool) -> String {
-        linearConnected ? "Linear and other trackers: Add Connector on the Mac."
-            : "Then add its connector, or another tracker's, with Add Connector on the Mac."
     }
 
     // MARK: Connectors ▸ Connections

@@ -10,8 +10,6 @@ import Foundation
 public struct MCPEventTrigger: Codable, Hashable, Sendable {
     /// The reserved key that narrows which servers it hears.
     public static let serverKey = "server"
-    /// The most the arguments may take as JSON, as for pin arguments.
-    public static let argumentLimit = 2048
 
     public var event: String
     /// `nil` means every server here that offers the event.

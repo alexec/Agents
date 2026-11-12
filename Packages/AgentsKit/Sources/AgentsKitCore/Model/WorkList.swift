@@ -234,9 +234,6 @@ public enum WorkList {
     /// The Project filter's first choice (#3283), as Work lists everything.
     public static let allProjects = "All projects"
 
-    /// An item's project on its page (#3283).
-    public static func projectWords(_ name: String) -> String { "Project \(name)" }
-
     /// A folder as Work matches it to a forge item's (#3283): `host|path`, with no slash at the end.
     public static func folderKey(host: MachineRef, path: String) -> String {
         var path = path
@@ -462,12 +459,6 @@ public enum WorkList {
     }
 
     public static let noAgentYet = "No agent yet"
-    public static func noWork(_ kind: Kind) -> String {
-        switch kind {
-        case .release: "No releases that an agent worked on yet."
-        default: "No \(kind.title.lowercased()) match."
-        }
-    }
     public static let lineageOnlyNote = "Lineage lists a release once an agent works on one of its issues or pull requests."
     public static let noForgeHere = "No machine reads issues and pull requests yet. Update Agents on a machine to see them."
 
