@@ -684,13 +684,13 @@ final class RemoteModel {
             case .machine:
                 // A machine's page (#4034), as the window's Machines group opens it.
                 openActivity = newValue
-            case .multiplier:
-                // The Multiplier page (#4116), from its row under Status.
+            case .multiplier, .velocity:
+                // The Multiplier page (#4116) and Velocity (#4758), from their rows under Status.
                 openActivity = newValue
-            case .spending, .tokens, .time, .velocity,
+            case .spending, .tokens, .time,
                  .folderMCPServers, .docs, .messages:
-                // Usage, a folder's connectors and Docs are Mac + web (#2798, #3321): the
-                // Remote opens none of them.
+                // Cost, Tokens, Time, a folder's connectors and Docs are Mac + web (#2798,
+                // #3321): the Remote opens none of them.
                 break
             }
         }
@@ -1427,6 +1427,15 @@ final class RemoteModel {
         guard let multiplier = try? await client.call(DaemonAPI.Method.multiplierState, DaemonAPI.Empty(),
                                                       returning: DaemonAPI.Multiplier.self) else { return }
         work.replaceMultiplier(multiplier)
+    }
+
+    /// The PRs that landed (#4758), for the Velocity page: the Mac's host's lineage alone, as
+    /// the window asks it (#4597). Nil when the host does not know the method, and the page
+    /// keeps its progress wheel.
+    func velocityHistory() async -> VelocityHistory? {
+        guard let history = try? await client.call(DaemonAPI.Method.velocityHistory, Optional<String>.none,
+                                                   returning: VelocityHistory.self) else { return nil }
+        return .merged([history])
     }
 
     /// The achievements (#984), for the Multiplier page's badges (#4116), from the Mac's host;

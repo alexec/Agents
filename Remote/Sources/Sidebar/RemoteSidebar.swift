@@ -10,7 +10,7 @@ import UIKit
 ///
 /// The rules are the Mac's own, from `SidebarFolderFold`, `SidebarSmartRow`,
 /// `SidebarOrder` and `SidebarFolds` in AgentsKitCore: the same groups, order, pins and
-/// folds, kept the same way. Usage, connectors and folder management are Mac + web (#2798); the Multiplier is first under Status (#4116). The views are this device's: on an iPad the list sits beside
+/// folds, kept the same way. Usage, connectors and folder management are Mac + web (#2798); the Multiplier is first under Status (#4116), and Velocity after it (#4758). The views are this device's: on an iPad the list sits beside
 /// what it picked; on an iPhone it is the screen the app opens on and a pick is pushed
 /// over it. Swipe actions and a long press stand in for the Mac's context menus.
 struct RemoteSidebar: View {
@@ -175,6 +175,11 @@ struct RemoteSidebar: View {
                     // The Multiplier page (#4116), first, as the window has it first under Usage.
                     MultiplierRow().accessibilityHint(MultiplierRow.help)
                         .activityIcon("multiply.circle").appText(.supporting).tag(SidebarItem.multiplier)
+                    // Velocity (#4758): the Multiplier's PRs over time, the one Usage page the
+                    // Remote has (tier Core), after the Multiplier as the window has it in Usage.
+                    HStack { Text("Velocity"); Spacer() }
+                        .accessibilityHint("The pull requests that landed, over time")
+                        .activityIcon("arrow.triangle.merge").appText(.supporting).tag(SidebarItem.velocity)
                     EventsRow().activityIcon("list.bullet.rectangle").appText(.supporting).tag(SidebarItem.events)
                     RuntimesRow().activityIcon("cpu", warns: runtimesTally.map { $0.noneWorking || $0.isLow } ?? false,
                                                tint: runtimesTally?.isLow == true ? .attention : .failure)
