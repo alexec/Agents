@@ -78,6 +78,7 @@ import { type ChangeUndo, type Inverse, changeUndoLine, changeUndoMenu, labelsUn
 import { sessionRef as copyRef, type MachineCopy, type TranscriptCopy } from "./localCopy";
 import { sessionRef } from "../protocol/ref";
 import { mark, markOnce } from "./marks";
+import { canJoin, type MachineJoin, type MachineMaking } from "./machineRow";
 
 /** What this page keeps by folder on a host, kept to the folders it lists (#3750). */
 function pruneFolderKeys(host: string, folders: readonly string[]): void {
@@ -1490,6 +1491,8 @@ export class Work {
   readonly hostsBeingStarted = signal<readonly string[]>([]);
   /** The machines New Machine is making (#3974), by name; "" while the control plane has not named it yet. */
   readonly machinesMaking = signal<readonly string[]>([]);
+  /** How each click on a machine that never joined goes (#4978), by `provider/workspace`. */
+  readonly machineJoins = signal<Readonly<Record<string, MachineJoin>>>({});
   /** The New Machine sheet (#4634), or null while it is shut: on a provider (the default one when none), or opened
    * again on the choices of a make the provider refused, with its reason. */
   readonly newMachineAsk = signal<NewMachineAsk | null>(null);
@@ -1697,6 +1700,11 @@ export class Store extends Work {
       }
       if (method === "control/providersChanged") {
         this.providers.take(params);
+        return;
+      }
+      if (method === "control/installProgress") {
+        // A join from the Machines group says its step on its row (#4978).
+        this.heardInstallStep(params as { name?: string; step?: string } | null);
         return;
       }
       if (method === "control/hostChanged") {
@@ -3130,6 +3138,47 @@ export class Store extends Work {
   }
 
   /** Delete on a machine New Machine made that never joined (#4610): the provider deletes the workspace. */
+  /**
+   * A click on a machine that never joined (#4978), as the window's joinMachine: the control plane installs Agents on it
+   * over ssh, from the machine that carries its provider for a codespace (`gh codespace ssh` starts a stopped one), after
+   * its provider starts it otherwise; it is linked to its workspace once it joins. The row says each step, and why it
+   * failed. `trust` is a host key the person looked at and trusts.
+   */
+  async joinMachine(row: MachineMaking, trust?: string): Promise<void> {
+    const key = `${row.provider}/${row.workspace}`;
+    const now = this.machineJoins.value[key];
+    if (!canJoin(row) || (now && "joining" in now)) return;
+    const set = (join: MachineJoin | null) => {
+      const next = { ...this.machineJoins.value };
+      if (join) next[key] = join; else delete next[key];
+      this.machineJoins.value = next;
+    };
+    set({ joining: null });
+    const outcome = await this.providers.install(row.ssh ?? "", row.name, row.provider, row.workspace, trust);
+    if ("needsTrust" in outcome) set({ needsTrust: outcome.needsTrust });
+    else if ("failed" in outcome) set({ failed: outcome.failed });
+    else set({ joining: "started" });
+  }
+
+  /** Forgets a join's host key question: the person did not trust it. */
+  cancelJoin(row: MachineMaking): void {
+    const next = { ...this.machineJoins.value };
+    delete next[`${row.provider}/${row.workspace}`];
+    this.machineJoins.value = next;
+  }
+
+  /** `control/installProgress`: the step of a join, on the row of its name. */
+  private heardInstallStep(params: { name?: string; step?: string } | null): void {
+    if (!params?.name || !params.step) return;
+    for (const w of (this.providers.list.value ?? []).flatMap((p) => p.workspaces.map((x) => ({ p: p.id, x })))) {
+      const key = `${w.p}/${w.x.id}`;
+      const now = this.machineJoins.value[key];
+      if (w.x.name === params.name && now && "joining" in now) {
+        this.machineJoins.value = { ...this.machineJoins.value, [key]: { joining: params.step } };
+      }
+    }
+  }
+
   async deleteWorkspace(provider: string, workspace: string): Promise<void> {
     try {
       await this.link.call("providers/deleteWorkspace", { id: provider as ProviderID, workspace });

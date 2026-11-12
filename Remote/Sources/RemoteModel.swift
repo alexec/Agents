@@ -2701,7 +2701,12 @@ final class RemoteModel {
     }
 
     /// The providers New Machine can use (#3979), for the Machines header's menu.
-    private(set) var machineProviders: [DaemonAPI.ProviderSummary] = []
+    var machineProviders: [DaemonAPI.ProviderSummary] { listedProviders.filter { $0.capabilities.contains("create") } }
+    /// Every machine provider this person may use: the Machines group shows each one's
+    /// machines that have not joined (#4978, as the window's).
+    private(set) var listedProviders: [DaemonAPI.ProviderSummary] = []
+    /// How each tap on a machine that never joined goes (#4978), by its row's id.
+    private(set) var machineJoins: [String: MachineJoin] = [:]
 
     /// The New Machine sheet (#4634), or nil while it is shut. A make the provider refused
     /// opens it again on its choices, with the reason.
@@ -2712,9 +2717,10 @@ final class RemoteModel {
     private(set) var machinesBeingMade = 0
 
     /// The machines New Machine made that have not joined (#4612): *Making…* while the control
-    /// plane waits for them, red with its reason once it gave up. A row each under Machines.
+    /// plane waits for them, red with its reason once it gave up. A row each under Machines; and
+    /// every other machine of the person's that has not joined, grey, a tap to join it (#4978).
     var machinesMaking: [MachineMaking] {
-        MachineMaking.rows(machineProviders, hostNames: Set(controlHosts.map(\.name)))
+        MachineMaking.rows(listedProviders, hostNames: Set(controlHosts.map(\.name)))
     }
 
     /// Delete on a machine the control plane gave up waiting for (#4612): the provider deletes
@@ -2832,7 +2838,44 @@ final class RemoteModel {
 
     private func heardProviders(_ params: JSONValue?) {
         guard let listed = try? params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) else { return }
-        machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
+        listedProviders = listed.filter(\.usable)
+    }
+
+    /// A tap on a machine that never joined (#4978), as the window's joinMachine: the control
+    /// plane installs Agents on it over ssh; the row says each step, and why it failed.
+    func joinMachine(_ row: MachineMaking, trust: String? = nil) async {
+        guard row.canJoin, machineJoins[row.id]?.isJoining != true, let ssh = row.ssh else { return }
+        guard let control = controlPlane else {
+            machineJoins[row.id] = .failed("The control plane isn’t answering.")
+            return
+        }
+        machineJoins[row.id] = .joining(step: nil)
+        var params: [String: JSONValue] = ["destination": .string(ssh), "name": .string(row.name),
+                                           "tunnel": .bool(row.tunnel), "provider": .string(row.provider.rawValue),
+                                           "workspace": .string(row.workspace)]
+        if let trust { params["trust"] = .string(trust) }
+        do {
+            let answer = try await control.call(DaemonAPI.Method.hostsInstall, JSONValue.object(params))
+            if let fingerprint = answer["needsTrust"]?.stringValue {
+                machineJoins[row.id] = .needsTrust(fingerprint)
+            } else {
+                machineJoins[row.id] = .joining(step: "started")
+            }
+        } catch {
+            machineJoins[row.id] = .failed(sentence(for: error))
+        }
+        await loadMachineProviders()
+    }
+
+    /// Forgets a join's host key question: the person did not trust it.
+    func cancelJoin(_ row: MachineMaking) { machineJoins[row.id] = nil }
+
+    /// `control/installProgress`: the step of a join, on the row of its name.
+    private func heardInstallStep(_ params: JSONValue?) {
+        guard let name = params?["name"]?.stringValue, let step = params?["step"]?.stringValue,
+              let row = machinesMaking.first(where: { $0.name == name }), machineJoins[row.id]?.isJoining == true
+        else { return }
+        machineJoins[row.id] = .joining(step: step)
     }
 
     func loadMachineProviders() async {
@@ -2840,7 +2883,7 @@ final class RemoteModel {
               let answer = try? await control.call(DaemonAPI.Method.providersList, DaemonAPI.Empty()),
               let listed = try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)
         else { return }
-        machineProviders = listed.filter { $0.capabilities.contains("create") && $0.usable }
+        listedProviders = listed.filter(\.usable)
     }
 
     /// A machine's runtimes, asked again as its page opens (#3629).
@@ -2979,6 +3022,11 @@ final class RemoteModel {
                         if change.method == DaemonAPI.Notification.controlProvidersChanged {
                             // The Machines group's New Machine row and its default (#4034).
                             self.heardProviders(change.params)
+                            continue
+                        }
+                        if change.method == DaemonAPI.Notification.controlInstallProgress {
+                            // A join from the Machines group says its step on its row (#4978).
+                            self.heardInstallStep(change.params)
                             continue
                         }
                         guard change.method == DaemonAPI.Notification.controlHostChanged else { continue }

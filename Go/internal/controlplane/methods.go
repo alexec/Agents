@@ -347,6 +347,13 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		if answer, carried, err := m.installCarried(params, from); carried {
 			return answer, err
 		}
+		// A click on a machine that never joined (#4978): its provider starts a stopped one first.
+		var request wire.MachineInstall
+		if json.Unmarshal(params, &request) == nil {
+			if err := m.s.providers.StartToJoin(request, m.callerPerson(from)); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if m.s.cfg.Hosted && overSSH[method] {
 		return nil, noSSHHere

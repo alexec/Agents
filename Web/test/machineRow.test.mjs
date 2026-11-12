@@ -65,17 +65,50 @@ test("a machine being made has a row until one of its name joins", () => {
   // machine of the name joined as, have no row; the page's own name goes once the list has it.
   const providers = [{ id: "do", name: "Do", workspaces: [
     { id: "ws-2", name: "machine-2", state: "running", notJoined: "Made at Do, but it didn’t join in 10 minutes." },
-    { id: "ws-5", name: "old", state: "running" },
     { id: "ws-1", name: "machine-1", state: "starting", joining: true },
     { id: "ws-3", name: "machine-3", state: "running", host: "h3", joining: true },
     { id: "ws-4", name: "machine-4", state: "running", joining: true },
   ] }];
   const rows = m.makingRows(["machine-1", ""], providers, [{ name: "machine-4" }]);
   assert.deepEqual(names(rows), ["", "machine-1", "machine-2"]);
-  assert.deepEqual(rows[1], { provider: "do", providerName: "Do", workspace: "ws-1", name: "machine-1", notJoined: null });
+  assert.deepEqual(rows[1], { provider: "do", providerName: "Do", workspace: "ws-1", name: "machine-1", notJoined: null,
+    joinable: false, state: "starting", ssh: null, tunnel: false });
   assert.equal(rows[2].notJoined, "Made at Do, but it didn’t join in 10 minutes.");
   assert.equal(m.deleteMakingQuestion(rows[2]),
     "Delete machine-2? Do deletes it. Nothing was installed on it, so there is nothing to back up.");
+});
+
+test("every machine the person has shows, also one Agents did not make, and a click joins it (#4978)", () => {
+  const providers = [{ id: "cs", name: "Codespaces", workspaces: [
+    { id: "cs-2", name: "beta", state: "stopped", ssh: "cs.cs-2.main" },
+    { id: "cs-3", name: "gamma", state: "running" },
+    { id: "failed-x", name: "x", state: "failed", reason: "No quota." },
+    { id: "cs-1", name: "alpha", state: "running", ssh: "cs.cs-1.main", tunnel: true },
+    { id: "ws-1", name: "machine-1", state: "starting", joining: true },
+  ] }, { id: "other", name: "Other", mayUse: false, workspaces: [{ id: "o", name: "o", state: "running", ssh: "o" }] }];
+  const rows = m.makingRows([], providers, []);
+  assert.deepEqual(rows.map((r) => r.name), ["machine-1", "alpha", "beta", "gamma"]);
+  const [making, alpha, beta, gamma] = rows;
+  assert.equal(m.canJoin(making), false);
+  assert.ok(m.canJoin(alpha) && alpha.tunnel);
+  assert.equal(m.makingLine(alpha), "Not joined");
+  assert.equal(m.joinHint(alpha), "Joins alpha");
+  assert.equal(m.makingTone(alpha), "stopped");
+  assert.equal(m.makingLine(beta), "Stopped, not joined");
+  assert.equal(m.joinHint(beta), "Starts beta and joins it");
+  assert.equal(m.canJoin(gamma), false);
+  assert.equal(m.joinHint(gamma), null);
+  assert.match(m.makingLine(gamma), /^Not joined\. Codespaces gives no ssh destination/);
+  // The join says how it goes, and why it failed.
+  assert.equal(m.makingLine(beta, { joining: null }), "Joining…");
+  assert.equal(m.makingLine(beta, { joining: "connect" }), "Starting it and connecting…");
+  assert.equal(m.makingLine(beta, { joining: "setUp" }), "Installing Agents…");
+  assert.equal(m.makingTone(beta, { joining: "setUp" }), "busy");
+  assert.equal(m.makingLine(beta, { failed: "ssh: refused" }), "Didn’t join: ssh: refused");
+  assert.equal(m.makingTone(beta, { failed: "ssh: refused" }), "failure");
+  assert.ok(m.makingFailed(beta, { failed: "no" }));
+  assert.equal(m.makingLine(beta, { needsTrust: "SHA256:abc" }), "Its ssh host key is new to the control plane: SHA256:abc");
+  assert.match(m.joinTrustQuestion(beta, "SHA256:abc"), /^Trust beta’s host key\?/);
 });
 
 test("the icon's colour says the state, the most urgent first (#4113)", () => {

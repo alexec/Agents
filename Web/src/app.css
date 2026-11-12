@@ -1303,6 +1303,10 @@ dialog.image-viewer::backdrop { background: color-mix(in srgb, var(--paper-scrim
 .machine-row-body { position: relative; background: var(--paper-sidebar); transition: transform 0.15s ease-out; }
 .machine-row.swiping .machine-row-body { transition: none; }
 .machine-row .sub-app-row { width: 100%; }
+/* A machine that never joined is a button: a click joins it (#4978). */
+.machine-row .machine-join { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left;
+  cursor: pointer; }
+.machine-row.joinable:not(.not-joined) .machine-name { opacity: 0.7; }
 .machine-name { display: inline-flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Its icon (#4113): the kind in its shape, the state in its colour, as the window's MachineIconView. */
 .machine-icon { flex: none; color: var(--accent); }

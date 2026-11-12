@@ -6,7 +6,8 @@ import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import type { Store } from "../model/store";
 import { deleteQuestion, machineActions, machineDot, machineIcon, machineKind, machineSwipes, removeQuestion, swipeDistance,
-  type MachineIconTone, type MachineKind, type MachineMaking } from "../model/machineRow";
+  type MachineIconTone, type MachineJoin, type MachineKind, type MachineMaking, joinHint, makingFailed, makingLine,
+  makingTone } from "../model/machineRow";
 import { machineSheets } from "../model/machineSheets";
 import { placedSessions } from "../model/overview";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
@@ -155,18 +156,35 @@ export function MachineRow({ store, host, on, open, children }: {
 }
 
 /** A machine New Machine is making (#3974): an amber, pulsing cloud and `Making…` until it joins; red with the reason,
- * and Delete in its menu, once the control plane gave up waiting for it (#4610). */
-export function MakingRow({ row, onDelete }: { row: MachineMaking; onDelete: () => void }) {
+ * and Delete in its menu, once the control plane gave up waiting for it (#4610). A machine of the person's that never
+ * joined (#4978) is grey and `Not joined`: a click joins it, and the line says each step and why it failed. */
+export function MakingRow({ row, join, onDelete, onJoin }: {
+  row: MachineMaking; join?: MachineJoin | undefined; onDelete: () => void; onJoin: () => void;
+}) {
   const name = row.name || "New machine";
-  const gaveUp = row.notJoined !== null;
-  const items = (): MenuItem[] => [{ label: `Delete ${name}…`, run: onDelete }];
+  const gaveUp = !row.joinable && row.notJoined !== null;
+  const failed = makingFailed(row, join);
+  const line = makingLine(row, join);
+  const hint = join && "joining" in join ? null : joinHint(row);
+  const items = (): MenuItem[] => [
+    ...(hint ? [{ label: failed ? `Join ${name} Again` : `Join ${name}`, run: onJoin }] : []),
+    ...(gaveUp ? [{ label: `Delete ${name}…`, run: onDelete }] : []),
+  ];
+  const menu = gaveUp || hint !== null;
+  const busy = !row.joinable || (join && "joining" in join);
   return (
-    <div class={`machine-row making${gaveUp ? " not-joined" : ""}`} role={gaveUp ? undefined : "status"}
-      onContextMenu={gaveUp ? (e) => openContextMenu(e, items()) : undefined}>
-      <span class="sub-app-row"><span class="machine-name"><MachineIcon kind="cloud" tone={gaveUp ? "failure" : "busy"} />{name}</span></span>
-      {gaveUp && <button type="button" class="machine-more" aria-label={`More for ${name}`}
+    <div class={`machine-row making${failed ? " not-joined" : ""}${row.joinable ? " joinable" : ""}`}
+      role={busy ? "status" : undefined}
+      onContextMenu={menu ? (e) => openContextMenu(e, items()) : undefined}>
+      {hint
+        ? <button type="button" class="sub-app-row machine-join" title={`${name}: ${line}. Click: ${hint}.`}
+          aria-label={`${name}, ${line}. ${hint}`} onClick={onJoin}>
+          <span class="machine-name"><MachineIcon kind="cloud" tone={makingTone(row, join)} />{name}</span>
+        </button>
+        : <span class="sub-app-row"><span class="machine-name"><MachineIcon kind="cloud" tone={makingTone(row, join)} />{name}</span></span>}
+      {menu && <button type="button" class="machine-more" aria-label={`More for ${name}`}
         onClick={(e) => openContextMenu(e, items())}>···</button>}
-      <p class={`machine-need small ${gaveUp ? "failure" : "quiet"}`}>{row.notJoined ?? "Making…"}</p>
+      <p class={`machine-need small ${failed ? "failure" : "quiet"}`}>{line}</p>
     </div>
   );
 }

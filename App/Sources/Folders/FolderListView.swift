@@ -254,7 +254,8 @@ struct FolderListView: View {
                             .appText(.supporting).sidebarInk(.machine(host)).tag(SidebarItem.machine(host))
                     }
                     // The machines New Machine is making, and the ones the control plane gave up
-                    // waiting for (#4610): a row each until a machine of the name joins.
+                    // waiting for (#4610), and every other machine of the person's that never
+                    // joined, a click to join it (#4978): a row each until a machine of the name joins.
                     ForEach(0..<model.machinesBeingMade, id: \.self) { _ in
                         MakingMachineRow(making: nil).appText(.supporting)
                     }

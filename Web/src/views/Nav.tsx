@@ -27,7 +27,7 @@ import { ConversationPage, MessagesList } from "./Messages";
 import { MachinePage } from "./MachinePage";
 import { machineNeed, machineNeedLine } from "./OfflineStrip";
 import { MachineRow, MakingRow } from "./MachineRow";
-import { deleteMakingQuestion, makingRows, newMachineItems } from "../model/machineRow";
+import { deleteMakingQuestion, joinTrustQuestion, type MachineMaking, makingRows, newMachineItems } from "../model/machineRow";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { AddMachineDialog } from "./AddMachineDialog";
 import { addMachineWords } from "../model/addMachine";
@@ -241,7 +241,9 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
               ))}
               {machinesHead(group) && makingRows(store.machinesMaking.value, store.providers.list.value, store.hosts.value)
                 .map((row) => <MakingRow key={`making-${row.provider}/${row.workspace}/${row.name}`} row={row}
-                  onDelete={async () => { if (await ask(deleteMakingQuestion(row))) void store.deleteWorkspace(row.provider, row.workspace); }} />)}
+                  join={store.machineJoins.value[`${row.provider}/${row.workspace}`]}
+                  onDelete={async () => { if (await ask(deleteMakingQuestion(row))) void store.deleteWorkspace(row.provider, row.workspace); }}
+                  onJoin={() => void joinAsking(store, row)} />)}
             </div>
           ))}
         </nav>
@@ -250,6 +252,15 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
       {registering.value && <AddMachineDialog store={store} close={() => { registering.value = false; }} />}
     </div>
   );
+}
+
+/** A click on a machine that never joined (#4978): a host key new to the control plane is asked about first. */
+async function joinAsking(store: Store, row: MachineMaking): Promise<void> {
+  await store.joinMachine(row);
+  const join = store.machineJoins.value[`${row.provider}/${row.workspace}`];
+  if (!join || !("needsTrust" in join)) return;
+  if (await ask(joinTrustQuestion(row, join.needsTrust))) await store.joinMachine(row, join.needsTrust);
+  else store.cancelJoin(row);
 }
 
 /** One page of a section, in the chat's place: Agents' Live Now and Projects too. */
