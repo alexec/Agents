@@ -109,10 +109,10 @@ struct Waiting: View {
             PairingView()
         } else if model.isStale {
             ContentUnavailableView {
-                Label("Can't reach your Mac", systemImage: "wifi.slash")
+                // The control plane, by where it runs (#4916): the Mac, or its address.
+                Label(model.controlPlaneReach.title, systemImage: "wifi.slash")
             } description: {
-                Text("It needs to be awake and on a network. "
-                     + "This screen fills in as soon as it answers.")
+                Text(model.controlPlaneReach.detail)
             } actions: {
                 // A device the Mac has forgotten is only turned away at home, not told
                 // why, so the way back is offered here too.

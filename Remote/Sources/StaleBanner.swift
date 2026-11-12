@@ -51,9 +51,9 @@ struct StaleBanner: View {
         }
     }
 
+    /// The Mac, or the control plane where it runs elsewhere (#4916).
     private var staleLine: String {
-        guard let last = model.lastHeard else { return "Not connected to your Mac yet" }
-        return "Last heard from your Mac \(last)"
+        model.controlPlaneReach.banner(lastHeard: model.lastHeard)
     }
 }
 
