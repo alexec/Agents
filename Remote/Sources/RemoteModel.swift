@@ -20,6 +20,9 @@ import Observation
 @Observable
 final class RemoteModel {
     let work = AgentsModel()
+    /// This device's local copy (#4791): sessions and chat ends kept in the app's Caches,
+    /// drawn at launch before the Mac answers. The Mac always wins.
+    @ObservationIgnored private(set) var localCopy: LocalCopyKeeper?
     private var labelVocabularies: [URL: [String]] = [:]
     @ObservationIgnored private var attentionRefreshTask: Task<Void, Never>?
 
@@ -351,6 +354,11 @@ final class RemoteModel {
         userScope.lock = lock
         files = RemoteFiles(client: client)
         pictures = PhonePictures(files: files)
+        // At once, so the list and a chat restored at launch draw before the Mac answers.
+        // An unpaired device has none: a forget deletes it.
+        let localCopy = LocalCopyKeeper(copy: .remote(), work: work)
+        self.localCopy = localCopy
+        Task { await localCopy.drawMachines() }
         #if DEBUG
         WalkNotify.model = work
         WalkNotify.also = { [weak self] method, params in
@@ -465,6 +473,8 @@ final class RemoteModel {
     /// every banner delivered from it.
     private func forgetKept() {
         StartDraftKeeper.shared.forgetAll()
+        // The copy of its sessions and chats goes with the pairing (#4791).
+        Task { [localCopy] in await localCopy?.forget() }
         liveActivities.endAll()
         notifier.forgetAll()
         AttentionSnapshotStore.clear()
@@ -4827,6 +4837,8 @@ final class RemoteModel {
         // Only the latest load puts its answer on screen: opening the chat and a
         // catch-up both load it, and the older answer could land last (#400).
         let load = work.beginTranscriptLoad()
+        // This device's copy of its end, drawn while the Mac's page is on its way (#4791).
+        Task { [localCopy] in await localCopy?.drawOpening(of: selection, load: load) }
         let turnsRequest = DaemonAPI.TurnsRequest.opening(selection)
         let pageSize = firstPageSize
         // Whether its host answered: with the history, or that it has no such session.
@@ -4852,7 +4864,7 @@ final class RemoteModel {
             // A chat left before its page arrived does not get that page shown under the
             // next one's name.
             guard self.selection == selection else { return }
-            work.takeOpening(opening, load: load)
+            if work.takeOpening(opening, load: load) { localCopy?.opened(selection, opening) }
             if let why = opening.turnsFailure { note("chat: turns of \(selection) did not load: \(why)") }
         } catch {
             // Said in the chat, with Try Again, where it used to stay blank without a
