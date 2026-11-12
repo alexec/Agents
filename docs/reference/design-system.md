@@ -61,15 +61,18 @@ Mac window and the iPhone and iPad app hold the same value.
 | label.pull | `--label-pull` | `Paper.pull` | `#7442b8` | `#b79af0` | A label naming a pull request, P#12. |
 | on-fill | `--paper-on-fill` | `none: SwiftUI's Color.white` | `#ffffff` | `#ffffff` | What is drawn on a filled mark: a state's badge, a swipe's action. |
 | scrim | `--paper-scrim` | `none: SwiftUI's Color.black` | `#000000` | `#000000` | Behind a sheet or a viewer, mixed with transparent to the strength it needs. |
-| forge.open | `--forge-open` | `WorkLook.Tone.green` | `#1a7f37` | `#3fb950` | Open; a check that passed; running. |
-| forge.done | `--forge-done` | `WorkLook.Tone.purple` | `#8250df` | `#a371f7` | A closed issue, a merged pull request. |
-| forge.closed | `--forge-closed` | `WorkLook.Tone.red` | `#cf222e` | `#f85149` | A pull request closed unmerged; a check that failed; changes asked for. |
-| forge.draft | `--forge-draft` | `WorkLook.Tone.grey` | `#6e7781` | `#8b949e` | A draft, an issue not planned. |
-| forge.waiting | `--forge-waiting` | `WorkItemActions.amber` | `#9a6700` | `#d29922` | A check still running; an agent that waits on the person. |
-| forge.fill.open | `--forge-fill-open` | `none: the window fills with WorkLook.Tone` | `#1f883d` | `#238636` | An open badge; the merge button. |
-| forge.fill.done | `--forge-fill-done` | `none: the window fills with WorkLook.Tone` | `#8250df` | `#8957e5` | A merged or closed badge. |
-| forge.fill.closed | `--forge-fill-closed` | `none: the window fills with WorkLook.Tone` | `#cf222e` | `#da3633` | A closed pull request's badge. |
-| forge.fill.draft | `--forge-fill-draft` | `none: the window fills with WorkLook.Tone` | `#59636e` | `#6e7681` | A draft's or a not planned issue's badge. |
+| forge.open | `--forge-open` | `Paper.forgeOpen` | `#1a7f37` | `#3fb950` | Open; a check that passed; running. |
+| forge.done | `--forge-done` | `Paper.forgeDone` | `#8250df` | `#a371f7` | A closed issue, a merged pull request. |
+| forge.closed | `--forge-closed` | `Paper.forgeClosed` | `#cf222e` | `#f85149` | A pull request closed unmerged; a check that failed; changes asked for. |
+| forge.draft | `--forge-draft` | `Paper.forgeDraft` | `#6e7781` | `#8b949e` | A draft, an issue not planned. |
+| forge.waiting | `--forge-waiting` | `Paper.forgeWaiting` | `#9a6700` | `#d29922` | A check still running; an agent that waits on the person. |
+| forge.waiting-wash | `--forge-waiting-wash` | `Paper.forgeWaitingWash` | `#fff8c5` | `#2f2a1a` | Under a notice in the forge's amber. |
+| forge.waiting-rule | `--forge-waiting-rule` | `Paper.forgeWaitingRule` | `#d4a72c` | `#6b5a1e` | The edge of a notice in the forge's amber. |
+| forge.mark | `--forge-mark` | `Paper.forgeMark` | `#212121` | `#212121` | The near-black disc under a connector's letters (GH, GL) in its set-up sheet. |
+| forge.fill.open | `--forge-fill-open` | `Paper.forgeFillOpen` | `#1f883d` | `#238636` | An open badge; the merge button. |
+| forge.fill.done | `--forge-fill-done` | `Paper.forgeFillDone` | `#8250df` | `#8957e5` | A merged or closed badge. |
+| forge.fill.closed | `--forge-fill-closed` | `Paper.forgeFillClosed` | `#cf222e` | `#da3633` | A closed pull request's badge. |
+| forge.fill.draft | `--forge-fill-draft` | `Paper.forgeFillDraft` | `#59636e` | `#6e7681` | A draft's or a not planned issue's badge. |
 | code.comment | `--code-comment` | `InkValues.comment` | `#64707a` | `#a3adb8` | A comment, in italic. |
 | code.keyword | `--code-keyword` | `InkValues.keyword` | `#2b4c8c` | `#8fb0e8` | A keyword, true, false, null. |
 | code.string | `--code-string` | `InkValues.string` | `#4e6420` | `#a9c27a` | A string. |
