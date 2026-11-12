@@ -23,16 +23,21 @@
 ## Keeping the three clients in step
 
 - **Three clients draw the same product:** the Mac window (`App/`), the Remote on iPhone and iPad (`Remote/`), and the web page (`Web/`). `Shared/UI` is drawn by both the window and the Remote.
-- **Each feature has a tier (#2796):** the Tier cell of its row in the parity table, below. The Mac window and the web page are full clients and are never trimmed; the tiers trim only the Remote.
+- **Each feature has a tier (#2796):** the Tier cell of its row in the parity table, below. The Mac window and the web page are full clients. The tiers trim only the Remote, with one exception: a Web + Mac link feature is not drawn on the Mac.
   - **Core:** all three clients (the session list, chat, question cards, the prompt bar, approvals, notices, the Brief, and the session and folder work the Remote keeps). The parity table lists it all.
   - **Mac + web:** the Mac window and the web page. The Remote gets no parity issue and does not have the feature: #2798 removes it, with no line in its place (Alex, 2026-10-29).
+  - **Web + Mac link (#4937):** the web page has the feature. The Mac window shows one link to it, where a person looks for it, and draws nothing more. The Remote gets nothing, as for Mac + web. This tier is for features that people use rarely and that cost much to build natively (Reports, the Console's admin pages; epic #4936). Each link:
+    - shows only when the web page is served and this Mac can open it (the rule of **Edit in Console**). A Mac with no web page has no link and no feature;
+    - opens the right place (the section, page, scope and range, as `#/reports/…`), not the Overview;
+    - signs the browser in as **Open in Browser** does: with the control plane on this Mac, it pairs the default browser in the same step the first time; with the control plane somewhere else, the web page's own sign-in, which keeps the address through the sign-in. The link carries no code or token.
   - **One client:** by design, no follow-up.
   - A new feature that is on neither of the parity table's lists is Mac + web.
 - **A change to any client's UI** (`App/Sources`, `Remote/Sources`, `Shared/UI` or `Web/src`) says, in its commit, what **each of the other two** does about it, one line each:
   - the same change in this branch: `remote: same`;
   - a parity issue filed: `web: #NNN`;
   - left out on purpose: `mac: by design (no swipe on Mac)`;
-  - not on the Remote because of its tier: `remote: tier mac+web`.
+  - not on the Remote because of its tier: `remote: tier mac+web`, or `remote: tier web+link`;
+  - a web change to a Web + Mac link feature: `mac: tier web+link` when the Mac's link still goes to the right place, else `mac: same` (the link changes in this branch) or `mac: #NNN`.
 - **For example,** a Mac sidebar change ends with `remote: #226` and `web: same`; a new Settings ▸ People control ends with `remote: tier mac+web` and `web: same`; a web-only fix ends with `mac: same, remote: same` when both already do it. A change to docs only says `mac: docs only, remote: docs only, web: docs only`.
 - **The table of where each client stands** is `specs/071-web-remote/walks/parity.md`, a file per screen under `walks/parity/` (Mac / Remote / web, a row per feature; #2020). `scripts/parity-counts.py` counts the verdicts and the tiers. A parity line that changes a row updates it in the same branch.
 
