@@ -241,6 +241,14 @@ func (l *live) closeForms(every bool) {
 	}
 }
 
+// questionTitle is how a message sent instead of an answer names the question it answers.
+func questionTitle(req wire.ElicitationRequest) string {
+	if req.Message != nil && strings.TrimSpace(*req.Message) != "" {
+		return "your question \"" + strings.TrimSpace(*req.Message) + "\""
+	}
+	return "your question"
+}
+
 // dismissedByMessage is the record's line for a question taken down by the person's message.
 const dismissedByMessage = "You sent a message instead of answering"
 
@@ -265,15 +273,24 @@ func (l *live) dismissQuestions() (left []string) {
 		l.d.record(l.id, wire.TranscriptEntryKind{ElicitationAnswered: &wire.TranscriptEntryKindElicitationAnswered{ID: pe.req.ID,
 			Summary: dismissedByMessage}})
 		if pe.left {
-			title := "your question"
-			if pe.req.Message != nil && strings.TrimSpace(*pe.req.Message) != "" {
-				title = "your question \"" + strings.TrimSpace(*pe.req.Message) + "\""
-			}
-			left = append(left, title)
+			left = append(left, questionTitle(pe.req))
 		} else {
 			pe.reply <- elicitationReply{action: wire.AnswerElicitationRequestActionCancel, byMessage: true}
 		}
 		l.d.formDown(l.id, pe.req.ID)
+	}
+	// A lost form (#4990) goes as a form left open does.
+	for _, req := range l.d.lostForms(l.id) {
+		if req.Secret != nil || req.HandOff != nil || req.Mode.Form == nil {
+			continue
+		}
+		if !l.d.endRequest(req.ID, wire.RequestStateDropped, nil, wire.RequestDroppedWhyByPerson, nil) {
+			continue
+		}
+		l.d.record(l.id, wire.TranscriptEntryKind{ElicitationAnswered: &wire.TranscriptEntryKindElicitationAnswered{ID: req.ID,
+			Summary: dismissedByMessage}})
+		left = append(left, questionTitle(req))
+		l.d.formDown(l.id, req.ID)
 	}
 	if len(pes) > 0 && !l.asking() {
 		l.d.moveIf(l.id, wire.AgentStateWaitingOnUser, wire.AgentStateRunning)
@@ -291,14 +308,24 @@ func (d *Daemon) everyLive() []*live {
 	return ls
 }
 
+// pendingElicitations is every form in front of the person: the ones held in memory, and
+// the lost ones (#4990), whose call a restart took but whose request is still open, so the
+// chat draws the card that Needs You lists.
 func (d *Daemon) pendingElicitations() []wire.ElicitationRequest {
 	out := []wire.ElicitationRequest{}
+	held := map[wire.UUID]bool{}
 	for _, l := range d.everyLive() {
 		l.mu.Lock()
 		for _, pe := range l.elicitations {
 			out = append(out, pe.req)
+			held[pe.req.ID] = true
 		}
 		l.mu.Unlock()
+	}
+	for _, req := range d.lostForms("") {
+		if !held[req.ID] {
+			out = append(out, req)
+		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].AskedAt < out[j].AskedAt })
 	return out
@@ -315,6 +342,10 @@ func (d *Daemon) answerElicitation(r wire.AnswerElicitationRequest) error {
 		}
 	}
 	if pe == nil {
+		// A lost form (#4990): its card is drawn again, so its answer comes here too.
+		if rec := d.request(r.RequestID); rec != nil && rec.State == wire.RequestStateOpen && rec.Detail.Elicitation != nil {
+			return d.answerLostForm(*rec.Detail.Elicitation, r.Action, r.Content, d.takeAnsweredBy(r.RequestID))
+		}
 		return &Error{Code: wire.FailureNoSuchAgent, Message: "That form has already been answered."}
 	}
 	action := r.Action

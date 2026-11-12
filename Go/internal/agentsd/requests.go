@@ -143,6 +143,39 @@ func (d *Daemon) listRequests(state wire.RequestsListState, folder string) []wir
 	return out
 }
 
+// lostForms is the forms of the open requests whose call a restart took (#4990): an
+// elicitation that no live agent holds, asked by a session that is not archived. With agent
+// set, that session's only. Oldest first.
+func (d *Daemon) lostForms(agent wire.UUID) []wire.ElicitationRequest {
+	out := []wire.ElicitationRequest{}
+	for _, r := range d.listRequests(wire.RequestsListStateOpen, "") {
+		if r.Detail.Elicitation == nil || r.AskedBy == nil || agent != "" && *r.AskedBy != agent {
+			continue
+		}
+		if a := d.Store.Agent(*r.AskedBy); a == nil || a.State == wire.AgentStateArchived {
+			continue
+		}
+		if d.liveFormOf(r.ID) != nil {
+			continue
+		}
+		out = append(out, *r.Detail.Elicitation)
+	}
+	return out
+}
+
+// dropRequestsOf drops every open request a session asked, held or lost, as it is archived
+// (#4990): halt takes down only the forms held in memory.
+func (d *Daemon) dropRequestsOf(agent wire.UUID, why wire.RequestDroppedWhy) {
+	for _, r := range d.listRequests(wire.RequestsListStateOpen, "") {
+		if r.AskedBy == nil || *r.AskedBy != agent {
+			continue
+		}
+		if d.endRequest(r.ID, wire.RequestStateDropped, nil, why, nil) && r.Detail.Elicitation != nil {
+			d.formDown(agent, r.ID)
+		}
+	}
+}
+
 func copyRequest(r *wire.Request) wire.Request {
 	c := *r
 	c.Waiters = append([]wire.RequestWaiter{}, r.Waiters...)
@@ -381,6 +414,7 @@ func (d *Daemon) answerLostForm(req wire.ElicitationRequest, action wire.AnswerE
 		return &Error{Code: wire.FailureNoSuchAgent, Message: "That request has ended already."}
 	}
 	d.takeAnsweredBy(req.ID)
+	d.formDown(req.AgentID, req.ID) // a lost form's card is drawn (#4990): it goes now
 	d.record(req.AgentID, wire.TranscriptEntryKind{ElicitationAnswered: &wire.TranscriptEntryKindElicitationAnswered{ID: req.ID,
 		Summary: outcomeSummary(action), Answers: said}})
 	if err := d.promptFromApp(req.AgentID, d.formAnsweredWords(req, action, content, said, "")); err != nil {

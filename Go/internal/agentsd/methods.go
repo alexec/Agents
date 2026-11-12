@@ -465,6 +465,7 @@ func (d *Daemon) archiveSweeping(id wire.UUID, by wire.AgentArchivedReason, swee
 	// Archived first, then its turn and runtime ended: the turn's ending finds it archived
 	// and leaves it so (#1611).
 	d.live(id).halt()
+	d.dropRequestsOf(id, wire.RequestDroppedWhyAskerEnded) // a lost form too (#4990)
 	if a := d.Store.Agent(id); a != nil {
 		details := map[string]string{"by": "you"}
 		if by == wire.AgentArchivedReasonByAgent {
