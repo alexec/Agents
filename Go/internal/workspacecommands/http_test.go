@@ -308,7 +308,7 @@ func fakeCodespaces(t *testing.T, repo string) (*fakeAPI, string) {
 				display = "psychic train"
 			}
 			all = append(all, map[string]any{"name": name, "display_name": display, "state": state,
-				"git_status": map[string]any{"ref": "main"}})
+				"git_status": map[string]any{"ref": "main"}, "idle_timeout_minutes": 240})
 		}
 		return map[string]any{"total_count": len(all), "codespaces": all}
 	}
@@ -368,6 +368,15 @@ func TestCodespacesStartAndStopAreRealCallsAndSSHGoesThroughGh(t *testing.T) {
 	}
 	if h := f.headers[0]; h.Get("Accept") != "application/vnd.github+json" || h.Get("X-GitHub-Api-Version") != "2022-11-28" {
 		t.Errorf("%v", h)
+	}
+}
+
+func TestACodespaceListsItsIdleTimeout(t *testing.T) {
+	_, text := fakeCodespaces(t, "")
+	p, _ := apiProvider(t, text, GitHubSecret, token)
+	all, err := p.List()
+	if err != nil || len(all) != 1 || all[0].JSON()["idleTimeoutMinutes"] != 240 {
+		t.Fatalf("%v %+v", err, all)
 	}
 }
 

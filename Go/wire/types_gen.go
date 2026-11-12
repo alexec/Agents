@@ -7681,6 +7681,9 @@ type MachineInfo struct {
 
 	Cost *string `json:"cost,omitzero"`
 
+	// The provider stops it by itself after this many minutes with no use, as GitHub stops a codespace (#4803): the machine's page says so.
+	IdleTimeoutMinutes *int64 `json:"idleTimeoutMinutes,omitzero"`
+
 	Host *MachineRef `json:"host,omitzero"`
 
 	// Why the make failed, in the provider's words, when `state` is failed.
@@ -8015,6 +8018,9 @@ type MachineWorkspace struct {
 	StopWhenIdleMinutes *int64 `json:"stopWhenIdleMinutes,omitzero"`
 
 	Cost *string `json:"cost,omitzero"`
+
+	// As its provider last listed it: the provider stops it after this many minutes with no use (#4803).
+	IdleTimeoutMinutes *int64 `json:"idleTimeoutMinutes,omitzero"`
 
 	Current bool `json:"current"`
 

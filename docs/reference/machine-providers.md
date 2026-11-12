@@ -63,6 +63,7 @@ logged.
 | `tunnel` | boolean, optional | It can't reach the control plane, so the control plane holds a reverse tunnel over ssh. |
 | `hostKeyRenews` | boolean, optional | Its ssh host key is made again at each start, as a Google Cloud workstation's is. After a Start that the control plane made, its ssh start takes the key it is offered and pins it again; at any other time a changed key is refused (#1701). |
 | `cost` | string, optional | Shown as it is, such as `$0.03/hour while running`. At most 120 characters. |
+| `idleTimeoutMinutes` | integer, optional | The provider stops it by itself after this many minutes with no use, as GitHub stops a codespace. The `codespaces-api` preset reads it from GitHub's `idle_timeout_minutes`; a command provider's `json` paths can name it too. The machine's page says *Kept awake while it works; GitHub stops it N minutes after that.* (#4803) |
 
 ## Answers and failures
 

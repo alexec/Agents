@@ -266,6 +266,9 @@ test("a cloud machine stops after 2 hours idle unless the person says Never (#37
   assert.equal(w.idleRowWords(0), "Never stop when idle");
   assert.equal(w.idleRowWords(120), "Stop after 2 hours idle");
   assert.equal(w.idleRowWords(7), "Stop after 7 minutes idle");
+  assert.equal(w.keptAwakeLine({ idleTimeoutMinutes: 240 }), "Kept awake while it works; GitHub stops it 240 minutes after that.");
+  assert.equal(w.keptAwakeLine({ idleTimeoutMinutes: 1 }), "Kept awake while it works; GitHub stops it 1 minute after that.");
+  assert.equal(w.keptAwakeLine({}), null);
   const asked = [];
   const p = new w.Providers({ call: async (method, params) => { asked.push([method, params]); return {}; } });
   assert.equal(await p.setIdle("7", 0), null);

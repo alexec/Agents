@@ -47,6 +47,14 @@ enum OfflineWords {
         return "Stays up for \(workflow) \(clock(at, now: now))"
     }
 
+    /// "Kept awake while it works; GitHub stops it 240 minutes after that." (#4803): a
+    /// codespace is kept awake while its machine works (#4637), and GitHub's own idle timeout
+    /// stops it once the machine is idle. Nil for a workspace with no idle timeout of its own.
+    static func keptAwakeLine(_ workspace: DaemonAPI.MachineWorkspace) -> String? {
+        guard let minutes = workspace.idleTimeoutMinutes, minutes > 0 else { return nil }
+        return "Kept awake while it works; GitHub stops it \(minutes == 1 ? "1 minute" : "\(minutes) minutes") after that."
+    }
+
     /// "at 02:55" today or within the day; "Tue at 02:55" further off. 24-hour, as the web's.
     static func clock(_ date: Date, now: Date) -> String {
         let calendar = Calendar.current

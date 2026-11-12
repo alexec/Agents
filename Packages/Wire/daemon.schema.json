@@ -16827,6 +16827,10 @@
         "cost": {
           "type": "string"
         },
+        "idleTimeoutMinutes": {
+          "type": "integer",
+          "description": "The provider stops it by itself after this many minutes with no use, as GitHub stops a codespace (#4803): the machine's page says so."
+        },
         "host": {
           "$ref": "#/definitions/MachineRef"
         },
@@ -17549,6 +17553,10 @@
         },
         "cost": {
           "type": "string"
+        },
+        "idleTimeoutMinutes": {
+          "type": "integer",
+          "description": "As its provider last listed it: the provider stops it after this many minutes with no use (#4803)."
         },
         "current": {
           "type": "boolean"
