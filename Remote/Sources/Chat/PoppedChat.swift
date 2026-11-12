@@ -110,7 +110,8 @@ struct PoppedChatScene: View {
                     ContentUnavailableView("No session", systemImage: "bubble.left.and.bubble.right",
                                            description: Text("Drag a session out of the sidebar to open it here."))
                 } else {
-                    ProgressView()
+                    // On its way: said only after 300 ms, as a network wait (#4795).
+                    DelayedProgress()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
