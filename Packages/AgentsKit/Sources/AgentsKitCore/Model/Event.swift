@@ -55,11 +55,11 @@ extension Consequence {
     }
 
     /// A fire put off rather than refused: queued behind a run (#422) or held by a
-    /// cooldown (#103). What comes of it later replaces it.
+    /// cooldown (#103) or by its hours (#4818). What comes of it later replaces it.
     public var isWaiting: Bool {
         guard case .refused(_, _, let reason) = self else { return false }
         switch reason {
-        case .queued, .coolingDown: return true
+        case .queued, .coolingDown, .outsideHours: return true
         default: return false
         }
     }

@@ -33019,6 +33019,10 @@
           "$ref": "#/definitions/JSONValue",
           "description": "The person's outside accounts (#3967), as an OutsideAccounts. The control plane refuses one with a value that looks like a secret."
         },
+        "timeZone": {
+          "$ref": "#/definitions/JSONValue",
+          "description": "The person's time zone (#4818), as a UserTimeZone. Their Mac sets it from its own clock; a workflow's hours: with no time-zone: go by it."
+        },
         "policy": {
           "$ref": "#/definitions/JSONValue",
           "description": "#2957, research R11: your layer, as a SignedYourPolicy. Only the keeper sets it (user/setPolicy); a client cannot (user/setSettings refuses this part)."
@@ -33077,9 +33081,10 @@
         "costLimits",
         "notifications",
         "accounts",
+        "timeZone",
         "policy"
       ],
-      "description": "A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits, notices (#2859) and outside accounts (#3967) follow the person. Resources belong to each machine. policy (#2957) is set only by the keeper, through user/setPolicy; user/setSettings refuses it."
+      "description": "A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers, agent configuration, runtimes, cost limits, notices (#2859), outside accounts (#3967) and the time zone (#4818) follow the person. Resources belong to each machine. policy (#2957) is set only by the keeper, through user/setPolicy; user/setSettings refuses it."
     },
     "UserSuspended": {
       "type": "object",
@@ -33102,6 +33107,20 @@
         "user",
         "provider",
         "at"
+      ],
+      "additionalProperties": false
+    },
+    "UserTimeZone": {
+      "type": "object",
+      "description": "The timeZone part of user settings (#4818).",
+      "properties": {
+        "identifier": {
+          "type": "string",
+          "description": "An IANA name, as TimeZone.identifier says it: Europe/London."
+        }
+      },
+      "required": [
+        "identifier"
       ],
       "additionalProperties": false
     },
@@ -34124,6 +34143,9 @@
         "cooldown": {
           "type": "number"
         },
+        "hours": {
+          "$ref": "#/definitions/WorkflowHours"
+        },
         "enabled": {
           "type": "boolean"
         },
@@ -34308,6 +34330,28 @@
         "workflowID",
         "enabled"
       ],
+      "additionalProperties": false
+    },
+    "WorkflowHours": {
+      "type": "object",
+      "description": "hours: (#4818): when a workflow may start, as the file says it. A fire outside it is held, and starts when it opens; Run now always runs.",
+      "properties": {
+        "between": {
+          "type": "string",
+          "description": "As the file says it, \"09:00-18:00\"; it can go past midnight, \"18:00-09:00\". Absent is the whole day."
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Weekday"
+          },
+          "description": "The days its window starts on. Absent is every day."
+        },
+        "timeZone": {
+          "type": "string",
+          "description": "time-zone:, an IANA name. Absent is the person's timeZone setting, else the host's zone."
+        }
+      },
       "additionalProperties": false
     },
     "WorkflowLimit": {
@@ -34828,6 +34872,24 @@
             "coolingDown"
           ],
           "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "outsideHours": {
+              "type": "object",
+              "properties": {
+                "until": {
+                  "$ref": "#/definitions/WireDate"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "outsideHours"
+          ],
+          "additionalProperties": false
         }
       ]
     },
@@ -34878,7 +34940,8 @@
             "type": "integer"
           },
           "minItems": 2,
-          "maxItems": 2
+          "maxItems": 2,
+          "description": "The first and the last hour of between:. The first is after the last when it goes past midnight (#4818): the hours after midnight belong to the day before."
         },
         "startMinute": {
           "type": "integer"
@@ -35069,6 +35132,10 @@
         },
         "cooldownEndsAt": {
           "$ref": "#/definitions/WireDate"
+        },
+        "hoursOpenAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When a fire held outside the workflow's hours: can start (#4818): the first time its hours: are open once its cooldown is over. Absent while its hours: are open by then."
         },
         "holdsAFire": {
           "type": "boolean"

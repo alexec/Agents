@@ -2632,6 +2632,15 @@ final class AppModel {
         return await userScope.set(part, to: encoded, on: controlRequests)
     }
 
+    /// The person's time zone (#4818): this Mac's, set at the user scope when it differs, so
+    /// a workflow's `hours:` with no `time-zone:` go by it on a server too. It has no control.
+    func keepTimeZone() async {
+        guard let settings = userScope.settings else { return }
+        let here = TimeZone.current.identifier
+        if (try? settings.timeZone?.decode(DaemonAPI.UserTimeZone.self))?.identifier == here { return }
+        _ = await setUserPart(.timeZone, DaemonAPI.UserTimeZone(identifier: here))
+    }
+
     /// After an edit in Agent Configuration or Agent Runtimes: a part that follows the person
     /// is set again from this Mac, when it changed here.
     func keepFollowingParts() async {
@@ -3895,6 +3904,15 @@ final class AppModel {
                     await self?.signIn.connected(control)
                     // Status ▸ Secrets and Accounts' rows say when the newest operation was (#4161).
                     await self?.userScope.load(control)
+                    await self?.keepTimeZone()
+                    // A change of this Mac's zone is the person's, while connected (#4818).
+                    let zoneWatch = Task { [weak self] in
+                        for await _ in NotificationCenter.default.notifications(named: .NSSystemTimeZoneDidChange) {
+                            NSTimeZone.resetSystemTimeZone()
+                            await self?.keepTimeZone()
+                        }
+                    }
+                    defer { zoneWatch.cancel() }
                     if let client = ControlConfig.client { await self?.lock.connected(control, client: client) }
                     await Self.sealWaiting(on: control, lock: self?.lock)
                     for await note in control.notifications() {

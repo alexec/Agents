@@ -220,9 +220,10 @@ func consequenceWorkflow(c wire.Consequence) string {
 	return ""
 }
 
-// waitingFire is Consequence.isWaiting: a fire queued behind a run or held by a cooldown.
+// waitingFire is Consequence.isWaiting: a fire queued behind a run or held by a cooldown or
+// by its hours (#4818).
 func waitingFire(c wire.Consequence) bool {
-	return c.Refused != nil && (c.Refused.Reason.Queued != nil || c.Refused.Reason.CoolingDown != nil)
+	return c.Refused != nil && (c.Refused.Reason.Queued != nil || c.Refused.Reason.CoolingDown != nil || c.Refused.Reason.OutsideHours != nil)
 }
 
 // addConsequenceLocked is EventLog.addConsequence: what came of a waiting fire takes the

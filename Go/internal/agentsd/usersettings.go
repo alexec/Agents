@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
@@ -55,11 +56,15 @@ type userSettingsSyncState struct {
 	// The agentConfig files written, relative to ~/.agents, so a persona or skill the
 	// control plane no longer sends is taken away again.
 	Files []string `json:"files,omitempty"`
+	// TimeZone is the person's timeZone part (#4818): the zone of a workflow's hours: with
+	// no time-zone:. "" is none, and this host's own zone.
+	TimeZone string `json:"timeZone,omitempty"`
 }
 
 type userScopeState struct {
 	userScopeMu sync.Mutex
 	userMark    *userSettingsSyncState
+	personTZ    atomic.Pointer[string]
 }
 
 // agentConfigName is a persona's or a skill's name, as one folder or file name.
@@ -144,6 +149,8 @@ func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 	if partSent(s.Policy) {
 		note(wire.UserSettingsPartNamePolicy, d.applyYoursFromControlPlane(s.Policy))
 	}
+	// timeZone (#4818): the zone of a workflow's hours: with no time-zone:.
+	mark.TimeZone = zoneOfPart(s.TimeZone)
 	opened, flagged, versions, kept, hints := d.openUserSecrets(u, before)
 	names, err := d.syncUserSecrets(home, opened, flagged, before.Secrets, kept)
 	for i := range opened {
@@ -180,6 +187,8 @@ func (d *Daemon) ApplyUserSettings(u wire.MachineUserSettings) error {
 		_ = os.Remove(filepath.Join(d.Store.Loc.Root, "from-control-plane.json"))
 	}
 	d.userMark = &mark
+	zone := mark.TimeZone
+	d.personTZ.Store(&zone)
 	log.Printf("user settings synced from the control plane: %d secrets", len(mark.Secrets))
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))
