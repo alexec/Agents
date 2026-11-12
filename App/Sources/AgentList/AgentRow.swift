@@ -199,7 +199,10 @@ struct AgentRow: View {
                 // In the report's place, at the report line's height. Nothing is held for
                 // the line when there is none (#144): the row is fixed to its height below,
                 // so the list measures it again when a line arrives.
-                if let acting = model.acting(agent.id) {
+                if let move = model.moves[agent.id] {
+                    // On its way to another machine (#4641): how far, or why it stopped.
+                    MovingLine(move: move, isCompact: isCompact) { model.putAwayMove(move.agentID) }
+                } else if let acting = model.acting(agent.id) {
                     Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
                         .frame(height: isCompact ? 14 : nil)
                 } else if let queued = model.queuedLine(agent) {

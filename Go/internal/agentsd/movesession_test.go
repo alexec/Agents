@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/internal/controllink"
@@ -21,6 +22,12 @@ import (
 // movingPair is two machines on one fake control plane: here, where the agents ask, and
 // there, which takes the sendFolder steps. It records the steps.
 func movingPair(t *testing.T) (here, there *Daemon, c *conn, steps func() []string) {
+	t.Helper()
+	return movingPairHeld(t, nil)
+}
+
+// movingPairHeld is movingPair whose moveIn step waits for hold to close, when not nil.
+func movingPairHeld(t *testing.T, hold chan struct{}) (here, there *Daemon, c *conn, steps func() []string) {
 	t.Helper()
 	here, c = start(t, t.TempDir())
 	t.Cleanup(here.Shutdown)
@@ -54,6 +61,9 @@ func movingPair(t *testing.T) (here, there *Daemon, c *conn, steps func() []stri
 			f, err = there.receive(*s.Receive)
 			out.Folder = &f
 		case s.MoveIn != nil:
+			if hold != nil {
+				<-hold
+			}
 			step = "moveIn"
 			in := *s.MoveIn
 			in.From.Machine = "mac"
@@ -235,8 +245,32 @@ func TestMoveSessionMovesItselfWhenTheTurnEnds(t *testing.T) {
 
 // Move to Machine… (#3790): the person moves a session with agents/moveToMachine, with no
 // card, and an archived one is refused before anything is asked.
+// nextMove is the next move/changed c hears, or nil after wait.
+func nextMove(c *conn, wait time.Duration) *wire.MoveNotification {
+	deadline := time.After(wait)
+	for {
+		select {
+		case line := <-c.out:
+			var m message
+			json.Unmarshal([]byte(line), &m)
+			if m.Method != wire.NotifyMoveChanged.Name {
+				continue
+			}
+			var n wire.MoveNotification
+			json.Unmarshal(m.Params, &n)
+			return &n
+		case <-deadline:
+			return nil
+		}
+	}
+}
+
+// Move to Machine… answers once the move is checked (#4641): move/changed says how it goes,
+// agents/moves finds it mid-move, a second move is refused, and the session stays here until
+// that machine has it.
 func TestPersonMovesASessionToAMachine(t *testing.T) {
-	here, there, c, steps := movingPair(t)
+	hold := make(chan struct{})
+	here, there, c, steps := movingPairHeld(t, hold)
 	src := repo(t)
 	sendGit(t, src, nil, "checkout", "-q", "-b", "fix-login")
 	os.WriteFile(filepath.Join(src, "notes.txt"), []byte("not committed\n"), 0o644)
@@ -244,11 +278,44 @@ func TestPersonMovesASessionToAMachine(t *testing.T) {
 	folder := filepath.Join(canonical(t.TempDir()), "app")
 
 	var answer wire.MoveToMachineAnswer
-	if err := json.Unmarshal(c.call(t, 1, "agents/moveToMachine", map[string]any{"agentID": a.ID, "machine": "pc", "folder": folder}), &answer); err != nil {
+	if err := json.Unmarshal(c.call(t, 1, "agents/moveToMachine", map[string]any{"agentID": a.ID, "machine": "pc-id", "machineName": "pc", "folder": folder}), &answer); err != nil {
 		t.Fatal(err)
 	}
 	if answer.Folder != folder || answer.CarriesOn {
 		t.Fatalf("%+v", answer)
+	}
+	// The branch goes; the session waits for the machine to take it.
+	var last *wire.MoveNotification
+	for last == nil || !last.BranchSent {
+		if last = nextMove(c, 10*time.Second); last == nil {
+			t.Fatal("no move/changed")
+		}
+		if last.Finished || last.AgentID != a.ID || last.MachineName != "pc" || last.Folder != folder {
+			t.Fatalf("%+v", last)
+		}
+	}
+	if last.Total == 0 || last.Sent != last.Total {
+		t.Fatalf("%+v", last)
+	}
+	if here.Store.Agent(a.ID) == nil {
+		t.Fatal("gone from here before that machine has it")
+	}
+	var under []wire.MoveNotification
+	json.Unmarshal(c.call(t, 4, "agents/moves", nil), &under)
+	if len(under) != 1 || under[0].AgentID != a.ID || !under[0].BranchSent {
+		t.Fatalf("%+v", under)
+	}
+	if msg := c.callError(t, 5, "agents/moveToMachine", map[string]any{"agentID": a.ID, "machine": "pc-id", "machineName": "pc", "folder": folder}).Message; !strings.HasSuffix(msg, "is moving to pc already.") {
+		t.Fatal(msg)
+	}
+	close(hold)
+	for last == nil || !last.Finished {
+		if last = nextMove(c, 10*time.Second); last == nil {
+			t.Fatal("no finished move/changed")
+		}
+	}
+	if last.Problem != nil {
+		t.Fatal(*last.Problem)
 	}
 	if got := strings.Join(steps(), ","); got != "state,state,upload,upload,receive,upload,moveIn" {
 		t.Fatal(got)
@@ -258,6 +325,10 @@ func TestPersonMovesASessionToAMachine(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(filepath.Join(folder, "notes.txt")); string(b) != "not committed\n" {
 		t.Fatalf("notes.txt there: %q", b)
+	}
+	json.Unmarshal(c.call(t, 6, "agents/moves", nil), &under)
+	if len(under) != 0 {
+		t.Fatalf("still under way: %+v", under)
 	}
 
 	// No folder, and none of the project's there: the person is asked for one, by the machine's name.

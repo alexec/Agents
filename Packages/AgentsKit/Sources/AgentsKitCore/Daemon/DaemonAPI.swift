@@ -402,6 +402,9 @@ public enum DaemonAPI {
         /// Move to Machine… (#3790): the person moving a session to another of their
         /// machines, with its branch and its uncommitted changes, as move_session does.
         public static let agentsMoveToMachine = "agents/moveToMachine"
+        /// The moves to another machine under way on a host (#4641), for a client that
+        /// connects mid-move; `move/changed` says how each goes.
+        public static let agentsMoves = "agents/moves"
 
         public static let permissionsPending = "permissions/pending"
         public static let elicitationsPending = "elicitations/pending"
@@ -612,6 +615,9 @@ public enum DaemonAPI {
         /// A clone began, or ended either way (027). Every window hears it, because a
         /// clone belongs to the Mac and not to the window that asked for it.
         public static let cloneChanged = "clone/changed"
+        /// A move to another machine went a step further, or ended either way (#4641).
+        /// Carries `MoveNotification`.
+        public static let moveChanged = "move/changed"
         /// A send went a part further, or ended either way (#4613). Carries
         /// `SendNotification`.
         public static let sendChanged = "send/changed"
@@ -4247,6 +4253,36 @@ public extension DaemonAPI {
         public init(folder: String, carriesOn: Bool) {
             self.folder = folder
             self.carriesOn = carriesOn
+        }
+    }
+
+    /// `move/changed` (#4641): `sent` of `total` bytes of the branch are on that machine (0 of 0
+    /// while the bundle is made); `branchSent` once the session itself goes. Once `finished`,
+    /// with no `problem` the session is there; else `problem` says why not, and it stays here.
+    struct MoveNotification: Codable, Hashable, Sendable, Identifiable {
+        public var agentID: UUID
+        public var machine: String
+        public var machineName: String
+        public var folder: String
+        public var startedAt: Date
+        public var sent: Int
+        public var total: Int
+        public var branchSent: Bool
+        public var finished: Bool
+        public var problem: String?
+        public var id: UUID { agentID }
+        public init(agentID: UUID, machine: String, machineName: String, folder: String, startedAt: Date, sent: Int = 0,
+                    total: Int = 0, branchSent: Bool = false, finished: Bool = false, problem: String? = nil) {
+            self.agentID = agentID
+            self.machine = machine
+            self.machineName = machineName
+            self.folder = folder
+            self.startedAt = startedAt
+            self.sent = sent
+            self.total = total
+            self.branchSent = branchSent
+            self.finished = finished
+            self.problem = problem
         }
     }
 

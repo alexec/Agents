@@ -5,7 +5,8 @@
 // colour. In the sidebar it is the mark, the title, the time and one grey line (#587): the rest is
 // the folder page's and the chat's.
 import { archivedOrder, archivedTime as archivedWhen } from "../model/archivedPage";
-import type { Agent } from "../protocol/generated";
+import type { Agent, MoveNotification } from "../protocol/generated";
+import { movingLine } from "../model/moveToMachine";
 import type { Store } from "../model/store";
 import { leaseMark, lineResource, startedByAgentLabel, waitMark, worktreeHelp, type LeaseMark, type WaitMark } from "../model/rowLines";
 import { blockWaitNames, openBlock } from "../model/block";
@@ -134,6 +135,8 @@ export interface RowExtras {
   question?: string | null;
   /** A lead's epic progress after its title (#3270), "5/7". */
   progress?: string | null;
+  /** On its way to another machine (#4641): how far, or why it stopped. */
+  move?: { line: string; stopped: boolean } | null;
 }
 
 /** A row's extras, read from the store: only what this agent names is looked up. */
@@ -163,7 +166,15 @@ export function rowExtras(store: Store, host: string, agent: Agent): RowExtras {
     said: store.saidLines.value[agent.id] ?? null,
     question: question ?? null,
     progress: store.leadProgressOf(host, agent) ?? null,
+    move: moveLineOf(store.moves.value[agent.id]),
   };
+}
+
+/** A move's line on the row (#4641): why it stopped, or how far it is. */
+function moveLineOf(move: MoveNotification | undefined): { line: string; stopped: boolean } | null {
+  if (!move) return null;
+  if (move.problem !== undefined) return { line: move.problem, stopped: true };
+  return { line: movingLine(move.machineName, move.sent, move.total, move.branchSent), stopped: false };
 }
 
 export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = false, place, markAgent, archivedTime = false }: {
@@ -220,7 +231,10 @@ export function SessionRow({ agent, chosen, onPick, going, extras, inSidebar = f
           {fileToSee && <span class="started-by file-to-see" role="img" title={fileToSee} aria-label={fileToSee}>🗎&#xFE0E;</span>}
         </span>
         {/* In the report's place, as the window's row has it (#87). */}
-        {going ? <span class="subtitle"><Telling recipient={going.recipient} doing={going.doing} /></span>
+        {/* On its way to another machine (#4641), as the window's row says it. */}
+        {extras?.move ? <span class={`subtitle moving${extras.move.stopped ? " failure" : ""}`} title={extras.move.line}
+          role={extras.move.stopped ? "alert" : "status"}>{extras.move.line}</span>
+          : going ? <span class="subtitle"><Telling recipient={going.recipient} doing={going.doing} /></span>
           : extras?.queued ? <span class="subtitle queued">{extras.queued}</span>
           // While the sidebar searches: the line it said that matches, in the report's place,
           // so a row found by what it said says why (#1663). The page's row has it below.

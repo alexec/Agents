@@ -100,6 +100,9 @@ final class AppModel {
     /// Clones under way on this Mac, from whichever window started them (027). Each is
     /// a row in the Folders column until it becomes a folder or fails.
     private(set) var clones: [DaemonAPI.CloneSummary] = []
+    /// Moves to another machine under way, by session, and those that stopped with a
+    /// problem until they are put away (#4641). Each is a line on the session's row.
+    var moves: [UUID: DaemonAPI.MoveNotification] = [:]
     /// Sends under way from this Mac's host, and those that stopped with a problem (#4613).
     /// Each is a row in the Folders column until it is a folder there, or is put away.
     var sends: [FolderSend] = []
@@ -3637,6 +3640,10 @@ final class AppModel {
             clones.removeAll { $0.id == change.clone.id }
             if !change.finished { clones.append(change.clone) }
 
+        case DaemonAPI.Notification.moveChanged:
+            guard let change = try? params?.decode(DaemonAPI.MoveNotification.self) else { return }
+            moveChanged(change)
+
         case DaemonAPI.Notification.sendChanged:
             guard let change = try? params?.decode(DaemonAPI.SendNotification.self) else { return }
             sendChanged(change)
@@ -4375,7 +4382,8 @@ final class AppModel {
             guard let change = try? params?.decode(DaemonAPI.FilesChangedNotification.self) else { return }
             serverFiles(host).apply(change)
         case DaemonAPI.Notification.shellOutput, DaemonAPI.Notification.shellStateChanged,
-             DaemonAPI.Notification.draftOptions, DaemonAPI.Notification.writeFailed:
+             DaemonAPI.Notification.draftOptions, DaemonAPI.Notification.writeFailed,
+             DaemonAPI.Notification.moveChanged:
             await received(method, params, nil)
         default:
             break
@@ -4392,6 +4400,7 @@ final class AppModel {
         await serverFilesByHost[host]?.reconnected()
         await refreshServerRuntimes(host)
         await refreshServerDisk(host)
+        await refreshMoves(on: host)
         // And its retention settings (051).
         if let settings = work.retentionState?.settings {
             _ = try? await server.call(DaemonAPI.Method.retentionSet,
@@ -4525,6 +4534,7 @@ final class AppModel {
         async let runtimeStates: Void = refreshRuntimeAllowances()
         async let cloning: Void = refreshClones()
         async let sending: Void = refreshSends()
+        async let moving: Void = refreshMoves(on: .mac)
         async let bringing: Void = refreshBringBacks()
         async let wake: Void = refreshWakeState()
         async let storeNotes: Void = refreshStoreNotes()
@@ -4544,7 +4554,7 @@ final class AppModel {
         async let dailySummary: Void = refreshDailySummarySettings()
         async let summaries: Void = refreshSummaryPages()
         _ = await (popped, runtimes, accounts, workflows, pinned, requests, permissions,
-                   elicitations, attention, resuming, cost, retention, clientPermissions, cloning, sending, bringing, wake, leases, events, modes,
+                   elicitations, attention, resuming, cost, retention, clientPermissions, cloning, sending, bringing, moving, wake, leases, events, modes,
                    transcript, runtimeStates, sandbox, person, disk, storeNotes, hostedMCP, mcpHealth, achievements, multiplier,
                    display, auto, dailySummary, summaries)
     }

@@ -147,7 +147,10 @@ struct AgentCard: View {
                     // same two lines as the Mac's row. The state is the icon's; what it
                     // is doing is the title, which the agent keeps current.
                     // Stop or archive on its way, as on the Mac's row (#87).
-                    if let acting = model.acting(agent.id) {
+                    if let move = model.moves[agent.id] {
+                        // On its way to another machine (#4641), as on the Mac's row.
+                        MovingLine(move: move, isCompact: false) { model.putAwayMove(move.agentID) }
+                    } else if let acting = model.acting(agent.id) {
                         Telling(host: model.answerRecipient(agent.id), doing: acting.doing)
                     } else if let queued = model.queuedLine(agent) {
                         // Its place in the queue (#362), as the Mac's row says it.

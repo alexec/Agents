@@ -20,7 +20,7 @@ import type {
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
   BackupRestoreResult, BackupSettings, BackupState, CapReached, ChannelLinkDecided, ChannelLinkRequest, ConnectAnotherRequest, ConnectReport, ControlPerson, DailySummarySettings, SummaryPage, SummaryPageText, DesktopControlSettings, WakeSettings, JoinDecided, JoinRequest, PeopleList, PersonRow, SecretsLeft, SignInDecided,
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
-  Connection, LineageNode, LineageSessionIssue, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestSecretUse, LockDelivery, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder,
+  Connection, LineageNode, LineageSessionIssue, MoveNotification, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestSecretUse, LockDelivery, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder,
   OutsideAccount, OutsideAccounts, PlaneMoveAsk, PlaneMoveReport, UserSecretRow, WebRemoteStatus, WireDate } from "../protocol/generated";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { parseQuery } from "./labels";
@@ -216,6 +216,13 @@ export class Work {
   readonly accountProfiles = signal<Record<string, AccountProfile[]>>({});
   /** The clones under way on each host (027), drawn where the folder will be. */
   readonly clones = signal<ByHost<CloneSummary>>({});
+  /**
+   * Moves to another machine under way, by session, whichever host makes them (#4641), and those
+   * that stopped with a problem, until the session is opened: a line on the session's row.
+   */
+  readonly moves = signal<Record<string, MoveNotification>>({});
+  /** What to do once a move this page asked for is there: open the session there (#4641). */
+  protected readonly moveFollows = new Map<string, () => void>();
   readonly agents = signal<ByHost<Agent>>({});
   readonly permissions = signal<ByHost<PermissionRequest>>({});
   readonly elicitations = signal<ByHost<ElicitationRequest>>({});
@@ -638,6 +645,18 @@ export class Work {
       case "folder/changed":
         this.upsertFolder(params as FolderSummary, host);
         return true;
+      case "move/changed": {
+        const move = params as MoveNotification;
+        const { [move.agentID]: _, ...rest } = this.moves.value;
+        const there = move.finished && move.problem === undefined;
+        this.moves.value = there ? rest : { ...rest, [move.agentID]: move };
+        if (move.finished) {
+          const follow = this.moveFollows.get(move.agentID);
+          this.moveFollows.delete(move.agentID);
+          if (there) follow?.();
+        }
+        return true;
+      }
       case "clone/changed": {
         // Every window hears it: a clone belongs to the host, not to whoever asked (027).
         const { clone, finished } = params as CloneNotification;
@@ -1942,6 +1961,11 @@ export class Store extends Work {
     }
     const clones = await this.link.call("folders/clones", {}, host).catch(failed("folders/clones"));
     if (clones) this.clones.value = { ...this.clones.value, [host]: clones };
+    if (this.has(host, Capability.sessionsMoving1)) {
+      void this.link.call("agents/moves", {}, host).then((moving) => {
+        if (moving.length > 0) this.moves.value = { ...this.moves.value, ...Object.fromEntries(moving.map((m) => [m.agentID, m])) };
+      }).catch(failed("agents/moves"));
+    }
     void this.loadRuntimes(host);
     void this.link.call("pins/list", {}, host).then((listed) => {
       const held = Object.fromEntries(Object.entries(this.pins.value).filter(([key]) => !key.startsWith(`${host}|`)));
@@ -3495,13 +3519,26 @@ export class Store extends Work {
 
   /**
    * Move to Machine… (#3790): `agentID` goes on on `machine`, in `folder` there, or the folder of
-   * its project there when `folder` is empty. Answers once that machine has it; throws why not.
+   * its project there when `folder` is empty. Answers once its host has checked the move (#4641),
+   * and `move/changed` says how it goes; `arrived` runs once that machine has it. Throws why not.
    */
-  async moveToMachine(host: string, agentID: string, machine: string, folder: string): Promise<MoveToMachineAnswer> {
+  async moveToMachine(host: string, agentID: string, machine: string, folder: string,
+    arrived: (answer: MoveToMachineAnswer) => void): Promise<MoveToMachineAnswer> {
     const there = folder.trim();
     const machineName = this.hosts.value.find((h) => h.id === machine)?.name;
-    return await this.link.call("agents/moveToMachine",
+    const answer = await this.link.call("agents/moveToMachine",
       { agentID: agentID as never, machine, ...(machineName ? { machineName } : {}), ...(there ? { folder: there } : {}) }, host);
+    // A host from before #4641 answers once that machine has it, and says nothing more.
+    if (!this.has(host, Capability.sessionsMoving1)) arrived(answer);
+    else this.moveFollows.set(agentID, () => arrived(answer));
+    return answer;
+  }
+
+  /** Takes a move that stopped off its session's row: once the session is opened (#4641). */
+  putAwayMove(agentID: string): void {
+    if (!this.moves.value[agentID]?.finished) return;
+    const { [agentID]: _, ...rest } = this.moves.value;
+    this.moves.value = rest;
   }
 
   /**
