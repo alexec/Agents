@@ -1,0 +1,27 @@
+/* The MCP Apps variables the connectors' pages read (#4607), each one a design token from
+   tokens.css, which scripts/design.sh gen makes. Change a colour, a radius or a size in
+   design/tokens.json, never here. The host's variables, when it sends them, replace these:
+   Go/internal/agentsd/views.go (viewThemeVariables) gives the same values. */
+
+:root {
+  --color-background-primary: var(--paper-ground);
+  --color-background-secondary: var(--paper-raised);
+  --color-background-tertiary: var(--paper-well);
+  --color-background-info: color-mix(in srgb, var(--accent) 14%, var(--paper-ground));
+  --color-background-danger: color-mix(in srgb, var(--tint-failure) 14%, var(--paper-ground));
+  --color-background-success: color-mix(in srgb, var(--tint-vouched) 14%, var(--paper-ground));
+  --color-background-warning: color-mix(in srgb, var(--tint-attention) 14%, var(--paper-ground));
+  --color-text-primary: var(--paper-ink);
+  --color-text-secondary: color-mix(in srgb, var(--paper-ink) 66%, transparent);
+  --color-text-info: var(--accent);
+  --color-text-danger: var(--tint-failure);
+  --color-text-success: var(--tint-vouched);
+  --color-text-warning: var(--tint-attention);
+  --color-border-primary: var(--paper-rule);
+  --color-border-info: var(--accent);
+  --font-sans: var(--font-text);
+  --border-radius-sm: var(--radius-control);
+  --border-radius-full: 9999px;
+  --font-text-sm-size: var(--type-fine);
+  --font-text-md-size: var(--type-supporting);
+}

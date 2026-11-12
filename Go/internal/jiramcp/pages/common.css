@@ -1,13 +1,4 @@
-:root { color-scheme: light dark;
-  --color-background-primary: light-dark(#fff, #111); --color-background-secondary: light-dark(#f7f7f7, #1a1a1a);
-  --color-text-primary: light-dark(#111, #eee); --color-text-secondary: light-dark(#555, #aaa);
-  --color-border-primary: light-dark(#ddd, #333); --color-text-info: light-dark(#33c, #99f);
-  --color-text-danger: light-dark(#b00, #f77); --color-text-success: light-dark(#070, #7c7);
-  --color-text-warning: light-dark(#8a5a00, #e8b04a); --color-background-warning: light-dark(#fdf3e1, #3a2a10);
-  --color-background-danger: light-dark(#fdecec, #3a1414); --color-background-success: light-dark(#e9f6e9, #12301a);
-  --color-background-info: light-dark(#ececfd, #1c1c3a); --color-background-tertiary: light-dark(#f2f2f2, #222);
-  --font-sans: system-ui, sans-serif; --font-mono: ui-monospace, monospace;
-  --border-radius-sm: 6px; --border-radius-full: 999px; --font-text-sm-size: 12px; --font-text-md-size: 14px; }
+/* The variables come from Go/internal/forgepages (#4607): no colour of its own here. */
 html, body { margin: 0; background: transparent; }
 body { font: var(--font-text-md-size)/1.45 var(--font-sans); color: var(--color-text-primary); }
 main { padding: 12px 14px; display: grid; gap: 8px; }
