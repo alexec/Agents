@@ -19,6 +19,9 @@ public enum AttentionLink: Hashable, Sendable {
     /// One need, by its token, for a row a push drew without naming its session (#1046).
     case need(String)
 
+    /// New session, with what the share sheet left in `SharedInbox` (#4915).
+    case start
+
     /// The scheme, registered by the Remote's `Info.plist`.
     public static let scheme = "agents"
 
@@ -26,6 +29,8 @@ public enum AttentionLink: Hashable, Sendable {
         switch self {
         case .attention:
             return URL(string: "\(Self.scheme)://attention") ?? URL(string: "about:blank")!
+        case .start:
+            return URL(string: "\(Self.scheme)://start") ?? URL(string: "about:blank")!
         case .agent(let id):
             return URL(string: "\(Self.scheme)://agent/\(id.uuidString)") ?? URL(string: "about:blank")!
         case .need(let token):
@@ -46,6 +51,8 @@ public enum AttentionLink: Hashable, Sendable {
         switch url.host?.lowercased() {
         case "attention":
             return .attention
+        case "start":
+            return .start
         case "agent":
             guard url.pathComponents.count == 2, let id = UUID(uuidString: url.pathComponents[1]) else { return nil }
             return .agent(id)

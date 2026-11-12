@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- #4915: Share ▸ Agents leaves what was shared in the Remote's own app group, for New
+	     session to take. Nothing else: the extension holds no key and reaches no Mac. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.alexecollins.agents</string>
+	</array>
+</dict>
+</plist>

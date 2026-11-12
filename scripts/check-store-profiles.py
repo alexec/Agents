@@ -5,7 +5,7 @@
     scripts/check-store-profiles.py --selftest   the table below matches project.yml (lint)
 
 SECRET is the `release` environment's secret that holds the profile (PROFILE_REMOTE,
-PROFILE_REMOTE_NOTIFY or PROFILE_REMOTE_WIDGET); the path is the profile as
+PROFILE_REMOTE_NOTIFY, PROFILE_REMOTE_WIDGET or PROFILE_REMOTE_SHARE); the path is the profile as
 installed (the testflight job decodes each secret to one). The target's .entitlements file is
 the one its Release configuration signs with in project.yml. A profile made before an
 entitlement was added (v0.12.1: Sign in with Apple, #2507) fails here, naming the entitlement
@@ -23,12 +23,14 @@ ENTITLEMENTS = {
     "PROFILE_REMOTE": "Remote/Remote-AppStore.entitlements",
     "PROFILE_REMOTE_NOTIFY": "RemoteNotify/RemoteNotify.entitlements",
     "PROFILE_REMOTE_WIDGET": "RemoteWidget/RemoteWidget.entitlements",
+    "PROFILE_REMOTE_SHARE": "RemoteShare/RemoteShare.entitlements",
 }
 # The profile each secret holds, as scripts/release-secrets.sh --store finds it by name.
 PROFILES = {
     "PROFILE_REMOTE": "Agents Remote App Store",
     "PROFILE_REMOTE_NOTIFY": "Agents Remote Notify App Store",
     "PROFILE_REMOTE_WIDGET": "Agents Remote Widget App Store",
+    "PROFILE_REMOTE_SHARE": "Agents Remote Share App Store",
 }
 GROUPS = "com.apple.security.application-groups"
 

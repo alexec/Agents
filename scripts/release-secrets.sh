@@ -12,7 +12,7 @@
 #   scripts/release-secrets.sh --store path/to/Distribution.p12
 #
 # The TestFlight upload's secrets (#914), into the same environment: the Apple Distribution
-# identity, exported from Keychain Access as a .p12, and the Remote's three installed App Store
+# identity, exported from Keychain Access as a .p12, and the Remote's four installed App Store
 # profiles, found by name. The Mac is not in the App Store (#4229). Run
 # the plain form first: it makes the environment and sets the App Store Connect key both use.
 #
@@ -56,6 +56,7 @@ if [[ ${1:-} == --store ]]; then
         PROFILE_REMOTE "Agents Remote App Store"
         PROFILE_REMOTE_NOTIFY "Agents Remote Notify App Store"
         PROFILE_REMOTE_WIDGET "Agents Remote Widget App Store"
+        PROFILE_REMOTE_SHARE "Agents Remote Share App Store"
     )
     typeset -A found
     for secret name in ${(kv)wanted}; do

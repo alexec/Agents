@@ -58,9 +58,12 @@ struct StartAgentView: View {
             }
             // After the kept draft, so a view's prompt is what the field holds (#834).
             takeOffer()
+            takeShared()
             focused = true
         }
         .onChange(of: model.offeredStart) { takeOffer() }
+        // Share ▸ Agents while this page is already on screen (#4915).
+        .onChange(of: model.sharedArrivals) { takeShared() }
         // Voice mode turned on in a chat (another window on an iPad): one listener (#2445).
         .onChange(of: VoiceMode.shared.isOn) { _, isOn in
             if isOn { dictation.stop() }
@@ -259,6 +262,16 @@ struct StartAgentView: View {
         text = start.prompt
         // Held to what a session takes, as a label typed here is.
         draftLabels += SessionLabelPolicy.accepted(start.labels, existing: draftLabels)
+        focused = true
+    }
+
+    /// What another app shared (#4915): its words after what is typed, its pictures and
+    /// files after what is attached, and what the paperclip would refuse said in its words.
+    private func takeShared() {
+        guard let shared = model.takeShared(in: key) else { return }
+        text = shared.text(after: text)
+        attachments += shared.attachments
+        if let note = shared.note { attachNote = note }
         focused = true
     }
 

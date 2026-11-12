@@ -70,9 +70,9 @@ You set this up once, as the Apple Developer account's Account Holder.
    | `ASC_KEY_ID`, `ASC_ISSUER_ID` | that key's ID and its issuer ID |
 
 3. **The TestFlight secrets.** Only the Remote is in the App Store (#4229). Export **Apple
-   Distribution: …** from Keychain Access as a `.p12` file. Install the three App Store
-   profiles: **Agents Remote App Store**, **Agents Remote Notify App Store** and **Agents
-   Remote Widget App Store**. Then run `scripts/release-secrets.sh --store Distribution.p12`
+   Distribution: …** from Keychain Access as a `.p12` file. Install the four App Store
+   profiles: **Agents Remote App Store**, **Agents Remote Notify App Store**, **Agents
+   Remote Widget App Store** and **Agents Remote Share App Store** (#4915). Then run `scripts/release-secrets.sh --store Distribution.p12`
    and delete the `.p12` file. It sets:
 
    | Secret | Value |
@@ -81,11 +81,12 @@ You set this up once, as the Apple Developer account's Account Holder.
    | `PROFILE_REMOTE` | `base64` of "Agents Remote App Store" |
    | `PROFILE_REMOTE_NOTIFY` | `base64` of "Agents Remote Notify App Store" |
    | `PROFILE_REMOTE_WIDGET` | `base64` of "Agents Remote Widget App Store" |
+   | `PROFILE_REMOTE_SHARE` | `base64` of "Agents Remote Share App Store" |
 
    Without these secrets the GitHub release still goes out, and the `testflight` job fails
    at its first step, naming the secrets that are missing.
 
-   Before it archives, the job runs `scripts/check-store-profiles.py` on the three decoded
+   Before it archives, the job runs `scripts/check-store-profiles.py` on the four decoded
    profiles (#2781). Each must allow every entitlement in the `.entitlements` file its target
    signs with in Release. The check names a missing entitlement and the secret, never a
    secret's value. `release-secrets.sh --store` runs the same check on the installed profiles
