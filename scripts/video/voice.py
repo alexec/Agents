@@ -1,25 +1,78 @@
-"""The narration: Chatterbox's default voice, two takes a line, each checked by Whisper (#1078).
+"""The narration: Kokoro's built-in voice Heart, said from a directed script (#1078, #4964).
 
-The takes are exaggeration 0.65 and 0.85 (cfg 0.35 and 0.3), as Alex chose. A take is kept
-only when Whisper hears the script's words in it (at most one word in ten wrong), starting and
-ending on the script's own first and last words, so a swallowed word at either end fails it. A marketing
-scene prefers the livelier take and a usage scene the calmer one, when both pass. A line with
-no good take is tried again with new seeds, and the scene stops if none passes.
+A scene's line is plain words, or a directed line: a small part of W3C SSML,
 
-Takes are kept in the cache by their text and settings, so a line said once is not said again.
+    <speak style="calm">Say what you want done.<break time="500ms"/>
+      <prosody rate="92%">Here: fix the Celsius conversion,</prosody></speak>
+
+- `<break time="…ms"/>`: a pause of that length.
+- `<prosody rate="…%">`: slower or faster than the voice's own pace.
+- `<emphasis>`: a stressed word. Kokoro cannot stress a word: it says it as written.
+- `style` on `<speak>` (not SSML): the tone, `calm`, `warm` or `bright`. Kokoro has no tone,
+  so a tone is only a pace (`STYLES`); the mark stays in the script for the next voice.
+
+Each phrase between pauses is said on its own by Kokoro (Apache-2.0, through mlx-audio), the
+pauses are silence, and the line is one file. Whisper (`mlx-whisper`) hears each line, which
+must say its words (at most one in ten wrong), starting and ending on its first and last
+words. Alex chose the voice Heart (2026-11-12, #4964). Each phrase is kept in the cache by its
+text, voice and pace, so a phrase said once is not said again.
 """
 import hashlib
+import html
 import json
 import re
 import subprocess
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
-TAKES = [(0.65, 0.35), (0.85, 0.3)]
-TRIES = 4
+VOICE = "af_heart"
+MODEL = "prince-canuma/Kokoro-82M"
+SR = 24000
+PACE = 0.95  # Heart's own pace is quick for a tutorial
+STYLES = {"calm": 1.0, "warm": 1.0, "bright": 1.04}
 MOST_WRONG = 0.1
 WHISPER = "mlx-community/whisper-small.en-mlx"
 
 _model = None
+
+
+def directed(line):
+    """The line as SSML: a plain line is one phrase."""
+    line = line.strip()
+    return line if line.startswith("<speak") else f"<speak>{html.escape(line, quote=False)}</speak>"
+
+
+def pieces(line):
+    """The line's phrases and pauses, in order: ("say", text, rate) and ("pause", seconds)."""
+    root = ET.fromstring(directed(line))
+    out = []
+
+    def walk(el, rate):
+        if el.tag == "prosody":
+            rate *= float(el.get("rate", "100%").rstrip("%")) / 100
+        if el.tag == "break":
+            out.append(("pause", float(re.sub(r"[^0-9.]", "", el.get("time", "300ms"))) / 1000))
+        elif el.text and el.text.strip():
+            out.append(("say", el.text, rate))
+        for child in el:
+            walk(child, rate)
+            if child.tail and child.tail.strip():
+                out.append(("say", child.tail, rate))
+
+    walk(root, STYLES.get(root.get("style", "calm"), 1.0))
+    merged = []  # text either side of an <emphasis> is one phrase
+    for piece in out:
+        if piece[0] == "say" and merged and merged[-1][0] == "say" and merged[-1][2] == piece[2]:
+            merged[-1] = ("say", merged[-1][1] + " " + piece[1], piece[2])
+        else:
+            merged.append(piece)
+    return [("say", re.sub(r"\s+([.,:;!?])", r"\1", " ".join(p[1].split())), p[2]) if p[0] == "say" else p
+            for p in merged]
+
+
+def plain(line):
+    """The words of a line, for the captions, Whisper and the video's description."""
+    return " ".join(p[1] for p in pieces(line) if p[0] == "say")
 
 
 def words(text):
@@ -67,21 +120,23 @@ def duration(path):
     return float(out.strip())
 
 
-def generate(text, path, exaggeration, cfg, seed):
+def generate(text, path, rate):
+    """One phrase in the voice, at PACE × rate, with the silence off both ends."""
     global _model
-    import torch
-    import torchaudio
-    from chatterbox.tts import ChatterboxTTS
+    import numpy as np
+    import soundfile
     if _model is None:
-        _model = ChatterboxTTS.from_pretrained(device="mps" if torch.backends.mps.is_available() else "cpu")
-    torch.manual_seed(seed)
-    wav = _model.generate(text, exaggeration=exaggeration, cfg_weight=cfg, temperature=0.8)
-    raw = path.with_suffix(".raw.wav")
-    torchaudio.save(str(raw), wav, _model.sr)
-    # Silence off both ends, so a line starts on its marker.
-    trim = "silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse"
-    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(raw), "-af", trim, str(path)], check=True)
-    raw.unlink()
+        from mlx_audio.tts.utils import load_model
+        _model = load_model(MODEL)
+    audio = np.concatenate([np.array(r.audio) for r in _model.generate(
+        text=text, voice=VOICE, speed=PACE * rate, lang_code=VOICE[0])])
+    loud = np.nonzero(np.abs(audio) > 0.01)[0]
+    soundfile.write(str(path), audio[loud[0]:loud[-1] + 1] if len(loud) else audio, SR)
+
+
+def silence(seconds, path):
+    subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i", f"anullsrc=r={SR}:cl=mono",
+                    "-t", f"{seconds:.3f}", str(path)], check=True)
 
 
 def hear(path):
@@ -90,33 +145,52 @@ def hear(path):
 
 
 def speak(scene, cache):
-    """Returns {key: {"path", "duration", "text", "heard", "wrong"}} for every line of the scene."""
+    """Returns {key: {"path", "duration", "text", "heard", "wrong"}} for every line of the scene;
+    "text" is the line's words, without its directions."""
     cache.mkdir(parents=True, exist_ok=True)
-    lively = getattr(scene, "GROUP", "usage") == "marketing"
     chosen = {}
-    for key, text in scene.LINES.items():
-        passed = []
-        for attempt in range(TRIES):
-            for n, (exaggeration, cfg) in enumerate(TAKES):
-                seed = 1 + n + 2 * attempt
-                tag = hashlib.sha1(f"{text}|{exaggeration}|{cfg}|{seed}".encode()).hexdigest()[:16]
-                path = cache / f"{tag}.wav"
-                check = cache / f"{tag}.json"
-                if not path.exists():
-                    generate(text, path, exaggeration, cfg, seed)
-                if not check.exists():
-                    heard = hear(path)
-                    check.write_text(json.dumps({"heard": heard, "wrong": wrong(text, heard)}))
-                result = json.loads(check.read_text())
-                take = {"path": str(path), "duration": duration(path), "text": text,
-                        "exaggeration": exaggeration, **result}
-                print(f"  {key} take {n + 1} (exaggeration {exaggeration}): {result['wrong']:.0%} wrong: {result['heard']}", flush=True)
-                if good(text, result["heard"]):
-                    passed.append(take)
-            if passed:
-                break
-        if not passed:
-            raise RuntimeError(f"no take of {key!r} says its script: {text}")
-        passed.sort(key=lambda t: -t["exaggeration"] if lively else t["exaggeration"])
-        chosen[key] = passed[0]
+    for key, line in scene.LINES.items():
+        tag = hashlib.sha1(f"{line}|{VOICE}|{PACE}".encode()).hexdigest()[:16]
+        path, check = cache / f"line-{tag}.wav", cache / f"line-{tag}.json"
+        text = plain(line)
+        if not path.exists():
+            parts = []
+            for n, piece in enumerate(pieces(line)):
+                if piece[0] == "pause":
+                    part = cache / f"pause-{piece[1]:.3f}.wav"
+                    if not part.exists():
+                        silence(piece[1], part)
+                else:
+                    said = hashlib.sha1(f"{piece[1]}|{VOICE}|{PACE * piece[2]:.4f}".encode()).hexdigest()[:16]
+                    part = cache / f"said-{said}.wav"
+                    if not part.exists():
+                        generate(piece[1], part, piece[2])
+                parts.append(part)
+            listing = cache / f"line-{tag}.txt"
+            listing.write_text("".join(f"file '{p}'\n" for p in parts))
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
+                            "-ar", str(SR), "-ac", "1", str(path)], check=True)
+            listing.unlink()
+        if not check.exists():
+            heard = hear(path)
+            check.write_text(json.dumps({"heard": heard, "wrong": wrong(text, heard)}))
+        result = json.loads(check.read_text())
+        print(f"  {key}: {result['wrong']:.0%} wrong: {result['heard']}", flush=True)
+        if not good(text, result["heard"]):
+            raise RuntimeError(f"the line {key!r} does not say its script (Whisper heard {result['heard']!r}): {text}")
+        chosen[key] = {"path": str(path), "duration": duration(path), "text": text, **result}
     return chosen
+
+
+def self_test():
+    line = ('<speak style="calm">Say it.<break time="500ms"/><prosody rate="90%">Click '
+            '<emphasis>New Session</emphasis>.</prosody></speak>')
+    assert pieces(line) == [("say", "Say it.", 1.0), ("pause", 0.5), ("say", "Click New Session.", 0.9)], pieces(line)
+    assert plain(line) == "Say it. Click New Session.", plain(line)
+    assert pieces("Fix it & run the tests.") == [("say", "Fix it & run the tests.", 1.0)]
+    assert pieces('<speak style="bright">Go.</speak>') == [("say", "Go.", STYLES["bright"])]
+    print("voice self-test passed")
+
+
+if __name__ == "__main__":
+    self_test()

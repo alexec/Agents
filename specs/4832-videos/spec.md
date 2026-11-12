@@ -66,7 +66,7 @@ work together and on their own), every claim is checked against
 `docs/reference/feature-matrix.md` before it is said, scratch data only, the person on camera
 is "Sam".
 
-- **Marketing:** short, a story, the livelier voice take. Made again when the UI changes
+- **Marketing:** short, a story, a livelier pace (`style="bright"`). Made again when the UI changes
   enough to matter. Pages: www.agentloops.dev, *Why Agents*, the channel, posts.
 - **Usage:** one task each, calm voice, the exact names on the screen. Made again on every
   release (an old UI in a usage video is wrong). Page: the docs page of the same name.
@@ -132,7 +132,8 @@ down what broke. It is not the final U1: it may be made again.
 
 Layout `mac`. Scratch app on `/tmp/run-vid-u1`, person "Sam", folder `weather` (the
 tutorial's Fahrenheit bug), runtime Claude. About 60 s after the cuts. Each line starts at
-its marker; `fast` spans are cut to the time given.
+its marker; `fast` spans are cut to the time given. The words below are what is said; the
+directions (pauses, pace, tone) are in `scripts/video/scenes/u1.py` (#4964).
 
 | # | Marker | What is shown | What is said | Time |
 |---|---|---|---|---|
@@ -242,8 +243,24 @@ anyway. Alex can overrule.
   upload is about 1,600, a caption 400, a playlist call 50).
 - *Alex's watch (2026-11-12):* "Great start! The cadence of the audio is off." Alex wants
   the narration written as a script for the voice, as for film or TV, with directions for
-  pauses and tone (#4964, a spike: the A/V script and SSML-style marks, carried out with
-  Chatterbox), and a title card on each video as well as a closing card (#4965).
+  pauses and tone (#4964), and a title card on each video as well as a closing card (#4965).
+
+**After Alex's watch: the voice and the cards (#4964, #4965, 2026-11-12).**
+
+- *The cadence:* the take spoke at 177 words a minute (about 150 is calm), with no pause in
+  a line and 0.06–0.4 s between lines. The fix is a directed script: a small part of SSML
+  (`<break>`, `<prosody rate>`, `<emphasis>`, and a tone), the form of the two-column A/V
+  script, with the words in the spec and the directions in the scene. Chatterbox reads no
+  markup (Turbo reads only sounds such as `[laugh]`), so `voice.py` carries out the marks:
+  each phrase said on its own, silence for a pause, and 0.9 s after each line.
+- *The voice:* Alex heard nine samples of the same script (Chatterbox with and without the
+  directions, Apple's Ava and Zoe reading SSML, and five of Kokoro's built-in voices) and
+  chose Kokoro's **Heart**, a built-in voice: no sample of a person's voice, no actor.
+  Kokoro has no tone or stress, so those marks change only the pace. Kokoro's own package
+  was last released in April 2025, so it runs through `mlx-audio` (MIT, 2026-11-09).
+- *The cards:* a title card (the logo, the title, "Loops · How to") fades into the window,
+  and the end card has the same look and names the docs page (#4965, PR #4973).
+- *Time:* about 2 h of the lane, most of it the samples; about 10 min of Alex's listening.
 - *What the next video needs:* nothing more for a private upload. `make.sh <id> --upload`
   is one step now. A public video still waits on open question 2 (the API audit) and on
   Alex's watch of this one.
