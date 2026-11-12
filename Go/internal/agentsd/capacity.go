@@ -151,6 +151,10 @@ func (d *Daemon) checkCapacity(ctx context.Context) {
 	d.capLevel, d.capLastBelow, d.capBelow = level, lastBelow, below
 	d.capSample, d.capSampled = s, true
 	d.capMu.Unlock()
+	// While the machine is ok, each look lets the helper queues move (#4580).
+	if level == wire.CapacityLevelOk {
+		d.goAfterTurn("helper queue", d.startQueuesAfterLook)
+	}
 	if level == was {
 		return
 	}
@@ -227,4 +231,26 @@ func (d *Daemon) watchCapacity() {
 			}
 		}
 	})
+}
+
+// capacityHold is why the machine holds an agent's helper start now, or "" while it is ok
+// (#4580): "this Mac is near capacity (load 2.4 per core)". A look under the line that has
+// not brought the level down yet still holds it.
+func (d *Daemon) capacityHold() string {
+	d.capMu.Lock()
+	level, s := d.capLevel, d.capSample
+	d.capMu.Unlock()
+	if capacityRank[level] == 0 {
+		return ""
+	}
+	words := "near capacity"
+	if level == wire.CapacityLevelFull {
+		words = "at capacity"
+	}
+	_, signal := capacityTarget(s)
+	what := signalWords(signal, s)
+	if signal == "" {
+		what += ", coming down"
+	}
+	return thisMachine() + " is " + words + " (" + what + ")"
 }
