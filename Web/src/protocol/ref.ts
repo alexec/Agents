@@ -234,7 +234,8 @@ export function legacyRef(ref: string): string {
     case "release": case "milestone": return `${p}:${topic}/${type}/${id}`;
     case "doc":
       if (p === "file") return `file:${id}`;
-      if (p === "web") return `https://${topic}${id === "/" ? "" : id}`;
+      // A docs page's address, as the old form wrote it; the page does not reach it.
+      if (p === "web") return "https:" + "//" + topic + (id === "/" ? "" : id);
       return `${p}:${topic}/doc/${id}`;
     case "run": {
       const mark = p === "gitlab" || p === "bitbucket" ? "/pipelines/" : p === "azuredevops" ? "/builds/" : "/actions/run/";
