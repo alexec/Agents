@@ -7,8 +7,8 @@ import SwiftUI
 // the person reads or types into: a note keeps its line, a banner moves the pane only when its
 // condition starts or ends, and a toast floats.
 //
-// The tint is on the icon only. The words are `ink`, on the `well` (a banner) or `raised`
-// (a toast); a message never fills its ground with a tint.
+// The tint is on the icon, a banner's 3px bar and its line (Paper v2, #4977). The words are
+// `ink`, on `raised` paper; a message never fills its ground with a tint.
 
 extension MessageTone {
     /// The state tint of the icon. Neutral has none.
@@ -18,6 +18,16 @@ extension MessageTone {
         case .attention: .attention
         case .failure: .failure
         case .success: .vouched
+        }
+    }
+
+    /// A banner's line round it: the tone's pale line, or the rule for neutral.
+    var line: Color {
+        switch self {
+        case .neutral: Paper.rule
+        case .attention: Paper.lineAttention
+        case .failure: Paper.lineFailure
+        case .success: Paper.lineVouched
         }
     }
 }
@@ -30,7 +40,7 @@ struct MessageIcon: View {
 
     var body: some View {
         Image(systemName: symbol ?? tone.symbol)
-            .foregroundStyle(tone.tint.style(or: .secondary))
+            .foregroundStyle(tone.tint.style(or: Paper.secondary))
             .accessibilityHidden(true)
     }
 }
@@ -80,7 +90,15 @@ struct PaneBanner<Words: View, Actions: View>: View {
         .buttonStyle(.paper)
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
-        .paperWell(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
+        .padding(.leading, tone.tint.color == nil ? 0 : 3)
+        .background(Paper.raised, in: RoundedRectangle(cornerRadius: Paper.Radius.card))
+        .overlay(alignment: .leading) {
+            // The tone's 3px bar, inset from the corners as the sheet draws it.
+            if let bar = tone.tint.color {
+                RoundedRectangle(cornerRadius: 1.5).fill(bar).frame(width: 3).padding(.vertical, 8).padding(.leading, 6)
+            }
+        }
+        .overlay(RoundedRectangle(cornerRadius: Paper.Radius.card).strokeBorder(tone.line, lineWidth: 1))
         .accessibilityElement(children: .contain)
         .onAppear { AccessibilityNotification.Announcement(announcement).post() }
         .transition(.move(edge: .top).combined(with: .opacity))
@@ -126,7 +144,7 @@ struct PaneBannerWords: View {
     var body: some View {
         Text(line)
         if let detail, !detail.isEmpty {
-            Text(detail).appText(.fine).foregroundStyle(.secondary)
+            Text(detail).appText(.fine).foregroundStyle(Paper.secondary)
         }
     }
 }

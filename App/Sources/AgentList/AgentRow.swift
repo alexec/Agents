@@ -130,7 +130,7 @@ struct AgentRow: View {
                         if let place {
                             Text(place)
                                 .appText(.fine)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(Paper.tertiary)
                                 .lineLimit(1)
                         }
                     }
@@ -140,7 +140,7 @@ struct AgentRow: View {
                     if let progress = model.leadProgress[agent.id] {
                         Text("· \(progress)")
                             .appText(isCompact ? .supporting : .reading)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .lineLimit(1)
                             .fixedSize()
                             .accessibilityLabel(LeadProgress.spoken(progress))
@@ -210,12 +210,12 @@ struct AgentRow: View {
                     // has said nothing yet, and starts by itself when a place frees.
                     Text(queued)
                         .appText(isCompact ? .fine : .supporting)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .help("Starts by itself when this folder has a place free for another helper")
                 } else if let reason = needsYouLine {
                     Text(reason)
                         .appText(isCompact ? .fine : .supporting)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .lineLimit(isCompact ? 1 : 2)
                         .fixedSize(horizontal: false, vertical: true)
                 } else if agent.missingFolder != nil, agent.state != .archived {
@@ -223,7 +223,7 @@ struct AgentRow: View {
                     // row says it, in the report's place.
                     Text(MissingFolderWords.label)
                         .appText(isCompact ? .fine : .supporting)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .help(agent.folderGoneMessage)
                 } else if isCompact, let said = model.work.saidLines[agent.id] {
                     // While the sidebar searches: the line it said that matches, in the
@@ -231,7 +231,7 @@ struct AgentRow: View {
                     // The page's row has it on a line of its own, below.
                     Text(said)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .lineLimit(1)
                         .help(said)
                 } else if let report = FileToSeeWords.reportLine(agent) {
@@ -239,7 +239,7 @@ struct AgentRow: View {
                     // file to see is named here first (#1873).
                     Text(report)
                         .appText(isCompact ? .fine : .supporting)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .lineLimit(isCompact ? 1 : 2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -274,7 +274,7 @@ struct AgentRow: View {
                     if let running = BackgroundWords.mark(agent.background) {
                         Label(running, systemImage: "apple.terminal")
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .lineLimit(1)
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel(running)
@@ -287,7 +287,7 @@ struct AgentRow: View {
                     if let wait = model.work.waitMark(of: agent) {
                         Text(wait.line)
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .lineLimit(1)
                             .help(wait.detail)
                     }
@@ -295,7 +295,7 @@ struct AgentRow: View {
                     if let said = model.work.saidLines[agent.id] {
                         Text(said)
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .lineLimit(1)
                             .help(said)
                     }
@@ -305,7 +305,7 @@ struct AgentRow: View {
                         HStack(spacing: 6) {
                             Label(line, systemImage: ArchiveRequestWords.symbol)
                                 .appText(.fine)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Paper.secondary)
                             Button(ArchiveRequestWords.archive) {
                                 Task { await model.archive(agent.id, andLeave: true) }
                             }
@@ -465,7 +465,7 @@ private struct FoldCount: View {
                     .rotationEffect(.degrees(isUnfolded ? 90 : 0))
             }
             .appText(.fine)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Paper.secondary)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -661,7 +661,7 @@ struct WorktreeBadge: View {
                 .strikethrough(isGone)
         }
         .appText(.fine)
-        .foregroundStyle(.tertiary)
+        .foregroundStyle(Paper.tertiary)
         .help(help)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(isGone ? "in worktree \(worktree.name), which is gone" : "in worktree \(worktree.name)")

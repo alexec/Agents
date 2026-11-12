@@ -75,11 +75,11 @@ struct PermissionView: View {
                 // Who is asking, by title and runtime (#121) — its subagent, when it is
                 // one (057). Still the agent's question to answer, so it is asked here.
                 if let asker = model.work.askerLine(request.agentID, subagent: request.subagent) {
-                    Text(asker).appText(.fine).foregroundStyle(.secondary)
+                    Text(asker).appText(.fine).foregroundStyle(Paper.secondary)
                 }
                 Text(request.toolCall.title).appText(.reading).fontWeight(.semibold)
                 if let kind = request.toolCall.kind, !request.toolCall.isPlanApproval {
-                    Text(kind).appText(.fine).foregroundStyle(.secondary)
+                    Text(kind).appText(.fine).foregroundStyle(Paper.secondary)
                 }
                 plan
             }
@@ -99,7 +99,7 @@ struct PermissionView: View {
         if let file = request.toolCall.planFile {
             HStack(spacing: 8) {
                 Text("The plan is open beside this conversation.")
-                    .appText(.fine).foregroundStyle(.secondary)
+                    .appText(.fine).foregroundStyle(Paper.secondary)
                 Button("Show plan") { show(file) }
                     .buttonStyle(.paper)
             }

@@ -1,4 +1,5 @@
 import AgentsKitCore
+import AppKit
 import SwiftUI
 
 /// The window's one sidebar (#145): Status, Machines and Usage at the top, then every folder, each a row
@@ -368,6 +369,7 @@ struct FolderListView: View {
             outlineRebuilds &+= 1
         }
         .listStyle(.sidebar)
+        .background(SidebarHighlightOff())
         .focused($listFocused)
         .environment(\.sidebarPicks, SidebarPicks(items: picked, listFocused: listFocused))
         // Rows as tall as their lines (#104). Small also makes the sidebar's own text
@@ -1444,22 +1446,71 @@ extension EnvironmentValues {
     @Entry var sidebarPicks = SidebarPicks()
 }
 
-/// A picked row in the focused sidebar of the key window is filled with the accent, and
-/// macOS draws its text white: 2.2:1 on the dark cobalt. The ground is 7.7:1 there, and
-/// 5.6:1 on the light one, as on the prominent button (#156). The list tells no row it
-/// is drawn so (`backgroundProminence` stays standard in a macOS sidebar), so the row
-/// works it out from what is picked, the list's focus and the window's.
+/// A picked row is the selection grey with a 3px bar in the accent at its leading edge
+/// (Paper v2, #4977), drawn by the row itself: the system's accent fill under white text
+/// was 2.2:1 on the dark cobalt, and `SidebarHighlightOff` turns that fill off. The text
+/// stays ink, 13:1 or more on the selection in both appearances. The grey is the same
+/// whether or not the list has the keyboard, so a picked row reads alike in every window.
 private struct SidebarInk: ViewModifier {
     let item: SidebarItem
     @Environment(\.sidebarPicks) private var picks
-    @Environment(\.controlActiveState) private var windowState
 
     func body(content: Content) -> some View {
-        if picks.listFocused, windowState == .key, picks.items.contains(item) {
-            // The marks set their own colour, which wins over this one: they read it (#2382).
-            content.foregroundStyle(Paper.ground).environment(\.sidebarRowInked, true)
-        } else {
-            content
+        content.listRowBackground(Group {
+            if picks.items.contains(item) { PaperSelectionRow() }
+        })
+    }
+}
+
+/// The selection grey with the accent's bar, inset as the system's sidebar selection is.
+struct PaperSelectionRow: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: Paper.Radius.control)
+            .fill(Paper.selection)
+            .overlay(alignment: .leading) {
+                UnevenRoundedRectangle(topLeadingRadius: Paper.Radius.control,
+                                       bottomLeadingRadius: Paper.Radius.control)
+                    .fill(Paper.accent)
+                    .frame(width: 3)
+            }
+            .padding(.horizontal, 10)
+    }
+}
+
+/// Turns off the sidebar table's own selection fill, so the row's `PaperSelectionRow`
+/// shows. The table still keeps the selection, the keyboard and VoiceOver's "selected".
+struct SidebarHighlightOff: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { Finder() }
+    func updateNSView(_ view: NSView, context: Context) { (view as? Finder)?.apply() }
+
+    final class Finder: NSView {
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            apply()
+            // SwiftUI makes the table after this view on a first draw.
+            DispatchQueue.main.async { [weak self] in self?.apply() }
+        }
+
+        func apply() {
+            var node: NSView? = superview
+            while let current = node {
+                if let table = Self.table(under: current) {
+                    if table.selectionHighlightStyle != .none { table.selectionHighlightStyle = .none }
+                    return
+                }
+                node = current.superview
+            }
+        }
+
+        /// The nearest table under a view, breadth first.
+        private static func table(under view: NSView) -> NSTableView? {
+            var queue = view.subviews
+            while !queue.isEmpty {
+                let next = queue.removeFirst()
+                if let table = next as? NSTableView { return table }
+                queue += next.subviews
+            }
+            return nil
         }
     }
 }

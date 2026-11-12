@@ -36,7 +36,7 @@ struct ElicitationView: View {
                 let asker = model.work.askerLine(request.agentID)
                 if asker != nil || needRequest != nil {
                     HStack(spacing: 8) {
-                        if let asker { Text(asker).appText(.fine).foregroundStyle(.secondary).lineLimit(1) }
+                        if let asker { Text(asker).appText(.fine).foregroundStyle(Paper.secondary).lineLimit(1) }
                         Spacer(minLength: 0)
                         if let needRequest { RequestCardLater(request: needRequest) }
                     }
@@ -76,7 +76,7 @@ struct ElicitationView: View {
                     switch request.mode {
                     case .form(let schema) where schema.singleChoice != nil:
                         if let description = schema.description {
-                            Text(description).appText(.supporting).foregroundStyle(.secondary)
+                            Text(description).appText(.supporting).foregroundStyle(Paper.secondary)
                         }
                         oneClick(schema)
 
@@ -143,7 +143,7 @@ struct ElicitationView: View {
         let last = pages.count - 1
         let page = min(max(step, 0), last)
         if let description = schema.description {
-            Text(description).appText(.supporting).foregroundStyle(.secondary)
+            Text(description).appText(.supporting).foregroundStyle(Paper.secondary)
         }
         // Every page is laid out, hidden, under the one that shows, so the card is as
         // tall as its tallest question whichever page is up. Answering the first
@@ -162,7 +162,7 @@ struct ElicitationView: View {
                 Text("\(page + 1)/\(pages.count)")
                     .appText(.fine)
                     .monospacedDigit()
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Paper.tertiary)
             }
             Spacer(minLength: 0)
             // On the last page this names whichever question is still unanswered,
@@ -170,7 +170,7 @@ struct ElicitationView: View {
             if page == last, let problem = schema.problems(with: values).first {
                 Text(problem)
                     .appText(.fine)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
                     .lineLimit(1)
             }
             // Saying no is an answer, and the paged form is the one shape that used
@@ -306,11 +306,11 @@ struct ElicitationView: View {
                     .appText(.reading)
                     .fontWeight(.medium)
                 if property.isRequired {
-                    Text("needed").appText(.fine).foregroundStyle(.tertiary)
+                    Text("needed").appText(.fine).foregroundStyle(Paper.tertiary)
                 }
             }
             if let description = property.description {
-                Text(description).appText(.supporting).foregroundStyle(.secondary)
+                Text(description).appText(.supporting).foregroundStyle(Paper.secondary)
             }
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -340,7 +340,7 @@ struct ElicitationView: View {
             if let description, !description.isEmpty {
                 Text(description)
                     .appText(.fine)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -440,7 +440,7 @@ struct ElicitationView: View {
             if let description, !description.isEmpty {
                 Text(description)
                     .appText(.fine)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             }
             if sending == key {
                 Telling(host: model.answerRecipient(request.agentID))
@@ -482,7 +482,7 @@ struct ElicitationView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 MarkdownText(markdown: property.title ?? property.name).appText(.reading)
-                if property.isRequired { Text("needed").appText(.fine).foregroundStyle(.tertiary) }
+                if property.isRequired { Text("needed").appText(.fine).foregroundStyle(Paper.tertiary) }
             }
             switch property.kind {
             case .string(_, _, _, let choices):
@@ -494,7 +494,7 @@ struct ElicitationView: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(choice.title)
                                 if let description = choice.description {
-                                    Text(description).appText(.supporting).foregroundStyle(.secondary)
+                                    Text(description).appText(.supporting).foregroundStyle(Paper.secondary)
                                 }
                             }
                             .tag(JSONValue.string(choice.value))
@@ -542,7 +542,7 @@ struct ElicitationView: View {
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(item.title)
                                 if let description = item.description {
-                                    Text(description).appText(.supporting).foregroundStyle(.secondary)
+                                    Text(description).appText(.supporting).foregroundStyle(Paper.secondary)
                                 }
                             }
                         }
@@ -550,7 +550,7 @@ struct ElicitationView: View {
                 }
             }
             if let description = property.description {
-                Text(description).appText(.supporting).foregroundStyle(.secondary)
+                Text(description).appText(.supporting).foregroundStyle(Paper.secondary)
             }
             // The field's note keeps its line (#4737); it waits for a value, as Submit does.
             FieldNote(text: values[property.name] == nil ? nil : property.problem(with: values[property.name]))
