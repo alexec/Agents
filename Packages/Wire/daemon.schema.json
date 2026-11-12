@@ -13138,6 +13138,10 @@
         "reverts": {
           "type": "string",
           "description": "The PR a merged revert reverts, by ref, from its body's \"Reverts owner/repo#n\" (#4552), for the recovery time."
+        },
+        "ci": {
+          "$ref": "#/definitions/LineagePRCI",
+          "description": "A PR's CI on its last head commit, from checks.passed and checks.failed (#4554), for CI time to green."
         }
       },
       "required": [
@@ -13204,7 +13208,7 @@
     },
     "LineageDelivery": {
       "type": "object",
-      "description": "A repo's delivery figures (#4552, epic #4551), from this machine's totals: the four DORA keys, DORA 2025's rework rate and flow efficiency, over the windowDays (28) before at, each with a weekly series. A week is 7 days back from at, not a calendar week. A figure says how many it is made from; one made from none has no value. band is where a value falls among DORA 2024's clusters, a reference from teams of people, not a grade; rework rate and flow efficiency have none.",
+      "description": "A repo's delivery figures (#4552, epic #4551), from this machine's totals: the four DORA keys, DORA 2025's rework rate and flow efficiency, and CI time to green and failed rounds (#4554), over the windowDays (28) before at, each with a weekly series. A week is 7 days back from at, not a calendar week. A figure says how many it is made from; one made from none has no value. band is where a value falls among DORA 2024's clusters, a reference from teams of people, not a grade; rework rate, flow efficiency and the CI figures have none.",
       "properties": {
         "since": {
           "$ref": "#/definitions/WireDate"
@@ -13238,6 +13242,14 @@
         "flowEfficiency": {
           "$ref": "#/definitions/LineageDeliveryFigure",
           "description": "The agents' working time on a closed issue and its PRs over its cycle time, at most 1, the median. Counted by its last merge."
+        },
+        "ciTimeToGreen": {
+          "$ref": "#/definitions/LineageDeliveryFigure",
+          "description": "CI time to green, in seconds (#4554): a merged PR's last push (the first run made on its last head commit) to the last of that commit's runs passing; the median, and p90. Counted by its merge. No band."
+        },
+        "failedRounds": {
+          "$ref": "#/definitions/LineageDeliveryFigure",
+          "description": "Failed CI rounds a merged PR, the mean (#4554): its checks.failed, once per run and attempt, 0 for none. count is the merged PRs. No band."
         }
       },
       "required": [
@@ -13249,13 +13261,15 @@
         "changeFailureRate",
         "recoveryTime",
         "reworkRate",
-        "flowEfficiency"
+        "flowEfficiency",
+        "ciTimeToGreen",
+        "failedRounds"
       ],
       "additionalProperties": false
     },
     "LineageDeliveryFigure": {
       "type": "object",
-      "description": "One delivery figure (#4552): value over the window, absent when made from none; p90 for lead time; count is what it is made from; weeks is the 4 weeks, oldest first; band is DORA 2024's.",
+      "description": "One delivery figure (#4552): value over the window, absent when made from none; p90 for lead time and CI time to green; count is what it is made from; weeks is the 4 weeks, oldest first; band is DORA 2024's.",
       "properties": {
         "value": {
           "type": "number"
@@ -14135,6 +14149,25 @@
         "linked",
         "unlinked",
         "uncounted"
+      ],
+      "additionalProperties": false
+    },
+    "LineagePRCI": {
+      "type": "object",
+      "description": "A PR's CI on its last head commit (#4554): headSha is that commit; pushedAt is when its first run was made, by the push (a rerun keeps it); greenAt is when the last of its runs that passed finished, absent until one passed. A new head commit starts it again.",
+      "properties": {
+        "headSha": {
+          "type": "string"
+        },
+        "pushedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "greenAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "headSha"
       ],
       "additionalProperties": false
     },

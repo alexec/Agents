@@ -2,6 +2,7 @@ package lineage
 
 import (
 	"math"
+	"strconv"
 	"testing"
 	"time"
 
@@ -171,5 +172,66 @@ func TestDeliveryBands(t *testing.T) {
 		if got := c.of(c.v); got != c.want {
 			t.Errorf("%v: got %s, want %s", c.v, got, c.want)
 		}
+	}
+}
+
+// #4554: CI time to green is each merged PR's last push to its last pass, the median and P90,
+// by merge; failed rounds is the mean of its failed CI runs, 0 for none.
+func TestDeliveryCITimeToGreen(t *testing.T) {
+	now := time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)
+	ago := func(days float64) *wire.Date {
+		d := wire.DateOf(now.Add(-time.Duration(days * float64(24*time.Hour))))
+		return &d
+	}
+	const repo = "github:repo:#alexec/agents"
+	minute := wire.Date(60)
+	merged := func(n int, at float64, green wire.Date, failed int64) wire.LineageCostNode {
+		r, o := repo, OutcomeMerged
+		c := wire.LineageCostNode{Node: wire.LineageNode{Kind: KindPR, Ref: "github:pr:alexec/agents#" + strconv.Itoa(n)}, Repo: &r,
+			Banked: blankCost(), Outcome: &o, EndedAt: ago(at)}
+		if green > 0 {
+			pushed := *ago(at) - green - minute
+			g := pushed + green
+			c.Ci = &wire.LineagePRCI{HeadSha: "abc", PushedAt: &pushed, GreenAt: &g}
+		}
+		if failed > 0 {
+			c.FailedChecks = &failed
+		}
+		return c
+	}
+	open := merged(9, 1, 5*minute, 3)
+	open.Outcome, open.EndedAt = nil, nil
+	never := merged(8, 2, 0, 0)
+	never.Ci = &wire.LineagePRCI{HeadSha: "def", PushedAt: ago(2)}
+	nodes := []wire.LineageCostNode{
+		merged(1, 20, 10*minute, 0),
+		merged(2, 10, 20*minute, 1),
+		merged(3, 3, 12*minute, 2),
+		merged(4, 2, 40*minute, 1),
+		// No pass kept: counts for failed rounds only.
+		never,
+		// Open: neither.
+		open,
+		// Before the window: neither.
+		merged(7, 40, 99*minute, 9),
+	}
+	d := DeliveryOf(nodes, repo, nil, now)
+	g := d.CiTimeToGreen
+	if g.Count != 4 || g.Value == nil || *g.Value != float64(16*minute) || g.P90 == nil || g.Band != nil {
+		t.Fatalf("ci time to green %+v", g)
+	}
+	if *g.P90 < float64(20*minute) || *g.P90 > float64(40*minute) {
+		t.Errorf("p90 %v", *g.P90)
+	}
+	if w := g.Weeks; len(w) != 4 || w[0].Count != 0 || w[1].Count != 1 || w[2].Count != 1 || w[3].Count != 2 {
+		t.Errorf("weeks %+v", w)
+	}
+	f := d.FailedRounds
+	if f.Count != 5 || f.Value == nil || math.Abs(*f.Value-4.0/5) > 1e-9 || f.Band != nil {
+		t.Errorf("failed rounds %+v", f)
+	}
+	empty := DeliveryOf(nil, repo, nil, now)
+	if empty.CiTimeToGreen.Value != nil || empty.FailedRounds.Value != nil || len(empty.CiTimeToGreen.Weeks) != 4 {
+		t.Errorf("empty %+v", empty)
 	}
 }

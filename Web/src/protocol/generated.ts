@@ -5511,6 +5511,11 @@ export interface LineageCostNode {
    * recovery time.
    */
   reverts?: string;
+  /**
+   * A PR's CI on its last head commit, from checks.passed and checks.failed (#4554), for CI time to
+   * green.
+   */
+  ci?: LineagePRCI;
 }
 
 /**
@@ -5536,11 +5541,11 @@ export interface LineageCostRollup {
 
 /**
  * A repo's delivery figures (#4552, epic #4551), from this machine's totals: the four DORA keys,
- * DORA 2025's rework rate and flow efficiency, over the windowDays (28) before at, each with a
- * weekly series. A week is 7 days back from at, not a calendar week. A figure says how many it is
- * made from; one made from none has no value. band is where a value falls among DORA 2024's
- * clusters, a reference from teams of people, not a grade; rework rate and flow efficiency have
- * none.
+ * DORA 2025's rework rate and flow efficiency, and CI time to green and failed rounds (#4554), over
+ * the windowDays (28) before at, each with a weekly series. A week is 7 days back from at, not a
+ * calendar week. A figure says how many it is made from; one made from none has no value. band is
+ * where a value falls among DORA 2024's clusters, a reference from teams of people, not a grade;
+ * rework rate, flow efficiency and the CI figures have none.
  */
 export interface LineageDelivery {
   since: WireDate;
@@ -5575,11 +5580,23 @@ export interface LineageDelivery {
    * median. Counted by its last merge.
    */
   flowEfficiency: LineageDeliveryFigure;
+  /**
+   * CI time to green, in seconds (#4554): a merged PR's last push (the first run made on its last
+   * head commit) to the last of that commit's runs passing; the median, and p90. Counted by its
+   * merge. No band.
+   */
+  ciTimeToGreen: LineageDeliveryFigure;
+  /**
+   * Failed CI rounds a merged PR, the mean (#4554): its checks.failed, once per run and attempt, 0
+   * for none. count is the merged PRs. No band.
+   */
+  failedRounds: LineageDeliveryFigure;
 }
 
 /**
- * One delivery figure (#4552): value over the window, absent when made from none; p90 for lead
- * time; count is what it is made from; weeks is the 4 weeks, oldest first; band is DORA 2024's.
+ * One delivery figure (#4552): value over the window, absent when made from none; p90 for lead time
+ * and CI time to green; count is what it is made from; weeks is the 4 weeks, oldest first; band is
+ * DORA 2024's.
  */
 export interface LineageDeliveryFigure {
   value?: number;
@@ -6066,6 +6083,17 @@ export interface LineageOverhead {
    * forge's runners).
    */
   uncounted: string[];
+}
+
+/**
+ * A PR's CI on its last head commit (#4554): headSha is that commit; pushedAt is when its first run
+ * was made, by the push (a rerun keeps it); greenAt is when the last of its runs that passed
+ * finished, absent until one passed. A new head commit starts it again.
+ */
+export interface LineagePRCI {
+  headSha: string;
+  pushedAt?: WireDate;
+  greenAt?: WireDate;
 }
 
 /**
@@ -15897,9 +15925,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineMember: { required: ["agentID", "askedAt", "isCallOpen"], optional: [] },
   LineageChanged: { required: ["host", "states"], optional: ["links"] },
   LineageCost: { required: ["cost", "inputTokens", "outputTokens", "turns", "workingSeconds", "waitingSeconds"], optional: ["limitTokens"] },
-  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "milestone", "endedAt", "resolved", "sessions", "estimate", "forecast", "files", "reverts"] },
+  LineageCostNode: { required: ["node", "banked", "lastAt"], optional: ["repo", "fixes", "partOf", "outcome", "failedChecks", "firstAt", "startedAt", "level", "feature", "parent", "milestone", "endedAt", "resolved", "sessions", "estimate", "forecast", "files", "reverts", "ci"] },
   LineageCostRollup: { required: ["node", "own", "total", "waste", "unlinked", "prsMerged", "prsClosed", "prsReverted", "failedChecks", "parts"], optional: ["limited"] },
-  LineageDelivery: { required: ["since", "at", "windowDays", "leadTime", "deploymentFrequency", "changeFailureRate", "recoveryTime", "reworkRate", "flowEfficiency"], optional: [] },
+  LineageDelivery: { required: ["since", "at", "windowDays", "leadTime", "deploymentFrequency", "changeFailureRate", "recoveryTime", "reworkRate", "flowEfficiency", "ciTimeToGreen", "failedRounds"], optional: [] },
   LineageDeliveryFigure: { required: ["count", "weeks"], optional: ["value", "p90", "band"] },
   LineageDeliveryWeek: { required: ["since", "count"], optional: ["value"] },
   LineageEndRequest: { required: ["from", "to", "rel"], optional: [] },
@@ -15928,6 +15956,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageNode: { required: ["kind", "ref"], optional: [] },
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
   LineageOverhead: { required: ["windowDays", "linked", "unlinked", "uncounted"], optional: ["currency", "unlinkedRatio", "epicRatio"] },
+  LineagePRCI: { required: ["headSha"], optional: ["pushedAt", "greenAt"] },
   LineageResolved: { required: ["title"], optional: ["state", "labels", "createdAt"] },
   LineageRuntimeCount: { required: ["runtimeID", "sessions"], optional: [] },
   LineageSessionIssue: { required: ["node"], optional: ["title"] },

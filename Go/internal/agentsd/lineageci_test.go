@@ -192,3 +192,48 @@ func TestDeployNodes(t *testing.T) {
 		}
 	}
 }
+
+// #4554: checks.* keep the PR's last head commit's first run and last pass on its cost node; a
+// new head commit starts again, and a late event of an older commit changes nothing.
+func TestLineageCIKeepsTimeToGreen(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	checks := func(name, sha string, run int, created, completed string) {
+		d.lineageEvent(wire.Event{Name: name, Details: map[string]string{"payload": fmt.Sprintf(
+			`{"pr":{"number":9,"url":"https://github.com/alexec/Agents/pull/9"},"headSha":%q,`+
+				`"run":{"id":%d,"attempt":1,"createdAt":%q},"completedAt":%q}`, sha, run, created, completed)}})
+	}
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#9"}
+	ci := func() *wire.LineagePRCI {
+		d.lineageSettle(5 * time.Second)
+		d.workMu.Lock()
+		defer d.workMu.Unlock()
+		return d.costLedgerLocked().Nodes[costKey(pr)].Ci
+	}
+	at := func(s string) wire.Date {
+		tm, _ := time.Parse(time.RFC3339, s)
+		return wire.DateOf(tm)
+	}
+	checks("checks.passed", "old", 1, "2026-11-10T09:00:00Z", "2026-11-10T09:10:00Z")
+	// The new head commit: one workflow fails, a rerun passes, another workflow passes later.
+	checks("checks.failed", "new", 2, "2026-11-10T10:00:00Z", "2026-11-10T10:05:00Z")
+	checks("checks.passed", "new", 3, "2026-11-10T10:00:30Z", "2026-11-10T10:12:00Z")
+	checks("checks.passed", "new", 2, "2026-11-10T10:00:00Z", "2026-11-10T10:20:00Z")
+	// A late event of the old commit.
+	checks("checks.passed", "old", 1, "2026-11-10T09:00:00Z", "2026-11-10T10:30:00Z")
+	got := ci()
+	if got == nil || got.HeadSha != "new" || got.PushedAt == nil || *got.PushedAt != at("2026-11-10T10:00:00Z") ||
+		got.GreenAt == nil || *got.GreenAt != at("2026-11-10T10:20:00Z") {
+		t.Fatalf("ci %+v", got)
+	}
+	// A push: a failure on it starts again, with no green.
+	checks("checks.failed", "newer", 4, "2026-11-10T11:00:00Z", "2026-11-10T11:04:00Z")
+	if got := ci(); got == nil || got.HeadSha != "newer" || got.GreenAt != nil || *got.PushedAt != at("2026-11-10T11:00:00Z") {
+		t.Fatalf("after a push: %+v", got)
+	}
+	// No times (as GitLab's): kept as it was.
+	d.lineageEvent(wire.Event{Name: "checks.passed", Details: map[string]string{"payload": `{"pr":{"number":9,"url":"https://github.com/alexec/Agents/pull/9"},"run":{"id":5}}`}})
+	if got := ci(); got == nil || got.HeadSha != "newer" {
+		t.Fatalf("after no times: %+v", got)
+	}
+}
