@@ -181,19 +181,35 @@ func PullType(provider string) string {
 	return "pr"
 }
 
-// RefFromLineage reads a lineage node's ref in the form it had before #4727 (spec
+// RefFromLineage reads a lineage node's ref in the form it had before #4800 (spec
 // 2348-lineage, "Node refs"), given the node's kind, and gives the full ref. A ref in the
 // full form already is read as ParseRef reads it. ok is false for a form it does not know;
-// the caller keeps that one as it is. c.Topic is the project of a session, which the old
-// form did not say; it can be empty.
+// the caller keeps that one as it is. c.Topic is the project of a session, a workflow or a
+// workflow's run, which the old form did not say; it can be empty.
 //
-//	issue github:alexec/agents#123   github:issue:alexec/agents#123
-//	pr    github:alexec/agents#123   github:pr:alexec/agents#123
-//	pr    gitlab:group/repo!45       gitlab:mr:group/repo#45
-//	issue linear:ENG-4               linear:issue:eng#ENG-4
-//	issue jira:ABC-9                 jira:issue:abc#ABC-9
-//	issue azureboards:project#12     azureboards:issue:project#12
-//	session session:<id>             agents:session:<c.Topic>#<id>
+//	issue        github:alexec/agents#123            github:issue:alexec/agents#123
+//	pr           github:alexec/agents#123            github:pr:alexec/agents#123
+//	pr           gitlab:group/repo!45                gitlab:mr:group/repo#45
+//	issue        linear:ENG-4                        linear:issue:eng#ENG-4
+//	issue        jira:ABC-9                          jira:issue:abc#ABC-9
+//	issue        azureboards:project#12              azureboards:issue:project#12
+//	session      session:<id>                        agents:session:<c.Topic>#<id>
+//	release      github:alexec/agents/release/v1.2   github:release:alexec/agents#v1.2
+//	milestone    github:alexec/agents/milestone/3    github:milestone:alexec/agents#3
+//	doc          github:alexec/agents/doc/specs/a.md github:doc:alexec/agents#specs/a.md
+//	doc          file:/Users/me/folder/docs/a.md     file:doc:#/Users/me/folder/docs/a.md
+//	doc          https://www.notion.so/Page-1        web:doc:www.notion.so#/Page-1
+//	ci-run       github:alexec/agents/actions/run/9  github:run:alexec/agents#9
+//	ci-run       gitlab:group/repo/pipelines/9       gitlab:run:group/repo#9
+//	ci-run       azuredevops:o/p/r/builds/9          azuredevops:run:o/p/r#9
+//	deploy       testflight:com.example.app/42       testflight:deploy:com.example.app#42
+//	target       target:testflight:com.Example.App   testflight:target:#com.example.app
+//	health       sentry:acme/12345                   sentry:issue:acme#12345
+//	health       betterstack:987                     betterstack:incident:#987
+//	workflow     workflow:/Users/me/folder/nightly   agents:workflow:<c.Topic>#/Users/me/folder/nightly
+//	workflow-run run:<id>                            agents:workflow-run:<c.Topic>#<id>
+//	repo         github:alexec/agents                github:repo:#alexec/agents
+//	repo         linear:ENG                          linear:repo:#eng
 func RefFromLineage(kind, old string, c RefContext) (Ref, bool) {
 	if r, err := ParseRef(old); err == nil {
 		return r, true
@@ -202,10 +218,15 @@ func RefFromLineage(kind, old string, c RefContext) (Ref, bool) {
 	if !ok || rest == "" || !refWord.MatchString(scheme) {
 		return Ref{}, false
 	}
+	topic := strings.ToLower(c.Topic)
 	var r Ref
 	switch {
 	case kind == "session" && scheme == "session":
-		r = Ref{Provider: "agents", Type: "session", Topic: strings.ToLower(c.Topic), ID: rest}
+		r = Ref{Provider: "agents", Type: "session", Topic: topic, ID: rest}
+	case kind == "workflow" && scheme == "workflow":
+		r = Ref{Provider: "agents", Type: "workflow", Topic: topic, ID: rest}
+	case kind == "workflow-run" && scheme == "run":
+		r = Ref{Provider: "agents", Type: "workflow-run", Topic: topic, ID: rest}
 	case kind == "issue" && (scheme == "linear" || scheme == "jira"):
 		team, _, ok := strings.Cut(rest, "-")
 		if !ok || team == "" {
@@ -225,6 +246,59 @@ func RefFromLineage(kind, old string, c RefContext) (Ref, bool) {
 			typ = PullType(scheme)
 		}
 		r = Ref{Provider: scheme, Type: typ, Topic: strings.ToLower(rest[:i]), ID: rest[i+1:]}
+	case kind == "release" || kind == "milestone":
+		path, id, ok := cutLast(rest, "/"+kind+"/")
+		if !ok {
+			return Ref{}, false
+		}
+		r = Ref{Provider: scheme, Type: kind, Topic: strings.ToLower(path), ID: id}
+	case kind == "doc" && scheme == "file":
+		r = Ref{Provider: "file", Type: "doc", ID: rest}
+	case kind == "doc" && (scheme == "https" || scheme == "http"):
+		host, path, _ := strings.Cut(strings.TrimPrefix(rest, "//"), "/")
+		if host == "" {
+			return Ref{}, false
+		}
+		r = Ref{Provider: "web", Type: "doc", Topic: strings.ToLower(host), ID: "/" + path}
+	case kind == "doc":
+		path, rel, ok := strings.Cut(rest, "/doc/")
+		if !ok {
+			return Ref{}, false
+		}
+		r = Ref{Provider: scheme, Type: "doc", Topic: strings.ToLower(path), ID: rel}
+	case kind == "ci-run":
+		var path, id string
+		for _, mark := range []string{"/actions/run/", "/pipelines/", "/builds/"} {
+			if path, id, ok = cutLast(rest, mark); ok {
+				break
+			}
+		}
+		if !ok {
+			return Ref{}, false
+		}
+		r = Ref{Provider: scheme, Type: "run", Topic: strings.ToLower(path), ID: id}
+	case kind == "deploy":
+		i := strings.LastIndex(rest, "/")
+		if i <= 0 {
+			return Ref{}, false
+		}
+		r = Ref{Provider: scheme, Type: "deploy", Topic: strings.ToLower(rest[:i]), ID: rest[i+1:]}
+	case kind == "target" && scheme == "target":
+		provider, id, ok := strings.Cut(rest, ":")
+		if !ok {
+			return Ref{}, false
+		}
+		r = Ref{Provider: provider, Type: "target", ID: strings.ToLower(id)}
+	case kind == "health" && scheme == "sentry":
+		org, id, ok := strings.Cut(rest, "/")
+		if !ok {
+			return Ref{}, false
+		}
+		r = Ref{Provider: scheme, Type: "issue", Topic: strings.ToLower(org), ID: id}
+	case kind == "health":
+		r = Ref{Provider: scheme, Type: "incident", ID: rest}
+	case kind == "repo" && !strings.Contains(rest, "#"):
+		r = Ref{Provider: scheme, Type: "repo", ID: strings.ToLower(rest)}
 	default:
 		return Ref{}, false
 	}
@@ -232,4 +306,13 @@ func RefFromLineage(kind, old string, c RefContext) (Ref, bool) {
 		return Ref{}, false
 	}
 	return r, true
+}
+
+// cutLast cuts s around the last sep: the text before it and after it, neither empty.
+func cutLast(s, sep string) (before, after string, ok bool) {
+	i := strings.LastIndex(s, sep)
+	if i <= 0 || i+len(sep) == len(s) {
+		return "", "", false
+	}
+	return s[:i], s[i+len(sep):], true
 }

@@ -1252,6 +1252,19 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			go m.s.checkCaps(owner)
 		}
 		return map[string]any{}, nil
+	case wire.CallBusPublish.Name:
+		// The event bus (#4729): events this machine recorded, envelope only.
+		publish, err := require[wire.BusPublish](params, "BusPublish")
+		if err != nil {
+			return nil, err
+		}
+		return m.s.busPublish(ctx, host, publish, time.Now())
+	case wire.CallBusSubscribe.Name:
+		sub, err := require[wire.BusSubscribe](params, "BusSubscribe")
+		if err != nil {
+			return nil, err
+		}
+		return m.s.busSubscribe(host, sub)
 	case "workflows/claimRun":
 		claim, err := require[wire.WorkflowClaim](params, "WorkflowClaim")
 		if err != nil {

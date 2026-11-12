@@ -168,6 +168,25 @@ func TestRefFromLineage(t *testing.T) {
 		{"issue", "azureboards:project#12", "azureboards:issue:project#12"},
 		{"session", "session:7F3C0000-0000-0000-0000-000000000001", "agents:session:alexec/agents#7F3C0000-0000-0000-0000-000000000001"},
 		{"pr", "github:pr:alexec/agents#4702", "github:pr:alexec/agents#4702"},
+		{"release", "github:alexec/agents/release/v1.2.0", "github:release:alexec/agents#v1.2.0"},
+		{"release", "gitlab:group/sub/repo/release/v2", "gitlab:release:group/sub/repo#v2"},
+		{"milestone", "github:alexec/agents/milestone/3", "github:milestone:alexec/agents#3"},
+		{"doc", "github:alexec/agents/doc/specs/a/spec.md", "github:doc:alexec/agents#specs/a/spec.md"},
+		{"doc", "file:/Users/me/folder/docs/a.md", "file:doc:#/Users/me/folder/docs/a.md"},
+		{"doc", "https://www.notion.so/Page-1", "web:doc:www.notion.so#/Page-1"},
+		{"ci-run", "github:alexec/agents/actions/run/19283746", "github:run:alexec/agents#19283746"},
+		{"ci-run", "gitlab:group/repo/pipelines/9", "gitlab:run:group/repo#9"},
+		{"ci-run", "bitbucket:ws/repo/pipelines/9", "bitbucket:run:ws/repo#9"},
+		{"ci-run", "azuredevops:org/proj/repo/builds/9", "azuredevops:run:org/proj/repo#9"},
+		{"deploy", "testflight:com.Example.App/42", "testflight:deploy:com.example.app#42"},
+		{"deploy", "appstore:com.example.app/1.2", "appstore:deploy:com.example.app#1.2"},
+		{"target", "target:testflight:com.Example.App", "testflight:target:#com.example.app"},
+		{"health", "sentry:acme/12345", "sentry:issue:acme#12345"},
+		{"health", "betterstack:987", "betterstack:incident:#987"},
+		{"workflow", "workflow:/Users/me/folder/nightly", "agents:workflow:alexec/agents#/Users/me/folder/nightly"},
+		{"workflow-run", "run:R1", "agents:workflow-run:alexec/agents#R1"},
+		{"repo", "github:alexec/Agents", "github:repo:#alexec/agents"},
+		{"repo", "linear:ENG", "linear:repo:#eng"},
 	} {
 		got, ok := RefFromLineage(tc.kind, tc.old, c)
 		if !ok || got.String() != tc.want {
@@ -176,7 +195,11 @@ func TestRefFromLineage(t *testing.T) {
 	}
 	for _, tc := range []struct{ kind, old string }{
 		{"file", "file:/tmp/a.md"},
-		{"release", "github:alexec/agents/release/v1.0.0"},
+		{"release", "github:alexec/agents"},
+		{"release", "github:alexec/agents/release/"},
+		{"ci-run", "github:alexec/agents/runs/9"},
+		{"target", "target:testflight"},
+		{"repo", "github:alexec/agents#12"},
 		{"issue", "linear:"},
 		{"issue", "linear:ENG"},
 		{"issue", "github:alexec/agents"},

@@ -54,10 +54,10 @@ AGENTS = [
 
 def setup(v):
     v.folders = {
-        "checkout-api": v.project("checkout-api", {"cart.py": CART}),
-        "ios-app": v.project("ios-app", {"util.py": UTIL}),
-        "docs-site": v.project("docs-site", {"README.md": README}),
-        "landing-page": v.project("landing-page", {"index.html": INDEX}),
+        "checkout-api": v.add_folder("checkout-api", {"cart.py": CART}),
+        "ios-app": v.add_folder("ios-app", {"util.py": UTIL}),
+        "docs-site": v.add_folder("docs-site", {"README.md": README}),
+        "landing-page": v.add_folder("landing-page", {"index.html": INDEX}),
     }
     v.tidy()
     v.open_phone()

@@ -190,7 +190,7 @@ struct WorkflowPage: View {
                         // Not on this host, without archiving it everywhere (#391).
                         if summary.canBeDenied {
                             Button { Task { await model.denyWorkflow(summary) } } label: {
-                                Text("Deny on This Machine").frame(maxWidth: .infinity)
+                                Text("Deny").frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.paper)
                         }

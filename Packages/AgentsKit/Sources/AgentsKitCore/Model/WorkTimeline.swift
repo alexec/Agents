@@ -683,8 +683,11 @@ public enum WorkTimeline {
     /// state, which is newer than the control plane's copy.
     public static func workingNow(_ timeline: DaemonAPI.WorkTimeline, sessions: [DaemonAPI.LineageSessionOn],
                                   agents: [Agent]) -> Set<String> {
-        let known = Set(agents.map { LineageList.node(ofSession: $0.id).ref.uppercased() })
-        var out = Set(sessions.filter { $0.state?.working == true && !known.contains($0.node.ref.uppercased()) }
+        // By the session's id: its ref's topic is its project's, which this app does not know (#4800).
+        let known = Set(agents.map { $0.id.uuidString.uppercased() })
+        var out = Set(sessions.filter {
+            $0.state?.working == true && !known.contains(WireRef.sessionID(fromRef: $0.node.ref)?.uppercased() ?? $0.node.ref)
+        }
             .flatMap { $0.on.map(\.ref) })
         let turning = agents.filter { $0.state == .running || $0.state == .starting }
         guard !turning.isEmpty else { return out }

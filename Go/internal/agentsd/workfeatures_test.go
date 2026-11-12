@@ -49,27 +49,27 @@ func TestWorkFeaturesGivesEpicsWithTheirPlans(t *testing.T) {
 		t.Fatalf("features: %+v", out)
 	}
 	epic := out.Features[0].Epics[0]
-	if epic.Item.Node.Ref != "github:alexec/agents#1" || epic.Steps != 2 || epic.Step == nil || *epic.Step != 2 || len(epic.Children) != 3 {
+	if epic.Item.Node.Ref != "github:issue:alexec/agents#1" || epic.Steps != 2 || epic.Step == nil || *epic.Step != 2 || len(epic.Children) != 3 {
 		t.Fatalf("epic: %+v", epic)
 	}
 	var outside []string
 	for _, b := range epic.BlockedOutside {
 		outside = append(outside, b.Ref)
 	}
-	if !slices.Equal(outside, []string{"github:alexec/agents#99", "github:alexec/agents#98"}) {
+	if !slices.Equal(outside, []string{"github:issue:alexec/agents#99", "github:issue:alexec/agents#98"}) {
 		t.Fatalf("blocked outside: %q", outside)
 	}
 	byRef := map[string]wire.WorkTimelineChild{}
 	for _, k := range epic.Children {
 		byRef[k.Item.Node.Ref] = k
 	}
-	if k := byRef["github:alexec/agents#11"]; k.StartedAt == nil || k.Item.Level == nil || *k.Item.Level != "story" {
+	if k := byRef["github:issue:alexec/agents#11"]; k.StartedAt == nil || k.Item.Level == nil || *k.Item.Level != "story" {
 		t.Fatalf("the timeline's child: %+v", k)
 	}
-	if k := byRef["github:alexec/agents#12"]; k.StartedAt != nil || k.WaitsForPerson == nil {
+	if k := byRef["github:issue:alexec/agents#12"]; k.StartedAt != nil || k.WaitsForPerson == nil {
 		t.Fatalf("a child that waits: %+v", k)
 	}
-	if missing := out.Features[0].Epics[1]; missing.Item.Node.Ref != "github:alexec/agents#404" || missing.Children != nil ||
+	if missing := out.Features[0].Epics[1]; missing.Item.Node.Ref != "github:issue:alexec/agents#404" || missing.Children != nil ||
 		!slices.ContainsFunc(out.Errors, func(e wire.ForgeListError) bool { return strings.Contains(e.Message, "#404") }) {
 		t.Fatalf("an epic with no plan: %+v, errors %+v", missing, out.Errors)
 	}
@@ -77,7 +77,7 @@ func TestWorkFeaturesGivesEpicsWithTheirPlans(t *testing.T) {
 	for _, k := range out.Features[0].Loose {
 		loose = append(loose, k.Item.Node.Ref)
 	}
-	if !slices.Equal(loose, []string{"github:alexec/agents#7", "github:alexec/agents#5"}) || out.Features[0].Loose[0].WaitsForPerson == nil {
+	if !slices.Equal(loose, []string{"github:issue:alexec/agents#7", "github:issue:alexec/agents#5"}) || out.Features[0].Loose[0].WaitsForPerson == nil {
 		t.Fatalf("loose: %q %+v", loose, out.Features[0].Loose)
 	}
 

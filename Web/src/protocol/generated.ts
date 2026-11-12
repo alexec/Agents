@@ -1529,6 +1529,112 @@ export interface BuildOutputRemoved {
   freed: WorktreeSize;
 }
 
+/**
+ * bus/deliver (#4729): one event on the bus that matched subscriptions of this machine, and which
+ * ones. Best effort: usually once, sometimes never, rarely twice.
+ */
+export interface BusDelivery {
+  event: BusEvent;
+  subscriptions: string[];
+}
+
+/**
+ * An event on the bus (#4729, spec 4724-event-bus, "The bus"): its envelope only. It carries no
+ * data and no details, so the control plane reads only refs, names and times (principle 7, #4726);
+ * a consumer reads the subject's state now, by its ref.
+ */
+export interface BusEvent {
+  /**
+   * The CloudEvents version of the envelope (#4728, spec 4724-event-bus, "An event"): always "1.0".
+   */
+  specversion: string;
+  /**
+   * The event's ref (#4728): the subject's ref, "@", the type, and, when the same type can happen
+   * again to that thing, "/" and the provider's key for this one, such as
+   * github:pr:alexec/agents#4702@pr.commented/2457. It comes from the provider's data only, never
+   * from the machine or the clock, so two machines make the same id for the same happening.
+   */
+  id: string;
+  /** The event's type, noun.verbed (#4728): the same as name, which stays for one release. */
+  type: string;
+  /**
+   * Who the event is about (#4728): github, jira, slack and so on; agents for the app's own events;
+   * server:<name> for an MCP server's event that says no subject.
+   */
+  provider: string;
+  /**
+   * The provider's space (#4728, spec 4724-event-bus, "Topics"): a repo's full name, a Jira
+   * project, a Slack channel; the project or the machine for the app's own events. Lower case; can
+   * be empty.
+   */
+  topic: string;
+  /**
+   * The ref of the thing the event happened to (#4728). None for an MCP server's event that says no
+   * subject.
+   */
+  subject?: Ref;
+  /** provider:topic, as CloudEvents asks for one (#4728). */
+  source: string;
+  /** When it happened, in RFC 3339 (#4728): the provider's own time when it says one. */
+  time: string;
+  /**
+   * The machine that raised it (#4728), as agents:machine:#<machine>. Not part of the event's
+   * identity.
+   */
+  producer: string;
+}
+
+/**
+ * bus/publish (#4729): events a machine recorded, at most 100 at a time, oldest first. Best effort:
+ * one not sent when it happened is never sent later.
+ */
+export interface BusPublish {
+  events: BusEvent[];
+}
+
+/**
+ * bus/publish's answer (#4729): how many events were new on the bus, and how many were dropped as
+ * copies of one already on it (the same id).
+ */
+export interface BusPublished {
+  kept: number;
+  dropped: number;
+}
+
+/**
+ * bus/subscribe (#4729): every subscription of a machine, at most 1,000. It replaces the ones the
+ * machine sent before; an empty list ends them all. A machine sends it again after each connect, as
+ * the control plane keeps none across a restart.
+ */
+export interface BusSubscribe {
+  subscriptions: BusSubscription[];
+}
+
+/**
+ * bus/subscribe's answer (#4729): how many subscriptions the control plane holds for the machine
+ * now.
+ */
+export interface BusSubscribed {
+  count: number;
+}
+
+/**
+ * One subscription on the bus (#4729): a wait or a workflow trigger of a machine. Each field that
+ * is there must match the event's envelope; one that is not there matches every event.
+ */
+export interface BusSubscription {
+  /** The machine's own name for it, sent back with each event it matches. */
+  id: string;
+  /** The event's provider: github, jira, agents and so on. */
+  provider?: string;
+  /** The event's type, noun.verbed, or noun.* for every type of that noun. */
+  type?: string;
+  /** The topics it is about; none for every topic. Lower case. */
+  topics?: string[];
+  /** The one thing it is about. */
+  subject?: Ref;
+}
+
 export interface CancelWaitRequest {
   agentID: UUID;
 }
@@ -2009,7 +2115,7 @@ export interface ClientPermissionSettings {
   grok: ClientPermissionMode;
   opencode: ClientPermissionMode;
   /**
-   * Set when the organisation's mode ceiling is below approving every request: Always-approve is
+   * Set when the organisation's mode ceiling is below approving every request: Always Approve is
    * refused, and no agent's requests are answered for the person.
    */
   setBy?: PolicySetBy;
@@ -4454,7 +4560,7 @@ export interface ForgeImageRequest {
 /**
  * An issue or a pull request (a GitLab merge request) as its forge says it (#3129): one model for
  * GitHub, GitLab, Linear and Jira (#3260), so one page draws each. node is its lineage node (kind
- * issue or pr, ref github:alexec/Agents#12). state is open, closed or merged; status is the
+ * issue or pr, ref github:issue:alexec/agents#12). state is open, closed or merged; status is the
  * tracker's own name for its step, where its workflow has steps (a Jira status, as In Progress; one
  * in Jira's Done category is closed). folder is a folder on this machine on its repo, to act from.
  * labels have their #rrggbb colour where the forge gives one (#2956). The pull request's own
@@ -5313,8 +5419,9 @@ export interface LineageCost {
 export interface LineageCostNode {
   node: LineageNode;
   /**
-   * The repo or tracker the node is in: github:alexec/agents, linear, or for a session its folder's
-   * repo (folder:<name> without one). Not a project (#3275).
+   * The repo or tracker the node is in, as a ref (#4800): github:repo:#alexec/agents,
+   * linear:repo:#eng, or for a session its folder's repo (folder:repo:#<name> without one). Not a
+   * project (#3275).
    */
   repo?: string;
   banked: LineageCost;
@@ -5380,9 +5487,9 @@ export interface LineageCostNode {
 /**
  * lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total
  * adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a
- * repo's every node (kind repo, ref github:alexec/agents). waste is the parts' PRs closed without a
- * merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes
- * added up, newest first, at most 500; limited says there are more.
+ * repo's every node (kind repo, ref github:repo:#alexec/agents). waste is the parts' PRs closed
+ * without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is
+ * the nodes added up, newest first, at most 500; limited says there are more.
  */
 export interface LineageCostRollup {
   node: LineageNode;
@@ -5818,9 +5925,11 @@ export interface LineageLinks {
 
 /**
  * A node in the lineage graph (#2348). kind is what it is: issue, pr, session, workflow-run,
- * commit, file, branch or release, and the list is open. ref names it apart from any tracker, as
- * <scheme>:<id>: github:alexec/Agents#123, gitlab:group/repo!45, linear:ENG-4, jira:ABC-9,
- * session:<agent id>.
+ * commit, file, branch or release, and the list is open. ref names it apart from any tracker, in
+ * the full ref form provider:type:topic#id (#4800): github:issue:alexec/agents#123,
+ * gitlab:mr:group/repo#45, linear:issue:eng#ENG-4, jira:issue:abc#ABC-9,
+ * agents:session:alexec/agents#<agent id>. A reader takes the old form (<scheme>:<id>, as
+ * github:alexec/Agents#123 or session:<agent id>) for one release.
  */
 export interface LineageNode {
   kind: string;
@@ -6913,6 +7022,11 @@ export interface MachineInfo {
    */
   hostKeyRenews?: boolean;
   cost?: string;
+  /**
+   * The provider stops it by itself after this many minutes with no use, as GitHub stops a
+   * codespace (#4803): the machine's page says so.
+   */
+  idleTimeoutMinutes?: number;
   host?: MachineRef;
   /** Why the make failed, in the provider's words, when `state` is failed. */
   reason?: string;
@@ -7236,6 +7350,11 @@ export interface MachineWorkspace {
   startWhenUsed: boolean;
   stopWhenIdleMinutes?: number;
   cost?: string;
+  /**
+   * As its provider last listed it: the provider stops it after this many minutes with no use
+   * (#4803).
+   */
+  idleTimeoutMinutes?: number;
   current: boolean;
   startForSchedules?: boolean;
   tellsSchedule?: boolean;
@@ -8352,7 +8471,7 @@ export interface OutsideAccount {
   /**
    * Ask before use (#4163): an agent's manage_accounts get of it waits on a person's approval, as a
    * secret's use does (#4015). Absent is on, also for an account an agent adds; false is off, which
-   * a person sets, or Allow Always on its request does. Not sealed: kept with the account, and
+   * a person sets, or Always Approve on its request does. Not sealed: kept with the account, and
    * agentsd enforces it.
    */
   askBeforeUse?: boolean;
@@ -10300,9 +10419,9 @@ export interface ReportNodes {
 /**
  * reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The
  * scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a
- * PR with none falls back to its outcome); releases have no state in v1. repo is a ref prefix
- * (github:alexec/Agents). since is on the node's last change. limit is 1 to 100, 50 when absent.
- * cursor is the last page's, opaque.
+ * PR with none falls back to its outcome); releases have no state in v1. repo is a repo's ref
+ * (github:repo:#alexec/agents; the old github:alexec/agents is read too). since is on the node's
+ * last change. limit is 1 to 100, 50 when absent. cursor is the last page's, opaque.
  */
 export interface ReportNodesQuery {
   /** issue, pr or release. */
@@ -10690,7 +10809,8 @@ export interface RequestSecretUse {
    */
   call?: string;
   /**
-   * The secret is the session's own (#3548): Allow always is the same as Allow for this session.
+   * The secret is the session's own (#3548): Always Approve is the same as Approve for This
+   * Session.
    */
   sessionOnly?: boolean;
   /**
@@ -11500,7 +11620,7 @@ export interface SecretTerminalValue {
  * secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a
  * terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163)
  * is not a secret's use: manage_accounts reads an account with Ask before use; the request names
- * the account, and Allow Always turns its Ask before use off.
+ * the account, and Always Approve turns its Ask before use off.
  */
 export type SecretUse =
   | "fill"
@@ -13432,6 +13552,11 @@ export interface UserSettings {
    */
   accounts?: JSONValue;
   /**
+   * The person's time zone (#4818), as a UserTimeZone. Their Mac sets it from its own clock; a
+   * workflow's hours: with no time-zone: go by it.
+   */
+  timeZone?: JSONValue;
+  /**
    * #2957, research R11: your layer, as a SignedYourPolicy. Only the keeper sets it
    * (user/setPolicy); a client cannot (user/setSettings refuses this part).
    */
@@ -13459,9 +13584,9 @@ export interface UserSettingsPart {
 
 /**
  * A part of a person's user settings (#1760, #2410). Each part has one fixed scope: MCP servers,
- * agent configuration, runtimes, cost limits, notices (#2859) and outside accounts (#3967) follow
- * the person. Resources belong to each machine. policy (#2957) is set only by the keeper, through
- * user/setPolicy; user/setSettings refuses it.
+ * agent configuration, runtimes, cost limits, notices (#2859), outside accounts (#3967) and the
+ * time zone (#4818) follow the person. Resources belong to each machine. policy (#2957) is set only
+ * by the keeper, through user/setPolicy; user/setSettings refuses it.
  */
 export type UserSettingsPartName =
   | "mcpServers"
@@ -13470,6 +13595,7 @@ export type UserSettingsPartName =
   | "costLimits"
   | "notifications"
   | "accounts"
+  | "timeZone"
   | "policy";
 
 /**
@@ -13483,6 +13609,12 @@ export interface UserSuspended {
   at: WireDate;
 }
 
+/** The timeZone part of user settings (#4818). */
+export interface UserTimeZone {
+  /** An IANA name, as TimeZone.identifier says it: Europe/London. */
+  identifier: string;
+}
+
 /**
  * The PRs that landed in an hour or a day in one repository (#4596): merged is every PR the agents
  * worked on that merged, merged reverts included; reverted is the merged reverts among them.
@@ -13494,8 +13626,8 @@ export interface VelocityBucket {
 
 /**
  * velocity/history's answer (#4596): the PRs that landed, by the hour (168 hours) and by the day
- * (90 days), then by repository (github:alexec/agents), from this machine's lineage store. Shaped
- * as usage/history is.
+ * (90 days), then by repository (its ref, github:repo:#alexec/agents), from this machine's lineage
+ * store. Shaped as usage/history is.
  */
 export interface VelocityHistory {
   hours: Record<string, Record<string, VelocityBucket>>;
@@ -13902,6 +14034,7 @@ export interface Workflow {
   unknownFields: Record<string, JSONValue>;
   settings: WorkflowSettings;
   cooldown?: number;
+  hours?: WorkflowHours;
   enabled?: boolean;
   archived?: boolean;
   whenDone?: WorkflowWhenDone;
@@ -13965,6 +14098,22 @@ export interface WorkflowEnableRequest {
   enabled: boolean;
 }
 
+/**
+ * hours: (#4818): when a workflow may start, as the file says it. A fire outside it is held, and
+ * starts when it opens; Run now always runs.
+ */
+export interface WorkflowHours {
+  /**
+   * As the file says it, "09:00-18:00"; it can go past midnight, "18:00-09:00". Absent is the whole
+   * day.
+   */
+  between?: string;
+  /** The days its window starts on. Absent is every day. */
+  days?: Weekday[];
+  /** time-zone:, an IANA name. Absent is the person's timeZone setting, else the host's zone. */
+  timeZone?: string;
+}
+
 export type WorkflowLimit = "folder";
 
 /**
@@ -14026,7 +14175,8 @@ export type WorkflowRefusal =
   | { settingRefused: { setting: string; detail: string } }
   | { awaitingApproval: Record<string, never> }
   | { deniedHere: Record<string, never> }
-  | { coolingDown: { until?: WireDate } };
+  | { coolingDown: { until?: WireDate } }
+  | { outsideHours: { until?: WireDate } };
 
 export interface WorkflowRemovedNotification {
   folder: URLString;
@@ -14040,6 +14190,10 @@ export interface WorkflowRequest {
 
 export interface WorkflowSchedule {
   minutes: number[];
+  /**
+   * The first and the last hour of between:. The first is after the last when it goes past midnight
+   * (#4818): the hours after midnight belong to the day before.
+   */
   hours: [number, number];
   startMinute: number;
   endMinute: number;
@@ -14114,6 +14268,11 @@ export interface WorkflowSummary {
   lastFiredAt?: WireDate;
   lastFiredBy?: WorkflowCause;
   cooldownEndsAt?: WireDate;
+  /**
+   * When a fire held outside the workflow's hours: can start (#4818): the first time its hours: are
+   * open once its cooldown is over. Absent while its hours: are open by then.
+   */
+  hoursOpenAt?: WireDate;
   holdsAFire: boolean;
   queued: number;
   offReason?: WorkflowOffReason;
@@ -15313,6 +15472,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BudgetRequest: { required: ["id", "user", "userName", "day", "at", "state"], optional: ["why", "daily", "dailyTokens", "decidedBy", "decidedAt"] },
   BudgetRequestList: { required: ["requests"], optional: [] },
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
+  BusDelivery: { required: ["event", "subscriptions"], optional: [] },
+  BusEvent: { required: ["specversion", "id", "type", "provider", "topic", "source", "time", "producer"], optional: ["subject"] },
+  BusPublish: { required: ["events"], optional: [] },
+  BusPublished: { required: ["kept", "dropped"], optional: [] },
+  BusSubscribe: { required: ["subscriptions"], optional: [] },
+  BusSubscribed: { required: ["count"], optional: [] },
+  BusSubscription: { required: ["id"], optional: ["provider", "type", "topics", "subject"] },
   CancelWaitRequest: { required: ["agentID"], optional: [] },
   CapReached: { required: ["user", "name", "spentUSD", "capUSD", "until"], optional: ["group"] },
   CapacityState: { required: ["level"], optional: ["words"] },
@@ -15746,7 +15912,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineFolderSent: { required: [], optional: ["state", "folder", "facts", "pack", "read"] },
   MachineHello: { required: ["version", "platform", "machineID"], optional: ["host", "name", "implementation", "capabilities"] },
   MachineHelloAnswer: { required: [], optional: ["capabilities"] },
-  MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "host", "reason", "joining", "notJoined"] },
+  MachineInfo: { required: ["id", "name", "state"], optional: ["ssh", "tunnel", "hostKeyRenews", "cost", "idleTimeoutMinutes", "host", "reason", "joining", "notJoined"] },
   MachineInstall: { required: ["destination"], optional: ["name", "key", "trust", "tunnel", "provider", "workspace"] },
   MachineJoinAsk: { required: ["name", "platform", "publicKey"], optional: ["version", "machineID", "person"] },
   MachineJoinDecision: { required: ["result"], optional: ["host", "controlKey", "name"] },
@@ -15775,7 +15941,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineUsageState: { required: ["machine", "disks"], optional: [] },
   MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   MachineUserSettings: { required: ["user", "settings", "secrets"], optional: ["waiting"] },
-  MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
+  MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "idleTimeoutMinutes", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
   MachineWorkspaceCall: { required: ["agent", "method", "params"], optional: ["deliver"] },
   MachinesSummaryFacts: { required: ["machines"], optional: [] },
   ManagedMCPServer: { required: ["name", "registryName", "version", "run", "addedAt", "destination"], optional: ["byHand"] },
@@ -16302,10 +16468,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserSecretRequest: { required: ["name"], optional: [] },
   UserSecretRow: { required: ["name", "updated", "machines"], optional: ["kind", "created", "hint", "lastOp", "backedUp", "leftOn", "version", "waiting", "needsApproval", "description"] },
   UserSecretSet: { required: ["name", "version", "values"], optional: ["kind", "needsApproval", "description"] },
-  UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "notifications", "accounts", "policy", "updated"] },
+  UserSettings: { required: [], optional: ["mcpServers", "agentConfig", "agentConfigFiles", "runtimes", "costLimits", "notifications", "accounts", "timeZone", "policy", "updated"] },
   UserSettingsChanged: { required: [], optional: ["parts", "agentConfigFiles", "secrets"] },
   UserSettingsPart: { required: ["part", "value"], optional: [] },
   UserSuspended: { required: ["user", "provider", "at"], optional: ["off"] },
+  UserTimeZone: { required: ["identifier"], optional: [] },
   VelocityBucket: { required: ["merged", "reverted"], optional: [] },
   VelocityHistory: { required: ["hours", "days", "now"], optional: ["timeZone"] },
   ViewAsk: { required: ["server", "uri", "hash", "isNew"], optional: [] },
@@ -16342,13 +16509,14 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkTimelineRelease: { required: ["tag", "at", "repo"], optional: ["url"] },
   WorkTimelineRequest: { required: ["project", "from", "to"], optional: [] },
   WorkTimelineSegment: { required: [], optional: ["startedAt", "closedAt"] },
-  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "enabled", "archived", "whenDone", "continueWhenBack", "muted", "runsOn"] },
+  Workflow: { required: ["workflowID", "folder", "name", "triggers", "mode", "prompt", "unknownFields", "settings"], optional: ["problem", "cooldown", "hours", "enabled", "archived", "whenDone", "continueWhenBack", "muted", "runsOn"] },
   WorkflowApproval: { required: ["digest", "isNew"], optional: ["note"] },
   WorkflowApproveRequest: { required: ["folder", "workflowID", "digest"], optional: [] },
   WorkflowArchiveRequest: { required: ["folder", "workflowID", "archived"], optional: [] },
   WorkflowClaim: { required: ["workflow", "trigger"], optional: [] },
   WorkflowClaimed: { required: ["won"], optional: [] },
   WorkflowEnableRequest: { required: ["folder", "workflowID", "enabled"], optional: [] },
+  WorkflowHours: { required: [], optional: ["between", "days", "timeZone"] },
   WorkflowLimitSettings: { required: [], optional: ["total"] },
   WorkflowMCPClearMissedRequest: { required: ["folder", "workflowID", "name"], optional: ["server"] },
   WorkflowMuteRequest: { required: ["folder", "workflowID", "muted"], optional: [] },
@@ -16357,7 +16525,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   WorkflowSchedule: { required: ["minutes", "hours", "startMinute", "endMinute", "days"], optional: [] },
   WorkflowSettings: { required: ["options", "labels"], optional: ["permissionMode", "runtimeID", "model", "effort", "permissionRequests", "sandbox"] },
   WorkflowSettingsRequest: { required: ["folder", "workflowID", "settings"], optional: ["cooldown", "labels", "whenDone", "continueWhenBack", "runsOn"] },
-  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "readyMadeUpdatedAt", "newerReadyMade", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "offReason", "standingAgentID", "mcpTriggers"] },
+  WorkflowSummary: { required: ["workflow", "isArchived", "isEnabled", "nextFireAtByTrigger", "isRunning", "holdsAFire", "queued"], optional: ["scope", "content", "overLimit", "totalLimit", "nextFireAt", "lastOutcome", "causingEvent", "causingEventName", "hearsFor", "readyMadeUpdatedAt", "newerReadyMade", "awaitingApproval", "deniedHere", "lastFiredAt", "lastFiredBy", "cooldownEndsAt", "hoursOpenAt", "offReason", "standingAgentID", "mcpTriggers"] },
   WorkflowWriteRequest: { required: ["workflowID", "content"], optional: [] },
   WorkflowsListRequest: { required: [], optional: ["folder", "scope"] },
   WorktreeRemovalRequest: { required: ["root", "confirmed", "folder"], optional: [] },

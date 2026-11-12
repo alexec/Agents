@@ -198,7 +198,7 @@ func TestForgeListsTheConnectedForgejosRepositories(t *testing.T) {
 			item = &i
 		}
 	}
-	if item == nil || item.Node != (wire.LineageNode{Kind: "issue", Ref: "forgejo:walkalex/app#7"}) || deref(item.Folder) == "" ||
+	if item == nil || item.Node != (wire.LineageNode{Kind: "issue", Ref: "forgejo:issue:walkalex/app#7"}) || deref(item.Folder) == "" ||
 		item.Labels[0].Name != "bug" || deref(item.Labels[0].Color) != "#ee0701" || item.UpdatedAt == 0 {
 		t.Fatalf("the Forgejo item: %+v in %+v", item, list)
 	}
@@ -208,7 +208,7 @@ func TestForgeListsTheConnectedForgejosRepositories(t *testing.T) {
 	var pulls wire.ForgeList
 	json.Unmarshal(c.call(t, 2, "forge/pulls", wire.ForgeListRequest{}), &pulls)
 	for _, i := range pulls.Items {
-		if i.Node.Ref == "forgejo:walkalex/app#7" && (i.Node.Kind != "pr" || deref(i.Mergeable) != "unknown") {
+		if i.Node.Ref == "forgejo:issue:walkalex/app#7" && (i.Node.Kind != "pr" || deref(i.Mergeable) != "unknown") {
 			t.Fatalf("a Forgejo pull request: %+v", i)
 		}
 	}
@@ -230,13 +230,13 @@ func TestForgeListSaysForgejoIsNotConnected(t *testing.T) {
 func TestForgeReadsAForgejoIssueAndPullRequest(t *testing.T) {
 	_, c, fj, _ := forgejoDaemon(t)
 	var issue wire.ForgeItemDetail
-	json.Unmarshal(c.call(t, 1, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "forgejo:walkalex/app#7"}}), &issue)
+	json.Unmarshal(c.call(t, 1, "forge/issue", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "issue", Ref: "forgejo:issue:walkalex/app#7"}}), &issue)
 	if issue.Body != "The body." || deref(issue.Cursor) != "1" || len(issue.Comments) != 1 || issue.Comments[0].Bot == nil || issue.Start == nil ||
 		!strings.Contains(issue.Start.Prompt, "Work on this Forgejo issue: http://localhost:3753/walkalex/App/issues/7") || issue.Start.Labels[0] != "#7" {
 		t.Fatalf("issue: %+v", issue)
 	}
 	var pr wire.ForgeItemDetail
-	json.Unmarshal(c.call(t, 2, "forge/pull", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "pr", Ref: "forgejo:walkalex/app#8"}}), &pr)
+	json.Unmarshal(c.call(t, 2, "forge/pull", wire.ForgeItemRequest{Node: wire.LineageNode{Kind: "pr", Ref: "forgejo:pr:walkalex/app#8"}}), &pr)
 	if deref(pr.Head) != "abc123" || len(pr.Checks) != 1 || *pr.FilesChanged != 2 || len(pr.MergeMethods) != 2 || pr.MergeMethods[0] != "squash" ||
 		deref(pr.Item.Review) != "approved" || pr.Start != nil {
 		t.Fatalf("pull: %+v", pr)
@@ -245,9 +245,9 @@ func TestForgeReadsAForgejoIssueAndPullRequest(t *testing.T) {
 		t.Fatalf("Forgejo was asked %v", fj.items)
 	}
 	for i, n := range []wire.LineageNode{
-		{Kind: "issue", Ref: "forgejo:walkalex/app#404"},
-		{Kind: "issue", Ref: "forgejo:kim/notes#1"},
-		{Kind: "issue", Ref: "forgejo:nobody#1"},
+		{Kind: "issue", Ref: "forgejo:issue:walkalex/app#404"},
+		{Kind: "issue", Ref: "forgejo:issue:kim/notes#1"},
+		{Kind: "issue", Ref: "forgejo:issue:nobody#1"},
 	} {
 		if e := c.callError(t, 10+i, "forge/issue", wire.ForgeItemRequest{Node: n}); e == nil || !strings.Contains(e.Message, "forge/issue") {
 			t.Fatalf("%s: %v", n.Ref, e)
@@ -259,8 +259,8 @@ func TestForgeReadsAForgejoIssueAndPullRequest(t *testing.T) {
 // repository's default method; rerun is refused, as Forgejo's API has none.
 func TestForgeWritesOnAForgejoItem(t *testing.T) {
 	_, c, fj, _ := forgejoDaemon(t)
-	issue := wire.LineageNode{Kind: "issue", Ref: "forgejo:walkalex/app#7"}
-	pr := wire.LineageNode{Kind: "pr", Ref: "forgejo:walkalex/app#8"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "forgejo:issue:walkalex/app#7"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "forgejo:pr:walkalex/app#8"}
 	var done wire.ForgeDone
 	json.Unmarshal(c.call(t, 1, "forge/comment", wire.ForgeCommentRequest{Node: issue, Body: "Done"}), &done)
 	if deref(done.URL) != "http://localhost:3753/c/1" {
@@ -300,12 +300,12 @@ func TestForgeWritesOnAForgejoItem(t *testing.T) {
 
 func TestForgejoOfNode(t *testing.T) {
 	for ref, want := range map[string]string{
-		"forgejo:walkalex/app#7": "walkalex/app 7",
-		"forgejo:a/b#0":          "",
-		"forgejo:a#1":            "",
-		"forgejo:a/b/c#1":        "",
-		"forgejo:/b#1":           "",
-		"gitlab:a/b#1":           "",
+		"forgejo:issue:walkalex/app#7": "walkalex/app 7",
+		"forgejo:issue:a/b#0":          "",
+		"forgejo:issue:a#1":            "",
+		"forgejo:issue:a/b/c#1":        "",
+		"forgejo:issue:/b#1":           "",
+		"gitlab:issue:a/b#1":           "",
 	} {
 		repo, n, ok := forgejoOfNode(wire.LineageNode{Kind: "issue", Ref: ref})
 		got := ""
@@ -322,7 +322,7 @@ func TestForgejoOfNode(t *testing.T) {
 // a blocker outside the plan is said; the children say the epic is their parent.
 func TestForgePlanReadsAForgejoEpic(t *testing.T) {
 	_, c, fj, _ := forgejoDaemon(t)
-	epic := wire.LineageNode{Kind: "issue", Ref: "forgejo:walkalex/app#1"}
+	epic := wire.LineageNode{Kind: "issue", Ref: "forgejo:issue:walkalex/app#1"}
 	var plan wire.ForgePlan
 	json.Unmarshal(c.call(t, 1, "forge/plan", wire.ForgePlanRequest{Node: epic}), &plan)
 	if deref(plan.Item.Level) != "epic" || deref(plan.Item.Feature) != "Export" || plan.Item.Progress == nil ||
@@ -335,9 +335,9 @@ func TestForgePlanReadsAForgejoEpic(t *testing.T) {
 			ch.Item.Parent != nil && *ch.Item.Parent == epic, ch.BlockedOutside))
 	}
 	want := []string{
-		"forgejo:walkalex/app#3 step=1 level=task parent=true outside=[]",
-		"forgejo:walkalex/app#4 step=1 level= parent=true outside=[{issue forgejo:kim/notes#9}]",
-		"forgejo:walkalex/app#2 step=2 level=story parent=true outside=[]",
+		"forgejo:issue:walkalex/app#3 step=1 level=task parent=true outside=[]",
+		"forgejo:issue:walkalex/app#4 step=1 level= parent=true outside=[{issue forgejo:issue:kim/notes#9}]",
+		"forgejo:issue:walkalex/app#2 step=2 level=story parent=true outside=[]",
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("children:\n%s", strings.Join(got, "\n"))
@@ -345,7 +345,7 @@ func TestForgePlanReadsAForgejoEpic(t *testing.T) {
 	if fj.items[0] != "plan walkalex/App#1" {
 		t.Fatalf("Forgejo was asked %v", fj.items)
 	}
-	for i, n := range []wire.LineageNode{{Kind: "issue", Ref: "forgejo:walkalex/app#404"}, {Kind: "issue", Ref: "forgejo:kim/notes#1"}} {
+	for i, n := range []wire.LineageNode{{Kind: "issue", Ref: "forgejo:issue:walkalex/app#404"}, {Kind: "issue", Ref: "forgejo:issue:kim/notes#1"}} {
 		if e := c.callError(t, 10+i, "forge/plan", wire.ForgePlanRequest{Node: n}); e == nil || !strings.Contains(e.Message, "forge/plan") {
 			t.Fatalf("%s: %v", n.Ref, e)
 		}
@@ -372,7 +372,7 @@ func TestForgeFeaturesCountForgejoEpics(t *testing.T) {
 // there; Blocked by makes a child depend on another, or no longer.
 func TestForgePlanWritesOnAForgejoEpic(t *testing.T) {
 	_, c, fj, _ := forgejoDaemon(t)
-	epic := wire.LineageNode{Kind: "issue", Ref: "forgejo:walkalex/app#1"}
+	epic := wire.LineageNode{Kind: "issue", Ref: "forgejo:issue:walkalex/app#1"}
 	var done wire.ForgeDone
 	json.Unmarshal(c.call(t, 1, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Title: new("Export as CSV"), Level: new("story")}), &done)
 	if deref(done.URL) != "http://localhost:3753/walkalex/App/issues/12" {
@@ -381,9 +381,9 @@ func TestForgePlanWritesOnAForgejoEpic(t *testing.T) {
 	c.call(t, 2, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Issue: new("#5")})
 	c.call(t, 3, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Issue: new("walkalex/lib#6")})
 	c.call(t, 4, "forge/add-child", wire.ForgeAddChildRequest{Node: epic, Issue: new("http://localhost:3753/walkalex/App/issues/7")})
-	child := wire.LineageNode{Kind: "issue", Ref: "forgejo:walkalex/app#2"}
-	c.call(t, 5, "forge/blocked-by", wire.ForgeBlockedByRequest{Node: child, Add: []wire.LineageNode{{Kind: "issue", Ref: "forgejo:walkalex/app#4"}},
-		Remove: []wire.LineageNode{{Kind: "issue", Ref: "forgejo:walkalex/app#3"}}})
+	child := wire.LineageNode{Kind: "issue", Ref: "forgejo:issue:walkalex/app#2"}
+	c.call(t, 5, "forge/blocked-by", wire.ForgeBlockedByRequest{Node: child, Add: []wire.LineageNode{{Kind: "issue", Ref: "forgejo:issue:walkalex/app#4"}},
+		Remove: []wire.LineageNode{{Kind: "issue", Ref: "forgejo:issue:walkalex/app#3"}}})
 	want := []string{"create walkalex/App Export as CSV [story feature:Export]", "blocked walkalex/App#1 by walkalex/App#12 true",
 		"blocked walkalex/App#1 by walkalex/app#5 true", "blocked walkalex/App#1 by walkalex/lib#6 true",
 		"blocked walkalex/App#1 by walkalex/app#7 true",
@@ -400,7 +400,7 @@ func TestForgePlanWritesOnAForgejoEpic(t *testing.T) {
 			t.Fatalf("%s: %v", r.issue, e)
 		}
 	}
-	if e := c.callError(t, 20, "forge/blocked-by", wire.ForgeBlockedByRequest{Node: child, Add: []wire.LineageNode{{Kind: "issue", Ref: "github:alexec/agents#1"}}}); e == nil ||
+	if e := c.callError(t, 20, "forge/blocked-by", wire.ForgeBlockedByRequest{Node: child, Add: []wire.LineageNode{{Kind: "issue", Ref: "github:issue:alexec/agents#1"}}}); e == nil ||
 		!strings.Contains(e.Message, "not on the forge") {
 		t.Fatalf("a blocker on GitHub: %v", e)
 	}
@@ -442,14 +442,14 @@ func TestLineageOnAForgejoFolder(t *testing.T) {
 	s := sessionNode(a.ID)
 	d.lineageEvent(wire.Event{Name: "pr.opened", Details: map[string]string{"payload": `{"pr":{"number":8,"branch":"agents/7-fix",` +
 		`"url":"http://localhost:3753/walkalex/App/pulls/8","fixes":["#7"]}}`}})
-	pr := wire.LineageNode{Kind: "pr", Ref: "forgejo:walkalex/app#8"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "forgejo:pr:walkalex/app#8"}
 	wantLinks(t, active(d, pr),
 		s.Ref+" opens "+pr.Ref+" (branch)",
-		pr.Ref+" fixes forgejo:walkalex/app#7 (pr-body)")
+		pr.Ref+" fixes forgejo:issue:walkalex/app#7 (pr-body)")
 	wantLinks(t, active(d, s),
-		s.Ref+" works-on forgejo:walkalex/app#7 (start)",
+		s.Ref+" works-on forgejo:issue:walkalex/app#7 (start)",
 		s.Ref+" opens "+pr.Ref+" (branch)")
-	if n, ok := d.labelNode(codeberg, "P#4"); !ok || n != (wire.LineageNode{Kind: "pr", Ref: "forgejo:kim/notes#4"}) {
+	if n, ok := d.labelNode(codeberg, "P#4"); !ok || n != (wire.LineageNode{Kind: "pr", Ref: "forgejo:pr:kim/notes#4"}) {
 		t.Fatalf("a Codeberg folder's P#4: %+v", n)
 	}
 	if _, _, ok := nodeOfRepo(pr); ok {

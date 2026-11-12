@@ -128,7 +128,7 @@ func TestAHeldWaitWakesTheAgentLater(t *testing.T) {
 	d.raise(wire.EventDraft{Name: "branch.moved", At: now(), Scope: folderScope(dir), Sentence: "cd moved.", Details: map[string]string{"branch": "cd"}})
 	waitFor(t, "the wake in its chat", func() bool {
 		for _, u := range userMessages(d, a.ID) {
-			if strings.HasPrefix(u, "The event you were waiting for happened.\n\nbranch.moved at ") && strings.Contains(u, "\ncd moved.\nbranch: cd") {
+			if strings.HasPrefix(u, "The event you were waiting for happened.\n\nbranch.moved at ") && strings.Contains(u, "\ncd moved.\n\n```yaml\nbranch: cd\n```") {
 				return true
 			}
 		}

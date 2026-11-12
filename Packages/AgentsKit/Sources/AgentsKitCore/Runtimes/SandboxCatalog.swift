@@ -72,7 +72,7 @@ public enum SandboxCatalog {
               failurePatterns: [], readsReply: false, hangsWhenOn: false),
         Entry(runtimeID: RuntimeCatalog.opencode.id, route: .fixed(.none),
               measuredOn: "OpenCode 1.18.33",
-              why: "OpenCode has no command sandbox. It asks before running commands unless set to Always-approve.",
+              why: "OpenCode has no command sandbox. It asks before running commands unless set to Always Approve.",
               failurePatterns: [], readsReply: false, hangsWhenOn: false),
     ]
 

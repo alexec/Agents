@@ -85,7 +85,6 @@ public struct Approval: Codable, Hashable, Sendable, Identifiable {
         case (.approve, _): "Approve"
         case (.deny, .file): "Undo"
         case (.deny, .archive): "Keep Session"
-        case (.deny, .deploy): "Reject"
         case (.deny, _): "Deny"
         case (.requestChanges, _): "Request Changes"
         case (.dismiss, _): "Dismiss"

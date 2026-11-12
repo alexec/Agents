@@ -24,7 +24,7 @@ PROMPT = "Add a hero banner to index.html. Ask me the colour first: Ocean blue, 
 
 
 def setup(v):
-    folder = v.project("landing-page", {"index.html": INDEX})
+    folder = v.add_folder("landing-page", {"index.html": INDEX})
     v.start(folder, PROMPT)
     v.wait_until(v.pending_question, timeout=120, what="the question")
     v.tidy()

@@ -23,7 +23,7 @@ public struct ClientPermissionSettings: Codable, Sendable, Hashable {
     public var grok: ClientPermissionMode
     public var opencode: ClientPermissionMode
     /// Set when the organisation's mode ceiling is below approving every request:
-    /// **Always approve** is refused and answers nothing. Only read: never written.
+    /// **Always Approve** is refused and answers nothing. Only read: never written.
     public var setBy: DaemonAPI.PolicySetBy?
 
     public init(cursor: ClientPermissionMode = .default, grok: ClientPermissionMode = .default,

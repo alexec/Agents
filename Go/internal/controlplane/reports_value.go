@@ -103,12 +103,16 @@ func (s *Service) readLineage(ctx context.Context, keys, read []store.Key) ([]wi
 		return nil, fail(storeUnavailable, "The reports could not be read: %v", err)
 	}
 	byNode := map[wire.LineageNode]*wire.LineageCostNode{}
+	var names lineage.Names
 	for _, data := range objects {
 		var kept storedLineage
 		if data == nil || json.Unmarshal(data, &kept) != nil {
 			continue
 		}
 		for _, n := range kept.Nodes {
+			// A copy from a release before #4800 holds the old ref form.
+			n = lineage.FullCostNode(n, nil)
+			n.Node = names.Name(n.Node)
 			if have := byNode[n.Node]; have != nil {
 				mergeNode(have, n)
 				continue

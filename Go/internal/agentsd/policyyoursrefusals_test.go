@@ -147,7 +147,7 @@ func TestYourLayerStopsSandboxOff(t *testing.T) {
 }
 
 // TestYourLayerStopsYesToAll: your layer's permissionRequests rule (FR-002, tighter is Ask
-// me) refuses Always-approve, the permission flow's ceiling.
+// me) refuses Always Approve, the permission flow's ceiling.
 func TestYourLayerStopsYesToAll(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	d.SettingsDir = t.TempDir()

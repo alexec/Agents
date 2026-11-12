@@ -373,7 +373,7 @@ func customServersWords(v string) string {
 	case "allow":
 		return "Allow"
 	case "refuse":
-		return "Refuse"
+		return "Deny"
 	}
 	return v
 }

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -54,25 +53,16 @@ type forgeAzureDevOps interface {
 // azureDevOpsOfNode is the repository, organization/project/name, and the number of an Azure
 // Repos pull request's node.
 func azureDevOpsOfNode(n wire.LineageNode) (string, int, bool) {
-	rest, ok := strings.CutPrefix(n.Ref, "azuredevops:")
-	at := strings.LastIndex(rest, "#")
-	if !ok || n.Kind != lineage.KindPR || at < 0 {
+	repo, number, ok := numberedNode(n, "azuredevops", lineage.KindPR)
+	if parts := strings.Split(repo, "/"); !ok || len(parts) != 3 || slices.Contains(parts, "") {
 		return "", 0, false
 	}
-	parts := strings.Split(rest[:at], "/")
-	if len(parts) != 3 || slices.Contains(parts, "") {
-		return "", 0, false
-	}
-	number, err := strconv.Atoi(rest[at+1:])
-	if err != nil || number <= 0 {
-		return "", 0, false
-	}
-	return rest[:at], number, true
+	return repo, number, true
 }
 
 // azureDevOpsNode is a pull request's node.
 func azureDevOpsNode(repo string, number int) wire.LineageNode {
-	return wire.LineageNode{Kind: lineage.KindPR, Ref: "azuredevops:" + strings.ToLower(repo) + "#" + strconv.Itoa(number)}
+	return numbered(lineage.KindPR, "azuredevops", repo, number)
 }
 
 // azureDevOpsToken is the token for the Azure DevOps at root: the connector's sign-in when it

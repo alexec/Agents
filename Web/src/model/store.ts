@@ -70,6 +70,7 @@ import { MachineLock } from "./machineLock";
 import { isLead, leadEpic, leadProgressWords } from "./leadProgress";
 import { type AgentWrite, PendingWrites, omitting, writeFailure } from "./pendingWrites";
 import type { MachineCopy, TranscriptCopy } from "./localCopy";
+import { sessionRef } from "../protocol/ref";
 
 /** What this page keeps by folder on a host, kept to the folders it lists (#3750). */
 function pruneFolderKeys(host: string, folders: readonly string[]): void {
@@ -2307,7 +2308,7 @@ export class Store extends Work {
 
   private async askLeadProgress(host: string, id: string, key: string): Promise<void> {
     // A call that fails keeps what the row said: the next wake asks again.
-    const walked = await this.link.call("lineage/walk", { node: { kind: "session", ref: `session:${id}` }, depth: 1 }, host).catch(() => null);
+    const walked = await this.link.call("lineage/walk", { node: { kind: "session", ref: sessionRef(id) }, depth: 1 }, host).catch(() => null);
     if (!walked) return;
     const epic = leadEpic(id, walked.links);
     const plan = epic ? await this.link.call("forge/plan", { node: epic }, host).catch(() => null) : undefined;
@@ -2558,7 +2559,7 @@ export class Store extends Work {
    * once with the host's row; the start's progress comes as `control/hostChanged`, and a refusal
    * is said in `problem`.
    */
-  /** Allow or Don’t Allow: any client may answer, and the control plane takes the first. */
+  /** Approve or Deny: any client may answer, and the control plane takes the first. */
   async answerGitLend(ask: GitLendAsk, allowed: boolean): Promise<void> {
     this.gitAsksAnswered.value = new Set([...this.gitAsksAnswered.value, askID(ask.host, ask.server)]);
     await this.lendGit(ask.host, ask.from, ask.server, allowed);

@@ -22,9 +22,10 @@ public enum LeadProgress {
     /// The epic a session works on: the newest issue it is linked to by `works-on` that has not
     /// ended. Nil when it works on none.
     public static func epic(of session: UUID, in links: [DaemonAPI.LineageLink]) -> DaemonAPI.LineageNode? {
-        let mine = LineageList.node(ofSession: session).ref.lowercased()
+        // By the session's id: its ref's topic is its project's, which this app does not know (#4800).
+        let mine = session.uuidString.uppercased()
         return links
-            .filter { $0.from.ref.lowercased() == mine && $0.rel == "works-on" && $0.to.kind == "issue" && $0.endedAt == nil }
+            .filter { WireRef.sessionID(fromRef: $0.from.ref)?.uppercased() == mine && $0.rel == "works-on" && $0.to.kind == "issue" && $0.endedAt == nil }
             .max { $0.at < $1.at }?.to
     }
 

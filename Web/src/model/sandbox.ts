@@ -17,7 +17,7 @@ const catalog: Record<string, { route: Route; why?: string }> = {
   antigravity: { route: { fixed: "none" },
     why: "Antigravity sandboxes commands only when a business account’s admin turns Sandbox mode on." },
   opencode: { route: { fixed: "none" },
-    why: "OpenCode has no command sandbox. It asks before running commands unless set to Always-approve." },
+    why: "OpenCode has no command sandbox. It asks before running commands unless set to Always Approve." },
 };
 
 /** The choices a person may make, `runtime` first; none for a runtime with no route. */

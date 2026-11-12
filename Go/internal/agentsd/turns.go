@@ -1465,7 +1465,7 @@ func (l *live) Permission(ctx context.Context, p sdk.RequestPermissionRequest) s
 	if option, ok := l.toolLevelAnswer(req); ok {
 		return option
 	}
-	// Always-approve answers before a card, for Cursor, Grok and OpenCode (061). A request
+	// Always Approve answers before a card, for Cursor, Grok and OpenCode (061). A request
 	// with no allow option still waits for the person.
 	if a := d.Store.Agent(l.id); a != nil && d.agentAlwaysApproves(a) {
 		for _, kind := range []wire.PermissionOptionKind{wire.PermissionOptionKindAllowOnce, wire.PermissionOptionKindAllowAlways} {

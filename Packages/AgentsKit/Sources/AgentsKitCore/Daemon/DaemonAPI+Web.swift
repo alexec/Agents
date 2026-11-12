@@ -484,7 +484,7 @@ public extension DaemonAPI {
                 // Web Push to this browser (#1486): the control plane's key, and the page's subscription.
                 Row(Method.clientsWebPushKey, params: Empty.self, result: JSONValue.self, kind: .controlRequest),
                 Row(Method.clientsSetWebPush, params: JSONValue.self, result: Empty.self, kind: .controlRequest),
-                // A host using a Mac's git access (#1122): Allow, Don't Allow and Revoke.
+                // A host using a Mac's git access (#1122): Approve, Deny and Revoke.
                 Row(Method.hostsLendGit, params: LendGit.self, result: Empty.self, kind: .controlRequest),
                 // A linked host's workspace (#691): Start on the offline strip.
                 Row(Method.hostsStart, params: MachineRequest.self, result: ControlMachine.self, kind: .controlRequest),

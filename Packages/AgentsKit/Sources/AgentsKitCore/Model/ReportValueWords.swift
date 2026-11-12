@@ -21,7 +21,8 @@ public enum ReportValueWords {
     /// "alexec/agents#12", "ENG-4", "alexec/agents release v0.14.0"
     /// (#3023).
     public static func name(_ node: DaemonAPI.LineageNode) -> String {
-        var id = node.ref
+        // Read in the old form (#4800): the words are made from it.
+        var id = WireRef.legacy(node.ref)
         if let colon = id.firstIndex(of: ":"), id[..<colon].allSatisfy({ $0.isLowercase || $0.isNumber || $0 == "-" }) {
             id = String(id[id.index(after: colon)...])
         }
@@ -34,8 +35,9 @@ public enum ReportValueWords {
     /// Where a GitHub issue, PR or release is; nil for a tracker whose address the
     /// ref does not say.
     public static func url(_ node: DaemonAPI.LineageNode) -> URL? {
-        guard node.ref.hasPrefix("github:") else { return nil }
-        let id = node.ref.dropFirst("github:".count)
+        let ref = WireRef.legacy(node.ref)
+        guard ref.hasPrefix("github:") else { return nil }
+        let id = ref.dropFirst("github:".count)
         if let range = id.range(of: "/release/") {
             return URL(string: "https://github.com/\(id[..<range.lowerBound])/releases/tag/\(id[range.upperBound...])")
         }

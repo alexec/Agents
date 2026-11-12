@@ -77,3 +77,54 @@ test("ref: the short forms parse to the full ref", () => {
     assert.throws(() => r.parseShortRef(input, c), undefined, input);
   }
 });
+
+test("ref: the old lineage forms read as Go's RefFromLineage reads them (#4800)", () => {
+  const rows = [
+    ["issue", "github:alexec/agents#123", "github:issue:alexec/agents#123"],
+    ["pr", "github:alexec/Agents#4702", "github:pr:alexec/agents#4702"],
+    ["pr", "gitlab:group/sub/repo!45", "gitlab:mr:group/sub/repo#45"],
+    ["issue", "linear:ENG-4", "linear:issue:eng#ENG-4"],
+    ["issue", "jira:ABC-9", "jira:issue:abc#ABC-9"],
+    ["issue", "azureboards:project#12", "azureboards:issue:project#12"],
+    ["session", "session:7F3C", "agents:session:alexec/agents#7F3C"],
+    ["release", "github:alexec/agents/release/v1.2.0", "github:release:alexec/agents#v1.2.0"],
+    ["doc", "github:alexec/agents/doc/specs/a/spec.md", "github:doc:alexec/agents#specs/a/spec.md"],
+    ["doc", "file:/Users/me/folder/docs/a.md", "file:doc:#/Users/me/folder/docs/a.md"],
+    ["doc", "https://www.notion.so/Page-1", "web:doc:www.notion.so#/Page-1"],
+    ["ci-run", "github:alexec/agents/actions/run/19283746", "github:run:alexec/agents#19283746"],
+    ["ci-run", "azuredevops:org/proj/repo/builds/9", "azuredevops:run:org/proj/repo#9"],
+    ["deploy", "testflight:com.Example.App/42", "testflight:deploy:com.example.app#42"],
+    ["target", "target:testflight:com.Example.App", "testflight:target:#com.example.app"],
+    ["health", "sentry:acme/12345", "sentry:issue:acme#12345"],
+    ["health", "betterstack:987", "betterstack:incident:#987"],
+    ["workflow", "workflow:/Users/me/folder/nightly", "agents:workflow:alexec/agents#/Users/me/folder/nightly"],
+    ["workflow-run", "run:R1", "agents:workflow-run:alexec/agents#R1"],
+    ["repo", "github:alexec/Agents", "github:repo:#alexec/agents"],
+    ["repo", "linear:ENG", "linear:repo:#eng"],
+    ["pr", "github:pr:alexec/agents#4702", "github:pr:alexec/agents#4702"],
+  ];
+  for (const [kind, old, want] of rows) {
+    const got = r.refFromLineage(kind, old, "Alexec/Agents");
+    assert.equal(got && r.formatRef(got), want, `${kind} ${old}`);
+  }
+  for (const [kind, old] of [["release", "github:alexec/agents"], ["issue", "linear:ENG"], ["repo", "github:o/r#12"], ["session", "nonsense"]]) {
+    assert.equal(r.refFromLineage(kind, old), undefined, `${kind} ${old}`);
+  }
+  assert.equal(r.sessionIdOf("agents:session:alexec/agents#A1"), "A1");
+  assert.equal(r.sessionIdOf("session:A1"), "A1");
+  assert.equal(r.sessionIdOf("github:issue:o/r#1"), undefined);
+  assert.equal(r.formatRef(r.repoOfRef(r.anyLineageRef("github:alexec/agents#12"))), "github:repo:#alexec/agents");
+});
+
+test("ref: legacyRef writes the old form back, for the page's words (#4800)", () => {
+  for (const [full, old] of [
+    ["github:issue:alexec/agents#12", "github:alexec/agents#12"], ["gitlab:mr:g/r#4", "gitlab:g/r!4"],
+    ["linear:issue:eng#ENG-4", "linear:ENG-4"], ["agents:session:alexec/agents#A1", "session:A1"],
+    ["github:release:alexec/agents#v1.2.0", "github:alexec/agents/release/v1.2.0"],
+    ["github:run:alexec/agents#9", "github:alexec/agents/actions/run/9"], ["gitlab:run:g/r#9", "gitlab:g/r/pipelines/9"],
+    ["testflight:deploy:com.x.app#42", "testflight:com.x.app/42"], ["testflight:target:#com.x.app", "target:testflight:com.x.app"],
+    ["sentry:issue:acme#42", "sentry:acme/42"], ["betterstack:incident:#7", "betterstack:7"],
+    ["web:doc:www.notion.so#/P-1", "https://www.notion.so/P-1"], ["github:doc:o/r#specs/a.md", "github:o/r/doc/specs/a.md"],
+    ["github:repo:#alexec/agents", "github:alexec/agents"], ["github:alexec/agents#12", "github:alexec/agents#12"],
+  ]) assert.equal(r.legacyRef(full), old, full);
+});

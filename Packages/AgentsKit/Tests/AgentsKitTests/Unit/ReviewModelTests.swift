@@ -40,7 +40,7 @@ struct ReviewModelTests {
                               line: "v0.17.0 waits for your approval", actions: [.approve, .deny])
         #expect(deploy.kindWord == "Deploy")
         #expect(deploy.word(for: .approve) == "Approve")
-        #expect(deploy.word(for: .deny) == "Reject")
+        #expect(deploy.word(for: .deny) == "Deny")
         #expect(!deploy.opensItsSubject)
         #expect(!deploy.isSession)
     }

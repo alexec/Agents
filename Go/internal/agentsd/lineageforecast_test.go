@@ -40,11 +40,11 @@ func TestBurnOfAWeeklyAllowance(t *testing.T) {
 func TestLineageForecastOfAnEpic(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	epic := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#10"}
+	epic := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#10"}
 	key, _ := json.Marshal([]any{"forge/plan", epic.Ref})
 	d.forgeRemember(string(key), forgeAnswer{plan: &forgePlanAnswer{
 		epic:     wire.ForgeItem{Node: epic, State: "open", Labels: []wire.ForgeLabel{{Name: "epic"}}},
-		children: []planChild{{item: wire.ForgeItem{Node: wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#11"}, State: "open"}}}}})
+		children: []planChild{{item: wire.ForgeItem{Node: wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#11"}, State: "open"}}}}})
 	var f wire.LineageForecast
 	if err := json.Unmarshal(c.call(t, 1, "lineage/forecast", wire.LineageForecastRequest{Node: &epic}), &f); err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestLineageForecastOfAnEpic(t *testing.T) {
 	if got := d.keepForecast(costKey(epic), &wire.LineageForecastKept{P50: 5, P85: 6}); got == nil || *got != *first {
 		t.Fatalf("kept again: %+v", got)
 	}
-	if got := d.keepForecast(costKey(wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#12"}), first); got != nil {
+	if got := d.keepForecast(costKey(wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#12"}), first); got != nil {
 		t.Fatalf("%+v", got)
 	}
 }
@@ -75,10 +75,10 @@ func TestLineageForecastOfAMilestone(t *testing.T) {
 	defer d.Shutdown()
 	folder := t.TempDir()
 	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
-	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#11"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#11"}
 	open := "open"
 	d.workMu.Lock()
-	d.costLedgerLocked().Nodes[costKey(issue)] = wire.LineageCostNode{Node: issue, Repo: new("github:alexec/agents"), Milestone: new("Planning"),
+	d.costLedgerLocked().Nodes[costKey(issue)] = wire.LineageCostNode{Node: issue, Repo: new("github:repo:#alexec/agents"), Milestone: new("Planning"),
 		Level: new("task"), Banked: wire.LineageCost{Cost: map[string]float64{}}, Resolved: &wire.LineageResolved{State: &open}}
 	d.workMu.Unlock()
 	var f wire.LineageForecast

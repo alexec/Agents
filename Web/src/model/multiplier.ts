@@ -3,6 +3,7 @@
 // the rising line's words, and the earned badges with the Next line.
 import type { Achievements, Multiplier } from "../protocol/generated";
 import { achievementList, orderedAchievements, type AchievementID } from "./achievements";
+import { legacyRef } from "../protocol/ref";
 
 /** The most Blobs drawn; past it, one Blob is `bigEach` engineers. */
 export const crowdCap = 1000;
@@ -98,7 +99,8 @@ export const oneDecimal = (value: number) => value.toLocaleString(undefined, { m
 export const whole = (value: number) => Math.round(value).toLocaleString();
 
 /** The PR's number as people write it, `#1234`, from a ref such as `github:alexec/agents#1234` (`shortName`). */
-export function prShortName(ref: string): string {
+export function prShortName(full: string): string {
+  const ref = legacyRef(full);
   const hash = ref.lastIndexOf("#");
   return hash < 0 ? ref : ref.slice(hash);
 }

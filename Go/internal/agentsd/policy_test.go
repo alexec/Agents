@@ -765,7 +765,7 @@ func TestARollupRowCarriesLimitTokens(t *testing.T) {
 	}
 }
 
-// Always-approve for the runtimes the app answers for is under the mode ceiling too: a
+// Always Approve for the runtimes the app answers for is under the mode ceiling too: a
 // saved Yes answers nothing, setting one is refused, and the state says who set it. A
 // helper or a workflow's agent never takes the person's from Settings.
 func TestAlwaysApproveIsUnderTheModeCeiling(t *testing.T) {
@@ -790,7 +790,7 @@ func TestAlwaysApproveIsUnderTheModeCeiling(t *testing.T) {
 
 	d.Told(wire.NotifyMachinePolicy.Name, k.signed(t, 1, map[string]any{"permissionMode": "approveForMe"}))
 	if d.agentAlwaysApproves(&person) || d.agentAlwaysApproves(&helper) {
-		t.Fatal("Always-approve answers above the ceiling")
+		t.Fatal("Always Approve answers above the ceiling")
 	}
 	var cp wire.ClientPermissionSettings
 	json.Unmarshal(c.call(t, 2, "clientPermissions/state", nil), &cp)
@@ -800,7 +800,7 @@ func TestAlwaysApproveIsUnderTheModeCeiling(t *testing.T) {
 	refused(t, c.callError(t, 3, "clientPermissions/set", map[string]any{"cursor": "alwaysApprove", "grok": "default", "opencode": "default"}), "policy", "permissionMode")
 	refused(t, c.callError(t, 4, "agents/setClientPermission", map[string]any{"agentID": person.ID, "mode": "alwaysApprove"}), "policy", "permissionMode")
 	refused(t, c.callError(t, 4, "agents/setLevels", map[string]any{"agentID": person.ID, "levels": map[string]any{"permissionRequests": "alwaysApprove"}}), "policy", "permissionMode")
-	// A start's own Yes to all: a person's is refused; a workflow's, and Auto's Approve for
+	// A start's own Always Approve: a person's is refused; a workflow's, and Auto's Approve for
 	// me cell, start asking.
 	yesToAll := map[string]any{"permissionRequests": "alwaysApprove"}
 	refused(t, c.callError(t, 4, "agents/start", map[string]any{"runtimeID": "grok", "cwd": "file://" + dir, "prompt": "x", "levels": yesToAll}), "policy", "permissionMode")
@@ -811,13 +811,13 @@ func TestAlwaysApproveIsUnderTheModeCeiling(t *testing.T) {
 	r.Levels = &wire.Levels{PermissionRequests: &yes}
 	id, err := d.startFor(r, startedBy{owner: wire.SessionLabelOwnerAgent})
 	if err != nil || !asks(d.Store.Agent(id)) {
-		t.Fatal("a workflow's Yes to all above the ceiling", err)
+		t.Fatal("a workflow's Always Approve above the ceiling", err)
 	}
 	c.call(t, 4, "auto/set", map[string]any{"order": []string{"grok"}, "excluded": []string{"claude", "codex", "cursor", "copilot", "gemini", "opencode", "antigravity"}, "overrides": []any{}})
 	var auto wire.UUID
 	json.Unmarshal(c.call(t, 4, "agents/start", map[string]any{"runtimeID": "auto", "cwd": "file://" + dir, "prompt": "x", "levels": map[string]any{"permission": "approveForMe"}}), &auto)
 	if a := d.Store.Agent(auto); a == nil || a.RuntimeID != "grok" || !asks(a) {
-		t.Fatalf("Auto's Yes to all above the ceiling: %+v", a)
+		t.Fatalf("Auto's Always Approve above the ceiling: %+v", a)
 	}
 	c.call(t, 5, "clientPermissions/set", map[string]any{"cursor": "default", "grok": "default", "opencode": "default"})
 	if fi, err := os.Stat(filepath.Join(d.SettingsDir, "client-permissions.json")); err != nil || fi.Mode().Perm() != 0o600 {

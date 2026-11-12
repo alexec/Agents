@@ -47,10 +47,10 @@ func TestDocsASessionReadsOrLinksTo(t *testing.T) {
 
 	s := sessionNode(a.ID)
 	wantLinks(t, active(d, s),
-		s.Ref+" reads github:alexec/agents/doc/specs/2348-lineage/spec.md (agent)",
-		s.Ref+" reads https://www.notion.so/acme/Design-abc123 (agent)",
-		s.Ref+" links-to github:alexec/agents/doc/docs/how-to/use-jira.md (agent)",
-		s.Ref+" links-to https://acme.atlassian.net/wiki/spaces/ENG/pages/12/Design (agent)")
+		s.Ref+" reads github:doc:alexec/agents#specs/2348-lineage/spec.md (agent)",
+		s.Ref+" reads web:doc:www.notion.so#/acme/Design-abc123 (agent)",
+		s.Ref+" links-to github:doc:alexec/agents#docs/how-to/use-jira.md (agent)",
+		s.Ref+" links-to web:doc:acme.atlassian.net#/wiki/spaces/ENG/pages/12/Design (agent)")
 
 	// Archived, its doc links end with the rest.
 	if err := d.archive(a.ID); err != nil {
@@ -69,7 +69,7 @@ func TestADocInAFolderWithNoForge(t *testing.T) {
 	a := seeded(t, d, folder, nil)
 	d.noteDocLinks(a.ID, "Per specs/1-x/spec.md.")
 	s := sessionNode(a.ID)
-	wantLinks(t, active(d, s), s.Ref+" links-to file:"+filepath.ToSlash(folder)+"/specs/1-x/spec.md (agent)")
+	wantLinks(t, active(d, s), s.Ref+" links-to file:doc:#"+filepath.ToSlash(folder)+"/specs/1-x/spec.md (agent)")
 }
 
 // #3308: the issue's and the PR's section name the docs its sessions read, and a doc does
@@ -135,13 +135,13 @@ func TestTheLineageSectionNamesTheDocs(t *testing.T) {
 // #3308: a doc's name and address in the section.
 func TestDocNameAndURL(t *testing.T) {
 	for _, c := range []struct{ ref, base, name, url string }{
-		{"github:alexec/agents/doc/specs/1/spec.md", "https://github.com", "specs/1/spec.md", "https://github.com/alexec/agents/blob/HEAD/specs/1/spec.md"},
-		{"gitlab:group/sub/project/doc/docs/a.md", "https://git.example.com", "docs/a.md", "https://git.example.com/group/sub/project/-/blob/HEAD/docs/a.md"},
-		{"gitlab:group/project/doc/docs/a.md", "", "docs/a.md", "https://gitlab.com/group/project/-/blob/HEAD/docs/a.md"},
-		{"forgejo:kim/notes/doc/docs/a.md", "http://localhost:3844", "docs/a.md", "http://localhost:3844/kim/notes/src/HEAD/docs/a.md"},
-		{"forgejo:kim/notes/doc/docs/a.md", "", "docs/a.md", ""},
-		{"bitbucket:walkalex/app/doc/docs/a.md", "", "docs/a.md", "https://bitbucket.org/walkalex/app/src/HEAD/docs/a.md"},
-		{"file:/Users/me/src/thing/specs/1/spec.md", "", "specs/1/spec.md", ""},
+		{"github:doc:alexec/agents#specs/1/spec.md", "https://github.com", "specs/1/spec.md", "https://github.com/alexec/agents/blob/HEAD/specs/1/spec.md"},
+		{"gitlab:doc:group/sub/project#docs/a.md", "https://git.example.com", "docs/a.md", "https://git.example.com/group/sub/project/-/blob/HEAD/docs/a.md"},
+		{"gitlab:doc:group/project#docs/a.md", "", "docs/a.md", "https://gitlab.com/group/project/-/blob/HEAD/docs/a.md"},
+		{"forgejo:doc:kim/notes#docs/a.md", "http://localhost:3844", "docs/a.md", "http://localhost:3844/kim/notes/src/HEAD/docs/a.md"},
+		{"forgejo:doc:kim/notes#docs/a.md", "", "docs/a.md", ""},
+		{"bitbucket:doc:walkalex/app#docs/a.md", "", "docs/a.md", "https://bitbucket.org/walkalex/app/src/HEAD/docs/a.md"},
+		{"file:doc:#/Users/me/src/thing/specs/1/spec.md", "", "specs/1/spec.md", ""},
 		{"https://www.notion.so/acme/Design-abc123", "", "www.notion.so/acme/Design-abc123", "https://www.notion.so/acme/Design-abc123"},
 	} {
 		if n, u := docName(c.ref), docURL(c.ref, c.base); n != c.name || u != c.url {

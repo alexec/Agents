@@ -1,19 +1,24 @@
-"""U1 Your first agent (Tutorials ▸ First agent): add a project, New Session, say what you
-want, answer the agent, watch its steps and its reply."""
+"""U1 Your first agent (Tutorials ▸ First agent): the Get started card, add a folder, New
+Session, say what you want, answer the agent, watch its steps, its reply and its Changes.
+The script is section 2.1 of specs/4832-videos/spec.md (#4835)."""
 GROUP = "usage"
 LAYOUT = "mac"
 TITLE = "Your first agent"
+WINDOW = (1360, 820)
+# The card is the story here: make.py and v.tidy() leave it showing.
+GET_STARTED = True
 DOCS = "tutorials/first-agent/"  # the docs page, on docs.agentloops.dev (upload.py)
 
 LINES = {
     "intro": "This is Agents. Here's how to start your first agent.",
-    "project": "A project is a folder you work in. Add one, and it appears in the sidebar.",
-    "new": "Click New Session. The agent works in the project folder, with Claude as its runtime.",
-    "prompt": "Say what you want done. Here, fix the Celsius conversion, and run the tests.",
+    "folder": "A folder is a directory you work in. Add one, and it appears in the sidebar.",
+    "new": "Click New Session. The agent works in this folder, with Claude as its runtime.",
+    "prompt": "Say what you want done. Here: fix the Celsius conversion, and run the tests.",
     "send": "Send it, and the agent starts at once.",
     "ask": "Before it changes a file or runs a command, it asks. Click Yes.",
     "steps": "Its steps appear as it works: what it read, the edit, and the tests it ran.",
-    "reply": "When it's done, its reply says what it changed. That's your first agent.",
+    "reply": "When it's done, its reply says what it changed, and Changes shows the edit.",
+    "end": "That's your first agent.",
 }
 
 FORECAST = '''public struct Forecast {
@@ -56,48 +61,85 @@ let package = Package(
 )
 '''
 
-PROMPT = "The Celsius conversion in Forecast.swift is wrong. Fix it, and run the tests."
+FILES = {
+    "Package.swift": PACKAGE,
+    "Sources/Weather/Forecast.swift": FORECAST,
+    "Tests/WeatherTests/ForecastTests.swift": TESTS,
+    "README.md": "# Weather\n\nA day's forecast, in Fahrenheit and Celsius.\n",
+    ".gitignore": ".build/\n",
+}
+
+PROMPT = "Fix the Celsius conversion and run the tests."
 
 
 def setup(v):
-    v.tidy()
+    # Nothing added yet: the window is empty but for the Get started card.
+    v.wait_until(lambda: v.find("Get started"), timeout=30, what="the Get started card")
+
+
+def rest_of(v, key, spent):
+    """Waits out what is left of line `key` after `spent` seconds of it."""
+    v.sleep(max(0.3, v.takes[key]["duration"] + 0.4 - spent))
 
 
 def run(v):
     v.sleep(1.0)
     v.say("intro")
-    v.mark("add")
-    folder = v.project("weather-app", {
-        "Package.swift": PACKAGE,
-        "Sources/Weather/Forecast.swift": FORECAST,
-        "Tests/WeatherTests/ForecastTests.swift": TESTS,
-        "README.md": "# Weather\n\nA day's forecast, in Fahrenheit and Celsius.\n",
-        ".gitignore": ".build/\n",
-    })
-    v.say("project")
+
+    # 2. Add a folder: the card's step, then the folder in the sidebar and the step ticked.
+    v.say("folder", wait=False)
+    v.sleep(1.5)
+    v.add_folder("weather", FILES)
+    v.wait_until(lambda: v.find("weather"), timeout=20, what="the folder in the sidebar")
+    rest_of(v, "folder", 1.5)
+
+    # 3. New Session on the folder: the start form, with Claude.
+    v.say("new", wait=False)
+    v.sleep(1.0)
     v.select("New Session")
-    v.say("new")
+    rest_of(v, "new", 1.0)
+
+    # 4. The prompt, typed as a person would.
     v.say("prompt", wait=False)
     v.sleep(1.2)
-    v.type("what do you want", PROMPT, 40)
-    v.sleep(0.8)
+    v.type("what do you want", PROMPT, 45)
+    rest_of(v, "prompt", 1.2 + len(PROMPT) * 0.05)
+
+    # 5. Send: the session is Working in the sidebar.
     v.answer_permissions = False
     v.key("return")
     v.say("send")
+
+    # 6. The permission card, and Yes.
     with v.fast(2.0):
-        ask = v.wait_until(lambda: (v.rpc("permissions/pending") or [None])[0], timeout=120, what="a permission card")
+        ask = v.wait_until(lambda: (v.rpc("permissions/pending") or [None])[0], timeout=180, what="a permission card")
         v.wait_until(lambda: v.find("=Yes"), timeout=90, what="the card in the window")
-    v.tidy()
     v.sleep(0.8)
-    v.say("ask")
+    v.say("ask", wait=False)
+    v.sleep(max(1.5, v.takes["ask"]["duration"] - 1.2))
     v.press("=Yes")
     v.answer_permissions = True
-    v.sleep(1.0)
-    v.say("steps")
+    v.sleep(1.2)
+
+    # 7. Its steps fill in, cut short.
+    v.say("steps", wait=False)
     agent = ask["agentID"]
-    with v.fast(3.0):
+    with v.fast(4.0):
         v.wait_state(agent, states=("finished", "idle", "done"), timeout=300)
-    v.tidy()
+    v.sleep(0.6)
+    # The line is said over the sped-up span and after it: wait out what is left.
+    v.sleep(max(0.5, v.takes["steps"]["duration"] - 4.0))
+
+    # 8. The reply, then the Changes pane with the fix in colour.
+    v.say("reply", wait=False)
+    v.sleep(2.5)
+    v.press("Sidebar On The Trailing Side")
+    v.sleep(0.6)
+    v.press("=Changes | Changes")
     v.sleep(1.0)
-    v.say("reply")
+    v.press("Forecast.swift, changed", wait=3)
+    rest_of(v, "reply", 4.1)
+
+    # 9. Done, and the card ticks Start your first agent.
+    v.say("end")
     v.sleep(1.5)

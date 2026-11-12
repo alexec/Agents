@@ -46,8 +46,8 @@ func TestLineageWalkResolvesForgeNodes(t *testing.T) {
 	defer d.Shutdown()
 	folder := t.TempDir()
 	d.repos = map[string]forgeRepo{folder: {"github", "alexec/agents"}}
-	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#12"}
-	pr := wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#13"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#12"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#13"}
 	fake := &fakeResolves{asked: map[string]int{}, of: map[string]wire.LineageResolved{
 		issue.Ref: {Title: "Resolve a node's title", Labels: []string{"area:lineage"}},
 		pr.Ref:    {Title: "Resolve it", Labels: []string{}},
@@ -96,9 +96,9 @@ func TestLineageWalkResolvesForgeNodes(t *testing.T) {
 func TestLineageWalkSkipsResolvingWithNoFolder(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
-	issue := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#12"}
+	issue := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#12"}
 	c.call(t, 1, "lineage/link", wire.LineageLinkRequest{
-		From: wire.LineageNode{Kind: "session", Ref: "session:00000000-0000-0000-0000-000000000001"},
+		From: wire.LineageNode{Kind: "session", Ref: "agents:session:#00000000-0000-0000-0000-000000000001"},
 		To:   issue, Rel: "works-on", Source: "start",
 	})
 	var g wire.LineageGraph
@@ -138,7 +138,7 @@ func TestLineageWalkResolvesOffTheRequestPath(t *testing.T) {
 	}
 	var g wire.LineageGraph
 	for i := 1; i <= resolvePerWalk+10; i++ {
-		g.Nodes = append(g.Nodes, wire.LineageNode{Kind: "issue", Ref: fmt.Sprintf("github:alexec/agents#%d", i)})
+		g.Nodes = append(g.Nodes, wire.LineageNode{Kind: "issue", Ref: fmt.Sprintf("github:issue:alexec/agents#%d", i)})
 	}
 
 	began := time.Now()
@@ -181,10 +181,10 @@ func TestLineageWalkResolvesOffTheRequestPath(t *testing.T) {
 
 func TestNodeOfRepo(t *testing.T) {
 	for ref, kind := range map[string]string{
-		"github:alexec/agents#12": "issue",
-		"github:alexec/agents#13": "pr",
-		"gitlab:group/project#4":  "issue",
-		"gitlab:group/project!5":  "pr",
+		"github:issue:alexec/agents#12": "issue",
+		"github:issue:alexec/agents#13": "pr",
+		"gitlab:issue:group/project#4":  "issue",
+		"gitlab:mr:group/project#5":     "pr",
 	} {
 		repo, n, ok := nodeOfRepo(wire.LineageNode{Kind: kind, Ref: ref})
 		if !ok || n <= 0 || repo.forge == "" {
@@ -192,11 +192,11 @@ func TestNodeOfRepo(t *testing.T) {
 		}
 	}
 	for ref, kind := range map[string]string{
-		"session:00000000-0000-0000-0000-000000000001": "session",
-		"linear:ENG-4":                     "issue",
-		"github:alexec/agents#0":           "issue",
-		"github:no-number":                 "issue",
-		"github:alexec/agents/milestone/3": "milestone",
+		"agents:session:#00000000-0000-0000-0000-000000000001": "session",
+		"linear:issue:eng#ENG-4":                               "issue",
+		"github:issue:alexec/agents#0":                         "issue",
+		"github:no-number":                                     "issue",
+		"github:milestone:alexec/agents#3":                     "milestone",
 	} {
 		if _, _, ok := nodeOfRepo(wire.LineageNode{Kind: kind, Ref: ref}); ok {
 			t.Errorf("%s: want not resolvable", ref)

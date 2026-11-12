@@ -766,7 +766,7 @@ func gitlabItemOf(i gitlabmcp.Item, folder string) wire.ForgeItem {
 
 // linearItemOf is a Linear issue in the one model, from folder.
 func linearItemOf(i linearmcp.Item, folder string) wire.ForgeItem {
-	out := wire.ForgeItem{Node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + i.Identifier}, Title: i.Title, State: i.State,
+	out := wire.ForgeItem{Node: linearNode(i.Identifier), Title: i.Title, State: i.State,
 		URL: optional(i.URL), Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, i.LabelColors), Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), StateReason: optional(i.StateReason),
 		Assignees: i.Assignees, Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), CreatedAt: forgeDateOptional(i.CreatedAt), ClosedAt: forgeDateOptional(i.ClosedAt), Comments: int64(i.Comments)}
 	if out.Assignees == nil {
@@ -774,7 +774,7 @@ func linearItemOf(i linearmcp.Item, folder string) wire.ForgeItem {
 	}
 	var parent *wire.LineageNode
 	if i.Parent != "" {
-		parent = &wire.LineageNode{Kind: lineage.KindIssue, Ref: "linear:" + i.Parent}
+		parent = new(linearNode(i.Parent))
 	}
 	withHierarchy(&out, parent, i.SubTotal, i.SubDone)
 	return out
@@ -782,7 +782,7 @@ func linearItemOf(i linearmcp.Item, folder string) wire.ForgeItem {
 
 // jiraItemOf is a Jira issue in the one model, from folder.
 func jiraItemOf(i jiramcp.Item, folder string) wire.ForgeItem {
-	out := wire.ForgeItem{Node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + i.Key}, Title: i.Title, State: i.State,
+	out := wire.ForgeItem{Node: jiraNode(i.Key), Title: i.Title, State: i.State,
 		Status: optional(i.Status), URL: optional(i.URL), Folder: optional(folder), Labels: forgeLabelsOf(i.Labels, nil),
 		Author: optional(i.Author), AuthorAvatar: optional(i.AuthorAvatar), StateReason: optional(i.StateReason), Assignees: i.Assignees, Milestone: optional(i.Milestone), UpdatedAt: forgeDate(i.UpdatedAt), CreatedAt: forgeDateOptional(i.CreatedAt), ClosedAt: forgeDateOptional(i.ClosedAt),
 		Comments: int64(i.Comments)}
@@ -791,7 +791,7 @@ func jiraItemOf(i jiramcp.Item, folder string) wire.ForgeItem {
 	}
 	var parent *wire.LineageNode
 	if i.Parent != "" {
-		parent = &wire.LineageNode{Kind: lineage.KindIssue, Ref: "jira:" + i.Parent}
+		parent = new(jiraNode(i.Parent))
 	}
 	withHierarchy(&out, parent, i.SubTotal, i.SubDone)
 	return out

@@ -38,7 +38,7 @@ export function LevelSelect({ field, levels, own, value, onChange, disabled }: {
 }) {
   const chosen = levels.chosen(field);
   const title = chosen ? levelWords(field, chosen) : customWords;
-  // Bypass Permissions asks once more, as Yes to all does (#2892).
+  // Bypass Permissions asks once more, as Always Approve does (#2892).
   const [confirming, setConfirming] = useState<string | undefined>();
   const close = (e: Event) => {
     setConfirming(undefined);
@@ -184,9 +184,9 @@ function ClientPermissionControl({ runtime, own, settings, onChange, disabled }:
   const mode = own ?? settings;
   // The value Settings gives, chosen again, follows Settings still.
   const pick = (choice: Mode) => onChange(own === undefined && choice === settings ? undefined : choice);
-  // Always-approve answers every request for every agent of the runtime: one more click (#2746).
+  // Always Approve answers every request for every agent of the runtime: one more click (#2746).
   const [confirming, setConfirming] = useState(false);
-  // In the words every runtime shares (#2658): Request cards or Yes to all.
+  // In the words every runtime shares (#2658): Request cards or Always Approve.
   const title = (choice: ClientPermissionSettings["cursor"]) => levelWords("permissionRequests", choice);
   const choices: ClientPermissionSettings["cursor"][] = ["default", "alwaysApprove"];
   const scope = `For this agent. Settings ▸ Agent Runtimes ▸ ${runtime} gives every new one its value.`;

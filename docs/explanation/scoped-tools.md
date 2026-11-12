@@ -99,7 +99,7 @@ each one has.
   its to-do list, as Claude's does. Sharing a conversation to OpenCode's website
   and self-update are switched off, as switches your own settings cannot turn back on. Left
   to itself OpenCode asks for nothing, so the app makes it ask before editing files, running
-  commands and fetching web pages. The **Default** or **Always-approve** capsule under the
+  commands and fetching web pages. The **Default** or **Always Approve** capsule under the
   prompt sets one Mac-wide value for every OpenCode agent, including workflows and agents
   in server folders. Its own question tool is off, so its questions come through the app's
   and reach you as a card.

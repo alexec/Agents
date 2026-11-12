@@ -62,14 +62,14 @@ func TestATerminalsAgentsSecretAsksAPerson(t *testing.T) {
 	}
 	time.Sleep(2 * formHoldLimit) // the CLI calls again, on the same request
 	if _, err := d.answerSecretUse(r, &wire.RequestSecretUseAnswer{Action: secretUseSession}, nil); err == nil {
-		t.Fatal("a terminal's request took Allow for This Session")
+		t.Fatal("a terminal's request took Approve for This Session")
 	}
 	answerUse(t, d, r, secretUseOnce)
 	if res := got(done); res.code != 0 || res.out != plain || !strings.Contains(res.err, "Needs you") {
 		t.Fatalf("allowed once: %+v", res)
 	}
 
-	// Once was one call: the next asks again, and Allow for 1 Hour lets the rest through. The
+	// Once was one call: the next asks again, and Approve for 1 Hour lets the rest through. The
 	// calls from here on are answered while they are held.
 	answered()
 	done = run("PLAIN_KEY")

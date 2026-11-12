@@ -34,7 +34,7 @@ def last_passage(v):
 
 
 def setup(v):
-    v.folder = v.project("weather-app", {"README.md": "# Weather\n\nA day's forecast, in Fahrenheit and Celsius.\n"})
+    v.folder = v.add_folder("weather-app", {"README.md": "# Weather\n\nA day's forecast, in Fahrenheit and Celsius.\n"})
     v.tidy()
     v.select("New Session")
     v.sleep(1.0)

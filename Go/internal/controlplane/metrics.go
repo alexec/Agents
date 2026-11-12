@@ -139,6 +139,17 @@ func (m *Metrics) Event(method string, sent int) {
 	m.add("agents_control_events_sent_total", label("method", m.method(method)), float64(sent))
 }
 
+// Bus counts an event on the bus (#4729): kept, dropped (a copy of an id already on it)
+// or delivered (to one machine).
+func (m *Metrics) Bus(result string) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.add("agents_control_bus_events_total", label("result", result), 1)
+}
+
 // Store counts a store operation (get, put, delete, list), whether it failed, and its time.
 func (m *Metrics) Store(op string, err error, took time.Duration) {
 	if m == nil {

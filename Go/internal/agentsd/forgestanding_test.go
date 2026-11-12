@@ -46,7 +46,7 @@ func TestStandingOfReadsTheBlock(t *testing.T) {
 func TestStandingMatchesAndOrder(t *testing.T) {
 	item := func(n string, milestone string, labels ...string) wire.ForgeItem {
 		i := forgeItemOf(planIssue(0, "open", labels...), "")
-		i.Node.Ref = "github:alexec/agents#" + n
+		i.Node.Ref = "github:issue:alexec/agents#" + n
 		if milestone != "" {
 			i.Milestone = &milestone
 		}
@@ -81,7 +81,7 @@ func TestStandingMatchesAndOrder(t *testing.T) {
 	standingOrder(items)
 	got := []string{}
 	for _, i := range items {
-		got = append(got, strings.TrimPrefix(i.Node.Ref, "github:alexec/agents#"))
+		got = append(got, strings.TrimPrefix(i.Node.Ref, "github:issue:alexec/agents#"))
 	}
 	if strings.Join(got, " ") != "31 40 25 9 30 12" {
 		t.Fatalf("order: %v", got)
@@ -102,12 +102,12 @@ func TestForgePlanOfAStandingEpic(t *testing.T) {
 	gh.labeled = map[string][]githubmcp.Item{"bug": {low, planIssue(10, "open", "bug"), high, milestoned, planIssue(14, "open", "bug", "epic"), other}}
 	gh.blockers = map[int][]githubmcp.Ref{10: {{Repo: "alexec/Agents", Number: 11, Open: true}, {Repo: "alexec/web", Number: 2, Open: false}},
 		9: {{Repo: "alexec/web", Number: 3, Open: true}}}
-	epic := wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#3659"}
+	epic := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#3659"}
 	var plan wire.ForgePlan
 	json.Unmarshal(c.call(t, 1, "forge/plan", wire.ForgePlanRequest{Node: epic}), &plan)
 	got := []string{}
 	for _, ch := range plan.Children {
-		got = append(got, strings.TrimPrefix(ch.Item.Node.Ref, "github:alexec/agents#"))
+		got = append(got, strings.TrimPrefix(ch.Item.Node.Ref, "github:issue:alexec/agents#"))
 		if ch.Step != 1 || ch.BlockedBy == nil {
 			t.Errorf("child: %+v", ch)
 		}
@@ -125,8 +125,8 @@ func TestForgePlanOfAStandingEpic(t *testing.T) {
 		}
 		return strings.Join(b, " ")
 	}
-	if len(plan.Children) == 3 && (blockers(0) != "|" || blockers(1) != "github:alexec/agents#11 github:alexec/web#2 | github:alexec/agents#11" ||
-		blockers(2) != "github:alexec/web#3 | github:alexec/web#3") {
+	if len(plan.Children) == 3 && (blockers(0) != "|" || blockers(1) != "github:issue:alexec/agents#11 github:issue:alexec/web#2 | github:issue:alexec/agents#11" ||
+		blockers(2) != "github:issue:alexec/web#3 | github:issue:alexec/web#3") {
 		t.Errorf("blockers: %q, %q, %q", blockers(0), blockers(1), blockers(2))
 	}
 	if len(gh.blocked) != 1 || fmt.Sprint(gh.blocked[0]) != "[11 10 9]" {
@@ -149,7 +149,7 @@ func TestForgePlanOfAStandingEpic(t *testing.T) {
 	gh.plan.Epic.Number = 3700
 	gh.bodies[3700] = "No block."
 	plan = wire.ForgePlan{}
-	json.Unmarshal(c.call(t, 3, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#3700"}}), &plan)
+	json.Unmarshal(c.call(t, 3, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#3700"}}), &plan)
 	if plan.Standing == nil || plan.Standing.Error == nil || len(plan.Children) != 0 || plan.Children == nil || len(plan.Steps) != 0 {
 		t.Fatalf("no block: %+v", plan)
 	}
@@ -187,35 +187,35 @@ func TestStandingBlockersOnEveryForge(t *testing.T) {
 	}
 
 	d, _, _, gl, ln, _ := allForgesDaemon(t)
-	check("GitLab", d, "gitlab:group/app#5", children("gitlab:group/app#7", "gitlab:group/app#8"),
-		"gitlab:group/app#90:true gitlab:ops/tool#91:false|")
-	check("Linear", d, "linear:ENG-5", children("linear:ENG-6", "linear:ENG-9"), "linear:OPS-1:true linear:ENG-2:false|")
+	check("GitLab", d, "gitlab:issue:group/app#5", children("gitlab:issue:group/app#7", "gitlab:issue:group/app#8"),
+		"gitlab:issue:group/app#90:true gitlab:issue:ops/tool#91:false|")
+	check("Linear", d, "linear:issue:eng#ENG-5", children("linear:issue:eng#ENG-6", "linear:issue:eng#ENG-9"), "linear:issue:ops#OPS-1:true linear:issue:eng#ENG-2:false|")
 	if fmt.Sprint(gl.blocked) != "[Group/App[7 8]]" || fmt.Sprint(ln.blocked) != "[[ENG-6 ENG-9]]" {
 		t.Errorf("asked GitLab %q, Linear %q", gl.blocked, ln.blocked)
 	}
 
 	d, _, j, _ := jiraDaemon(t)
-	check("Jira", d, "jira:PROJ-7", children("jira:PROJ-8", "jira:PROJ-9"), "jira:OPS-1:true jira:PROJ-2:false|")
+	check("Jira", d, "jira:issue:proj#PROJ-7", children("jira:issue:proj#PROJ-8", "jira:issue:proj#PROJ-9"), "jira:issue:ops#OPS-1:true jira:issue:proj#PROJ-2:false|")
 	if fmt.Sprint(j.blocked) != "[[PROJ-8 PROJ-9]]" {
 		t.Errorf("asked Jira %q", j.blocked)
 	}
 
 	d, _, b, _ := boardsDaemon(t)
-	check("Azure Boards", d, "azureboards:acme/web app#12", children("azureboards:acme/web app#13", "azureboards:acme/web app#14"),
-		"azureboards:acme/ops#90:true azureboards:acme/web app#91:false|")
+	check("Azure Boards", d, "azureboards:issue:acme/web app#12", children("azureboards:issue:acme/web app#13", "azureboards:issue:acme/web app#14"),
+		"azureboards:issue:acme/ops#90:true azureboards:issue:acme/web app#91:false|")
 	if fmt.Sprint(b.blocked) != "[acme/web app[13 14]]" {
 		t.Errorf("asked Azure Boards %q", b.blocked)
 	}
 
 	d, _, fj, _ := forgejoDaemon(t)
-	check("Forgejo", d, "forgejo:walkalex/app#1", children("forgejo:walkalex/app#2", "forgejo:walkalex/app#3"),
-		"forgejo:kim/notes#9:true forgejo:walkalex/app#5:false|")
+	check("Forgejo", d, "forgejo:issue:walkalex/app#1", children("forgejo:issue:walkalex/app#2", "forgejo:issue:walkalex/app#3"),
+		"forgejo:pr:kim/notes#9:true forgejo:issue:walkalex/app#5:false|")
 	if fmt.Sprint(fj.blocked) != "[walkalex/App[2 3]]" {
 		t.Errorf("asked Forgejo %q", fj.blocked)
 	}
 	// A forge the epic is on but no folder here is: the read says why.
-	if err := d.standingBlockers(context.Background(), "forge/plan", wire.ForgeItem{Node: wire.LineageNode{Kind: "issue", Ref: "forgejo:kim/notes#1"}},
-		children("forgejo:kim/notes#2")); err == nil || !strings.Contains(err.Error(), "forge/plan") {
+	if err := d.standingBlockers(context.Background(), "forge/plan", wire.ForgeItem{Node: wire.LineageNode{Kind: "issue", Ref: "forgejo:issue:kim/notes#1"}},
+		children("forgejo:issue:kim/notes#2")); err == nil || !strings.Contains(err.Error(), "forge/plan") {
 		t.Errorf("Forgejo with no folder: %v", err)
 	}
 }
@@ -230,10 +230,10 @@ func TestForgePlanOfAStandingEpicWithNoParent(t *testing.T) {
 	child.ParentRepo, child.ParentNumber = "alexec/Agents", 3265
 	gh.labeled = map[string][]githubmcp.Item{"enhancement": {planIssue(10, "open", "enhancement"), child, planIssue(14, "open", "enhancement")}}
 	var plan wire.ForgePlan
-	json.Unmarshal(c.call(t, 1, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "github:alexec/agents#4208"}}), &plan)
+	json.Unmarshal(c.call(t, 1, "forge/plan", wire.ForgePlanRequest{Node: wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#4208"}}), &plan)
 	got := []string{}
 	for _, ch := range plan.Children {
-		got = append(got, strings.TrimPrefix(ch.Item.Node.Ref, "github:alexec/agents#"))
+		got = append(got, strings.TrimPrefix(ch.Item.Node.Ref, "github:issue:alexec/agents#"))
 	}
 	if strings.Join(got, " ") != "10 14" || plan.Standing == nil || plan.Standing.Error != nil {
 		t.Fatalf("plan %v: %+v", got, plan.Standing)
@@ -258,24 +258,24 @@ func TestStandingParentlessOnGitLabAndForgejo(t *testing.T) {
 		return strings.Join(out, " ")
 	}
 	d, _, _, gl, _, _ := allForgesDaemon(t)
-	kept, err := d.standingParentless(context.Background(), "forge/plan", wire.ForgeItem{Node: wire.LineageNode{Kind: "issue", Ref: "gitlab:group/app#5"}},
-		items("gitlab:group/app#7", "gitlab:group/app#8", "gitlab:group/app#9"))
-	if err != nil || refs(kept) != "gitlab:group/app#8 gitlab:group/app#9" || fmt.Sprint(gl.parented) != "[Group/App[7 8 9]]" {
+	kept, err := d.standingParentless(context.Background(), "forge/plan", wire.ForgeItem{Node: wire.LineageNode{Kind: "issue", Ref: "gitlab:issue:group/app#5"}},
+		items("gitlab:issue:group/app#7", "gitlab:issue:group/app#8", "gitlab:issue:group/app#9"))
+	if err != nil || refs(kept) != "gitlab:issue:group/app#8 gitlab:issue:group/app#9" || fmt.Sprint(gl.parented) != "[Group/App[7 8 9]]" {
 		t.Errorf("GitLab: %q, %v, asked %q", refs(kept), err, gl.parented)
 	}
 
 	d, _, fj, _ := forgejoDaemon(t)
-	kept, err = d.standingParentless(context.Background(), "forge/plan", wire.ForgeItem{Node: wire.LineageNode{Kind: "issue", Ref: "forgejo:walkalex/app#1"}},
-		items("forgejo:walkalex/app#2", "forgejo:walkalex/app#3"))
-	if err != nil || refs(kept) != "forgejo:walkalex/app#3" || fmt.Sprint(fj.parented) != "[walkalex/App[2 3]]" {
+	kept, err = d.standingParentless(context.Background(), "forge/plan", wire.ForgeItem{Node: wire.LineageNode{Kind: "issue", Ref: "forgejo:issue:walkalex/app#1"}},
+		items("forgejo:issue:walkalex/app#2", "forgejo:issue:walkalex/app#3"))
+	if err != nil || refs(kept) != "forgejo:issue:walkalex/app#3" || fmt.Sprint(fj.parented) != "[walkalex/App[2 3]]" {
 		t.Errorf("Forgejo: %q, %v, asked %q", refs(kept), err, fj.parented)
 	}
 
 	// On Linear the list said the parent: nothing more is asked.
-	parent := wire.LineageNode{Kind: "issue", Ref: "linear:ENG-5"}
-	linear := items("linear:ENG-6", "linear:ENG-7")
+	parent := wire.LineageNode{Kind: "issue", Ref: "linear:issue:eng#ENG-5"}
+	linear := items("linear:issue:eng#ENG-6", "linear:issue:eng#ENG-7")
 	linear[0].Parent = &parent
-	if kept, err = d.standingParentless(context.Background(), "forge/plan", wire.ForgeItem{Node: parent}, linear); err != nil || refs(kept) != "linear:ENG-7" {
+	if kept, err = d.standingParentless(context.Background(), "forge/plan", wire.ForgeItem{Node: parent}, linear); err != nil || refs(kept) != "linear:issue:eng#ENG-7" {
 		t.Errorf("Linear: %q, %v", refs(kept), err)
 	}
 }

@@ -33,22 +33,22 @@ func TestReportsValueAddsUpTheWork(t *testing.T) {
 		return wire.LineageCostNode{Node: wire.LineageNode{Kind: kind, Ref: ref},
 			Banked: wire.LineageCost{Cost: map[string]float64{"USD": usd}, InputTokens: 10, Turns: 1}, LastAt: wire.DateOf(now)}
 	}
-	issue := node("issue", "github:o/r#1", 1)
+	issue := node("issue", "github:issue:o/r#1", 1)
 	issue.FirstAt = at(10 * time.Hour)
 	// A milestone, as a host before #3878 sends it: no row adds it up.
-	issue.PartOf = []string{"github:o/r/milestone/1"}
-	merged := node("pr", "github:o/r#2", 4)
-	merged.Fixes, merged.Outcome, merged.EndedAt, merged.FailedChecks = []string{"github:o/r#1"}, str("merged"), at(time.Hour), n64(2)
-	merged.PartOf = []string{"github:o/r/release/v1.0.0"}
-	closed := node("pr", "github:o/r#3", 3)
-	closed.Fixes, closed.Outcome, closed.EndedAt = []string{"github:o/r#1"}, str("closed"), at(2*time.Hour)
-	session := node("session", "session:a", 0.5)
+	issue.PartOf = []string{"github:milestone:o/r#1"}
+	merged := node("pr", "github:issue:o/r#2", 4)
+	merged.Fixes, merged.Outcome, merged.EndedAt, merged.FailedChecks = []string{"github:issue:o/r#1"}, str("merged"), at(time.Hour), n64(2)
+	merged.PartOf = []string{"github:release:o/r#v1.0.0"}
+	closed := node("pr", "github:issue:o/r#3", 3)
+	closed.Fixes, closed.Outcome, closed.EndedAt = []string{"github:issue:o/r#1"}, str("closed"), at(2*time.Hour)
+	session := node("session", "agents:session:#a", 0.5)
 	// A release session's own cost, on its release (#4524).
-	release := node("release", "github:o/r/release/v1.0.0", 0.25)
-	old := node("issue", "github:o/r#9", 100)
+	release := node("release", "github:release:o/r#v1.0.0", 0.25)
+	old := node("issue", "github:issue:o/r#9", 100)
 	old.LastAt = wire.DateOf(now.Add(-40 * 24 * time.Hour))
 	// Bea's machine banked its own turns on the same issue.
-	beaIssue := node("issue", "github:o/r#1", 2)
+	beaIssue := node("issue", "github:issue:o/r#1", 2)
 	beaIssue.FirstAt = at(20 * time.Hour)
 
 	send := func(host string, work ...wire.LineageCostNode) {
@@ -82,7 +82,7 @@ func TestReportsValueAddsUpTheWork(t *testing.T) {
 	if org.PrsMerged != 1 || org.PrsClosed != 1 || org.FailedChecks != 2 || org.PerMergedPR["USD"] != 10.25 {
 		t.Fatalf("%+v", org)
 	}
-	if len(org.Issues) != 1 || org.Issues[0].Node.Ref != "github:o/r#1" || org.Issues[0].Total.Cost["USD"] != 10 ||
+	if len(org.Issues) != 1 || org.Issues[0].Node.Ref != "github:issue:o/r#1" || org.Issues[0].Total.Cost["USD"] != 10 ||
 		org.Issues[0].Waste.Cost["USD"] != 3 {
 		t.Fatalf("%+v", org.Issues)
 	}
@@ -93,12 +93,12 @@ func TestReportsValueAddsUpTheWork(t *testing.T) {
 	}
 	// The release has its own 0.25, the merged PR and the issue it fixes: 4 (the PR) + 1 + 2
 	// (the issue, from both machines), not the closed PR, which is not part-of it.
-	if len(org.Releases) != 1 || org.Releases[0].Node.Ref != "github:o/r/release/v1.0.0" ||
+	if len(org.Releases) != 1 || org.Releases[0].Node.Ref != "github:release:o/r#v1.0.0" ||
 		org.Releases[0].Total.Cost["USD"] != 7.25 || org.Releases[0].PrsMerged != 1 || org.Releases[0].PrsClosed != 0 {
 		t.Fatalf("%+v", org.Releases)
 	}
 	if all := value(admin, wire.ReportRangeThreeMonths, &wire.ReportScope{Kind: wire.ReportScopeKindOrg}); len(all.Issues) != 2 ||
-		all.Issues[0].Node.Ref != "github:o/r#9" {
+		all.Issues[0].Node.Ref != "github:issue:o/r#9" {
 		t.Fatalf("%+v", all.Issues)
 	}
 
@@ -124,7 +124,7 @@ func TestReportsValueReadsLineageOnceByTag(t *testing.T) {
 	now := time.Now()
 	put := func(host string, usd float64) {
 		t.Helper()
-		node := wire.LineageCostNode{Node: wire.LineageNode{Kind: "issue", Ref: "github:o/r#1"},
+		node := wire.LineageCostNode{Node: wire.LineageNode{Kind: "issue", Ref: "github:issue:o/r#1"},
 			Banked: wire.LineageCost{Cost: map[string]float64{"USD": usd}}, LastAt: wire.DateOf(now)}
 		if err := p.s.keepWork(ctx, host, []wire.LineageCostNode{node}, now); err != nil {
 			t.Fatal(err)

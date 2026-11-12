@@ -398,7 +398,7 @@ struct SidebarWorkflowRow: View {
                 }
                 // Not on this host, without archiving it everywhere (#391).
                 if summary.canBeDenied {
-                    Button("Deny on This Machine", systemImage: "hand.raised.slash") {
+                    Button("Deny", systemImage: "hand.raised.slash") {
                         Task { await model.denyWorkflow(summary) }
                     }
                 }

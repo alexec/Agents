@@ -1477,9 +1477,9 @@ struct WebFixturesTests {
     @Test func workflows() throws {
         func flow(_ id: String, _ triggers: [WorkflowTrigger], mode: WorkflowMode = .new,
                   problem: WorkflowProblem? = nil, settings: WorkflowSettings = WorkflowSettings(),
-                  cooldown: TimeInterval? = nil) -> Workflow {
+                  cooldown: TimeInterval? = nil, hours: WorkflowHours? = nil) -> Workflow {
             Workflow(workflowID: id, folder: Self.folderURL, triggers: triggers, mode: mode, prompt: "Do it.",
-                     problem: problem, settings: settings, cooldown: cooldown)
+                     problem: problem, settings: settings, cooldown: cooldown, hours: hours)
         }
         let nightly = WorkflowSchedule(minutes: [0], hours: 2...2, days: Weekday.everyDay)
         let office = WorkflowSchedule(minutes: [0, 30], hours: 9...17, startMinute: 30, endMinute: 30, days: Weekday.weekdays)
@@ -1527,6 +1527,13 @@ struct WebFixturesTests {
                 mode: .triggering, cooldown: 24 * 60 * 60),
                 lastOutcome: .refused(.coolingDown(until: Self.base.addingTimeInterval(600)), at: Self.base, repeats: 3),
                 cooldownEndsAt: Self.base.addingTimeInterval(600), holdsAFire: true)),
+            // Hours (#4818): a schedule past midnight, and a trigger held outside the hours, grey.
+            ("a schedule past midnight", WorkflowSummary(workflow: flow("late", [.schedule(
+                WorkflowSchedule(minutes: [0], firstHour: 22, lastHour: 2, endMinute: 0, days: [.fri]))]))),
+            ("outside its hours, a trigger held", WorkflowSummary(workflow: flow("night", [.schedule(nightly)],
+                hours: WorkflowHours(between: "18:00-09:00", days: [.mon, .tue], timeZone: "Europe/London")),
+                lastOutcome: .refused(.outsideHours(until: Self.base.addingTimeInterval(3600)), at: Self.base, repeats: 2),
+                holdsAFire: true, hoursOpenAt: Self.base.addingTimeInterval(3600))),
             ("a server's event, from one server", WorkflowSummary(workflow: flow("red", [.serverEvent(
                 MCPEventTrigger(event: "checks.failed", servers: ["ci"], arguments: ["repo": .string("alexec/Agents")]))]))),
             ("a server's event, from any or two", WorkflowSummary(workflow: flow("prs", [

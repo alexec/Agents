@@ -182,7 +182,7 @@ func partKind(part wire.UserSettingsPartName) (string, bool) {
 	switch part {
 	case wire.UserSettingsPartNameMcpServers, wire.UserSettingsPartNameAgentConfig,
 		wire.UserSettingsPartNameRuntimes, wire.UserSettingsPartNameCostLimits, wire.UserSettingsPartNameNotifications,
-		wire.UserSettingsPartNameAccounts:
+		wire.UserSettingsPartNameAccounts, wire.UserSettingsPartNameTimeZone:
 		return "{", true
 	}
 	return "", false
@@ -269,6 +269,8 @@ func partOf(s *wire.UserSettings, part wire.UserSettingsPartName) *wire.JSONValu
 		return &s.Notifications
 	case wire.UserSettingsPartNameAccounts:
 		return &s.Accounts
+	case wire.UserSettingsPartNameTimeZone:
+		return &s.TimeZone
 	}
 	return nil
 }

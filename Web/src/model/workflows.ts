@@ -637,6 +637,11 @@ export function refusalMessage(refusal: WorkflowRefusal): string {
       ? `it is cooling down until ${shortTime(fromWireDate(refusal.coolingDown.until))}, and runs once then`
       : "a run is still going, and it runs once more when that ends";
   }
+  if ("outsideHours" in refusal) {
+    return refusal.outsideHours.until !== undefined
+      ? `it is outside its hours until ${shortTime(fromWireDate(refusal.outsideHours.until))}, and runs once then`
+      : "it is outside its hours, and its hours name no day";
+  }
   return "it is waiting for your OK";
 }
 
@@ -645,7 +650,7 @@ function refusedSummary(outcome: Extract<WorkflowOutcome, { refused: unknown }>)
   const { _0: refusal, repeats } = outcome.refused;
   const many = repeats > 1;
   // Held, not dropped: it is going to run, and "did not run" would say otherwise.
-  if ("coolingDown" in refusal) {
+  if ("coolingDown" in refusal || "outsideHours" in refusal) {
     return many ? `Waiting — ${repeats} triggers held into one run, as ${refusalMessage(refusal)}` : `Waiting — ${refusalMessage(refusal)}`;
   }
   if ("queued" in refusal) {

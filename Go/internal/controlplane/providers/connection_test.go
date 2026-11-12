@@ -29,14 +29,16 @@ func parsed(t *testing.T, text string) any {
 func TestTheContractsResultsAreRead(t *testing.T) {
 	content, err := Content(parsed(t, `{"content": [{"type": "text", "text": "…"}],
 		"structuredContent": {"contract": 1, "workspaces": [
-			{"id": "a", "name": "devbox", "state": "stopped", "ssh": "alex@h -p 2222", "tunnel": true, "cost": "$1"},
+			{"id": "a", "name": "devbox", "state": "stopped", "ssh": "alex@h -p 2222", "tunnel": true, "cost": "$1",
+				"idleTimeoutMinutes": 240},
 			{"id": "b", "name": "odd", "state": "hibernating"},
 			{"name": "no id"}]}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	yes := true
-	want := []MachineInfo{{ID: "a", Name: "devbox", State: "stopped", SSH: new("alex@h -p 2222"), Tunnel: &yes, Cost: new("$1")},
+	want := []MachineInfo{{ID: "a", Name: "devbox", State: "stopped", SSH: new("alex@h -p 2222"), Tunnel: &yes, Cost: new("$1"),
+		IdleTimeoutMinutes: new(int64(240))},
 		{ID: "b", Name: "odd", State: "unknown"}}
 	if got := ContractMapping.Workspaces(content); !reflect.DeepEqual(got, want) {
 		t.Errorf("%+v", got)

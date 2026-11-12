@@ -37,7 +37,7 @@ type milestoneItem struct {
 type milestoneKey struct{ repo, name string }
 
 func milestoneKeyOf(repo, name string) milestoneKey {
-	return milestoneKey{strings.ToLower(repo), strings.ToLower(name)}
+	return milestoneKey{strings.ToLower(FullRepoText(repo)), strings.ToLower(name)}
 }
 
 // milestoneItems is each milestone's items in nodes, given landed (the refs that landed).
@@ -106,6 +106,9 @@ func MilestoneShares(nodes []wire.LineageCostNode, landings []Landing, not miles
 // items are in, or every repo when they are in more than one) from nodes at now, with w's
 // what-if (#4531).
 func MilestoneForecastOf(nodes []wire.LineageCostNode, name, repo string, now time.Time, w WhatIf) wire.LineageForecast {
+	if repo != "" {
+		repo = FullRepoText(repo)
+	}
 	all := Landings(nodes)
 	landed := map[string]bool{}
 	for _, l := range all {

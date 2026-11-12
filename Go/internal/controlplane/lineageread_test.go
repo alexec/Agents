@@ -22,11 +22,11 @@ func TestLineageReadsMergeEveryMachine(t *testing.T) {
 	beas := p.machine(bea, "BEAS-MAC")
 
 	now := time.Now()
-	epic := wire.LineageNode{Kind: "issue", Ref: "github:o/r#1"}
-	child := wire.LineageNode{Kind: "issue", Ref: "github:o/r#2"}
+	epic := wire.LineageNode{Kind: "issue", Ref: "github:issue:o/r#1"}
+	child := wire.LineageNode{Kind: "issue", Ref: "github:issue:o/r#2"}
 	pr := wire.LineageNode{Kind: "pr", Ref: "github:o/r!3"}
-	lead := wire.LineageNode{Kind: "session", Ref: "session:lead"}
-	lane := wire.LineageNode{Kind: "session", Ref: "session:lane"}
+	lead := wire.LineageNode{Kind: "session", Ref: "agents:session:#lead"}
+	lane := wire.LineageNode{Kind: "session", Ref: "agents:session:#lane"}
 	at := func(ago time.Duration) wire.Date { return wire.DateOf(now.Add(-ago)) }
 	link := func(from, to wire.LineageNode, rel string, ago time.Duration) wire.LineageLink {
 		return wire.LineageLink{From: from, To: to, Rel: rel, Source: "start", At: at(ago)}

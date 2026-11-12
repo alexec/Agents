@@ -3,12 +3,14 @@ package controlplane
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/records"
 	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -53,14 +55,26 @@ func (s *Service) keepWork(ctx context.Context, host string, work []wire.Lineage
 		// What cannot be read starts again from what was sent.
 		_ = json.Unmarshal(object.Data, &kept)
 	}
-	byKey := map[wire.LineageNode]wire.LineageCostNode{}
-	for _, n := range kept.Nodes {
-		byKey[n.Node] = n
-	}
 	for _, n := range work {
 		if n.Node.Kind == "" || n.Node.Ref == "" {
 			return fail(invalidParams, "A lineage node needs a kind and a ref.")
 		}
+	}
+	// In the full ref form (#4800): a machine on a release before it sends the old form, and
+	// a copy kept from before it holds it. What is sent now names a session first.
+	var names lineage.Names
+	work = slices.Clone(work)
+	for i, n := range work {
+		work[i] = lineage.FullCostNode(n, nil)
+		work[i].Node = names.Name(work[i].Node)
+	}
+	byKey := map[wire.LineageNode]wire.LineageCostNode{}
+	for _, n := range kept.Nodes {
+		n = lineage.FullCostNode(n, nil)
+		n.Node = names.Name(n.Node)
+		byKey[n.Node] = n
+	}
+	for _, n := range work {
 		byKey[n.Node] = n
 	}
 	oldest := wire.DateOf(now.Add(-lineageNodeKept))

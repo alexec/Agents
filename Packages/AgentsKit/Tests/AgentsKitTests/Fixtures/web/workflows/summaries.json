@@ -1384,6 +1384,146 @@
     "expected" : {
       "canFire" : true,
       "needsAPerson" : false,
+      "summary" : "Fri on the hour between 10pm and 2am, in a new agent"
+    },
+    "input" : {
+      "holdsAFire" : false,
+      "isArchived" : false,
+      "isEnabled" : true,
+      "isRunning" : false,
+      "nextFireAtByTrigger" : [
+
+      ],
+      "queued" : 0,
+      "scope" : "folder",
+      "workflow" : {
+        "folder" : "file:///fixture/folder",
+        "mode" : "new",
+        "name" : "Late",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri"
+                ],
+                "endMinute" : 0,
+                "hours" : [
+                  22,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "late"
+      }
+    },
+    "name" : "a schedule past midnight"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
+      "summary" : "Every day at 2am, in a new agent"
+    },
+    "input" : {
+      "holdsAFire" : true,
+      "hoursOpenAt" : 812503600,
+      "isArchived" : false,
+      "isEnabled" : true,
+      "isRunning" : false,
+      "lastOutcome" : {
+        "refused" : {
+          "_0" : {
+            "outsideHours" : {
+              "until" : 812503600
+            }
+          },
+          "at" : 812500000,
+          "repeats" : 2
+        }
+      },
+      "nextFireAtByTrigger" : [
+
+      ],
+      "queued" : 0,
+      "scope" : "folder",
+      "workflow" : {
+        "folder" : "file:///fixture/folder",
+        "hours" : {
+          "between" : "18:00-09:00",
+          "days" : [
+            "mon",
+            "tue"
+          ],
+          "timeZone" : "Europe/London"
+        },
+        "mode" : "new",
+        "name" : "Night",
+        "prompt" : "Do it.",
+        "settings" : {
+          "labels" : [
+
+          ],
+          "options" : {
+
+          }
+        },
+        "triggers" : [
+          {
+            "schedule" : {
+              "_0" : {
+                "days" : [
+                  "fri",
+                  "mon",
+                  "sat",
+                  "sun",
+                  "thu",
+                  "tue",
+                  "wed"
+                ],
+                "endMinute" : 30,
+                "hours" : [
+                  2,
+                  2
+                ],
+                "minutes" : [
+                  0
+                ],
+                "startMinute" : 0
+              }
+            }
+          }
+        ],
+        "unknownFields" : {
+
+        },
+        "workflowID" : "night"
+      }
+    },
+    "name" : "outside its hours, a trigger held"
+  },
+  {
+    "expected" : {
+      "canFire" : true,
+      "needsAPerson" : false,
       "summary" : "When ci reports checks.failed (repo alexec/Agents), in a new agent"
     },
     "input" : {

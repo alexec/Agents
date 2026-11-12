@@ -163,8 +163,8 @@ func TestLinksReleasesFromTags(t *testing.T) {
 	// since).
 	wantLinks(t, active(d, rel013))
 	wantLinks(t, active(d, rel014),
-		"github:alexec/agents#3023 part-of "+rel014.Ref+" (forge)",
-		"github:alexec/agents#3024 part-of "+rel014.Ref+" (forge)")
+		"github:pr:alexec/agents#3023 part-of "+rel014.Ref+" (forge)",
+		"github:pr:alexec/agents#3024 part-of "+rel014.Ref+" (forge)")
 	for _, l := range d.lineage().Links(rel014).Links {
 		if l.To == rel014 && l.At != wire.DateOf(t014) {
 			t.Errorf("link at %v, want the tag's commit time %v", l.At, t014)
@@ -185,11 +185,11 @@ func TestRollupOfARelease(t *testing.T) {
 	cost := wire.LineageCost{Cost: map[string]float64{"USD": 1}}
 	merged := lineage.OutcomeMerged
 	nodes := []wire.LineageCostNode{
-		{Node: wire.LineageNode{Kind: lineage.KindPR, Ref: "github:o/r#2"}, Banked: cost, PartOf: []string{"github:o/r/release/v1.0.0"}, Fixes: []string{"github:o/r#1"}, Outcome: &merged, LastAt: 2},
-		{Node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "github:o/r#1"}, Banked: cost, LastAt: 1},
-		{Node: wire.LineageNode{Kind: lineage.KindPR, Ref: "github:o/r#9"}, Banked: cost, LastAt: 3}, // not part of the release.
+		{Node: wire.LineageNode{Kind: lineage.KindPR, Ref: "github:pr:o/r#2"}, Banked: cost, PartOf: []string{"github:release:o/r#v1.0.0"}, Fixes: []string{"github:issue:o/r#1"}, Outcome: &merged, LastAt: 2},
+		{Node: wire.LineageNode{Kind: lineage.KindIssue, Ref: "github:issue:o/r#1"}, Banked: cost, LastAt: 1},
+		{Node: wire.LineageNode{Kind: lineage.KindPR, Ref: "github:pr:o/r#9"}, Banked: cost, LastAt: 3}, // not part of the release.
 	}
-	r := lineage.Rollup(nodes, wire.LineageNode{Kind: lineage.KindRelease, Ref: "github:o/r/release/v1.0.0"})
+	r := lineage.Rollup(nodes, wire.LineageNode{Kind: lineage.KindRelease, Ref: "github:release:o/r#v1.0.0"})
 	if r.Total.Cost["USD"] != 2 || len(r.Parts) != 2 {
 		t.Fatalf("%+v", r)
 	}

@@ -44,6 +44,8 @@ It takes nothing. It returns:
   start takes the key it is offered and pins it again. At any other time, a changed key is
   refused.
 - `cost` is optional, and is shown as given.
+- `idleTimeoutMinutes` is optional: the provider stops the workspace by itself after this
+  many minutes with no use, as GitHub stops a codespace (#4803). The machine's page says so.
 
 **Limits**: at most 200 workspaces are read. Ids must be stable across restarts.
 

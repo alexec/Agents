@@ -146,7 +146,9 @@ public enum WorkList {
 
     /// The repo or tracker of a ref: "github:alexec/Agents" of "github:alexec/Agents#12", the team "linear:ENG" of
     /// "linear:ENG-4" (#3311), "jira" of "jira:PROJ-1".
-    public static func repo(of ref: String) -> String {
+    public static func repo(of full: String) -> String {
+        // Read in the old form (#4800): the words are made from it.
+        let ref = WireRef.legacy(full)
         guard let colon = ref.firstIndex(of: ":") else { return ref }
         let forge = String(ref[..<colon])
         let id = ref[ref.index(after: colon)...]
@@ -161,7 +163,7 @@ public enum WorkList {
 
     /// A lineage node's repo: lineage says "linear" for every Linear issue, Work its team (#3311).
     static func repo(of n: DaemonAPI.ReportNode) -> String {
-        if let repo = n.repo, repo != "linear" { return repo }
+        if let repo = n.repo.map(WireRef.legacy), repo != "linear" { return repo }
         return repo(of: n.node.ref)
     }
 
@@ -172,7 +174,8 @@ public enum WorkList {
 
     /// "alexec/Agents" of "github:alexec/Agents"; "Linear · ENG" of a Linear team (#3311); "Jira" of "jira";
     /// "Azure Boards · acme/web" of an Azure Boards project (#3815).
-    public static func repoName(_ repo: String) -> String {
+    public static func repoName(_ full: String) -> String {
+        let repo = WireRef.legacy(full)
         if repo.hasPrefix("linear:") { return "Linear · \(repo.dropFirst("linear:".count))" }
         if repo.hasPrefix("azureboards:") { return "Azure Boards · \(repo.dropFirst("azureboards:".count))" }
         if let tracker = forgeTitle[repo], !repo.contains(":") { return tracker }
@@ -180,13 +183,15 @@ public enum WorkList {
     }
 
     /// An issue's or a PR's number in its repo, for Newest; 0 for one without.
-    public static func number(_ ref: String) -> Int {
+    public static func number(_ full: String) -> Int {
+        let ref = WireRef.legacy(full)
         guard let range = ref.range(of: #"[#!-]\d+$"#, options: .regularExpression) else { return 0 }
         return Int(ref[range].dropFirst()) ?? 0
     }
 
     /// "#12", "!45", "ENG-4" or "v0.14.0": a row's short name in its repo.
-    public static func shortRef(_ ref: String) -> String {
+    public static func shortRef(_ full: String) -> String {
+        let ref = WireRef.legacy(full)
         if let range = ref.range(of: #"[#!]\d+$"#, options: .regularExpression) { return String(ref[range]) }
         if let range = ref.range(of: #"/release/.+$"#, options: .regularExpression) {
             return String(ref[range].dropFirst("/release/".count))
@@ -423,7 +428,7 @@ public enum WorkList {
 
     /// "GitHub" of "github:alexec/Agents#12", by the ref's forge; "the forge" of one it does not know.
     public static func forgeName(_ ref: String) -> String {
-        let forge = ref.split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
+        let forge = WireRef.legacy(ref).split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
         return forgeTitle[forge] ?? "the forge"
     }
 
@@ -432,7 +437,7 @@ public enum WorkList {
 
     /// Whether the item's page offers Labels: not on a pull request of a forge whose pull requests have none (#3881).
     public static func takesLabels(_ node: DaemonAPI.LineageNode) -> Bool {
-        let forge = node.ref.split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
+        let forge = WireRef.legacy(node.ref).split(separator: ":", maxSplits: 1).first.map(String.init) ?? ""
         return !(node.kind == "pr" && forgesWithoutPRLabels.contains(forge))
     }
 

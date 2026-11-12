@@ -547,7 +547,8 @@ public enum LineageList {
     public static let depth = 2
 
     public static func node(ofSession id: UUID) -> Node {
-        Node(kind: "session", ref: "session:\(id.uuidString)")
+        // The project is not known here: the daemon names the session as it keeps it (#4800).
+        Node(kind: "session", ref: WireRef.sessionRef(id: id.uuidString))
     }
 
     /// A PR's page, not its issue's: GitHub sends /issues/ to /pull/ but not the other way.

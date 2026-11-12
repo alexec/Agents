@@ -45,6 +45,8 @@ type Listing struct {
 	Tunnel        string
 	HostKeyRenews string
 	Cost          string
+	// IdleTimeout is where the provider's own idle timeout in minutes is (#4803).
+	IdleTimeout string
 	// Its words for a state, lower-cased, to a contract state.
 	States map[string]string
 }
@@ -60,7 +62,7 @@ var ContractMapping = ToolMapping{
 		"name": "{name}", "options": "{options}", "firstBoot": "{firstBoot}"}},
 	Delete: &Call{Tool: "workspace_delete", Arguments: map[string]any{"id": "{id}"}},
 	Listing: Listing{Items: "workspaces", ID: "id", Name: "name", State: "state", SSH: "ssh", Tunnel: "tunnel",
-		HostKeyRenews: "hostKeyRenews", Cost: "cost", States: map[string]string{}},
+		HostKeyRenews: "hostKeyRenews", Cost: "cost", IdleTimeout: "idleTimeoutMinutes", States: map[string]string{}},
 	Native: true,
 }
 
@@ -145,7 +147,8 @@ func MapFrom(m any) (ToolMapping, error) {
 		required bool
 	}{{"items", &l.Items, false}, {"id", &l.ID, true}, {"name", &l.Name, true}, {"state", &l.State, true},
 		{"ssh", &l.SSH, false}, {"tunnel", &l.Tunnel, false},
-		{"hostKeyRenews", &l.HostKeyRenews, false}, {"cost", &l.Cost, false}} {
+		{"hostKeyRenews", &l.HostKeyRenews, false}, {"cost", &l.Cost, false},
+		{"idleTimeoutMinutes", &l.IdleTimeout, false}} {
 		if *p.into, err = path(p.key, p.required); err != nil {
 			return out, err
 		}
@@ -308,6 +311,11 @@ func (m ToolMapping) Workspace(item any) *MachineInfo {
 				cost = string([]rune(cost)[:120])
 			}
 			w.Cost = optional(cost)
+		}
+	}
+	if m.Listing.IdleTimeout != "" {
+		if n, ok := integer(pathValue(m.Listing.IdleTimeout, item)); ok && n > 0 {
+			w.IdleTimeoutMinutes = new(int64(n))
 		}
 	}
 	return w

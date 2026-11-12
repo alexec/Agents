@@ -49,8 +49,8 @@ func TestLineageFromLabelsHelpersAndArchive(t *testing.T) {
 	s, p := sessionNode(child.ID), sessionNode(parent.ID)
 	wantLinks(t, active(d, s),
 		p.Ref+" started "+s.Ref+" (helper)",
-		s.Ref+" works-on github:alexec/agents#12 (start)",
-		s.Ref+" works-on linear:ENG-4 (start)")
+		s.Ref+" works-on github:issue:alexec/agents#12 (start)",
+		s.Ref+" works-on linear:issue:eng#ENG-4 (start)")
 
 	if _, err := d.setSessionLabels(child.ID, map[string]json.RawMessage{"add": json.RawMessage(`["P#40"]`)}); err != nil {
 		t.Fatal(err)
@@ -66,8 +66,8 @@ func TestLineageFromLabelsHelpersAndArchive(t *testing.T) {
 	})
 	wantLinks(t, active(d, s),
 		p.Ref+" started "+s.Ref+" (helper)",
-		s.Ref+" works-on linear:ENG-4 (start)",
-		s.Ref+" works-on github:alexec/agents#40 (agent)")
+		s.Ref+" works-on linear:issue:eng#ENG-4 (start)",
+		s.Ref+" works-on github:pr:alexec/agents#40 (agent)")
 
 	if err := d.archive(child.ID); err != nil {
 		t.Fatal(err)
@@ -84,10 +84,14 @@ func TestLineageFromAWorkflowRun(t *testing.T) {
 	a := seeded(t, d, folder, nil)
 	run, wf := store.NewUUID(), "fix-failed-checks"
 	d.change(a.ID, func(a *wire.Agent) { a.StartedByRun, a.StartedByWorkflow = &run, &wf })
-	r := wire.LineageNode{Kind: "workflow-run", Ref: "run:" + string(run)}
+	r := wire.LineageNode{Kind: "workflow-run", Ref: "agents:workflow-run:#" + string(run)}
 	wantLinks(t, active(d, r),
 		r.Ref+" started "+sessionNode(a.ID).Ref+" (helper)",
-		r.Ref+" part-of workflow:"+folder+"/fix-failed-checks (helper)")
+		r.Ref+" part-of agents:workflow:#"+folder+"/fix-failed-checks (helper)")
+	// Asked in the old form, it is the same node (#4800).
+	if got := active(d, wire.LineageNode{Kind: "workflow-run", Ref: "run:" + string(run)}); len(got) != 2 {
+		t.Fatalf("the old form: %v", got)
+	}
 }
 
 // #2349: pr.opened links every session on its branch, in its repo, and the issues its body
@@ -109,12 +113,12 @@ func TestLineageFromPREvents(t *testing.T) {
 			`"url":"https://github.com/alexec/Agents/pull/9","fixes":["#7","Other/Repo#3"]}}`}}
 	}
 	d.lineageEvent(event("pr.opened"))
-	pr := wire.LineageNode{Kind: "pr", Ref: "github:alexec/agents#9"}
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#9"}
 	wantLinks(t, active(d, pr),
 		sessionNode(first.ID).Ref+" opens "+pr.Ref+" (branch)",
 		sessionNode(second.ID).Ref+" opens "+pr.Ref+" (branch)",
-		pr.Ref+" fixes github:alexec/agents#7 (pr-body)",
-		pr.Ref+" fixes github:other/repo#3 (pr-body)")
+		pr.Ref+" fixes github:issue:alexec/agents#7 (pr-body)",
+		pr.Ref+" fixes github:issue:other/repo#3 (pr-body)")
 	if got := active(d, sessionNode(elsewhere.ID)); len(got) != 0 {
 		t.Fatalf("a session in another repo: %v", got)
 	}
@@ -135,24 +139,24 @@ func TestLineageWhenAPRMerges(t *testing.T) {
 	d.noteLineage(nil, a)
 	d.lineageEvent(wire.Event{Name: "pr.merged", Details: map[string]string{"payload": `{"pr":{"number":5,` +
 		`"url":"https://gitlab.example.com/group/sub/project/-/merge_requests/5","fixes":["#2"]}}`}})
-	wantLinks(t, active(d, wire.LineageNode{Kind: "pr", Ref: "gitlab:group/sub/project!5"}),
-		"gitlab:group/sub/project!5 fixes gitlab:group/sub/project#2 (pr-body)")
+	wantLinks(t, active(d, wire.LineageNode{Kind: "pr", Ref: "gitlab:mr:group/sub/project#5"}),
+		"gitlab:mr:group/sub/project#5 fixes gitlab:issue:group/sub/project#2 (pr-body)")
 }
 
 func TestPROfURL(t *testing.T) {
 	for raw, want := range map[string]string{
-		"https://github.com/alexec/Agents/pull/12":                 "github:alexec/agents#12",
-		"https://github.com/alexec/Agents/pull/12/files":           "github:alexec/agents#12",
-		"https://gitlab.com/group/project/-/merge_requests/3":      "gitlab:group/project!3",
-		"https://gitlab.example.com/a/b/c/-/merge_requests/4#note": "gitlab:a/b/c!4",
+		"https://github.com/alexec/Agents/pull/12":                 "github:pr:alexec/agents#12",
+		"https://github.com/alexec/Agents/pull/12/files":           "github:pr:alexec/agents#12",
+		"https://gitlab.com/group/project/-/merge_requests/3":      "gitlab:mr:group/project#3",
+		"https://gitlab.example.com/a/b/c/-/merge_requests/4#note": "gitlab:mr:a/b/c#4",
 		"https://github.com/alexec/Agents/issues/12":               "",
 		"https://example.com/o/r/pull/1":                           "",
 		"https://github.com/o/r/pull/x":                            "",
-		"https://codeberg.org/kim/Notes/pulls/5":                   "forgejo:kim/notes#5",
-		"http://localhost:3753/walkalex/App/pulls/8/files":         "forgejo:walkalex/app#8",
+		"https://codeberg.org/kim/Notes/pulls/5":                   "forgejo:pr:kim/notes#5",
+		"http://localhost:3753/walkalex/App/pulls/8/files":         "forgejo:pr:walkalex/app#8",
 		"https://github.com/o/r/pulls/5":                           "",
 		"https://gitlab.com/o/r/pulls/5":                           "",
-		"https://bitbucket.org/walkalex/App/pull-requests/8/diff":  "bitbucket:walkalex/app#8",
+		"https://bitbucket.org/walkalex/App/pull-requests/8/diff":  "bitbucket:pr:walkalex/app#8",
 		"https://bitbucket.org/walkalex/app/pull/8":                "",
 		"https://bitbucket.org/a/b/c/pull-requests/8":              "",
 		"https://example.com/walkalex/app/pull-requests/8":         "",

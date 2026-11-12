@@ -129,7 +129,7 @@ func TestLineageOnASelfHostedGitLabOfAnyName(t *testing.T) {
 	if r := d.folderRepo(folder); r != (forgeRepo{"gitlab", "platform/api"}) {
 		t.Fatalf("on the connected GitLab: %+v", r)
 	}
-	if n, ok := d.labelNode(folder, "P#4"); !ok || n != (wire.LineageNode{Kind: "pr", Ref: "gitlab:platform/api!4"}) {
+	if n, ok := d.labelNode(folder, "P#4"); !ok || n != (wire.LineageNode{Kind: "pr", Ref: "gitlab:mr:platform/api#4"}) {
 		t.Fatalf("its P#4: %+v", n)
 	}
 

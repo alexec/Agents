@@ -155,7 +155,7 @@
       "picks" : "Picks Claude now",
       "picksNone" : "No runtime can start now",
       "words" : {
-        "alwaysApprove" : "Yes to all",
+        "alwaysApprove" : "Always Approve",
         "default" : "Request cards"
       }
     },
