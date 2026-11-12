@@ -1,7 +1,7 @@
 // The line on a choice a policy refuses or caps (#998, spec 998 FR-020): "Set by your organisation"
 // (or "Set by you", "Set by this folder": the layer that decided, #3150), and the rule's words in its tip and a detail line. The choice itself is shown,
 // dimmed, never hidden. The same as the window's and the Remote's (Shared/UI/OrgPolicyLine.swift).
-import type { CostState, PassThroughName, PolicyRefusal, PolicySetBy } from "../protocol/generated";
+import type { CostState, PassThroughName, PolicySetBy } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { budgetFoot, budgetRows, line, markTitle, refusalLine, runtimeName, startsNothing } from "../model/orgPolicy";
 import { money } from "../model/limits";
@@ -16,12 +16,6 @@ export function OrgPolicyLine({ mark }: { mark: PolicySetBy | undefined }) {
       <strong>{markTitle(mark)}</strong> <span>{mark.words}</span>
     </span>
   );
-}
-
-/** A refused call's line (policyRefused): its title and words, where a call failed. */
-export function OrgPolicyRefusal({ refusal }: { refusal: PolicyRefusal | null | undefined }) {
-  if (!refusal) return null;
-  return <p class="org-policy-refusal" role="alert">{refusalLine(refusal)}</p>;
 }
 
 /** A choice's title with the mark after it, for a native <option>, which can hold only text. */

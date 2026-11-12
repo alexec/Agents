@@ -372,19 +372,6 @@ export function lineWords(line: TimelineLine, backtest: WorkTimelineBacktest | u
   return out;
 }
 
-/** The hover card on a join: each of its lines. */
-export function joinCardWords(join: TimelineJoin, lines: readonly TimelineLine[], backtest: WorkTimelineBacktest | undefined, now: number): string[] {
-  return join.lines.flatMap((id) => {
-    const line = lines.find((l) => l.id === id);
-    if (!line) return [];
-    return line.how.how === "forecast" ? [`${line.number} ${line.title}`, ...joinWords(line, backtest, now)] : lineWords(line, backtest, now);
-  });
-}
-
-/** The hover card on a release. */
-export const releaseWords = (r: WorkTimelineRelease) =>
-  [r.tag, `Released ${fromWireDate(r.at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}`];
-
 /** A row of the hover card, on three lines (Alex, 2026-11-10): the state glyph and the title; the label
  * chips, where the wire has them; then the prediction, in the window's words. A release has no glyph. */
 export interface CardRow { state?: "open" | "closed"; title: string; labels: ForgeLabel[]; line: string }
