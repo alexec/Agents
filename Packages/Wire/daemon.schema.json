@@ -9135,6 +9135,25 @@
               "type": "string"
             }
           }
+        },
+        "provider": {
+          "type": "string",
+          "description": "Only events of this provider (#4730): github, jira, agents and so on. With provider, topics or subject the pattern also hears the person's other machines' events, on the bus."
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only events about one of these topics (#4730), lower case: a repo's full name, a Jira project, a Slack channel."
+        },
+        "subject": {
+          "$ref": "#/definitions/Ref",
+          "description": "Only events about this one thing (#4730)."
+        },
+        "debounce": {
+          "type": "number",
+          "description": "Seconds (#4730): a burst of matches on one subject and type is held this long and delivered once, the last one, with how many came. Best effort."
         }
       },
       "required": [

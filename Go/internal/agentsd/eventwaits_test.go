@@ -215,7 +215,7 @@ func TestAWaitEnds(t *testing.T) {
 		a.EventWait = &w
 	})
 	d.waitDeadlinesPassed()
-	if text := <-answered; !strings.HasPrefix(text, "Your wait for lease.granted timed out at ") || !strings.HasSuffix(text, " with no match.") {
+	if text := <-answered; !strings.HasPrefix(text, "Your wait for lease.granted timed out at ") || !strings.Contains(text, " with no match. ") || !strings.HasSuffix(text, "check the state now, by its ref, before you go on.") {
 		t.Fatal(text)
 	}
 	// A second wait replaces the first, which hears so.
