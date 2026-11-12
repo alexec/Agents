@@ -83,6 +83,7 @@ public enum Capability {
     public static let handover1 = "handover/1"
     public static let hostBrowserSettings1 = "host.browser-settings/1"
     public static let hostDesktopControl1 = "host.desktop-control/1"
+    public static let hostDriveApproval1 = "host.drive-approval/1"
     public static let hostLock1 = "host.lock/1"
     public static let hostLock2 = "host.lock/2"
     public static let hostLock3 = "host.lock/3"
@@ -287,6 +288,8 @@ public enum Capability {
         "browser/state": "host.browser-settings/1",
         "browser/unwatch": "browser/1",
         "browser/watch": "browser/1",
+        "browserControl/set": "host.drive-approval/1",
+        "browserControl/state": "host.drive-approval/1",
         "capacity/state": "capacity/1",
         "catalog/destination-state": "catalog/1",
         "catalog/preview": "catalog/1",
@@ -981,6 +984,7 @@ public enum Capability {
             "host.secret-grants/1",
             "host.session-secrets/1",
             "host.desktop-control/1",
+            "host.drive-approval/1",
             "host.org-routes/2",
             "host.user-settings/1",
             "host.user-settings/2",

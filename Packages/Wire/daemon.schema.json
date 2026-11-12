@@ -3055,6 +3055,19 @@
       },
       "additionalProperties": false
     },
+    "BrowserControlSettings": {
+      "type": "object",
+      "description": "Whether agents on this machine may use the app's browser tools (browser_navigate and the rest, fill_secret, hand_to_person), and whether each lease of the browser asks a person first (#4264). Kept in <settings>/browser-control.json. Only the person's own clients may change it.",
+      "properties": {
+        "mode": {
+          "$ref": "#/definitions/DriveApproval"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "additionalProperties": false
+    },
     "BrowserFrame": {
       "type": "object",
       "description": "browser/frame: a JPEG of the machine's browser's page (#3528, spike #3527), from CDP Page.startScreencast, sent only to the clients that watch it. Never recorded.",
@@ -7320,10 +7333,14 @@
     },
     "DesktopControlSettings": {
       "type": "object",
-      "description": "Whether agents on this Mac may drive its apps through drive_screen (#3004, FR-004). Kept in <settings>/desktop-control.json; Off when unset. Only the person's own clients may change it.",
+      "description": "Whether agents on this Mac may drive its apps through drive_screen (#3004, FR-004), and whether each lease of the screen asks a person first (#4264). Kept in <settings>/desktop-control.json. Only the person's own clients may change it.",
       "properties": {
         "enabled": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether drive_screen is offered: mode is ask or always. A client that sends only enabled sets always (true) or off (false)."
+        },
+        "mode": {
+          "$ref": "#/definitions/DriveApproval"
         }
       },
       "required": [
@@ -8264,6 +8281,15 @@
         "text"
       ],
       "additionalProperties": false
+    },
+    "DriveApproval": {
+      "type": "string",
+      "description": "Whether an agent's lease of the browser or the screen waits on a person (#4264). ask: each lease opens a Needs you request of kind approve (secretUse, use browser or screen), the default on a machine that a person uses; always: it never asks, the default on a machine that only agents use (a bot's machine, a Codespace), where ask counts as always, as nobody answers there; off: the tools are not offered, and are refused.",
+      "enum": [
+        "ask",
+        "always",
+        "off"
+      ]
     },
     "DropboxPutRequest": {
       "type": "object",
@@ -25646,6 +25672,10 @@
           "type": "string",
           "description": "For account (#4163): the manage_accounts call that waits, such as get. name is then the account's service and address."
         },
+        "app": {
+          "type": "string",
+          "description": "For screen (#4264): the app drive_screen names in the call that asks."
+        },
         "sessionOnly": {
           "type": "boolean",
           "description": "The secret is the session's own (#3548): Always Approve is the same as Approve for This Session."
@@ -27588,13 +27618,15 @@
     },
     "SecretUse": {
       "type": "string",
-      "description": "What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120). terminal (#4179) prints a secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163) is not a secret's use: manage_accounts reads an account with Ask before use; the request names the account, and Always Approve turns its Ask before use off.",
+      "description": "What agentsd does with a secret with Ask before use (#4015): fill types it into a page (fill_secret), ci sends it to GitHub (set_ci_secret), mcp adds it to an HTTP MCP server's header or URL on each request agentsd sends the server for a session (#4120). terminal (#4179) prints a secret that does not ask to `agents-secret NAME` run with no session's grant, such as from a terminal: agentsd cannot tell that caller from an agent that dropped its grant. account (#4163) is not a secret's use: manage_accounts reads an account with Ask before use; the request names the account, and Always Approve turns its Ask before use off. browser and screen (#4264) are not a secret's use either: an agent's lease of the browser or the screen on a machine whose Browser or Desktop control is ask; name is the browser or the screen, place the machine, app the app drive_screen names, and Always Approve sets the setting to always.",
       "enum": [
         "fill",
         "ci",
         "mcp",
         "terminal",
-        "account"
+        "account",
+        "browser",
+        "screen"
       ]
     },
     "SecretsLeft": {

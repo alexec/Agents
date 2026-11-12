@@ -54,7 +54,12 @@
     {
       "name": "host.desktop-control/1",
       "by": "host",
-      "description": "The host serves the app tool drive_screen (#3004, US1): an agent drives an app on this Mac through its own screen, mouse and keyboard, holding the screen lease while it does, only while the person has turned desktop control on (desktopControl/state, desktopControl/set; Off by default). Mac only."
+      "description": "The host serves the app tool drive_screen (#3004, US1): an agent drives an app on this Mac through its own screen, mouse and keyboard, holding the screen lease while it does, only while the person has turned desktop control on (desktopControl/state, desktopControl/set): Ask, the default on a machine a person uses, asks a person before each lease of the screen (#4264). Mac only."
+    },
+    {
+      "name": "host.drive-approval/1",
+      "by": "host",
+      "description": "Browser and Desktop control are Ask, Always Approve or Off (#4264): with Ask, an agent's lease of the browser or the screen waits on a request of kind approve (secretUse, use browser or screen), answered Approve (this lease), Approve for This Session, Always Approve (the setting) or Deny. browserControl/state and browserControl/set are the browser's; desktopControl's settings carry mode."
     },
     {
       "name": "host.org-routes/2",
@@ -2115,6 +2120,58 @@
       }
     },
     {
+      "name": "browserControl/set",
+      "x-capability": "host.drive-approval/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Set the browser for this machine: Ask, Always Approve or Off (#4264). Refused notPermitted from any caller but the person's own clients: never an agent, an MCP tool or a workflow.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BrowserControlSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BrowserControlSettings"
+        }
+      }
+    },
+    {
+      "name": "browserControl/state",
+      "x-capability": "host.drive-approval/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The browser for this machine (#4264): when never set, Ask on a machine a person uses and Always Approve on one only agents use.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BrowserControlSettings"
+        }
+      }
+    },
+    {
       "name": "capacity/changed",
       "x-capability": "capacity/1",
       "description": "The machine's capacity level moved (#4748): its rows say Near capacity or At capacity, as a low disk.",
@@ -3187,7 +3244,7 @@
           "name": "web"
         }
       ],
-      "description": "Turn desktop control on or off for this Mac (#3004, FR-004). Refused notPermitted from any caller but the person's own clients: never an agent, an MCP tool or a workflow.",
+      "description": "Set desktop control for this Mac: Ask, Always Approve or Off (#3004, FR-004, #4264). Refused notPermitted from any caller but the person's own clients: never an agent, an MCP tool or a workflow.",
       "paramStructure": "by-name",
       "params": [
         {
@@ -3213,7 +3270,7 @@
           "name": "web"
         }
       ],
-      "description": "Whether desktop control is on for this Mac (#3004). Off when never set.",
+      "description": "Desktop control for this Mac (#3004, #4264): when never set, Ask on a machine a person uses and Always Approve on one only agents use.",
       "paramStructure": "by-name",
       "params": [
         {

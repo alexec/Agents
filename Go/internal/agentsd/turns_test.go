@@ -39,6 +39,8 @@ func TestMain(m *testing.M) {
 	}
 	// A test's writes are not synced to the disk: on a Mac each sync costs about 4 ms (#4709).
 	store.SyncWrites = false
+	// The browser and the screen do not ask in a test unless it says so (askDrive, #4264).
+	askDriveByDefault = false
 	// The sealed-secret tests are the Mac's path on every system; a test of the Linux release
 	// layer turns it on for its daemon (releaseOn).
 	releaseLayerHere = false

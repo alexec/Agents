@@ -300,6 +300,9 @@ func secretUseWanted(u wire.RequestSecretUse) string {
 	if u.Use == wire.SecretUseTerminal {
 		return "Wants to print " + u.Name + " for " + u.Place + ". " + terminalCaveat
 	}
+	if u.Use == wire.SecretUseScreen && u.App != nil {
+		return "Wants to use the screen on " + u.Place + " to drive " + *u.App
+	}
 	return "Wants to use " + u.Name + " on " + u.Place
 }
 
