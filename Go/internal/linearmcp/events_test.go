@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The events over a fake Linear held in memory: the github server's cases, for Linear.
@@ -33,7 +35,7 @@ func (f *fakeLinear) Activity(_ context.Context, kind Kind, team, since string) 
 	}
 	var out []Activity
 	for _, a := range f.activity {
-		if a.Kind == kind && !before(a.At, since) {
+		if a.Kind == kind && !mcpevents.Before(a.At, since) {
 			out = append(out, a)
 		}
 	}
@@ -53,7 +55,9 @@ func issue(identifier, team string, labels ...string) Issue {
 
 var start = time.Date(2026, 10, 16, 12, 0, 0, 0, time.UTC)
 
-func at(minutes int) string { return timeString(start.Add(time.Duration(minutes) * time.Minute)) }
+func at(minutes int) string {
+	return mcpevents.TimeString(start.Add(time.Duration(minutes) * time.Minute))
+}
 
 type poller struct {
 	t      *testing.T

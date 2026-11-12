@@ -3,6 +3,8 @@ package jiramcp
 import (
 	"context"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // What the events and the view read from Jira (#3247). RealJira reads it over Jira's REST API
@@ -163,12 +165,6 @@ func clip(body string) string {
 	return body
 }
 
-// timeLayout is how the events draft carries a time: ISO 8601 in UTC with milliseconds, which
-// sorts as text in time order.
-const timeLayout = "2006-01-02T15:04:05.000Z"
-
-func timeString(t time.Time) string { return t.UTC().Format(timeLayout) }
-
 // jiraTime is how Jira's REST API writes a time: 2026-11-02T09:15:00.000+0000, with no colon
 // in the offset.
 const jiraTime = "2006-01-02T15:04:05.000-0700"
@@ -181,13 +177,13 @@ func parseTime(text string) (time.Time, bool) {
 	return t, err == nil
 }
 
-// normalized is text in timeLayout, or "" when it is not a time.
+// normalized is text in mcpevents.TimeLayout, or "" when it is not a time.
 func normalized(text string) string {
 	t, ok := parseTime(text)
 	if !ok {
 		return ""
 	}
-	return timeString(t)
+	return mcpevents.TimeString(t)
 }
 
 // before says whether a is earlier than b; a time that is not one is earliest of all.

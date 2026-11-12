@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"testing"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // CodeRabbit (#1344): its two events over the fake GitHub, what RealGitHub reads for them,
@@ -20,7 +22,7 @@ func (f *fakeGitHub) CodeRabbitComments(_ context.Context, _, since string) ([]C
 	defer f.mu.Unlock()
 	var out []CodeRabbitComment
 	for _, c := range f.rabbit {
-		if !before(c.At, since) {
+		if !mcpevents.Before(c.At, since) {
 			out = append(out, c)
 		}
 	}

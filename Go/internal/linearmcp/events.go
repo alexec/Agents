@@ -131,7 +131,7 @@ func eventsList() map[string]any { return mcpevents.List(events) }
 
 // MARK: Polling
 
-// candidate is something that may be raised: its id, its time (in timeLayout) and its data.
+// candidate is something that may be raised: its id, its time (in mcpevents.TimeLayout) and its data.
 type candidate = mcpevents.Candidate
 
 const (
@@ -141,7 +141,7 @@ const (
 )
 
 // polls is how it polls, with Linear's times and errors.
-var polls = mcpevents.Poller{NextPollMs: nextPollMs, Normalize: normalized, Fail: eventsError}
+var polls = mcpevents.Poller{NextPollMs: nextPollMs, Normalize: mcpevents.Normalized, Fail: eventsError}
 
 // Events answers events/list and events/poll over Linear.
 type Events struct {
@@ -179,7 +179,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 		return nil, eventsError(&LinearError{Kind: NotSignedIn, Message: "Linear is not signed in: connect Linear in Connectors, or set LINEAR_API_KEY to a personal API key"})
 	}
 	now := s.now()
-	return polls.Poll(e.Name, p, func() string { return timeString(now) }, func(since string) ([]candidate, mcpevents.Listed, error) {
+	return polls.Poll(e.Name, p, func() string { return mcpevents.TimeString(now) }, func(since string) ([]candidate, mcpevents.Listed, error) {
 		found, truncated, err := s.candidates(ctx, e, a, since)
 		return found, mcpevents.Listed{Truncated: truncated}, err
 	})
@@ -211,7 +211,7 @@ func (s *Events) candidates(ctx context.Context, e event, a args, since string) 
 				continue
 			}
 		}
-		at := normalized(it.At)
+		at := mcpevents.Normalized(it.At)
 		if at == "" {
 			continue
 		}

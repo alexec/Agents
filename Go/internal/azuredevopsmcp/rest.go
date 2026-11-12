@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // RealAzureDevOps reads Azure DevOps's REST API (7.1) as the person, with the personal access
@@ -673,8 +674,8 @@ func (f *RealAzureDevOps) closedPulls(ctx context.Context, repo, since string) (
 		if p.Status == "active" || p.ClosedDate == "" {
 			continue
 		}
-		listed = listed.saw(p.ClosedDate)
-		if !before(p.ClosedDate, since) {
+		listed = listed.Saw(p.ClosedDate)
+		if !mcpevents.Before(p.ClosedDate, since) {
 			out = append(out, p)
 		}
 	}
@@ -787,9 +788,9 @@ func (f *RealAzureDevOps) headChecks(ctx context.Context, repo, since string) ([
 	// Oldest first, so the first failed build is the run.
 	for i := len(builds) - 1; i >= 0; i-- {
 		b := builds[i]
-		listed = listed.saw(b.FinishTime)
+		listed = listed.Saw(b.FinishTime)
 		passed, done := buildPassed(b.Result)
-		if !done || before(b.FinishTime, since) {
+		if !done || mcpevents.Before(b.FinishTime, since) {
 			continue
 		}
 		var of []pullJSON
@@ -808,7 +809,7 @@ func (f *RealAzureDevOps) headChecks(ctx context.Context, repo, since string) ([
 			}
 		}
 		for _, p := range of {
-			out = append(out, headCheck{pr: p, at: normalized(b.FinishTime), check: Check{Name: b.Definition.Name, URL: b.Links.Web.Href},
+			out = append(out, headCheck{pr: p, at: mcpevents.Normalized(b.FinishTime), check: Check{Name: b.Definition.Name, URL: b.Links.Web.Href},
 				runID: b.ID, key: fmt.Sprintf("build:%d", b.ID), passed: passed})
 		}
 	}
@@ -831,9 +832,9 @@ func (f *RealAzureDevOps) headChecks(ctx context.Context, repo, since string) ([
 		last := -1 // not read yet: only a status that would be raised reads it
 		for _, name := range names {
 			s := newest[name]
-			listed = listed.saw(s.at())
+			listed = listed.Saw(s.at())
 			passed, done := statusPassed(s.State)
-			if !done || before(s.at(), since) {
+			if !done || mcpevents.Before(s.at(), since) {
 				continue
 			}
 			// A status of an iteration is of that push's commit; one with none is of the pull request.
@@ -847,7 +848,7 @@ func (f *RealAzureDevOps) headChecks(ctx context.Context, repo, since string) ([
 					continue
 				}
 			}
-			out = append(out, headCheck{pr: p, at: normalized(s.at()), check: Check{Name: name, URL: s.TargetURL},
+			out = append(out, headCheck{pr: p, at: mcpevents.Normalized(s.at()), check: Check{Name: name, URL: s.TargetURL},
 				key: fmt.Sprintf("status:%d", s.ID), passed: passed})
 		}
 	}
@@ -932,8 +933,8 @@ func (f *RealAzureDevOps) CompletedBuilds(ctx context.Context, repo, pipeline, b
 	}
 	var out []CompletedBuild
 	for _, b := range builds {
-		listed = listed.saw(b.FinishTime)
-		if b.Status != "completed" || before(b.FinishTime, since) ||
+		listed = listed.Saw(b.FinishTime)
+		if b.Status != "completed" || mcpevents.Before(b.FinishTime, since) ||
 			(pipeline != "" && !strings.EqualFold(b.Definition.Name, pipeline)) ||
 			(branch != "" && b.ref() != branch && b.SourceBranch != branch) {
 			continue
@@ -950,7 +951,7 @@ func completed(b buildJSON) CompletedBuild {
 		head = sha
 	}
 	return CompletedBuild{ID: b.ID, Name: b.Definition.Name, Number: b.BuildNumber, Reason: b.Reason, Branch: b.ref(),
-		HeadSHA: head, URL: b.Links.Web.Href, Result: b.Result, Actor: b.RequestedFor.name(), At: normalized(b.FinishTime),
+		HeadSHA: head, URL: b.Links.Web.Href, Result: b.Result, Actor: b.RequestedFor.name(), At: mcpevents.Normalized(b.FinishTime),
 		Trusted: !b.fromFork() && b.RequestedFor.ID != "" && !isBot(b.RequestedFor)}
 }
 
@@ -991,8 +992,8 @@ func (f *RealAzureDevOps) ReviewComments(ctx context.Context, repo, since string
 				if c.IsDeleted || c.CommentType == "system" {
 					continue
 				}
-				listed = listed.saw(c.PublishedDate)
-				if before(c.PublishedDate, since) {
+				listed = listed.Saw(c.PublishedDate)
+				if mcpevents.Before(c.PublishedDate, since) {
 					continue
 				}
 				out = append(out, ReviewComment{ID: c.ID, ThreadID: t.ID, At: c.PublishedDate, PR: f.pr(repo, p), Author: c.Author.name(),

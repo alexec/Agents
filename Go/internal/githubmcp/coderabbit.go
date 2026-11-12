@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/alexec/agents/Go/internal/mcpevents"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -202,7 +203,7 @@ func (g *RealGitHub) CodeRabbitPRs(ctx context.Context, repo string) ([]Reviewed
 			if c.Commit.Oid == n.HeadRefOid && c.Commit.Status != nil && c.Commit.Status.Context != nil {
 				// Its status rules: pending while it reviews, even with an earlier review on the commit.
 				r.Reviewed = statusReviewed(c.Commit.Status.Context.State, c.Commit.Status.Context.Description)
-				r.StatusAt = normalized(c.Commit.Status.Context.CreatedAt)
+				r.StatusAt = mcpevents.Normalized(c.Commit.Status.Context.CreatedAt)
 				if r.StatusAt == "" {
 					r.StatusAt = c.Commit.Status.Context.CreatedAt
 				}

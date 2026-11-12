@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // P20261031-1: a pr.commented wait with pr: N, over the real client, against a fake of GitHub
@@ -41,7 +43,7 @@ func newCommentAPI(t *testing.T) *commentAPI {
 			per, _ := strconv.Atoi(r.URL.Query().Get("per_page"))
 			var kept []map[string]any
 			for _, c := range a.comments {
-				if !before(c["created_at"].(string), since) {
+				if !mcpevents.Before(c["created_at"].(string), since) {
 					kept = append(kept, c)
 				}
 			}
@@ -75,7 +77,7 @@ func (a *commentAPI) comment(id, n int, at string) {
 	a.comments = append(a.comments, map[string]any{"id": id, "html_url": fmt.Sprintf("c%d", id),
 		"issue_url": fmt.Sprintf("%srepos/%s/issues/%d", a.URL+"/", repo, n), "body": "a person's words",
 		"user": map[string]any{"login": "alexec"}, "author_association": "OWNER", "created_at": at})
-	sort.SliceStable(a.comments, func(i, j int) bool { return before(a.comments[j]["created_at"].(string), a.comments[i]["created_at"].(string)) })
+	sort.SliceStable(a.comments, func(i, j int) bool { return mcpevents.Before(a.comments[j]["created_at"].(string), a.comments[i]["created_at"].(string)) })
 }
 
 func (a *commentAPI) taken() (listings, items int) {
@@ -103,7 +105,7 @@ func prCommentedCost(t *testing.T, k int) (firstListings, firstItems, secondList
 	}
 	start := poll(nil)["cursor"]
 	for i := range k {
-		api.comment(i+1, 1000+i, timeString(clock.Add(time.Duration(i+1)*time.Second)))
+		api.comment(i+1, 1000+i, mcpevents.TimeString(clock.Add(time.Duration(i+1)*time.Second)))
 	}
 	clock = clock.Add(time.Hour)
 	api.taken()

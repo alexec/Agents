@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/alexec/agents/Go/internal/mcpevents"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -198,7 +199,7 @@ func (b *RealBitbucket) Board(ctx context.Context, repo string, meta mcp.Meta) (
 		return nil, err
 	}
 	pulls := list.Values
-	sort.SliceStable(pulls, func(i, j int) bool { return before(pulls[j].CreatedOn, pulls[i].CreatedOn) })
+	sort.SliceStable(pulls, func(i, j int) bool { return mcpevents.Before(pulls[j].CreatedOn, pulls[i].CreatedOn) })
 	me, err := b.viewer(ctx)
 	if err != nil {
 		return nil, err
@@ -267,7 +268,7 @@ func (b *RealBitbucket) OpenIssues(ctx context.Context, repo, label string, meta
 		return nil, err
 	}
 	issues := list.Values
-	sort.SliceStable(issues, func(i, j int) bool { return before(issues[j].CreatedOn, issues[i].CreatedOn) })
+	sort.SliceStable(issues, func(i, j int) bool { return mcpevents.Before(issues[j].CreatedOn, issues[i].CreatedOn) })
 	// Without the viewer the list still shows, as Team and Others only.
 	me, _ := b.viewer(ctx)
 	people := teamMetaOf(meta)
@@ -380,7 +381,7 @@ func (b *RealBitbucket) PRPage(ctx context.Context, repo string, number int) (ma
 		conversation = append(conversation, noteOf(c.User, c.Content.Raw, c.CreatedOn, c.Links.HTML.Href, c.ID))
 	}
 	sort.SliceStable(conversation, func(i, j int) bool {
-		return before(conversation[i].(map[string]any)["at"].(string), conversation[j].(map[string]any)["at"].(string))
+		return mcpevents.Before(conversation[i].(map[string]any)["at"].(string), conversation[j].(map[string]any)["at"].(string))
 	})
 	state := prState{checks: "none", conflicts: conflicts}
 	runs := []any{}
@@ -435,7 +436,7 @@ func (b *RealBitbucket) PRPage(ctx context.Context, repo string, number int) (ma
 // keeps a thread by its first comment, which each answer names as its parent (or its parent's
 // parent). answers are the ones whose thread starts on no line.
 func lineThreads(lines []commentJSON) (threads []any, answers []commentJSON) {
-	sort.SliceStable(lines, func(i, j int) bool { return before(lines[i].CreatedOn, lines[j].CreatedOn) })
+	sort.SliceStable(lines, func(i, j int) bool { return mcpevents.Before(lines[i].CreatedOn, lines[j].CreatedOn) })
 	rootOf := map[int]int{}
 	var order []int
 	byRoot := map[int][]commentJSON{}

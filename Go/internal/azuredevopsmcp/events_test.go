@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/alexec/agents/Go/internal/gitlabmcp"
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // The events over the fake Azure DevOps: the gitlab server's names, the trust filter (#728),
@@ -143,7 +144,7 @@ func TestChecksFailedForAPullRequestsHead(t *testing.T) {
 		}
 	})
 	ids, result := p.poll()
-	same(t, ids, []string{"checks.failed:acme/Web App/app:sha1:" + timeString(start.Add(60e9))})
+	same(t, ids, []string{"checks.failed:acme/Web App/app:sha1:" + mcpevents.TimeString(start.Add(60e9))})
 	d := data(t, result, 0)
 	same(t, d["headSha"], "sha1")
 	url := "https://ado.test/acme/Web%20App/_build/results?buildId=11"
@@ -174,7 +175,7 @@ func TestChecksFailedFromABranchBuildAtTheHead(t *testing.T) {
 		}
 	})
 	ids, result := p.poll()
-	same(t, ids, []string{"checks.failed:acme/Web App/app:sha1:" + timeString(start.Add(60e9))})
+	same(t, ids, []string{"checks.failed:acme/Web App/app:sha1:" + mcpevents.TimeString(start.Add(60e9))})
 	url := "https://ado.test/acme/Web%20App/_build/results?buildId=21"
 	same(t, data(t, result, 0)["run"], map[string]any{"id": 21, "name": "ci", "url": url})
 }
@@ -193,7 +194,7 @@ func TestChecksFailedFromAnotherServicesStatus(t *testing.T) {
 		f.statuses[3] = []obj{prStatus(5, "scan", "deps", "failed", 1, 1)}
 	})
 	ids, result := p.poll()
-	same(t, ids, []string{"checks.failed:acme/Web App/app:sha1:" + timeString(start.Add(60e9))})
+	same(t, ids, []string{"checks.failed:acme/Web App/app:sha1:" + mcpevents.TimeString(start.Add(60e9))})
 	d := data(t, result, 0)
 	same(t, d["run"], map[string]any{"id": 0, "name": "scan/deps", "url": "https://scan.test/1"})
 	same(t, d["failedJobs"], []any{map[string]any{"name": "scan/deps", "url": "https://scan.test/1"},
@@ -206,8 +207,8 @@ func TestChecksFailedFromAnotherServicesStatus(t *testing.T) {
 		f.builds = []obj{build(31, 1, "sha1", "ci", "failed", 3)}
 	})
 	ids, result = p.poll()
-	same(t, ids, []string{"checks.failed:acme/Web App/app:sha1:" + timeString(start.Add(180e9)),
-		"checks.failed:acme/Web App/app:sha3:" + timeString(start.Add(180e9))})
+	same(t, ids, []string{"checks.failed:acme/Web App/app:sha1:" + mcpevents.TimeString(start.Add(180e9)),
+		"checks.failed:acme/Web App/app:sha3:" + mcpevents.TimeString(start.Add(180e9))})
 	same(t, data(t, result, 0)["run"].(map[string]any)["id"], 31)
 }
 
@@ -229,7 +230,7 @@ func TestChecksPassedForEachBuildAndStatusAtTheHead(t *testing.T) {
 		f.statuses[1] = []obj{prStatus(7, "scan", "deps", "succeeded", 1, 0), prStatus(8, "scan", "wait", "pending", 1, 0)}
 	})
 	ids, result := p.poll()
-	at := timeString(start.Add(60e9))
+	at := mcpevents.TimeString(start.Add(60e9))
 	same(t, ids, []string{"checks.passed:acme/Web App/app:sha1:build:41:" + at, "checks.passed:acme/Web App/app:sha1:build:42:" + at,
 		"checks.passed:acme/Web App/app:sha1:status:7:" + at})
 	d := data(t, result, 0)
@@ -265,7 +266,7 @@ func TestRunCompletedForABuildNoPullRequestOwns(t *testing.T) {
 	f.set(func() {
 		f.builds = []obj{tag, branchBuild(52, "main", "sha52", "release", "partiallySucceeded", 1), scheduled, forked}
 	})
-	done := timeString(start.Add(60e9))
+	done := mcpevents.TimeString(start.Add(60e9))
 	id := func(n int) string { return "run.completed:acme/Web App/app:" + strconv.Itoa(n) + ":" + done }
 	ids, result := p.poll()
 	same(t, ids, []string{id(51), id(52)})
@@ -282,13 +283,13 @@ func TestRunCompletedForABuildNoPullRequestOwns(t *testing.T) {
 	// Run again: a new finish time is a new event.
 	f.set(func() { tag["finishTime"], tag["result"] = at(3), "succeeded" })
 	ids, _ = release.poll()
-	same(t, ids, []string{"run.completed:acme/Web App/app:51:" + timeString(start.Add(180e9))})
+	same(t, ids, []string{"run.completed:acme/Web App/app:51:" + mcpevents.TimeString(start.Add(180e9))})
 
 	one := newPoller(t, f, "run.completed", map[string]any{"run": 52})
 	one.poll()
 	f.set(func() { f.builds[1]["finishTime"] = at(5) })
 	ids, _ = one.poll()
-	same(t, ids, []string{"run.completed:acme/Web App/app:52:" + timeString(start.Add(300e9))})
+	same(t, ids, []string{"run.completed:acme/Web App/app:52:" + mcpevents.TimeString(start.Add(300e9))})
 	ids, _ = one.poll()
 	same(t, ids, []string(nil))
 }
@@ -372,7 +373,7 @@ func TestDeployWaitingIsABuildHeldByAnApproval(t *testing.T) {
 			map[string]any{"id": "AAA-1", "name": "Production", "url": url},
 		},
 		"reviewers":  []string{"dev@acme.test", "[Web App]\\Release Approvers"},
-		"canApprove": true, "waitingSince": timeString(start.Add(120e9)),
+		"canApprove": true, "waitingSince": mcpevents.TimeString(start.Add(120e9)),
 	})
 	ids, _ = release.poll()
 	same(t, ids, []string{key})

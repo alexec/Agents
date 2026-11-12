@@ -4,7 +4,8 @@ import (
 	"context"
 	"regexp"
 	"strings"
-	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // What the events read from Bitbucket Cloud (#2828), in the gitlab server's shape
@@ -197,21 +198,10 @@ func (c ReviewComment) data() map[string]any {
 		"comment": map[string]any{"id": c.ID, "author": c.Author, "path": c.Path, "line": c.Line, "body": c.Body, "url": c.URL}}
 }
 
-// Listed is how far a listing read: Newest is the newest time of anything it listed, wanted
-// or not (in timeLayout, "" when it listed nothing), and Truncated says it stopped at maxPages
-// before it reached since.
-type Listed struct {
-	Newest    string
-	Truncated bool
-}
-
-// saw is l with t seen too.
-func (l Listed) saw(t string) Listed {
-	if t = normalized(t); t > l.Newest {
-		l.Newest = t
-	}
-	return l
-}
+// Listed is how far a listing read (mcpevents.Listed): Newest is the newest time of anything it
+// listed, wanted or not (in mcpevents.TimeLayout, "" when it listed nothing), and Truncated says
+// it stopped at maxPages before it reached since.
+type Listed = mcpevents.Listed
 
 // Bitbucket is what the events ask of Bitbucket Cloud.
 type Bitbucket interface {
@@ -288,37 +278,4 @@ var botName = regexp.MustCompile(`[-_]bot$|\[bot\]$`)
 // Connect app, Pipelines), a team, or one named as a bot.
 func isBot(name, kind string) bool {
 	return (kind != "" && kind != "user") || botName.MatchString(strings.ToLower(name))
-}
-
-// timeLayout is how the events draft carries a time: ISO 8601 in UTC with milliseconds, which
-// sorts as text in time order.
-const timeLayout = "2006-01-02T15:04:05.000Z"
-
-func timeString(t time.Time) string { return t.UTC().Format(timeLayout) }
-
-func parseTime(text string) (time.Time, bool) {
-	t, err := time.Parse(time.RFC3339Nano, text)
-	return t, err == nil
-}
-
-// normalized is text in timeLayout, or "" when it is not a time.
-func normalized(text string) string {
-	t, ok := parseTime(text)
-	if !ok {
-		return ""
-	}
-	return timeString(t)
-}
-
-// before says whether a is earlier than b; a time that is not one is earliest of all.
-func before(a, b string) bool {
-	ta, oka := parseTime(a)
-	tb, okb := parseTime(b)
-	switch {
-	case !oka:
-		return okb
-	case !okb:
-		return false
-	}
-	return ta.Before(tb)
 }

@@ -15,6 +15,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/alexec/agents/Go/internal/mcpevents"
 )
 
 // A fake Azure DevOps over HTTP (no account, #2829): the REST API paths the server reads and
@@ -246,7 +248,7 @@ func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
 			}
 			if q.Get("searchCriteria.queryTimeRangeType") == "closed" {
 				closed, _ := pr["closedDate"].(string)
-				if closed == "" || before(closed, q.Get("searchCriteria.minTime")) {
+				if closed == "" || mcpevents.Before(closed, q.Get("searchCriteria.minTime")) {
 					continue
 				}
 			}
@@ -292,7 +294,7 @@ func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
 		for i := len(f.builds) - 1; i >= 0; i-- { // newest first
 			b := f.builds[i]
 			if (q.Get("resultFilter") != "" && b["result"] != q.Get("resultFilter")) ||
-				(q.Get("minTime") != "" && before(b["finishTime"].(string), q.Get("minTime"))) ||
+				(q.Get("minTime") != "" && mcpevents.Before(b["finishTime"].(string), q.Get("minTime"))) ||
 				(q.Get("branchName") != "" && b["sourceBranch"] != q.Get("branchName")) {
 				continue
 			}
