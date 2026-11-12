@@ -201,3 +201,23 @@ span.tabs { display: inline-flex; margin: 0; border-bottom: 0; }
 .overview-card .overview-rows li { padding: 6px 0; border-bottom: 1px solid color-mix(in srgb, var(--paper-rule) 60%, transparent); }
 .overview-card .overview-rows li:last-child { border-bottom: 0; }
 .overview-figure { font-size: 2rem; }
+
+/* The ⌘K command menu (#4788): a field and what it finds, over the page near its top, as the window's. */
+dialog.command-menu { width: min(560px, calc(100vw - 32px)); max-height: none; margin: 48px auto auto; padding: 0; border: 0;
+  background: none; color: inherit; overflow: visible; }
+dialog.command-menu::backdrop { background: color-mix(in srgb, var(--paper-scrim) 8%, transparent); }
+.command-menu-box { display: flex; flex-direction: column; gap: 8px; }
+.command-menu-box input { width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit; font-size: 0.9375rem; color: inherit;
+  background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-console);
+  box-shadow: 0 8px 24px var(--paper-shadow); }
+.command-menu-box input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.command-menu-found { max-height: 360px; overflow-y: auto; margin: 0; padding: 4px; list-style: none; background: var(--paper-raised);
+  border: 1px solid var(--paper-rule); border-radius: var(--radius-console); box-shadow: 0 8px 24px var(--paper-shadow); }
+.command-menu-found li { display: flex; align-items: baseline; gap: 8px; padding: 6px 8px; border-radius: 4px; cursor: pointer; }
+.command-menu-found li.on { background: var(--paper-wash); }
+.command-kind { flex: none; width: 1rem; text-align: center; opacity: 0.6; }
+.command-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.command-detail { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.6; font-size: 0.75rem; }
+.command-key { margin-left: auto; flex: none; font: inherit; font-size: 0.6875rem; opacity: 0.6; padding: 0 5px;
+  border: 1px solid var(--paper-rule); border-radius: 4px; }
+.command-menu-none { margin: 0; padding: 0 12px; font-size: 0.75rem; opacity: 0.65; }
