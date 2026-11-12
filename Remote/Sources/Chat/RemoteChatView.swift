@@ -62,8 +62,8 @@ struct RemoteChatView: View {
                     if let popped { await model.loadTranscript(of: popped) } else { await model.loadTranscript() }
                 }
             } else {
-                // Not looked for yet: on its way, not gone.
-                ProgressView()
+                // Not looked for yet: on its way, not gone. Said only after 300 ms (#4795).
+                DelayedProgress()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }

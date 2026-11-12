@@ -1470,6 +1470,9 @@ struct WebFixturesTests {
         }
     }
 
+    /// The zone the fixtures' viewer is in, for a workflow's hours (#4819).
+    static let viewerZone = TimeZone(identifier: "America/Los_Angeles")!
+
     /// A workflow's row under the sessions: `Workflow.summary`, `canFire`, and
     /// `WorkflowSummary.needsAPerson`. The app's own event triggers are left out: their words
     /// come from the event catalogue, which the web remote does not carry. A server's event
@@ -1534,6 +1537,12 @@ struct WebFixturesTests {
                 hours: WorkflowHours(between: "18:00-09:00", days: [.mon, .tue], timeZone: "Europe/London")),
                 lastOutcome: .refused(.outsideHours(until: Self.base.addingTimeInterval(3600)), at: Self.base, repeats: 2),
                 holdsAFire: true, hoursOpenAt: Self.base.addingTimeInterval(3600))),
+            // Said on the card and the row (#4819): in the viewer's own zone, unnamed; shut, with none held.
+            ("working hours, shut, none held", WorkflowSummary(workflow: flow("office-hours", [.schedule(nightly)],
+                hours: WorkflowHours(between: "9-18", days: [.mon, .tue, .wed, .thu, .fri])),
+                hoursOpenAt: Self.base.addingTimeInterval(7200))),
+            ("weekends, every hour", WorkflowSummary(workflow: flow("weekend", [.schedule(nightly)],
+                hours: WorkflowHours(days: [.sat, .sun, .wed], timeZone: Self.viewerZone.identifier)))),
             ("a server's event, from one server", WorkflowSummary(workflow: flow("red", [.serverEvent(
                 MCPEventTrigger(event: "checks.failed", servers: ["ci"], arguments: ["repo": .string("alexec/Agents")]))]))),
             ("a server's event, from any or two", WorkflowSummary(workflow: flow("prs", [
@@ -1544,8 +1553,12 @@ struct WebFixturesTests {
         let cases = try all.map { Case(name: $0.0, input: Self.sortingSets(try Self.encode($0.1))) }
         try pin("workflows/summaries.json", cases) { input in
             let summary = try input.decode(WorkflowSummary.self)
+            // Its hours as the card and the row say them (#4819), to a viewer in one fixed zone.
+            let hours = summary.workflow.hours.flatMap { $0.sentence(viewer: Self.viewerZone) }
+            let open = summary.hoursOpenSentence(viewer: Self.viewerZone)
             return .object(["summary": .string(summary.workflow.summary), "canFire": .bool(summary.workflow.canFire),
-                            "needsAPerson": .bool(summary.needsAPerson)])
+                            "needsAPerson": .bool(summary.needsAPerson),
+                            "hours": hours.map(JSONValue.string) ?? .null, "hoursOpen": open.map(JSONValue.string) ?? .null])
         }
     }
 

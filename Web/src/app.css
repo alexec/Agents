@@ -654,10 +654,13 @@ a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underli
   background: conic-gradient(var(--notch, var(--paper-ink)) 0 80%, transparent 0);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), var(--paper-ink) calc(100% - var(--notch-width, 2px)));
   mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), var(--paper-ink) calc(100% - var(--notch-width, 2px)));
-  animation: spin 1s linear infinite;
+  /* Nothing for 300 ms, then the spinner (#4795): a wait shorter than that, as most are, shows no flash of one. */
+  opacity: 0;
+  animation: spin 1s linear infinite, spinner-shown 0s linear 300ms forwards;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s; } }
+@keyframes spinner-shown { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s, 0s; } }
 /* A working session's mark on all three clients (#2044, #2332), as WorkingRing: three dots on a ring
    seen edge on that spins once in 1.8 s while it thinks or replies, and also pivots ±30° once in
    3.6 s while it runs a tool. The keyframes (ring-think-*, ring-do-*) come from spinnerClock.ts,

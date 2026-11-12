@@ -73,14 +73,32 @@ extension WorkflowSummary {
                                             text: "Cooling down until \(end.formatted(date: .omitted, time: .shortened))",
                                             detail: holdsAFire ? "A trigger came in meanwhile; it runs once then" : nil))
         }
-        // Not for one queued: the line above says it, with how many (#422).
-        if case .refused(let refusal, _, _) = lastOutcome, refusal != .queued, let outcome = lastOutcome {
+        // Its hours (#4819): the window, or when it opens while it is shut.
+        if let line = hoursLine {
+            lines.append(line)
+        }
+        // Not for one queued: the line above says it, with how many (#422); nor for one held
+        // outside its hours, which the hours' line says with the day (#4819).
+        if case .refused(let refusal, _, _) = lastOutcome, refusal != .queued,
+           !(refusal.isOutsideHours && hoursOpenAt != nil), let outcome = lastOutcome {
             lines.append(WorkflowStatusLine(symbol: "xmark.circle", text: outcome.summary,
                                             tint: needsAPerson && awaitingApproval == nil && overLimit == nil
                                                 ? .attention : .none))
         }
         lines.append(nextLine)
         return lines
+    }
+
+    /// The window its `hours:` name, and when they open while they are shut (#4819).
+    private var hoursLine: WorkflowStatusLine? {
+        guard let hours = workflow.hours, let window = hours.sentence(viewer: .current) else { return nil }
+        if let open = hoursOpenSentence() {
+            return WorkflowStatusLine(symbol: "hourglass", text: open,
+                                      detail: holdsAFire ? "\(window). A trigger came in outside them; it runs once then"
+                                                         : "\(window). A trigger before then waits, and runs once then")
+        }
+        return WorkflowStatusLine(symbol: "clock", text: window,
+                                  detail: "A trigger outside them waits, and runs once when they open. Run now always runs")
     }
 
     /// Whether the switch is on, and where that came from: the file, an agent, or the

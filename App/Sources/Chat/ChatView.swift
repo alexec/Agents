@@ -86,9 +86,8 @@ struct ChatView: View {
                 SessionNotLoadedPage(failure: failure) { await model.loadTranscript() }
             } else {
                 // Not looked for yet, as the selection kept from the last launch: on its
-                // way, not gone.
-                ProgressView()
-                    .controlSize(.small)
+                // way, not gone. Said only after 300 ms, as a network wait (#4795).
+                DelayedProgress(controlSize: .small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }

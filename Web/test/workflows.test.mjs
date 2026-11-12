@@ -13,6 +13,8 @@ for (const { name, input, expected } of cases("workflows/summaries.json")) {
       summary: w.workflowSummary(input.workflow, (id) => names[id]),
       canFire: w.canFire(input.workflow),
       needsAPerson: w.workflowNeedsAPerson(input),
+      hours: input.workflow.hours ? w.hoursSentence(input.workflow.hours, "America/Los_Angeles") : null,
+      hoursOpen: w.hoursOpenSentence(input, "America/Los_Angeles"),
     }, expected);
   });
 }

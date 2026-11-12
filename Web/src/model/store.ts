@@ -69,7 +69,7 @@ import { Providers } from "./providers";
 import { MachineLock } from "./machineLock";
 import { isLead, leadEpic, leadProgressWords } from "./leadProgress";
 import { type AgentWrite, PendingWrites, omitting, writeFailure } from "./pendingWrites";
-import type { MachineCopy, TranscriptCopy } from "./localCopy";
+import { sessionRef as copyRef, type MachineCopy, type TranscriptCopy } from "./localCopy";
 import { sessionRef } from "../protocol/ref";
 
 /** What this page keeps by folder on a host, kept to the folders it lists (#3750). */
@@ -97,6 +97,18 @@ const openingTurns = 12;
 
 /** How many entries one opened turn asks for, the last of them first (#291). Earlier ones come on ask. */
 export const turnPage = 200;
+/** How long the pointer stays on a row before its chat is fetched (#4795). */
+export const prefetchAfter = 100;
+/** The chats fetched before they are opened that are held, and for how long (#4795). */
+const prefetchKept = 8;
+const prefetchFresh = 60_000;
+
+/** The rows before and after `session` in `list` (#4795): the ones opened next. None when it is not in it. */
+export function neighbours(session: string, list: readonly string[]): string[] {
+  const at = list.indexOf(session);
+  if (at < 0) return [];
+  return [list[at + 1], list[at - 1]].filter((id): id is string => id !== undefined && id !== session);
+}
 
 /** How many opened turns' entries a chat keeps. A turn closed, or past this, is read again when opened. */
 export const openTurnsHeld = 8;
@@ -2377,7 +2389,59 @@ export class Store extends Work {
 
   async openSession(host: string, session: string): Promise<void> {
     this.watch(host, session);
+    // What was fetched for it under the pointer or beside the last one opened, at once (#4795).
+    const fetched = this.takePrefetched(host, session);
+    if (fetched) this.drawTranscriptCopy(fetched);
     await this.loadTranscript(host, session);
+    // The rows either side, which are opened next.
+    const now = this.watching.value;
+    if (now?.host === host && now.session === session) this.prefetchNeighbours(host, session);
+  }
+
+  /** Chats fetched before they are opened (#4795): in memory only, the newest few, for a minute. */
+  private prefetched = new Map<string, TranscriptCopy>();
+  private prefetching = new Set<string>();
+
+  /**
+   * Fetches a chat before it is opened (#4795; spec 4777-fast): the row under the pointer, and the
+   * rows beside the open one. Not the open one, nor one held and fresh; a fetch that fails holds nothing.
+   */
+  async prefetch(host: string, session: string): Promise<void> {
+    const key = `${host}|${session}`;
+    const now = this.watching.value;
+    if (now?.host === host && now.session === session) return;
+    const held = this.prefetched.get(key);
+    if (held && Date.now() - held.at < prefetchFresh) return;
+    if (this.prefetching.has(key)) return;
+    this.prefetching.add(key);
+    try {
+      const agentID = session as never;
+      const turns = await this.link.call("agents/turns", { agentID, limit: openingTurns }, host);
+      const page = await this.link.call("agents/transcript", { agentID, limit: turnPage, from: turns.openStart }, host);
+      this.prefetched.delete(key);
+      this.prefetched.set(key, { kind: "transcript", ref: copyRef(session), host, session, turns, page, at: Date.now() });
+      while (this.prefetched.size > prefetchKept) this.prefetched.delete(this.prefetched.keys().next().value!);
+    } catch {
+      // Nothing held: opening it loads as before.
+    } finally {
+      this.prefetching.delete(key);
+    }
+  }
+
+  /** What was fetched for a chat, when it is fresh: taken, so it is drawn once. */
+  private takePrefetched(host: string, session: string): TranscriptCopy | undefined {
+    const key = `${host}|${session}`;
+    const held = this.prefetched.get(key);
+    this.prefetched.delete(key);
+    return held && Date.now() - held.at < prefetchFresh ? held : undefined;
+  }
+
+  /** The live sessions of the open one's folder, in the order its list draws them, either side of it. */
+  private prefetchNeighbours(host: string, session: string): void {
+    const agent = this.agents.value[host]?.find((a) => a.id === session);
+    if (!agent) return;
+    const list = this.folderView(host, agentFolderPath(agent)).headings.flatMap((h) => h.agents.map((a) => a.id));
+    for (const id of neighbours(session, list)) void this.prefetch(host, id);
   }
 
   closeSession(): void {
