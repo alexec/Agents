@@ -150,12 +150,13 @@ func (g *githubCodespaces) Stop(ctx context.Context, id string) error {
 }
 
 func (g *githubCodespaces) PrepareSSH(ctx context.Context, login string) error {
-	who := exec.CommandContext(ctx, "gh", "api", "user", "--jq", ".login")
+	gh := codespaceGH()
+	who := exec.CommandContext(ctx, gh, "api", "user", "--jq", ".login")
 	identity, err := who.Output()
 	if err != nil || !strings.EqualFold(strings.TrimSpace(string(identity)), login) {
 		return fmt.Errorf("Sign in to GitHub CLI as %s to connect this Codespace over SSH", login)
 	}
-	cmd := exec.CommandContext(ctx, "gh", "codespace", "ssh", "--config")
+	cmd := exec.CommandContext(ctx, gh, "codespace", "ssh", "--config")
 	output, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("GitHub CLI could not prepare Codespaces SSH access; check that `gh` is installed and signed in")
@@ -166,6 +167,26 @@ func (g *githubCodespaces) PrepareSSH(ctx context.Context, login string) error {
 	}
 	return mergeCodespacesSSHConfig(filepath.Join(home, ".ssh", "config"), output)
 }
+
+// codespaceGH is the person's gh: on the daemon's own PATH, else where a login shell would
+// find it, as launchd keeps the daemon's PATH to /usr/bin:/bin:/usr/sbin:/sbin and a gh
+// from Homebrew or the installer is in /opt/homebrew/bin or /usr/local/bin. It is "gh"
+// when there is none, so the error says gh is missing.
+func codespaceGH() string {
+	if path := codespaceGHPath(); path != "" {
+		return path
+	}
+	return "gh"
+}
+
+func codespaceGHPath() string {
+	if path, err := exec.LookPath("gh"); err == nil {
+		return path
+	}
+	return forgeCLI("gh")
+}
+
+func init() { codespacessh.Find = codespaceGHPath }
 
 var (
 	codespacesSSHBegin = codespacessh.Begin("")

@@ -95,6 +95,27 @@ func TestPrepareSaysThereIsNoGH(t *testing.T) {
 	}
 }
 
+// A gh that Find finds is run, not the gh on PATH.
+func TestPrepareRunsTheGHFindFinds(t *testing.T) {
+	was := GH
+	GH = filepath.Join(t.TempDir(), "no-gh")
+	t.Cleanup(func() { GH = was })
+	dir := t.TempDir()
+	found := filepath.Join(dir, "gh")
+	if err := os.WriteFile(found, []byte("#!/bin/sh\nprintf 'Host cs.fuzzy.main\\n\\tUser codespace\\n'\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	Find = func() string { return found }
+	t.Cleanup(func() { Find = nil })
+	path := filepath.Join(t.TempDir(), "config")
+	if err := Prepare(context.Background(), path, "fuzzy", "cs.fuzzy.main", "t", []string{"PATH=/usr/bin:/bin"}); err != nil {
+		t.Fatal(err)
+	}
+	if !Has(path, "fuzzy", "cs.fuzzy.main") {
+		t.Error("no block")
+	}
+}
+
 // A deleted codespace's block goes, and every other line stays (#3746).
 func TestRemoveTakesOutOnlyItsBlock(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config")
@@ -144,7 +165,9 @@ exec sleep 30
 	t.Cleanup(func() { KeepAwakeEvery = was })
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
-	go func() { done <- KeepAwake(ctx, "fuzzy", "ghp_test", []string{"PATH=/usr/bin:/bin", "GITHUB_TOKEN=other"}) }()
+	go func() {
+		done <- KeepAwake(ctx, "fuzzy", "ghp_test", []string{"PATH=/usr/bin:/bin", "GITHUB_TOKEN=other"})
+	}()
 	calls := filepath.Join(dir, "calls")
 	for start := time.Now(); ; time.Sleep(10 * time.Millisecond) {
 		if data, _ := os.ReadFile(calls); len(data) > 0 {
