@@ -263,6 +263,58 @@ and which of the events it waits on may be missing, so it can check the state it
 branch or the pull request). A wait only on events that are had again says
 that they were caught up. To be woken by the restart itself, wait on `system.restarted`.
 
+## The envelope
+
+Every event, the app's own and every MCP server's, has the same envelope: the
+[CloudEvents 1.0](https://cloudevents.io) JSON format, with two extensions, `provider` and
+`topic` (#4728, spec `specs/4724-event-bus/spec.md`). `events/list` returns it, and
+`events.jsonl` keeps it.
+
+```json
+{
+  "specversion": "1.0",
+  "id":       "github:pr:alexec/agents#4702@pr.commented/2457",
+  "type":     "pr.commented",
+  "provider": "github",
+  "topic":    "alexec/agents",
+  "subject":  "github:pr:alexec/agents#4702",
+  "source":   "github:alexec/agents",
+  "time":     "2026-11-11T17:02:11Z",
+  "producer": "agents:machine:#mac-mini",
+  "data":     { "number": 4702 }
+}
+```
+
+| Field | What it is |
+| --- | --- |
+| `id` | The event's ref: the subject's ref, `@`, the type, and, when the same type can happen again to that thing, `/` and the provider's key for this one. It comes from the provider's data only, never from the machine or the clock, so two machines that hear the same happening make the same id. |
+| `type` | The event's name, `noun.verbed`. |
+| `provider` | Who it is about: `github`, `jira`, `slack` and so on; `agents` for the app's own. |
+| `topic` | The provider's space, in lower case: a repo's full name, a Jira project, a Slack channel. |
+| `subject` | The ref of the thing it happened to (`provider:type:topic#id`). |
+| `source` | `provider:topic`. |
+| `time` | When it happened, in RFC 3339: the provider's own time when it says one. |
+| `producer` | The machine that raised it, as `agents:machine:#<machine>`. Not part of the id. |
+| `data` | What it carries: an MCP server's event data, or the app's own event's details. |
+
+- **The app's own events** have the provider `agents`. Their topic is the folder's project
+  for `agent.*`, `workflow.*`, `request.*`, `branch.*`, `folder.*`, `file.*` and
+  `cost.limit_reached`, and the machine for `machine.*`, `mac.*`, `person.*`, `lease.*`,
+  `server.*`, `system.*` and `cost.allowance_*`. Their subject is the session
+  (`agents:session:<project>#<agent>`), the workflow, the request, the branch, the folder,
+  the lease (`agents:lease:<machine>#<resource>`), the server or the machine
+  (`agents:machine:#<machine>`). Only the machine that raises one has it, so its key is the
+  event's position on that machine.
+- **An MCP server's event** takes its subject and key from the server, which says them in
+  `events/poll` beside each event's `eventId`, as `subject` (a ref in the full form) and
+  `key`. A server that says none, or a subject that is not a ref, gets the provider
+  `server:<name>`, no topic and no subject, and its `eventId` as the key:
+  `server:ci@build.done/evt-9`. The subjects and keys of this folder's servers are in
+  [Subjects and keys](#subjects-and-keys).
+- **The details stay for one release.** `name`, `details`, `position`, `scope` and the rest
+  are still there, so a reader of the old shape works. An event recorded before the
+  envelope gets one when the log is read, with no subject for a server's event.
+
 ## No custom events
 
 Agents do not raise events of their own. The `publish_event` tool and the `custom.` events it
@@ -384,6 +436,37 @@ Each workflow page shows a line for each server its event triggers hear, on the 
 iPhone and iPad and the web page: when it was last asked and when the last event came, or
 why not (**Can't reach github**, the server no longer offers the event, refused it, or doesn't
 take the filters).
+
+### Subjects and keys
+
+What each of this folder's MCP servers says of its events' envelope (#4728). The topic is
+in lower case; the id keeps its case. "Poll time" is for an event about a state (in
+conflict, opened, assigned) that has no time or id of its own: its key is when the poll saw
+it, so two machines can make two ids for one change.
+
+| Server | Events | Subject | Key |
+| --- | --- | --- | --- |
+| `github` | `issue.*` | `github:issue:<owner/repo>#<n>` | the activity's id |
+| `github` | `pr.labelled`, `pr.unlabelled`, `pr.commented`, `pr.reviewed`, `review.comment` | `github:pr:<owner/repo>#<n>` | the label activity's, comment's or review's id |
+| `github` | `checks.failed`, `checks.passed` | the run's PR, or the run (`github:run:…#<run id>`) when it names none | the head commit, or the run's attempt |
+| `github` | `run.completed`, `deploy.waiting` | `github:run:<owner/repo>#<run id>` | the attempt (and the environments) |
+| `github` | `pr.merged` / `pr.closed` | the PR | none / the close time |
+| `github` | `pr.conflicted` and the other states | the PR, or the issue for `issue.assigned` | the review for `review.posted`, else the poll time |
+| `gitlab` | `issue.*`, `review.comment`, `pr.merged`, `pr.closed`, states | `gitlab:issue:` or `gitlab:mr:<group/project>#<n>` | as `github` |
+| `gitlab` | `checks.failed` | `gitlab:pipeline:<group/project>#<pipeline id>` | the pipeline's update time |
+| `forgejo`, `bitbucket` | `issue.*`, `review.comment`, `pr.merged`, `pr.closed`, states | `<server>:issue:` or `<server>:pr:<owner/repo>#<n>` | as `github` |
+| `forgejo`, `bitbucket` | `checks.failed` | the PR | the head commit and the time |
+| `azuredevops` | PR events, `checks.*` | `azuredevops:pr:<org/project/repo>#<n>` | the thread and comment, or the head commit and the time |
+| `azuredevops` | `run.completed`, `deploy.waiting` | `azuredevops:run:<org/project/repo>#<build id>` | the finish time, or the environments |
+| `azureboards` | `issue.*` | `azureboards:issue:<org/project>#<id>` | none for `issue.opened`; else the activity's id |
+| `jira` | `issue.*` | `jira:issue:<project>#<KEY-n>` | none for `issue.opened`; else the comment, label or change's id |
+| `linear` | `issue.*` | `linear:issue:<team>#<ENG-n>` | none for `issue.opened`; else the comment, label or history entry's id |
+| `sentry` | `health.issue_new` / `health.issue_regressed` | `sentry:issue:<org/project>#<id>` | none / the regression's time |
+| `betterstack` | `health.incident_*` | `betterstack:incident:<team>#<id>` | none |
+| `slack` | `message.received`, `question.answered` | `slack:message:<team/channel>#<ts>` (the question's for an answer) | none |
+| `googlechat` | message and answer events | `googlechat:message:spaces/<space>#<message>` | none |
+| `whatsapp` | message and answer events | `whatsapp:message:<phone number id>#<wamid>` | none |
+| `email` | `email.received` | `email:message:<mailbox>#<Message-ID>` | none |
 
 ## The Events page
 

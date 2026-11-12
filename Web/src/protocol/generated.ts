@@ -3675,6 +3675,49 @@ export interface Event {
    * agent, a workflow or the machine did.
    */
   actor?: AuditActor;
+  /**
+   * The CloudEvents version of the envelope (#4728, spec 4724-event-bus, "An event"): always "1.0".
+   */
+  specversion?: string;
+  /**
+   * The event's ref (#4728): the subject's ref, "@", the type, and, when the same type can happen
+   * again to that thing, "/" and the provider's key for this one, such as
+   * github:pr:alexec/agents#4702@pr.commented/2457. It comes from the provider's data only, never
+   * from the machine or the clock, so two machines make the same id for the same happening.
+   */
+  id?: string;
+  /** The event's type, noun.verbed (#4728): the same as name, which stays for one release. */
+  type?: string;
+  /**
+   * Who the event is about (#4728): github, jira, slack and so on; agents for the app's own events;
+   * server:<name> for an MCP server's event that says no subject.
+   */
+  provider?: string;
+  /**
+   * The provider's space (#4728, spec 4724-event-bus, "Topics"): a repo's full name, a Jira
+   * project, a Slack channel; the project or the machine for the app's own events. Lower case; can
+   * be empty.
+   */
+  topic?: string;
+  /**
+   * The ref of the thing the event happened to (#4728). None for an MCP server's event that says no
+   * subject.
+   */
+  subject?: Ref;
+  /** provider:topic, as CloudEvents asks for one (#4728). */
+  source?: string;
+  /** When it happened, in RFC 3339 (#4728): the provider's own time when it says one. */
+  time?: string;
+  /**
+   * The machine that raised it (#4728), as agents:machine:#<machine>. Not part of the event's
+   * identity.
+   */
+  producer?: string;
+  /**
+   * What the event carries (#4728): an MCP server's event data, or the app's own event's details.
+   * The details stay for one release.
+   */
+  data?: JSONValue;
 }
 
 export interface EventDraft {
@@ -15439,7 +15482,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ElicitationSecret: { required: ["name", "isSet"], optional: ["url", "canBeSessionOnly", "canAskBeforeUse", "description"] },
   Empty: { required: [], optional: [] },
   EntryNotification: { required: ["agentID", "entry"], optional: ["index", "oversized"] },
-  Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message", "actor"] },
+  Event: { required: ["position", "name", "at", "count", "scope", "sentence", "details", "chainDepth", "consequences"], optional: ["lastAt", "publisher", "message", "actor", "specversion", "id", "type", "provider", "topic", "subject", "source", "time", "producer", "data"] },
   EventDraft: { required: ["name", "at", "scope", "sentence", "details", "chainDepth"], optional: ["message"] },
   EventPattern: { required: ["name", "filters"], optional: ["anyOf"] },
   EventPublisher: { required: ["agentID", "title"], optional: [] },

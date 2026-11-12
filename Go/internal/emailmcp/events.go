@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/alexec/agents/Go/wire"
 
 	"github.com/emersion/go-imap/v2"
 )
@@ -362,7 +363,7 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 					"subject": m.Subject, "date": m.Date.Format(time.RFC3339), "authenticated": m.Authenticated},
 			}
 			event["sender"] = senderOf(m)
-			out = append(out, event)
+			out = append(out, mcpevents.Enveloped(event, s.messageRef(m), ""))
 		}
 	}
 	pace := plainPollMs
@@ -370,6 +371,26 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 		pace = idlePollMs
 	}
 	return map[string]any{"events": out, "cursor": c.encoded(), "truncated": false, "hasMore": more, "nextPollMs": pace}, nil
+}
+
+// messageRef is the ref of the mail an event is about (#4728): email:message:<mailbox>#<id>,
+// the mailbox being the account's user, in lower case, and the id its Message-ID (or the
+// server's own id for a mail with none). A mail comes once, so there is no key.
+func (s *Events) messageRef(m Summary) wire.Ref {
+	id := m.messageID
+	if id == "" {
+		id = m.ID
+	}
+	mailbox := ""
+	if s.Mailbox != nil && s.Mailbox.Account != nil {
+		if a, err := s.Mailbox.Account(); err == nil {
+			mailbox = a.User
+		}
+	}
+	if id == "" {
+		return wire.Ref{}
+	}
+	return mcpevents.Ref("email", "message", mailbox, id)
 }
 
 // remember keeps the folder's mark at changes, when IDLE holds it.

@@ -4159,6 +4159,36 @@ type Event struct {
 
 	// Who raised it, when a person's call through the control plane did (#1751, spec 736 FR-040): the actor the control plane gave the call's channel, never taken from the client. None for what an agent, a workflow or the machine did.
 	Actor *AuditActor `json:"actor,omitzero"`
+
+	// The CloudEvents version of the envelope (#4728, spec 4724-event-bus, "An event"): always "1.0".
+	Specversion *string `json:"specversion,omitzero"`
+
+	// The event's ref (#4728): the subject's ref, "@", the type, and, when the same type can happen again to that thing, "/" and the provider's key for this one, such as github:pr:alexec/agents#4702@pr.commented/2457. It comes from the provider's data only, never from the machine or the clock, so two machines make the same id for the same happening.
+	ID *string `json:"id,omitzero"`
+
+	// The event's type, noun.verbed (#4728): the same as name, which stays for one release.
+	Type *string `json:"type,omitzero"`
+
+	// Who the event is about (#4728): github, jira, slack and so on; agents for the app's own events; server:<name> for an MCP server's event that says no subject.
+	Provider *string `json:"provider,omitzero"`
+
+	// The provider's space (#4728, spec 4724-event-bus, "Topics"): a repo's full name, a Jira project, a Slack channel; the project or the machine for the app's own events. Lower case; can be empty.
+	Topic *string `json:"topic,omitzero"`
+
+	// The ref of the thing the event happened to (#4728). None for an MCP server's event that says no subject.
+	Subject *Ref `json:"subject,omitzero"`
+
+	// provider:topic, as CloudEvents asks for one (#4728).
+	Source *string `json:"source,omitzero"`
+
+	// When it happened, in RFC 3339 (#4728): the provider's own time when it says one.
+	Time *string `json:"time,omitzero"`
+
+	// The machine that raised it (#4728), as agents:machine:#<machine>. Not part of the event's identity.
+	Producer *string `json:"producer,omitzero"`
+
+	// What the event carries (#4728): an MCP server's event data, or the app's own event's details. The details stay for one release.
+	Data JSONValue `json:"data,omitzero"`
 }
 
 type EventDraft struct {
