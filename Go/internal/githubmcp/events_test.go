@@ -102,7 +102,7 @@ func (f *fakeGitHub) addRunWith(id int, branch, at string, pr int, trusted bool,
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.runs = append(f.runs, fakeRun{RunRef{ID: id, Attempt: 1, Name: "CI", URL: fmt.Sprintf("https://github.com/%s/actions/runs/%d", repo, id),
-		HeadSHA: fmt.Sprintf("sha%d", id), Branch: branch, PRNumber: pr, UpdatedAt: at}, trusted, conclusion})
+		HeadSHA: fmt.Sprintf("sha%d", id), Branch: branch, PRNumber: pr, UpdatedAt: at, CreatedAt: at}, trusted, conclusion})
 }
 
 func (f *fakeGitHub) addActivity(a IssueActivity) {
@@ -484,9 +484,11 @@ func TestAFailedRunGivesOneChecksFailedAndASecondAttemptANewID(t *testing.T) {
 	equal(t, e["data"], map[string]any{
 		"pr": map[string]any{"number": float64(402), "title": "PR 402", "branch": "agents/queue-helpers",
 			"url": "https://github.com/" + repo + "/pull/402"},
-		"headSha":    "sha9100",
-		"run":        map[string]any{"id": float64(9100), "attempt": float64(1), "name": "CI", "url": "https://github.com/" + repo + "/actions/runs/9100"},
-		"failedJobs": []any{map[string]any{"name": "test", "url": "https://github.com/" + repo + "/actions/runs/9100/job/1"}},
+		"headSha": "sha9100",
+		"run": map[string]any{"id": float64(9100), "attempt": float64(1), "name": "CI", "url": "https://github.com/" + repo + "/actions/runs/9100",
+			"createdAt": h.at(5)},
+		"completedAt": h.at(5),
+		"failedJobs":  []any{map[string]any{"name": "test", "url": "https://github.com/" + repo + "/actions/runs/9100/job/1"}},
 	}, "data")
 	quiet := h.poll("checks.failed", args, raised["cursor"])
 	equal(t, ids(quiet), []string{}, "quiet")
@@ -511,7 +513,9 @@ func TestAPassedRunGivesOneChecksPassedWithNoFailedJobsAndAFailedRunDoesNotLeakI
 		"pr": map[string]any{"number": float64(405), "title": "PR 405", "branch": "agents/queue-helpers-2",
 			"url": "https://github.com/" + repo + "/pull/405"},
 		"headSha": "sha9106",
-		"run":     map[string]any{"id": float64(9106), "attempt": float64(1), "name": "CI", "url": "https://github.com/" + repo + "/actions/runs/9106"},
+		"run": map[string]any{"id": float64(9106), "attempt": float64(1), "name": "CI", "url": "https://github.com/" + repo + "/actions/runs/9106",
+			"createdAt": h.at(5)},
+		"completedAt": h.at(5),
 	}, "data")
 	// checks.failed still ignores the passed run.
 	firstFailed := h.poll("checks.failed", args, nil)

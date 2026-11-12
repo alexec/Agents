@@ -11,8 +11,9 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// The delivery figures (#4552, epic #4551): the four DORA keys, DORA 2025's rework rate and
-// flow efficiency, for a repo, from the cost ledger's nodes and its releases' tag times.
+// The delivery figures (#4552, epic #4551): the four DORA keys, DORA 2025's rework rate,
+// flow efficiency and CI time to green, for a repo, from the cost ledger's nodes and its
+// releases' tag times.
 //
 //   - Lead time for changes: from the first work on an issue (its own start or its PRs') to
 //     the first release tag that carries a merged PR that fixes it. Median and P90.
@@ -26,6 +27,10 @@ import (
 //     file another PR merged in the ReworkRange before changed.
 //   - Flow efficiency: a closed issue's agents' working time (its own and its PRs') over its
 //     cycle time (#3562), at most 1. Median.
+//   - CI time to green (#4554): a merged PR's last push (the first run made on its last head
+//     commit) to the last of that commit's runs passing. Median and P90. The ci-speed skill's
+//     figure, and the lane-count rule's (more than 15 minutes means fewer lanes).
+//   - Failed rounds: a merged PR's failed CI runs and attempts. Mean.
 //   - Approval wait (#4553): from a PR's needs-approval label (its opening when the label is
 //     unknown) to its first answer by a person. Median and P90; and the share of merged PRs
 //     that had one before their merge.
@@ -269,6 +274,25 @@ func DeliveryOf(nodes []wire.LineageCostNode, repo string, releases map[string]w
 		}
 	}
 	out.FlowEfficiency = figureOf(flow, since, at, median)
+
+	// CI time to green and failed rounds, by merge (#4554).
+	var green, rounds []sample
+	for _, n := range merged {
+		if ci := n.Ci; ci != nil && ci.PushedAt != nil && ci.GreenAt != nil && *ci.GreenAt >= *ci.PushedAt {
+			green = append(green, sample{*n.EndedAt, float64(*ci.GreenAt - *ci.PushedAt)})
+		}
+		v := 0.0
+		if n.FailedChecks != nil {
+			v = float64(*n.FailedChecks)
+		}
+		rounds = append(rounds, sample{*n.EndedAt, v})
+	}
+	out.CiTimeToGreen = figureOf(green, since, at, median)
+	if v := valuesIn(green, since, at+1); len(v) > 0 {
+		p := percentile(v, 0.9)
+		out.CiTimeToGreen.P90 = &p
+	}
+	out.FailedRounds = figureOf(rounds, since, at, mean)
 
 	// The approval wait (#4553), and the share of merged PRs that waited.
 	out.ApprovalWait = approvalWaitIn(mine, since, at)

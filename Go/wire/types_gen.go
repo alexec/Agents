@@ -6146,6 +6146,9 @@ type LineageCostNode struct {
 
 	// A PR's first answer by a person (#4553): the first pr.reviewed or pr.commented at or after the wait's start, while it was open, not by a bot and not a comment that starts with <!-- agent -->. The approval wait is this less askedAt, else openedAt.
 	AnsweredAt *Date `json:"answeredAt,omitzero"`
+
+	// A PR's CI on its last head commit, from checks.passed and checks.failed (#4554), for CI time to green.
+	Ci *LineagePRCI `json:"ci,omitzero"`
 }
 
 // lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a repo's every node (kind repo, ref github:repo:#alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
@@ -6173,7 +6176,7 @@ type LineageCostRollup struct {
 	Limited *bool `json:"limited,omitzero"`
 }
 
-// A repo's delivery figures (#4552, epic #4551), from this machine's totals: the four DORA keys, DORA 2025's rework rate and flow efficiency, over the windowDays (28) before at, each with a weekly series. A week is 7 days back from at, not a calendar week. A figure says how many it is made from; one made from none has no value. band is where a value falls among DORA 2024's clusters, a reference from teams of people, not a grade; rework rate and flow efficiency have none.
+// A repo's delivery figures (#4552, epic #4551), from this machine's totals: the four DORA keys, DORA 2025's rework rate and flow efficiency, and CI time to green and failed rounds (#4554), over the windowDays (28) before at, each with a weekly series. A week is 7 days back from at, not a calendar week. A figure says how many it is made from; one made from none has no value. band is where a value falls among DORA 2024's clusters, a reference from teams of people, not a grade; rework rate, flow efficiency and the CI figures have none.
 type LineageDelivery struct {
 	Since Date `json:"since"`
 
@@ -6204,9 +6207,15 @@ type LineageDelivery struct {
 
 	// The share of merged PRs, 0 to 1, that waited for a person's answer before their merge (#4553), by merge time. count is the merged PRs.
 	ApprovalShare LineageDeliveryFigure `json:"approvalShare"`
+
+	// CI time to green, in seconds (#4554): a merged PR's last push (the first run made on its last head commit) to the last of that commit's runs passing; the median, and p90. Counted by its merge. No band.
+	CiTimeToGreen LineageDeliveryFigure `json:"ciTimeToGreen"`
+
+	// Failed CI rounds a merged PR, the mean (#4554): its checks.failed, once per run and attempt, 0 for none. count is the merged PRs. No band.
+	FailedRounds LineageDeliveryFigure `json:"failedRounds"`
 }
 
-// One delivery figure (#4552): value over the window, absent when made from none; p90 for lead time; count is what it is made from; weeks is the 4 weeks, oldest first; band is DORA 2024's.
+// One delivery figure (#4552): value over the window, absent when made from none; p90 for lead time, the approval wait and CI time to green; count is what it is made from; weeks is the 4 weeks, oldest first; band is DORA 2024's.
 type LineageDeliveryFigure struct {
 	Value *float64 `json:"value,omitzero"`
 
@@ -6652,6 +6661,15 @@ type LineageOverhead struct {
 
 	// What no figure here counts: people-time (a person's reviews and answers) and ci-minutes (the forge's runners).
 	Uncounted []string `json:"uncounted"`
+}
+
+// A PR's CI on its last head commit (#4554): headSha is that commit; pushedAt is when its first run was made, by the push (a rerun keeps it); greenAt is when the last of its runs that passed finished, absent until one passed. A new head commit starts it again.
+type LineagePRCI struct {
+	HeadSha string `json:"headSha"`
+
+	PushedAt *Date `json:"pushedAt,omitzero"`
+
+	GreenAt *Date `json:"greenAt,omitzero"`
 }
 
 // A node's title, state and labels from its connector (#3089), resolved and cached on the daemon so a lineage renderer shows "Fix flaky test" rather than its ref. state is open, closed or merged (a pull request's; an issue's is open or closed); absent when the connector does not say. labels is empty when it has none. Resolved for a GitHub or GitLab issue or pull request only; Linear and releases are not resolved yet.

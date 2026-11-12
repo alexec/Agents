@@ -472,7 +472,7 @@ func (r runJSON) ref() RunRef {
 		number = r.PullRequests[0].Number
 	}
 	return RunRef{ID: r.ID, Attempt: attempt, Name: name, URL: r.HTMLURL, HeadSHA: r.HeadSHA,
-		Branch: r.HeadBranch, PRNumber: number, UpdatedAt: r.UpdatedAt}
+		Branch: r.HeadBranch, PRNumber: number, UpdatedAt: r.UpdatedAt, CreatedAt: r.CreatedAt}
 }
 
 func (r runJSON) completed(repo string) CompletedRun {
