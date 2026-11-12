@@ -71,4 +71,5 @@ What agents learnt about this repo: its code, tools, process and decisions. One 
 - [Developer ID has no Apple sign-in](developer-id-has-no-apple-sign-in.md) — Apple leaves applesignin out of Developer ID profiles; only the Live build has it (#4283); no release secret
 - [Shell is a stranger to the live socket](shell-is-a-stranger-to-the-live-socket.md) — control-role methods refused from a script; pair_web_page missing 2026-11-10; set connectors up by PR + Alex Approve
 - [Claude works after its prompt ends](claude-works-after-its-prompt-ends.md) — background command's end starts a cycle with no prompt; agentsd's unprompted turn (#4323)
+- [Browser screenshots land in the main checkout](browser-screenshots-land-in-the-main-checkout.md) — browser_take_screenshot writes only under ~/Agents; use your worktree's build/
 - [Lineage tests fail on Mac main](lineage-tests-fail-on-mac-main.md) — health/sessions/signin agentsd tests fail on main on the Mac; check on a main copy, let Linux CI prove them

@@ -74,8 +74,14 @@ func TestConnectingAzureDevOpsWithAToken(t *testing.T) {
 		!strings.Contains(fmt.Sprint(list.Providers), "azuredevops") {
 		t.Fatalf("list: %+v", list)
 	}
-	if msg := c.callErr(t, 5, "connections/sign-in", map[string]any{"provider": "azuredevops"}); !strings.Contains(msg, "personal access token") {
-		t.Fatalf("an Azure DevOps sign-in page: %s", msg)
+	if list.Connections[0].ByToken == nil || !*list.Connections[0].ByToken {
+		t.Fatalf("a personal access token's row: %+v", list.Connections[0])
+	}
+	// No Entra app on this machine (#3921): the sign-in says to use a token.
+	t.Setenv("AGENTS_PERSONAL_HOME", t.TempDir())
+	t.Setenv("AGENTS_"+connections.AzureDevOpsClientIDName, "")
+	if msg := c.callErr(t, 5, "connections/sign-in", map[string]any{"provider": "azuredevops", "url": ado.URL + "/acme"}); !strings.Contains(msg, "personal access token") {
+		t.Fatalf("an Azure DevOps sign-in with no Entra app: %s", msg)
 	}
 	// A token with no refresh is not renewed, and stays.
 	d.renewConnections()
@@ -85,6 +91,118 @@ func TestConnectingAzureDevOpsWithAToken(t *testing.T) {
 	c.call(t, 6, "connections/disconnect", map[string]any{"provider": "azuredevops"})
 	if _, ok, _ := file.Get(connections.AzureDevOps); ok {
 		t.Fatal("still kept after disconnect")
+	}
+}
+
+// Azure DevOps by Microsoft Entra (#3921): Entra's device flow for the organization given, the
+// access token checked with it as a bearer token, the pair kept and renewed with the scope, and
+// an Azure DevOps Server or no organization refused before Entra is asked.
+func TestSigningInToAzureDevOpsWithEntra(t *testing.T) {
+	var mu sync.Mutex
+	var forms []map[string]string
+	access := "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxIn0.c2ln"
+	entra := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.ParseForm()
+		form := map[string]string{"path": r.URL.Path}
+		for k := range r.PostForm {
+			form[k] = r.PostForm.Get(k)
+		}
+		mu.Lock()
+		forms = append(forms, form)
+		mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.URL.Path == "/organizations/oauth2/v2.0/devicecode":
+			fmt.Fprint(w, `{"device_code":"dc-secret","user_code":"ENTRA123","verification_uri":"https://microsoft.com/devicelogin","expires_in":900,"interval":5}`)
+		case form["grant_type"] == "refresh_token":
+			fmt.Fprint(w, `{"access_token":"`+access+`2","refresh_token":"rt-2","expires_in":3600}`)
+		default:
+			fmt.Fprint(w, `{"access_token":"`+access+`","refresh_token":"rt-1","expires_in":3600}`)
+		}
+	}))
+	defer entra.Close()
+	ado := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer "+access) {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if r.URL.Path == "/acme/_apis/connectionData" {
+			w.Header().Set("Content-Type", "application/json")
+			fmt.Fprint(w, `{"authenticatedUser":{"id":"u1","providerDisplayName":"Agents Test"}}`)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer ado.Close()
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	d.azureDevOpsHTTP = ado.Client()
+	d.newDeviceFlow = func(wire.ConnectionProvider) *connections.DeviceFlow {
+		f := connections.NewAzureDevOpsEntraFlow("entra-app", "")
+		f.Base, f.HTTP = entra.URL+"/organizations/", entra.Client()
+		f.Sleep = func(ctx context.Context, _ time.Duration) error { return ctx.Err() }
+		return f
+	}
+
+	if msg := c.callErr(t, 1, "connections/sign-in", map[string]any{"provider": "azuredevops"}); !strings.Contains(msg, "organization") {
+		t.Fatalf("no organization: %s", msg)
+	}
+	if msg := c.callErr(t, 2, "connections/sign-in", map[string]any{"provider": "azuredevops", "url": "https://tfs.example.com/tfs/DefaultCollection"}); !strings.Contains(msg, "Server") {
+		t.Fatalf("an Azure DevOps Server: %s", msg)
+	}
+	var started wire.ConnectionSignIn
+	json.Unmarshal(c.call(t, 3, "connections/sign-in", map[string]any{"provider": "azuredevops", "url": ado.URL + "/acme"}), &started)
+	if started.Status != wire.ConnectionSignInStatusWaiting || deref(started.UserCode) != "ENTRA123" ||
+		started.VerificationURL != "https://microsoft.com/devicelogin" || started.Grant != wire.ConnectionSignInGrantDeviceCode {
+		t.Fatalf("started: %+v", started)
+	}
+	var done wire.ConnectionSignIn
+	for range 50 {
+		raw := c.call(t, 4, "connections/sign-in/wait", map[string]any{"flowID": started.FlowID})
+		if strings.Contains(string(raw), "eyJ") || strings.Contains(string(raw), "rt-1") || strings.Contains(string(raw), "dc-secret") {
+			t.Fatalf("a secret went to the client: %s", raw)
+		}
+		json.Unmarshal(raw, &done)
+		if done.Status != wire.ConnectionSignInStatusWaiting {
+			break
+		}
+	}
+	if done.Status != wire.ConnectionSignInStatusConnected || done.Connection == nil || deref(done.Connection.Login) != "Agents Test" ||
+		done.Connection.ByToken != nil || done.Connection.ExpiresAt != nil {
+		t.Fatalf("done: %+v (%s)", done, deref(done.Message))
+	}
+	kept, ok, _ := file.Get(connections.AzureDevOps)
+	if !ok || kept.Access != access || kept.Refresh != "rt-1" || kept.Resource != "acme" || kept.URL != ado.URL+"/" || kept.AccessExpiresAt.IsZero() {
+		t.Fatalf("kept: %+v", kept)
+	}
+	mu.Lock()
+	start := forms[0]
+	mu.Unlock()
+	if start["client_id"] != "entra-app" || start["scope"] != connections.AzureDevOpsEntraScope {
+		t.Fatalf("the device code asked for: %+v", start)
+	}
+
+	// Due within the margin: renewed with the scope, as Entra wants it.
+	kept.AccessExpiresAt = time.Now().Add(time.Minute)
+	file.Put(kept)
+	d.renewConnections()
+	renewed, _, _ := file.Get(connections.AzureDevOps)
+	mu.Lock()
+	last := forms[len(forms)-1]
+	mu.Unlock()
+	if renewed.Access != access+"2" || renewed.Refresh != "rt-2" || renewed.Resource != "acme" || renewed.Login != "Agents Test" ||
+		last["grant_type"] != "refresh_token" || last["scope"] != connections.AzureDevOpsEntraScope {
+		t.Fatalf("renewed %+v with %+v", renewed, last)
+	}
+	// An Entra connection that must sign in again is still Entra's, not a token's.
+	renewed.Access, renewed.Refresh, renewed.SignInAgain = "", "", true
+	file.Put(renewed)
+	var list wire.ConnectionsList
+	json.Unmarshal(c.call(t, 5, "connections/list", map[string]any{}), &list)
+	if len(list.Connections) != 1 || list.Connections[0].ByToken != nil || list.Connections[0].State != wire.ConnectionStateSignInAgain {
+		t.Fatalf("list: %+v", list.Connections)
 	}
 }
 

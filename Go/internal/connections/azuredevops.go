@@ -14,11 +14,51 @@ import (
 	"time"
 )
 
-// AzureDevOps is the eighth provider (#3802): a personal access token on one organization of
-// dev.azure.com, or one collection of an Azure DevOps Server, as the azuredevops and
-// azureboards servers take it. Azure DevOps has no device flow for Agents, and a token has no
-// refresh: it ends on the date the person gave it. Microsoft Entra sign-in comes later.
+// AzureDevOps is the eighth provider (#3802): one organization of dev.azure.com, or one
+// collection of an Azure DevOps Server, as the azuredevops and azureboards servers take it.
+// Two ways in: a personal access token, which has no refresh and ends on the date the person
+// gave it; or, on dev.azure.com only, a sign-in with Microsoft Entra (#3921), Entra's device
+// flow with an Entra app's client id, whose access token the host renews by itself.
 const AzureDevOps = "azuredevops"
+
+// The Entra sign-in (#3921). An Entra app is a public client ("Allow public client flows"),
+// so the device flow and its refresh need no client secret. Agents has no app of its own on
+// Entra yet: the host reads one from the person's secrets, AZURE_DEVOPS_CLIENT_ID (and
+// AZURE_DEVOPS_TENANT, a tenant id or domain, when the app is in one tenant only).
+const (
+	AzureDevOpsClientIDName = "AZURE_DEVOPS_CLIENT_ID"
+	AzureDevOpsTenantName   = "AZURE_DEVOPS_TENANT"
+	// EntraLogin is Microsoft Entra's sign-in root; a walk gives a fake one.
+	EntraLogin = "https://login.microsoftonline.com/"
+	// EntraTenant is the tenant a sign-in goes to when the person names none: any work or
+	// school account. Azure DevOps takes no personal Microsoft account by Entra.
+	EntraTenant = "organizations"
+	// AzureDevOpsEntraScope is Azure DevOps's own resource (its fixed application id) with the
+	// rights the person has, and a refresh token.
+	AzureDevOpsEntraScope = "499b84ac-1321-427f-aa17-267ca6975798/.default offline_access"
+)
+
+// NewAzureDevOpsEntraFlow is Entra's device flow for the app clientID in tenant
+// (EntraTenant when blank), for Azure DevOps.
+func NewAzureDevOpsEntraFlow(clientID, tenant string) *DeviceFlow {
+	tenant = strings.TrimSpace(tenant)
+	if tenant == "" {
+		tenant = EntraTenant
+	}
+	return &DeviceFlow{ClientID: clientID, Name: "Microsoft Entra", Base: EntraLogin + url.PathEscape(tenant) + "/",
+		CodePath: "oauth2/v2.0/devicecode", TokenPath: "oauth2/v2.0/token", Scope: AzureDevOpsEntraScope,
+		RefreshScope: true, HTTP: &http.Client{Timeout: 30 * time.Second}}
+}
+
+// AzureDevOpsAuthorization is the Authorization header for token: Bearer for an Entra access
+// token (a JWT, three parts with dots), else Basic with the personal access token as the
+// password and no user. A personal access token has no dot.
+func AzureDevOpsAuthorization(token string) string {
+	if strings.HasPrefix(token, "eyJ") && strings.Count(token, ".") == 2 {
+		return "Bearer " + token
+	}
+	return "Basic " + base64.StdEncoding.EncodeToString([]byte(":"+token))
+}
 
 // AzureDevOpsServices is Azure DevOps Services' root, the one a connection is on when the
 // address names no other.
@@ -82,7 +122,7 @@ func IsAzureDevOpsServices(root string) bool { return root == "" || root == Azur
 
 // CheckAzureDevOpsToken asks the organization org of the Azure DevOps at root whose token this
 // is, and gives the account's display name. The token goes only in the Authorization header
-// (Basic, as the password with no user); an error never holds it.
+// (AzureDevOpsAuthorization); an error never holds it.
 func CheckAzureDevOpsToken(ctx context.Context, client *http.Client, root, org, token string) (string, error) {
 	if client == nil {
 		client = &http.Client{Timeout: 30 * time.Second}
@@ -94,7 +134,8 @@ func CheckAzureDevOpsToken(ctx context.Context, client *http.Client, root, org, 
 	if err != nil {
 		return "", errors.New("the request to Azure DevOps could not be made")
 	}
-	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(":"+token)))
+	auth := AzureDevOpsAuthorization(token)
+	req.Header.Set("Authorization", auth)
 	req.Header.Set("Accept", "application/json")
 	res, err := c.Do(req)
 	if err != nil {
@@ -105,6 +146,9 @@ func CheckAzureDevOpsToken(ctx context.Context, client *http.Client, root, org, 
 	switch {
 	case res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusNonAuthoritativeInfo ||
 		(res.StatusCode >= 300 && res.StatusCode < 400) || (res.StatusCode == http.StatusOK && kind == "text/html"):
+		if strings.HasPrefix(auth, "Bearer ") {
+			return "", errors.New("Azure DevOps did not let your Microsoft account into " + org + ". Check that the organization is connected to your Microsoft Entra tenant and that you are a member, or connect with a personal access token")
+		}
 		return "", errors.New("Azure DevOps did not take the token for " + org + ". Make one in that organization's User settings ▸ Personal access tokens")
 	case res.StatusCode == http.StatusNotFound:
 		return "", errors.New("there is no organization " + org + " on " + hostOf(root))
@@ -134,6 +178,20 @@ func AzureDevOpsConnection(root, org, token, login string, at time.Time) Connect
 		c.Workspace = u.Host + strings.TrimSuffix(u.Path, "/") + "/" + org
 	}
 	return c
+}
+
+// AzureDevOpsSignedIn is the connection an Entra sign-in makes on the organization org of
+// dev.azure.com: AzureDevOpsConnection's, with the access token's end and its refresh.
+func AzureDevOpsSignedIn(root, org, login string, t Token, at time.Time) Connection {
+	c := AzureDevOpsConnection(root, org, t.Access, login, at)
+	c.Refresh, c.AccessExpiresAt, c.RefreshExpiresAt = t.Refresh, t.AccessExpiresAt, t.RefreshExpiresAt
+	return c
+}
+
+// ByEntra is an Azure DevOps connection made by the Entra sign-in: one with a refresh, or one
+// that must sign in again (a personal access token never must: it has no end the host knows).
+func ByEntra(c Connection) bool {
+	return c.Provider == AzureDevOps && (c.Refresh != "" || c.SignInAgain)
 }
 
 func hostOf(root string) string {

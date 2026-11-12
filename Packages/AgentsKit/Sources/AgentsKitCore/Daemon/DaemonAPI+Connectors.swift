@@ -119,7 +119,11 @@ extension DaemonAPI {
         /// The web page's origin, for a code flow that hands back by postMessage. Nil on the
         /// Mac and the Remote, which take it back at agents://oauth/callback.
         public var origin: String?
-        public init(provider: ConnectionProvider, origin: String? = nil) { self.provider = provider; self.origin = origin }
+        /// Azure DevOps's Microsoft Entra sign-in (#3921): the organization it is for.
+        public var url: String?
+        public init(provider: ConnectionProvider, origin: String? = nil, url: String? = nil) {
+            self.provider = provider; self.origin = origin; self.url = url
+        }
     }
 
     /// What the hand-back page gave the client: the code and the state, or the provider's error.

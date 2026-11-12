@@ -72,3 +72,21 @@ func TestCheckAzureDevOpsToken(t *testing.T) {
 		t.Fatalf("a server: %+v", c)
 	}
 }
+
+// #3921: an Entra access token (a JWT) goes as a bearer token; a personal access token as
+// Basic's password.
+func TestAzureDevOpsAuthorization(t *testing.T) {
+	if got := AzureDevOpsAuthorization("eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxIn0.c2ln"); got != "Bearer eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxIn0.c2ln" {
+		t.Fatalf("Entra: %q", got)
+	}
+	if got := AzureDevOpsAuthorization("abc123"); got != "Basic OmFiYzEyMw==" {
+		t.Fatalf("a personal access token: %q", got)
+	}
+	f := NewAzureDevOpsEntraFlow("app", "contoso.onmicrosoft.com")
+	if f.Base != EntraLogin+"contoso.onmicrosoft.com/" || !f.RefreshScope || f.Scope != AzureDevOpsEntraScope {
+		t.Fatalf("flow: %+v", f)
+	}
+	if NewAzureDevOpsEntraFlow("app", " ").Base != EntraLogin+"organizations/" {
+		t.Fatal("no tenant")
+	}
+}
