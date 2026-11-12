@@ -16,7 +16,19 @@ import (
 // each one raised once from what Forgejo says.
 
 func TestTheEventsAreTheGitLabServersNames(t *testing.T) {
-	same(t, EventNames(), gitlabmcp.EventNames())
+	// The gitlab server's, with run.completed after checks.failed as there; Forgejo has no
+	// deploy.waiting (#4217).
+	without := func(names []string) []string {
+		var out []string
+		for _, n := range names {
+			if n != "run.completed" && n != "deploy.waiting" {
+				out = append(out, n)
+			}
+		}
+		return out
+	}
+	same(t, without(EventNames()), without(gitlabmcp.EventNames()))
+	same(t, EventNames()[:2], []string{"checks.failed", "run.completed"})
 }
 
 func TestOpenedIsRaisedWhenReadyAndOnlyForTheReposOwn(t *testing.T) {
@@ -326,7 +338,7 @@ func TestEventsListSchemas(t *testing.T) {
 		}
 		has("mine", named[name])
 		has("fixes", named[name])
-		has("any", named[name] || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled")
+		has("any", named[name] || name == "run.completed" || name == "issue.closed" || name == "issue.commented" || name == "issue.labelled")
 		if issue, ok := props["issue"].(map[string]any); ok && name != "issue.assigned" && !reflect.DeepEqual(issue["type"], []string{"integer", "array"}) {
 			t.Errorf("%s: issue is %v", name, issue["type"])
 		}
