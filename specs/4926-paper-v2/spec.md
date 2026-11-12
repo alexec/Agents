@@ -15,6 +15,7 @@ Alex's words on the earlier rounds (2026-11-12):
 4. On the first contact sheet: **a bit more high-contrast; too much shading; gradients are fine.**
 5. On the second: **rather than dark backgrounds, use lighter backgrounds and gradients.**
 6. On the third: **only use the gradient on paper (greyscale) backgrounds. It is used as a way to avoid low contrast.**
+7. On the fourth: **only use a gradient on what were large grey backgrounds. Never on coloured backgrounds, nor on small areas like buttons or notices.**
 
 ## The contact sheet
 
@@ -31,7 +32,7 @@ Alex's words on the earlier rounds (2026-11-12):
 1. **Clear and crisp.** High contrast: deep charcoal ink (17:1) on near-white paper. Every text colour is 4.5:1 or more on every surface, the selection included.
 2. **Few colours, each with one job.** Colour means something: a link, a state or a label. It is never decoration.
 3. **Lines, not shading.** A line (1.5:1) sets things apart. Nothing on the page casts a shadow and there are few grey fills. Only what floats over the page (a menu, a toast, a sheet) has a short shadow. A control's edge is 3:1 or more (WCAG 1.4.11).
-4. **Greyscale paper gradients give shape; colour never fills.** Buttons, chips, badges, cards, a picked choice and the selected row are paper with a short white-to-grey gradient. The gradient gives a thing its shape, so nothing depends on a faint line. Colour is only in text, icons, lines (a state's edge, the selection's bar) and a switch that is on.
+4. **One gradient, on the large grey only.** The sidebar column, the one large grey background, goes from paper to a slightly deeper grey, top to bottom. Nothing else has a gradient: not a coloured background, and not a small thing such as a button, a chip, a badge, a notice or a card. Those are flat paper with a line. Colour never fills. It is only in text, icons, lines (a state's edge, the selection's bar) and a switch that is on.
 5. **One face, one icon set, on all three clients.** Today the Mac and the Remote draw SF Symbols, and the web page draws Unicode glyphs (`✎ ▤ ◉ ▦ ✓`). One set makes the three clients look like one product.
 
 ## Token changes (`design/tokens.json`)
@@ -60,15 +61,13 @@ Alex's words on the earlier rounds (2026-11-12):
 
 The code inks and the forge colours keep their values.
 
-### Gradients (new: `gradient.*`): greyscale paper only
+### Gradient (new: `gradient.sidebar`): the large grey only
 
 | Token | Light | Dark | Used for |
 |---|---|---|---|
-| `gradient.control` | `#ffffff` → `#ebe9e3`, top to bottom | `#353533` → `#262625` | buttons, chips, state badges, a picked choice, the segmented control's chosen part, a tooltip |
-| `gradient.card` | `#ffffff` → `#f7f6f2` | `#262625` → `#212120` | cards, panels, the question card |
-| `gradient.selection` | `#e6e3dc` → `#f3f2ee`, left to right | `#3a3a37` → `#2a2a28` | the selected row, with a 3px accent bar |
+| `gradient.sidebar` | `#f7f6f3` → `#ecebe6`, top to bottom | `#181817` → `#111110` | the sidebar column (`color.sidebar` stays as its flat value where a gradient cannot be drawn) |
 
-No gradient has a hue. A state shows its colour in its text, its icon and a line (`line.accent` `#a9c2ee` / `#3d5687`, `line.attention` `#ebbf9f` / `#6b4a33`, `line.vouched` `#a9d3bb` / `#36614d`, `line.failure` `#eeb0b3` / `#6b3a3d`), or in a notice's 3px bar. A switch or checkbox that is on is a flat `accent`. Every text colour is 4.7:1 or more on the darker end of each gradient (light 5.2:1 or more). SwiftUI draws each one as a `LinearGradient`.
+There are no other gradients. Buttons, chips, badges, notices, cards and a picked choice are flat `raised` with a `rule` or `edge` line. A state shows its colour in its text, its icon and a line: `line.accent` `#a9c2ee` / `#3d5687`, `line.attention` `#ebbf9f` / `#6b4a33`, `line.vouched` `#a9d3bb` / `#36614d` and `line.failure` `#eeb0b3` / `#6b3a3d`. A notice also has a 3px bar. A switch or checkbox that is on is a flat `accent`. Every text colour is 5.3:1 or more on the deeper end of the sidebar gradient. SwiftUI draws it as a `LinearGradient`.
 
 ### Depth (new: `shadow.*`, replacing the one `color.shadow`)
 
@@ -108,7 +107,7 @@ The contact sheet prints each colour's ratio on the ground, light and dark.
 - **Text:** every text colour is 4.5:1 or more on every surface: ground, sidebar, raised, well, wash and selection.
 - **Ink:** 17:1 in the light and 15.6:1 in the dark.
 - **Control edges:** 3:1 or more on every surface where a control is drawn.
-- **Gradients:** every text colour is 4.7:1 or more on the darker end of each greyscale gradient.
+- **The sidebar gradient:** every text colour is 5.3:1 or more on its deeper end.
 
 The first story adds these pairs to `DesignTokensTests`.
 
@@ -149,7 +148,7 @@ The web page must not clip when a person sets 0.12em letter spacing and 0.16em w
 ## Decisions
 
 - Decided: no handwriting, because Alex wants a clean, simple look (2026-11-12).
-- Decided: higher contrast (ink 17:1), lines (1.5:1) in place of shadows on the page, few grey fills, short shadows only on what floats, and greyscale paper gradients that give shape in place of faint lines, with colour only in text, icons, lines and a switch that is on, because Alex asked for more contrast, less shading, light backgrounds, and gradients only on paper greys to avoid low contrast (2026-11-12). Alex can overrule.
+- Decided: higher contrast (ink 17:1), lines (1.5:1) in place of shadows on the page, few grey fills, short shadows only on what floats, and one gradient, on the sidebar (the one large grey), with colour only in text, icons, lines and a switch that is on, because Alex asked for more contrast, less shading, light backgrounds, and a gradient only on large grey backgrounds (2026-11-12). Alex can overrule.
 - Decided: one icon set, Lucide at a 1.5 stroke, on all three clients, because the clients draw different icons today and Lucide is the one set that meets the library rule. Alex can overrule.
 - Decided: the colour, gradient, depth, radius and spacing tokens above, because each passes WCAG AA and follows the principles. Alex can overrule.
 - Decided: no setting to turn the face off, because one clear look is simpler. Alex can overrule.
@@ -159,7 +158,7 @@ The web page must not clip when a person sets 0.12em letter spacing and 0.16em w
 
 These are filed as sub-issues of #4925 after Alex approves the sheet. Each is blocked by #4926. Story 1 goes first; stories 2, 3 and 4 follow it and can run at the same time.
 
-1. **Paper v2 tokens:** colour, gradients, depth, radius and reading spacing (`design/tokens.json`, `Paper.swift`, `StateTint.swift`, `paper.css`, contrast pairs in `DesignTokensTests`).
+1. **Paper v2 tokens:** colour, the sidebar gradient, depth, radius and reading spacing (`design/tokens.json`, `Paper.swift`, `StateTint.swift`, `paper.css`, contrast pairs in `DesignTokensTests`).
 2. **The face:** Atkinson Hyperlegible Next and Mono on the three clients (`design/fonts/`, `TypeScale.swift`, `Web/assets/fonts`, acknowledgements).
 3. **One icon set:** Lucide on the three clients (`design/icons.json`, `scripts/design.sh icons`, an asset catalogue, the web's glyphs replaced).
 4. **The components to the sheet:** buttons, fields, badges, notices, menus, the session row, the question card and the prompt bar drawn as the contact sheet shows, on the three clients.

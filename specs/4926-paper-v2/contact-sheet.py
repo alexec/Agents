@@ -28,7 +28,7 @@ def icon(name, size=18, cls=""):
 # Colour: token, light, dark, what it is for, what it is drawn on.
 SURFACES = [
     ("ground", "#fcfbf9", "#1a1a19", "The page every column sits on. Paper, a breath off white."),
-    ("sidebar", "#f5f4f0", "#141413", "The folders column: one step deeper than the ground."),
+    ("sidebar", "#f5f4f0", "#141413", "The folders column, the one large grey: a gradient from #f7f6f3 to #ecebe6 (dark #181817 to #111110)."),
     ("raised", "#ffffff", "#212120", "What floats: cards, the prompt bar, menus, sheets. Set apart by a line, not a shadow."),
     ("well", "#f3f2ee", "#262625", "What is set into the page: code, your own message, a field."),
     ("wash", "#eeece7", "#2e2e2c", "A row under the pointer; a pressed quiet button."),
@@ -137,10 +137,10 @@ page = f'''<!doctype html>
   --ink:#1a1918; --secondary:#4a4741; --tertiary:#625e57; --rule:#d6d2c9; --edge:#7d786e;
   --accent:#1a52c0; --attention:#a3400e; --failure:#b0222a; --vouched:#25684f; --issue:#0c6278; --pull:#6c3cae;
   --on-ink:#ffffff;
-  --grad-plain: linear-gradient(180deg, #ffffff, #ebe9e3);
-  --grad-card: linear-gradient(180deg, #ffffff, #f7f6f2);
-  --grad-accent: var(--grad-plain); --grad-attention: var(--grad-plain); --grad-vouched: var(--grad-plain); --grad-failure: var(--grad-plain);
-  --grad-selection: linear-gradient(90deg, #e6e3dc, #f3f2ee);
+  --grad-plain: var(--raised); --grad-card: var(--raised);
+  --grad-accent: var(--raised); --grad-attention: var(--raised); --grad-vouched: var(--raised); --grad-failure: var(--raised);
+  --grad-selection: var(--selection);
+  --grad-sidebar: linear-gradient(180deg, #f7f6f3, #ecebe6);
   --grad-switch: var(--accent);
   --line-accent: #a9c2ee; --line-attention: #ebbf9f; --line-vouched: #a9d3bb; --line-failure: #eeb0b3;
   --shadow-raised: 0 0 #0000;
@@ -155,10 +155,10 @@ page = f'''<!doctype html>
   --ink:#f4f2ed; --secondary:#bdb9b0; --tertiary:#a29e95; --rule:#3d3d3a; --edge:#85817a;
   --accent:#86b4ff; --attention:#f3a672; --failure:#f4878d; --vouched:#92ccad; --issue:#73cbe0; --pull:#bea3f2;
   --on-ink:#141413;
-  --grad-plain: linear-gradient(180deg, #353533, #262625);
-  --grad-card: linear-gradient(180deg, #262625, #212120);
-  --grad-accent: var(--grad-plain); --grad-attention: var(--grad-plain); --grad-vouched: var(--grad-plain); --grad-failure: var(--grad-plain);
-  --grad-selection: linear-gradient(90deg, #3a3a37, #2a2a28);
+  --grad-plain: var(--raised); --grad-card: var(--raised);
+  --grad-accent: var(--raised); --grad-attention: var(--raised); --grad-vouched: var(--raised); --grad-failure: var(--raised);
+  --grad-selection: var(--selection);
+  --grad-sidebar: linear-gradient(180deg, #181817, #111110);
   --grad-switch: var(--accent);
   --line-accent: #3d5687; --line-attention: #6b4a33; --line-vouched: #36614d; --line-failure: #6b3a3d;
   --shadow-raised: 0 0 #0000;
@@ -242,7 +242,7 @@ h3 {{ font-size: 13px; font-weight: 650; color: var(--secondary); margin: 22px 0
 .chip.mono {{ font: 12px/1 var(--mono); }}
 .badge {{ font: 600 12px/1 var(--text); padding: 4px 9px 4px 6px; border-radius: 99px; display: inline-flex; gap: 4px; align-items: center; }}
 .badge.attention {{ background: var(--grad-attention); color: var(--attention); box-shadow: inset 0 0 0 1px var(--line-attention); }} .badge.failure {{ background: var(--grad-failure); color: var(--failure); box-shadow: inset 0 0 0 1px var(--line-failure); }} .badge.vouched {{ background: var(--grad-vouched); color: var(--vouched); box-shadow: inset 0 0 0 1px var(--line-vouched); }} .badge.working {{ background: var(--grad-plain); color: var(--secondary); box-shadow: inset 0 0 0 1px var(--rule); }}
-.side {{ background: var(--sidebar); border-radius: 10px; padding: 10px; box-shadow: inset 0 0 0 1px var(--rule); }}
+.side {{ background: var(--grad-sidebar); border-radius: 10px; padding: 10px; box-shadow: inset 0 0 0 1px var(--rule); }}
 .sec {{ font-size: 12px; font-weight: 650; color: var(--secondary); padding: 8px 8px 4px; display: flex; justify-content: space-between; }}
 .srow {{ display: grid; grid-template-columns: 20px 1fr auto; gap: 2px 8px; padding: 7px 8px; border-radius: 8px; }}
 .srow .t {{ font-weight: 600; font-size: 14px; }} .srow .s {{ grid-column: 2; font-size: 13px; color: var(--secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
@@ -294,7 +294,7 @@ pre {{ font: 13px/1.6 var(--mono); background: var(--well); border-radius: 10px;
 <script>if (new URLSearchParams(location.search).get("mode") === "dark") document.documentElement.classList.add("dark");</script>
 <div class="sheet">
 <header>
-  <div><h1>Paper v2</h1><div class="sub">The design system of Agents on the Mac, iPhone, iPad and the web. Clear and crisp: deep charcoal on paper, one face, thin icons. Lines set things apart, not shadows. Surfaces are paper: a short greyscale gradient gives each one its shape, so nothing depends on a faint line. Colour is only in text, icons, lines and a switch that is on.</div></div>
+  <div><h1>Paper v2</h1><div class="sub">The design system of Agents on the Mac, iPhone, iPad and the web. Clear and crisp: deep charcoal on paper, one face, thin icons. Lines set things apart, not shadows. Flat paper and lines. The one gradient is on the large grey column, the sidebar, where it gives the page depth without a shadow.</div></div>
   <div class="sub" style="text-align:right">#4926 · proposal · <span class="mode-name"></span></div>
 </header>
 
@@ -331,7 +331,7 @@ pre {{ font: 13px/1.6 var(--mono); background: var(--well); border-radius: 10px;
 </div>
 
 <h2>Edges and depth</h2>
-<p>Flat and crisp. A line (1.5:1) sets things apart; nothing on the page casts a shadow. Only what floats over the page (a menu, a toast, a sheet) has one, short and close. A control's edge is 3:1 or more. Gradients are greyscale paper only, white to a light grey, top to bottom: a button, a chip, a badge, a card, a picked choice. They give a thing its shape without a low-contrast line or a shadow. Colour never fills: it is in text, icons, a line (a state's edge, the selection's bar) and a switch that is on. Focus is a cobalt ring.</p>
+<p>Flat and crisp. A line (1.5:1) sets things apart; nothing on the page casts a shadow. Only what floats over the page (a menu, a toast, a sheet) has one, short and close. A control's edge is 3:1 or more. One gradient only: the large grey background, the sidebar, goes from paper to a slightly deeper grey, top to bottom. Never on a coloured background, and never on a small thing such as a button, a chip, a badge or a notice: those are flat paper with a line. Colour never fills: it is in text, icons, a line (a state's edge, the selection's bar) and a switch that is on. Focus is a cobalt ring.</p>
 <div class="levels">
   <div class="lvl l0"><b>0 · On the page</b>Rows, the chat. A line, no shadow.</div>
   <div class="lvl l1"><b>1 · Raised</b>Cards, buttons. White and a line; no shadow.</div>
@@ -343,9 +343,7 @@ pre {{ font: 13px/1.6 var(--mono); background: var(--well); border-radius: 10px;
     <div class="ln"><span>rule · 1px</span><div style="border-top:1px solid var(--rule)"></div></div>
     <div class="ln"><span>edge · 1px</span><div style="border-top:1px solid var(--edge)"></div></div>
     <div class="ln"><span>accent · focus</span><div style="border-top:2px solid var(--accent)"></div></div>
-    <div class="ln"><span>plain gradient</span><div style="height:18px;border-radius:7px;background:var(--grad-plain);box-shadow:inset 0 0 0 1px var(--rule)"></div></div>
-    <div class="ln"><span>card gradient</span><div style="height:18px;border-radius:7px;background:var(--grad-card);box-shadow:inset 0 0 0 1px var(--rule)"></div></div>
-    <div class="ln"><span>selection gradient</span><div style="height:18px;border-radius:7px;background:var(--grad-selection);box-shadow:inset 3px 0 0 var(--accent)"></div></div>
+    <div class="ln"><span>sidebar gradient</span><div style="height:40px;border-radius:7px;background:var(--grad-sidebar);box-shadow:inset 0 0 0 1px var(--rule)"></div></div>
   </div>
   <div class="panel"><div class="radii"><div class="rad" style="border-radius:5px">5 · code</div><div class="rad" style="border-radius:7px">7 · control</div><div class="rad" style="border-radius:10px">10 · card</div><div class="rad" style="border-radius:16px">16 · floating</div><div class="rad" style="border-radius:99px">pill · state</div></div></div>
 </div>
@@ -361,7 +359,7 @@ pre {{ font: 13px/1.6 var(--mono); background: var(--well); border-radius: 10px;
   <h3>Buttons</h3>
   <div class="row"><span class="btn prom">Send</span><span class="btn accent">Approve</span><span class="btn">Files</span><span class="btn focus">Focused</span><span class="btn quiet">Cancel</span><span class="btn quiet hover">Hover</span><span class="btn danger">{I("archive",16)}Archive</span><span class="btn" disabled>Disabled</span></div>
   <div class="row"><span class="btn icon-btn">{I("ellipsis",16)}</span><span class="btn icon-btn">{I("pin",16)}</span><span class="btn quiet icon-btn">{I("x",16)}</span><span class="btn quiet icon-btn">{I("search",16)}</span></div>
-  <div class="cap">Every button is paper with a greyscale gradient. Prominent has a stronger edge and bold text, one per view. Accent has cobalt text and a cobalt edge, for the one choice that moves work on. Quiet buttons have no edge until the pointer is on them.</div>
+  <div class="cap">Every button is flat paper with a line. Prominent has a stronger edge and bold text, one per view. Accent has cobalt text and a cobalt edge, for the one choice that moves work on. Quiet buttons have no edge until the pointer is on them.</div>
   <h3>Fields and choices</h3>
   <div class="row"><span class="field ph">{I("search",16)}Search, or label:name</span><span class="field focus">web-shop</span></div>
   <div class="row"><span class="field well">Filled field, set into the page</span><span class="seg"><span class="on">Sessions</span><span>Workflows</span><span>Files</span></span></div>
@@ -391,7 +389,7 @@ pre {{ font: 13px/1.6 var(--mono); background: var(--well); border-radius: 10px;
     <div class="srow unread"><span class="st vouched">{I("circle-check",17)}</span><span class="t">Rename the export button</span><span class="w">1h</span><span class="s"><span style="color:var(--pull)">P#44</span> merged</span></div>
     <div class="srow"><span class="st failure">{I("circle-x",17)}</span><span class="t">Upgrade the test runner</span><span class="w">3h</span><span class="s">Failed: the build broke</span></div>
   </div>
-  <div class="cap">Selected (a paper gradient and a cobalt bar) · hover · waiting · unread (the cobalt dot) · failed. Only "needs you" and the endings have colour.</div>
+  <div class="cap">Selected (the selection grey and a cobalt bar) · hover · waiting · unread (the cobalt dot) · failed. Only "needs you" and the endings have colour.</div>
   <h3>Chat</h3>
   <div class="chat">
     <div class="me prose">After sign-in the page goes back to the home page, not the page I was on.</div>
