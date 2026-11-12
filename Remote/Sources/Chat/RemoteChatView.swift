@@ -374,6 +374,18 @@ struct RemoteChatView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             })
         }
+        // A use of a secret with Ask before use waits the same way, as on the Mac (#4918).
+        for request in model.work.secretUses(askedBy: agent.id) {
+            if let use = request.secretUse {
+                cards.append(WaitingCard(id: "secretUse:" + request.id.uuidString) {
+                    SecretUseCard(request: request, use: use,
+                                  answer: { await model.answerSecretUse(request, $0) },
+                                  isDisabled: model.isStale(agent))
+                        .chatColumn()
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                })
+            }
+        }
         // An ask to be archived waits the same way, last when asked at once, as on the
         // Mac (#827).
         if agent.asksToArchive {

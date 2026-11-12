@@ -23,6 +23,11 @@ export function secretUseOf(request: PersonRequest): RequestSecretUse | undefine
   return request.source === "secretUse" ? request.detail.secretUse : undefined;
 }
 
+/** The uses of a secret a session waits on (#4918), in the list's order: its chat's cards. A terminal's has no session, so none is. */
+export function secretUsesAskedBy(requests: PersonRequest[], session: string): PersonRequest[] {
+  return requests.filter((r) => r.askedBy === session && secretUseOf(r) !== undefined);
+}
+
 /** The row's title: the secret first, as the banner says it, so a narrow sidebar cuts the place, not the name. */
 export function secretUseTitle(use: RequestSecretUse): string {
   return `Wants to ${use.use === "account" ? "read" : "use"} ${use.name}`;

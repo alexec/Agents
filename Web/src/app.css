@@ -540,6 +540,10 @@ button.link.reading:hover { text-decoration: underline; }
 .archive-card p { margin: 0; }
 .archive-card .strong { color: var(--tint-attention); }
 .archive-card .archive-answers { display: flex; justify-content: flex-end; gap: 10px; }
+.secret-use-card { border-color: color-mix(in srgb, var(--tint-attention) 25%, transparent); }
+.secret-use-card p { margin: 0; }
+.secret-use-card .strong { color: var(--tint-attention); }
+.secret-use-card .secret-use-answers { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 /* An agent driving the Mac's screen (#3004, US4): the latest still, or "Mac is locked", and its last action. */
 .desktop-tile { display: flex; flex-direction: column; gap: 8px; }
 .desktop-tile p { margin: 0; }

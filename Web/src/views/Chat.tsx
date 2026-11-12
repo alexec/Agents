@@ -50,6 +50,7 @@ import { BackToList } from "./BackToList";
 import { comingBackDescription, footStatusWords } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { DesktopControlPauseCard } from "./DesktopControlPauseCard";
+import { SecretUseCard } from "./SecretUseCard";
 import { LiveTile } from "./LiveTile";
 import { showsThoughts, shownItems } from "../model/thoughts";
 import { hasTurnInFlight, promptPlaceholder, willQueue } from "../model/promptWords";
@@ -476,6 +477,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       node: <div class="cards"><GuardedChangeCard store={store} host={host} folder={folder} change={change} down={down} /></div>,
     })),
     ...asked,
+    // A use of a secret with Ask before use waits the same way (#4918): its Needs You row stays.
+    ...store.secretUsesAskedBy(host, session).map((request) => ({
+      key: `secretUse:${request.id}`,
+      node: <SecretUseCard store={store} host={host} request={request} disabled={down} />,
+    })),
     // It drives the screen, the browser or a simulator (#3004, #4140): the live tile, above any
     // pause card. Open takes over the browser or the simulator in a tab of its own (#4141).
     ...(agent && agent.state === "running" ? [{

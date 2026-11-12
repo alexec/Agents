@@ -378,6 +378,19 @@ struct ChatView: View {
                     .help(selectedHostOffline ? offlineHelp : "")
             })
         }
+        // A use of a secret with Ask before use waits the same way (#4918): its Needs you row
+        // stays, and an answer on either takes both away.
+        for request in model.work.secretUses(askedBy: agent.id) {
+            if let use = request.secretUse {
+                cards.append(WaitingCard(id: "secretUse:" + request.id.uuidString) {
+                    SecretUseCard(request: request, use: use,
+                                  answer: { await model.answerSecretUse(request, $0) },
+                                  isDisabled: selectedHostOffline)
+                        .chatColumn()
+                        .help(selectedHostOffline ? offlineHelp : "")
+                })
+            }
+        }
         // An ask to be archived waits the same way, last when asked at once (#827).
         if agent.asksToArchive {
             cards.append(WaitingCard(id: "archive:" + agent.id.uuidString) {

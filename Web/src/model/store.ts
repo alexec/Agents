@@ -3,7 +3,7 @@
 // (research R7). Nothing here decides anything; the hosts do.
 import { pageSize } from "./archivedPage";
 import { deferParams, isDeferred, type Later } from "./later";
-import { answerElsewhere, approveSecretUse, isTerminalRequest, type SecretUseAction, secretUseApprovalParams, secretUseSigns } from "./secretUse";
+import { answerElsewhere, approveSecretUse, isTerminalRequest, type SecretUseAction, secretUseApprovalParams, secretUseSigns, secretUsesAskedBy } from "./secretUse";
 import { preferencesSaid, sendPreferencesWith } from "./preferences";
 import { folderPath as hostedFolderPath, healthTally, personalServers } from "./hostedMCP";
 import type { ExportImportBusy } from "./exports";
@@ -4128,6 +4128,11 @@ export class Store extends Work {
   /** A folder's deferred requests (#4236): the Later group's rows, in no count. */
   laterRequestsIn(host: string, folder: string): PersonRequest[] {
     return this.openPersonRequestsIn(host, folder).filter(isDeferred);
+  }
+
+  /** The uses of a secret with Ask before use that a session waits on (#4918), oldest first, Later's too: each is a card in its chat as well as a row in Needs You. */
+  secretUsesAskedBy(host: string, session: string): PersonRequest[] {
+    return secretUsesAskedBy(this.personRequests.value[host] ?? [], session);
   }
 
   /** A machine's open requests from a terminal's agents-secret (#4179): no session asked them, so no folder lists them. Not the deferred ones. */
