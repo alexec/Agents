@@ -159,7 +159,7 @@ the window wins and the tutorial gets an issue.
 | 1 | Write the script (2.1). | Product Owner | this spec |
 | 2 | Make `make.sh u1` work on today's app (one app, `Agents` program name, the walk socket, the Get started card), change `u1.py` to the script, take it, look at the contact sheet and Whisper's check. | a lane | child: the take |
 | 3 | `upload.py` uploads any scene: a playlist per group (`Loops usage`, `Loops marketing`, `Loops integrations`) on the Loops channel, private, the captions from the `.vtt` (`captions.insert`), a thumbnail from the contact sheet, title "<TITLE> — Loops <version>". | a lane | child: upload any scene |
-| 4 | The YouTube sign-in: Alex makes the brand channel **Loops**; the OAuth app In production (#1856's Branding and Publish steps), then `upload.py --sign-in --no-browser` (an agent opens the address; Alex signs in and presses Allow). | Alex, with an agent | child: YouTube sign-in (`alex-todo`) |
+| 4 | The YouTube sign-in (done 2026-11-12, #4837): the agents' Google account **Loops Agents** (agentloops@fastmail.com) owns the channel **Loops** and the Cloud project `loops-videos`, whose OAuth app is In production; `upload.py --sign-in --no-browser`, the address opened in the agents' own Chrome profile. Alex typed the account's password; an agent did the rest. | Alex, with an agent | child: YouTube sign-in (`alex-todo`) |
 | 5 | Upload U1, private. Alex watches it on YouTube and says what to change. | a lane, then Alex | child: rehearsal upload |
 | 6 | Write the retro below: what broke at each step, the time and money each cost, and an issue for each fix. | the lane of step 5 | same |
 
@@ -211,8 +211,12 @@ anyway. Alex can overrule.
 
 ## Open questions
 
-1. **The channel:** answered (Alex, 2026-11-11): a new brand channel for the product, made
-   under Alex's Google account, not Alex's own channel.
+1. **The channel:** answered (Alex, 2026-11-11, changed 2026-11-12): a new channel for the
+   product, **Loops**, on a Google account of the agents' own (Loops Agents,
+   agentloops@fastmail.com, #4837), not under Alex's Google account. Google refuses sign-up
+   and sign-in in the app's browser (Chrome for Testing), so its pages open in the agents'
+   own Chrome profile (`.agents/signups/cdp.mjs`, not incognito, profile
+   `chrome-profile-google`).
 2. **Public videos** need the YouTube API audit (Google's compliance review) before uploads
    by the API can be public, or Alex makes each one public by hand. Not needed for the
    rehearsal; decided before the first public video.
