@@ -432,6 +432,9 @@ func (m *mesh) received(line string, link *peerLink) {
 		if json.Unmarshal(o["lineage"], &c) == nil && c.Host != "" {
 			m.s.tellLineageChanged(c)
 		}
+	case o["bus"] != nil:
+		// A new event another copy took (#4729): for the machines held here.
+		m.s.busFromPeer(o["bus"])
 	case o["presence"] != nil:
 		var p struct {
 			Client string          `json:"client"`
