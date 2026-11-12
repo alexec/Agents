@@ -337,6 +337,12 @@ func TestFilesLoadOnlyWhenTheyMatchTheirManifest(t *testing.T) {
 		t.Errorf("wrong hash: %v", err)
 	}
 
+	// A file this user cannot read says so, not that it does not match (#4756).
+	writeManifest(t, folder, "out "+hashOf(index)+" Web/dist/index.html", "out "+hashOf(index)+" Web/dist/gone.html")
+	if _, err := LoadFiles(folder); !errors.As(err, &failure) || !strings.HasPrefix(err.Error(), "gone.html cannot be read: ") {
+		t.Errorf("unreadable: %v", err)
+	}
+
 	os.WriteFile(filepath.Join(folder, "run.sh"), []byte("x"), 0o644)
 	writeManifest(t, folder, "out "+hashOf(index)+" Web/dist/index.html", "out "+hashOf([]byte("x"))+" Web/dist/run.sh")
 	if _, err := LoadFiles(folder); !errors.As(err, &failure) || err.Error() != "run.sh has a type the web remote never serves" {
