@@ -14,7 +14,7 @@ export function diskWords(bytes: number): string {
  * As Swift's "%.1f": toFixed takes an exact tie (a quarter, 12.25) up, printf to the even
  * tenth. Only a whole number of quarters can be an exact tie.
  */
-function oneDecimal(x: number): string {
+export function oneDecimal(x: number): string {
   const quarters = x * 4;
   if (!Number.isInteger(quarters) || quarters % 2 === 0) return x.toFixed(1);
   const tenths = Math.floor(x * 10);

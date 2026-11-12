@@ -60,3 +60,27 @@ test("a runtime's row offers Update when the app carries a newer copy, and none 
   assert.equal(r.offersUpdate(status(true, { installing: {} })), false, "already updating");
   assert.equal(r.offersUpdate(status(true, { available: { path: "/p" } }, false)), false, "no recipe");
 });
+
+test("the summary says the load and the level, and a line why at near and full (#4582)", async () => {
+  const c = await load("src/model/capacity.ts");
+  const usage = (capacity, o = {}) => ({ cpuPercent: 82, cpuCount: 10, memoryUsed: 14, memoryTotal: 16,
+    loadPerCore: 2.4, loadPerCore5: 2.1, memoryPressure: "normal", swapUsedPercent: 3, capacity, ...o });
+  assert.equal(c.loadWords(2.44), "Load 2.4 per core");
+  assert.equal(c.levelWords("ok"), null);
+  assert.equal(c.levelWords(undefined), null);
+  assert.equal(c.levelWords("near"), "Near capacity");
+  assert.equal(c.levelWords("full"), "At capacity");
+  assert.equal(c.warningWords(usage("ok"), "This Mac"), null);
+  assert.equal(c.warningWords(usage("near", { loadPerCore: 1.8 }), "This Mac"), "This Mac is near capacity: load 1.8 per core.");
+  assert.equal(c.warningWords(usage("near", { loadPerCore: 0.4, memoryPressure: "warn" }), "studio"), "studio is near capacity: memory pressure warn.");
+  assert.equal(c.warningWords(usage("full", { loadPerCore: 3.1 }), "This Mac"), "This Mac is at capacity: load 3.1 per core.");
+  assert.equal(c.warningWords(usage("full", { loadPerCore: 1, memoryPressure: "critical" }), "This Mac"), "This Mac is at capacity: memory pressure critical.");
+  assert.equal(c.warningWords(usage("full", { loadPerCore: 1, swapUsedPercent: 62 }), "This Mac"), "This Mac is at capacity: swap 62% used.");
+  assert.equal(c.warningWords(usage("near", { loadPerCore: 1.2 }), "This Mac"), "This Mac is near capacity: load 1.2 per core.", "coming down: the load");
+  assert.equal(c.detailWords(usage("ok")), "Load 2.4 per core over 1 minute, 2.1 over 5 · Memory pressure normal · Swap 3% used");
+  assert.equal(c.detailWords(usage("ok", { loadPerCore5: undefined, memoryPressure: undefined, swapUsedPercent: undefined })), "Load 2.4 per core over 1 minute");
+  assert.equal(c.detailWords(usage(undefined, { loadPerCore: undefined })), null);
+  assert.equal(c.queuedWords(0), null);
+  assert.equal(c.queuedWords(1), "1 start queued");
+  assert.equal(c.queuedWords(2), "2 starts queued");
+});

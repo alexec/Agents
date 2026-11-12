@@ -1949,6 +1949,8 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .machine-fold > summary::before { content: "▸"; display: inline-block; width: 1em; opacity: 0.6; }
 .machine-fold[open] > summary::before { content: "▾"; }
 .machine-summary { font-variant-numeric: tabular-nums; }
+/* At near and full, the level and why, over the summary (#4582); tinted by .tinted or .failure. */
+.machine-capacity { font-variant-numeric: tabular-nums; margin: 0 0 4px; }
 /* A view's agents/open-diff (#1341): the files over the chat or the pin, with the Review page's diff. */
 .view-diff { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; background: var(--paper-ground); }
 .view-diff .column-head .spacer { flex: 1; }
