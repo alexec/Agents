@@ -27,29 +27,29 @@ def icon(name, size=18, cls=""):
 
 # Colour: token, light, dark, what it is for, what it is drawn on.
 SURFACES = [
-    ("ground", "#f7f6f2", "#222220", "The page every column sits on. Warm paper, never pure white."),
-    ("sidebar", "#f1efea", "#1c1c1a", "The folders column: one step deeper than the ground."),
-    ("raised", "#fdfcfa", "#2a2a27", "What floats: cards, the prompt bar, menus, sheets."),
-    ("well", "#efede8", "#2d2d2a", "What is set into the page: code, your own message, a field."),
-    ("wash", "#e9e6e0", "#34332f", "A row under the pointer; a pressed quiet button."),
-    ("selection", "#e2ddd3", "#3d3c37", "The picked row. Nothing is drawn in a tint on it."),
+    ("ground", "#fcfbf9", "#1a1a19", "The page every column sits on. Paper, a breath off white."),
+    ("sidebar", "#f5f4f0", "#141413", "The folders column: one step deeper than the ground."),
+    ("raised", "#ffffff", "#212120", "What floats: cards, the prompt bar, menus, sheets. Set apart by a line, not a shadow."),
+    ("well", "#f3f2ee", "#262625", "What is set into the page: code, your own message, a field."),
+    ("wash", "#eeece7", "#2e2e2c", "A row under the pointer; a pressed quiet button."),
+    ("selection", "#e6e3dc", "#363633", "The picked row, with a cobalt bar at its edge. Every text colour still reads on it."),
 ]
 INKS = [
-    ("ink", "#262522", "#ebe8e1", "Text and icons. Charcoal, never pure black. The prominent button's fill."),
-    ("secondary", "#5c5952", "#aba79e", "A row's second line, a speaker's name, a section heading."),
-    ("tertiary", "#6e6a63", "#959189", "Timestamps, counts, placeholders. Only on ground, sidebar and raised."),
+    ("ink", "#1a1918", "#f4f2ed", "Text and icons: a deep charcoal, 17:1. The prominent button's gradient."),
+    ("secondary", "#4a4741", "#bdb9b0", "A row's second line, a speaker's name, a section heading."),
+    ("tertiary", "#625e57", "#a29e95", "Timestamps, counts, placeholders."),
 ]
 LINES = [
-    ("rule", "#e4e1da", "#3a3935", "Hairlines between rows and round cards. Felt more than seen (1.2:1)."),
-    ("edge", "#8f8a80", "#77736b", "The edge of a field, a checkbox, a toggle's track: 3:1, so a control can be found."),
+    ("rule", "#d6d2c9", "#3d3d3a", "The line that sets things apart, in place of a shadow (1.5:1): rows, cards, columns."),
+    ("edge", "#7d786e", "#85817a", "The edge of a field, a checkbox, a toggle's track: 3:1, so a control can be found."),
 ]
 SIGNALS = [
-    ("accent", "#1f5fc8", "#7fb0ff", "Cobalt, from the icon: links, focus, the chosen control. Never decoration."),
-    ("attention", "#a8420f", "#f0a06b", "Needs you. The only tint drawn in a list."),
-    ("failure", "#b4232b", "#f08086", "Failed, denied, deleted."),
-    ("vouched", "#2a7157", "#8bc6a7", "Done and approved: an ending the app can vouch for."),
-    ("issue", "#0e6b82", "#6cc6db", "A label naming an issue, #812."),
-    ("pull", "#7442b8", "#b79af0", "A label naming a pull request, P#44."),
+    ("accent", "#1a52c0", "#86b4ff", "Cobalt, from the icon: links, focus, the chosen control, and its gradient #2f6ee0 → #1a52c0 (white text on it is 4.7:1 or more)."),
+    ("attention", "#a3400e", "#f3a672", "Needs you. The only tint drawn in a list."),
+    ("failure", "#b0222a", "#f4878d", "Failed, denied, deleted."),
+    ("vouched", "#25684f", "#92ccad", "Done and approved: an ending the app can vouch for."),
+    ("issue", "#0c6278", "#73cbe0", "A label naming an issue, #812."),
+    ("pull", "#6c3cae", "#bea3f2", "A label naming a pull request, P#44."),
 ]
 
 
@@ -69,7 +69,7 @@ def swatches(rows, on=True):
     for name, light, dark, use in rows:
         note = ""
         if on:
-            note = f'<span class="ratio">{ratio(light, "#f7f6f2"):.1f}:1 · {ratio(dark, "#222220"):.1f}:1 on ground</span>'
+            note = f'<span class="ratio">{ratio(light, "#fcfbf9"):.1f}:1 · {ratio(dark, "#1a1a19"):.1f}:1 on ground</span>'
         out.append(f'''<div class="sw">
   <div class="chips"><span style="background:{light}"></span><span style="background:{dark}"></span></div>
   <div><div class="sw-name">{name}</div><div class="sw-hex">{light} · {dark}</div>
@@ -133,25 +133,35 @@ page = f'''<!doctype html>
 @font-face {{ font-family: "Lexend"; src: url("https://cdn.jsdelivr.net/fontsource/fonts/lexend:vf@latest/latin-wght-normal.woff2") format("woff2-variations"); font-weight: 100 900; }}
 @font-face {{ font-family: "Figtree"; src: url("https://cdn.jsdelivr.net/fontsource/fonts/figtree:vf@latest/latin-wght-normal.woff2") format("woff2-variations"); font-weight: 300 900; }}
 :root {{
-  --ground:#f7f6f2; --sidebar:#f1efea; --raised:#fdfcfa; --well:#efede8; --wash:#e9e6e0; --selection:#e2ddd3;
-  --ink:#262522; --secondary:#5c5952; --tertiary:#6e6a63; --rule:#e4e1da; --edge:#8f8a80;
-  --accent:#1f5fc8; --attention:#a8420f; --failure:#b4232b; --vouched:#2a7157; --issue:#0e6b82; --pull:#7442b8;
-  --on-ink:#f7f6f2;
-  --shadow-raised: 0 1px 2px rgb(38 37 34 / 6%);
-  --shadow-floating: 0 1px 2px rgb(38 37 34 / 4%), 0 6px 20px rgb(38 37 34 / 8%);
-  --shadow-sheet: 0 2px 6px rgb(38 37 34 / 5%), 0 18px 48px rgb(38 37 34 / 12%);
-  --focus: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent);
+  --ground:#fcfbf9; --sidebar:#f5f4f0; --raised:#ffffff; --well:#f3f2ee; --wash:#eeece7; --selection:#e6e3dc;
+  --ink:#1a1918; --secondary:#4a4741; --tertiary:#625e57; --rule:#d6d2c9; --edge:#7d786e;
+  --accent:#1a52c0; --attention:#a3400e; --failure:#b0222a; --vouched:#25684f; --issue:#0c6278; --pull:#6c3cae;
+  --on-ink:#ffffff;
+  --grad-ink: linear-gradient(180deg, #3a3835, #1a1918);
+  --grad-accent: linear-gradient(180deg, #2f6ee0, #1a52c0);
+  --grad-attention: linear-gradient(180deg, #b8501a, #a3400e);
+  --grad-vouched: linear-gradient(180deg, #2f7d5f, #25684f);
+  --grad-failure: linear-gradient(180deg, #c4343b, #b0222a);
+  --shadow-raised: 0 0 #0000;
+  --shadow-floating: 0 4px 12px rgb(26 25 24 / 10%);
+  --shadow-sheet: 0 12px 32px rgb(26 25 24 / 18%);
+  --focus: 0 0 0 2px var(--raised), 0 0 0 4px var(--accent);
   --text: "Atkinson Hyperlegible Next", -apple-system, system-ui, sans-serif;
   --mono: "Atkinson Hyperlegible Mono", ui-monospace, "SF Mono", monospace;
 }}
 .dark {{
-  --ground:#222220; --sidebar:#1c1c1a; --raised:#2a2a27; --well:#2d2d2a; --wash:#34332f; --selection:#3d3c37;
-  --ink:#ebe8e1; --secondary:#aba79e; --tertiary:#959189; --rule:#3a3935; --edge:#77736b;
-  --accent:#7fb0ff; --attention:#f0a06b; --failure:#f08086; --vouched:#8bc6a7; --issue:#6cc6db; --pull:#b79af0;
-  --on-ink:#222220;
-  --shadow-raised: 0 1px 2px rgb(0 0 0 / 30%);
-  --shadow-floating: 0 1px 2px rgb(0 0 0 / 30%), 0 8px 24px rgb(0 0 0 / 35%);
-  --shadow-sheet: 0 2px 6px rgb(0 0 0 / 30%), 0 20px 56px rgb(0 0 0 / 50%);
+  --ground:#1a1a19; --sidebar:#141413; --raised:#212120; --well:#262625; --wash:#2e2e2c; --selection:#363633;
+  --ink:#f4f2ed; --secondary:#bdb9b0; --tertiary:#a29e95; --rule:#3d3d3a; --edge:#85817a;
+  --accent:#86b4ff; --attention:#f3a672; --failure:#f4878d; --vouched:#92ccad; --issue:#73cbe0; --pull:#bea3f2;
+  --on-ink:#141413;
+  --grad-ink: linear-gradient(180deg, #ffffff, #dedad2);
+  --grad-accent: linear-gradient(180deg, #a9cbff, #5b9bff);
+  --grad-attention: linear-gradient(180deg, #f8c39c, #f3a672);
+  --grad-vouched: linear-gradient(180deg, #b5e0c8, #92ccad);
+  --grad-failure: linear-gradient(180deg, #f9b0b4, #f4878d);
+  --shadow-raised: 0 0 #0000;
+  --shadow-floating: 0 4px 12px rgb(0 0 0 / 40%);
+  --shadow-sheet: 0 12px 32px rgb(0 0 0 / 55%);
 }}
 * {{ box-sizing: border-box; }}
 body {{ margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.5 var(--text); letter-spacing: .005em; -webkit-font-smoothing: antialiased; }}
@@ -193,7 +203,7 @@ h3 {{ font-size: 13px; font-weight: 650; color: var(--secondary); margin: 22px 0
 .l0 {{ background: var(--ground); box-shadow: inset 0 0 0 1px var(--rule); }}
 .l1 {{ background: var(--raised); box-shadow: var(--shadow-raised), 0 0 0 1px var(--rule); }}
 .l2 {{ background: var(--raised); box-shadow: var(--shadow-floating), 0 0 0 1px var(--rule); border-radius: 12px; }}
-.l3 {{ background: var(--raised); box-shadow: var(--shadow-sheet); border-radius: 16px; }}
+.l3 {{ background: var(--raised); box-shadow: var(--shadow-sheet), 0 0 0 1px var(--rule); border-radius: 16px; }}
 .radii {{ display: flex; gap: 22px; }}
 .rad {{ width: 84px; height: 56px; background: var(--well); box-shadow: inset 0 0 0 1px var(--rule); display: grid; place-items: center; font-size: 12px; color: var(--secondary); }}
 .lines .ln {{ display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 14px; margin: 10px 0; font-size: 13px; color: var(--secondary); }}
@@ -206,8 +216,9 @@ h3 {{ font-size: 13px; font-weight: 650; color: var(--secondary); margin: 22px 0
 .ic-name {{ font: 11px var(--mono); color: var(--tertiary); }} .ic-use {{ font-size: 12.5px; line-height: 1.35; color: var(--secondary); }}
 /* Components */
 .btn {{ font: 500 14px/1 var(--text); border-radius: 7px; padding: 8px 14px; border: 0; display: inline-flex; gap: 6px; align-items: center; color: var(--ink); background: var(--raised); box-shadow: 0 0 0 1px var(--rule), var(--shadow-raised); }}
-.btn.prom {{ background: var(--ink); color: var(--on-ink); box-shadow: none; }}
-.btn.accent {{ background: var(--accent); color: var(--on-ink); box-shadow: none; }}
+.btn.prom {{ background: var(--grad-ink); color: var(--on-ink); box-shadow: none; }}
+.btn.accent {{ background: var(--grad-accent); color: #fff; box-shadow: none; }}
+.dark .btn.accent {{ color: #0b1a3a; }}
 .btn.quiet {{ background: transparent; box-shadow: none; color: var(--secondary); }}
 .btn.quiet.hover {{ background: var(--wash); color: var(--ink); }}
 .btn.danger {{ color: var(--failure); }}
@@ -219,23 +230,24 @@ h3 {{ font-size: 13px; font-weight: 650; color: var(--secondary); margin: 22px 0
 .field.well {{ background: var(--well); box-shadow: none; color: var(--tertiary); }}
 .toggle {{ width: 34px; height: 20px; border-radius: 10px; background: var(--wash); box-shadow: inset 0 0 0 1px var(--edge); position: relative; }}
 .toggle::after {{ content: ""; position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--raised); box-shadow: 0 0 0 1px var(--edge); }}
-.toggle.on {{ background: var(--accent); box-shadow: none; }} .toggle.on::after {{ left: 17px; box-shadow: none; }}
+.toggle.on {{ background: var(--grad-accent); box-shadow: none; }} .toggle.on::after {{ left: 17px; box-shadow: none; }}
 .check {{ width: 16px; height: 16px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--edge); background: var(--raised); display: grid; place-items: center; }}
-.check.on {{ background: var(--accent); box-shadow: none; color: var(--on-ink); }}
+.check.on {{ background: var(--grad-accent); box-shadow: none; color: #fff; }}
 .seg {{ display: inline-flex; background: var(--well); border-radius: 8px; padding: 2px; }}
 .seg span {{ font-size: 13px; padding: 5px 12px; border-radius: 6px; color: var(--secondary); }}
 .seg span.on {{ background: var(--raised); color: var(--ink); box-shadow: var(--shadow-raised), 0 0 0 1px var(--rule); }}
-.chip {{ font: 600 12px/1 var(--text); padding: 4px 7px; border-radius: 6px; background: var(--well); color: var(--secondary); display: inline-flex; gap: 4px; align-items: center; }}
+.chip {{ font: 600 12px/1 var(--text); padding: 4px 7px; border-radius: 6px; background: var(--raised); box-shadow: inset 0 0 0 1px var(--rule); color: var(--secondary); display: inline-flex; gap: 4px; align-items: center; }}
 .chip.issue {{ color: var(--issue); }} .chip.pull {{ color: var(--pull); }}
 .chip.mono {{ font: 12px/1 var(--mono); }}
-.badge {{ font: 600 12px/1 var(--text); padding: 4px 8px 4px 6px; border-radius: 99px; display: inline-flex; gap: 4px; align-items: center; background: color-mix(in srgb, currentColor 10%, transparent); }}
-.badge.attention {{ color: var(--attention); }} .badge.failure {{ color: var(--failure); }} .badge.vouched {{ color: var(--vouched); }} .badge.working {{ color: var(--secondary); }}
+.badge {{ font: 600 12px/1 var(--text); padding: 4px 9px 4px 6px; border-radius: 99px; display: inline-flex; gap: 4px; align-items: center; color: #fff; }}
+.dark .badge {{ color: var(--on-ink); }}
+.badge.attention {{ background: var(--grad-attention); }} .badge.failure {{ background: var(--grad-failure); }} .badge.vouched {{ background: var(--grad-vouched); }} .badge.working {{ background: var(--raised); color: var(--secondary); box-shadow: inset 0 0 0 1px var(--rule); }}
 .side {{ background: var(--sidebar); border-radius: 10px; padding: 10px; box-shadow: inset 0 0 0 1px var(--rule); }}
 .sec {{ font-size: 12px; font-weight: 650; color: var(--secondary); padding: 8px 8px 4px; display: flex; justify-content: space-between; }}
 .srow {{ display: grid; grid-template-columns: 20px 1fr auto; gap: 2px 8px; padding: 7px 8px; border-radius: 8px; }}
 .srow .t {{ font-weight: 600; font-size: 14px; }} .srow .s {{ grid-column: 2; font-size: 13px; color: var(--secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 .srow .w {{ font-size: 12px; color: var(--tertiary); }}
-.srow.hover {{ background: var(--wash); }} .srow.sel {{ background: var(--selection); }}
+.srow.hover {{ background: var(--wash); }} .srow.sel {{ background: var(--selection); box-shadow: inset 3px 0 0 var(--accent); }}
 .srow .st {{ color: var(--secondary); }} .srow .st.attention {{ color: var(--attention); }} .srow .st.vouched {{ color: var(--vouched); }} .srow .st.failure {{ color: var(--failure); }}
 .srow.unread .t::after {{ content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-left: 6px; vertical-align: 2px; }}
 .chat {{ background: var(--ground); border-radius: 10px; padding: 16px 18px; box-shadow: inset 0 0 0 1px var(--rule); }}
@@ -251,28 +263,29 @@ pre {{ font: 13px/1.6 var(--mono); background: var(--well); border-radius: 10px;
 .card {{ background: var(--raised); border-radius: 10px; padding: 14px 16px; box-shadow: var(--shadow-raised), 0 0 0 1px var(--rule); }}
 .card .by {{ font-size: 12px; color: var(--tertiary); margin-bottom: 4px; }}
 .card .q {{ font-weight: 650; margin-bottom: 10px; }}
-.opt {{ display: block; width: 100%; text-align: left; padding: 9px 12px; border-radius: 8px; margin-top: 6px; background: var(--ground); box-shadow: 0 0 0 1px var(--rule); font-size: 14px; }}
-.opt.pick {{ box-shadow: 0 0 0 1.5px var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--raised)); }}
+.opt {{ display: block; width: 100%; text-align: left; padding: 9px 12px; border-radius: 8px; margin-top: 6px; background: var(--raised); box-shadow: inset 0 0 0 1px var(--edge); font-size: 14px; }}
+.opt.pick {{ background: var(--grad-accent); color: #fff; box-shadow: none; font-weight: 600; }}
+.dark .opt.pick {{ color: #0b1a3a; }}
 .notice {{ display: flex; gap: 10px; align-items: flex-start; border-radius: 10px; padding: 10px 12px; font-size: 14px; background: var(--raised); box-shadow: 0 0 0 1px var(--rule); }}
 .notice .bar {{ width: 3px; align-self: stretch; border-radius: 2px; }}
-.notice.info .bar {{ background: var(--accent); }} .notice.warn .bar {{ background: var(--attention); }} .notice.err .bar {{ background: var(--failure); }}
+.notice.info .bar {{ background: var(--grad-accent); }} .notice.warn .bar {{ background: var(--grad-attention); }} .notice.err .bar {{ background: var(--grad-failure); }}
 .notice.warn .i {{ color: var(--attention); }} .notice.err .i {{ color: var(--failure); }} .notice.info .i {{ color: var(--accent); }}
 .prompt {{ background: var(--raised); border-radius: 16px; padding: 12px 14px 10px; box-shadow: var(--shadow-floating), 0 0 0 1px var(--rule); }}
 .prompt .ph {{ color: var(--tertiary); min-height: 44px; }}
 .prompt .bar2 {{ display: flex; justify-content: space-between; align-items: center; color: var(--secondary); }}
-.send {{ width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: var(--on-ink); display: grid; place-items: center; }}
+.send {{ width: 30px; height: 30px; border-radius: 50%; background: var(--grad-accent); color: var(--on-ink); display: grid; place-items: center; }}
 .menu {{ background: var(--raised); border-radius: 12px; padding: 5px; width: 230px; box-shadow: var(--shadow-floating), 0 0 0 1px var(--rule); font-size: 14px; }}
 .menu div {{ padding: 7px 10px; border-radius: 7px; display: flex; gap: 9px; align-items: center; }}
 .menu .hl {{ background: var(--wash); }} .menu hr {{ border: 0; border-top: 1px solid var(--rule); margin: 4px 6px; }}
 .menu .danger {{ color: var(--failure); }} .menu .kbd {{ margin-left: auto; color: var(--tertiary); font-size: 12px; }}
-.tip {{ background: var(--ink); color: var(--on-ink); font-size: 12.5px; padding: 5px 9px; border-radius: 6px; width: fit-content; }}
+.tip {{ background: var(--grad-ink); color: var(--on-ink); font-size: 12.5px; padding: 5px 9px; border-radius: 6px; width: fit-content; }}
 .toast {{ background: var(--raised); border-radius: 12px; padding: 10px 14px; box-shadow: var(--shadow-floating), 0 0 0 1px var(--rule); display: flex; gap: 10px; align-items: center; font-size: 14px; width: fit-content; }}
 .toast .i {{ color: var(--vouched); }}
 .empty {{ text-align: center; padding: 26px 10px; color: var(--secondary); }}
-.empty .i {{ color: var(--tertiary); }} .empty b {{ display: block; color: var(--ink); font-size: 16px; margin: 8px 0 2px; }}
+.empty .i {{ color: var(--accent); }} .empty b {{ display: block; color: var(--ink); font-size: 16px; margin: 8px 0 2px; }}
 .progress {{ height: 4px; background: var(--wash); border-radius: 2px; overflow: hidden; width: 240px; }}
-.progress span {{ display: block; height: 100%; width: 62%; background: var(--accent); border-radius: 2px; }}
-.sheetdemo {{ background: color-mix(in srgb, #000 18%, var(--ground)); border-radius: 12px; padding: 26px; }}
+.progress span {{ display: block; height: 100%; width: 62%; background: linear-gradient(90deg, #5b9bff, var(--accent)); border-radius: 2px; }}
+.sheetdemo {{ background: color-mix(in srgb, #000 30%, var(--ground)); border-radius: 12px; padding: 26px; }}
 .dark .sheetdemo {{ background: color-mix(in srgb, #000 40%, var(--ground)); }}
 .sheetdemo .l3 {{ height: auto; padding: 18px 20px; color: var(--ink); }}
 .label {{ font-size: 12px; color: var(--tertiary); margin: 0 0 6px; }}
@@ -282,12 +295,12 @@ pre {{ font: 13px/1.6 var(--mono); background: var(--well); border-radius: 10px;
 <script>if (new URLSearchParams(location.search).get("mode") === "dark") document.documentElement.classList.add("dark");</script>
 <div class="sheet">
 <header>
-  <div><h1>Paper v2</h1><div class="sub">The design system of Agents on the Mac, iPhone, iPad and the web. Quiet, clear and warm: charcoal on paper, one face, thin icons, and edges and shading that you feel more than see.</div></div>
+  <div><h1>Paper v2</h1><div class="sub">The design system of Agents on the Mac, iPhone, iPad and the web. Clear and crisp: deep charcoal on paper, one face, thin icons. Lines set things apart, not shadows; a cobalt gradient marks the one thing to press.</div></div>
   <div class="sub" style="text-align:right">#4926 · proposal · <span class="mode-name"></span></div>
 </header>
 
 <h2>Colour</h2>
-<p>Few colours, each with one job. Surfaces are warm greys; text is charcoal; colour means something (a link, a state, a label) and is never decoration. Each chip shows light, then dark. Every text colour is 4.5:1 or more on the surfaces it is drawn on.</p>
+<p>Few colours, each with one job, at high contrast. Surfaces are near white; text is deep charcoal (17:1); colour means something (a link, a state, a label) and is never decoration. Each chip shows light, then dark. Every text colour is 4.5:1 or more on every surface, the selection included.</p>
 <h3>Surfaces</h3><div class="grid3">{swatches(SURFACES, on=False)}</div>
 <h3>Ink</h3><div class="grid3">{swatches(INKS)}</div>
 <h3>Lines</h3><div class="grid3">{swatches(LINES)}</div>
@@ -319,18 +332,20 @@ pre {{ font: 13px/1.6 var(--mono); background: var(--well); border-radius: 10px;
 </div>
 
 <h2>Edges and depth</h2>
-<p>Very subtle. A hairline at 1.2:1 separates; a shadow you barely see lifts. Only a sheet casts a shadow you notice. A control's own edge is stronger (3:1), so it can be found. Focus is a soft cobalt ring.</p>
+<p>Flat and crisp. A line (1.5:1) sets things apart; nothing on the page casts a shadow. Only what floats over the page (a menu, a toast, a sheet) has one, short and close. A control's edge is 3:1 or more. Gradients go only on what you press or what tells a state: the prominent and accent buttons, a picked choice, a state badge, a toggle. Focus is a cobalt ring.</p>
 <div class="levels">
-  <div class="lvl l0"><b>0 · On the page</b>Rows, the chat. A hairline, no shadow.</div>
-  <div class="lvl l1"><b>1 · Raised</b>Cards, buttons. Hairline + 0 1px 2px at 6%.</div>
-  <div class="lvl l2"><b>2 · Floating</b>Menus, the prompt bar, toasts. + 0 6px 20px at 8%.</div>
-  <div class="lvl l3"><b>3 · Sheet</b>Dialogs and sheets. No hairline; 0 18px 48px at 12%.</div>
+  <div class="lvl l0"><b>0 · On the page</b>Rows, the chat. A line, no shadow.</div>
+  <div class="lvl l1"><b>1 · Raised</b>Cards, buttons. White and a line; no shadow.</div>
+  <div class="lvl l2"><b>2 · Floating</b>Menus, the prompt bar, toasts. A line + 0 4px 12px at 10%.</div>
+  <div class="lvl l3"><b>3 · Sheet</b>Dialogs and sheets. A line + 0 12px 32px at 18%, over a dimmed page.</div>
 </div>
 <div class="grid2" style="margin-top:22px">
   <div class="panel lines">
     <div class="ln"><span>rule · 1px</span><div style="border-top:1px solid var(--rule)"></div></div>
     <div class="ln"><span>edge · 1px</span><div style="border-top:1px solid var(--edge)"></div></div>
-    <div class="ln"><span>accent · focus</span><div style="border-top:3px solid color-mix(in srgb, var(--accent) 28%, transparent)"></div></div>
+    <div class="ln"><span>accent · focus</span><div style="border-top:2px solid var(--accent)"></div></div>
+    <div class="ln"><span>cobalt gradient</span><div style="height:14px;border-radius:7px;background:var(--grad-accent)"></div></div>
+    <div class="ln"><span>ink gradient</span><div style="height:14px;border-radius:7px;background:var(--grad-ink)"></div></div>
   </div>
   <div class="panel"><div class="radii"><div class="rad" style="border-radius:5px">5 · code</div><div class="rad" style="border-radius:7px">7 · control</div><div class="rad" style="border-radius:10px">10 · card</div><div class="rad" style="border-radius:16px">16 · floating</div><div class="rad" style="border-radius:99px">pill · state</div></div></div>
 </div>
@@ -346,7 +361,7 @@ pre {{ font: 13px/1.6 var(--mono); background: var(--well); border-radius: 10px;
   <h3>Buttons</h3>
   <div class="row"><span class="btn prom">Send</span><span class="btn accent">Approve</span><span class="btn">Files</span><span class="btn focus">Focused</span><span class="btn quiet">Cancel</span><span class="btn quiet hover">Hover</span><span class="btn danger">{I("archive",16)}Archive</span><span class="btn" disabled>Disabled</span></div>
   <div class="row"><span class="btn icon-btn">{I("ellipsis",16)}</span><span class="btn icon-btn">{I("pin",16)}</span><span class="btn quiet icon-btn">{I("x",16)}</span><span class="btn quiet icon-btn">{I("search",16)}</span></div>
-  <div class="cap">Prominent is ink, one per view. Accent is for the one choice that moves work on. Quiet buttons have no edge until the pointer is on them.</div>
+  <div class="cap">Prominent is an ink gradient, one per view. Accent, the icon's cobalt gradient, is for the one choice that moves work on. Quiet buttons have no edge until the pointer is on them.</div>
   <h3>Fields and choices</h3>
   <div class="row"><span class="field ph">{I("search",16)}Search, or label:name</span><span class="field focus">web-shop</span></div>
   <div class="row"><span class="field well">Filled field, set into the page</span><span class="seg"><span class="on">Sessions</span><span>Workflows</span><span>Files</span></span></div>
@@ -376,7 +391,7 @@ pre {{ font: 13px/1.6 var(--mono); background: var(--well); border-radius: 10px;
     <div class="srow unread"><span class="st vouched">{I("circle-check",17)}</span><span class="t">Rename the export button</span><span class="w">1h</span><span class="s"><span style="color:var(--pull)">P#44</span> merged</span></div>
     <div class="srow"><span class="st failure">{I("circle-x",17)}</span><span class="t">Upgrade the test runner</span><span class="w">3h</span><span class="s">Failed: the build broke</span></div>
   </div>
-  <div class="cap">Selected · hover · waiting · unread (the cobalt dot) · failed. Only "needs you" and the endings have colour.</div>
+  <div class="cap">Selected (a cobalt bar) · hover · waiting · unread (the cobalt dot) · failed. Only "needs you" and the endings have colour.</div>
   <h3>Chat</h3>
   <div class="chat">
     <div class="me prose">After sign-in the page goes back to the home page, not the page I was on.</div>

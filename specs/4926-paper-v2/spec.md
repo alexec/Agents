@@ -12,6 +12,7 @@ Alex's words on the earlier rounds (2026-11-12):
 1. On the handwriting mock: the goal is **a clean, modern character, a look of our own that separates us from the competition, simple, very easy on the eye and very easy to read.** No handwriting.
 2. On the font mocks: show **a high-fidelity mock**.
 3. On the high-fidelity shots of the product: **get the font, the colour and the iconography right together.** Show **a contact sheet of the design system**: every component, the colours and how they are used, the icons and what they mean, the common components. **Borders and shading must be right, and very subtle.**
+4. On the first contact sheet: **a bit more high-contrast; too much shading; gradients are fine.**
 
 ## The contact sheet
 
@@ -25,10 +26,11 @@ Alex's words on the earlier rounds (2026-11-12):
 
 ## Principles
 
-1. **Quiet.** Few colours, each with one job. Colour means something: a link, a state or a label. It is never decoration.
-2. **Warm charcoal on paper.** No pure white and no pure black. These come from the dyslexia guides and are easy on the eye.
-3. **Edges you feel more than see.** A hairline at about 1.2:1 separates two things. A shadow you barely see lifts a thing. Only a sheet casts a shadow you notice. A control's own edge is the exception: it is 3:1, so a person can find it (WCAG 1.4.11).
-4. **One face, one icon set, on all three clients.** Today the Mac and the Remote draw SF Symbols, and the web page draws Unicode glyphs (`✎ ▤ ◉ ▦ ✓`). One set makes the three clients look like one product.
+1. **Clear and crisp.** High contrast: deep charcoal ink (17:1) on near-white paper. Every text colour is 4.5:1 or more on every surface, the selection included.
+2. **Few colours, each with one job.** Colour means something: a link, a state or a label. It is never decoration.
+3. **Lines, not shading.** A line (1.5:1) sets things apart. Nothing on the page casts a shadow and there are few grey fills. Only what floats over the page (a menu, a toast, a sheet) has a short shadow. A control's edge is 3:1 or more (WCAG 1.4.11).
+4. **A gradient marks what to press or a state.** The prominent button (ink), the accent button, a picked choice, a toggle, the send button (the app icon's cobalt) and the state badges get a short vertical gradient. White text on each one is 4.7:1 or more.
+5. **One face, one icon set, on all three clients.** Today the Mac and the Remote draw SF Symbols, and the web page draws Unicode glyphs (`✎ ▤ ◉ ▦ ✓`). One set makes the three clients look like one product.
 
 ## Token changes (`design/tokens.json`)
 
@@ -36,32 +38,49 @@ Alex's words on the earlier rounds (2026-11-12):
 
 | Token | Today light / dark | v2 light | v2 dark | Used for |
 |---|---|---|---|---|
-| `color.ground` | `#f7f8f9` / `#1c1d20` | `#f7f6f2` | `#222220` | the page |
-| `color.sidebar` | `#f0f1f3` / `#161719` | `#f1efea` | `#1c1c1a` | the folders column |
-| `color.raised` | `#ffffff` / `#26282c` | `#fdfcfa` | `#2a2a27` | cards, the prompt bar, menus, sheets |
-| `color.well` | `#f0f2f4` / `#2a2d31` | `#efede8` | `#2d2d2a` | code, your own message, a filled field |
-| `color.wash` | `#e7eaee` / `#33363b` | `#e9e6e0` | `#34332f` | hover; a pressed quiet button |
-| `color.selection` | `#d8dee6` / `#3a3e44` | `#e2ddd3` | `#3d3c37` | the picked row |
-| `color.ink` | `#1c1d20` / `#e8eaed` | `#262522` | `#ebe8e1` | text, icons, the prominent button |
-| `color.secondary` (new) | system `.secondary` | `#5c5952` | `#aba79e` | second lines, speakers, section headings |
-| `color.tertiary` (new) | system `.tertiary` | `#6e6a63` | `#959189` | timestamps, counts, placeholders (only on ground, sidebar, raised) |
-| `color.rule` | `#dde1e6` / `#3a3e44` | `#e4e1da` | `#3a3935` | hairlines, about 1.2:1 |
-| `color.edge` (new) | none | `#8f8a80` | `#77736b` | a field's, checkbox's or toggle's edge, 3:1 |
-| `color.tint.attention` | `#ba4a13` / `#f0a06b` | `#a8420f` | `#f0a06b` | needs you |
-| `color.tint.vouched` | `#2d765c` / `#8bc6a7` | `#2a7157` | `#8bc6a7` | done, approved |
+| `color.ground` | `#f7f8f9` / `#1c1d20` | `#fcfbf9` | `#1a1a19` | the page |
+| `color.sidebar` | `#f0f1f3` / `#161719` | `#f5f4f0` | `#141413` | the folders column |
+| `color.raised` | `#ffffff` / `#26282c` | `#ffffff` | `#212120` | cards, the prompt bar, menus, sheets |
+| `color.well` | `#f0f2f4` / `#2a2d31` | `#f3f2ee` | `#262625` | code, your own message, a filled field |
+| `color.wash` | `#e7eaee` / `#33363b` | `#eeece7` | `#2e2e2c` | hover; a pressed quiet button |
+| `color.selection` | `#d8dee6` / `#3a3e44` | `#e6e3dc` | `#363633` | the picked row, with a 3px accent bar |
+| `color.ink` | `#1c1d20` / `#e8eaed` | `#1a1918` | `#f4f2ed` | text, icons |
+| `color.secondary` (new) | system `.secondary` | `#4a4741` | `#bdb9b0` | second lines, speakers, section headings |
+| `color.tertiary` (new) | system `.tertiary` | `#625e57` | `#a29e95` | timestamps, counts, placeholders |
+| `color.rule` | `#dde1e6` / `#3a3e44` | `#d6d2c9` | `#3d3d3a` | the line that sets things apart, 1.5:1 |
+| `color.edge` (new) | none | `#7d786e` | `#85817a` | a field's, checkbox's or toggle's edge, 3:1 or more |
+| `color.accent` | `#1f5fc8` / `#7fb0ff` | `#1a52c0` | `#86b4ff` | links, focus, the chosen control |
+| `color.tint.attention` | `#ba4a13` / `#f0a06b` | `#a3400e` | `#f3a672` | needs you |
+| `color.tint.failure` | `#b4232b` / `#f08086` | `#b0222a` | `#f4878d` | failed |
+| `color.tint.vouched` | `#2d765c` / `#8bc6a7` | `#25684f` | `#92ccad` | done, approved |
+| `color.label.issue` | `#0e6b82` / `#6cc6db` | `#0c6278` | `#73cbe0` | #812 |
+| `color.label.pull` | `#7442b8` / `#b79af0` | `#6c3cae` | `#bea3f2` | P#44 |
 
-The accent, the failure tint, the issue and pull labels, the code inks and the forge colours keep their values.
+The code inks and the forge colours keep their values.
+
+### Gradients (new: `gradient.*`)
+
+Each one is vertical, top to bottom:
+
+| Token | Light | Dark | Used for |
+|---|---|---|---|
+| `gradient.ink` | `#3a3835` → `#1a1918` | `#ffffff` → `#dedad2` | the prominent button, a tooltip |
+| `gradient.accent` | `#2f6ee0` → `#1a52c0` | `#a9cbff` → `#5b9bff` | the accent button, send, a picked choice, a toggle or checkbox that is on |
+| `gradient.attention` | `#b8501a` → `#a3400e` | `#f8c39c` → `#f3a672` | the "Needs you" badge, a warning's bar |
+| `gradient.vouched` | `#2f7d5f` → `#25684f` | `#b5e0c8` → `#92ccad` | the "Merged" and "Done" badges |
+| `gradient.failure` | `#c4343b` → `#b0222a` | `#f9b0b4` → `#f4878d` | the "Failed" badge, an error's bar |
+
+In the light, the text on each gradient is white, and on its lighter top it is 4.7:1 or more. In the dark, the text is `#141413`, and it is 6.2:1 or more. SwiftUI draws each gradient as a `LinearGradient`.
 
 ### Depth (new: `shadow.*`, replacing the one `color.shadow`)
 
 | Token | Light | Dark | Used for |
 |---|---|---|---|
-| `shadow.raised` | `0 1px 2px` at 6% | `0 1px 2px` black at 30% | cards, buttons (with a `rule` hairline) |
-| `shadow.floating` | raised + `0 6px 20px` at 8% | + `0 8px 24px` at 35% | menus, the prompt bar, toasts |
-| `shadow.sheet` | `0 2px 6px` 5% + `0 18px 48px` 12% | 30% + 50% | sheets and dialogs (no hairline) |
-| `focus` | 3px ring, accent at 28% | the same | keyboard focus |
+| `shadow.floating` | `0 4px 12px` ink at 10% | black at 40% | menus, the prompt bar, toasts (with a `rule` line) |
+| `shadow.sheet` | `0 12px 32px` ink at 18% | black at 55% | sheets and dialogs, over a dimmed page |
+| `focus` | a 2px accent ring with a 2px gap | the same | keyboard focus |
 
-The shadows' colour is the ink (`#262522`) in the light and black in the dark. On the Mac and the Remote, each one is a `.shadow` pair in `Paper.swift`.
+Cards, buttons and rows have no shadow, only a `rule` line.
 
 ### Radius
 
@@ -86,7 +105,14 @@ The meanings are the table in the contact sheet's Icons part. They go into `desi
 
 ## Contrast (WCAG 2.2 AA)
 
-The contact sheet prints each colour's ratio on the ground, light and dark. Every text colour is 4.5:1 or more on each surface it is drawn on. `tertiary` is drawn only on the ground, the sidebar and raised surfaces, where it is 4.6:1 to 5.3:1. A tint on `selection` falls under 4.5:1, as it does today, so nothing is drawn in a tint on a selection. The edge of a control is 3:1 or more on the ground and on raised surfaces. The first story adds these pairs to `DesignTokensTests`.
+The contact sheet prints each colour's ratio on the ground, light and dark.
+
+- **Text:** every text colour is 4.5:1 or more on every surface: ground, sidebar, raised, well, wash and selection.
+- **Ink:** 17:1 in the light and 15.6:1 in the dark.
+- **Control edges:** 3:1 or more on every surface where a control is drawn.
+- **Gradients:** the text on each gradient is 4.7:1 or more at its lightest point.
+
+The first story adds these pairs to `DesignTokensTests`.
 
 ## Fonts
 
@@ -125,9 +151,9 @@ The web page must not clip when a person sets 0.12em letter spacing and 0.16em w
 ## Decisions
 
 - Decided: no handwriting, because Alex wants a clean, simple look (2026-11-12).
-- Decided: borders and shadows are very subtle (hairline 1.2:1, shadows of 6–12%), but a control's edge is 3:1, because Alex asked for subtle and WCAG 1.4.11 needs a control to be found. Alex can overrule.
+- Decided: higher contrast (ink 17:1), lines (1.5:1) in place of shadows on the page, few grey fills, short shadows only on what floats, and gradients only on what you press or what tells a state, because Alex asked for more contrast, less shading and allowed gradients (2026-11-12). Alex can overrule.
 - Decided: one icon set, Lucide at a 1.5 stroke, on all three clients, because the clients draw different icons today and Lucide is the one set that meets the library rule. Alex can overrule.
-- Decided: the colour, depth, radius and spacing tokens above, because each passes WCAG AA and follows the principles. Alex can overrule.
+- Decided: the colour, gradient, depth, radius and spacing tokens above, because each passes WCAG AA and follows the principles. Alex can overrule.
 - Decided: no setting to turn the face off, because one clear look is simpler. Alex can overrule.
 - **Alex's choice (pending):** the contact sheet as a whole, including the face (Atkinson Hyperlegible Next is proposed).
 
@@ -135,7 +161,7 @@ The web page must not clip when a person sets 0.12em letter spacing and 0.16em w
 
 These are filed as sub-issues of #4925 after Alex approves the sheet. Each is blocked by #4926. Story 1 goes first; stories 2, 3 and 4 follow it and can run at the same time.
 
-1. **Paper v2 tokens:** colour, depth, radius and reading spacing (`design/tokens.json`, `Paper.swift`, `StateTint.swift`, `paper.css`, contrast pairs in `DesignTokensTests`).
+1. **Paper v2 tokens:** colour, gradients, depth, radius and reading spacing (`design/tokens.json`, `Paper.swift`, `StateTint.swift`, `paper.css`, contrast pairs in `DesignTokensTests`).
 2. **The face:** Atkinson Hyperlegible Next and Mono on the three clients (`design/fonts/`, `TypeScale.swift`, `Web/assets/fonts`, acknowledgements).
 3. **One icon set:** Lucide on the three clients (`design/icons.json`, `scripts/design.sh icons`, an asset catalogue, the web's glyphs replaced).
 4. **The components to the sheet:** buttons, fields, badges, notices, menus, the session row, the question card and the prompt bar drawn as the contact sheet shows, on the three clients.
