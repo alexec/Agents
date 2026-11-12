@@ -64,9 +64,12 @@ struct WaitingBeacon: View {
     var size: CGFloat
     /// The accent, as the sidebar's marks; the ground on a row filled with the accent (#2382).
     var color: Color = Paper.accent
+    /// What it waits on (#5022): a clock, a pull request, checks, other agents, a place in
+    /// line, or the beacon for any other wait. It breathes the same whatever it draws.
+    var kind: WaitKind = .other
 
     var body: some View {
-        BeaconMark(color: color)
+        BeaconMark(color: color, symbol: kind.symbol)
             .frame(width: size, height: size)
             // One element and no words of its own: the caller says what it means.
             .accessibilityElement()
@@ -96,8 +99,10 @@ private struct ClockedMark {
 /// The beacon's layer, its colour resolved as the ring's.
 private struct BeaconMark {
     var color: Color
+    var symbol: String
 
     @MainActor func update(_ view: BeaconView, in environment: EnvironmentValues) {
+        view.symbol = symbol
         view.color = color.resolve(in: environment).cgColor
         view.reduceMotion = environment.accessibilityReduceMotion
     }
@@ -329,6 +334,10 @@ private final class ClockedMarkView: ClockedLayersView {
 private final class BeaconView: ClockedLayersView {
     private let symbolMask = CALayer()
     private var scale: CGFloat = 2
+    /// The SF Symbol it is masked to; a new one draws the mask again, and the breath goes on.
+    var symbol: String = StatusShape.waitingSymbol {
+        didSet { if symbol != oldValue { withoutActions { drawMask() } } }
+    }
 
     convenience init() {
         self.init(dots: 1)
@@ -356,15 +365,15 @@ private final class BeaconView: ClockedLayersView {
         guard side > 0 else { return }
         symbolMask.frame = CGRect(x: 0, y: 0, width: side, height: side)
         symbolMask.contentsScale = scale
-        symbolMask.contents = Self.symbolImage(side: side, scale: scale)
+        symbolMask.contents = Self.symbolImage(symbol, side: side, scale: scale)
     }
 
-    private static func symbolImage(side: CGFloat, scale: CGFloat) -> CGImage? {
+    private static func symbolImage(_ name: String, side: CGFloat, scale: CGFloat) -> CGImage? {
         #if os(macOS)
         let config = NSImage.SymbolConfiguration(pointSize: side, weight: .medium)
         // The Lucide symbol of the same meaning (#4976), as `Image(icon:)` draws it
-        let base = PaperIcon.lucide(StatusShape.waitingSymbol).flatMap { NSImage(named: $0) }
-            ?? NSImage(systemSymbolName: StatusShape.waitingSymbol, accessibilityDescription: nil)
+        let base = PaperIcon.lucide(name).flatMap { NSImage(named: $0) }
+            ?? NSImage(systemSymbolName: name, accessibilityDescription: nil)
         guard let symbol = base?.withSymbolConfiguration(config) else { return nil }
         let fit = NSImage(size: symbol.size, flipped: false) { frame in
             symbol.draw(in: frame)
@@ -374,7 +383,7 @@ private final class BeaconView: ClockedLayersView {
         return fit.cgImage(forProposedRect: &pixels, context: nil, hints: nil)
         #else
         let config = UIImage.SymbolConfiguration(pointSize: side, weight: .medium)
-        guard let symbol = UIImage(systemName: StatusShape.waitingSymbol, withConfiguration: config) else { return nil }
+        guard let symbol = UIImage(systemName: name, withConfiguration: config) else { return nil }
         let format = UIGraphicsImageRendererFormat()
         format.scale = scale
         return UIGraphicsImageRenderer(size: symbol.size, format: format).image { _ in

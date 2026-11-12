@@ -98,7 +98,8 @@ struct AgentRow: View {
                        isUnread: agent.isUnread,
                        isWaitingForPerson: agent.isWaitingForPerson,
                        personLine: agent.eventWait?.personLine,
-                       tool: RunningToolWords.tool(agent))
+                       tool: RunningToolWords.tool(agent),
+                       waitKind: WaitKind.of(agent))
                 .frame(width: isCompact ? 16 : nil)
                 .padding(.top, 1)
             }
@@ -535,8 +536,10 @@ private struct SessionMark: View {
             case .queued:
                 Image(icon: "list.number").sidebarMark(Paper.accent)
             case .waiting:
-                // The waiting card's beacon, breathing in step with every other (#2456, #2657).
-                WaitingBeacon(size: 12 * scale, color: onAccent ? Paper.ground : Paper.accent)
+                // The waiting card's beacon, breathing in step with every other (#2456, #2657),
+                // drawn as what it waits on (#5022).
+                WaitingBeacon(size: 12 * scale, color: onAccent ? Paper.ground : Paper.accent,
+                              kind: WaitKind.of(agent))
             case .paused:
                 Image(icon: "pause.circle").sidebarMark(Paper.accent)
             case .done:
@@ -590,6 +593,8 @@ struct StatusIcon: View {
     var personLine: String?
     /// The tool it runs, which tips the working ring (#2044, #2332).
     var tool: String?
+    /// What it waits on (#5022), which the waiting beacon draws.
+    var waitKind: WaitKind = .other
     /// The well grows with the text beside it (#750), so the row keeps its shape.
     @ScaledMetric private var scale: CGFloat = 1
     /// On a row filled with the accent, the dot is the ground as the other marks (#2382).
@@ -608,7 +613,7 @@ struct StatusIcon: View {
             if shape == .waiting {
                 // The beacon breathes in the accent, where the unread dot before the title is grey,
                 // round and still (#2456, #2657).
-                WaitingBeacon(size: 12 * scale, color: onAccent ? Paper.ground : Paper.accent)
+                WaitingBeacon(size: 12 * scale, color: onAccent ? Paper.ground : Paper.accent, kind: waitKind)
             } else if let symbol = shape.symbol {
                 Image(icon: symbol)
                     // Decorative: a glyph filling an 18-point well, not text (FR-015).

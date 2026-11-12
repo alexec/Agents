@@ -157,19 +157,50 @@ test("the event wait card names a session by its title and an event by its meani
 
 test("a waiting row is one line: the first thing it waits for and how many more (#582)", () => {
   assert.equal(lines.rowWaitLine([]), null);
-  assert.equal(lines.rowWaitLine(["“Fix login”"]), "◷ Waiting for “Fix login”");
-  assert.equal(lines.rowWaitLine(["“Fix login”", "“Ship it”", "build"]), "◷ Waiting for “Fix login” (+2)");
+  assert.equal(lines.rowWaitLine(["“Fix login”"]), "Waiting for “Fix login”");
+  assert.equal(lines.rowWaitLine(["“Fix login”", "“Ship it”", "build"]), "Waiting for “Fix login” (+2)");
+  assert.equal(lines.rowWaitLine(["until 14:30"]), "Waiting until 14:30");
   const waiting = { state: "finished", eventWait: { id: "w", from: 0, since: 0,
     patterns: [{ name: "agent.finished", filters: { agent: "a" } }, { name: "mac.wake", filters: {} }] } };
   assert.deepEqual(lines.eventWaitThings(waiting, title), ["“Fix login”", "mac.wake"]);
   const lease = { waitingNames: ["build"], waitingFull: ["Waiting for build, held by “Ship it”, 1st in line"] };
   const mark = lines.waitMark(waiting, { names: ["“Docs”"], lines: ["Docs — still working"] }, lease, title);
-  assert.equal(mark.line, "◷ Waiting for “Docs” (+3)");
+  assert.equal(mark.line, "Waiting for “Docs” (+3)");
   assert.equal(mark.detail.split("\n")[0], "Docs — still working");
   assert.equal(mark.detail.split("\n")[2], "Waiting for build, held by “Ship it”, 1st in line");
   assert.equal(lines.waitMark({ state: "running" }, { names: [], lines: [] }, null, title), null);
   assert.equal(lines.waitMark({ state: "finished" }, { names: [], lines: ["Checks again at 14:30"] }, null, title).line,
-    "◷ Checks again at 14:30");
+    "Checks again at 14:30");
+});
+
+test("the mark draws what it waits on, as WaitKind does (#5022)", () => {
+  const on = (names, extra = {}) => ({ id: "me", state: "finished", eventWait: { id: "w", from: 0, since: 0,
+    patterns: names.map((name) => ({ name, filters: {} })), ...extra } });
+  assert.equal(lines.waitKind(on(["time.reached"])), "time");
+  assert.equal(lines.waitKind(on(["pr.merged", "pr.closed", "checks.failed", "checks.passed", "pr.conflicted"])), "pullRequest");
+  assert.equal(lines.waitKind(on(["checks.failed", "checks.passed"])), "checks");
+  assert.equal(lines.waitKind(on(["ci.finished"])), "checks");
+  assert.equal(lines.waitKind(on(["agent.finished", "agent.failed"])), "agents");
+  assert.equal(lines.waitKind(on(["agent.finished", "mac.wake"])), "other");
+  assert.equal(lines.waitKind(on(["branch.moved"])), "other");
+  assert.equal(lines.waitKind({ state: "finished" }), "other");
+  assert.equal(lines.waitKind({ id: "me", state: "finished", eventWait: { id: "w", from: 0, since: 0,
+    patterns: [{ name: "lease.granted", filters: { agent: "me", resource: "build" } }] } }), "line");
+  assert.equal(lines.waitKind({ state: "finished", report: { outcome: "waiting", message: "", at: 0,
+    block: { waits: [{ agentID: "a", nameAtReport: "Docs" }] } } }), "agents");
+});
+
+test("a row says a time, a PR and its checks in words (#5022)", () => {
+  const pr = (event) => ({ trigger: { event, arguments: { repo: "alexec/Agents", pr: 4980 } }, servers: ["github"] });
+  const on = (names, extra = {}) => ({ id: "me", state: "finished", eventWait: { id: "w", from: 0, since: 0,
+    patterns: names.map((name) => ({ name, filters: {} })), ...extra } });
+  const at = wire(new Date(2026, 9, 4, 14, 30));
+  assert.deepEqual(lines.eventWaitThings(on(["time.reached"], { deadline: at }), title), ["until 14:30"]);
+  assert.equal(lines.rowWaitLine(lines.eventWaitThings(on(["time.reached"], { deadline: at }), title)), "Waiting until 14:30");
+  assert.deepEqual(lines.eventWaitThings(on(["pr.merged", "checks.failed"], { serverEvents: [pr("pr.merged"), pr("checks.failed")] }), title),
+    ["PR #4980"]);
+  assert.deepEqual(lines.eventWaitThings(on(["checks.passed"], { serverEvents: [pr("checks.passed")] }), title), ["checks on #4980"]);
+  assert.deepEqual(lines.eventWaitThings(on(["pr.merged"]), title), ["a pull request"]);
 });
 
 test("a place in a lease's line is its wait card, said once (#2361)", () => {
@@ -191,7 +222,7 @@ test("a place in a lease's line is its wait card, said once (#2361)", () => {
   assert.deepEqual(lines.eventWaitThings(agent, title, snapshot), ["Build"]);
   assert.equal(lines.leaseMark("me", snapshot, title, "build"), null);
   const mark = lines.waitMark(agent, { names: [], lines: [] }, null, title, snapshot);
-  assert.equal(mark.line, "◷ Waiting for Build");
+  assert.equal(mark.line, "Waiting for Build");
 });
 
 test("who started it, and the worktree's help", () => {

@@ -77,6 +77,8 @@ public struct WaitStatus: Codable, Hashable, Sendable {
         if let resource = wait.lineResource {
             return [lease?.waiting.first { $0.name == resource }?.shortName ?? resource.key]
         }
+        // A time, a PR or its checks as one thing in words (#5022), not a pattern a thing.
+        if let thing = WaitKind.thing(of: wait) { return [thing] }
         return things(wait.patterns, names: names)
     }
 
@@ -86,11 +88,13 @@ public struct WaitStatus: Codable, Hashable, Sendable {
         }
     }
 
-    /// A row's one wait line (#582): "◷ Waiting for “Fix login” (+2)", the first thing
-    /// it waits for and how many more. Nil when it waits for nothing.
+    /// A row's one wait line (#582): "Waiting for “Fix login” (+2)", the first thing it
+    /// waits for and how many more, or "Waiting until 14:30". No ◷ (#5022): the row's mark
+    /// says what kind of wait it is. Nil when it waits for nothing.
     public static func rowLine(_ things: [String]) -> String? {
         guard let first = things.first else { return nil }
-        return "\(symbol) Waiting for \(first)" + (things.count > 1 ? " (+\(things.count - 1))" : "")
+        let what = first.hasPrefix("until ") ? "Waiting \(first)" : "Waiting for \(first)"
+        return what + (things.count > 1 ? " (+\(things.count - 1))" : "")
     }
 
     /// The wait card's time (#2843): "12 / 30 min" or "12 min" while both are under an

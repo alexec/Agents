@@ -71,7 +71,8 @@ struct AgentCard: View {
                            endedReason: agent.endedReason,
                            outcomeUnknown: agent.endingIsUnaccountedFor,
                            isWaitingForPerson: agent.isWaitingForPerson,
-                           tool: RunningToolWords.tool(agent))
+                           tool: RunningToolWords.tool(agent),
+                           waitKind: WaitKind.of(agent))
                     .padding(.top, 1)
 
                 VStack(alignment: .leading, spacing: 3) {
@@ -475,6 +476,8 @@ struct StatusIcon: View {
     var isWaitingForPerson = false
     /// The tool it runs, which tips the working ring (#2044, #2332).
     var tool: String?
+    /// What it waits on (#5022), which the waiting beacon draws.
+    var waitKind: WaitKind = .other
 
     private var shape: StatusShape {
         StatusShape(state: state, outcome: outcome, isWaiting: isWaiting, isComingBack: isComingBack,
@@ -488,7 +491,7 @@ struct StatusIcon: View {
         Group {
             if shape == .waiting {
                 // The beacon breathes in the accent, as the sidebar's (#2456, #2657).
-                WaitingBeacon(size: 18)
+                WaitingBeacon(size: 18, kind: waitKind)
             } else if let symbol = shape.symbol {
                 Image(systemName: symbol)
                     // Decorative: a glyph filling a 20-point well, not text (FR-015).

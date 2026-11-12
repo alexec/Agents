@@ -10,7 +10,7 @@
         "Haiku one, renamed — still working",
         "Haiku two — finished: complete"
       ],
-      "waitLine" : "◷ Waiting for “Haiku one, renamed”"
+      "waitLine" : "Waiting for “Haiku one, renamed”"
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",
@@ -130,7 +130,7 @@
         "Haiku one, renamed — still working",
         "Haiku two — finished: complete"
       ],
-      "waitLine" : "◷ Waiting for “Haiku one, renamed”"
+      "waitLine" : "Waiting for “Haiku one, renamed”"
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",
@@ -251,7 +251,7 @@
         "Haiku one, renamed — still working",
         "Haiku two — finished: complete"
       ],
-      "waitLine" : "◷ Waiting for “Haiku one, renamed”"
+      "waitLine" : "Waiting for “Haiku one, renamed”"
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",
@@ -370,7 +370,7 @@
       "lines" : [
         "Haiku one, renamed — still working"
       ],
-      "waitLine" : "◷ Waiting for “Haiku one, renamed”"
+      "waitLine" : "Waiting for “Haiku one, renamed”"
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",
@@ -587,7 +587,7 @@
         "Archived — archived",
         "Gone — gone"
       ],
-      "waitLine" : "◷ Waiting for “No outcome” (+6)"
+      "waitLine" : "Waiting for “No outcome” (+6)"
     },
     "input" : {
       "agentID" : "00000000-0000-0000-0000-000000000062",
