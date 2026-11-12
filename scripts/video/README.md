@@ -90,10 +90,13 @@ changes, the same scene makes it again.
   fifths in (`thumbnails.set`; a channel that is not verified yet cannot set one, so the log
   says so and YouTube picks one). A new take replaces the old one in its playlist: the old
   video is made private and taken out of the playlist, never deleted. The local files are
-  deleted after a good upload. `upload.py --self-test` proves each call against a fake API. Until Alex's steps on #1793 are done (the
-  OAuth client in `~/.agents/secrets/youtube-client.json`, then `upload.py --sign-in`; with
-  `--no-browser` it only prints the consent address, for an agent to open in the Safari MCP), the
-  video stays in `out/` and the log says why.
+  deleted after a good upload. `upload.py --self-test` proves each call against a fake API. The OAuth client in
+  `~/.agents/secrets/youtube-client.json` is the agents' Google account's (Loops Agents, Cloud
+  project `loops-videos`, In production; #4837), and its refresh token is
+  `youtube-token.json`. To sign in again, `upload.py --sign-in --no-browser` prints the consent
+  address; open it in the agents' own Chrome profile (`chrome-profile-google`, which keeps the
+  Google sign-in), never the app's browser, which Google refuses. Without a sign-in the video
+  stays in `out/` and the log says why.
 - **Its walk hand-off.** A walk's Connect Linear sheet opens no authentication session (that
   is Safari's sheet, on the person's screen): it writes the flow and its address to
   `sign-in.json` in the walk's folder. The scene approves in the video Chrome, reads the code
