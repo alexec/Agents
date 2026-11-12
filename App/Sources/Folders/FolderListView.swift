@@ -2,7 +2,7 @@ import AgentsKitCore
 import AppKit
 import SwiftUI
 
-/// The window's one sidebar (#145): Status, Machines and Usage at the top, then every folder, each a row
+/// The window's one sidebar (#145): Status, Machines and Reports at the top, then every folder, each a row
 /// that folds open on its sessions and workflows, and at the foot what this Mac and its
 /// hosts are doing.
 ///
@@ -22,7 +22,7 @@ struct FolderListView: View {
     @AppStorage("showsStatus", store: WindowDefaults.store) private var showsStatus = true
     /// The Work group (#4004), open the first time: folded, it hides what the one Work row showed.
     @AppStorage("showsWork", store: WindowDefaults.store) private var showsWorkLists = true
-    /// Usage, open until folded, and kept so (#915).
+    /// Reports, open until folded, and kept so (#915): its key from when it was Usage.
     @AppStorage("showsUsage", store: WindowDefaults.store) private var showsUsage = true
     /// The smart groups turned off in Settings ▸ Sidebar (#846).
     @AppStorage(SidebarSmartRow.offDefaultsKey, store: WindowDefaults.store) private var smartOff = SidebarSmartRow.offAtFirst
@@ -194,13 +194,6 @@ struct FolderListView: View {
                     .help("Every folder’s Markdown docs and your docs connectors’ pages, read only")
                     .activityIcon("doc.text")
                     .appText(.supporting).sidebarInk(.docs).tag(SidebarItem.docs)
-                // The daily summary's page (#3721), while the daily summary is on.
-                if model.dailySummarySettings?.mode.writesPages == true {
-                    SummaryRowLabel(newest: model.summaryPages.first)
-                        .help("Your daily summary: what landed, what failed and what waits on you")
-                        .activityIcon(SummaryRowLabel.systemImage)
-                        .appText(.supporting).sidebarInk(.summary).tag(SidebarItem.summary)
-                }
                 // Messages (#4344): the messaging connectors' conversations, the last row above Work.
                 HStack { Text(MessagesList.title).foregroundStyle(.primary); Spacer() }
                     .help(MessagesList.sidebarHelp)
@@ -281,9 +274,17 @@ struct FolderListView: View {
                     .appText(.supporting).sidebarInk(.time).tag(SidebarItem.time)
                 VelocityRow().activityIcon("arrow.triangle.merge")
                     .appText(.supporting).sidebarInk(.velocity).tag(SidebarItem.velocity)
+                // The daily summary's page (#3721), a report too, while the daily summary is on.
+                if model.dailySummarySettings?.mode.writesPages == true {
+                    SummaryRowLabel(newest: model.summaryPages.first)
+                        .help("Your daily summary: what landed, what failed and what waits on you")
+                        .activityIcon(SummaryRowLabel.systemImage)
+                        .appText(.supporting).sidebarInk(.summary).tag(SidebarItem.summary)
+                }
             } header: {
-                // The size of every other group's heading (#495).
-                Text("Usage").appText(.supporting)
+                // The size of every other group's heading (#495). Reports (Alex, 2026-11-12): every
+                // page that reports on the work, Multiplier and Velocity among them; was Usage.
+                Text("Reports").appText(.supporting)
             }
 
             // Pinned, Needs You (with everything waiting for an OK, #773), Working, Unread: a group each, headed and folding as a
