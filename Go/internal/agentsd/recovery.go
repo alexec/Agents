@@ -69,8 +69,7 @@ func pickUps(a *wire.Agent) int64 {
 }
 
 func mayBePickedUp(a *wire.Agent) bool {
-	return a.State == wire.AgentStateStopped && a.EndedReason != nil && *a.EndedReason == wire.EndedReasonDaemonGone &&
-		pickUps(a) < pickUpsBeforeLeavingAlone
+	return stoppedWithTheDaemon(a) && pickUps(a) < pickUpsBeforeLeavingAlone
 }
 
 // recover is DaemonCore.recover's part for agents: called before any client connects.
@@ -96,10 +95,11 @@ func (d *Daemon) recover() {
 		}
 	}
 	// Those a clean stop cut off in a turn, which it wrote stopped with the daemon (#1605).
-	if alive := d.readAlive(); alive != nil {
+	alive := d.readAlive()
+	if alive != nil {
 		for id, was := range alive.CutOff {
 			a := d.Store.Agent(id)
-			if a == nil || a.State != wire.AgentStateStopped || a.EndedReason == nil || *a.EndedReason != wire.EndedReasonDaemonGone {
+			if a == nil || !stoppedWithTheDaemon(a) {
 				continue
 			}
 			left = append(left, leftAgent{a: *a, was: was, ended: true})
@@ -128,6 +128,25 @@ func (d *Daemon) recover() {
 			d.resumeMu.Unlock()
 		}
 	}
+	// Those a start before this one told why they stopped, and died before it picked them up
+	// (#4917): picked up now, with nothing said again.
+	if alive != nil {
+		for id, was := range alive.PickUp {
+			a := d.Store.Agent(id)
+			if a == nil || !stoppedWithTheDaemon(a) || !mayBePickedUp(a) || a.Purpose != nil {
+				continue
+			}
+			d.resumeMu.Lock()
+			if _, already := d.interrupted[id]; !already {
+				d.interrupted[id] = was
+			}
+			d.resumeMu.Unlock()
+		}
+	}
+}
+
+func stoppedWithTheDaemon(a *wire.Agent) bool {
+	return a.State == wire.AgentStateStopped && a.EndedReason != nil && *a.EndedReason == wire.EndedReasonDaemonGone
 }
 
 func (d *Daemon) resumingNow() []wire.UUID {
@@ -195,11 +214,14 @@ func (d *Daemon) leaveTheQueue(id wire.UUID) {
 
 // pickUp sends the restart words first in the agent's queue, as the person's, so what
 // they queued goes with them; the count is written before the words go.
+//
+// The agent stays on alive.json's list until the turn has begun or the attempt has ended,
+// so a host that dies first leaves it for the next start (#4917).
 func (d *Daemon) pickUp(id wire.UUID) {
 	d.resumeMu.Lock()
 	was, ok := d.interrupted[id]
-	delete(d.interrupted, id)
 	d.resumeMu.Unlock()
+	defer d.pickedUp(id)
 	a := d.Store.Agent(id)
 	if !ok || a == nil || !mayBePickedUp(a) {
 		return
@@ -234,6 +256,18 @@ func (d *Daemon) pickUp(id wire.UUID) {
 			return
 		}
 	}
+}
+
+// pickedUp takes an agent off the list to pick up, and off alive.json's, unless the host is
+// going: then its stop writes the list (noteCutOffAgents), the agent still on it.
+func (d *Daemon) pickedUp(id wire.UUID) {
+	if d.going() {
+		return
+	}
+	d.resumeMu.Lock()
+	delete(d.interrupted, id)
+	d.resumeMu.Unlock()
+	d.writeAlive(d.aliveNow(now(), nil))
 }
 
 // clearPickUps is a clean shutdown's: no agent was cut off by it.
