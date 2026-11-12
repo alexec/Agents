@@ -2858,7 +2858,6 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 /* The one toast: fixed at the bottom centre of the viewport, above the prompt bar. */
 .toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; width: max-content;
   max-width: min(560px, calc(100vw - 32px)); pointer-events: none; }
-body:has(.prompt) .toasts { bottom: 140px; }
 .message-toast { display: flex; align-items: center; gap: 10px; padding: 9px 12px 9px 14px; font-size: 0.8125rem;
   color: var(--paper-ink); background: var(--paper-raised); border: 1px solid var(--paper-rule);
   border-radius: var(--radius-floating); box-shadow: 0 4px 16px var(--paper-shadow); pointer-events: auto;

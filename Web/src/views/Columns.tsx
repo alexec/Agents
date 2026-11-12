@@ -81,9 +81,10 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
   }, [shown?.at, r.session]);
   return (
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
+      <NavBar store={store} session={session} />
+      {/* The page's banners, under its toolbar (docs/reference/design-system.md, "Messages"). */}
       {down && <Banner session={session} />}
       <OrgPolicyStrip store={store} />
-      <NavBar store={store} session={session} />
       {section === "overview" ? <div class="columns overview-columns console" aria-busy={down}><Overview store={store} down={down} /></div>
         : section !== "agents" ? <SectionPage store={store} section={section} down={down} /> : <div class="columns with-sidebar" aria-busy={down}>
         <Sidebar session={session} store={store} linkDown={down} />

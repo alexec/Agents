@@ -4,7 +4,7 @@
 // types into: a banner moves it only when its condition starts or ends, a toast and an alert float.
 import type { ComponentChildren } from "preact";
 import { signal, useSignal } from "@preact/signals";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { Store } from "../model/store";
 import { undoLabel } from "../model/archiveWords";
 import { alertButton, alertParts, toastMillis, toneGlyph, toneRole, type Tone } from "../model/messageKinds";
@@ -94,8 +94,21 @@ export function Toasts({ store }: { store: Store }) {
     document.addEventListener("keydown", press);
     return () => document.removeEventListener("keydown", press);
   }, [toast?.key]);
+  // Above the prompt bar, whatever its height: the toast's foot is 12 px over the bar's top, or 24 px over
+  // the viewport's foot when the page has no bar.
+  const above = useSignal<number | null>(null);
+  useLayoutEffect(() => {
+    if (!toast) return;
+    const place = () => {
+      const bar = document.querySelector(".bar")?.getBoundingClientRect();
+      above.value = bar && bar.height > 0 ? Math.max(24, innerHeight - bar.top + 12) : null;
+    };
+    place();
+    addEventListener("resize", place);
+    return () => removeEventListener("resize", place);
+  }, [toast?.key]);
   return (
-    <div class="toasts" aria-live="polite" aria-atomic="true">
+    <div class="toasts" aria-live="polite" aria-atomic="true" style={above.value === null ? undefined : { bottom: `${above.value}px` }}>
       {toast && (
         <div key={toast.key} class={`message-toast tone-${toast.tone}${toast.name ? ` ${toast.name}` : ""}`} role={toneRole(toast.tone)}
           onMouseEnter={() => { hovering.value = true; }} onMouseLeave={() => { hovering.value = false; }}
