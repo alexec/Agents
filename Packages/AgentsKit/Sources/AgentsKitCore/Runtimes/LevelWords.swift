@@ -207,13 +207,6 @@ public enum LevelWords {
     }
 }
 
-public extension Levels {
-    /// The pill's words for a field: the value, or Custom when the agent's own setting
-    /// matches none.
-    var modelWords: String { model.map(LevelWords.model) ?? LevelWords.custom }
-    var permissionWords: String { permission.map(LevelWords.permission) ?? LevelWords.custom }
-}
-
 public extension LevelWords {
     /// A runtime's state on the Auto page (Story 3): Available, Rate limited, Out, Not signed
     /// in, Failed, Installing…, Install failed or Not installed, from what the window already

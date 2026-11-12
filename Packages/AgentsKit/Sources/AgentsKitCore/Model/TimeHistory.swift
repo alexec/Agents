@@ -56,14 +56,6 @@ public struct TimeHistory: Codable, Sendable, Hashable {
         records.note(recap, day: day)
     }
 
-    /// What `gh` said about the pull requests merged on each of these days. A day it
-    /// named none of is a day with none.
-    public mutating func setPRsMerged(_ counts: [String: Int], on days: [String]) {
-        for day in days {
-            changeRecap(day) { $0.prsMerged = counts[day] ?? 0 }
-        }
-    }
-
     /// Add a stretch of one kind of time, split across the hours it covers, so no hour
     /// holds more than happened in it.
     public mutating func add(_ kind: TimeKind, from start: Date, to end: Date, runtime: String,

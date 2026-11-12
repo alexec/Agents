@@ -328,46 +328,6 @@ public struct ToolPolicy: Hashable, Sendable {
         self.authMethodBeforeContinuing = authMethodBeforeContinuing
     }
 
-    /// What rides in `_meta` on `session/new`, `session/load` and `session/fork`.
-    ///
-    /// A deny list nests the removed names at its path, with `extra` beside them in that
-    /// same object. A runtime scoped by flags or by words sends no `_meta` at all.
-    public var sessionMeta: JSONValue? {
-        switch lever {
-        case .sessionMetaDenyList(let path, let extra):
-            // Nothing to deny is not a message. An empty list says the client thought
-            // about tools and had none to hide, which is a different thing from saying
-            // nothing at all, and a runtime we have nothing to hide from gets the
-            // nothing — as it always has.
-            removed.isEmpty ? nil : Self.nesting(.array(removed.map { .string($0.name) }), at: path, beside: extra)
-        case .launchArguments, .environmentJSON, .file, .words:
-            nil
-        }
-    }
-
-    /// What is added to the runtime's environment when the process is started: the
-    /// `environmentJSON` lever's variable, its value as compact JSON with sorted keys, so
-    /// the same policy is the same text every launch. Empty for every other lever.
-    public var launchEnvironment: [String: String] {
-        guard case .environmentJSON(let variable, let value) = lever else { return [:] }
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        guard let data = try? encoder.encode(value), let text = String(data: data, encoding: .utf8) else { return [:] }
-        return [variable: text]
-    }
-
-    /// Fold the path from the inside out: the value goes at the last key, `beside` joins
-    /// it in that same object, and every key outwards wraps what has been built so far.
-    private static func nesting(_ value: JSONValue, at path: [String],
-                                beside extra: [String: JSONValue]) -> JSONValue? {
-        guard let last = path.last else { return nil }
-        var innermost = extra
-        innermost[last] = value
-        var built = JSONValue.object(innermost)
-        for key in path.dropLast().reversed() { built = .object([key: built]) }
-        return built
-    }
-
     /// What is added to the runtime's own arguments when the process is started.
     public var launchArguments: [String] {
         guard case .launchArguments(let flag, let repeatsFlag, let extra) = lever else { return [] }

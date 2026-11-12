@@ -164,24 +164,6 @@ public struct ToolCall: Codable, Hashable, Sendable {
         (name ?? title).hasSuffix(AppTool.finishTurn)
     }
 
-    /// Whether this is one of the calls that took over a part of `finish_turn` (#481):
-    /// labels, a move, asking to be archived or archiving itself, or a wait on agents or a time. What
-    /// `finish_turn` was let do without asking, these are too.
-    public var isOwnSessionCall: Bool {
-        let called = name ?? title
-        if called.hasSuffix(AppTool.setSessionLabels) || called.hasSuffix(AppTool.moveWorktree) { return true }
-        if called.hasSuffix(AppTool.archiveSession) || AppTool.retiredOwnArchive.contains(where: called.hasSuffix) {
-            return rawInput?["id"]?.stringValue?.isEmpty ?? true
-        }
-        if called.hasSuffix(AppTool.checkAgain) { return true }
-        // A wait on sessions is `wait_for_event` on `agent.ended` (#3799).
-        if called.hasSuffix(AppTool.waitForEvent) {
-            let events = rawInput?["events"]?.arrayValue?.compactMap(\.stringValue) ?? [rawInput?["events"]?.stringValue].compactMap { $0 }
-            return events.contains("agent.ended")
-        }
-        return false
-    }
-
     /// Whether this is one of the retired names for a half of `finish_turn`, found in a
     /// conversation that called them before they went.
     public var isRetiredEndOfTurn: Bool {
@@ -201,25 +183,6 @@ public struct ToolCall: Codable, Hashable, Sendable {
     /// Whether this call is the app's own rather than the agent's work at all.
     public var isTheApps: Bool {
         isFinishingTurn || isShowingFile || isManagingWorkflows
-    }
-
-    /// Whether the app may answer the runtime's permission question itself.
-    ///
-    /// Every one of the app's own tools, because none of them is a question worth
-    /// putting to somebody. Suggestions and a read-only pane carry no information to
-    /// decide on; a workflow is answerable *after* it exists, on the folder page,
-    /// where it can be paused or archived by somebody who has seen what it does. A
-    /// sheet in front of the writing would only make the uninformed answer the quick
-    /// one — and, under a runtime that asks before every call, would stop the writing
-    /// dead whenever nobody was looking.
-    ///
-    /// And any other tool of the app's own MCP server, named with that server in front
-    /// (049): leases, waits, events and agents. A runtime that asks before every MCP call
-    /// — Antigravity does, and Copilot asks before every call of any kind — would otherwise
-    /// stop an agent on a card each time it reached for the app, which is the one thing
-    /// the app has already agreed to by handing it the tool.
-    public var isAutoAllowable: Bool {
-        isTheApps || AppTool.isServedByTheApp(name ?? title)
     }
 
     /// Whether this is a runtime asking to leave plan mode: "here is the plan, may I
@@ -245,39 +208,8 @@ public struct ToolCall: Codable, Hashable, Sendable {
         return plan
     }
 
-    /// The Markdown files this call writes, by absolute path: where its locations and
-    /// diffs say it writes, for an edit.
-    public var markdownWritten: [ShownFile] {
-        guard kind == "edit" else { return [] }
-        let paths = locations.map(\.path) + diffs.map(\.path)
-        var seen: Set<String> = []
-        return paths.compactMap { path in
-            guard let file = ShownFile(wire: .object(["path": .string(path)])), file.isMarkdown,
-                  seen.insert(file.path).inserted else { return nil }
-            return file
-        }
-    }
-
     /// The diffs this call carries, which is what the transcript draws first.
     public var diffs: [ToolCallContent.Diff] {
         content.compactMap { if case .diff(let diff) = $0 { return diff } else { return nil } }
-    }
-}
-
-extension ToolCall {
-    /// Everything this call printed, as text: its text content, then its raw output.
-    public var printedText: String {
-        var parts: [String] = []
-        for item in content {
-            if case .content(.text(let text)) = item { parts.append(text) }
-        }
-        if let raw = rawOutput {
-            if let text = raw.stringValue {
-                parts.append(text)
-            } else if let data = try? JSONEncoder().encode(raw) {
-                parts.append(String(decoding: data, as: UTF8.self))
-            }
-        }
-        return parts.joined(separator: "\n")
     }
 }

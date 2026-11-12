@@ -92,12 +92,6 @@ public struct GuardedChange: Codable, Hashable, Sendable, Identifiable {
         "Keep the change to \(path)?"
     }
 
-    /// The path a workflow's waiting change is asked by (#569): its file, relative to
-    /// the folder.
-    public static func workflowPath(_ workflowID: String) -> String {
-        "\(WorkflowPaths.folderName)/\(workflowID).\(WorkflowPaths.fileExtension)"
-    }
-
     /// The workflow a path names, or nil when it is not a workflow's file.
     public static func workflowID(inPath path: String) -> String? {
         let folder = WorkflowPaths.folderName + "/", suffix = "." + WorkflowPaths.fileExtension

@@ -26,16 +26,11 @@ public enum DisplayPreference {
     /// Whether a chat the person started may archive itself when it ends done (#1802). On
     /// unless they turn it off; the host reads it when such a turn ends.
     public static let agentsMayArchiveMyChats = "agentsMayArchiveMyChats"
-    public static let agentsMayArchiveMyChatsDefault = true
     /// The person's attention (#2805): how many notices agents may send at once, and how
     /// many minutes one takes to come back. Every agent on the host shares them; the host
     /// reads them each time an agent calls `notify`.
     public static let noticeBurst = "noticeBurst"
-    public static let noticeBurstDefault = 3
-    public static let noticeBurstRange = 1...20
     public static let noticeCooldownMinutes = "noticeCooldownMinutes"
-    public static let noticeCooldownDefault = 10
-    public static let noticeCooldownRange = 1...1440
     /// The cool-downs the Mac and the Remote offer in a menu (#2896): a Stepper took 50
     /// presses from 10 to 60 minutes. The web keeps its number field, so a value set there
     /// may be none of these; the menu then shows it as well.

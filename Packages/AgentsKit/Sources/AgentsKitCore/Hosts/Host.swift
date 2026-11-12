@@ -157,15 +157,6 @@ public struct ServerFacts: Codable, Hashable, Sendable {
         return false
     }
 
-    /// What choosing a vendor's archive for this server goes by (049): its platform, whether
-    /// its CPU has AVX2, and whether its C library is musl. Nil off Linux or on another
-    /// architecture.
-    public var archiveFacts: ArchiveToolset.HostFacts? {
-        guard system == "Linux", let base = ArchiveToolset.linuxPlatform(architecture) else { return nil }
-        if case .musl = libc { return ArchiveToolset.HostFacts(base: base, avx2: avx2, musl: true) }
-        return ArchiveToolset.HostFacts(base: base, avx2: avx2)
-    }
-
     /// Linux on one of the two architectures there is a binary for (FR-004).
     public var isSupported: Bool {
         system == "Linux" && architecture.isSupported

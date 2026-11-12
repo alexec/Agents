@@ -183,12 +183,6 @@ public extension Agent {
         return group == .needsAttention || group == .blocked
     }
 
-    /// Whether the person has looked at this conversation since its report landed.
-    var reportIsSeen: Bool {
-        guard let report else { return false }
-        return reportSeenAt == report.at
-    }
-
     /// A turn that ended cleanly, was asked how it went, and still said nothing.
     ///
     /// Not a completion — nothing vouched for it. It needs review even after being read.
