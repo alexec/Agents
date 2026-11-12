@@ -43,6 +43,7 @@ import { PageTitle, PersonMenu, SearchBox } from "./TopBar";
 import { pageCrumbs } from "../model/crumbs";
 import { MultiplierPage } from "./Multiplier";
 import { lowWords, runtimeTally, setupRuntimes } from "../model/runtimes";
+import { eventsWaitingLine } from "../model/eventsWaiting";
 import type { Session } from "../session";
 import { ask } from "./MessageKinds";
 import { CommandMenu } from "./CommandMenu";
@@ -174,6 +175,15 @@ function RuntimesLowLine({ store }: { store: Store }) {
   return words ? <p class="page-need quiet small" role="status">{words}</p> : null;
 }
 
+const isEventsPage = (page: NavPage) => page.draw.kind === "activity" && page.draw.page === "events";
+
+/** Under Status ▸ Events, in grey: `4 sessions waiting`, as the window's Events row. Nothing when none waits;
+ * no time, as a wait's age says nothing. */
+function EventsWaitingLine({ store }: { store: Store }) {
+  const words = eventsWaitingLine(store.events.value);
+  return words ? <p class="page-need quiet small" role="status">{words}</p> : null;
+}
+
 /** A section's list of pages on the left, the page open on the right. */
 export function SectionPage({ store, section, down }: { store: Store; section: Exclude<NavSection, "overview" | "agents">; down: boolean }) {
   const admin = adminOf(store);
@@ -184,6 +194,11 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
   const list = pagesShown(section, admin, open?.id, more);
   const registering = useSignal(false);
   useUserScopeStatus(store, section === "status");
+  // Status ▸ Events' grey line reads who waits on each machine that answers; events/changed keeps it.
+  const online = store.hosts.value.filter((h) => hostAnswers(h.state)).map((h) => h.id);
+  useEffect(() => {
+    if (section === "status") for (const host of online) void store.loadEvents(host);
+  }, [section, online.join(",")]);
   // The Machines header (#3974): + opens New Machine's sheet (#4634); its menu also registers one.
   const machinesHead = (group: string) => section === "machines" && group === "Machines";
   // With two or more providers, New Machine names the default, and New Machine on ‹name› opens the sheet on another (#3979).
@@ -220,6 +235,7 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
                     <PageMark store={store} page={p} />
                   </button>
                   {isRuntimesPage(p) && <RuntimesLowLine store={store} />}
+                  {isEventsPage(p) && <EventsWaitingLine store={store} />}
                   {p.draw.kind === "statusList" && <StatusListLastLine store={store} list={p.draw.list} />}
                 </Fragment>
               ))}

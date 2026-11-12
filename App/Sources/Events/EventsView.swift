@@ -429,18 +429,26 @@ private struct WaitingNow: View {
     }
 }
 
-/// The foot of the sidebar's way into Events (042; wireframes §1). Its line says when
-/// the last thing happened. There is no count: the log is read, it does not ask.
+/// The foot of the sidebar's way into Events (042; wireframes §1). Under the title, in
+/// grey, how many sessions wait for an event; nothing when none waits. There is no count
+/// of events: the log is read, it does not ask.
 struct EventsRow: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        // The title alone (#587): only a session's row has something at its end. When
-        // the last event came is the tooltip's.
-        HStack(alignment: .firstTextBaseline) {
-            Text("Events").foregroundStyle(.primary)
-            Spacer()
+        // The title (#587): only a session's row has something at its end. When the last
+        // event came is the tooltip's; a wait's age says nothing, so the line has none.
+        let waiting = EventsWords.waitingLine(model.work.waitingAgents.count)
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Events").foregroundStyle(.primary)
+                Spacer()
+            }
+            if let waiting {
+                Text(waiting).appText(.fine).foregroundStyle(.secondary).lineLimit(1)
+            }
         }
+        .accessibilityValue(waiting ?? "")
         .help(model.work.lastEventAt.map { "Last at \(LeaseWords.clock($0)). What happened, what came of it, and who is waiting" }
               ?? "What happened, what came of it, and who is waiting")
     }

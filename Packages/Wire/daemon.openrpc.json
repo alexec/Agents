@@ -3629,6 +3629,11 @@
     {
       "name": "events/changed",
       "x-capability": "events/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
       "x-notification": true,
       "paramStructure": "by-name",
       "params": [
