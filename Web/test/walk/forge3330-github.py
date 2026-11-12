@@ -64,6 +64,9 @@ class Handler(BaseHTTPRequestHandler):
         return self.answer(200, {"data": {}})
 
     def do_GET(self):
+        # The token check of connections/sign-in/token (AGENTS_TEST_GITHUB_URL): any token is sam's (#4092).
+        if self.path.split("?")[0] == "/api/user":
+            return self.answer(200, {"login": "sam"})
         self.answer(404, {"message": "Not Found"})
 
 

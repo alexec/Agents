@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
 	"github.com/alexec/agents/Go/internal/emailmcp"
 	"github.com/alexec/agents/Go/wire"
 )
@@ -350,6 +351,41 @@ func TestConnectingGitHubWithAPersonalAccessToken(t *testing.T) {
 	kept, ok, _ := file.Get(connections.GitHub)
 	if !ok || kept.Access != "github_pat_secret" || kept.Refresh != "" ||
 		!kept.AccessExpiresAt.Equal(time.Date(2027, 2, 1, 16, 0, 0, 0, time.UTC)) || connections.ByAppToken(kept) {
+		t.Fatalf("kept: %+v", kept)
+	}
+}
+
+// A walk (#4092) connects its fixture GitHub with any token and no Keychain item by hand: with
+// AGENTS_TEST_GITHUB_URL set, connections/sign-in/token checks the token at the fixture's
+// /api/user, never at api.github.com. With it unset, the check goes to api.github.com.
+func TestAWalkConnectsTheFixtureGitHubWithAnyToken(t *testing.T) {
+	t.Setenv(skillcatalog.GitHubVariable, "")
+	if f := (&Daemon{}).deviceFlow(wire.ConnectionProviderGithub); f.API != "https://api.github.com/" {
+		t.Fatalf("live: %q", f.API)
+	}
+	var asked atomic.Int32
+	fixture := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/user" {
+			http.NotFound(w, r)
+			return
+		}
+		asked.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"login":"sam"}`)
+	}))
+	defer fixture.Close()
+	t.Setenv(skillcatalog.GitHubVariable, fixture.URL)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	file := &connections.File{Path: filepath.Join(t.TempDir(), connections.FileName)}
+	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+
+	var made wire.ConnectionTokenAnswer
+	json.Unmarshal(c.call(t, 1, "connections/sign-in/token", map[string]any{"provider": "github", "token": "walk"}), &made)
+	if made.Error != nil || made.Connection == nil || deref(made.Connection.Login) != "sam" || asked.Load() != 1 {
+		t.Fatalf("made: %+v, asked %d", made, asked.Load())
+	}
+	if kept, ok, _ := file.Get(connections.GitHub); !ok || kept.Access != "walk" || kept.Login != "sam" {
 		t.Fatalf("kept: %+v", kept)
 	}
 }

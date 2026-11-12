@@ -75,6 +75,9 @@ class Handler(BaseHTTPRequestHandler):
         self.answer(200, {"data": {}})
 
     def do_GET(self):
+        # The token check of connections/sign-in/token (AGENTS_TEST_GITHUB_URL): any token is sam's (#4092).
+        if self.path.split("?")[0] == "/api/user":
+            return self.answer(200, {"login": "sam"})
         m = re.match(r"^/api/repos/([^/]+/[^/]+)/labels", self.path)
         if m:
             return self.answer(200, [{"name": k, "color": c} for k, c in LABELS.items()])
