@@ -172,18 +172,25 @@ private struct EventSheet: View {
     }
 }
 
-/// The Events row under Activity, the Mac's shape: the title alone (#587), when the last
-/// event came said to VoiceOver.
+/// The Events row under Activity, the Mac's shape: the title (#587), and in grey under it
+/// how many sessions wait for an event; when the last event came is said to VoiceOver.
 struct EventsRow: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("Events")
-            Spacer()
+        let waiting = EventsWords.waitingLine(model.work.waitingAgents.count)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Events")
+                Spacer()
+            }
+            if let waiting {
+                Text(waiting).appText(.fine).foregroundStyle(.secondary).lineLimit(1)
+            }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityValue(model.work.lastEventAt.map { "last at \(LeaseWords.clock($0))" } ?? "")
+        .accessibilityValue([waiting, model.work.lastEventAt.map { "last at \(LeaseWords.clock($0))" }]
+            .compactMap { $0 }.joined(separator: ", "))
         .accessibilityHint("Opens Events")
     }
 }

@@ -15721,6 +15721,7 @@ export interface Notifications {
   "dailySummary/changed": DailySummarySettings;
   "desktopControl/liveFrame": DesktopControlLiveFrame;
   "disk/changed": DiskState;
+  "events/changed": EventsChange;
   "files/changed": FilesChangedNotification;
   "folder/changed": FolderSummary;
   "folder/removed": FolderRemovedNotification;

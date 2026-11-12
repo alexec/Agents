@@ -743,6 +743,7 @@ public extension DaemonAPI {
                 Row(Notification.mcpHealthChanged, params: MCPHealthSnapshot.self, result: Empty.self,
                     kind: .hostNotification),
                 Row(Notification.diskChanged, params: DiskState.self, result: Empty.self, kind: .hostNotification),
+                Row(Notification.eventsChanged, params: EventsChange.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.capacityChanged, params: CapacityState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.backupsChanged, params: BackupState.self, result: Empty.self, kind: .hostNotification),
                 Row(Notification.worktreesSized, params: WorktreesSized.self, result: Empty.self, kind: .hostNotification),

@@ -14,7 +14,7 @@ import type {
   PermissionNotification, PermissionRequest, FolderSummary, HelperLimits, DiskThresholds, NotCommittedResponse, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, MCPToolsAnswer, ConnectorToolLevel, DiskState, CapacityState, StoreNotes,
-  BusEvent, CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings, WorkflowHours,
+  BusEvent, CostState, EventsChange, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings, WorkflowHours,
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, VelocityHistory, Achievements, Multiplier,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
@@ -22,6 +22,7 @@ import type {
   PolicyView, PolicyState, PassThroughName, SignInRequest, CatalogRequest, BudgetRequest, RemoveRequest, ClientPermissionSettings, PRCostComment,
   Connection, LineageNode, LineageSessionIssue, MoveNotification, MoveToMachineAnswer, ProblemReport, ProblemReportRequest, Request as PersonRequest, RequestSecretUse, LockDelivery, RequestUpdate, ProviderID, StartedMachinePreview, FoldersFindRequest, FoundFolder,
   OutsideAccount, OutsideAccounts, AgentChanges, ListRevision, PlaneMoveAsk, PlaneMoveReport, UserSecretRow, WebRemoteStatus, WireDate } from "../protocol/generated";
+import { takeEventsChange } from "./eventsWaiting";
 import { endedConnections, endedLine, hasEnded } from "./connectorSetup";
 import { parseQuery } from "./labels";
 import { Failure } from "../protocol/generated";
@@ -455,6 +456,8 @@ export class Work {
   readonly resuming = signal<Record<string, readonly string[]>>({});
   /** Each host's volumes low on space (#196), replaced whole by each disk/changed, never merged. */
   readonly disk = signal<Record<string, DiskState>>({});
+  /** The newest page of each host's events, for the sidebar's Events row and page (#151); events/changed keeps who waits. */
+  readonly events = signal<Record<string, EventsPage>>({});
   /** Each host's capacity level (#4748), from capacity/state on connect and each capacity/changed: its row says it. */
   readonly capacity = signal<Record<string, CapacityState>>({});
   /** The person's Mac's backups (#1810), for Settings ▸ Backups: null until it has said, or from a
@@ -733,6 +736,10 @@ export class Work {
       }
       case "agents/draftOptions":
         this.draftOptions.value = params as DraftOptionsNotification;
+        return true;
+      case "events/changed":
+        // Who waits now, for Status ▸ Events' grey line and Waiting now, and the event that came.
+        this.events.value = { ...this.events.value, [host]: takeEventsChange(this.events.value[host], params as EventsChange) };
         return true;
       case "workflow/changed":
         this.placeWorkflow(params as WorkflowSummary, host);
@@ -4578,8 +4585,6 @@ export class Store extends Work {
     }
   }
 
-  /** The newest page of each host's events, for the sidebar's Events row and page (#151). */
-  readonly events = signal<Record<string, EventsPage>>({});
   /** Each host's day of spending and its limits, for Spending (#151). */
   readonly costs = signal<Record<string, CostState>>({});
   /** Each host's use by hour and by day (#823), for the charts on Cost. */
