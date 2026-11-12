@@ -110,6 +110,21 @@ the agent out of the line. If the agent waits for something else instead, it kee
 and the app starts it again when its turn comes. The line and the wait both outlive a restart
 of Agents.
 
+The line stays first come, first served, but an agent that loses its place through no act of
+its own keeps the time it first asked (#4041):
+
+- **A restart.** If the line and the agent's wait do not agree after Agents starts again, the
+  app ends the wait and tells the agent to ask again. When it asks again for the same
+  resource, it goes back into the line at the time its wait began, ahead of the agents that
+  asked after it. The place is kept as long as the wait would have lasted.
+- **A lease that ran out.** An agent whose lease runs out before its job ends, and that asks
+  again within five minutes, goes into the line as of the time its lease ran out: after the
+  agents that were already waiting then, and before the agents that came later. After five
+  minutes, it goes to the end of the line.
+
+How long a session has run does not change the order, so a new lane does not wait behind
+the long-running ones.
+
 An agent that needs two resources asks for them one at a time, always in the same order,
 so that two agents cannot each hold one and wait forever for the other. If that happens
 anyway, both leases still run out in time, and you can see both waits and end one of them.

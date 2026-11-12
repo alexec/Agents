@@ -102,6 +102,8 @@ type noticeKind struct {
 type leaseBook struct {
 	Entries map[wire.ResourceName]*leaseEntry `json:"entries"`
 	Notices map[string][]leaseNotice          `json:"notices"`
+	// Kept is each agent's kept places (#4041), by agent.
+	Kept map[string][]keptPlace `json:"kept,omitempty"`
 }
 
 // leaseEvent is what the book did, for settle to say.
@@ -144,6 +146,7 @@ func (d *Daemon) loadLeases() []leaseEvent {
 				Lease *wire.Lease `json:"lease"`
 			} `json:"entries"`
 			Notices map[string][]leaseNotice `json:"notices"`
+			Kept    map[string][]keptPlace   `json:"kept"`
 		}
 		if err := diskjson.Unmarshal(b, &raw); err == nil {
 			for name, e := range raw.Entries {
@@ -162,6 +165,7 @@ func (d *Daemon) loadLeases() []leaseEvent {
 			if raw.Notices != nil {
 				d.book.Notices = raw.Notices
 			}
+			d.book.Kept = raw.Kept
 		} else {
 			log.Printf("leases: could not read %s: %v", d.leasesFile(), err)
 		}
@@ -249,10 +253,13 @@ func (d *Daemon) setRules(name wire.ResourceName, rules leaseRules) []leaseEvent
 // lapse ends what has run out and warns once of what is about to.
 func (d *Daemon) lapse(at time.Time) []leaseEvent {
 	var events []leaseEvent
+	d.pruneKept(at)
 	for name, e := range d.book.Entries {
 		var kept []wire.Lease
 		for _, l := range e.Leases {
 			if !l.ExpiresAt.Time().After(at) {
+				// It keeps its place for a while, as of when it ran out (#4041).
+				d.keepPlace(l.Holder, keptPlace{Resource: name, AskedAt: l.ExpiresAt, Until: wire.DateOf(at.Add(leaseKeptWindow))})
 				d.leaveNotice(leaseNotice{Resource: name, DisplayName: l.DisplayName, Kind: noticeKind{Expired: &struct{}{}}, At: wire.DateOf(at)}, l.Holder)
 				events = append(events, leaseEvent{released: true, lease: l, ending: "expired"})
 				continue
@@ -435,6 +442,10 @@ func (d *Daemon) dropLeases(agent wire.UUID, ending string) {
 		d.store(name, e)
 	}
 	delete(d.book.Notices, string(agent))
+	if _, ok := d.book.Kept[string(agent)]; ok {
+		delete(d.book.Kept, string(agent))
+		moved = true
+	}
 	if moved {
 		d.leasesChanged()
 	}
