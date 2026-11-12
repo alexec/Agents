@@ -40,6 +40,7 @@ func TestMakeAppRepositoryPushesTheStarterAndAddsTheFolder(t *testing.T) {
 		t.Fatalf("%v %s", err, out)
 	}
 	gh.bare = "file://" + bare
+	starterTemplate(t, "alexec/web-service-starter", webTemplate)
 	a := seeded(t, d, gitFolder(t, "git@github.com:alexec/agents.git"), func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateRunning, nil })
 	if !appToolServed("make_app_repository") {
 		t.Fatal("make_app_repository is not served")
@@ -67,6 +68,9 @@ func TestMakeAppRepositoryPushesTheStarterAndAddsTheFolder(t *testing.T) {
 	deploy, _ := os.ReadFile(filepath.Join(dest, ".github/workflows/deploy.yml"))
 	if !strings.Contains(string(deploy), "tidelog") || strings.Contains(string(deploy), "__") {
 		t.Errorf("deploy.yml is not filled:\n%s", deploy)
+	}
+	if _, err := os.Stat(filepath.Join(dest, ".github/README.md")); err == nil {
+		t.Error("the template's own README is in the new app")
 	}
 	if fi, err := os.Stat(filepath.Join(dest, "setup-gcp.sh")); err != nil || fi.Mode()&0o100 == 0 {
 		t.Errorf("setup-gcp.sh cannot be run: %v", err)

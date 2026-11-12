@@ -127,11 +127,23 @@ The person can start again later: each step checks what is already there and ski
     `set_environment_gate` makes an environment with required reviewers.
   - Each tool gets a line in the brief (`Go/internal/agentsd/brief.go`), gated as the
     GitHub tools are.
-- **Decided: the starters live in this repository**, under `templates/` (an iPhone app
-  and a web service, each with its workflows, the deploy notice and Sentry's SDK), and
-  agentsd embeds them. The agent pushes one to the new repository. Not a public template
-  repository on GitHub, because publishing outside this repository is Alex's choice. Alex
-  can overrule.
+- **The starters are GitHub template repositories (Alex, 2026-11-10, #4561),**
+  `alexec/iphone-app-starter` and `alexec/web-service-starter`, public and marked as
+  templates. This replaces "the starters live in this repository, under `templates/`, and
+  agentsd embeds them": a baked-in starter changes only with a release of Agents. A template
+  repository changes on its own, anyone can name their own or a fork, GitHub's **Use this
+  template** works without Agents, and Dependabot keeps its dependencies current.
+  - `make_app_repository`'s `starter` is a repository, `owner/name`, with `iphone-app` and
+    `web-service` as short names for ours. agentsd fetches its default branch (a shallow
+    clone with the person's GitHub connection), fills the placeholders and pushes the result
+    as the new repository's first commit, as before. Not GitHub's generate-from-template,
+    which copies the placeholders unfilled and shows "generated from" the template.
+  - A template's `.starterignore` names its own files, which a new app does not get: its
+    CI (`.github/workflows/template.yml`, which fills sample values, checks the workflows and
+    builds), `.github/template/` and `.github/README.md` (what GitHub shows on the template's
+    page, with the placeholders; the app's own `README.md` is at the root).
+  - Decided: agentsd takes the default branch, not a tag, because a fix then reaches the next
+    new app at once; a person who wants a fixed version names a fork. Alex can overrule.
 - **Decided: the flow is a ready-made skill, `start-a-new-app`,** with no workflow, as
   `map-a-docs-server` is (#3307), and a line in the brief that says to follow it when a
   person asks for a new app. Because the steps are judgment (which accounts, what is there
@@ -162,7 +174,7 @@ The lead owns the plan from here.
 | Step | Child | Level | Blocked by |
 | --- | --- | --- | --- |
 | 1 | #3706 CI secrets, variables and gates as app tools: `set_ci_secret`, `set_ci_variable`, `set_environment_gate` (GitHub) | task | — |
-| 1 | #3707 Starters: an iPhone app (TestFlight and App Store with cloud-managed signing) and a web service (Cloud Run), each with Sentry, under `templates/` | task | — |
+| 1 | #3707 Starters: an iPhone app (TestFlight and App Store with cloud-managed signing) and a web service (Cloud Run), each with Sentry, now the template repositories `alexec/iphone-app-starter` and `alexec/web-service-starter` (#4561) | task | — |
 | 2 | #3708 A repository from a starter: made on GitHub, cloned on the machine, shown as a folder | story | #3707 |
 | 3 | #3709 Apple: the cards, the key as a CI secret, the bundle id from a one-time CI job ([apple.md](apple.md)) | story | #3706, #3708 |
 | 3 | #3710 Google Cloud: the Cloud Shell card and the two variables ([google-cloud.md](google-cloud.md)) | story | #3706, #3708 |

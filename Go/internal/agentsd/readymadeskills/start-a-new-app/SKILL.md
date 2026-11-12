@@ -54,8 +54,10 @@ The person's GitHub login is the `login` of the GitHub server's `get_me`, or the
 
 ## 2. The repository
 
-Call `make_app_repository` with the name, the starter (`iphone-app` or `web-service`) and
-its values. For **Both**, call it twice, once for each starter. It makes a private
+Call `make_app_repository` with the name, the starter and its values. The starters are
+GitHub template repositories: `iphone-app` is `alexec/iphone-app-starter` and `web-service`
+is `alexec/web-service-starter`. When the person names another template repository, such as
+a fork of ours, give it as `owner/name`; its `.github/README.md` says its placeholders. For **Both**, call it twice, once for each starter. It makes a private
 repository, pushes the starter as its first commit, clones it on this machine and adds it
 as a folder. It skips what is there already, so after a failure, call it again once. When
 it fails again, stop (the rules above).

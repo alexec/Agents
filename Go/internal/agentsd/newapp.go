@@ -35,18 +35,13 @@ func (d *Daemon) makeAppRepository(caller wire.UUID, args map[string]json.RawMes
 		return "", Invalid("Nothing was made: name is the repository's name: letters, digits, '.', '-' and '_', e.g. tide-log.")
 	}
 	starter := strings.TrimSpace(argString(args, "starter"))
-	if !starterKnown(starter) {
-		return "", Invalid("Nothing was made: starter is one of %s.", strings.Join(starterIDs(), ", "))
+	starterRef, ok := starterRepo(starter)
+	if !ok {
+		return "", Invalid("Nothing was made: starter is a template repository, owner/name, or one of ours: %s.", starterShortList())
 	}
 	values := map[string]string{}
 	if raw, ok := args["values"]; ok && json.Unmarshal(raw, &values) != nil {
 		return "", Invalid("Nothing was made: values is an object of the starter's placeholders, e.g. {\"APP_NAME\": \"Tide Log\"}.")
-	}
-	// GITHUB_REPO is the repository's own name, which the app knows; the rest are the agent's.
-	values["GITHUB_REPO"] = "owner/" + name
-	if _, err := starterFiles(starter, values); err != nil {
-		names, _ := starterPlaceholders(starter)
-		return "", Invalid("Nothing was made: %v. The %s starter takes values for %s.", err, starter, strings.Join(withoutRepo(names), ", "))
 	}
 	owner := strings.TrimPrefix(strings.TrimSpace(argString(args, "owner")), "@")
 	if owner != "" && !ciRepoRef.MatchString(owner+"/r") {
@@ -62,6 +57,18 @@ func (d *Daemon) makeAppRepository(caller wire.UUID, args map[string]json.RawMes
 	c, _ := d.githubConnection()
 	token := c.Access
 
+	// The starter is fetched before anything is made, so its missing values are refused first.
+	// GITHUB_REPO is the repository's own name, which the app knows; the rest are the agent's.
+	raw, err := fetchStarter(starterRef, token)
+	if err != nil {
+		return "", Invalid("Nothing was made: %v.", err)
+	}
+	values["GITHUB_REPO"] = "owner/" + name
+	if missing := starterMissing(raw, values); len(missing) > 0 {
+		return "", Invalid("Nothing was made: the %s starter needs %s. It takes values for %s.", starter,
+			strings.Join(missing, ", "), strings.Join(withoutRepo(starterPlaceholders(raw)), ", "))
+	}
+
 	ctx, cancel := context.WithTimeout(d.ctx, ciToolTimeout)
 	repo, made, err := gh.MakeRepository(ctx, owner, name, values["APP_NAME"])
 	cancel()
@@ -75,7 +82,7 @@ func (d *Daemon) makeAppRepository(caller wire.UUID, args map[string]json.RawMes
 		done = append(done, repo.FullName+" was on GitHub already")
 	}
 	values["GITHUB_REPO"] = repo.FullName
-	files, err := starterFiles(starter, values)
+	files, err := fillStarter(raw, values)
 	if err != nil {
 		return "", Invalid("Nothing more was made: %v", err)
 	}
