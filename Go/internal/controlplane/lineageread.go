@@ -94,6 +94,11 @@ func (s *Service) scopeLineageGraph(ctx context.Context, scope *wire.ReportScope
 	if err != nil {
 		return nil, err
 	}
+	return s.keptLineageGraph(ctx, keep)
+}
+
+// keptLineageGraph is the merged copy of the machines whose people keep says.
+func (s *Service) keptLineageGraph(ctx context.Context, keep func(person string) bool) (*mergedLineage, error) {
 	keys, err := s.cfg.Store.List(ctx, lineageGraphPrefix)
 	if err != nil {
 		return nil, fail(storeUnavailable, "Lineage could not be read: %v", err)

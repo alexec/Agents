@@ -11399,6 +11399,14 @@ type ReportCounts struct {
 	WorkflowFailures int64 `json:"workflowFailures"`
 }
 
+// A repo's delivery figures on Reports ▸ Planning (#4555): lineage.DeliveryOf over the scope's machines' nodes, each node once, with each release tag's time from its earliest link. Of a scope, never of a person.
+type ReportDelivery struct {
+	// As LineageCostNode.repo, in the full form (#4800).
+	Repo string `json:"repo"`
+
+	Figures LineageDelivery `json:"figures"`
+}
+
 // How far the estimates were from the actual figures (#3561), over the issues closed in the range that had an estimate when their work started: the median of max(estimate/actual, actual/estimate), so 1.5 means 1.5 times too high or too low. A figure is absent when no issue had it. coverage and landsAtErrorDays (#4525) check the claims the kept estimate made: how often its P10-P90 dollar range held the actual, and how many days its landing date was off by, the median over the same issues.
 type ReportEstimateError struct {
 	// The closed issues with an estimate.
@@ -11694,6 +11702,9 @@ type ReportValue struct {
 
 	// The open epics in the scope (#4528), the most recently changed first, at most 20, so Reports ▸ Planning can ask lineage/forecast when each lands.
 	OpenEpics []LineageNode `json:"openEpics,omitzero"`
+
+	// The scope's delivery figures (#4555, epic #4551), a repo each: the repos with the most PRs merged in the 28 days to now, at most 3, the most first, whatever the range. Absent from a control plane before it; empty when no repo had a merge.
+	Delivery []ReportDelivery `json:"delivery,omitzero"`
 
 	Issues []ReportValueRow `json:"issues"`
 

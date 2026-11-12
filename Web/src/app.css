@@ -1247,6 +1247,15 @@ dialog.image-viewer::backdrop { background: color-mix(in srgb, var(--paper-scrim
   padding: 10px 12px; background: var(--paper-raised); }
 .report-scopes { margin-bottom: 8px; }
 .report-whatif { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+/* Reports ▸ Planning's Delivery row (#4555): a card a figure, wrapping on a narrow page. */
+.delivery-repo h4 { margin: 4px 0; }
+.delivery-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.delivery-card { display: flex; flex-direction: column; gap: 3px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
+  padding: 8px 10px; background: var(--paper-raised); min-width: 0; }
+.delivery-value { font-size: 1.125rem; }
+.delivery-spark { display: block; height: 22px; }
+.delivery-spark path { fill: none; stroke: var(--accent, currentColor); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.delivery-band { align-self: flex-start; font-size: 0.6875rem; padding: 0 6px; border-radius: 8px; border: 1px solid var(--paper-rule); }
 /* A feature with no use in 90 days (#2165), as the window's orange mark. */
 .report-unused { color: var(--tint-attention); }
 /* The Console's pages draw Settings' sections (People, Groups): Settings' rows, as sidebar.css has them under .with-sidebar. */

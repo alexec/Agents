@@ -265,6 +265,14 @@ func (s *Service) otlpBody(ctx context.Context, now time.Time) ([]byte, error) {
 			// AGGREGATION_TEMPORALITY_CUMULATIVE: today's total, from midnight.
 			"sum": map[string]any{"aggregationTemporality": 2, "isMonotonic": true, "dataPoints": points}})
 	}
+	// The organisation's delivery figures (#4555), as gauges: a figure, not today's sum. One
+	// that cannot be read leaves them out of this send, not the usage.
+	all := func(string) bool { return true }
+	if nodes, err := s.scopeLineage(ctx, all); err == nil {
+		if delivery, err := s.keptDelivery(ctx, all, nodes, now); err == nil {
+			metrics = append(metrics, deliveryGauges(delivery, at)...)
+		}
+	}
 	if metrics == nil {
 		metrics = []any{}
 	}
