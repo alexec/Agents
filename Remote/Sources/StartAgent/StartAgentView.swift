@@ -148,7 +148,7 @@ struct StartAgentView: View {
                 HostOfflineStrip(host: model.startHost)
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { promptBar }
+        .safeAreaInset(edge: .bottom, spacing: 0) { promptBar.liftsRemoteToasts() }
         .sheet(isPresented: $showingMore) {
             MoreSheet(folder: folder, labels: $draftLabels, atLabels: moreAtLabels)
                 .environment(model)
@@ -269,15 +269,13 @@ struct StartAgentView: View {
 
     private var promptBar: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // The start's notes (#4737), shown only while there is one: kept lines would cost
+            // the phone's bar lines for ever.
             if let attachNote {
-                Text(attachNote).appText(.supporting).tinted(.failure)
-                    .fixedSize(horizontal: false, vertical: true)
+                SheetNote(text: attachNote, reservesSpace: false)
             }
             if let refusal = model.startRefusal {
-                Text(refusal)
-                    .appText(.supporting)
-                    .tinted(.failure)
-                    .fixedSize(horizontal: false, vertical: true)
+                SheetNote(text: refusal, reservesSpace: false)
             }
             // In words as well as the spinner, as the Mac's bar says it (#87): a
             // worktree and a runtime to start can take seconds.
@@ -288,16 +286,12 @@ struct StartAgentView: View {
             // runtime chosen is out (052, 065), Auto picks nothing (#2658), or the
             // organisation sets the sandbox (#998).
             if let out = model.startRuntimeOut {
-                Text(out)
-                    .appText(.supporting)
-                    .foregroundStyle(StateTint.attention.style(or: .primary))
-                    .fixedSize(horizontal: false, vertical: true)
+                // Attention: the person chooses another runtime. The tint is on the icon.
+                SheetNote(tone: .attention, text: out, reservesSpace: false)
             }
             if model.startAutoPicksNothing {
-                Text(LevelWords.noRuntime(model.startAutoPreview?.skipped ?? [], name: PromptWords.runtimeName))
-                    .appText(.supporting)
-                    .tinted(.failure)
-                    .fixedSize(horizontal: false, vertical: true)
+                SheetNote(text: LevelWords.noRuntime(model.startAutoPreview?.skipped ?? [], name: PromptWords.runtimeName),
+                          reservesSpace: false)
             }
             if let mark = model.sandboxSettings.setBy {
                 OrgPolicyLine(mark: mark)

@@ -47,11 +47,9 @@ struct RemoteMoveToMachineSheet: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(MoveToMachineWords.folderHelp)
                             Text(MoveToMachineWords.whatGoes(stops: model.canStop(agent)))
-                            if let problem {
-                                Text(problem).tinted(.failure)
-                            } else if moving {
-                                Text(MoveToMachineWords.moving)
-                            }
+                            // The sheet's note (#4737): it failed, or it is moving.
+                            SheetNote(tone: problem == nil ? .neutral : .failure,
+                                      text: problem ?? (moving ? MoveToMachineWords.moving : nil))
                         }
                     }
                 }

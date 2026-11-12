@@ -5648,6 +5648,10 @@ final class RemoteModel {
 
     func dismissProblem() { problem = nil }
 
+    /// A failure of something the person did, from a view that holds the call's answer (an
+    /// account not added, a device not forgotten): shown as the scene's failure toast (#4737).
+    func report(_ problem: String) { self.problem = problem }
+
 #if DEBUG
     /// Open a named folder, and optionally a named agent, straight after connecting.
     ///

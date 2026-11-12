@@ -75,8 +75,10 @@ struct PromptBar: View {
                     RaiseTheLimitOnTheMac()
                 }
             }
+            // A field note (#4737), shown only while there is one: a kept line would cost the
+            // phone's bar a line for ever.
             if let attachRefusal {
-                Text(attachRefusal).appText(.fine).tinted(.failure)
+                FieldNote(text: attachRefusal)
             }
             if draftLostSomething {
                 Text(PromptWords.draftLostSomething)

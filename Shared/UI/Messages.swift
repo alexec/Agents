@@ -144,19 +144,24 @@ extension View {
 /// on a line that is always kept, so it moves nothing when it comes or goes. No actions. Show
 /// a failure after Submit, not while the person types. VoiceOver reads it as the field's hint:
 /// put `.accessibilityHint(text ?? "")` on the field.
+///
+/// The kept line is one line; longer words (a phone is narrow) wrap to at most three.
 struct FieldNote: View {
     var tone: MessageTone = .failure
     let text: String?
 
     var body: some View {
         Label {
+            // A space when there are no words keeps the line.
             Text(text ?? " ")
+                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
         } icon: {
             MessageIcon(tone: tone)
         }
         .appText(.fine)
         .foregroundStyle(Paper.ink)
-        .lineLimit(1, reservesSpace: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .opacity(text == nil ? 0 : 1)
         .accessibilityHidden(text == nil)
     }
@@ -165,14 +170,18 @@ struct FieldNote: View {
 /// The note of a sheet's or a form's action: it failed, or it is in progress. Beside or above
 /// the sheet's buttons, in two lines that are always kept. It goes when the action starts
 /// again or the sheet closes.
+///
+/// `reservesSpace: false` is for a note that is shown only while it has words, where two
+/// kept lines would cost more than they save (the phone's start bar, #4739).
 struct SheetNote: View {
     var tone: MessageTone = .failure
     let text: String?
+    var reservesSpace = true
 
     var body: some View {
         Label {
             Text(text ?? " ")
-                .lineLimit(2, reservesSpace: true)
+                .lineLimit(reservesSpace ? 2 : 4, reservesSpace: reservesSpace)
                 .fixedSize(horizontal: false, vertical: true)
         } icon: {
             if tone == .neutral, text != nil {
