@@ -68,7 +68,8 @@ func (d *Daemon) releaseTimes(nodes []wire.LineageCostNode, repo string) map[str
 			}
 			seen[ref] = true
 			release := wire.LineageNode{Kind: lineage.KindRelease, Ref: ref}
-			if lineage.RepoOf(release) != repo {
+			// In the full form (#4800), so the old form of either still matches.
+			if lineage.RepoOf(release) != lineage.FullRepoText(repo) {
 				continue
 			}
 			for _, l := range d.lineage().Links(release).Links {

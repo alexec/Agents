@@ -33,6 +33,8 @@ export function secretUseWhere(use: RequestSecretUse): string {
   if (use.use === "ci") return `CI secret in ${use.place}`;
   if (use.use === "terminal") return `Terminal: ${use.place} · ${terminalCaveat}`;
   if (use.use === "account") return `Account: manage_accounts ${use.call ?? "get"}`;
+  if (use.use === "browser") return `Browser on ${use.place}`;
+  if (use.use === "screen") return use.app ? `Screen: ${use.app} on ${use.place}` : `Screen on ${use.place}`;
   return use.use === "mcp" ? `MCP server ${use.place}` : `Fill on ${use.place}`;
 }
 

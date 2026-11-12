@@ -58,6 +58,7 @@ const CapDropbox1 = "dropbox/1"
 const CapElicitations1 = "elicitations/1"
 const CapEventsAudit1 = "events.audit/1"
 const CapEventsBus1 = "events.bus/1"
+const CapEventsLeases1 = "events.leases/1"
 const CapEventsTeam1 = "events.team/1"
 const CapEvents1 = "events/1"
 const CapFeatures1 = "features/1"
@@ -82,6 +83,7 @@ const CapGroups1 = "groups/1"
 const CapHandover1 = "handover/1"
 const CapHostBrowserSettings1 = "host.browser-settings/1"
 const CapHostDesktopControl1 = "host.desktop-control/1"
+const CapHostDriveApproval1 = "host.drive-approval/1"
 const CapHostLock1 = "host.lock/1"
 const CapHostLock2 = "host.lock/2"
 const CapHostLock3 = "host.lock/3"
@@ -286,6 +288,8 @@ var HostCapabilities = pairs([][2]string{
 	{"browser/state", "host.browser-settings/1"},
 	{"browser/unwatch", "browser/1"},
 	{"browser/watch", "browser/1"},
+	{"browserControl/set", "host.drive-approval/1"},
+	{"browserControl/state", "host.drive-approval/1"},
 	{"capacity/state", "capacity/1"},
 	{"catalog/destination-state", "catalog/1"},
 	{"catalog/preview", "catalog/1"},
@@ -750,6 +754,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"bots/make", "bots/1"},
 	{"bots/setCaps", "bots/1"},
 	{"bots/stopRun", "bots/1"},
+	{"bus/lease", "events.leases/1"},
 	{"bus/log", "events.bus/1"},
 	{"bus/publish", "events.bus/1"},
 	{"bus/subscribe", "events.bus/1"},
@@ -1105,6 +1110,7 @@ var DeclaredCapabilities = map[string][]string{
 		"host.secret-grants/1",
 		"host.session-secrets/1",
 		"host.desktop-control/1",
+		"host.drive-approval/1",
 		"host.org-routes/2",
 		"host.user-settings/1",
 		"host.user-settings/2",

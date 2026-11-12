@@ -1262,6 +1262,13 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			return nil, err
 		}
 		return m.s.busPublish(ctx, host, publish, time.Now())
+	case wire.CallBusLease.Name:
+		// Producer leases (#4731): which machine polls each server's poll.
+		lease, err := require[wire.BusLease](params, "BusLease")
+		if err != nil {
+			return nil, err
+		}
+		return m.s.busLeaseCall(ctx, host, lease, time.Now())
 	case wire.CallBusSubscribe.Name:
 		sub, err := require[wire.BusSubscribe](params, "BusSubscribe")
 		if err != nil {

@@ -13,7 +13,9 @@ const width = 600;
 const height = 200;
 const axis = 56;
 
-export function TimeCharts({ history, runtimeName }: { history: TimeHistory | undefined; runtimeName: (id: string) => string }) {
+export function TimeCharts({ history, runtimeName, approvalWait }: {
+  history: TimeHistory | undefined; runtimeName: (id: string) => string; approvalWait?: string | null;
+}) {
   const range = useSignal<UsageRange>("W");
   const picked = useSignal<string | null>(null);
   if (!history) return <p class="quiet">Loading…</p>;
@@ -91,6 +93,7 @@ export function TimeCharts({ history, runtimeName }: { history: TimeHistory | un
           )}
         </>
       )}
+      {approvalWait && <p class="usage-share approval-wait">{approvalWait}</p>}
       <p class="quiet small">Chats run side by side, so an hour can hold more than an hour of chat time. Time between turns is not counted.</p>
     </section>
   );

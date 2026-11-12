@@ -29,7 +29,7 @@ import { dayTokenLimitReached, money } from "../model/limits";
 import { UsageCharts } from "./UsageCharts";
 import { mergeUsage } from "../model/usage";
 import { hostAnswers, hostNeedsUpdate } from "../model/capabilities";
-import { mergeTime } from "../model/time";
+import { approvalWaitWords, mergeTime } from "../model/time";
 import { velocityHere } from "../model/velocity";
 import { TimeCharts } from "./TimeCharts";
 import { VelocityCharts } from "./VelocityCharts";
@@ -685,7 +685,10 @@ function TimePage({ store }: { store: Store }) {
   const runtimeName = chartRuntimeName(store, hosts);
   if (!host) return <p class="quiet">No machine is connected.</p>;
   const history = store.time.value[host] ? mergeTime(hosts.flatMap((each) => store.time.value[each] ?? [])) : undefined;
-  return <TimeCharts history={history} runtimeName={runtimeName} />;
+  // How long PRs waited for the person (#4553): This Mac's, as Velocity is, not added up across hosts, which would
+  // count a PR two machines know twice.
+  const approvalWait = approvalWaitWords(store.time.value[host]?.approvalWait);
+  return <TimeCharts history={history} runtimeName={runtimeName} approvalWait={approvalWait} />;
 }
 
 /**

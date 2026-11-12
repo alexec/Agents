@@ -66,6 +66,8 @@ type eventBus struct {
 	mu sync.Mutex
 	// subs is each machine's subscriptions, as its last bus/subscribe sent them.
 	subs map[string][]wire.BusSubscription
+	// standby is the polls each machine stands by on (#4731), and when it last asked.
+	standby map[string]map[string]time.Time
 	// kept, dropped and delivered count since this copy started.
 	kept, dropped, delivered atomic.Int64
 }
@@ -91,6 +93,9 @@ func busLogKey(bus string, at time.Time, hash string) string {
 type busPeer struct {
 	Person string        `json:"person"`
 	Event  wire.BusEvent `json:"event"`
+	// PollOnly is a copy that was dropped: only the machines that stand by on its poll get
+	// it (#4731), as another poll may have made the copy that was kept.
+	PollOnly bool `json:"pollOnly,omitempty"`
 }
 
 // checkBusEvent says what is wrong with an envelope a machine sent, if anything.
@@ -108,6 +113,8 @@ func checkBusEvent(e wire.BusEvent) error {
 		return fmt.Errorf("the source, the producer or the time is too long")
 	case e.Subject != nil && e.Subject.Check() != nil:
 		return fmt.Errorf("the subject is not a ref: %v", e.Subject.Check())
+	case e.Poll != nil && checkBusPoll(*e.Poll) != nil:
+		return checkBusPoll(*e.Poll)
 	case len(e.Sealed) > busSealedMost:
 		return fmt.Errorf("at most %d sealed copies", busSealedMost)
 	}
@@ -164,6 +171,14 @@ func (s *Service) busPublish(ctx context.Context, host string, p wire.BusPublish
 			out.Dropped++
 			s.bus.dropped.Add(1)
 			s.metrics.Bus("dropped")
+			// The kept copy may have come from another poll: the machines that stand by on
+			// this one get it still (#4731). They drop one they have.
+			if e.Poll != nil {
+				s.busDeliverTo(person, host, e, true)
+				if s.mesh != nil {
+					s.mesh.broadcast(encodePeer("bus", busPeer{Person: person, Event: e, PollOnly: true}))
+				}
+			}
 			continue
 		}
 		out.Kept++
@@ -279,30 +294,49 @@ func busMatches(sub wire.BusSubscription, e wire.BusEvent) bool {
 }
 
 // busDeliver sends e to each machine of person held here whose subscriptions match it,
-// once, with the ones that do, but the machine that published it, which has it. A machine no longer held here loses its subscriptions: it
-// sends them again where it connects.
+// once, with the ones that do, or that stands by on the poll that made it (#4731), but the
+// machine that published it, which has it. A machine no longer held here loses its
+// subscriptions: it sends them again where it connects.
 func (s *Service) busDeliver(person, publisher string, e wire.BusEvent) {
+	s.busDeliverTo(person, publisher, e, false)
+}
+
+// busDeliverTo is busDeliver; pollOnly sends e only to the machines that stand by on its
+// poll.
+func (s *Service) busDeliverTo(person, publisher string, e wire.BusEvent, pollOnly bool) {
 	type delivery struct {
 		host string
 		subs []string
 	}
 	var out []delivery
+	now := time.Now()
 	s.bus.mu.Lock()
-	for host, subs := range s.bus.subs {
+	hosts := map[string]bool{}
+	for host := range s.bus.subs {
+		hosts[host] = true
+	}
+	for host := range s.bus.standby {
+		hosts[host] = true
+	}
+	for host := range hosts {
 		if !s.router.Holds(host) {
 			delete(s.bus.subs, host)
+			delete(s.bus.standby, host)
 			continue
 		}
 		if host == publisher || s.ownerOf(host) != person {
 			continue
 		}
-		var matched []string
-		for _, sub := range subs {
-			if busMatches(sub, e) {
-				matched = append(matched, sub.ID)
+		matched := []string{}
+		if !pollOnly {
+			for _, sub := range s.bus.subs[host] {
+				if busMatches(sub, e) {
+					matched = append(matched, sub.ID)
+				}
 			}
 		}
-		if len(matched) > 0 {
+		standing := e.Poll != nil && s.bus.standsBy(host, *e.Poll, now)
+		if len(matched) > 0 || standing {
 			out = append(out, delivery{host, matched})
 		}
 	}
@@ -321,7 +355,7 @@ func (s *Service) busFromPeer(raw json.RawMessage) {
 	if json.Unmarshal(raw, &p) != nil || p.Person == "" || checkBusEvent(p.Event) != nil {
 		return
 	}
-	s.busDeliver(p.Person, "", p.Event)
+	s.busDeliverTo(p.Person, "", p.Event, p.PollOnly)
 }
 
 // sweepBus keeps the newest kept envelopes of each bus, and deletes at most most

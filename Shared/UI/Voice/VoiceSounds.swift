@@ -67,7 +67,15 @@ enum VoiceSound: CaseIterable {
     /// (a prompt said over the voice, #3565), the sound it has at first.
     func play() {
         #if os(macOS)
-        Self.play(saysLetMeThink ? soundAtFirst : VoiceSettings.soundName(self), volume: volume)
+        let name = saysLetMeThink ? soundAtFirst : VoiceSettings.soundName(self)
+        #if DEBUG
+        // A walk's tape takes the sound's name in place of the sound (#4854).
+        if let tape = VoiceTape.current {
+            if !name.isEmpty { tape.sound(name, volume: volume) }
+            return
+        }
+        #endif
+        Self.play(name, volume: volume)
         #else
         // begin recording, a quiet tock, sent, the key tock, the error, end recording.
         let id: SystemSoundID = switch self {
@@ -79,6 +87,12 @@ enum VoiceSound: CaseIterable {
         case .problem: 1073
         case .ended: 1114
         }
+        #if DEBUG
+        if let tape = VoiceTape.current {
+            tape.sound(Int(id), volume: 1)
+            return
+        }
+        #endif
         AudioServicesPlaySystemSound(id)
         #endif
     }

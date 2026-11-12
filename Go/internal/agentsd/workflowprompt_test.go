@@ -34,10 +34,10 @@ func TestEveryRunSaysWhyItStarted(t *testing.T) {
 		want string
 	}{
 		{"an event", fireRequest{causingEvent: &lease.Position},
-			`because of the event lease.granted: x was given build. Its details are resource: build.)`},
+			`because of the event lease.granted: x was given build. Its details are resource: build.)` + "\n\n" + hintWords(lease)},
 		{"the agent behind an event", fireRequest{triggeringAgent: &a.ID, causingEvent: &finished.Position},
 			`because “Fix the build” has just finished its work. The event was agent.finished: Fix the build finished. Its details are agent: ` +
-				string(a.ID) + `; outcome: done.)`},
+				string(a.ID) + `; outcome: done.)` + "\n\n" + hintWords(finished)},
 		{"a schedule", fireRequest{trigger: schedule, dueAt: &due}, `because of its schedule: the 09:00 run.)`},
 		{"Run now", fireRequest{byHand: true, trigger: byHandTrigger()}, `because the person ran it by hand, with Run now.)`},
 		{"an agent's run", fireRequest{byHand: true, byAgent: &a.ID, trigger: byHandTrigger()},

@@ -136,6 +136,7 @@ recording starts, and `run(v)` is the recording. `v` is the `Video` in `make.py`
 | `v.open_site(url)`, `v.open_web_tab()` | an integration's site in the video Chrome, and the scratch web page in a tab beside it |
 | `v.secret(name, value, refused)` | a token the scene made: looked for in every frame, and `refused()` must be true after `revoke(v)` |
 | `v.hide_in_window(label)`, `v.web("secret", selector=…/pattern=…)` | places that show a secret, hidden in every frame |
+| `v.tape()` | voice mode's speech and sounds go on a tape from here, mixed under the frames (below) |
 
 An integration scene also has `INTEGRATION`, `CHROME_PROFILE`, `BROWSER_ADDRESS` (the address
 drawn in the browser's bar) and `revoke(v)`, which runs after every take.
@@ -143,7 +144,25 @@ drawn in the browser's bar) and `revoke(v)`, which runs after every take.
 Sheets and popovers are in the picture, where they sit on the window. The menu bar, a
 menu and anything outside the window are not.
 
-## What it needs
+## Voice mode's sound (#4854)
+
+A walk plays nothing out loud, so a voice-mode scene calls `v.tape()`: the walk's
+`{"cmd": "voice", "tape": "<work>/voice"}` (`VoiceTape`, Debug builds only). From then on voice
+mode writes what it would play to that folder, in place of the speaker: each sentence's
+samples to `speech.wav` (24 kHz mono) at the time it would play, and a mark in `marks.json`
+for each sentence (`said`, `seconds`) and each sound (`sound`, `volume`), timed from the tape's
+`start` on the same clock as the frames. The voice still waits as long as each sentence would
+play, so what is said, the phases and the strip move as in a real run. The take ends the tape
+(`"tape": ""`), and `frame.compose` puts each sentence and each sound
+(`/System/Library/Sounds/<name>.aiff`, at its volume) at its place, with the narration, if any.
+The sentences are in the captions and in Whisper's check. No speaker, no audio device and no
+permission, and the screen may be locked.
+
+`scenes/voice-tape.py` is the take that proves it, not a docs video: voice mode on, a prompt
+heard, the reply spoken, voice mode off. A Remote's marks name SystemSoundIDs, which have no
+file on the Mac: they are left out, with a warning.
+
+
 
 - `ffmpeg` (Homebrew), `uv`, Node and Chrome. The first run makes
   `~/.cache/agents-video/venv` with Chatterbox and mlx-whisper.

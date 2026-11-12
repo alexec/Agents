@@ -670,6 +670,7 @@ type prEventPayload struct {
 		URL    string   `json:"url"`
 		Fixes  []string `json:"fixes"`
 	} `json:"pr"`
+	OpenedAt string `json:"openedAt"`
 }
 
 // lineagePRStarted links the session a workflow run started works-on the PR the event that
@@ -696,8 +697,9 @@ func (d *Daemon) lineagePRStarted(e wire.Event, session wire.UUID) {
 }
 
 // lineageEvent makes the links a raised event says: pr.opened, pr.merged and pr.closed,
-// the CI runs of checks.* and run.completed (lineageci.go), and the health signals of
-// health.* (lineagehealth.go).
+// the CI runs of checks.* and run.completed (lineageci.go), the health signals of
+// health.* (lineagehealth.go), and the approval wait of pr.labelled, pr.reviewed and
+// pr.commented (lineageapproval.go).
 func (d *Daemon) lineageEvent(e wire.Event) {
 	switch e.Name {
 	case "checks.failed", "checks.passed", "run.completed":
@@ -707,6 +709,9 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 		return
 	case "health.incident_started":
 		d.lineageIncidentEvent(e)
+		return
+	case "pr.labelled", "pr.reviewed", "pr.commented":
+		d.lineageApprovalEvent(e)
 		return
 	}
 	switch e.Name {
@@ -775,6 +780,10 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 			for _, id := range boardsKeys(p.PR.Branch) {
 				d.link(pr, boardsNode(boards[0], id), lineage.RelFixes, lineage.SourceBranch)
 			}
+		}
+		// The approval wait's start when its label is unknown (#4553).
+		if at, ok := payloadTime(p.OpenedAt); ok && e.Name == "pr.opened" {
+			d.notePROpened(pr, at)
 		}
 		// How it ended, for its cost (#2350).
 		d.notePROutcome(pr, e.Name, p.PR.Title)

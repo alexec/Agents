@@ -109,7 +109,7 @@ func TestLineageFiguresOfARepo(t *testing.T) {
 		return d.costLedgerLocked().Nodes[costKey(repo.pr(n))]
 	}
 	waitFor(t, "the merged PRs' files", func() bool { return len(node(40).Files) == 2 && len(node(41).Files) == 1 })
-	if r := node(41).Reverts; r == nil || *r != "github:alexec/agents#40" {
+	if r := node(41).Reverts; r == nil || *r != repo.pr(40).Ref {
 		t.Fatalf("reverts %v", r)
 	}
 	d.lineageDo(func() {
@@ -118,7 +118,7 @@ func TestLineageFiguresOfARepo(t *testing.T) {
 	d.lineageSettle(2 * time.Second)
 
 	var got wire.LineageFigures
-	of := wire.LineageNode{Kind: lineage.KindRepo, Ref: "github:alexec/agents"}
+	of := lineage.RepoNode(wire.Ref{Provider: "github", Topic: "alexec/agents"})
 	if err := json.Unmarshal(c.call(t, 1, "lineage/figures", wire.LineageNodeRequest{Node: of}), &got); err != nil {
 		t.Fatal(err)
 	}

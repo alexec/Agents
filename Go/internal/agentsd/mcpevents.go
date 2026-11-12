@@ -197,6 +197,8 @@ type mcpEventsBook struct {
 	// mcpSleep is how a poll waits: false when it was stopped first. A test hands in a
 	// quicker one.
 	mcpSleep func(ctx context.Context, d time.Duration) bool
+	// mcpLeases is which polls this machine holds, and stands by on (#4731).
+	mcpLeases mcpLeaseBook
 }
 
 func (d *Daemon) mcpEventsPath() string { return filepath.Join(d.Store.Loc.Root, "mcp-events.json") }
@@ -256,6 +258,8 @@ func (d *Daemon) mcpEventsClock(ctx context.Context) {
 
 // kickMCPEvents asks for a look soon: a workflow file moved.
 func (d *Daemon) kickMCPEvents() {
+	// A wait or a trigger on the bus may have come or gone (#4730).
+	d.busSubscribeSoon()
 	d.mcpEvMu.Lock()
 	kick := d.mcpKick
 	d.mcpEvMu.Unlock()
@@ -285,6 +289,11 @@ func (d *Daemon) stopMCPEvents() {
 	}
 	d.mcpEvStarted = false
 	d.mcpEvStop()
+	d.mcpEvMu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	d.releaseProducerLeases(ctx)
+	cancel()
+	d.mcpEvMu.Lock()
 	for _, cancel := range d.mcpCancels {
 		cancel()
 	}
@@ -890,6 +899,7 @@ func (d *Daemon) applyMCPSubscriptionsLocked(ctx context.Context, wanted map[str
 		delete(d.mcpCancels, id)
 		delete(d.mcpLives, id)
 		delete(d.mcpTold, id)
+		d.mcpLetGo(id)
 		log.Printf("mcp events: %s %s unsubscribed (key %s)", gone.server, gone.event, gone.key)
 	}
 	ids := make([]string, 0, len(wanted))
@@ -961,6 +971,21 @@ func (d *Daemon) runMCPSubscription(ctx context.Context, id string) {
 			return
 		}
 		wait := mcpPollDefault
+		if !d.mcpMayPoll(ctx, s) {
+			// Another machine polls it; the bus brings what it finds (#4731). Its cursor goes,
+			// so a poll here, when the lease comes back, starts from now: no backfill (#4726).
+			d.mcpEvMu.Lock()
+			if r := d.mcpRecordsLocked().Subscriptions[id]; r != nil && r.Cursor != nil {
+				r.Cursor, r.PreviousCursor = nil, nil
+				d.mcpUnsaved = true
+			}
+			d.mcpEvMu.Unlock()
+			d.setMCPLive(id, mcpLive{state: wire.MCPTriggerStatusStateActive})
+			if !d.mcpSleep(ctx, mcpStandbyPace) {
+				return
+			}
+			continue
+		}
 		var failed *mcpEventsError
 		for pages := 0; pages < mcpPageLimit; pages++ {
 			d.mcpEvMu.Lock()
@@ -1039,7 +1064,7 @@ func (d *Daemon) runMCPSubscription(ctx context.Context, id string) {
 			d.saveMCPRecordsIfDueLocked()
 		}
 		d.mcpEvMu.Unlock()
-		if !d.mcpSleep(ctx, wait) {
+		if !d.mcpWaitHolding(ctx, id, wait) {
 			return
 		}
 	}
@@ -1104,6 +1129,7 @@ func (d *Daemon) stopMCP(id string, s *mcpSubscription, code wire.MCPTriggerFail
 		stoppedWaits: append([]wire.UUID(nil), s.waitIDs...),
 		failure:      &wire.MCPTriggerFailure{Code: code, Message: message, Since: now()}})
 	log.Printf("mcp events: %s %s stopped (%s)", s.server, s.event, code)
+	d.mcpLetGo(id)
 	d.endWaitsOnStoppedServers(s)
 }
 
