@@ -33,7 +33,7 @@ fi
 [[ -d $folder ]] || { print -u2 "pr-clip: $folder is not a folder"; exit 2; }
 
 audio=$(ffprobe -v error -select_streams a -show_entries stream=codec_type -of csv=p=0 "$in")
-[[ -n $audio ]] || { print -u2 "pr-clip: $in has no sound track; a silent clip is #4094's"; exit 2; }
+[[ -n $audio ]] || { print -u2 "pr-clip: $in has no sound track; a silent clip is scripts/video/clip.sh's (#4094)"; exit 2; }
 seconds=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$in")
 if (( seconds > 30 )); then
   print -u2 "pr-clip: $in is ${seconds%.*} s long; the clip keeps the first 30 s"
