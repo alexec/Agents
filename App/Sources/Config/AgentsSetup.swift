@@ -234,7 +234,7 @@ private struct SetupSkillRow: View {
             if skill.managed != nil { SharedChip(text: "skills.sh", tone: .source) }
             if hasUpdate { SharedChip(text: "update", tone: .attention) }
             Text(failure ?? detail).appText(.supporting)
-                .foregroundStyle(failure == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(SharedInk.attention))
+                .foregroundStyle(failure == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(SharedInk.warning))
                 .lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8)
             if skill.managed != nil {

@@ -56,7 +56,7 @@ extension WorkflowSummary {
         }
         if let limit = overLimit {
             lines.append(WorkflowStatusLine(symbol: "exclamationmark.triangle", text: "Over the limit: \(limit.sentence(total: limitTotal))",
-                                            detail: limit.remedy, tint: .attention))
+                                            detail: limit.remedy, tint: .warning))
         }
         if isRunning {
             var agentID: UUID?
@@ -223,7 +223,7 @@ extension MCPTriggerStatus {
             } else {
                 body = (failure?.message ?? "Can't reach \(who)") + again
             }
-            tint = .attention
+            tint = .warning
         case .stopped:
             body = failure?.message ?? "Stopped"
             tint = .failure

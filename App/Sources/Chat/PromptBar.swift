@@ -306,7 +306,7 @@ struct PromptBar: View {
            let sentence = model.runtimeAllowances?.startingOnOut(runtimeID) {
             Text(sentence)
                 .appText(.fine)
-                .foregroundStyle(StateTint.attention.style(or: .primary))
+                .foregroundStyle(StateTint.warning.style(or: .primary))
         }
     }
 
@@ -1118,7 +1118,7 @@ struct PromptBar: View {
             .controlSize(.small)
         }
         .padding(10)
-        .background(StateTint.attention.color?.opacity(0.07) ?? .clear, in: RoundedRectangle(cornerRadius: 8))
+        .background(StateTint.warning.color?.opacity(0.07) ?? .clear, in: RoundedRectangle(cornerRadius: 8))
     }
 
     /// The command sandbox, beside the mode it is so often mistaken for (064, FR-004).
@@ -1253,7 +1253,7 @@ struct PromptBar: View {
             }
         }
         .padding(10)
-        .background(StateTint.attention.color?.opacity(0.07) ?? .clear, in: RoundedRectangle(cornerRadius: 8))
+        .background(StateTint.warning.color?.opacity(0.07) ?? .clear, in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var labelDraft: some View {

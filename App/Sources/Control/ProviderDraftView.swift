@@ -116,13 +116,13 @@ struct ProviderDraftStatus: View {
             if let line = listLine(update) {
                 Text(line + (changed ? " (before your change)" : ""))
                     .appText(.supporting)
-                    .tinted(update.check?.passed == true ? .none : .attention)
+                    .tinted(update.check?.passed == true ? .none : .warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let ssh = sshLine(update) {
                 Text(ssh.text)
                     .appText(.supporting)
-                    .tinted(ssh.warning ? .attention : .none)
+                    .tinted(ssh.warning ? .warning : .none)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !changed {

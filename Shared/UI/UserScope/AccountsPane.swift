@@ -127,10 +127,10 @@ struct AccountsPane: View {
                 Label(AskBeforeUseWords.asks, systemImage: "hand.raised").appText(.fine).foregroundStyle(.secondary)
             }
             if let soon = AccountsWords.expiresSoon(account, now: Date()) {
-                Text(soon).appText(.fine).tinted(.attention)
+                Text(soon).appText(.fine).tinted(.warning)
             }
             if !oneMachine, let warning = AccountsWords.notBackedUp(account, rows: secrets, names: machineNames) {
-                Text("⚠ " + warning).appText(.fine).tinted(.attention)
+                Text("⚠ " + warning).appText(.fine).tinted(.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

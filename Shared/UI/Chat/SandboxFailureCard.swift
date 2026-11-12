@@ -50,8 +50,8 @@ struct SandboxFailureCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(StateTint.attention.color?.opacity(isWaiting ? 0.07 : 0.03) ?? .clear, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder((StateTint.attention.color ?? .secondary).opacity(0.25)))
+        .background(StateTint.warning.color?.opacity(isWaiting ? 0.07 : 0.03) ?? .clear, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder((StateTint.warning.color ?? .secondary).opacity(0.25)))
     }
 
     private var answers: some View {

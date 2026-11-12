@@ -41,7 +41,7 @@ struct SecretsPane<Extra: View>: View {
             }
             if let left = state.left {
                 Section {
-                    Text(UserScopeWords.secretsLeft(left)).appText(.supporting).tinted(.attention)
+                    Text(UserScopeWords.secretsLeft(left)).appText(.supporting).tinted(.warning)
                         .fixedSize(horizontal: false, vertical: true)
                     Button("OK") { state.left = nil }
                 }
@@ -134,11 +134,11 @@ struct SecretsPane<Extra: View>: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if let left = UserScopeWords.leftOn(row) {
-                        Text(left).appText(.fine).tinted(.attention)
+                        Text(left).appText(.fine).tinted(.warning)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if !oneMachine, let warning = SecretInfoWords.notBackedUp(row, names: machineNames) {
-                        Text("⚠ " + warning).appText(.fine).tinted(.attention)
+                        Text("⚠ " + warning).appText(.fine).tinted(.warning)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }

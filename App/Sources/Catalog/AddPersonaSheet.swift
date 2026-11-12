@@ -26,7 +26,7 @@ struct MarketplacePersonasSection: View {
                 Button("Add persona…") { adding = true }.buttonStyle(.paper)
             }
             ForEach(personas) { persona in row(persona) }
-            if let failure { Text(failure).appText(.fine).foregroundStyle(SharedInk.attention) }
+            if let failure { Text(failure).appText(.fine).foregroundStyle(SharedInk.warning) }
         }
         .task(id: place) { await load() }
         .sheet(isPresented: $adding) {
@@ -527,6 +527,6 @@ private struct PersonaNote: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background((attention ? SharedInk.attention : SharedInk.reach).opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+            .background((attention ? SharedInk.warning : SharedInk.reach).opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
     }
 }

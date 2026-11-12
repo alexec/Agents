@@ -24,8 +24,10 @@
   /* The app icon's cobalt: links, focus, controls and the prominent button's fill. */
   --accent: #1f5fc8;
   accent-color: var(--accent);
-  /* Needs you; the only tint drawn in a list. */
-  --tint-attention: #ba4a13;
+  /* Needs you: a question, a request, a wait only the person can settle; the only tint drawn in a list. Yellow, never the warning's orange (#5016). */
+  --tint-attention: #856a00;
+  /* A warning: something is wrong or nearly so, and a person should know. Not a request (#5016). */
+  --tint-warning: #ba4a13;
   /* Failed. */
   --tint-failure: #b4232b;
   /* Approved, done: an ending the app can vouch for. */
@@ -112,7 +114,8 @@
     --paper-selection: #3a3e44;
     --paper-shadow: rgb(0 0 0 / 10%);
     --accent: #7fb0ff;
-    --tint-attention: #f0a06b;
+    --tint-attention: #e6c04f;
+    --tint-warning: #f0a06b;
     --tint-failure: #f08086;
     --tint-vouched: #8bc6a7;
     --label-issue: #6cc6db;

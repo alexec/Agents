@@ -29,7 +29,7 @@ struct ConnectorToolsList: View {
                 ProgressView().controlSize(.small)
             }
             if let failure {
-                Text(failure).appText(.fine).foregroundStyle(SharedInk.attention)
+                Text(failure).appText(.fine).foregroundStyle(SharedInk.warning)
             }
         }
         .padding(.top, 4)

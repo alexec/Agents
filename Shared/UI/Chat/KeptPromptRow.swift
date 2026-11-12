@@ -30,7 +30,7 @@ struct KeptPromptRow: View {
             HStack(spacing: 12) {
                 Text(line)
                     .appText(.supporting)
-                    .foregroundStyle((kept.failed == nil ? StateTint.none : .attention).style(or: .secondary))
+                    .foregroundStyle((kept.failed == nil ? StateTint.none : .warning).style(or: .secondary))
                 if kept.failed != nil {
                     Button("Try Again") { Task { await actions.retryKept(kept) } }
                         .buttonStyle(.borderless)

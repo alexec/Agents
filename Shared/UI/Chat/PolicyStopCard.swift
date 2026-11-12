@@ -20,7 +20,7 @@ struct PolicyStopCard: View {
         VStack(alignment: .leading, spacing: 8) {
             Label(PolicyLayersWords.stopTitle, systemImage: PolicyLayersWords.stopSymbol)
                 .appText(.reading).fontWeight(.semibold)
-                .tinted(.attention)
+                .tinted(.warning)
             if let rule = refusal.rule {
                 Text(PolicyLayersWords.ruleTitle(rule)).appText(.reading)
             }
@@ -59,8 +59,8 @@ struct PolicyStopCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(StateTint.attention.color?.opacity(0.05) ?? .clear, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder((StateTint.attention.color ?? .secondary).opacity(0.25)))
+        .background(StateTint.warning.color?.opacity(0.05) ?? .clear, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder((StateTint.warning.color ?? .secondary).opacity(0.25)))
         .accessibilityElement(children: .contain)
     }
 

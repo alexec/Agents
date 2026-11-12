@@ -23,7 +23,7 @@ struct FolderMCPSection: View {
             .padding(.bottom, 4)
         if let problem {
             Text(problem)
-                .appText(.supporting).foregroundStyle(SharedInk.attention)
+                .appText(.supporting).foregroundStyle(SharedInk.warning)
                 .padding(.horizontal, 16).padding(.vertical, 13)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .paperRow()
@@ -35,10 +35,10 @@ struct FolderMCPSection: View {
                 .paperRow()
         } else {
             if let approvalsProblem {
-                Text(approvalsProblem).appText(.fine).foregroundStyle(SharedInk.attention)
+                Text(approvalsProblem).appText(.fine).foregroundStyle(SharedInk.warning)
             }
             if let failure {
-                Text(failure).appText(.fine).foregroundStyle(SharedInk.attention)
+                Text(failure).appText(.fine).foregroundStyle(SharedInk.warning)
             }
             ForEach(servers) { server in
                 FolderMCPRow(server: server, servers: servers, place: place, file: file,

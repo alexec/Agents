@@ -279,7 +279,7 @@ private struct ProblemsList: View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(systemName: symbol(problem.severity))
                 .foregroundStyle((problem.severity == "error" ? StateTint.failure
-                    : problem.severity == "warning" ? .attention : .none).style(or: .secondary))
+                    : problem.severity == "warning" ? .warning : .none).style(or: .secondary))
                 .accessibilityLabel(problem.severity)
             Text("\(problem.line):\(problem.column)")
                 .appText(.fine)

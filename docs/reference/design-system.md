@@ -56,7 +56,8 @@ Mac window and the iPhone and iPad app hold the same value.
 | selection | `--paper-selection` | `paperSelection` | `#d8dee6` | `#3a3e44` | A selection. Nothing is drawn in the accent on it. |
 | shadow | `--paper-shadow` | `Paper.shadow` | `#20242a` at 10% | `#000000` at 10% | Under a raised thing: short and neutral, paper lifted a little off the desk. |
 | accent | `--accent` | `AccentColor.colorset` | `#1f5fc8` | `#7fb0ff` | The app icon's cobalt: links, focus, controls and the prominent button's fill. |
-| tint.attention | `--tint-attention` | `StateTint.orange` | `#ba4a13` | `#f0a06b` | Needs you; the only tint drawn in a list. |
+| tint.attention | `--tint-attention` | `StateTint.yellow` | `#856a00` | `#e6c04f` | Needs you: a question, a request, a wait only the person can settle; the only tint drawn in a list. Yellow, never the warning's orange (#5016). |
+| tint.warning | `--tint-warning` | `StateTint.orange` | `#ba4a13` | `#f0a06b` | A warning: something is wrong or nearly so, and a person should know. Not a request (#5016). |
 | tint.failure | `--tint-failure` | `StateTint.red` | `#b4232b` | `#f08086` | Failed. |
 | tint.vouched | `--tint-vouched` | `StateTint.green` | `#2d765c` | `#8bc6a7` | Approved, done: an ending the app can vouch for. |
 | label.issue | `--label-issue` | `Paper.issue` | `#0e6b82` | `#6cc6db` | A label naming an issue, #12. |

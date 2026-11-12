@@ -86,10 +86,12 @@ struct WaitCard: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background((personLine == nil ? nil : StateTint.attention.color?.opacity(0.07)) ?? .clear,
-                    in: RoundedRectangle(cornerRadius: 10))
+        // A wait for the person is a request, not a warning (#5016): the card's own paper,
+        // and a yellow edge.
+        .background(personLine == nil ? Color.clear : Paper.raised, in: RoundedRectangle(cornerRadius: 10))
         .overlay(RoundedRectangle(cornerRadius: 10)
-            .strokeBorder(((personLine == nil ? nil : StateTint.attention.color) ?? .secondary).opacity(0.25)))
+            .strokeBorder(personLine == nil ? Color.secondary.opacity(0.25)
+                          : (StateTint.attention.color ?? .secondary).opacity(0.6)))
         .accessibilityElement(children: .contain)
     }
 

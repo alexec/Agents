@@ -15,14 +15,21 @@ import SwiftUI
 /// reported `done` itself (its FR-012), on the grounds that a self-reported completion
 /// is the one ending the app can vouch for. Narrowing the palette would have thrown
 /// that away, so the rule is three colours with one meaning each.
+///
+/// Four since #5016: a person is needed (yellow) and a warning (orange) were one orange,
+/// so a card that asked for something read as a warning. Each still has one meaning.
 enum StateTint {
     /// A person is needed: a question asked mid-turn, or an outcome that says the
     /// agent cannot get further alone.
     ///
-    /// Orange, and deliberately not `Color.accentColor`. The accent is what every
-    /// ordinary control is drawn in, and a reader whose accent is set to orange must
-    /// still be able to tell a waiting agent from a button (FR-005).
+    /// Yellow, and deliberately not `Color.accentColor`. The accent is what every
+    /// ordinary control is drawn in, and a reader whose accent is set to yellow must
+    /// still be able to tell a waiting agent from a button (FR-005). Not orange either:
+    /// orange is a warning, and a request is not a warning (#5016).
     case attention
+    /// Something is wrong, or nearly so, and a person should know: a failure line on a
+    /// form, an allowance nearly spent, a sandbox that would not start. Orange (#5016).
+    case warning
     /// Broken, and not actionable from this screen: a folder gone, a limit reached, a
     /// runtime that needs signing in, a call that failed.
     case failure
@@ -39,15 +46,17 @@ enum StateTint {
     /// the surface had is not this type's to take away.
     var color: Color? {
         switch self {
-        case .attention: return Self.orange
+        case .attention: return Self.yellow
+        case .warning: return Self.orange
         case .failure: return Self.red
         case .vouched: return Self.green
         case .none: return nil
         }
     }
 
-    /// Orange, red and green mixed for cool paper rather than taken from the system.
-    /// Each clears 4.5:1 against the ground and the well in both appearances.
+    /// Yellow, orange, red and green mixed for cool paper rather than taken from the
+    /// system. Each clears 4.5:1 against the ground and the well in both appearances.
+    private static let yellow = Color(light: 0x856A00, dark: 0xE6C04F)
     private static let orange = Color(light: 0xBA4A13, dark: 0xF0A06B)
     private static let red = Color(light: 0xB4232B, dark: 0xF08086)
     private static let green = Color(light: 0x2D765C, dark: 0x8BC6A7)
@@ -87,7 +96,7 @@ extension View {
 /// What happened to a file, as its icon in Files and Changes draws it (#63): a square
 /// whose glyph says the status, in the system colour GitHub's tree taught people to read.
 ///
-/// Apart from `StateTint` on purpose. Those three say whether an agent needs a person;
+/// Apart from `StateTint` on purpose. Those four say whether an agent needs a person;
 /// these five say what happened to a file, and Alex approved the system's own colours for
 /// them (specs/072-changes-tree/look), so dark mode and Increase Contrast each get theirs.
 /// The glyph and the words always go with the colour; it never carries the status alone.

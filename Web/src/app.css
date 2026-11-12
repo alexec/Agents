@@ -531,12 +531,13 @@ button.link.reading:hover { text-decoration: underline; }
 .turn-changes .turn-files li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .turn-changes .undo { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 /* A change to a folder's own files, asked over the prompt or on the folder's page (#531). */
-.guarded-change { border-color: color-mix(in srgb, var(--tint-attention) 25%, transparent); }
+/* A request, not a warning (#5016): the card's own paper, and a yellow edge. */
+.card.guarded-change { border-color: color-mix(in srgb, var(--tint-attention) 60%, transparent); }
 .guarded-change p { margin: 0; }
 .guarded-change .strong { color: var(--tint-attention); }
 .guarded-change .guarded-answers { display: flex; justify-content: flex-end; gap: 10px; }
 /* An agent's ask to be archived, at the end of the chat as a permission is (#827). */
-.archive-card { border-color: color-mix(in srgb, var(--tint-attention) 25%, transparent); }
+.card.archive-card { border-color: color-mix(in srgb, var(--tint-attention) 60%, transparent); }
 .archive-card p { margin: 0; }
 .archive-card .strong { color: var(--tint-attention); }
 .archive-card .archive-answers { display: flex; justify-content: flex-end; gap: 10px; }
@@ -570,17 +571,15 @@ a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underli
 .wait-card-progress { height: 3px; overflow: hidden; border-radius: 99px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .wait-card-progress span { display: block; height: 100%; background: var(--accent); transition: width .15s linear; }
 .wait-card .wait-answers { display: flex; justify-content: flex-end; gap: 10px; }
-/* A wait only the person can settle (#3147): tinted as a question is, its session under Needs you. */
-.wait-card.for-person {
-  border-color: color-mix(in srgb, var(--tint-attention) 25%, transparent);
-  background: color-mix(in srgb, var(--tint-attention) 7%, transparent);
-}
+/* A wait only the person can settle (#3147): its session under Needs you. A request, not a
+   warning (#5016): the card's own paper, and a yellow edge. */
+.wait-card.for-person { border-color: color-mix(in srgb, var(--tint-attention) 60%, transparent); }
 .wait-card-mark { font-weight: 700; }
 .note.switch {
   padding: 10px 12px;
   border-radius: var(--radius-card);
-  border: 1px solid color-mix(in srgb, var(--tint-attention) 25%, transparent);
-  background: color-mix(in srgb, var(--tint-attention) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--tint-warning) 25%, transparent);
+  background: color-mix(in srgb, var(--tint-warning) 7%, transparent);
 }
 .report .heading { font-weight: 500; margin: 0; opacity: 0.8; }
 .report .heading.tinted { opacity: 1; }
@@ -883,7 +882,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 /* This Mac's host down, in the folders column (#83): said whole, never cut off. */
 .host-down { padding: 6px 8px 8px; }
 .host-down p { margin: 0 0 3px; }
-.host-down .strong { color: var(--tint-attention); font-size: 0.78125rem; }
+.host-down .strong { color: var(--tint-warning); font-size: 0.78125rem; }
 
 /* Shown only at some widths. */
 .narrow-only, .medium-only { display: none; }
@@ -926,7 +925,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .menus .spacer { flex: 1; }
 /* A new session's sandbox would not start (064, #257): what it said, and the way on. */
 .sandbox-refusal { display: flex; align-items: center; gap: 10px; padding: 10px; margin-bottom: 6px; border-radius: 8px;
-  background: color-mix(in srgb, var(--tint-attention) 7%, transparent); }
+  background: color-mix(in srgb, var(--tint-warning) 7%, transparent); }
 .sandbox-refusal > div { flex: 1; min-width: 0; }
 .sandbox-refusal p { margin: 0; }
 .menus-right { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
@@ -1190,7 +1189,7 @@ dialog.image-viewer::backdrop { background: color-mix(in srgb, var(--paper-scrim
 .passage { padding: 2px 8px; margin: 0 -8px 10px; border-radius: var(--radius-control); transition: background 0.15s; }
 .passage[role=button] { cursor: text; }
 .passage[role=button]:hover { background: var(--paper-wash); }
-.passage.marked { background: color-mix(in srgb, var(--tint-attention) 10%, transparent); }
+.passage.marked { background: color-mix(in srgb, var(--tint-warning) 10%, transparent); }
 /* The agent's caret (#1236): after the last thing typed, in the passage the caret is in. */
 .passage.typing .markdown:empty::after,
 .passage.typing .markdown > :last-child:not(ul, ol, pre, blockquote, table)::after,
@@ -1283,7 +1282,7 @@ dialog.image-viewer::backdrop { background: color-mix(in srgb, var(--paper-scrim
 .sub-app .settings-body .hint.attention { color: var(--tint-attention); }
 /* A secret's last 4 and its not-backed-up line (#4159). */
 .secret-hint { margin-inline-start: 6px; }
-.secret-warning { color: var(--tint-attention); }
+.secret-warning { color: var(--tint-warning); }
 .sub-app .settings-body .join-command { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .sub-app .settings-body .join-command-line { display: flex; align-items: flex-start; gap: 6px; }
 .sub-app .settings-body .join-command .code-text { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.6875rem;
@@ -1370,7 +1369,7 @@ dialog.image-viewer::backdrop { background: color-mix(in srgb, var(--paper-scrim
 .overview-links { display: flex; gap: 14px; }
 .overview-figure { font-weight: 700; }
 .overview-rows .link, .overview-links .link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-align: left; }
-.overview .attention { color: var(--tint-attention); }
+.overview .attention { color: var(--tint-warning); }
 /* Agents' filters and its pages at the sidebar's foot (#2141). */
 .agent-filters { display: flex; gap: 6px; padding: 4px 10px 2px; }
 .agent-filters select { flex: 1; min-width: 0; font: inherit; font-size: 0.75rem; color: inherit; background: var(--paper-raised);
@@ -1490,7 +1489,7 @@ dialog.image-viewer::backdrop { background: color-mix(in srgb, var(--paper-scrim
 .counts { font-size: 0.71875rem; font-variant-numeric: tabular-nums; opacity: 0.7; white-space: nowrap; }
 .change-mark { display: inline-block; width: 14px; text-align: center; font-weight: 600; }
 .state-added { color: var(--tint-vouched); }
-.state-modified, .state-binary { color: var(--tint-attention); }
+.state-modified, .state-binary { color: var(--tint-warning); }
 .state-deleted { color: var(--tint-failure); }
 .state-renamed { color: var(--accent); }
 .state-untracked { opacity: 0.6; }
@@ -1785,7 +1784,7 @@ button.plain:hover { opacity: 1; }
 .slot-mark { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid currentColor; opacity: 0.55;
   display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; box-sizing: border-box; }
 .slot-mark.read { background: var(--accent); border-color: var(--accent); color: var(--paper-ground); opacity: 1; }
-.slot-mark.failed, .slot-mark.refused { color: var(--tint-attention); opacity: 1; }
+.slot-mark.failed, .slot-mark.refused { color: var(--tint-warning); opacity: 1; }
 .slot-mark.skipped { border-style: dashed; }
 .slot-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
 .slot-actions:empty { display: none; }
@@ -1800,7 +1799,7 @@ button.plain:hover { opacity: 1; }
 .board-add input { font: inherit; color: inherit; padding: 5px 8px; border: 1px solid var(--paper-rule);
   border-radius: var(--radius-control); background: var(--paper-ground); }
 .board-add input:nth-of-type(2) { flex: 1; min-width: 260px; }
-.connector-setup .attention, .connections .attention { color: var(--tint-attention); }
+.connector-setup .attention, .connections .attention { color: var(--tint-warning); }
 .connect-sheet { max-width: 480px; }
 .connect-sheet ul.abilities { list-style: none; padding: 0; margin: 0 0 8px; background: var(--paper-raised);
   border: 1px solid var(--paper-rule); border-radius: 8px; }
@@ -1812,7 +1811,7 @@ button.plain:hover { opacity: 1; }
 .connect-sheet .token-form { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; }
 .connect-sheet .token-form label { display: flex; flex-direction: column; gap: 2px; font-size: 0.8125rem; }
 .connect-sheet .token-form .link { align-self: flex-start; }
-.connect-sheet .token-form .attention { color: var(--tint-attention); }
+.connect-sheet .token-form .attention { color: var(--tint-warning); }
 .user-code { font-size: 1.5rem; font-weight: 600; letter-spacing: 0.06em; user-select: all; }
 
 /* The usage charts on Cost (#823), as Health draws them. */
@@ -1888,7 +1887,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .chart-area { stroke: none; opacity: 0.25; }
 .chart-series-0 { --series: var(--accent); }
 .chart-series-1 { --series: var(--tint-vouched); }
-.chart-series-2 { --series: var(--tint-attention); }
+.chart-series-2 { --series: var(--tint-warning); }
 .chart-series-3 { --series: var(--tint-failure); }
 .chart-series-4 { --series: color-mix(in srgb, var(--accent) 50%, var(--tint-failure)); }
 .chart-series-5 { --series: color-mix(in srgb, var(--paper-ink) 55%, transparent); }
@@ -1911,7 +1910,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .mermaid-fence { padding: 10px; border-radius: 8px; background: var(--paper-well); margin: 0 0 1em; }
 .mermaid-problem { margin: 0 0 4px; }
 .mermaid-box { fill: color-mix(in srgb, var(--accent) 12%, var(--paper-ground)); stroke: currentColor; stroke-opacity: 0.7; stroke-width: 1; }
-.mermaid-note { fill: color-mix(in srgb, var(--tint-attention) 20%, var(--paper-ground)); }
+.mermaid-note { fill: color-mix(in srgb, var(--tint-warning) 20%, var(--paper-ground)); }
 .mermaid-frame { fill: none; stroke-opacity: 0.35; }
 .mermaid-line polyline { fill: none; stroke: currentColor; stroke-opacity: 0.7; stroke-width: 1.2; stroke-linejoin: round; }
 .mermaid-dashed > polyline:first-child { stroke-dasharray: 4 3; }
@@ -1994,14 +1993,14 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .plane-move-lines li { display: flex; gap: 10px; padding: 3px 0; }
 .plane-move-lines li .mark { width: 16px; flex: none; text-align: center; opacity: 0.6; }
 .plane-move-lines li.line-yes .mark, .plane-move-lines li.line-done .mark { color: var(--tint-vouched); opacity: 1; }
-.plane-move-lines li.line-bad .mark { color: var(--tint-attention); opacity: 1; }
+.plane-move-lines li.line-bad .mark { color: var(--tint-warning); opacity: 1; }
 .plane-move-lines .hint, .plane-move-members .hint { display: block; font-size: 0.75rem; opacity: 0.65; }
 .plane-move-members { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 8px; }
 .plane-move-members li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-top: 1px solid var(--paper-rule); }
 .plane-move-members li:first-child { border-top: 0; }
 .plane-move-members li > span:last-child { width: 250px; flex: none; }
 .plane-move-members li.member-knows > span:last-child { color: var(--tint-vouched); }
-.plane-move-members li.member-cantFollow > span:last-child { color: var(--tint-attention); }
+.plane-move-members li.member-cantFollow > span:last-child { color: var(--tint-warning); }
 .plane-move-sheet .sheet-actions .leading { margin-right: auto; }
 .provider-sheet .token-form textarea { font: inherit; font-family: var(--font-mono); font-size: 0.75rem; }
 .provider-sheet .token-form label.setting { flex-direction: row; justify-content: space-between; align-items: center; }
@@ -2569,7 +2568,7 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .work-plan-no-writes { margin: 0; padding: 10px 12px; border-top: 1px solid var(--paper-rule); background: var(--paper-well); }
 .work-plan-could-not { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 24px 12px; text-align: center; }
 .work-plan-could-not p { margin: 0; }
-.work-plan-could-not .mark { font-size: 22px; color: var(--tint-attention); }
+.work-plan-could-not .mark { font-size: 22px; color: var(--tint-warning); }
 .work-plan-query { padding: 10px 12px; }
 .work-plan-query p { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 4px; }
 .work-plan-query-error { display: flex; gap: 8px; align-items: baseline; padding: 10px; color: var(--plan-red); background: color-mix(in srgb, var(--plan-red) 8%, transparent); }
@@ -2804,7 +2803,7 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
 .persona-catalog-row .spacer, .persona-sheet-head .spacer { flex: 1; }
 .persona-sheet .sheet-actions { align-items: center; }
 .persona-sheet .sheet-actions .hint { margin-right: auto; }
-.chip.attention { background: color-mix(in srgb, var(--tint-attention) 22%, var(--paper-ground)); opacity: 1; }
+.chip.attention { background: color-mix(in srgb, var(--tint-warning) 22%, var(--paper-ground)); opacity: 1; }
 dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
 .persona-sheet { min-width: 0; }
 .persona-sheet h2 { margin: 0; }
@@ -2821,7 +2820,7 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 .persona-file { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); padding: 14px; overflow: auto; max-height: 55vh; }
 .persona-file pre { margin: 6px 0 0; white-space: pre-wrap; font-family: var(--font-mono); }
 .persona-note { margin: 0 0 8px; padding: 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.persona-note.attention { background: color-mix(in srgb, var(--tint-attention) 14%, transparent); }
+.persona-note.attention { background: color-mix(in srgb, var(--tint-warning) 14%, transparent); }
 .persona-diff { max-height: 55vh; overflow: auto; }
 @media (max-width: 640px) { .persona-preview { grid-template-columns: 1fr; } }
 
