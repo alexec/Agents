@@ -105,3 +105,14 @@ Two kinds, so the PR is safe to merge at any time:
 1. The plan: Free now, Team when #1064 makes the repo private?
 2. Move the starters and `agents-walk` too?
 3. Go for the transfer, in the order above?
+
+## Alex's answer
+
+Alex, 2026-11-12, by form:
+
+1. **Plan: Free now**, Team when #1064 makes the repo private.
+2. **Move too:** `web-service-starter`, `iphone-app-starter` and `agents-walk`. Make
+   `agents-releases` (#2145) in the organisation.
+3. **Go for the transfer, in the order above.**
+4. **The `release.yml` change waits for #4291:** Alex gives the agents' bot the Workflows
+   permission first; then a lane pushes it as the bot. The transfer waits for it too.
