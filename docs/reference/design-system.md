@@ -234,6 +234,8 @@ On the web, the fallbacks `--tint-success` and `--danger`, which no token declar
 | Website (agentloops.dev) | `www/tokens.css` | Made by `scripts/design.sh gen`. `www/style.css` still has its own values until #4606. |
 | Docs site | `docs/stylesheets/tokens.css`; the dark values follow the theme's `slate` scheme | Made by `scripts/design.sh gen`. The site still uses its theme's own colours and fonts until #4605. |
 | Forge connector pages | `Go/internal/forgepages/tokens.css`, as `light-dark()` pairs | Made by `scripts/design.sh gen`. Each page's `common.css` still has its own values until #4607. In the app, the host gives a page the app's own colours and fonts, which it then uses. |
+| Hosted sign-in pages, connector sign-in loopback page, org OIDC page | `Go/internal/paperpage/tokens.css` and `page.css`, inlined in each page's `<style>` | Made by `scripts/design.sh gen`. `page.css` names colours and fonts only by the tokens; the package's test fails when it names one raw. The OIDC page's policy lets in only the style's hash. |
+| OAuth hand-back pages (oauth.agentloops.dev) | `deploy/site/www/oauth/tokens.css`, which each page links before `callback.css` | Made by `scripts/design.sh gen`. The site's policy is `style-src 'self'`, so the file is served from the same origin. |
 | This page | The tables above | Made by `scripts/design.sh gen`. |
 
 `scripts/lint.sh` runs `scripts/design.sh check`, so CI fails when a made file is stale.
