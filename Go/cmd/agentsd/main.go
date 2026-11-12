@@ -108,6 +108,7 @@ func main() {
 	// events/raise, as a debug build on a scratch root has it: never on a root a person
 	// uses, nor in a release.
 	d.RaiseByHand = buildinfo.Version == "dev" && !ordinaryRoot(cl.root)
+	d.DiskOverride = d.RaiseByHand
 	if home := personalHome(cl); home != "" {
 		// The person's settings are in their home: a server's
 		// (Daemon.swift's --serve), and the ordinary root's (StoreLocations.personalHome).

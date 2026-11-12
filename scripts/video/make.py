@@ -214,8 +214,8 @@ class Video:
 
     # --- the scratch set-up -------------------------------------------------------------
     def launch(self, build):
-        # The real disk's free space is not the video's: a scratch root says its own (Debug).
-        # The Go host does not read it yet (#4851).
+        # The real disk's free space is not the video's: a scratch root says its own, which
+        # an unreleased agentsd reads (#195, #4851).
         Path(self.root).mkdir(parents=True)
         (Path(self.root) / "disk-free-override").write_text("500GB\n")
         args = [SKILL / "launch.sh", "--seeded", "--slug", f"vid-{self.scene.ID}", "--appearance", "light", "--outside-checkout", "--person", "Sam"]

@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -417,6 +418,7 @@ func (d *Daemon) checkDisk() {
 		set     bool
 	}
 	mounts := map[string]*mount{}
+	override := sync.OnceValues(d.diskOverride)
 	look := func(folder string, t diskThresholds, has bool) {
 		var st syscall.Statfs_t
 		var fi syscall.Stat_t
@@ -428,6 +430,9 @@ func (d *Daemon) checkDisk() {
 		if m == nil {
 			m = &mount{reading: wire.DiskReading{Volume: volume, Mount: key,
 				FreeBytes: int64(st.Bavail) * int64(st.Bsize), TotalBytes: int64(st.Blocks) * int64(st.Bsize)}, t: defaultDiskThresholds}
+			if free, ok := override(); ok {
+				m.reading.FreeBytes = min(free, m.reading.TotalBytes)
+			}
 			mounts[key] = m
 		}
 		if has {
@@ -529,6 +534,38 @@ func (d *Daemon) checkDisk() {
 	if changed {
 		Broadcast(d, wire.NotifyDiskChanged, wire.DiskState{Alarms: alarms})
 	}
+}
+
+// diskOverride is the free space a scratch root says every volume has (#195, #4851), so
+// the strip, the events and a video can be seen without the real disk: a file
+// disk-free-override in the root holding a number of bytes, or of GB with GB after it
+// ("500GB"). Only an unreleased build on a scratch root reads it (DiskOverride).
+func (d *Daemon) diskOverride() (int64, bool) {
+	if !d.DiskOverride {
+		return 0, false
+	}
+	text, err := os.ReadFile(filepath.Join(d.Store.Loc.Root, "disk-free-override"))
+	if err != nil {
+		return 0, false
+	}
+	return parseDiskOverride(string(text))
+}
+
+// parseDiskOverride reads "500GB", "1.5 gb" or "1500000000"; anything else is no override.
+func parseDiskOverride(text string) (int64, bool) {
+	said := strings.ToUpper(strings.TrimSpace(text))
+	if gb, ok := strings.CutSuffix(said, "GB"); ok {
+		n, err := strconv.ParseFloat(strings.TrimSpace(gb), 64)
+		if err != nil || n < 0 {
+			return 0, false
+		}
+		return int64(n * gigabyte), true
+	}
+	n, err := strconv.ParseInt(said, 10, 64)
+	if err != nil || n < 0 {
+		return 0, false
+	}
+	return n, true
 }
 
 func (d *Daemon) diskState() wire.DiskState {
