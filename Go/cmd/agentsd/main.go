@@ -152,6 +152,7 @@ func main() {
 	d.StartProjects()
 	d.StartMCPHealth()
 	d.StartMCPEvents()
+	d.StartRepoAliases()
 	d.StartMachineWatch()
 	<-ctx.Done()
 	log.Printf("shutting down")

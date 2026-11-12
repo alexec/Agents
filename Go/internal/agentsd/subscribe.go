@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/alexec/agents/Go/internal/repoalias"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -61,13 +63,23 @@ func (f busFilter) envelopeMatches(e wire.Event) bool {
 	if f.provider != "" && (e.Provider == nil || *e.Provider != f.provider) {
 		return false
 	}
-	if len(f.topics) > 0 && (e.Topic == nil || !contains(f.topics, strings.ToLower(*e.Topic))) {
+	if len(f.topics) > 0 && (e.Topic == nil || !slices.ContainsFunc(f.topics, func(t string) bool { return sameTopic(e, t) })) {
 		return false
 	}
-	if f.subject != nil && (e.Subject == nil || e.Subject.String() != f.subject.String()) {
+	// A repo whose owner moved is one repo by either name (#4957).
+	if f.subject != nil && (e.Subject == nil || repoalias.Ref(*e.Subject).String() != repoalias.Ref(*f.subject).String()) {
 		return false
 	}
 	return true
+}
+
+// sameTopic is whether the event's topic is t, by the repo's name now (#4957).
+func sameTopic(e wire.Event, t string) bool {
+	provider := ""
+	if e.Provider != nil {
+		provider = *e.Provider
+	}
+	return repoalias.SameRepo(provider, *e.Topic, t)
 }
 
 // busKeys are the keys a wait or a trigger takes for its filter, out of its settings.
