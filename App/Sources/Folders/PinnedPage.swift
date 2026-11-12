@@ -37,7 +37,7 @@ struct PinnedPage: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image(systemName: kind == .html ? "globe" : "doc.text")
+            Image(icon: kind == .html ? "globe" : "doc.text")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 1) {
@@ -86,7 +86,7 @@ struct PinnedPage: View {
     private var content: some View {
         if let problem {
             VStack(spacing: 10) {
-                Image(systemName: "doc.questionmark")
+                Image(icon: "doc.questionmark")
                     .appText(.title)
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)

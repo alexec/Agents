@@ -845,7 +845,7 @@ private struct NewSessionTopRow: View {
     var body: some View {
         let folder = model.newSessionFolder
         HStack(spacing: 6) {
-            Image(systemName: "square.and.pencil")
+            Image(icon: "square.and.pencil")
                 .sidebarMark(Paper.accent)
                 .frame(width: 16)
                 .accessibilityHidden(true)
@@ -1117,7 +1117,7 @@ private struct MachinesHeader: View {
             Text("Machines").appText(.supporting)
             Spacer()
             if hovering, ControlConfig.endpoint != nil {
-                Button { model.newMachine() } label: { Image(systemName: "plus") }
+                Button { model.newMachine() } label: { Image(icon: "plus") }
                     .buttonStyle(.borderless)
                     .help("New Machine: choose what the provider makes, starting from the options used last")
                     .accessibilityLabel("New Machine")
@@ -1185,7 +1185,7 @@ private struct SidebarFoot: View {
                 let row = model.hosts.controlRows[host]
                 HStack(spacing: 8) {
                     Label(OfflineWords.footLine(name: model.hosts.label(host), row: row),
-                          systemImage: "bolt.horizontal.circle")
+                          icon: "bolt.horizontal.circle")
                         .appText(.fine)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1204,7 +1204,7 @@ private struct SidebarFoot: View {
             // A file this Mac keeps that could not be read (#205): why paired devices or
             // folders may have gone from view, and that what they held is kept.
             ForEach(model.storeNotes, id: \.self) { note in
-                Label(note, systemImage: "exclamationmark.triangle")
+                Label(note, icon: "exclamationmark.triangle")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 14)
@@ -1338,7 +1338,7 @@ private struct WakefulnessRow: View {
             // points over, so it broke mid-phrase and read as a mistake. Two lines on
             // purpose, left-aligned, survives a narrower sidebar too.
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Image(systemName: state.isHolding ? "sun.max" : "battery.25")
+                Image(icon: state.isHolding ? "sun.max" : "battery.25")
                     .foregroundStyle(state.isHolding ? AnyShapeStyle(.secondary)
                                                      : StateTint.attention.style(or: .secondary))
                 VStack(alignment: .leading, spacing: 1) {

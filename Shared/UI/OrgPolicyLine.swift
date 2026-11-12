@@ -10,7 +10,7 @@ struct OrgPolicyLine: View {
 
     var body: some View {
         #if os(macOS)
-        Label(mark.title, systemImage: mark.symbol)
+        Label(mark.title, icon: mark.symbol)
             .appText(.fine)
             .foregroundStyle(.secondary)
             .help(mark.words)
@@ -18,7 +18,7 @@ struct OrgPolicyLine: View {
             .accessibilityLabel(OrgPolicyWords.line(mark))
         #else
         VStack(alignment: .leading, spacing: 1) {
-            Label(mark.title, systemImage: mark.symbol)
+            Label(mark.title, icon: mark.symbol)
             Text(mark.words).fixedSize(horizontal: false, vertical: true)
         }
         .appText(.fine)
@@ -37,7 +37,7 @@ struct OrgPolicyRefusalLine: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             if let title = refusal.title {
-                Label(title, systemImage: refusal.symbol).bold()
+                Label(title, icon: refusal.symbol).bold()
             }
             Text(refusal.words).fixedSize(horizontal: false, vertical: true)
         }

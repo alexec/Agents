@@ -127,7 +127,7 @@ struct SimulatorPaneView: View {
                     Button {
                         touch { try await calls.home(simulator.udid) }
                     } label: {
-                        Image(systemName: "circle.circle")
+                        Image(icon: "circle.circle")
                             .tapTarget()
                     }
                     .help("Home")
@@ -144,7 +144,7 @@ struct SimulatorPaneView: View {
             Button {
                 Task { await reload() }
             } label: {
-                Image(systemName: "arrow.clockwise")
+                Image(icon: "arrow.clockwise")
                     .tapTarget()
             }
             .help("List the simulators again")

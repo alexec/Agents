@@ -159,7 +159,7 @@ struct FilesPane: View {
                     fileProblem = nil
                     fileGone = false
                 } label: {
-                    Label("Back", systemImage: "chevron.left")
+                    Label("Back", icon: "chevron.left")
                         .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
@@ -167,7 +167,7 @@ struct FilesPane: View {
                 Button {
                     state.folder = nil
                 } label: {
-                    Label("The agent's folder", systemImage: "house")
+                    Label("The agent's folder", icon: "house")
                         .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
@@ -206,14 +206,14 @@ struct FilesPane: View {
         let pins = model.pins(in: folder.folder)
         if pins.contains(where: { $0.path == path }) {
             Button { Task { await model.unpin(path, in: folder) } } label: {
-                Label("Unpin", systemImage: "pin.fill").labelStyle(.iconOnly)
+                Label("Unpin", icon: "pin.fill").labelStyle(.iconOnly)
             }
             .buttonStyle(.borderless)
             .help("Pinned under the folder. Click to unpin it.")
         } else {
             let full = pins.count >= PinLimits.perFolder
             Button { Task { await model.pin(path, in: folder) } } label: {
-                Label("Pin to Folder", systemImage: "pin").labelStyle(.iconOnly)
+                Label("Pin to Folder", icon: "pin").labelStyle(.iconOnly)
             }
             .buttonStyle(.borderless)
             .disabled(full)
@@ -233,7 +233,7 @@ struct FilesPane: View {
                                  set: { allowed in
                                      if allowed { state.scriptsAllowed.insert(path) } else { state.scriptsAllowed.remove(path) }
                                  })) {
-                Label("Allow scripts", systemImage: "curlybraces")
+                Label("Allow scripts", icon: "curlybraces")
                     .labelStyle(.iconOnly)
             }
             .toggleStyle(.button)
@@ -662,7 +662,7 @@ private struct Gone: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: "questionmark.folder")
+            Image(icon: "questionmark.folder")
                 .appText(.title)
                 .foregroundStyle(.tertiary)
             Text(message)

@@ -228,7 +228,7 @@ private struct ResourceRow: View {
                     Button {
                         Task { await model.removeFromLine(state.name, agentID: member.agentID, on: host) }
                     } label: {
-                        Image(systemName: "xmark")
+                        Image(icon: "xmark")
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.tertiary)

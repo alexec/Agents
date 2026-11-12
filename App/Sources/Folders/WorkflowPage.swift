@@ -68,7 +68,7 @@ struct WorkflowPage: View {
                 // closed. Saying so and going back beats a page about a workflow that
                 // is not there, which a reader would take for a failure of the app.
                 ContentUnavailableView("This workflow is no longer there",
-                                       systemImage: "clock.badge.questionmark",
+                                       icon: "clock.badge.questionmark",
                                        description: Text("Its file has been removed or renamed."))
                     .padding(.top, 60)
             }
@@ -229,21 +229,21 @@ struct WorkflowPage: View {
             // Settings' for the folder's, which has that editor only on this Mac.
             if summary.scope == "user" || place.host == .mac {
                 Button { editFile(summary) } label: {
-                    Label("Edit File…", systemImage: "square.and.pencil")
+                    Label("Edit File…", toolbarIcon: "square.and.pencil")
                 }
                 .help(summary.scope == "user"
                       ? "Open this workflow's file in Settings ▸ Agent Configuration ▸ Workflows"
                       : "Open this workflow's file in Project Settings ▸ Agent Configuration ▸ Workflows")
             }
             Button(role: .destructive) { confirmsDelete = true } label: {
-                Label("Delete…", systemImage: "trash")
+                Label("Delete…", toolbarIcon: "trash")
             }
             .help("Delete this workflow file from disk")
             if summary.isArchived {
                 Button {
                     Task { await model.setWorkflowArchived(summary, false) }
                 } label: {
-                    Label("Unarchive", systemImage: "tray.and.arrow.up")
+                    Label("Unarchive", toolbarIcon: "tray.and.arrow.up")
                 }
                 .help("Take this workflow out of the archive. Takes archived: true out of its file")
             } else {
@@ -255,7 +255,7 @@ struct WorkflowPage: View {
                         Button {
                             Task { await model.approveWorkflow(summary) }
                         } label: {
-                            Label("Approve", systemImage: "checkmark.seal")
+                            Label("Approve", toolbarIcon: "checkmark.seal")
                         }
                         .help("Let this workflow run as its file now reads")
                     }
@@ -265,7 +265,7 @@ struct WorkflowPage: View {
                         Button {
                             Task { await model.denyWorkflow(summary) }
                         } label: {
-                            Label("Deny", systemImage: "hand.raised.slash")
+                            Label("Deny", toolbarIcon: "hand.raised.slash")
                         }
                         .help("Don't run it on this machine. Other machines still see it waiting; Approve takes this back")
                     }
@@ -276,7 +276,7 @@ struct WorkflowPage: View {
                     Button {
                         Task { await model.runWorkflow(summary) }
                     } label: {
-                        Label(summary.isRunning ? "Running…" : "Run Now", systemImage: "play")
+                        Label(summary.isRunning ? "Running…" : "Run Now", toolbarIcon: "play")
                     }
                     .disabled(summary.isRunning)
                     .help(summary.isRunning ? "Running" : "Run this workflow now")
@@ -287,7 +287,7 @@ struct WorkflowPage: View {
                     Task { await model.setWorkflowEnabled(summary, !summary.isEnabled) }
                 } label: {
                     Label(summary.isEnabled ? "Turn Off" : "Turn On",
-                          systemImage: summary.isEnabled ? "pause.circle" : "play.circle")
+                          toolbarIcon: summary.isEnabled ? "pause.circle" : "play.circle")
                 }
                 .help(summary.isEnabled
                       ? "Turn this workflow off: its triggers stop, and it stays on the list. Writes enabled: false into its file"
@@ -297,7 +297,7 @@ struct WorkflowPage: View {
                 Button {
                     Task { await model.setPinned(summary, !pinned, on: place.host) }
                 } label: {
-                    Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
+                    Label(pinned ? "Unpin" : "Pin", toolbarIcon: pinned ? "pin.slash" : "pin")
                 }
                 .help(pinned ? "Take this workflow out of Pinned in the sidebar"
                              : "Keep this workflow in Pinned, at the top of the sidebar")
@@ -307,7 +307,7 @@ struct WorkflowPage: View {
                     Button {
                         Task { await model.setWorkflowMuted(summary, !muted, on: place.host) }
                     } label: {
-                        Label(MuteWords.label(muted: muted), systemImage: MuteWords.symbol(muted: muted))
+                        Label(MuteWords.label(muted: muted), toolbarIcon: MuteWords.symbol(muted: muted))
                     }
                     .help(MuteWords.workflowHelp(muted: muted))
                 }
@@ -320,7 +320,7 @@ struct WorkflowPage: View {
                         place.leave()
                     }
                 } label: {
-                    Label("Archive", systemImage: "archivebox")
+                    Label("Archive", toolbarIcon: "archivebox")
                 }
                 .help("Archive this workflow and go back to the folder. Writes archived: true into its file")
             }
@@ -381,7 +381,7 @@ struct WorkflowPage: View {
 
     private func statusRow(_ line: WorkflowStatusLine) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: line.symbol)
+            Image(icon: line.symbol)
                 .appText(.reading)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 3) {
@@ -402,7 +402,7 @@ struct WorkflowPage: View {
                 } label: {
                     HStack(spacing: 2) {
                         Text("Open the agent")
-                        Image(systemName: "arrow.right")
+                        Image(icon: "arrow.right")
                     }
                 }
                 .buttonStyle(.link)
@@ -460,7 +460,7 @@ struct WorkflowPage: View {
         if summary.workflow.mode != .triggering {
             let on = summary.workflow.continueWhenBack == true
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: ContinueWhenBackWords.symbol)
+                Image(icon: ContinueWhenBackWords.symbol)
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                 note(ContinueWhenBackWords.workflowSentence(on))
@@ -485,7 +485,7 @@ struct WorkflowPage: View {
         if summary.workflow.mode != .triggering {
             let current = summary.workflow.whenDone ?? .keep
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "archivebox")
+                Image(icon: "archivebox")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                 note(current.sentence)
@@ -521,7 +521,7 @@ struct WorkflowPage: View {
         let current = summary.workflow.cooldown
         let choices = Self.cooldownChoices + (current.map { Self.cooldownChoices.contains($0) ? [] : [$0] } ?? [])
         return HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "hourglass")
+            Image(icon: "hourglass")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
             note(summary.cooldownSentence { $0.formatted(date: .omitted, time: .shortened) }
@@ -572,7 +572,7 @@ struct WorkflowPage: View {
         }
         return VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "clock")
+                Image(icon: "clock")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                 note(WorkflowHours.sentence(summary.workflow.hours))
@@ -597,7 +597,7 @@ struct WorkflowPage: View {
 
     private func triggerRow(_ trigger: WorkflowTrigger, at index: Int, _ summary: WorkflowSummary) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: symbol(for: trigger))
+            Image(icon: symbol(for: trigger))
                 .appText(.reading)
                 .foregroundStyle(.secondary)
                 .frame(width: 18)
@@ -790,7 +790,7 @@ struct WorkflowPage: View {
     private func agentRow(_ summary: WorkflowSummary) -> some View {
         let mode = summary.workflow.mode
         return HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: mode.symbol)
+            Image(icon: mode.symbol)
                 .appText(.fine)
                 .foregroundStyle(.secondary)
             Text(mode.words)
@@ -816,7 +816,7 @@ struct WorkflowPage: View {
             } label: {
                 HStack(spacing: 2) {
                     Text(kept.title ?? "Untitled")
-                    Image(systemName: "arrow.right")
+                    Image(icon: "arrow.right")
                 }
             }
             .buttonStyle(.link)
@@ -836,7 +836,7 @@ struct WorkflowPage: View {
         let labels = summary.workflow.settings.labels
         return VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "tag")
+                Image(icon: "tag")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
                 LabelTagField(labels: labels.map { SessionLabel(value: $0, owner: .person) },
@@ -906,7 +906,7 @@ struct WorkflowPage: View {
                     Button {
                         model.reveal(file, on: place.host)
                     } label: {
-                        Label(file.lastPathComponent, systemImage: "doc.text")
+                        Label(file.lastPathComponent, icon: "doc.text")
                             .lineLimit(1)
                     }
                     .buttonStyle(.paper)
@@ -914,7 +914,7 @@ struct WorkflowPage: View {
                     .help("\(file.path) — click to show in Finder")
                 } else {
                     // The file is on the host. Finder here cannot show it (058, FR-019).
-                    Label(file.lastPathComponent, systemImage: "doc.text")
+                    Label(file.lastPathComponent, icon: "doc.text")
                         .appText(.fine)
                         .lineLimit(1)
                         .help("On \(model.hosts.label(place.host)). Open it there.")
@@ -1114,7 +1114,7 @@ struct WorkflowPage: View {
     }
 
     private func marked(_ text: String) -> some View {
-        Label(text, systemImage: "exclamationmark.triangle")
+        Label(text, icon: "exclamationmark.triangle")
             .appText(.fine)
             .foregroundStyle(StateTint.attention.style(or: .secondary))
             .fixedSize(horizontal: false, vertical: true)

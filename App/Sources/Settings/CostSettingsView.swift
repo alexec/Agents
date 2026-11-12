@@ -16,7 +16,7 @@ struct CostSettingsView: View {
                 if let state = model.costState { today(state) }
                 // The ledger or the limits set aside as unreadable (#171).
                 if let note = model.costState?.note {
-                    Label(note, systemImage: "exclamationmark.triangle")
+                    Label(note, icon: "exclamationmark.triangle")
                         .foregroundStyle(.secondary)
                 }
             } header: {
@@ -41,7 +41,7 @@ struct CostSettingsView: View {
                       + "report neither, so no limit applies to them: an agent on one runs past "
                       + "every limit, and while it is running the day's totals are a floor rather "
                       + "than a fact.",
-                      systemImage: "questionmark.circle")
+                      icon: "questionmark.circle")
                     .foregroundStyle(.secondary)
             }
             .paperListRow()

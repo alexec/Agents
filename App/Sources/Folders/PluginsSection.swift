@@ -52,7 +52,7 @@ private struct PluginRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: plugin.awaitingApproval == nil ? "puzzlepiece.extension" : "hand.raised")
+            Image(icon: plugin.awaitingApproval == nil ? "puzzlepiece.extension" : "hand.raised")
                 .appText(.reading)
                 .foregroundStyle((plugin.awaitingApproval == nil ? StateTint.none : .attention).style(or: .secondary))
                 .accessibilityLabel(plugin.awaitingApproval == nil ? "Approved" : "Waiting for your OK")

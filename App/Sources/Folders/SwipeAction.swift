@@ -39,6 +39,6 @@ extension SwipeAction where Label == Text {
 
 extension SwipeAction where Label == SwiftUI.Label<Text, Image> {
     init(_ title: LocalizedStringKey, systemImage: String, action: @escaping @MainActor () async -> Void) {
-        self.init(action: action) { SwiftUI.Label(title, systemImage: systemImage) }
+        self.init(action: action) { SwiftUI.Label(title, icon: systemImage) }
     }
 }

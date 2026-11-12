@@ -103,7 +103,7 @@ struct SessionListView: View {
             Button {
                 deleting = session
             } label: {
-                Image(systemName: "trash")
+                Image(icon: "trash")
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)

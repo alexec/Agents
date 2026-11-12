@@ -126,7 +126,7 @@ struct ConnectJiraSheet: View {
     private func connected(_ c: DaemonAPI.Connection) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(Paper.accent)
+                Image(icon: "checkmark.circle.fill").foregroundStyle(Paper.accent)
                 Text(Words.connected(c)).appText(.supporting).fontWeight(.semibold)
             }
             Text(Words.proof(c)).appText(.fine).fixedSize(horizontal: false, vertical: true)

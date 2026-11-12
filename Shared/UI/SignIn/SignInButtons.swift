@@ -39,7 +39,7 @@ struct SignInButtons: View {
             if asking != nil {
                 ForEach(providers.orgs) { org in
                     Button { Task { await signInWithOrg(org.id) } } label: {
-                        Label(SignInWords.orgButton(org.name), systemImage: "building.2").frame(maxWidth: .infinity)
+                        Label(SignInWords.orgButton(org.name), icon: "building.2").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
@@ -50,7 +50,7 @@ struct SignInButtons: View {
                         emailField
                     } else {
                         Button { emailShown = true } label: {
-                            Label(SignInWords.useEmail, systemImage: "envelope").frame(maxWidth: .infinity)
+                            Label(SignInWords.useEmail, icon: "envelope").frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.large)
@@ -77,14 +77,14 @@ struct SignInButtons: View {
                     .disabled(busy != nil)
                 case "google":
                     Button { Task { await google(row) } } label: {
-                        Label(SignInWords.button("google"), systemImage: "g.circle").frame(maxWidth: .infinity)
+                        Label(SignInWords.button("google"), icon: "g.circle").frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.large)
                     .disabled(busy != nil || row.clientID == nil)
                 case "github":
                     Button { startGitHub(row) } label: {
-                        Label(SignInWords.button("github"), systemImage: "chevron.left.forwardslash.chevron.right")
+                        Label(SignInWords.button("github"), icon: "chevron.left.forwardslash.chevron.right")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)

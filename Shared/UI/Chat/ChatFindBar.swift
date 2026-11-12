@@ -27,7 +27,7 @@ struct ChatFindBar: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
+            Image(icon: "magnifyingglass")
                 .foregroundStyle(.tertiary)
             TextField("Find in Chat", text: $text)
                 .textFieldStyle(.plain)
@@ -44,11 +44,11 @@ struct ChatFindBar: View {
                     .monospacedDigit()
                     .fixedSize()
             }
-            Button { step(back: true) } label: { Image(systemName: "chevron.up") }
+            Button { step(back: true) } label: { Image(icon: "chevron.up") }
                 .help("Earlier match")
                 .accessibilityLabel("Earlier match")
                 .disabled((at ?? 0) == 0)
-            Button { step(back: false) } label: { Image(systemName: "chevron.down") }
+            Button { step(back: false) } label: { Image(icon: "chevron.down") }
                 .help("Later match")
                 .accessibilityLabel("Later match")
                 .disabled(at.map { $0 >= (result?.matches.count ?? 0) - 1 } ?? true)

@@ -23,7 +23,7 @@ private struct ServerViewRow: View {
     var body: some View {
         HStack(spacing: 6) {
             // As a pinned view's row (#155): plain text beside a plain image.
-            Image(systemName: "square.grid.2x2")
+            Image(icon: "square.grid.2x2")
                 .sidebarMark(Paper.accent)
                 .frame(width: 16)
                 .accessibilityHidden(true)

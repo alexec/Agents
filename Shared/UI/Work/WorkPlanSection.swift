@@ -93,7 +93,7 @@ struct WorkPlanSection: View {
     /// The glyph and *Plan*; a standing epic's says *never closes* at its end.
     private func title(standing: Bool) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: standing ? "arrow.trianglehead.2.clockwise" : "square.stack.3d.up")
+            Image(icon: standing ? "arrow.trianglehead.2.clockwise" : "square.stack.3d.up")
                 .foregroundStyle(.secondary).accessibilityHidden(true)
             Text("Plan").appText(.reading).fontWeight(.semibold)
             if standing {
@@ -141,7 +141,7 @@ struct WorkPlanSection: View {
             let state = model.workSessionState(lead.session) ?? lead.state
             HStack(spacing: 6) {
                 Circle().fill(WorkLook.Tone.purple.color).frame(width: 18, height: 18)
-                    .overlay(Image(systemName: "sparkle").imageScale(.small).foregroundStyle(.white))
+                    .overlay(Image(icon: "sparkle").imageScale(.small).foregroundStyle(.white))
                     .accessibilityHidden(true)
                 Text("Lead")
                 Button(title.map { "“\($0)”" } ?? "A session") { model.openWorkSession(lead.session) }
@@ -153,7 +153,7 @@ struct WorkPlanSection: View {
             .appText(.supporting)
             .lineLimit(1)
         } else {
-            Label("No lead", systemImage: "person").appText(.supporting).foregroundStyle(.secondary)
+            Label("No lead", icon: "person").appText(.supporting).foregroundStyle(.secondary)
         }
     }
 
@@ -163,7 +163,7 @@ struct WorkPlanSection: View {
     private func query(_ standing: DaemonAPI.ForgeStanding) -> some View {
         if let error = standing.error {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "exclamationmark.octagon").accessibilityHidden(true)
+                Image(icon: "exclamationmark.octagon").accessibilityHidden(true)
                 Text(error).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading)
                 if let url = detail.item.url.flatMap(URL.init(string:)) {
                     Button("Edit on \(WorkList.forgeName(detail.item.node.ref))") { openURL(url) }.linkStyle()
@@ -201,7 +201,7 @@ struct WorkPlanSection: View {
                 title(standing: false).fixedSize()
                 RoundedRectangle(cornerRadius: 3).fill(Paper.wash).frame(width: 200, height: 8)
             }
-            Label("No lead", systemImage: "person").appText(.supporting).foregroundStyle(.secondary)
+            Label("No lead", icon: "person").appText(.supporting).foregroundStyle(.secondary)
                 .redacted(reason: .placeholder)
             Divider()
             WorkPlaceholderRows(count: 4)
@@ -213,7 +213,7 @@ struct WorkPlanSection: View {
     /// forge's words and Try again. The rest of the page still shows.
     private func couldNotRead(_ words: String) -> some View {
         VStack(spacing: 6) {
-            Image(systemName: "exclamationmark.triangle")
+            Image(icon: "exclamationmark.triangle")
                 // The state's own glyph, larger than any text step: a marked decorative glyph.
                 .font(.system(size: 22))
                 .foregroundStyle(Paper.forgeWaiting)
@@ -302,7 +302,7 @@ struct WorkPlanSection: View {
             withAnimation(ResponseMotion.response) { folded[step.step] = !isFolded }
         } label: {
             band {
-                Image(systemName: "chevron.right")
+                Image(icon: "chevron.right")
                     .imageScale(.small)
                     .rotationEffect(.degrees(isFolded ? 0 : 90))
                     .frame(width: 12)
@@ -390,7 +390,7 @@ struct WorkPlanSection: View {
                 addField(closes: !open)
             } else {
                 Button { adding = true; childFocused = true } label: {
-                    Label("Add child", systemImage: "plus").foregroundStyle(.tint).contentShape(Rectangle())
+                    Label("Add child", icon: "plus").foregroundStyle(.tint).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .help("Open a new issue as a child of the epic, or make an issue that is there one")
@@ -535,7 +535,7 @@ private struct WorkPlanRow<BlockedBy: View>: View {
             .focused($focused)
             .help("Open \(ref)'s page")
             if !compact {
-                Menu { menu } label: { Image(systemName: "ellipsis") }
+                Menu { menu } label: { Image(icon: "ellipsis") }
                     .menuStyle(.button)
                     .buttonStyle(.borderless)
                     .menuIndicator(.hidden)
@@ -601,7 +601,7 @@ private struct WorkPlanRow<BlockedBy: View>: View {
             if let words {
                 Text("·").foregroundStyle(.secondary)
                 Group {
-                    if let glyph = glyph { Image(systemName: glyph).imageScale(.small) }
+                    if let glyph = glyph { Image(icon: glyph).imageScale(.small) }
                     Text(words).lineLimit(1).truncationMode(.tail)
                 }
                 .foregroundStyle(tint)

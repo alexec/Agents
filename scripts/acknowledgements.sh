@@ -43,6 +43,12 @@ fonts=$(mktemp)
     cat $license
     print '```\n'
   done
+  # The icons (#4976): Lucide's symbols in Shared/UI/Icons.xcassets, made from its SVGs
+  print "## Lucide ($(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["lucide"]["version"])' $root/design/icons.json))\n"
+  print "The icons are Lucide's, drawn at a 1.5 stroke (scripts/design.sh icons).\n"
+  print '```'
+  cat $root/design/icons/LICENSE
+  print '```\n'
 } > $out
 {
   print "# Acknowledgements\n"

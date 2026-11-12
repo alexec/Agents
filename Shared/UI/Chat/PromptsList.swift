@@ -57,10 +57,10 @@ struct PromptsList: View {
                     if prompts.isEmpty {
                         // None in hand while earlier ones are not loaded: the first row says so.
                         if !page.hasMoreOfTheConversation {
-                            ContentUnavailableView("No prompts yet", systemImage: "text.bubble")
+                            ContentUnavailableView("No prompts yet", icon: "text.bubble")
                         }
                     } else if shown.isEmpty {
-                        ContentUnavailableView("No prompts match", systemImage: "magnifyingglass")
+                        ContentUnavailableView("No prompts match", icon: "magnifyingglass")
                     }
                 }
                 .safeAreaInset(edge: .top, spacing: 0) {
@@ -180,7 +180,7 @@ private struct PromptsListRow: View {
             Menu {
                 actions
             } label: {
-                Label("More", systemImage: "ellipsis.circle")
+                Label("More", icon: "ellipsis.circle")
                     .labelStyle(.iconOnly)
                     .foregroundStyle(.secondary)
             }
@@ -193,12 +193,12 @@ private struct PromptsListRow: View {
 
     @ViewBuilder
     private var actions: some View {
-        Button("Copy", systemImage: "doc.on.doc") { CopiesMessage.copy(prompt.text) }
+        Button("Copy", icon: "doc.on.doc") { CopiesMessage.copy(prompt.text) }
         if let branch {
-            Button("Branch from Here", systemImage: "arrow.triangle.branch", action: branch)
+            Button("Branch from Here", icon: "arrow.triangle.branch", action: branch)
                 .help(SessionPrompt.branchHelp)
         } else if branchNeedsUpdate {
-            Button("Branch from Here", systemImage: "arrow.triangle.branch") {}
+            Button("Branch from Here", icon: "arrow.triangle.branch") {}
                 .disabled(true)
                 .help(UpdateWords.hostNeedsUpdate)
         }
@@ -209,11 +209,11 @@ private struct PromptsListRow: View {
     private var ending: some View {
         switch prompt.ending {
         case .stopped?:
-            Image(systemName: "stop.circle")
+            Image(icon: "stop.circle")
                 .foregroundStyle(.secondary)
                 .accessibilityLabel("Stopped")
         case .failed?:
-            Image(systemName: "exclamationmark.triangle")
+            Image(icon: "exclamationmark.triangle")
                 .foregroundStyle(StateTint.failure.style(or: .secondary))
                 .accessibilityLabel("Failed")
         case nil:

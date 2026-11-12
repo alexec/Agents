@@ -521,16 +521,16 @@ private struct SlotMark: View {
         Group {
             switch state {
             case .read:
-                Image(systemName: "checkmark.circle.fill").foregroundStyle(Paper.accent)
+                Image(icon: "checkmark.circle.fill").foregroundStyle(Paper.accent)
             case .failed, .refused:
-                Image(systemName: "exclamationmark.circle").tinted(.attention)
+                Image(icon: "exclamationmark.circle").tinted(.attention)
             case .skipped:
                 Circle().strokeBorder(style: StrokeStyle(lineWidth: 1.2, dash: [2.5, 2])).foregroundStyle(.secondary)
                     .frame(width: 13, height: 13)
             case .notRead where reading:
                 ProgressView().controlSize(.mini)
             case .notConnected, .noRemote, .notRead:
-                Image(systemName: "circle").foregroundStyle(.secondary)
+                Image(icon: "circle").foregroundStyle(.secondary)
             }
         }
         .appText(.fine)
@@ -580,7 +580,7 @@ private struct SlotChange: View {
                 ForEach(choices, id: \.title) { choice in
                     Button(action: choice.pick) {
                         HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: choice.chosen ? "largecircle.fill.circle" : "circle")
+                            Image(icon: choice.chosen ? "largecircle.fill.circle" : "circle")
                                 .foregroundStyle(choice.chosen ? Paper.accent : .secondary)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(choice.title).appText(.supporting).fontWeight(.semibold)

@@ -11,7 +11,7 @@ struct FoldRow: View {
     var body: some View {
         Button(action: open) {
             HStack(spacing: 6) {
-                Image(systemName: "arrow.up.and.down")
+                Image(icon: "arrow.up.and.down")
                     .imageScale(.small)
                 Text(count == 1 ? "1 unchanged line" : "\(count) unchanged lines")
             }

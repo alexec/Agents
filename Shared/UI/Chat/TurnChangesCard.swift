@@ -17,14 +17,14 @@ struct TurnChangesCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label(TurnChangesWords.title(changes), systemImage: TurnChangesWords.symbol)
+            Label(TurnChangesWords.title(changes), icon: TurnChangesWords.symbol)
                 .appText(.reading).fontWeight(.semibold)
             VStack(alignment: .leading, spacing: 3) {
                 ForEach(changes.files) { file in
                     Label {
                         Text(file.shown).appText(.fine).lineLimit(1).truncationMode(.middle)
                     } icon: {
-                        Image(systemName: TurnChangesWords.stateSymbol(file.state)).foregroundStyle(.secondary)
+                        Image(icon: TurnChangesWords.stateSymbol(file.state)).foregroundStyle(.secondary)
                     }
                     .accessibilityLabel("\(TurnChangesWords.stateWord(file.state)) \(file.shown)")
                 }
@@ -38,12 +38,12 @@ struct TurnChangesCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let cannot = changes.cannotUndo, !cannot.isEmpty {
-                Label(TurnChangesWords.cannotUndo(cannot), systemImage: "exclamationmark.triangle")
+                Label(TurnChangesWords.cannotUndo(cannot), icon: "exclamationmark.triangle")
                     .appText(.fine).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let done {
-                Label(TurnChangesWords.undone(done), systemImage: "arrow.uturn.backward")
+                Label(TurnChangesWords.undone(done), icon: "arrow.uturn.backward")
                     .appText(.fine).foregroundStyle(.secondary)
             }
             if let problem {

@@ -178,7 +178,7 @@ private struct VoiceTuningSections: View {
                 ProgressView().controlSize(.small)
                     .accessibilityLabel("Making a sample")
             } else {
-                Label("Play a Sample", systemImage: "play.circle")
+                Label("Play a Sample", icon: "play.circle")
             }
         }
         .disabled(sample.isMaking)
@@ -249,7 +249,7 @@ private struct SoundPicker: View {
             Button {
                 sound.preview()
             } label: {
-                Image(systemName: "play.circle")
+                Image(icon: "play.circle")
             }
             .buttonStyle(.borderless)
             .disabled(name == VoiceSettings.noSound)

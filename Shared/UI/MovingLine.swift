@@ -18,7 +18,7 @@ struct MovingLine: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .help(problem)
                 Spacer(minLength: 2)
-                Button(action: putAway) { Image(systemName: "xmark") }
+                Button(action: putAway) { Image(icon: "xmark") }
                     .buttonStyle(.plain)
                     .appText(.fine)
                     .foregroundStyle(.secondary)

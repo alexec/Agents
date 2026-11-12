@@ -57,7 +57,7 @@ struct SecretAskCard: View {
             Label {
                 Text(secret.name).monospaced().fontWeight(.semibold)
             } icon: {
-                Image(systemName: "key").foregroundStyle(.secondary)
+                Image(icon: "key").foregroundStyle(.secondary)
             }
             .appText(.reading)
             .accessibilityLabel("Asks for the secret \(secret.name)")

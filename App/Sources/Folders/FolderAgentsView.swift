@@ -135,7 +135,7 @@ struct FolderAgentsView: View {
                     .truncationMode(.middle)
                     .help(summary.folder.folder.path)
                 if !summary.exists {
-                    Label("Folder is missing", systemImage: "exclamationmark.triangle")
+                    Label("Folder is missing", icon: "exclamationmark.triangle")
                         .appText(.supporting)
                         .tinted(.failure)
                         .lineLimit(1)
@@ -158,7 +158,7 @@ struct FolderAgentsView: View {
                     model.showProject(project)
                 } label: {
                     if project.id == current?.id {
-                        Label(projectLabel(project), systemImage: "checkmark")
+                        Label(projectLabel(project), icon: "checkmark")
                     } else {
                         Text(projectLabel(project))
                     }
@@ -169,7 +169,7 @@ struct FolderAgentsView: View {
                 Text(current?.name ?? summary?.name ?? "Project")
                     .appText(.title).fontWeight(.semibold)
                     .lineLimit(1)
-                Image(systemName: "chevron.up.chevron.down")
+                Image(icon: "chevron.up.chevron.down")
                     .imageScale(.small)
                     .foregroundStyle(.secondary)
                     .accessibilityHidden(true)
@@ -203,7 +203,7 @@ struct FolderAgentsView: View {
                         model.showFolder(key)
                     } label: {
                         if key == summary.key {
-                            Label(machineLabel(key, in: project), systemImage: "checkmark")
+                            Label(machineLabel(key, in: project), icon: "checkmark")
                         } else {
                             Text(machineLabel(key, in: project))
                         }
@@ -227,7 +227,7 @@ struct FolderAgentsView: View {
                     Text("On \(model.hosts.label(summary.host))")
                         .appText(.reading)
                         .lineLimit(1)
-                    Image(systemName: "chevron.up.chevron.down")
+                    Image(icon: "chevron.up.chevron.down")
                         .imageScale(.small)
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)

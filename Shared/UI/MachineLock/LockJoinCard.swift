@@ -262,7 +262,7 @@ private struct LockCardFrame<Content: View>: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "lock.shield")
+            Image(icon: "lock.shield")
                 // Decorative: the card says what it is in words.
                 .glyph(size: 13)
                 .foregroundStyle(StateTint.attention.style(or: .primary))

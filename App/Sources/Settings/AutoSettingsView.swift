@@ -55,7 +55,7 @@ struct AutoSettingsView: View {
         let status = model.runtimes.first { $0.id == runtimeID }
         let included = !model.autoSettings.excluded.contains(runtimeID)
         return HStack(spacing: 10) {
-            Image(systemName: "line.3.horizontal")
+            Image(icon: "line.3.horizontal")
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
             Toggle(isOn: Binding(get: { included }, set: { on in
@@ -135,7 +135,7 @@ private struct MappingCell: View {
                             set(choice.native)
                         } label: {
                             if choice.native == cell.native {
-                                Label(choice.words, systemImage: "checkmark")
+                                Label(choice.words, icon: "checkmark")
                             } else {
                                 Text(choice.words)
                             }

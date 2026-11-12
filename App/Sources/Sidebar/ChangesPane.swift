@@ -225,7 +225,7 @@ enum ChangeMark {
 private struct NothingChanged: View {
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "plusminus")
+            Image(icon: "plusminus")
                 .appText(.title)
                 .foregroundStyle(.tertiary)
             Text("Nothing changed yet")
@@ -248,7 +248,7 @@ private struct NothingToShow: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "plusminus")
+            Image(icon: "plusminus")
                 .appText(.title)
                 .foregroundStyle(.tertiary)
             Text("Nothing to show")

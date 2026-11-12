@@ -87,7 +87,7 @@ struct WorkMergeBox: View {
 
     private func rowView(_ row: WorkLook.MergeRow) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: Self.symbol(row))
+            Image(icon: Self.symbol(row))
                 .foregroundStyle(Self.tint(row.sign).map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
@@ -102,7 +102,7 @@ struct WorkMergeBox: View {
                     // *15 ›*: the row is the button that pushes the Checks page.
                     HStack(spacing: 4) {
                         Text("\(checks.count)").monospacedDigit()
-                        Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                        Image(icon: "chevron.right").foregroundStyle(.tertiary)
                     }
                     .appText(.supporting).foregroundStyle(.secondary)
                 } else {
@@ -123,7 +123,7 @@ struct WorkMergeBox: View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(Array(checks.enumerated()), id: \.offset) { _, check in
                 HStack(spacing: 8) {
-                    Image(systemName: Self.checkSymbol(check.state))
+                    Image(icon: Self.checkSymbol(check.state))
                         .foregroundStyle(Self.tint(Self.checkSign(check.state)).map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
                         .frame(width: 16)
                         .accessibilityLabel(check.state)
@@ -159,12 +159,12 @@ struct WorkMergeBox: View {
                         Button(WorkLook.resolveOnForge(node.ref)) { openURL(url.appendingPathComponent("conflicts")) }
                     }
                     if box.approves, let head = detail.head {
-                        Button("Approve", systemImage: "checkmark") {
+                        Button("Approve", icon: "checkmark") {
                             act(DaemonAPI.Method.forgeApprove, DaemonAPI.ForgeApproveRequest(node: node, sha: head))
                         }
                     }
                     if box.reruns {
-                        Button("Rerun failed", systemImage: "arrow.clockwise") {
+                        Button("Rerun failed", icon: "arrow.clockwise") {
                             act(DaemonAPI.Method.forgeRerun, DaemonAPI.ForgeNodeRequest(node: node))
                         }
                     }
@@ -230,7 +230,7 @@ struct WorkMergeBox: View {
             }
         } label: {
             Group {
-                if glyph { Label("Approve", systemImage: "checkmark") } else { Text("Approve") }
+                if glyph { Label("Approve", icon: "checkmark") } else { Text("Approve") }
             }
             .frame(maxWidth: .infinity)
         }
@@ -238,7 +238,7 @@ struct WorkMergeBox: View {
 
     private var rerunButton: some View {
         Button { act(DaemonAPI.Method.forgeRerun, DaemonAPI.ForgeNodeRequest(node: node)) } label: {
-            Label("Rerun failed", systemImage: "arrow.clockwise").frame(maxWidth: .infinity)
+            Label("Rerun failed", icon: "arrow.clockwise").frame(maxWidth: .infinity)
         }
     }
 
@@ -266,7 +266,7 @@ struct WorkMergeBox: View {
                 }
             } label: {
                 // The full-width pair is one height: a Menu's label is shorter than a button's.
-                Image(systemName: "chevron.down").imageScale(.small).frame(maxHeight: full ? .infinity : nil)
+                Image(icon: "chevron.down").imageScale(.small).frame(maxHeight: full ? .infinity : nil)
             }
             .menuIndicator(.hidden)
             .accessibilityLabel("More ways to merge")
@@ -369,11 +369,11 @@ struct WorkFilesChanged: View {
             if compact {
                 Button { Task { await showDiff() } } label: {
                     HStack {
-                        Label("Files changed", systemImage: "doc.on.doc")
+                        Label("Files changed", icon: "doc.on.doc")
                         Spacer()
                         if loading { ProgressView().controlSize(.small) }
                         if let n = detail.filesChanged { Text("\(n)").foregroundStyle(.secondary).monospacedDigit() }
-                        Image(systemName: "chevron.right").foregroundStyle(.tertiary).accessibilityHidden(true)
+                        Image(icon: "chevron.right").foregroundStyle(.tertiary).accessibilityHidden(true)
                     }
                     .appText(.supporting)
                     .padding(.horizontal, 12).padding(.vertical, 10)
@@ -384,7 +384,7 @@ struct WorkFilesChanged: View {
             } else {
                 Button { Task { await showDiff() } } label: {
                     HStack(spacing: 6) {
-                        Label(WorkLook.filesChanged(detail.filesChanged), systemImage: "doc.on.doc")
+                        Label(WorkLook.filesChanged(detail.filesChanged), icon: "doc.on.doc")
                         if loading { ProgressView().controlSize(.small) }
                     }
                 }
@@ -480,7 +480,7 @@ struct WorkLabelsPicker: View {
                         let on = item.labels.contains { $0.name == label.name }
                         Button { set(label.name, !on) } label: {
                             HStack(spacing: 8) {
-                                Image(systemName: "checkmark").opacity(on ? 1 : 0).accessibilityHidden(true)
+                                Image(icon: "checkmark").opacity(on ? 1 : 0).accessibilityHidden(true)
                                 WorkLabelChip(label: label)
                                 Spacer(minLength: 0)
                             }
@@ -542,7 +542,7 @@ struct WorkCommentBox: View {
         HStack(alignment: .top, spacing: 10) {
             if !compact {
                 // The person's avatar comes with the forge's login for them (#4363); a person's glyph till then.
-                Image(systemName: "person.crop.circle.fill")
+                Image(icon: "person.crop.circle.fill")
                     // Sized to the timeline's avatar column, not to a text step: a marked decorative glyph.
                     .font(.system(size: WorkTimelineEntry<EmptyView, EmptyView>.column))
                     .foregroundStyle(.tertiary)
@@ -590,12 +590,12 @@ struct WorkCommentBox: View {
     @ViewBuilder
     private func closeButton(_ state: String) -> some View {
         if state == "open" {
-            Button(empty ? "Close \(noun)" : "Close with comment", systemImage: noun == "issue" ? "checkmark.circle" : "xmark.circle") {
+            Button(empty ? "Close \(noun)" : "Close with comment", icon: noun == "issue" ? "checkmark.circle" : "xmark.circle") {
                 Task { await close(reopen: false) }
             }
             .help(noun == "issue" ? "Close it as completed" : "Close it without merging")
         } else {
-            Button(empty ? "Reopen \(noun)" : "Reopen with comment", systemImage: "arrow.uturn.backward.circle") {
+            Button(empty ? "Reopen \(noun)" : "Reopen with comment", icon: "arrow.uturn.backward.circle") {
                 Task { await close(reopen: true) }
             }
         }
@@ -708,7 +708,7 @@ struct WorkChecksPage: View {
                 if writes, !WorkList.failedChecks(detail).isEmpty {
                     Button { rerun() } label: {
                         HStack {
-                            Label("Rerun failed", systemImage: "arrow.clockwise")
+                            Label("Rerun failed", icon: "arrow.clockwise")
                             if busy == DaemonAPI.Method.forgeRerun { ProgressView() }
                         }
                         .frame(maxWidth: .infinity)
@@ -745,7 +745,7 @@ struct WorkChecksPage: View {
         let logs = check.state == "failing" && writes
         let url = check.url.flatMap(URL.init(string:))
         let line = HStack(spacing: 10) {
-            Image(systemName: WorkMergeBox.checkSymbol(check.state))
+            Image(icon: WorkMergeBox.checkSymbol(check.state))
                 .foregroundStyle(WorkMergeBox.tint(WorkMergeBox.checkSign(check.state)).map(AnyShapeStyle.init) ?? AnyShapeStyle(.secondary))
                 .frame(width: 18)
                 .accessibilityLabel(check.state)
@@ -756,7 +756,7 @@ struct WorkChecksPage: View {
             }
             if busy == check.name { ProgressView() }
             if logs || url != nil {
-                Image(systemName: "chevron.right").foregroundStyle(.tertiary).accessibilityHidden(true)
+                Image(icon: "chevron.right").foregroundStyle(.tertiary).accessibilityHidden(true)
             }
         }
         .appText(.reading)

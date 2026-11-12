@@ -210,7 +210,7 @@ struct MarkdownText: View {
     @ViewBuilder
     private func marker(ordered: Bool, number: Int, checked: Bool?) -> some View {
         if let checked {
-            Image(systemName: checked ? "checkmark.square" : "square")
+            Image(icon: checked ? "checkmark.square" : "square")
                 .foregroundStyle(checked ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
                 .accessibilityLabel(checked ? "Done" : "Not done")
         } else if ordered {
@@ -628,7 +628,7 @@ private struct PictureAlternative: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
-            Image(systemName: "photo").foregroundStyle(.tertiary)
+            Image(icon: "photo").foregroundStyle(.tertiary)
             Text(alt.isEmpty ? URL(string: source)?.lastPathComponent ?? source : alt)
                 .foregroundStyle(.secondary)
         }

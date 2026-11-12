@@ -45,13 +45,13 @@ struct BlocksView: View {
                     .frame(maxWidth: 420, maxHeight: 320)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             } else {
-                Label("A picture that cannot be drawn here", systemImage: "photo")
+                Label("A picture that cannot be drawn here", icon: "photo")
                     .appText(.reading)
                     .foregroundStyle(.secondary)
             }
 
         case .audio:
-            Label("Audio", systemImage: "waveform")
+            Label("Audio", icon: "waveform")
                 .appText(.reading)
                 .foregroundStyle(.secondary)
 
@@ -61,7 +61,7 @@ struct BlocksView: View {
             Button {
                 if let url = URL(string: uri) { openURL(url) }
             } label: {
-                Label(name, systemImage: "doc")
+                Label(name, icon: "doc")
                     .appText(.reading)
             }
             .linkStyle()

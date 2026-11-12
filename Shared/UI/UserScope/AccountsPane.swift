@@ -49,7 +49,7 @@ struct AccountsPane: View {
             } else if status != nil {
                 if let only, all.contains(where: { AccountsWords.secretName($0) != nil }) {
                     Section {
-                        Label(SecretInfoWords.onlyMachineLine(only, names: machineNames), systemImage: "exclamationmark.triangle")
+                        Label(SecretInfoWords.onlyMachineLine(only, names: machineNames), icon: "exclamationmark.triangle")
                             .appText(.supporting).tinted(.attention)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -114,7 +114,7 @@ struct AccountsPane: View {
                     Button("Edit…") { editing = account }
                     Button("Remove…", role: .destructive) { removing = account }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    Image(icon: "ellipsis.circle")
                 }
                 .fixedSize()
                 .accessibilityLabel("\(account.service) actions")
@@ -124,7 +124,7 @@ struct AccountsPane: View {
                 .fixedSize(horizontal: false, vertical: true)
             SecretInfoLine(parts: AccountsWords.line(account))
             if AccountsWords.asks(account) {
-                Label(AskBeforeUseWords.asks, systemImage: "hand.raised").appText(.fine).foregroundStyle(.secondary)
+                Label(AskBeforeUseWords.asks, icon: "hand.raised").appText(.fine).foregroundStyle(.secondary)
             }
             if let soon = AccountsWords.expiresSoon(account, now: Date()) {
                 Text(soon).appText(.fine).tinted(.attention)

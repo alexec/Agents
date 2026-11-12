@@ -73,7 +73,7 @@ private struct EarnedBadge: View {
     }
 
     var body: some View {
-        Image(systemName: badge.achievement.symbol)
+        Image(icon: badge.achievement.symbol)
             .glyph(size: 14, weight: .semibold)
             .foregroundStyle(.white)
             .frame(width: 30, height: 30)

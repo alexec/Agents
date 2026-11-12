@@ -33,7 +33,7 @@ struct RemoteFolderSheet: View {
                     } label: {
                         Label(listing.url.deletingLastPathComponent().lastPathComponent.isEmpty
                               ? "/" : listing.url.deletingLastPathComponent().lastPathComponent,
-                              systemImage: "chevron.left")
+                              icon: "chevron.left")
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)

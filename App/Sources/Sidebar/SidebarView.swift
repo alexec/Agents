@@ -72,7 +72,7 @@ struct SidebarView: View {
             ForEach(SidebarPane.allCases) { pane in
                 Group {
                     if iconsOnly {
-                        Image(systemName: pane.symbol)
+                        Image(icon: pane.symbol)
                             .accessibilityLabel(pane.title)
                     } else {
                         Text(pane.title)
@@ -159,7 +159,7 @@ private struct NoAgent: View {
         VStack(spacing: 8) {
             // Deliberately not the sidebar glyph: that one means the control in the
             // toolbar, and repeating it here reads as a button that does nothing.
-            Image(systemName: "square.dashed")
+            Image(icon: "square.dashed")
                 .appText(.title)
                 .foregroundStyle(.tertiary)
             Text("No agent chosen")
@@ -222,7 +222,7 @@ struct SidebarToggle: View {
             guard fits else { return }
             if frame.isOpen { frame.isOpen = false } else { frame.open() }
         } label: {
-            Image(systemName: "sidebar.trailing")
+            Image(toolbarIcon: "sidebar.trailing")
         }
         .disabled(!fits && !frame.isOpen)
         .help(fits

@@ -13,7 +13,7 @@ struct ReviewPullRowLabel: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "arrow.triangle.pull")
+            Image(icon: "arrow.triangle.pull")
                 .sidebarMark(AnyShapeStyle(Paper.accent))
                 .frame(width: 16)
                 .accessibilityHidden(true)

@@ -43,7 +43,7 @@ struct ShellTabs: View {
                 }
             }
             Button(action: open) {
-                Image(systemName: "plus")
+                Image(icon: "plus")
                     .frame(width: 22, height: 22)
                     .contentShape(Rectangle())
             }
@@ -83,7 +83,7 @@ private struct ShellTab: View {
                     // Room is kept for the mark whether or not it shows, so tabs do
                     // not shift under the pointer.
                     Button(action: close) {
-                        Image(systemName: "xmark")
+                        Image(icon: "xmark")
                             .appText(.fine)
                             .frame(width: 14, height: 14)
                             .contentShape(Rectangle())

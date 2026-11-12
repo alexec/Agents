@@ -962,7 +962,7 @@ private struct LoadFailureLine: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Label(sentence, systemImage: "exclamationmark.triangle")
+            Label(sentence, icon: "exclamationmark.triangle")
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
             Button("Try Again") {

@@ -513,14 +513,14 @@ private struct SettingsRail: View {
         return RailButton(lit: lit, label: [each.title, warns].compactMap { $0 }.joined(separator: ", "),
                           selected: lit, action: { pane = each }) {
             HStack(spacing: 8) {
-                Image(systemName: each.symbol)
+                Image(icon: each.symbol)
                     .frame(width: 20)
                     .foregroundStyle(lit ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
                     .accessibilityHidden(true)
                 Text(each.title).lineLimit(1)
                 Spacer()
                 if warns != nil {
-                    Image(systemName: "exclamationmark.triangle.fill")
+                    Image(icon: "exclamationmark.triangle.fill")
                         .foregroundStyle(lit ? AnyShapeStyle(.white) : StateTint.failure.style(or: .secondary))
                         .accessibilityHidden(true)
                 }

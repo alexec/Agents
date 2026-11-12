@@ -126,7 +126,7 @@ struct FolderTerminalPanel: View {
 
     private func bar(_ tabs: FolderShellTabs) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "apple.terminal")
+            Image(icon: "apple.terminal")
                 .foregroundStyle(.secondary)
             Text("Terminal")
                 .appText(.supporting).fontWeight(.semibold)
@@ -145,7 +145,7 @@ struct FolderTerminalPanel: View {
             Button {
                 frame.isOpen = false
             } label: {
-                Image(systemName: "chevron.down")
+                Image(icon: "chevron.down")
             }
             .buttonStyle(.borderless)
             .help("Hide the folder’s shells (⌃`). They keep running.")

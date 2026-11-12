@@ -44,7 +44,7 @@ enum UpdateWords {
 /// A pane whose feature the host does not have (#1748): said in its place, with no call sent.
 struct HostNeedsUpdateView: View {
     var body: some View {
-        ContentUnavailableView("Needs an Update", systemImage: "arrow.down.circle",
+        ContentUnavailableView("Needs an Update", icon: "arrow.down.circle",
                                description: Text(UpdateWords.hostNeedsUpdate))
     }
 }

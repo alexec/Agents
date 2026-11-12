@@ -21,7 +21,7 @@ struct ChecklistRow<Action: View>: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: isDone ? "checkmark.circle.fill" : "circle")
+            Image(icon: isDone ? "checkmark.circle.fill" : "circle")
                 // Decorative: the row's state, said in its accessibility value.
                 .glyph(size: 13)
                 .foregroundStyle(isDone ? AnyShapeStyle(Paper.accent) : AnyShapeStyle(.secondary))

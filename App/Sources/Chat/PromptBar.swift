@@ -358,7 +358,7 @@ struct PromptBar: View {
                 Button {
                     isShowingSessions = true
                 } label: {
-                    Image(systemName: "clock.arrow.circlepath")
+                    Image(icon: "clock.arrow.circlepath")
                 }
                 .buttonStyle(.paper)
                 .appText(.fine)
@@ -607,7 +607,7 @@ struct PromptBar: View {
 
             HStack(spacing: 8) {
                 Button(action: chooseAttachment) {
-                    Image(systemName: "paperclip")
+                    Image(icon: "paperclip")
                         .appText(.reading).fontWeight(.semibold)
                         .frame(width: 22, height: 22)
                 }
@@ -621,7 +621,7 @@ struct PromptBar: View {
                 PushToTalkButton(tap: toggleDictation, begin: beginDictation, end: finishPushToTalk,
                                  cancel: dictation.stop) {
                     // The microphone, blue while it listens: the waveform is voice mode's (Alex, 2026-10-29).
-                    Image(systemName: "microphone")
+                    Image(icon: "microphone")
                         .appText(.reading).fontWeight(.semibold)
                         .foregroundStyle(dictation.isListening ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                         .frame(width: 22, height: 22)
@@ -663,7 +663,7 @@ struct PromptBar: View {
                             if acting == .stop {
                                 ProgressView().controlSize(.small)
                             } else {
-                                Image(systemName: PromptWords.stopSymbol)
+                                Image(icon: PromptWords.stopSymbol)
                                     .appText(.reading).fontWeight(.semibold)
                             }
                         }
@@ -684,7 +684,7 @@ struct PromptBar: View {
                             if isGoing {
                                 ProgressView().controlSize(.small)
                             } else {
-                                Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
+                                Image(icon: PromptWords.sendSymbol(willQueue: willQueue))
                                     .appText(.reading).fontWeight(.semibold)
                             }
                         }
@@ -1002,7 +1002,7 @@ struct PromptBar: View {
         } label: {
             HStack(spacing: 4) {
                 Text(reachTitle)
-                Image(systemName: "chevron.down")
+                Image(icon: "chevron.down")
                     // Decorative: a glyph in a capsule, not text (FR-015).
                     .glyph(size: 8, weight: .semibold)
                     .foregroundStyle(.secondary)

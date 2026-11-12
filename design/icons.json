@@ -1,0 +1,1365 @@
+{
+  "$comment": "The one icon set (#4976; specs/4926-paper-v2/spec.md, Icons): Lucide (ISC) at a 1.5 stroke. Each icon has its meaning and the SF Symbols it replaces. scripts/design.sh icons makes Shared/UI/Icons.xcassets and Shared/UI/LucideIcons.swift from this file.",
+  "lucide": {
+    "version": "1.72.0",
+    "integrity": "sha512-QhdZ60O7Zcs/e8gw40uMfEn055xZTHBZoNi0xb+/1R2dTd0v4FXS46VL6rKSwC+V92tLBiqsAbCcijy7Wy4j4w=="
+  },
+  "stroke": 1.5,
+  "icons": [
+    {
+      "lucide": "circle-help",
+      "group": "States",
+      "meaning": "Needs you: a question or an approval waits",
+      "sf": [
+        "questionmark.circle",
+        "exclamationmark.circle.fill"
+      ]
+    },
+    {
+      "lucide": "loader-circle",
+      "group": "States",
+      "meaning": "Working",
+      "sf": []
+    },
+    {
+      "lucide": "circle-pause",
+      "group": "States",
+      "meaning": "Waiting: on a check, a lease, a time",
+      "sf": [
+        "pause.circle",
+        "dot.radiowaves.left.and.right"
+      ]
+    },
+    {
+      "lucide": "circle-check",
+      "group": "States",
+      "meaning": "Done",
+      "sf": [
+        "checkmark.circle",
+        "checkmark.circle.fill"
+      ]
+    },
+    {
+      "lucide": "circle-x",
+      "group": "States",
+      "meaning": "Failed",
+      "sf": [
+        "xmark.circle",
+        "xmark.circle.fill",
+        "multiply.circle",
+        "xmark.octagon.fill"
+      ]
+    },
+    {
+      "lucide": "archive",
+      "group": "States",
+      "meaning": "Archived",
+      "sf": [
+        "archivebox"
+      ]
+    },
+    {
+      "lucide": "message-circle",
+      "group": "Things",
+      "meaning": "Session",
+      "sf": [
+        "bubble.left",
+        "bubble.left.fill",
+        "message",
+        "text.bubble"
+      ]
+    },
+    {
+      "lucide": "messages-square",
+      "group": "Things",
+      "meaning": "Conversations, channels",
+      "sf": [
+        "bubble.left.and.bubble.right",
+        "bubble.left.and.text.bubble.right"
+      ]
+    },
+    {
+      "lucide": "message-circle-question-mark",
+      "group": "Things",
+      "meaning": "A question in the chat",
+      "sf": [
+        "questionmark.bubble"
+      ]
+    },
+    {
+      "lucide": "folder",
+      "group": "Things",
+      "meaning": "Folder",
+      "sf": [
+        "folder"
+      ]
+    },
+    {
+      "lucide": "folder-open",
+      "group": "Things",
+      "meaning": "An open folder",
+      "sf": [
+        "folder.fill"
+      ]
+    },
+    {
+      "lucide": "folder-search",
+      "group": "Things",
+      "meaning": "A folder that is not found",
+      "sf": [
+        "questionmark.folder",
+        "folder.badge.questionmark"
+      ]
+    },
+    {
+      "lucide": "workflow",
+      "group": "Things",
+      "meaning": "Workflow",
+      "sf": [
+        "flowchart",
+        "point.3.connected.trianglepath.dotted"
+      ]
+    },
+    {
+      "lucide": "circle-dot",
+      "group": "Things",
+      "meaning": "Issue; a chosen option",
+      "sf": [
+        "smallcircle.filled.circle",
+        "circle.circle",
+        "largecircle.fill.circle"
+      ]
+    },
+    {
+      "lucide": "git-pull-request",
+      "group": "Things",
+      "meaning": "Pull request",
+      "sf": [
+        "arrow.triangle.pull"
+      ]
+    },
+    {
+      "lucide": "git-branch",
+      "group": "Things",
+      "meaning": "Branch, worktree",
+      "sf": [
+        "arrow.triangle.branch"
+      ]
+    },
+    {
+      "lucide": "git-merge",
+      "group": "Things",
+      "meaning": "Merge",
+      "sf": [
+        "arrow.triangle.merge"
+      ]
+    },
+    {
+      "lucide": "laptop",
+      "group": "Things",
+      "meaning": "Machine",
+      "sf": [
+        "laptopcomputer"
+      ]
+    },
+    {
+      "lucide": "monitor",
+      "group": "Things",
+      "meaning": "A desktop machine, a screen",
+      "sf": [
+        "desktopcomputer",
+        "display"
+      ]
+    },
+    {
+      "lucide": "server",
+      "group": "Things",
+      "meaning": "Server",
+      "sf": [
+        "server.rack"
+      ]
+    },
+    {
+      "lucide": "hard-drive",
+      "group": "Things",
+      "meaning": "Disk",
+      "sf": [
+        "internaldrive"
+      ]
+    },
+    {
+      "lucide": "smartphone",
+      "group": "Things",
+      "meaning": "Phone",
+      "sf": [
+        "iphone"
+      ]
+    },
+    {
+      "lucide": "cpu",
+      "group": "Things",
+      "meaning": "Processor",
+      "sf": [
+        "cpu"
+      ]
+    },
+    {
+      "lucide": "user",
+      "group": "Things",
+      "meaning": "Person",
+      "sf": [
+        "person",
+        "person.fill"
+      ]
+    },
+    {
+      "lucide": "circle-user",
+      "group": "Things",
+      "meaning": "A person's account",
+      "sf": [
+        "person.crop.circle",
+        "person.crop.circle.fill"
+      ]
+    },
+    {
+      "lucide": "users",
+      "group": "Things",
+      "meaning": "People",
+      "sf": [
+        "person.2",
+        "person.3"
+      ]
+    },
+    {
+      "lucide": "user-plus",
+      "group": "Things",
+      "meaning": "Add a person",
+      "sf": [
+        "person.badge.plus"
+      ]
+    },
+    {
+      "lucide": "user-x",
+      "group": "Things",
+      "meaning": "A person removed or refused",
+      "sf": [
+        "person.crop.circle.badge.xmark",
+        "person.crop.circle.badge.exclamationmark"
+      ]
+    },
+    {
+      "lucide": "user-key",
+      "group": "Things",
+      "meaning": "A person's key",
+      "sf": [
+        "person.badge.key"
+      ]
+    },
+    {
+      "lucide": "contact",
+      "group": "Things",
+      "meaning": "Accounts",
+      "sf": [
+        "person.crop.rectangle.stack"
+      ]
+    },
+    {
+      "lucide": "plug",
+      "group": "Things",
+      "meaning": "Connector",
+      "sf": [
+        "bolt.horizontal.circle"
+      ]
+    },
+    {
+      "lucide": "puzzle",
+      "group": "Things",
+      "meaning": "Plugin",
+      "sf": [
+        "puzzlepiece.extension"
+      ]
+    },
+    {
+      "lucide": "layout-grid",
+      "group": "Things",
+      "meaning": "Project; a view",
+      "sf": [
+        "square.grid.2x2"
+      ]
+    },
+    {
+      "lucide": "layers",
+      "group": "Things",
+      "meaning": "A stack, a plan",
+      "sf": [
+        "square.stack.3d.up"
+      ]
+    },
+    {
+      "lucide": "package",
+      "group": "Things",
+      "meaning": "Package, release",
+      "sf": [
+        "shippingbox"
+      ]
+    },
+    {
+      "lucide": "file-text",
+      "group": "Things",
+      "meaning": "File, doc",
+      "sf": [
+        "doc.text",
+        "doc.richtext"
+      ]
+    },
+    {
+      "lucide": "file",
+      "group": "Things",
+      "meaning": "A file",
+      "sf": [
+        "doc"
+      ]
+    },
+    {
+      "lucide": "file-question-mark",
+      "group": "Things",
+      "meaning": "A file that is not found",
+      "sf": [
+        "doc.questionmark"
+      ]
+    },
+    {
+      "lucide": "file-search",
+      "group": "Things",
+      "meaning": "Search in a file",
+      "sf": [
+        "doc.text.magnifyingglass"
+      ]
+    },
+    {
+      "lucide": "copy",
+      "group": "Things",
+      "meaning": "Copy",
+      "sf": [
+        "doc.on.doc",
+        "square.on.square"
+      ]
+    },
+    {
+      "lucide": "square-terminal",
+      "group": "Things",
+      "meaning": "Terminal, command",
+      "sf": [
+        "apple.terminal",
+        "terminal"
+      ]
+    },
+    {
+      "lucide": "code",
+      "group": "Things",
+      "meaning": "Code",
+      "sf": [
+        "chevron.left.forwardslash.chevron.right"
+      ]
+    },
+    {
+      "lucide": "braces",
+      "group": "Things",
+      "meaning": "Data, JSON",
+      "sf": [
+        "curlybraces"
+      ]
+    },
+    {
+      "lucide": "globe",
+      "group": "Things",
+      "meaning": "Web page",
+      "sf": [
+        "globe"
+      ]
+    },
+    {
+      "lucide": "compass",
+      "group": "Things",
+      "meaning": "Browser",
+      "sf": [
+        "safari"
+      ]
+    },
+    {
+      "lucide": "image",
+      "group": "Things",
+      "meaning": "Picture",
+      "sf": [
+        "photo"
+      ]
+    },
+    {
+      "lucide": "link",
+      "group": "Things",
+      "meaning": "Link",
+      "sf": [
+        "link"
+      ]
+    },
+    {
+      "lucide": "tag",
+      "group": "Things",
+      "meaning": "Label",
+      "sf": [
+        "tag"
+      ]
+    },
+    {
+      "lucide": "building-2",
+      "group": "Things",
+      "meaning": "Organisation",
+      "sf": [
+        "building.2"
+      ]
+    },
+    {
+      "lucide": "landmark",
+      "group": "Things",
+      "meaning": "Institution",
+      "sf": [
+        "building.columns"
+      ]
+    },
+    {
+      "lucide": "mail",
+      "group": "Things",
+      "meaning": "Email",
+      "sf": [
+        "envelope",
+        "envelope.badge"
+      ]
+    },
+    {
+      "lucide": "mail-open",
+      "group": "Things",
+      "meaning": "Email, read",
+      "sf": [
+        "envelope.open"
+      ]
+    },
+    {
+      "lucide": "bell",
+      "group": "Things",
+      "meaning": "Notification",
+      "sf": [
+        "bell"
+      ]
+    },
+    {
+      "lucide": "bell-off",
+      "group": "Things",
+      "meaning": "Muted",
+      "sf": [
+        "bell.slash"
+      ]
+    },
+    {
+      "lucide": "house",
+      "group": "Things",
+      "meaning": "Home",
+      "sf": [
+        "house"
+      ]
+    },
+    {
+      "lucide": "calendar",
+      "group": "Things",
+      "meaning": "Date",
+      "sf": [
+        "calendar"
+      ]
+    },
+    {
+      "lucide": "hammer",
+      "group": "Things",
+      "meaning": "Build, tool",
+      "sf": [
+        "hammer"
+      ]
+    },
+    {
+      "lucide": "settings",
+      "group": "Things",
+      "meaning": "Settings",
+      "sf": [
+        "gearshape",
+        "gearshape.2"
+      ]
+    },
+    {
+      "lucide": "list-checks",
+      "group": "Things",
+      "meaning": "Checklist",
+      "sf": [
+        "checklist"
+      ]
+    },
+    {
+      "lucide": "list-ordered",
+      "group": "Things",
+      "meaning": "Numbered list, prompts",
+      "sf": [
+        "list.number"
+      ]
+    },
+    {
+      "lucide": "list",
+      "group": "Things",
+      "meaning": "List",
+      "sf": [
+        "list.bullet.rectangle"
+      ]
+    },
+    {
+      "lucide": "menu",
+      "group": "Things",
+      "meaning": "Drag to reorder",
+      "sf": [
+        "line.3.horizontal"
+      ]
+    },
+    {
+      "lucide": "chart-pie",
+      "group": "Things",
+      "meaning": "Share of a whole",
+      "sf": [
+        "chart.pie"
+      ]
+    },
+    {
+      "lucide": "chart-column",
+      "group": "Things",
+      "meaning": "Chart",
+      "sf": [
+        "chart.bar"
+      ]
+    },
+    {
+      "lucide": "target",
+      "group": "Things",
+      "meaning": "Goal",
+      "sf": [
+        "target",
+        "scope"
+      ]
+    },
+    {
+      "lucide": "lightbulb",
+      "group": "Things",
+      "meaning": "Idea, suggestion",
+      "sf": [
+        "lightbulb"
+      ]
+    },
+    {
+      "lucide": "paintbrush",
+      "group": "Things",
+      "meaning": "Look",
+      "sf": [
+        "paintbrush"
+      ]
+    },
+    {
+      "lucide": "eye",
+      "group": "Things",
+      "meaning": "Show",
+      "sf": [
+        "eye"
+      ]
+    },
+    {
+      "lucide": "eye-off",
+      "group": "Things",
+      "meaning": "Hide",
+      "sf": [
+        "eye.slash"
+      ]
+    },
+    {
+      "lucide": "wifi-off",
+      "group": "Things",
+      "meaning": "Offline",
+      "sf": [
+        "wifi.slash"
+      ]
+    },
+    {
+      "lucide": "radio",
+      "group": "Things",
+      "meaning": "Broadcast, live",
+      "sf": [
+        "antenna.radiowaves.left.and.right"
+      ]
+    },
+    {
+      "lucide": "cloud",
+      "group": "Things",
+      "meaning": "Cloud",
+      "sf": [
+        "cloud",
+        "cloud.fill"
+      ]
+    },
+    {
+      "lucide": "sun",
+      "group": "Things",
+      "meaning": "Awake, held",
+      "sf": [
+        "sun.max"
+      ]
+    },
+    {
+      "lucide": "sunrise",
+      "group": "Things",
+      "meaning": "Morning",
+      "sf": [
+        "sun.horizon"
+      ]
+    },
+    {
+      "lucide": "battery-low",
+      "group": "Things",
+      "meaning": "On battery",
+      "sf": [
+        "battery.25"
+      ]
+    },
+    {
+      "lucide": "hourglass",
+      "group": "Things",
+      "meaning": "Takes time",
+      "sf": [
+        "hourglass"
+      ]
+    },
+    {
+      "lucide": "ticket",
+      "group": "Things",
+      "meaning": "Ticket",
+      "sf": [
+        "ticket"
+      ]
+    },
+    {
+      "lucide": "sticky-note",
+      "group": "Things",
+      "meaning": "Note",
+      "sf": [
+        "note"
+      ]
+    },
+    {
+      "lucide": "scroll-text",
+      "group": "Things",
+      "meaning": "Log, record",
+      "sf": [
+        "scroll"
+      ]
+    },
+    {
+      "lucide": "at-sign",
+      "group": "Things",
+      "meaning": "Mention",
+      "sf": [
+        "at"
+      ]
+    },
+    {
+      "lucide": "hash",
+      "group": "Things",
+      "meaning": "Number",
+      "sf": [
+        "number"
+      ]
+    },
+    {
+      "lucide": "panel-left",
+      "group": "Things",
+      "meaning": "Left sidebar",
+      "sf": [
+        "sidebar.left"
+      ]
+    },
+    {
+      "lucide": "panel-right",
+      "group": "Things",
+      "meaning": "Right sidebar",
+      "sf": [
+        "sidebar.trailing"
+      ]
+    },
+    {
+      "lucide": "mouse-pointer-click",
+      "group": "Things",
+      "meaning": "Click, control the screen",
+      "sf": [
+        "cursorarrow.rays"
+      ]
+    },
+    {
+      "lucide": "hand",
+      "group": "Things",
+      "meaning": "Stop and ask; a hand raised",
+      "sf": [
+        "hand.raised",
+        "hand.raised.fill"
+      ]
+    },
+    {
+      "lucide": "pointer",
+      "group": "Things",
+      "meaning": "Tap",
+      "sf": [
+        "hand.tap"
+      ]
+    },
+    {
+      "lucide": "ear",
+      "group": "Things",
+      "meaning": "Listen",
+      "sf": [
+        "ear"
+      ]
+    },
+    {
+      "lucide": "droplet",
+      "group": "Things",
+      "meaning": "Drop",
+      "sf": [
+        "drop"
+      ]
+    },
+    {
+      "lucide": "dot",
+      "group": "Things",
+      "meaning": "A running mark",
+      "sf": [
+        "circle.fill"
+      ]
+    },
+    {
+      "lucide": "square-dot",
+      "group": "Things",
+      "meaning": "A changed file",
+      "sf": [
+        "dot.square"
+      ]
+    },
+    {
+      "lucide": "chart-gantt",
+      "group": "Things",
+      "meaning": "Timeline",
+      "sf": [
+        "timeline.selection"
+      ]
+    },
+    {
+      "lucide": "phone",
+      "group": "Things",
+      "meaning": "Phone, messaging",
+      "sf": [
+        "phone.bubble"
+      ]
+    },
+    {
+      "lucide": "clock-fading",
+      "group": "Things",
+      "meaning": "Background work",
+      "sf": [
+        "person.crop.circle.badge.clock"
+      ]
+    },
+    {
+      "lucide": "square-pen",
+      "group": "Actions",
+      "meaning": "New session",
+      "sf": [
+        "square.and.pencil"
+      ]
+    },
+    {
+      "lucide": "pencil",
+      "group": "Actions",
+      "meaning": "Edit",
+      "sf": [
+        "pencil",
+        "pencil.circle"
+      ]
+    },
+    {
+      "lucide": "arrow-up",
+      "group": "Actions",
+      "meaning": "Send",
+      "sf": [
+        "arrow.up"
+      ]
+    },
+    {
+      "lucide": "arrow-down",
+      "group": "Actions",
+      "meaning": "Down",
+      "sf": [
+        "arrow.down"
+      ]
+    },
+    {
+      "lucide": "circle-arrow-down",
+      "group": "Actions",
+      "meaning": "Download, to the end",
+      "sf": [
+        "arrow.down.circle"
+      ]
+    },
+    {
+      "lucide": "arrow-right",
+      "group": "Actions",
+      "meaning": "Go on",
+      "sf": [
+        "arrow.right"
+      ]
+    },
+    {
+      "lucide": "circle-arrow-right",
+      "group": "Actions",
+      "meaning": "Go on, in a circle",
+      "sf": [
+        "arrow.right.circle"
+      ]
+    },
+    {
+      "lucide": "square-arrow-right",
+      "group": "Actions",
+      "meaning": "Move to",
+      "sf": [
+        "arrow.right.square"
+      ]
+    },
+    {
+      "lucide": "arrow-up-to-line",
+      "group": "Actions",
+      "meaning": "To the top",
+      "sf": [
+        "arrow.up.to.line"
+      ]
+    },
+    {
+      "lucide": "corner-down-right",
+      "group": "Actions",
+      "meaning": "Reply, a thread",
+      "sf": [
+        "arrow.turn.down.right"
+      ]
+    },
+    {
+      "lucide": "arrow-up-down",
+      "group": "Actions",
+      "meaning": "Sort",
+      "sf": [
+        "arrow.up.and.down"
+      ]
+    },
+    {
+      "lucide": "maximize-2",
+      "group": "Actions",
+      "meaning": "Expand",
+      "sf": [
+        "arrow.up.left.and.arrow.down.right"
+      ]
+    },
+    {
+      "lucide": "undo-2",
+      "group": "Actions",
+      "meaning": "Undo, go back",
+      "sf": [
+        "arrow.uturn.backward",
+        "arrow.uturn.left",
+        "arrowshape.turn.up.left",
+        "arrow.uturn.backward.circle"
+      ]
+    },
+    {
+      "lucide": "paperclip",
+      "group": "Actions",
+      "meaning": "Attach",
+      "sf": [
+        "paperclip"
+      ]
+    },
+    {
+      "lucide": "mic",
+      "group": "Actions",
+      "meaning": "Voice",
+      "sf": [
+        "microphone",
+        "mic.fill"
+      ]
+    },
+    {
+      "lucide": "audio-waveform",
+      "group": "Actions",
+      "meaning": "Voice mode",
+      "sf": [
+        "waveform",
+        "waveform.circle"
+      ]
+    },
+    {
+      "lucide": "search",
+      "group": "Actions",
+      "meaning": "Search",
+      "sf": [
+        "magnifyingglass"
+      ]
+    },
+    {
+      "lucide": "zoom-in",
+      "group": "Actions",
+      "meaning": "Zoom in",
+      "sf": [
+        "plus.magnifyingglass"
+      ]
+    },
+    {
+      "lucide": "zoom-out",
+      "group": "Actions",
+      "meaning": "Zoom out",
+      "sf": [
+        "minus.magnifyingglass"
+      ]
+    },
+    {
+      "lucide": "ellipsis",
+      "group": "Actions",
+      "meaning": "More",
+      "sf": [
+        "ellipsis"
+      ]
+    },
+    {
+      "lucide": "circle-ellipsis",
+      "group": "Actions",
+      "meaning": "More, in a circle",
+      "sf": [
+        "ellipsis.circle"
+      ]
+    },
+    {
+      "lucide": "pin",
+      "group": "Actions",
+      "meaning": "Pin",
+      "sf": [
+        "pin",
+        "pin.fill"
+      ]
+    },
+    {
+      "lucide": "pin-off",
+      "group": "Actions",
+      "meaning": "Unpin",
+      "sf": [
+        "pin.slash"
+      ]
+    },
+    {
+      "lucide": "external-link",
+      "group": "Actions",
+      "meaning": "Open outside the app",
+      "sf": [
+        "arrow.up.right.square"
+      ]
+    },
+    {
+      "lucide": "rotate-cw",
+      "group": "Actions",
+      "meaning": "Retry",
+      "sf": [
+        "arrow.clockwise",
+        "arrow.clockwise.circle"
+      ]
+    },
+    {
+      "lucide": "refresh-cw",
+      "group": "Actions",
+      "meaning": "Again and again, sync",
+      "sf": [
+        "arrow.triangle.2.circlepath",
+        "arrow.trianglehead.2.clockwise"
+      ]
+    },
+    {
+      "lucide": "repeat",
+      "group": "Actions",
+      "meaning": "Repeat",
+      "sf": [
+        "repeat"
+      ]
+    },
+    {
+      "lucide": "history",
+      "group": "Actions",
+      "meaning": "History",
+      "sf": [
+        "clock.arrow.circlepath"
+      ]
+    },
+    {
+      "lucide": "circle-stop",
+      "group": "Actions",
+      "meaning": "Stop",
+      "sf": [
+        "stop.circle",
+        "stop",
+        "stop.fill"
+      ]
+    },
+    {
+      "lucide": "play",
+      "group": "Actions",
+      "meaning": "Run",
+      "sf": [
+        "play",
+        "play.fill"
+      ]
+    },
+    {
+      "lucide": "circle-play",
+      "group": "Actions",
+      "meaning": "Run, in a circle",
+      "sf": [
+        "play.circle"
+      ]
+    },
+    {
+      "lucide": "check",
+      "group": "Actions",
+      "meaning": "Approve",
+      "sf": [
+        "checkmark"
+      ]
+    },
+    {
+      "lucide": "x",
+      "group": "Actions",
+      "meaning": "Close, deny",
+      "sf": [
+        "xmark"
+      ]
+    },
+    {
+      "lucide": "chevron-right",
+      "group": "Actions",
+      "meaning": "Open, go in",
+      "sf": [
+        "chevron.right",
+        "chevron.compact.right",
+        "forward"
+      ]
+    },
+    {
+      "lucide": "chevron-left",
+      "group": "Actions",
+      "meaning": "Back",
+      "sf": [
+        "chevron.left",
+        "chevron.backward"
+      ]
+    },
+    {
+      "lucide": "chevron-down",
+      "group": "Actions",
+      "meaning": "Fold, menu",
+      "sf": [
+        "chevron.down"
+      ]
+    },
+    {
+      "lucide": "chevron-up",
+      "group": "Actions",
+      "meaning": "Up",
+      "sf": [
+        "chevron.up"
+      ]
+    },
+    {
+      "lucide": "chevrons-up-down",
+      "group": "Actions",
+      "meaning": "Choose",
+      "sf": [
+        "chevron.up.chevron.down"
+      ]
+    },
+    {
+      "lucide": "plus",
+      "group": "Actions",
+      "meaning": "Add",
+      "sf": [
+        "plus"
+      ]
+    },
+    {
+      "lucide": "circle-plus",
+      "group": "Actions",
+      "meaning": "Add, in a circle",
+      "sf": [
+        "plus.circle"
+      ]
+    },
+    {
+      "lucide": "square-plus",
+      "group": "Actions",
+      "meaning": "Add, in a square",
+      "sf": [
+        "plus.square"
+      ]
+    },
+    {
+      "lucide": "circle-minus",
+      "group": "Actions",
+      "meaning": "Remove",
+      "sf": [
+        "minus.circle"
+      ]
+    },
+    {
+      "lucide": "square-minus",
+      "group": "Actions",
+      "meaning": "Remove, in a square",
+      "sf": [
+        "minus.square"
+      ]
+    },
+    {
+      "lucide": "diff",
+      "group": "Actions",
+      "meaning": "Changes",
+      "sf": [
+        "plusminus"
+      ]
+    },
+    {
+      "lucide": "trash-2",
+      "group": "Actions",
+      "meaning": "Delete",
+      "sf": [
+        "trash"
+      ]
+    },
+    {
+      "lucide": "inbox",
+      "group": "Actions",
+      "meaning": "Inbox, nothing here",
+      "sf": [
+        "tray",
+        "tray.full"
+      ]
+    },
+    {
+      "lucide": "archive-restore",
+      "group": "Actions",
+      "meaning": "Unarchive",
+      "sf": [
+        "tray.and.arrow.up"
+      ]
+    },
+    {
+      "lucide": "square-check",
+      "group": "Actions",
+      "meaning": "A box that is checked",
+      "sf": [
+        "checkmark.square"
+      ]
+    },
+    {
+      "lucide": "square",
+      "group": "Actions",
+      "meaning": "A box that is not checked",
+      "sf": [
+        "square"
+      ]
+    },
+    {
+      "lucide": "square-dashed",
+      "group": "Actions",
+      "meaning": "An empty place",
+      "sf": [
+        "square.dashed",
+        "questionmark.square.dashed"
+      ]
+    },
+    {
+      "lucide": "circle",
+      "group": "Actions",
+      "meaning": "An option not chosen",
+      "sf": [
+        "circle"
+      ]
+    },
+    {
+      "lucide": "circle-dashed",
+      "group": "Actions",
+      "meaning": "Not started",
+      "sf": [
+        "circle.dashed",
+        "circle.dotted"
+      ]
+    },
+    {
+      "lucide": "ban",
+      "group": "Actions",
+      "meaning": "Not allowed",
+      "sf": [
+        "slash.circle",
+        "nosign",
+        "hand.raised.slash"
+      ]
+    },
+    {
+      "lucide": "sparkles",
+      "group": "Actions",
+      "meaning": "Suggested by an agent",
+      "sf": [
+        "sparkle",
+        "sparkles"
+      ]
+    },
+    {
+      "lucide": "zap",
+      "group": "Actions",
+      "meaning": "Fast, now",
+      "sf": [
+        "bolt"
+      ]
+    },
+    {
+      "lucide": "info",
+      "group": "Notices",
+      "meaning": "For your information",
+      "sf": [
+        "info",
+        "info.circle"
+      ]
+    },
+    {
+      "lucide": "triangle-alert",
+      "group": "Notices",
+      "meaning": "Warning: it may go wrong",
+      "sf": [
+        "exclamationmark.triangle",
+        "exclamationmark.triangle.fill"
+      ]
+    },
+    {
+      "lucide": "circle-alert",
+      "group": "Notices",
+      "meaning": "Error: it went wrong",
+      "sf": [
+        "exclamationmark.circle"
+      ]
+    },
+    {
+      "lucide": "octagon-alert",
+      "group": "Notices",
+      "meaning": "Stopped by a rule",
+      "sf": [
+        "exclamationmark.octagon"
+      ]
+    },
+    {
+      "lucide": "shield-check",
+      "group": "Notices",
+      "meaning": "Trust: approve a device, a tool",
+      "sf": [
+        "checkmark.shield"
+      ]
+    },
+    {
+      "lucide": "shield-alert",
+      "group": "Notices",
+      "meaning": "A trust problem",
+      "sf": [
+        "exclamationmark.shield"
+      ]
+    },
+    {
+      "lucide": "shield-x",
+      "group": "Notices",
+      "meaning": "Trust refused",
+      "sf": [
+        "xmark.shield"
+      ]
+    },
+    {
+      "lucide": "shield",
+      "group": "Notices",
+      "meaning": "Protected",
+      "sf": [
+        "lock.shield"
+      ]
+    },
+    {
+      "lucide": "badge-check",
+      "group": "Notices",
+      "meaning": "Vouched for",
+      "sf": [
+        "checkmark.seal",
+        "checkmark.seal.fill"
+      ]
+    },
+    {
+      "lucide": "key",
+      "group": "Notices",
+      "meaning": "A secret",
+      "sf": [
+        "key",
+        "key.horizontal"
+      ]
+    },
+    {
+      "lucide": "lock",
+      "group": "Notices",
+      "meaning": "Locked, signed in",
+      "sf": [
+        "lock",
+        "lock.fill"
+      ]
+    },
+    {
+      "lucide": "coins",
+      "group": "Notices",
+      "meaning": "Cost",
+      "sf": [
+        "dollarsign.circle"
+      ]
+    },
+    {
+      "lucide": "clock",
+      "group": "Notices",
+      "meaning": "Time, a schedule",
+      "sf": [
+        "clock"
+      ]
+    },
+    {
+      "lucide": "clock-alert",
+      "group": "Notices",
+      "meaning": "A time that waits on you",
+      "sf": [
+        "clock.badge.questionmark"
+      ]
+    },
+    {
+      "lucide": "alarm-clock",
+      "group": "Notices",
+      "meaning": "Reminder",
+      "sf": [
+        "alarm"
+      ]
+    }
+  ]
+}

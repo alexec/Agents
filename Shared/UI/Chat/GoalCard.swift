@@ -23,7 +23,7 @@ struct GoalCard: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
-                            Image(systemName: goal.status == .complete ? "checkmark.circle" : "scope")
+                            Image(icon: goal.status == .complete ? "checkmark.circle" : "scope")
                                 .appText(.supporting)
                                 .accessibilityHidden(true)
                             Text(goal.objective)
@@ -36,7 +36,7 @@ struct GoalCard: View {
                                 .appText(.fine)
                                 .foregroundStyle(.secondary)
                                 .fixedSize()
-                            Image(systemName: "chevron.right")
+                            Image(icon: "chevron.right")
                                 .appText(.fine)
                                 .foregroundStyle(.secondary)
                                 .rotationEffect(.degrees(isExpanded ? 90 : 0))

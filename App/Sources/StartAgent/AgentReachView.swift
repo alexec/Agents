@@ -19,21 +19,21 @@ struct AgentReachView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Folders").appText(.reading).fontWeight(.semibold)
                 if let cwd {
-                    Label(cwd.lastPathComponent, systemImage: "folder")
+                    Label(cwd.lastPathComponent, icon: "folder")
                         .appText(.reading)
                         .foregroundStyle(.secondary)
                         .help(cwd.path(percentEncoded: false))
                 }
                 ForEach(folders, id: \.self) { folder in
                     HStack {
-                        Label(folder.lastPathComponent, systemImage: "folder")
+                        Label(folder.lastPathComponent, icon: "folder")
                             .appText(.reading)
                             .help(folder.path(percentEncoded: false))
                         Spacer()
                         Button {
                             folders.removeAll { $0 == folder }
                         } label: {
-                            Image(systemName: "xmark")
+                            Image(icon: "xmark")
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
@@ -55,7 +55,7 @@ struct AgentReachView: View {
                         Button {
                             servers.removeAll { $0.id == server.id }
                         } label: {
-                            Image(systemName: "xmark")
+                            Image(icon: "xmark")
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)

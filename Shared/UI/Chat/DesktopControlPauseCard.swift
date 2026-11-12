@@ -30,7 +30,7 @@ struct DesktopControlPauseCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(DesktopControlPauseWords.title(pause.app), systemImage: DesktopControlPauseWords.symbol)
+            Label(DesktopControlPauseWords.title(pause.app), icon: DesktopControlPauseWords.symbol)
                 .appText(.reading).fontWeight(.semibold)
                 .tinted(.attention)
             Text(DesktopControlPauseWords.body)

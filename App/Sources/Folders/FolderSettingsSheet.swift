@@ -106,7 +106,7 @@ struct FolderSettingsSheet: View {
                 RailButton(lit: chosen == each, label: each.title, selected: chosen == each,
                            action: { ask?.pane = each }) {
                     HStack(spacing: 8) {
-                        Image(systemName: each.symbol)
+                        Image(icon: each.symbol)
                             .frame(width: 20)
                             .foregroundStyle(chosen == each ? AnyShapeStyle(Paper.ground) : AnyShapeStyle(.secondary))
                             .accessibilityHidden(true)
@@ -140,7 +140,7 @@ private struct FolderGeneralPane: View {
                             .textSelection(.enabled)
                             .help(summary.folder.folder.path)
                         if !summary.exists {
-                            Label("Folder is missing", systemImage: "exclamationmark.triangle")
+                            Label("Folder is missing", icon: "exclamationmark.triangle")
                                 .appText(.fine)
                                 .tinted(.failure)
                         } else if summary.host == .mac {

@@ -58,7 +58,7 @@ struct RequestRowLabel: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             // In Later (#4234), grey: nobody is waited on until it comes back.
-            Image(systemName: request.symbol)
+            Image(icon: request.symbol)
                 .sidebarMark(request.isDeferred ? AnyShapeStyle(.secondary) : StateTint.attention.style(or: .primary))
                 .frame(width: 16)
                 .accessibilityHidden(true)
@@ -99,7 +99,7 @@ struct ApprovalMark: View {
     var kind: Approval.Kind?
 
     var body: some View {
-        Image(systemName: kind == .workflowFailed ? "exclamationmark.triangle" : "checkmark.shield")
+        Image(icon: kind == .workflowFailed ? "exclamationmark.triangle" : "checkmark.shield")
             .sidebarMark(StateTint.attention.style(or: .primary))
             .frame(width: 16)
             .accessibilityHidden(true)

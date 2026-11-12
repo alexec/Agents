@@ -146,7 +146,7 @@ struct AddMCPByHandPane: View {
                         Button {
                             rows.wrappedValue.removeAll { $0.id == row.id }
                         } label: {
-                            Image(systemName: "minus.circle")
+                            Image(icon: "minus.circle")
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("Remove \(row.name.isEmpty ? (header ? "header" : "variable") : row.name)")
@@ -171,7 +171,7 @@ struct AddMCPByHandPane: View {
                 }
                 switch answer.outcome {
                 case .answered(let serverName, let version, let tools):
-                    Label(answeredLine(serverName, version, tools.count), systemImage: "checkmark.circle")
+                    Label(answeredLine(serverName, version, tools.count), icon: "checkmark.circle")
                         .appText(.fine)
                     if !tools.isEmpty {
                         Text(tools.joined(separator: " · ")).appText(.code).foregroundStyle(.secondary)

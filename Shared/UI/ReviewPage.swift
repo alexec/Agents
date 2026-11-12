@@ -216,7 +216,7 @@ struct ReviewPage: View {
 /// Where a Review page was, once its change is answered or gone (#1472).
 struct ReviewGonePage: View {
     var body: some View {
-        ContentUnavailableView("Nothing waits for an OK here", systemImage: "checkmark.shield",
+        ContentUnavailableView("Nothing waits for an OK here", icon: "checkmark.shield",
                                description: Text("The change was answered, or it is no longer there."))
     }
 }

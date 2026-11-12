@@ -99,7 +99,7 @@ struct MessagesView: View {
         .navigationTitle(list.open?.conversation.title ?? MessagesList.title)
         .toolbar {
             ToolbarItemGroup(placement: .navigation) {
-                Button { list.open = nil } label: { Image(systemName: "chevron.left") }
+                Button { list.open = nil } label: { Image(toolbarIcon: "chevron.left") }
                     .disabled(list.open == nil)
                     .help("Back to Messages")
             }
@@ -146,7 +146,7 @@ private struct MessagesListPane: View {
                 let rows = list.rows
                 List {
                     ForEach(MessagesList.problems(lists), id: \.self) { line in
-                        Label(line, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
+                        Label(line, icon: "exclamationmark.triangle").foregroundStyle(.secondary)
                     }
                     if rows.isEmpty {
                         Text(list.unreadOnly ? MessagesList.noUnread : MessagesList.noConversations).foregroundStyle(.secondary)
@@ -202,7 +202,7 @@ private struct ConversationRow: View {
     var body: some View {
         let c = row.conversation
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: MessagesList.symbol(c.source))
+            Image(icon: MessagesList.symbol(c.source))
                 .foregroundStyle(.secondary)
                 .frame(width: 18)
                 .help(ChannelLinkWords.channel(c.source))
@@ -247,7 +247,7 @@ private struct ConversationPage: View {
                 Text(problem).foregroundStyle(.secondary).padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let messages {
                 List {
-                    Label(MessagesList.outside, systemImage: "exclamationmark.shield").appText(.fine).foregroundStyle(.secondary)
+                    Label(MessagesList.outside, icon: "exclamationmark.shield").appText(.fine).foregroundStyle(.secondary)
                     if messages.isEmpty {
                         Text(MessagesList.noMessages).foregroundStyle(.secondary)
                     }
@@ -276,7 +276,7 @@ private struct ConversationPage: View {
         VStack(alignment: .leading, spacing: 6) {
             if thread != nil {
                 HStack(spacing: 8) {
-                    Label(MessagesList.inThread, systemImage: "arrowshape.turn.up.left").appText(.fine).foregroundStyle(.secondary)
+                    Label(MessagesList.inThread, icon: "arrowshape.turn.up.left").appText(.fine).foregroundStyle(.secondary)
                     Button(MessagesList.leaveThread) { thread = nil }
                         .linkStyle()
                 }
@@ -294,7 +294,7 @@ private struct ConversationPage: View {
             }
             Text(MessagesList.sentAs(replyAs)).appText(.fine).foregroundStyle(.secondary)
             if let sendProblem {
-                Label(sendProblem, systemImage: "exclamationmark.triangle").appText(.fine).foregroundStyle(.secondary)
+                Label(sendProblem, icon: "exclamationmark.triangle").appText(.fine).foregroundStyle(.secondary)
             }
         }
     }
@@ -320,7 +320,7 @@ private struct ConversationPage: View {
     private var header: some View {
         let c = row.conversation
         return HStack(spacing: 8) {
-            Image(systemName: MessagesList.symbol(c.source)).foregroundStyle(.secondary)
+            Image(icon: MessagesList.symbol(c.source)).foregroundStyle(.secondary)
             Text(ChannelLinkWords.channel(c.source)).foregroundStyle(.secondary)
             Text(verbatim: "▸ \(row.item.server)").appText(.fine).foregroundStyle(.secondary)
             Spacer()

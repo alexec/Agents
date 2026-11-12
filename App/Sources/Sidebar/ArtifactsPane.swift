@@ -127,7 +127,7 @@ struct ArtifactsPane: View {
     private func row(_ artifact: Artifact) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 6) {
-                Image(systemName: symbol(for: artifact))
+                Image(icon: symbol(for: artifact))
                     .foregroundStyle(.secondary)
                 Text(artifact.name)
                     .lineLimit(1)
@@ -203,7 +203,7 @@ struct ArtifactsPane: View {
 private struct Nothing: View {
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "tray")
+            Image(icon: "tray")
                 .appText(.title)
                 .foregroundStyle(.tertiary)
             Text("Nothing exchanged yet")

@@ -27,7 +27,7 @@ struct MCPTriggerLines: View {
     private func line(_ status: MCPTriggerStatus, now: Date) -> some View {
         let words = status.words(now: now)
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "antenna.radiowaves.left.and.right")
+            Image(icon: "antenna.radiowaves.left.and.right")
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)

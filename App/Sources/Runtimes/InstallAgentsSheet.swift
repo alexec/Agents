@@ -163,7 +163,7 @@ struct RuntimeStatusIcon: View {
                 // The agent's row, at the same size, so a list of installs turns with it.
                 SyncedSpinner(diameter: 12)
             } else {
-                Image(systemName: symbol)
+                Image(icon: symbol)
                     // Decorative: the row's status glyph, held to its 18-point frame.
                     .glyph(size: 15)
                     .foregroundStyle(tint.style(or: .secondary))

@@ -412,7 +412,7 @@ struct WorkFeaturesPane: View {
             state.groupOpen[group] = !isOpen
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: "chevron.right")
+                Image(icon: "chevron.right")
                     .imageScale(.small)
                     .rotationEffect(.degrees(isOpen ? 90 : 0))
                     .frame(width: 12)
@@ -479,7 +479,7 @@ struct WorkFeaturesPane: View {
             Task { await state.setOpen(feature.name, !open, model: model) }
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "chevron.right")
+                Image(icon: "chevron.right")
                     .imageScale(.small)
                     .rotationEffect(.degrees(open ? 90 : 0))
                     .foregroundStyle(.secondary)
@@ -525,7 +525,7 @@ struct WorkFeaturesPane: View {
         // One text, so on a phone the words wrap as a line does, not as a column beside the glyph.
         let start = Text(words).monospacedDigit()
         let line = needs.map {
-            Text("\(start) · \(Text("\(Image(systemName: "exclamationmark.triangle")) \($0)").fontWeight(.semibold))")
+            Text("\(start) · \(Text("\(Image(icon: "exclamationmark.triangle")) \($0)").fontWeight(.semibold))")
         } ?? start
         return line
             .foregroundStyle(needs == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(Self.attention))
@@ -588,7 +588,7 @@ struct WorkFeaturesPane: View {
         let place = state.places[epic.node.ref].flatMap { WorkFeatures.whereWords($0) }
         return open(epic, indent: epicIndent) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "chart.pie")
+                Image(icon: "chart.pie")
                     .foregroundStyle(epic.state == "open" ? WorkLook.Tone.green.color : WorkLook.Tone.purple.color)
                     .accessibilityHidden(true)
                 if compact {
@@ -744,7 +744,7 @@ struct WorkFeaturesPane: View {
         // One width for both marks, so the numbers and titles line up.
         Group {
             if flight == .needsYou {
-                Image(systemName: "exclamationmark.triangle").foregroundStyle(Self.attention).imageScale(.small)
+                Image(icon: "exclamationmark.triangle").foregroundStyle(Self.attention).imageScale(.small)
                     .accessibilityLabel("Needs you")
             } else {
                 Circle().fill(WorkLook.Tone.green.color).frame(width: 8, height: 8)

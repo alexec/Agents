@@ -39,7 +39,7 @@ struct MessageIcon: View {
     var symbol: String?
 
     var body: some View {
-        Image(systemName: symbol ?? tone.symbol)
+        Image(icon: symbol ?? tone.symbol)
             .foregroundStyle(tone.tint.style(or: Paper.secondary))
             .accessibilityHidden(true)
     }
@@ -261,7 +261,7 @@ struct Toast<Actions: View>: View {
                 #endif
             if seconds == nil {
                 Button(action: dismiss) {
-                    Image(systemName: "xmark")
+                    Image(icon: "xmark")
                 }
                 .buttonStyle(.borderless)
                 .foregroundStyle(.secondary)

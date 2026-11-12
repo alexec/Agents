@@ -37,7 +37,7 @@ struct FileTreeRow: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 // The same width for a file as a folder's chevron, so names line up.
-                Image(systemName: "chevron.right")
+                Image(icon: "chevron.right")
                     .appText(.fine)
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(isOpen ? 90 : 0))
@@ -75,13 +75,13 @@ struct FileTreeRow: View {
     private var icon: some View {
         switch kind {
         case .folder(let open):
-            Image(systemName: open ? "folder.fill" : "folder")
+            Image(icon: open ? "folder.fill" : "folder")
                 .foregroundStyle(.tint)
         case .file(let state?):
-            Image(systemName: ChangeTint.symbol(state))
+            Image(icon: ChangeTint.symbol(state))
                 .foregroundStyle(ChangeTint.color(state))
         case .file(nil):
-            Image(systemName: "doc")
+            Image(icon: "doc")
                 .foregroundStyle(.secondary)
         }
     }

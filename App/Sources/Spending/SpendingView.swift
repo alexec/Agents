@@ -29,7 +29,7 @@ struct SpendingView: View {
             VStack(alignment: .leading, spacing: 20) {
                 // The day's ledger or the limits set aside as unreadable (#171).
                 if let note = model.costState?.note {
-                    Label(note, systemImage: "exclamationmark.triangle")
+                    Label(note, icon: "exclamationmark.triangle")
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -100,7 +100,7 @@ struct SpendingView: View {
     private var unmeasured: some View {
         let chats = spending.unmeasuredAgents == 1 ? "1 chat" : "\(spending.unmeasuredAgents) chats"
         return Label("At least this much: \(chats) ran on a runtime that reported no price.",
-                     systemImage: "questionmark.circle")
+                     icon: "questionmark.circle")
             .appText(.reading)
             .foregroundStyle(.secondary)
             .padding(.top, 4)

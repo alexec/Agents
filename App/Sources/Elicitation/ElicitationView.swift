@@ -248,7 +248,7 @@ struct ElicitationView: View {
     private static let choicesCap: CGFloat = 320
 
     private func turn(to page: Int, _ symbol: String, _ label: String, enabled: Bool) -> some View {
-        Button { step = page } label: { Image(systemName: symbol) }
+        Button { step = page } label: { Image(icon: symbol) }
             .buttonStyle(.paper)
             .disabled(!enabled)
             .modifier(Held(sending: sending))

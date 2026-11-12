@@ -15,7 +15,7 @@ struct AccountMoveStrip: View {
             Button {
                 Task { await model.continueInNew(agent.id) }
             } label: {
-                Label(OrgAccountWords.continueInNew, systemImage: "arrow.turn.down.right")
+                Label(OrgAccountWords.continueInNew, icon: "arrow.turn.down.right")
             }
             .help("Start a new session that reads this one and carries on, on the account new sessions use")
         }

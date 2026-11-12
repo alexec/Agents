@@ -105,7 +105,7 @@ struct WorkTimelineEvent: View {
 
     var body: some View {
         WorkTimelineEntry {
-            Image(systemName: symbol)
+            Image(icon: symbol)
                 .appText(.fine)
                 .foregroundStyle(.secondary)
                 .frame(width: 22, height: 22)

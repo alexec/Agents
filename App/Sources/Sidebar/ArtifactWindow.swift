@@ -52,7 +52,7 @@ struct ArtifactWindow: View {
             if let key, let agent {
                 content(key: key, agent: agent)
             } else {
-                ContentUnavailableView("This session is gone", systemImage: "questionmark.folder",
+                ContentUnavailableView("This session is gone", icon: "questionmark.folder",
                                        description: Text("Close this window."))
             }
         }

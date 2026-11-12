@@ -284,7 +284,7 @@ private struct AgentConfigFileList: View {
         .background(Paper.ground)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Add File", systemImage: "plus") { newName = ""; adding = true }
+                Button("Add File", toolbarIcon: "plus") { newName = ""; adding = true }
                     .disabled(busy || !loaded)
             }
         }
@@ -402,7 +402,7 @@ private struct AgentConfigFileScreen: View {
         .toolbar {
             if dirty {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Back", systemImage: "chevron.backward") { leaving = UnsavedLeave { dismiss() } }
+                    Button("Back", toolbarIcon: "chevron.backward") { leaving = UnsavedLeave { dismiss() } }
                 }
             }
             ToolbarItem(placement: .confirmationAction) {

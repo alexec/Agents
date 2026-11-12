@@ -18,7 +18,7 @@ struct SessionDeletedPage: View {
     let next: Next
 
     var body: some View {
-        ContentUnavailableView("This session was deleted", systemImage: "trash",
+        ContentUnavailableView("This session was deleted", icon: "trash",
                                description: Text(description))
     }
 
@@ -41,7 +41,7 @@ struct SessionNotLoadedPage: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label("This session did not load", systemImage: "exclamationmark.triangle")
+            Label("This session did not load", icon: "exclamationmark.triangle")
         } description: {
             Text(failure.reason)
         } actions: {

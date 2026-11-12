@@ -49,7 +49,7 @@ struct SecretsPane<Extra: View>: View {
             }
             if let only = SecretInfoWords.onlyMachine(state.secrets?.secrets ?? []) {
                 Section {
-                    Label(SecretInfoWords.onlyMachineLine(only, names: machineNames), systemImage: "exclamationmark.triangle")
+                    Label(SecretInfoWords.onlyMachineLine(only, names: machineNames), icon: "exclamationmark.triangle")
                         .appText(.supporting).tinted(.attention)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -117,7 +117,7 @@ struct SecretsPane<Extra: View>: View {
                             Button("Replace…") { replacing = row }
                             Button("Remove…", role: .destructive) { removing = row }
                         } label: {
-                            Image(systemName: "ellipsis.circle")
+                            Image(icon: "ellipsis.circle")
                         }
                         .fixedSize()
                         .accessibilityLabel("\(row.name) actions")
@@ -126,7 +126,7 @@ struct SecretsPane<Extra: View>: View {
                         .fixedSize(horizontal: false, vertical: true)
                     SecretInfoLine(parts: SecretInfoWords.line(row))
                     if row.asksBeforeUse {
-                        Label(AskBeforeUseWords.asks, systemImage: "hand.raised")
+                        Label(AskBeforeUseWords.asks, icon: "hand.raised")
                             .appText(.fine).foregroundStyle(.secondary)
                     }
                     if let waiting = UserScopeWords.waiting(row) {

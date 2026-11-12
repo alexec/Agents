@@ -127,7 +127,7 @@ struct BringingBackRow: View {
                         .buttonStyle(.link)
                         .appText(.fine)
                 }
-                Button { model.putAwayBringBack(bringBack) } label: { Image(systemName: "xmark") }
+                Button { model.putAwayBringBack(bringBack) } label: { Image(icon: "xmark") }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     .help("Put away")

@@ -112,7 +112,7 @@ struct WorkItemRow: View {
     @ViewBuilder
     private var comments: some View {
         if let n = WorkLook.commentsWords(row.comments) {
-            Label(n, systemImage: "bubble.left")
+            Label(n, icon: "bubble.left")
                 .labelStyle(.titleAndIcon)
                 .appText(.fine)
                 .foregroundStyle(.secondary)
@@ -142,9 +142,9 @@ struct WorkChecksGlyph: View {
     var body: some View {
         Group {
             switch checks {
-            case .passing: Image(systemName: "checkmark").foregroundStyle(WorkLook.Tone.green.color)
-            case .failing: Image(systemName: "xmark").foregroundStyle(WorkLook.Tone.red.color)
-            case .running: Image(systemName: "circle.fill").imageScale(.small).foregroundStyle(Paper.forgeWaiting)
+            case .passing: Image(icon: "checkmark").foregroundStyle(WorkLook.Tone.green.color)
+            case .failing: Image(icon: "xmark").foregroundStyle(WorkLook.Tone.red.color)
+            case .running: Image(icon: "circle.fill").imageScale(.small).foregroundStyle(Paper.forgeWaiting)
             }
         }
         .appText(.fine)

@@ -28,7 +28,7 @@ struct PolicyRuleRow: View {
                 Text(row.title)
             }
             if let line = rule?.capLine {
-                Label(line, systemImage: "lock.fill")
+                Label(line, icon: "lock.fill")
                     .appText(.fine).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -94,7 +94,7 @@ struct PolicyRuleRow: View {
             Button {
                 set(nil)
             } label: {
-                if yours == nil { Label(notSetWords, systemImage: "checkmark") } else { Text(notSetWords) }
+                if yours == nil { Label(notSetWords, icon: "checkmark") } else { Text(notSetWords) }
             }
             Divider()
             ForEach(values, id: \.self) { value in
@@ -102,7 +102,7 @@ struct PolicyRuleRow: View {
                 Button {
                     set(value)
                 } label: {
-                    if yours == value { Label(words(value), systemImage: "checkmark") } else { Text(words(value)) }
+                    if yours == value { Label(words(value), icon: "checkmark") } else { Text(words(value)) }
                     if looser, let line = rule?.capLine { Text(line) }
                 }
                 .disabled(looser)

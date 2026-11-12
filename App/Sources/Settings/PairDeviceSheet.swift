@@ -26,7 +26,7 @@ struct PairDeviceSheet: View {
             Text("Pair a Device")
                 .appText(.title)
             if let paired {
-                Label("\(paired.name) is paired", systemImage: "checkmark.circle")
+                Label("\(paired.name) is paired", icon: "checkmark.circle")
                     .appText(.reading)
                 Text("It reaches your agents through the control plane, as a Device.")
                     .foregroundStyle(.secondary)

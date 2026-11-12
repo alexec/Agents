@@ -120,7 +120,7 @@ struct LabelTagField: View {
             Button {
                 remove(label.value)
             } label: {
-                Image(systemName: "xmark")
+                Image(icon: "xmark")
                     .imageScale(.small)
                     .accessibilityLabel("Remove \(label.value)")
             }

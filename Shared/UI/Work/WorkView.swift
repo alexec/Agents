@@ -40,10 +40,10 @@ struct WorkView: View {
             // The Remote's item page has its own bar: ‹ Issues, ↑ ↓ and Open on GitHub (#4401).
             if Self.history(place) {
                 ToolbarItemGroup(placement: Self.historyPlacement) {
-                    Button { model.workHistory.back() } label: { Image(systemName: "chevron.left") }
+                    Button { model.workHistory.back() } label: { Image(toolbarIcon: "chevron.left") }
                         .disabled(!model.workHistory.canGoBack)
                         .help("Back")
-                    Button { model.workHistory.forward() } label: { Image(systemName: "chevron.right") }
+                    Button { model.workHistory.forward() } label: { Image(toolbarIcon: "chevron.right") }
                         .disabled(!model.workHistory.canGoForward)
                         .help("Forward")
                 }

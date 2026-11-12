@@ -119,7 +119,7 @@ private struct FolderMCPRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: icon)
+                Image(icon: icon)
                     .appText(.reading)
                     .foregroundStyle((isWaiting || !server.missingSecrets.isEmpty || needsSignIn ? StateTint.attention : StateTint.none).style(or: .secondary))
                     .accessibilityLabel(isWaiting ? "Waiting for your OK" : "Connector")
@@ -147,7 +147,7 @@ private struct FolderMCPRow: View {
                     if !isWaiting {
                         // Allow, Ask or Off for each of its tools (#4099).
                         Button { showingTools.toggle() } label: {
-                            Label("Tools", systemImage: showingTools ? "chevron.down" : "chevron.right")
+                            Label("Tools", icon: showingTools ? "chevron.down" : "chevron.right")
                                 .appText(.supporting)
                         }
                         .buttonStyle(.plain)

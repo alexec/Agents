@@ -61,7 +61,7 @@ struct WorkMenuLabel: View {
     var body: some View {
         HStack(spacing: 3) {
             Text(title).lineLimit(1)
-            Image(systemName: "chevron.down").imageScale(.small).fontWeight(.semibold).accessibilityHidden(true)
+            Image(icon: "chevron.down").imageScale(.small).fontWeight(.semibold).accessibilityHidden(true)
         }
         .appText(.supporting)
         .foregroundStyle(isSet ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
@@ -94,7 +94,7 @@ struct WorkClearButton: View {
 
     var body: some View {
         Button(action: action) {
-            Label(WorkLook.clear, systemImage: "xmark").labelStyle(.titleAndIcon)
+            Label(WorkLook.clear, icon: "xmark").labelStyle(.titleAndIcon)
         }
         .buttonStyle(.plain)
         .appText(.supporting)
@@ -111,12 +111,12 @@ struct WorkSearchField: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+            Image(icon: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
             TextField(prompt, text: $text)
                 .textFieldStyle(.plain)
                 .accessibilityLabel(prompt)
             if !text.isEmpty {
-                Button { text = "" } label: { Image(systemName: "xmark.circle.fill") }
+                Button { text = "" } label: { Image(icon: "xmark.circle.fill") }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
                     .help("Clear")
@@ -186,7 +186,7 @@ struct WorkRefreshButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "arrow.triangle.2.circlepath")
+            Image(toolbarIcon: "arrow.triangle.2.circlepath")
                 .symbolEffect(.rotate, isActive: running)
         }
         .help("Refresh")

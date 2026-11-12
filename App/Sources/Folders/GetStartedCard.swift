@@ -33,7 +33,7 @@ struct GetStartedCard: View {
                 Button {
                     model.dismissGetStarted()
                 } label: {
-                    Image(systemName: "xmark")
+                    Image(icon: "xmark")
                         // Decorative: the button's label is said below.
                         .glyph(size: 10, weight: .semibold)
                         .foregroundStyle(.secondary)

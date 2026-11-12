@@ -40,7 +40,7 @@ struct FileCard: View {
                     .clipShape(RoundedRectangle(cornerRadius: 6))
             }
             HStack(spacing: 10) {
-                Image(systemName: symbol)
+                Image(icon: symbol)
                     .foregroundStyle(.secondary)
                     .frame(width: 18)
                 VStack(alignment: .leading, spacing: 2) {
@@ -49,7 +49,7 @@ struct FileCard: View {
                 }
                 Spacer(minLength: 0)
                 if actions.showFile != nil {
-                    Image(systemName: "chevron.right").appText(.fine).foregroundStyle(.tertiary)
+                    Image(icon: "chevron.right").appText(.fine).foregroundStyle(.tertiary)
                 }
             }
         }

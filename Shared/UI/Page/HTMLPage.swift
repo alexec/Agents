@@ -42,7 +42,7 @@ struct HTMLPage: View {
     var body: some View {
         if let failure {
             VStack(spacing: 6) {
-                Image(systemName: "exclamationmark.triangle")
+                Image(icon: "exclamationmark.triangle")
                     .appText(.title)
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)

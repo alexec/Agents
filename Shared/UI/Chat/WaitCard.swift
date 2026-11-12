@@ -117,7 +117,7 @@ struct WaitCard: View {
             HStack(spacing: 7) {
                 if let personLine {
                     // Needs you's mark and words, as the session's row has them (#3147).
-                    Image(systemName: StatusShape.needsYou.symbol ?? "exclamationmark.circle.fill")
+                    Image(icon: StatusShape.needsYou.symbol ?? "exclamationmark.circle.fill")
                         .tinted(.attention)
                         .accessibilityHidden(true)
                     Text(personLine).fontWeight(.semibold).tinted(.attention)

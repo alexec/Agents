@@ -36,7 +36,7 @@ struct ArchivedSessionsPage: View {
             case .hostSilent:
                 ArchivedStaleStrip().frame(maxHeight: .infinity)
             case .empty:
-                ContentUnavailableView(ArchivedPage.Sessions.emptyTitle, systemImage: ArchivedPage.Sessions.systemImage,
+                ContentUnavailableView(ArchivedPage.Sessions.emptyTitle, icon: ArchivedPage.Sessions.systemImage,
                                        description: Text(ArchivedPage.Sessions.emptyLine))
             case .noMatch:
                 ArchivedNoMatch(title: ArchivedPage.Sessions.noMatch) { filter = "" }
@@ -125,7 +125,7 @@ struct ArchivedWorkflowsPage: View {
             case .hostSilent:
                 ArchivedStaleStrip().frame(maxHeight: .infinity)
             case .empty:
-                ContentUnavailableView(ArchivedPage.Workflows.emptyTitle, systemImage: ArchivedPage.Workflows.systemImage,
+                ContentUnavailableView(ArchivedPage.Workflows.emptyTitle, icon: ArchivedPage.Workflows.systemImage,
                                        description: Text(ArchivedPage.Workflows.emptyLine))
             case .noMatch:
                 ArchivedNoMatch(title: ArchivedPage.Workflows.noMatch) { filter = "" }
@@ -199,7 +199,7 @@ private struct ArchivedNoMatch: View {
 
     var body: some View {
         ContentUnavailableView {
-            Label(title, systemImage: "magnifyingglass")
+            Label(title, icon: "magnifyingglass")
         } actions: {
             Button("Clear", action: clear)
         }
@@ -214,7 +214,7 @@ private struct ArchivedPlaceholderRows: View {
             Section("Today") {
                 ForEach(0..<6, id: \.self) { index in
                     HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: ArchivedPage.Sessions.systemImage)
+                        Image(icon: ArchivedPage.Sessions.systemImage)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(index.isMultiple(of: 2) ? "An archived session's title" : "A shorter title")
                             Text("The last line it said, in grey").appText(.fine)

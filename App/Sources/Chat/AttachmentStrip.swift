@@ -12,7 +12,7 @@ struct AttachmentStrip: View {
             HStack(spacing: 8) {
                 ForEach(attachments) { attachment in
                     HStack(spacing: 6) {
-                        Image(systemName: symbol(for: attachment))
+                        Image(icon: symbol(for: attachment))
                             // Decorative: a glyph in a badge, not text (FR-015).
                             .glyph(size: 10)
                         VStack(alignment: .leading, spacing: 0) {
@@ -26,7 +26,7 @@ struct AttachmentStrip: View {
                         Button {
                             remove(attachment)
                         } label: {
-                            Image(systemName: "xmark")
+                            Image(icon: "xmark")
                                 // Decorative: a glyph in a badge, not text (FR-015).
                                 .glyph(size: 8, weight: .bold)
                         }
