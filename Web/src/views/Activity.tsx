@@ -30,7 +30,10 @@ import { UsageCharts } from "./UsageCharts";
 import { mergeUsage } from "../model/usage";
 import { hostAnswers, hostNeedsUpdate } from "../model/capabilities";
 import { mergeTime } from "../model/time";
+import { velocityHere } from "../model/velocity";
 import { TimeCharts } from "./TimeCharts";
+import { VelocityCharts } from "./VelocityCharts";
+import { pageHost } from "./Multiplier";
 import { Capability } from "../protocol/capabilities.generated";
 import { OrgBudget, OrgPolicyLine, PassThroughList } from "./OrgPolicyLine";
 import { PageTitle } from "./TopBar";
@@ -232,7 +235,7 @@ export function availabilityWords(availability: RuntimeAvailability): string {
 
 const onlineHosts = (store: Store): ControlMachine[] => store.hosts.value.filter((h) => hostAnswers(h.state));
 
-const pageTitles: Record<ActivityPage, string> = { events: "Events", runtimes: "Runtimes", mcp: "Connectors", spending: "Cost", tokens: "Tokens", time: "Time" };
+const pageTitles: Record<ActivityPage, string> = { events: "Events", runtimes: "Runtimes", mcp: "Connectors", spending: "Cost", tokens: "Tokens", time: "Time", velocity: "Velocity" };
 
 /** How much is left, with no times, as allowanceReading's first part: "62% left". Null when the reading has no amount. */
 function allowanceAmount(state: AllowanceState, now: Date): string | null {
@@ -427,6 +430,7 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
           {page === "spending" && costPane.value === "reports" && <ReportsPane store={store} runtimeName={chartRuntimeName(store, chartHosts(store))} />}
           {page === "tokens" && <TokensPage store={store} hostName={hostName} />}
           {page === "time" && <TimePage store={store} />}
+          {page === "velocity" && <VelocityPage store={store} />}
         </div>
       </div>
       {signingIn.value && (
@@ -620,6 +624,25 @@ function TimePage({ store }: { store: Store }) {
   if (!host) return <p class="quiet">No machine is connected.</p>;
   const history = store.time.value[host] ? mergeTime(hosts.flatMap((each) => store.time.value[each] ?? [])) : undefined;
   return <TimeCharts history={history} runtimeName={runtimeName} />;
+}
+
+/**
+ * The PRs that landed (#4598): this Mac's velocity/history, the host the Multiplier page reads, not every
+ * host's added up, which would count a PR two machines worked on twice. Read on open, when the host's
+ * Multiplier changes (a merge or a merged revert), and every 60 s while visible, as Time is.
+ */
+function VelocityPage({ store }: { store: Store }) {
+  const host = pageHost(store);
+  const multiplier = host ? store.multiplier.value[host] : undefined;
+  useEffect(() => { if (host) void store.loadVelocity(host); }, [host, multiplier]);
+  useEffect(() => {
+    if (!host) return;
+    const every = setInterval(() => { if (document.visibilityState === "visible") void store.loadVelocity(host); }, 60_000);
+    return () => clearInterval(every);
+  }, [host]);
+  if (!host) return <p class="quiet">No machine is connected.</p>;
+  const history = store.velocity.value[host];
+  return <VelocityCharts history={history ? velocityHere(history) : undefined} />;
 }
 
 /** What the work used in tokens (#956): the charts in tokens, then each host's day against its token limits. */
