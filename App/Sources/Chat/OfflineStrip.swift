@@ -1,7 +1,8 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Across the top of a chat whose server has gone (037, wireframes/mac-offline.svg).
+/// Across the top of a chat whose server has gone (037, wireframes/mac-offline.svg): a
+/// neutral banner (#4737).
 ///
 /// What the chat shows is what the window last had. A server's agents carry on; the
 /// window tries that host again by itself. This Mac's host says whether it is down,
@@ -13,16 +14,11 @@ struct OfflineStrip: View {
     var body: some View {
         // The control plane being away is the window's own strip, above everything.
         if let text = line {
-            HStack(spacing: 10) {
-                if starting {
-                    ProgressView().controlSize(.mini)
-                } else {
-                    Circle().tinted(.attention).frame(width: 7, height: 7)
-                }
+            // Neutral (#4737): the person need not act; the window tries again by itself.
+            PaneBanner(tone: .neutral, symbol: MessageTone.offlineSymbol, busy: starting,
+                       announcement: text) {
                 Text(text)
-                    .appText(.supporting)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
+            } actions: {
                 if let workspace, starting, let since = workspace.since {
                     // How long the start has taken so far (#691, L1).
                     TimelineView(.periodic(from: since, by: 1)) { context in
@@ -31,7 +27,6 @@ struct OfflineStrip: View {
                     }
                 } else if let workspace, OfflineWords.offersStart(state: row?.state ?? "offline", workspace: workspace) {
                     Button("Start") { Task { await model.startHost(host) } }
-                        .controlSize(.small)
                         .disabled(model.hostsBeingStarted.contains(host))
                         .help("Starts \(workspace.workspaceName) at \(workspace.providerName).")
                 } else if starting || workspace?.hostState == "stopping" {
@@ -45,15 +40,10 @@ struct OfflineStrip: View {
                 }
                 if host == .mac {
                     Button("Try Again") { model.tryMacHostAgain() }
-                        .controlSize(.small)
                 } else {
                     Button("Try now") { model.hosts.retryNow() }
-                        .controlSize(.small)
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 9)
-            .paperWell(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
             .chatColumn()
             .padding(.top, 8)
         }

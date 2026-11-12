@@ -70,30 +70,22 @@ struct WorkEmptyState: View {
 }
 
 /// What the forges said when a read failed: a strip above the list (not in place of it), a
-/// warning glyph, the forge's words, one line each, and Try again.
+/// failure banner (#4737), the forge's words, one line each, and Try again.
 struct WorkErrorStrip: View {
     let lines: [String]
     var retry: (() -> Void)?
 
     var body: some View {
+        // A failure banner (#4737): a read that failed. Not the `forge.waiting` wash, which is
+        // for a check that runs.
         if !lines.isEmpty {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(Paper.forgeWaiting)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(lines, id: \.self) { Text($0).lineLimit(1).truncationMode(.tail).help($0) }
-                }
-                .appText(.supporting)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            PaneBanner(tone: .failure, announcement: lines.joined(separator: " ")) {
+                ForEach(lines, id: \.self) { Text($0).lineLimit(1).truncationMode(.tail).help($0) }
+            } actions: {
                 if let retry {
-                    Button(WorkLook.tryAgain, action: retry).buttonStyle(.paper)
+                    Button(WorkLook.tryAgain, action: retry)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(RoundedRectangle(cornerRadius: Paper.Radius.control).fill(Paper.forgeWaitingWash))
-            .overlay(RoundedRectangle(cornerRadius: Paper.Radius.control).strokeBorder(Paper.forgeWaitingRule))
         }
     }
 }
