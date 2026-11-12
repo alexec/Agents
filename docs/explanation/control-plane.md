@@ -238,8 +238,8 @@ the Console page and the MDM pin come in later steps of #998.
 The control plane on a Mac has a second, smaller listener: plain HTTP on the loopback
 address only, at **http://localhost:8792**. It serves the web page, which is built into
 Agents and checked against a list of its files' hashes, and takes the page's WebSocket.
-Nothing else on the network can reach it, and **Serve Agents to browsers on this Mac** in
-**Settings ▸ Control plane** turns it off.
+Nothing else on the network can reach it. It is off by default (#4923): **Serve Agents to
+browsers on this Mac** in **Settings ▸ Control plane** turns it on.
 
 A browser that pairs there becomes a client of the **browser** kind, with a key of its own
 that script can use but not read. A browser key works only on that listener, and a window's

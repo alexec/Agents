@@ -24,7 +24,9 @@ serving it at a public address (issue #61).
 
 ### Open the page and pair the browser
 
-1. In the window, choose **View ▸ Open in Browser**. The same button is first on
+1. Turn on **Serve Agents to browsers on this Mac** in **Settings ▸ Control plane**. It is
+   off by default.
+2. In the window, choose **View ▸ Open in Browser**. The same button is first on
    **Settings ▸ Control plane**, beside **Use Agents in Safari or Chrome on this Mac**, and
    in the Agents menu bar item.
 
@@ -58,7 +60,8 @@ address, it connects with that key, and nothing needs pasting.
 
 When this Mac reports to a control plane that runs somewhere else, such as in the cloud, this
 Mac's host serves the page at the same address, **http://localhost:8792**. **Serve Agents to
-browsers on this Mac**, in **Settings ▸ Control plane**, turns it on and off, as before.
+browsers on this Mac**, in **Settings ▸ Control plane**, turns it on and off, as before. It is
+off by default.
 
 The page works as it does with the control plane here, with two differences:
 
