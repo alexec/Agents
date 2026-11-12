@@ -113,7 +113,26 @@ func (c *carriedProviders) carry(request wire.ProviderCarry) wire.ProviderCarrie
 			values[k] = v
 		}
 	}
-	return redacted(providers.NewRedaction(values), c.call(request))
+	out := redacted(providers.NewRedaction(values), c.call(request))
+	logCarried(request, out)
+	return out
+}
+
+// logCarried logs a call that failed, with its reason, and a create's outcome, here on the
+// machine that carries the provider (#4706): the control plane's copy of a failed make's
+// reason went with a redeploy, and this log had only "providers: create <id>". The reason
+// is the redacted one, as the control plane gets it.
+func logCarried(request wire.ProviderCarry, out wire.ProviderCarried) {
+	name := ""
+	if request.Name != nil && *request.Name != "" {
+		name = " " + *request.Name
+	}
+	switch {
+	case out.Error != nil:
+		log.Printf("providers: %s%s at %s failed: %s", request.Call, name, request.Provider, *out.Error)
+	case request.Call == "create":
+		log.Printf("providers: create%s at %s: ok", name, request.Provider)
+	}
 }
 
 // redacted is out with each secret's value said as ${NAME}.
