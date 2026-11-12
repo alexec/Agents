@@ -57,29 +57,39 @@ test("status secrets: two pages under Status, after Events", () => {
   assert.deepEqual(nav.navPages.status.map((p) => p.id), ["runtimes", "events", "secrets", "accounts"]);
 });
 
-test("status sidebar: the grey line names a recent read only", () => {
+test("status sidebar: the grey line names the newest operation", () => {
   const read = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(5) } }),
     row("OLD", { lastOp: { what: "replaced", at: wire(60) } })]);
-  assert.equal(s.recentRead(read, now), "GITHUB_TOKEN");
+  assert.equal(s.recentOperation(read, now), "GITHUB_TOKEN");
   const within = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(3 * 60) } })]);
-  assert.equal(s.recentRead(within, now), "GITHUB_TOKEN");
+  assert.equal(s.recentOperation(within, now), "GITHUB_TOKEN");
   const stale = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(5 * 60) } })]);
-  assert.equal(s.recentRead(stale, now), null);
+  assert.equal(s.recentOperation(stale, now), null);
   const replaced = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(60) } }),
     row("NEW", { lastOp: { what: "replaced", at: wire(5) } })]);
-  assert.equal(s.recentRead(replaced, now), null);
+  assert.equal(s.recentOperation(replaced, now), "NEW · Replaced");
+  const iso = (minutesAgo) => new Date(now - minutesAgo * 60_000).toISOString();
+  const added = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(60) } }),
+    row("NEW_TOKEN", { created: iso(2) })]);
+  assert.equal(s.recentOperation(added, now), "NEW_TOKEN · Added");
+  assert.equal(s.recentOperation(s.secretLines([row("NEW_TOKEN", { created: iso(5 * 60) })]), now), null);
   const accounts = s.accountLines([{ service: "gitlab.com", address: "agentstest@example.com", secret: "GITLAB_TOKEN" }],
     [row("GITLAB_TOKEN", { lastOp: { what: "read", at: wire(10) } })]);
-  assert.equal(s.recentRead(accounts, now), "gitlab.com · agentstest@example.com");
+  assert.equal(s.recentOperation(accounts, now), "gitlab.com · agentstest@example.com");
+  const rotated = s.accountLines([{ service: "gitlab.com", address: "agentstest@example.com", secret: "GITLAB_TOKEN" }],
+    [row("GITLAB_TOKEN", { lastOp: { what: "replaced", at: wire(10) } })]);
+  assert.equal(s.recentOperation(rotated, now), "gitlab.com · agentstest@example.com · GITLAB_TOKEN replaced");
 });
 
-test("status sidebar: the grey line names the session that read it, when the page knows it", () => {
+test("status sidebar: the grey line names the session that did it, when the page knows it", () => {
   const titles = { fixer: "Fix the login" };
   const read = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(5), agent: "fixer" } })]);
-  assert.equal(s.recentRead(read, now, (id) => titles[id]), "GITHUB_TOKEN · Fix the login");
+  assert.equal(s.recentOperation(read, now, (id) => titles[id]), "GITHUB_TOKEN · Fix the login");
+  const added = s.secretLines([row("NEW_TOKEN", { lastOp: { what: "added", at: wire(1), agent: "fixer" } })]);
+  assert.equal(s.recentOperation(added, now, (id) => titles[id]), "NEW_TOKEN · Added · Fix the login");
   const unknown = s.secretLines([row("GITHUB_TOKEN", { lastOp: { what: "read", at: wire(5), agent: "gone" } })]);
-  assert.equal(s.recentRead(unknown, now, (id) => titles[id]), "GITHUB_TOKEN");
+  assert.equal(s.recentOperation(unknown, now, (id) => titles[id]), "GITHUB_TOKEN");
   const accounts = s.accountLines([{ service: "gitlab.com", secret: "GITLAB_TOKEN" }],
     [row("GITLAB_TOKEN", { lastOp: { what: "read", at: wire(10), agent: "fixer" } })]);
-  assert.equal(s.recentRead(accounts, now, (id) => titles[id]), "gitlab.com · Fix the login");
+  assert.equal(s.recentOperation(accounts, now, (id) => titles[id]), "gitlab.com · Fix the login");
 });

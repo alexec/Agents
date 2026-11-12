@@ -16,7 +16,7 @@ public enum StatusSecretsWords {
     public static let noSecrets = "No secrets yet."
     public static let noAccounts = "No accounts yet."
     /// Before the grey line's name, for VoiceOver.
-    public static let readLabel = "Last read:"
+    public static let lastLabel = "Last operation:"
     public static let notBackedUp = "Not backed up: only on one machine."
     public static let secretsHelp = "When something last happened to one of your secrets"
     public static let accountsHelp = "When something last happened to one of your outside accounts"
@@ -40,8 +40,8 @@ public enum StatusSecretsWords {
         public var agent: UUID?
     }
 
-    /// How long a read stays recent for the sidebar row's grey line.
-    public static let recentReadWindow: TimeInterval = 4 * 3600
+    /// How long an operation stays recent for the sidebar row's grey line.
+    public static let recentWindow: TimeInterval = 4 * 3600
 
     /// `••••` and the last 4 when a machine sent them (#4158).
     public static func masked(_ hint: String?) -> String {
@@ -116,14 +116,16 @@ public enum StatusSecretsWords {
         lines.compactMap(\.at).max()
     }
 
-    /// The sidebar row's grey line: the name of the item read last (an account's address too) and the session that
-    /// read it, by `agentTitle`, only when the newest operation on any line is a read in the last 4 hours. Nil otherwise.
-    /// A session the client does not know, or one with no title, is left out.
-    public static func recentRead(_ lines: [Line], now: Date = Date(), agentTitle: (UUID) -> String? = { _ in nil }) -> String? {
+    /// The sidebar row's grey line (#4931): the name of the item behind the row's time (an account's address too), the
+    /// operation when it is not a read ("Added", "GITLAB_TOKEN replaced"), and the session that did it, by `agentTitle`,
+    /// only when that newest operation is less than 4 hours old. Nil otherwise. A session the client does not know, or
+    /// one with no title, is left out.
+    public static func recentOperation(_ lines: [Line], now: Date = Date(), agentTitle: (UUID) -> String? = { _ in nil }) -> String? {
         guard let newest = lines.filter({ $0.at != nil }).max(by: { $0.at! < $1.at! }),
-              newest.isRead, let at = newest.at, now.timeIntervalSince(at) < recentReadWindow else { return nil }
+              let at = newest.at, now.timeIntervalSince(at) < recentWindow else { return nil }
+        let operation = newest.isRead ? nil : newest.operation
         let agent = newest.agent.flatMap(agentTitle)
-        return [newest.title, newest.detail, agent].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        return [newest.title, newest.detail, operation, agent].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
     /// "5 min ago", "2 h ago", "3 d ago", as the wireframe's rows.

@@ -12,7 +12,7 @@ export const statusSecretsWords = {
   noSecrets: "No secrets yet.",
   noAccounts: "No accounts yet.",
   notBackedUp: "Not backed up: only on one machine.",
-  readLabel: "Last read:",
+  lastLabel: "Last operation:",
 };
 
 /** One line of a Status list. */
@@ -35,8 +35,8 @@ export interface StatusLine {
   agent: string | null;
 }
 
-/** How long a read stays recent for the sidebar row's grey line, in milliseconds. */
-export const recentReadWindow = 4 * 3_600_000;
+/** How long an operation stays recent for the sidebar row's grey line, in milliseconds. */
+export const recentWindow = 4 * 3_600_000;
 
 export function masked(hint: string | undefined): string {
   return "••••" + (hint ?? "");
@@ -115,17 +115,19 @@ export function newestAt(lines: readonly StatusLine[]): number | null {
   return times.length ? Math.max(...times) : null;
 }
 
-/** The sidebar row's grey line: the name of the item read last (an account's address too) and the session that read
- * it, by agentTitle, only when the newest operation on any line is a read in the last 4 hours. Null otherwise. A session
- * the page does not know, or one with no title, is left out. */
-export function recentRead(lines: readonly StatusLine[], now: number = Date.now(),
+/** The sidebar row's grey line (#4931): the name of the item behind the row's time (an account's address too), the
+ * operation when it is not a read ("Added", "GITLAB_TOKEN replaced"), and the session that did it, by agentTitle, only when
+ * that newest operation is less than 4 hours old. Null otherwise. A session the page does not know, or one with no title,
+ * is left out. */
+export function recentOperation(lines: readonly StatusLine[], now: number = Date.now(),
   agentTitle: (id: string) => string | undefined = () => undefined): string | null {
   const timed = lines.filter((l) => l.at !== null);
   if (!timed.length) return null;
   const newest = timed.reduce((a, b) => ((b.at as number) > (a.at as number) ? b : a));
-  if (!newest.isRead || now - (newest.at as number) >= recentReadWindow) return null;
+  if (now - (newest.at as number) >= recentWindow) return null;
+  const operation = newest.isRead ? null : newest.operation;
   const agent = newest.agent ? agentTitle(newest.agent) : undefined;
-  return [newest.title, newest.detail, agent].filter((p): p is string => !!p).join(" · ");
+  return [newest.title, newest.detail, operation, agent].filter((p): p is string => !!p).join(" · ");
 }
 
 /** "5 min ago", "2 h ago", "3 d ago", as the window's. */

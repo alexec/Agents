@@ -13,6 +13,10 @@ struct StatusSecretsWordsTests {
                                 backedUp: backedUp)
     }
 
+    private func iso(minutesAgo: Double) -> String {
+        ISO8601DateFormatter().string(from: now.addingTimeInterval(-minutesAgo * 60))
+    }
+
     @Test func secretsGoNewestFirstWithTheirLastOperation() throws {
         let lines = StatusSecretsWords.secretLines([
             secret("GITHUB_TOKEN", hint: "ab12", op: "read", minutesAgo: 120),
@@ -48,32 +52,41 @@ struct StatusSecretsWordsTests {
         #expect(lines[2].hint == "not in Secrets" && lines[2].backedUp)
     }
 
-    @Test func theGreyLineNamesARecentReadOnly() {
+    @Test func theGreyLineNamesTheNewestOperation() {
         let read = StatusSecretsWords.secretLines([secret("GITHUB_TOKEN", op: "read", minutesAgo: 5),
                                                    secret("OLD", op: "replaced", minutesAgo: 60)])
-        #expect(StatusSecretsWords.recentRead(read, now: now) == "GITHUB_TOKEN")
+        #expect(StatusSecretsWords.recentOperation(read, now: now) == "GITHUB_TOKEN")
         let within = StatusSecretsWords.secretLines([secret("GITHUB_TOKEN", op: "read", minutesAgo: 3 * 60)])
-        #expect(StatusSecretsWords.recentRead(within, now: now) == "GITHUB_TOKEN")
+        #expect(StatusSecretsWords.recentOperation(within, now: now) == "GITHUB_TOKEN")
         let stale = StatusSecretsWords.secretLines([secret("GITHUB_TOKEN", op: "read", minutesAgo: 5 * 60)])
-        #expect(StatusSecretsWords.recentRead(stale, now: now) == nil)
+        #expect(StatusSecretsWords.recentOperation(stale, now: now) == nil)
         let replaced = StatusSecretsWords.secretLines([secret("GITHUB_TOKEN", op: "read", minutesAgo: 60),
                                                        secret("NEW", op: "replaced", minutesAgo: 5)])
-        #expect(StatusSecretsWords.recentRead(replaced, now: now) == nil)
+        #expect(StatusSecretsWords.recentOperation(replaced, now: now) == "NEW · Replaced")
+        let added = StatusSecretsWords.secretLines([secret("GITHUB_TOKEN", op: "read", minutesAgo: 60),
+                                                    secret("NEW_TOKEN", created: iso(minutesAgo: 2))])
+        #expect(StatusSecretsWords.recentOperation(added, now: now) == "NEW_TOKEN · Added")
+        let staleAdd = StatusSecretsWords.secretLines([secret("NEW_TOKEN", created: iso(minutesAgo: 5 * 60))])
+        #expect(StatusSecretsWords.recentOperation(staleAdd, now: now) == nil)
         let gitlab = DaemonAPI.OutsideAccount(service: "gitlab.com", address: "agentstest@example.com", secret: "GITLAB_TOKEN")
         let accounts = StatusSecretsWords.accountLines([gitlab], secrets: [secret("GITLAB_TOKEN", op: "read", minutesAgo: 10)])
-        #expect(StatusSecretsWords.recentRead(accounts, now: now) == "gitlab.com · agentstest@example.com")
+        #expect(StatusSecretsWords.recentOperation(accounts, now: now) == "gitlab.com · agentstest@example.com")
+        let rotated = StatusSecretsWords.accountLines([gitlab], secrets: [secret("GITLAB_TOKEN", op: "replaced", minutesAgo: 10)])
+        #expect(StatusSecretsWords.recentOperation(rotated, now: now) == "gitlab.com · agentstest@example.com · GITLAB_TOKEN replaced")
     }
 
-    @Test func theGreyLineNamesTheSessionThatReadIt() {
+    @Test func theGreyLineNamesTheSessionThatDidIt() {
         let fixer = UUID(), gone = UUID()
         let titles = [fixer: "Fix the login"]
         let read = StatusSecretsWords.secretLines([secret("GITHUB_TOKEN", op: "read", minutesAgo: 5, agent: fixer)])
-        #expect(StatusSecretsWords.recentRead(read, now: now) { titles[$0] } == "GITHUB_TOKEN · Fix the login")
+        #expect(StatusSecretsWords.recentOperation(read, now: now) { titles[$0] } == "GITHUB_TOKEN · Fix the login")
         let unknown = StatusSecretsWords.secretLines([secret("GITHUB_TOKEN", op: "read", minutesAgo: 5, agent: gone)])
-        #expect(StatusSecretsWords.recentRead(unknown, now: now) { titles[$0] } == "GITHUB_TOKEN")
+        #expect(StatusSecretsWords.recentOperation(unknown, now: now) { titles[$0] } == "GITHUB_TOKEN")
+        let added = StatusSecretsWords.secretLines([secret("NEW_TOKEN", op: "added", minutesAgo: 1, agent: fixer)])
+        #expect(StatusSecretsWords.recentOperation(added, now: now) { titles[$0] } == "NEW_TOKEN · Added · Fix the login")
         let gitlab = DaemonAPI.OutsideAccount(service: "gitlab.com", secret: "GITLAB_TOKEN")
         let accounts = StatusSecretsWords.accountLines([gitlab], secrets: [secret("GITLAB_TOKEN", op: "read", minutesAgo: 10, agent: fixer)])
-        #expect(StatusSecretsWords.recentRead(accounts, now: now) { titles[$0] } == "gitlab.com · Fix the login")
+        #expect(StatusSecretsWords.recentOperation(accounts, now: now) { titles[$0] } == "gitlab.com · Fix the login")
     }
 
     @Test func agesAreShort() {

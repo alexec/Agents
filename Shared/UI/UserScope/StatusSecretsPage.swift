@@ -27,9 +27,9 @@ extension UserScopeState {
 }
 
 /// The sidebar's Status ▸ Secrets and Status ▸ Accounts rows (#4161): the title, and at its end the
-/// age of the newest operation on any of them. Under it, in grey, the secret or account read last and the
-/// session that read it, when that read is the newest operation and is less than 4 hours old. The icon keeps
-/// its plain tint: a read is not a warning.
+/// age of the newest operation on any of them. Under it, in grey, the secret or account that operation was on, the
+/// operation when it is not a read, and the session that did it, when it is less than 4 hours old (#4931). The icon
+/// keeps its plain tint: an operation is not a warning.
 struct StatusSecretsRow: View {
     let kind: StatusSecretsKind
     let state: UserScopeState
@@ -40,7 +40,7 @@ struct StatusSecretsRow: View {
         let lines = state.statusLines(kind)
         let newest = StatusSecretsWords.newest(lines)
         TimelineView(.periodic(from: .now, by: 60)) { context in
-            let read = StatusSecretsWords.recentRead(lines, now: context.date, agentTitle: agentTitle)
+            let read = StatusSecretsWords.recentOperation(lines, now: context.date, agentTitle: agentTitle)
             VStack(alignment: .leading, spacing: 1) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(kind.title).foregroundStyle(.primary)
@@ -54,7 +54,7 @@ struct StatusSecretsRow: View {
                     Text(read).appText(.fine).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 }
             }
-            .accessibilityValue(read.map { "\(StatusSecretsWords.readLabel) \($0)" } ?? "")
+            .accessibilityValue(read.map { "\(StatusSecretsWords.lastLabel) \($0)" } ?? "")
         }
         .help(kind.help)
     }
