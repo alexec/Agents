@@ -13113,6 +13113,18 @@
         "reverts": {
           "type": "string",
           "description": "The PR a merged revert reverts, by ref, from its body's \"Reverts owner/repo#n\" (#4552), for the recovery time."
+        },
+        "openedAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When a PR was opened (#4553): pr.opened's openedAt, the earliest kept. The approval wait's start when askedAt is unknown."
+        },
+        "askedAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When a PR was labelled needs-approval (#4553), from pr.labelled: the approval wait's start."
+        },
+        "answeredAt": {
+          "$ref": "#/definitions/WireDate",
+          "description": "A PR's first answer by a person (#4553): the first pr.reviewed or pr.commented at or after the wait's start, while it was open, not by a bot and not a comment that starts with <!-- agent -->. The approval wait is this less askedAt, else openedAt."
         }
       },
       "required": [
@@ -13213,6 +13225,14 @@
         "flowEfficiency": {
           "$ref": "#/definitions/LineageDeliveryFigure",
           "description": "The agents' working time on a closed issue and its PRs over its cycle time, at most 1, the median. Counted by its last merge."
+        },
+        "approvalWait": {
+          "$ref": "#/definitions/LineageDeliveryFigure",
+          "description": "The approval wait (#4553), in seconds: from a PR's needs-approval label (its opening when the label is unknown) to its first answer by a person; the median, and p90. Counted by the answer's time."
+        },
+        "approvalShare": {
+          "$ref": "#/definitions/LineageDeliveryFigure",
+          "description": "The share of merged PRs, 0 to 1, that waited for a person's answer before their merge (#4553), by merge time. count is the merged PRs."
         }
       },
       "required": [
@@ -13224,7 +13244,9 @@
         "changeFailureRate",
         "recoveryTime",
         "reworkRate",
-        "flowEfficiency"
+        "flowEfficiency",
+        "approvalWait",
+        "approvalShare"
       ],
       "additionalProperties": false
     },
@@ -31267,6 +31289,10 @@
         },
         "records": {
           "$ref": "#/definitions/TimeRecords"
+        },
+        "approvalWait": {
+          "$ref": "#/definitions/LineageDeliveryFigure",
+          "description": "How long this machine's PRs waited for a person's answer (#4553), over every repo it has: the approvalWait of LineageDelivery. Reports ▸ Time's line on the web page. Absent from a host too old to say."
         }
       },
       "required": [

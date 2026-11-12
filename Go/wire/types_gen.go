@@ -6070,6 +6070,15 @@ type LineageCostNode struct {
 
 	// The PR a merged revert reverts, by ref, from its body's "Reverts owner/repo#n" (#4552), for the recovery time.
 	Reverts *string `json:"reverts,omitzero"`
+
+	// When a PR was opened (#4553): pr.opened's openedAt, the earliest kept. The approval wait's start when askedAt is unknown.
+	OpenedAt *Date `json:"openedAt,omitzero"`
+
+	// When a PR was labelled needs-approval (#4553), from pr.labelled: the approval wait's start.
+	AskedAt *Date `json:"askedAt,omitzero"`
+
+	// A PR's first answer by a person (#4553): the first pr.reviewed or pr.commented at or after the wait's start, while it was open, not by a bot and not a comment that starts with <!-- agent -->. The approval wait is this less askedAt, else openedAt.
+	AnsweredAt *Date `json:"answeredAt,omitzero"`
 }
 
 // lineage/cost (#2350): a node's cost rolled up. own is what was banked on the node itself. total adds its parts: an issue's PRs (the PRs that fix it); a release's PRs and the issues they fix; a repo's every node (kind repo, ref github:repo:#alexec/agents). waste is the parts' PRs closed without a merge or reverted. unlinked is the parts' sessions: turns with no active link. parts is the nodes added up, newest first, at most 500; limited says there are more.
@@ -6122,6 +6131,12 @@ type LineageDelivery struct {
 
 	// The agents' working time on a closed issue and its PRs over its cycle time, at most 1, the median. Counted by its last merge.
 	FlowEfficiency LineageDeliveryFigure `json:"flowEfficiency"`
+
+	// The approval wait (#4553), in seconds: from a PR's needs-approval label (its opening when the label is unknown) to its first answer by a person; the median, and p90. Counted by the answer's time.
+	ApprovalWait LineageDeliveryFigure `json:"approvalWait"`
+
+	// The share of merged PRs, 0 to 1, that waited for a person's answer before their merge (#4553), by merge time. count is the merged PRs.
+	ApprovalShare LineageDeliveryFigure `json:"approvalShare"`
 }
 
 // One delivery figure (#4552): value over the window, absent when made from none; p90 for lead time; count is what it is made from; weeks is the 4 weeks, oldest first; band is DORA 2024's.
@@ -14208,6 +14223,9 @@ type TimeHistory struct {
 	Recap map[string]DayRecap `json:"recap"`
 
 	Records TimeRecords `json:"records"`
+
+	// How long this machine's PRs waited for a person's answer (#4553), over every repo it has: the approvalWait of LineageDelivery. Reports ▸ Time's line on the web page. Absent from a host too old to say.
+	ApprovalWait *LineageDeliveryFigure `json:"approvalWait,omitzero"`
 }
 
 type TimeRecord struct {
