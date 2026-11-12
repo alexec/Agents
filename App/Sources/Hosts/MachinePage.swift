@@ -137,8 +137,12 @@ struct MachinePage: View {
                 }
                 .monospacedDigit()
                 .help(ProcessWords.machineCPU(usage.machine))
-                if let queued = CapacityWords.queued(queuedStarts) {
-                    Text(queued).foregroundStyle(.secondary)
+                // The starts that wait, and the leases that wait for the machine (#4748).
+                let waits = [CapacityWords.queued(queuedStarts),
+                             CapacityWords.leasesInLine(CapacityWords.leasesInLine(model.leases(on: host)?.resources ?? []))]
+                    .compactMap { $0 }
+                if !waits.isEmpty {
+                    Text(waits.joined(separator: " · ")).foregroundStyle(.secondary)
                 }
             } else if let failure {
                 Text(failure).foregroundStyle(.secondary)
@@ -329,7 +333,7 @@ struct MachineRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             // A laptop, a cloud or a rack, in its state's colour (#4113): the row has no dot.
             MachineIconView(symbol: MachineIcon.symbol(isThisMac: host == .mac, row: row),
-                            icon: MachineIcon.of(dot, diskLow: model.diskWarns(host)))
+                            icon: MachineIcon.of(dot, diskLow: model.diskWarns(host), capacity: model.capacityLevel(host)))
                 .frame(width: 16)
             VStack(alignment: .leading, spacing: 2) {
                 Text(name).foregroundStyle(.primary).lineLimit(1)
@@ -498,7 +502,13 @@ extension AppModel {
     /// last said: This Mac's are always read, a server's when its page was opened.
     func need(of host: MachineRef) -> MachineNeed? {
         MachineNeed.most(row: hosts.controlRows[host], offline: hostUnreachable(host),
-                         runtimes: runtimes(on: host), disks: diskAlarms(host))
+                         runtimes: runtimes(on: host), disks: diskAlarms(host), capacity: capacityLevel(host))
+    }
+
+    /// The machine's capacity level, as it last pushed it (#4748); nil while it is unreachable,
+    /// where what it last said is old.
+    func capacityLevel(_ host: MachineRef) -> DaemonAPI.CapacityLevel? {
+        hostUnreachable(host) ? nil : work.capacity[host]?.level
     }
 
     /// Whether a disk on the machine is low or almost full, as its page says (#3626, #3628).

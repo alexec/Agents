@@ -4,14 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strings"
+	"os"
+	"path/filepath"
 	goruntime "runtime"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v4/load"
 	"github.com/shirou/gopsutil/v4/mem"
 
+	"github.com/alexec/agents/Go/internal/safe"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -139,7 +143,7 @@ func (d *Daemon) withCapacity(u wire.MachineUsage) wire.MachineUsage {
 
 // checkCapacity looks once, moves the level and raises its events.
 func (d *Daemon) checkCapacity(ctx context.Context) {
-	s := capacitySampler(ctx)
+	s := d.sampleNow(ctx)
 	target, signal := capacityTarget(s)
 	d.capMu.Lock()
 	was := d.capLevel
@@ -161,6 +165,10 @@ func (d *Daemon) checkCapacity(ctx context.Context) {
 	}
 	log.Printf("capacity: %s (was %s; load %.2f per core, memory pressure %s, swap %.0f%%)",
 		level, was, s.load1, pressureWords(s.pressure), s.swap)
+	// The rows say the level with no page open (#4748), and a compute line's reason moves.
+	state := d.capacityState()
+	safe.Go("capacity/changed", func() { Broadcast(d, wire.NotifyCapacityChanged, state) })
+	d.capacityWaitMoved()
 	switch {
 	case was == wire.CapacityLevelOk:
 		d.raiseMachineBusy(level, signal, s)
@@ -215,6 +223,31 @@ func sentenceMachine() string {
 	return strings.ToUpper(m[:1]) + m[1:]
 }
 
+// capacityOverrideFile is a walk's load (#4748): while <root>/capacity-override holds a
+// number, each look reads it as the load per core, so a scratch set-up can be shown near or
+// at capacity without loading the Mac it runs on. Never written by the app; a real root has none.
+const capacityOverrideFile = "capacity-override"
+
+// sampleNow is a look: the walk's load when its root sets one, the machine's otherwise.
+func (d *Daemon) sampleNow(ctx context.Context) capacitySample {
+	if d.Store != nil {
+		if v, ok := overriddenLoad(d.Store.Loc.Root); ok {
+			return capacitySample{load1: v, load5: v}
+		}
+	}
+	return capacitySampler(ctx)
+}
+
+// overriddenLoad is the walk's load from root, if it set one.
+func overriddenLoad(root string) (float64, bool) {
+	b, err := os.ReadFile(filepath.Join(root, capacityOverrideFile))
+	if err != nil {
+		return 0, false
+	}
+	v, err := strconv.ParseFloat(strings.TrimSpace(string(b)), 64)
+	return v, err == nil
+}
+
 // watchCapacity looks once now and every 15 s after.
 func (d *Daemon) watchCapacity() {
 	d.checkCapacity(d.ctx)
@@ -252,4 +285,26 @@ func (d *Daemon) capacityHold() string {
 		what += ", coming down"
 	}
 	return thisMachine() + " is " + words + " (" + what + ")"
+}
+
+// capacityLevelWords is a level as a sentence's subject and verb, "this Mac is near capacity", or
+// "" at ok.
+func capacityLevelWords(level wire.CapacityLevel) string {
+	switch level {
+	case wire.CapacityLevelNear:
+		return thisMachine() + " is near capacity"
+	case wire.CapacityLevelFull:
+		return thisMachine() + " is at capacity"
+	}
+	return ""
+}
+
+// capacityState is capacity/state and capacity/changed (#4748): the level now.
+func (d *Daemon) capacityState() wire.CapacityState {
+	level := d.capacityLevel()
+	st := wire.CapacityState{Level: level}
+	if w := capacityLevelWords(level); w != "" {
+		st.Words = &w
+	}
+	return st
 }

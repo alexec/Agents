@@ -31,11 +31,9 @@ public struct WaitStatus: Codable, Hashable, Sendable {
     public static func of(_ agent: Agent, names: (UUID) -> String?, lease: LeaseStatus? = nil) -> WaitStatus? {
         if let wait = agent.eventWait, wait.isOpen, let resource = wait.lineResource {
             let place = lease?.waiting.first { $0.name == resource }
-            let what = place.map { place in
-                "\(place.displayName) · held by \(place.holderName)"
-                    + (place.until.map { " until \(LeaseWords.clock($0))" } ?? "")
-                    + " · \(LeaseWords.ordinal(place.place)) in line"
-            } ?? "your turn with \(resource)"
+            // Its reason is the holder's, or the machine's (#4748).
+            let what = place.map { "\($0.displayName) · \($0.reason) · \(LeaseWords.ordinal($0.place)) in line" }
+                ?? "your turn with \(resource)"
             let short = place.map { "\($0.shortName) · \(LeaseWords.ordinal($0.place)) in line" } ?? resource.key
             return WaitStatus(line: "\(symbol) Waiting for \(what)", mark: "\(symbol) Waiting for \(short)", cancellable: true)
         }

@@ -547,6 +547,7 @@ struct RemoteChatView: View {
                 return Image(uiImage: image)
             },
             leaseStatus: { [model] agentID in model.work.leaseStatus(of: agentID) },
+            capacityStart: { [model] agent in model.work.capacityStartLine(agent) },
             openLease: openLease,
             fromLine: { [model] sender in model.work.fromLine(sender) },
             // Ask for More on a Stopped by a policy card (#3262); the Remote has no Spending.

@@ -60,4 +60,17 @@ struct LeaseStatusTests {
         #expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 101].map(LeaseWords.ordinal)
                 == ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", "22nd", "101st"])
     }
+
+    /// A line that waits for the machine says the machine, not a holder (#4748).
+    @Test func aWaitForTheMachineSaysTheMachine() throws {
+        let build = ResourceName("build")!
+        let snapshot = DaemonAPI.LeaseSnapshot(resources: [
+            .init(name: build, kind: .named, displayName: "build", places: 2,
+                  line: [.init(agentID: fixer, askedAt: minutes(-1), isCallOpen: true)],
+                  capacityWait: "this Mac is near capacity"),
+        ], at: at)
+        let status = try #require(LeaseStatus.of(fixer, in: snapshot, titles: titles))
+        #expect(status.lines == ["\u{25F7} Waiting for build \u{00B7} this Mac is near capacity \u{00B7} 1st"])
+        #expect(status.waitingLines == ["Waiting for build, this Mac is near capacity, 1st in line"])
+    }
 }

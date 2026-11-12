@@ -23,6 +23,7 @@ public enum Capability {
     public static let bots1 = "bots/1"
     public static let bringBack1 = "bring.back/1"
     public static let browser1 = "browser/1"
+    public static let capacity1 = "capacity/1"
     public static let catalog1 = "catalog/1"
     public static let changesUndo1 = "changes.undo/1"
     public static let changes1 = "changes/1"
@@ -281,6 +282,7 @@ public enum Capability {
         "browser/state": "host.browser-settings/1",
         "browser/unwatch": "browser/1",
         "browser/watch": "browser/1",
+        "capacity/state": "capacity/1",
         "catalog/destination-state": "catalog/1",
         "catalog/preview": "catalog/1",
         "catalog/search": "catalog/1",
@@ -619,6 +621,7 @@ public enum Capability {
         "bringBack/changed": "bring.back/1",
         "browser/frame": "browser/1",
         "browser/pageChanged": "browser/1",
+        "capacity/changed": "capacity/1",
         "clientPermissions/changed": "client-permissions/1",
         "clone/changed": "clone/1",
         "cost/changed": "cost/1",

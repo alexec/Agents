@@ -2106,6 +2106,53 @@
       }
     },
     {
+      "name": "capacity/changed",
+      "x-capability": "capacity/1",
+      "description": "The machine's capacity level moved (#4748): its rows say Near capacity or At capacity, as a low disk.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/CapacityState"
+          }
+        }
+      ]
+    },
+    {
+      "name": "capacity/state",
+      "x-capability": "capacity/1",
+      "description": "The machine's capacity level now (#4748), asked on connect; capacity/changed says each move after.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/CapacityState"
+        }
+      }
+    },
+    {
       "name": "catalog/destination-state",
       "x-capability": "catalog/1",
       "paramStructure": "by-name",

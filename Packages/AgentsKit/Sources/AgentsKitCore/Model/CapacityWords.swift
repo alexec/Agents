@@ -61,4 +61,27 @@ public enum CapacityWords {
     public static func queued(_ count: Int) -> String? {
         count == 0 ? nil : "\(count) \(count == 1 ? "start" : "starts") queued"
     }
+
+    /// "1 lease in line for the machine": the leases whose lines wait for the machine, not for
+    /// a holder (#4579, #4748). Nil at none.
+    public static func leasesInLine(_ count: Int) -> String? {
+        count == 0 ? nil : "\(count) \(count == 1 ? "lease" : "leases") in line for the machine"
+    }
+
+    /// How many wait in lines that wait for the machine, from the lease snapshot (#4748).
+    public static func leasesInLine(_ resources: [DaemonAPI.ResourceState]) -> Int {
+        resources.filter { $0.capacityWait != nil }.reduce(0) { $0 + $1.line.count }
+    }
+
+    /// A queued start held by the machine, at the foot of its chat (#4748): "◷ In line to start
+    /// · this Mac is near capacity".
+    public static func startLine(_ words: String) -> String {
+        "\(LeaseStatus.waitingSymbol) In line to start \u{00B7} \(words)"
+    }
+
+    /// A resource's line on the machine's page when it waits for the machine (#4748):
+    /// "Held for capacity: this Mac is near capacity".
+    public static func heldForCapacity(_ words: String) -> String {
+        "Held for capacity: \(words)"
+    }
 }

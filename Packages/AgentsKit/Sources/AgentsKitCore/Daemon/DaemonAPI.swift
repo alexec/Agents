@@ -3445,6 +3445,10 @@ public enum DaemonAPI {
         public var line: [LineMember]
         /// Whether any holder's lease is inside its warning window.
         public var endingSoon: Bool
+        /// Why its line waits for the machine, not for a holder (#4748): "this Mac is near
+        /// capacity", or "this Mac has capacity again" while the line is served one a look.
+        /// Nil when it waits for a holder, and from a host from before #4748.
+        public var capacityWait: String?
 
         /// The first holder. Still sent, so a client from before #116 draws the one.
         public var lease: Lease? { holds.first }
@@ -3453,7 +3457,7 @@ public enum DaemonAPI {
 
         public init(name: ResourceName, kind: ResourceKind, displayName: String, isGone: Bool = false,
                     holds: [Lease] = [], places: Int = 1, declared: DeclaredResource? = nil,
-                    line: [LineMember] = [], endingSoon: Bool = false) {
+                    line: [LineMember] = [], endingSoon: Bool = false, capacityWait: String? = nil) {
             self.name = name
             self.kind = kind
             self.displayName = displayName
@@ -3463,6 +3467,7 @@ public enum DaemonAPI {
             self.declared = declared
             self.line = line
             self.endingSoon = endingSoon
+            self.capacityWait = capacityWait
         }
 
         public init(name: ResourceName, kind: ResourceKind, displayName: String, isGone: Bool = false,
@@ -3477,7 +3482,7 @@ public enum DaemonAPI {
         }
 
         private enum CodingKeys: String, CodingKey {
-            case name, kind, displayName, isGone, holds, lease, places, declared, line, endingSoon
+            case name, kind, displayName, isGone, holds, lease, places, declared, line, endingSoon, capacityWait
         }
 
         public init(from decoder: any Decoder) throws {
@@ -3495,6 +3500,7 @@ public enum DaemonAPI {
             declared = try container.decodeIfPresent(DeclaredResource.self, forKey: .declared)
             line = try container.decodeIfPresent([LineMember].self, forKey: .line) ?? []
             endingSoon = try container.decodeIfPresent(Bool.self, forKey: .endingSoon) ?? false
+            capacityWait = try container.decodeIfPresent(String.self, forKey: .capacityWait)
         }
 
         public func encode(to encoder: any Encoder) throws {
@@ -3509,6 +3515,7 @@ public enum DaemonAPI {
             try container.encodeIfPresent(declared, forKey: .declared)
             try container.encode(line, forKey: .line)
             try container.encode(endingSoon, forKey: .endingSoon)
+            try container.encodeIfPresent(capacityWait, forKey: .capacityWait)
         }
     }
 

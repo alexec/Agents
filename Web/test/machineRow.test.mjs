@@ -86,6 +86,11 @@ test("the icon's colour says the state, the most urgent first (#4113)", () => {
   assert.equal(m.machineIcon("attention", true), "failure", "red wins over amber");
   assert.equal(m.machineIcon("attention", false), "attention");
   assert.equal(m.machineIcon("stopped", false), "stopped");
+  // Its capacity (#4748): red at full, amber at near, as the machine's page tints them.
+  assert.equal(m.machineIcon("online", false, "full"), "failure");
+  assert.equal(m.machineIcon("online", false, "near"), "attention");
+  assert.equal(m.machineIcon("online", false, "ok"), "accent");
+  assert.equal(m.machineIcon("busy", false, "full"), "busy");
 });
 
 test("the icon's shape says the kind", () => {

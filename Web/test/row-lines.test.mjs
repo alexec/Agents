@@ -214,3 +214,16 @@ test("the chat's lease lines: one a lease or wait, and an event wait's line and 
   assert.equal(lines.eventWaitLine(agent, title), "◷ Waiting for workflow.completed workflow nightly · since 23:30 · until 09:00");
   assert.equal(lines.eventWaitLine({ state: "running" }, title), null);
 });
+
+test("a line that waits for the machine says the machine, not a holder (#4748)", () => {
+  const now = new Date(2026, 9, 4, 14, 0);
+  const snapshot = { at: wire(now), resources: [{ name: "build", kind: "named", displayName: "build", isGone: false,
+    endingSoon: false, places: 2, holds: [], line: [{ agentID: "me", askedAt: wire(now), isCallOpen: true }],
+    capacityWait: "this Mac is near capacity" }] };
+  const mark = lines.leaseMark("me", snapshot, title);
+  assert.deepEqual(mark.lines, ["◷ Waiting for build · this Mac is near capacity · 1st"]);
+  assert.equal(mark.full, "Waiting for build, this Mac is near capacity, 1st in line.");
+  const agent = { id: "me", state: "running", eventWait: { id: "w", from: 0, since: 0,
+    patterns: [{ name: "lease.granted", filters: { agent: "me", resource: "build" } }] } };
+  assert.equal(lines.eventWaitLine(agent, title, snapshot), "◷ Waiting for build · this Mac is near capacity · 1st in line");
+});
