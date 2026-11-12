@@ -501,7 +501,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const box = got ? mergeBox(got) : undefined;
   const isPull = kind === "pr" && got !== undefined;
   const writeBox = (top: boolean) => box && detail.value && (
-    <WorkMergeBox store={store} host={detail.value.host} detail={detail.value.got} box={box} writes={writes} top={top}
+    <WorkMergeBox store={store} host={detail.value.host} detail={detail.value.got} box={box} writes={writes} waiting={fromDevice.value} top={top}
       checksPage={top ? () => { checksPage.value = true; } : undefined} wrote={() => void reread()} />
   );
   // The comment box's Close or Reopen: an issue with no tracker's status; a pull request's as its forge offers them.
@@ -663,7 +663,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
         {detail.value && hasPlan(detail.value.got.item) && (
           <WorkPlan store={store} host={detail.value.host} lineageHost={lineageHost} detail={detail.value.got} asked={asked.value}
             estimates={estimate.value?.children ?? []}
-            writes={writes} wrote={() => void reread()} />
+            writes={writes} waiting={fromDevice.value} wrote={() => void reread()} />
         )}
         {loading && (
           <div class="work-timeline" aria-hidden="true">
@@ -713,7 +713,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
           ? <WorkCommentBox store={store} host={detail.value.host} node={node} noun={kind === "pr" ? "pull request" : "issue"}
               closes={closes} said={said.value}
               wrote={(w, failed) => { said.value = { words: w, failed }; if (!failed) void reread(); }} />
-          : !box && <p class="quiet small work-no-writes">No machine of yours can write to {forgeName(ref)}.</p>)}
+          : !box && !fromDevice.value && <p class="quiet small work-no-writes">No machine of yours can write to {forgeName(ref)}.</p>)}
       </div>
       {item && (
         <aside class="work-side links" aria-label="Linked, lineage and docs">

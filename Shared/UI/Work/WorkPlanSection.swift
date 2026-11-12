@@ -26,6 +26,8 @@ struct WorkPlanSection: View {
     /// A phone: the header's bar and words stack, and the rows are the phone rows.
     var compact = false
     let writes: Bool
+    /// The page is this device's copy (#4930): no changes, and no words on why, until the machine answers.
+    var waiting = false
     let wrote: () -> Void
 
     @Environment(\.openURL) private var openURL
@@ -261,7 +263,7 @@ struct WorkPlanSection: View {
             if changes(plan) {
                 Divider()
                 addChild(open: plan.children.isEmpty)
-            } else if !writes, plan.item.state == "open", plan.standing == nil {
+            } else if !writes, !waiting, !fromDevice, plan.item.state == "open", plan.standing == nil {
                 Divider()
                 Text("No machine of yours can write to \(WorkList.forgeName(plan.item.node.ref)).")
                     .appText(.supporting).foregroundStyle(.secondary)

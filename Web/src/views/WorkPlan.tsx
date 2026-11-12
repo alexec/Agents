@@ -33,9 +33,11 @@ const holdsRuntime = (s: AgentState) => s === "starting" || s === "running" || s
 /** The mark's glyph before line 2's words; a closed child's state icon says it is done. */
 const markGlyph: Record<PlanMark, string | undefined> = { done: undefined, working: "●", attention: "⚠", waiting: "○", blocked: "⊘" };
 
-export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = [], writes, wrote }: {
+export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = [], writes, waiting = false, wrote }: {
   store: Store; host: string; lineageHost: string | undefined; detail: ForgeItemDetail; asked: number;
-  estimates?: readonly LineageEstimate[]; writes: boolean; wrote: () => void;
+  estimates?: readonly LineageEstimate[]; writes: boolean;
+  /** The page is this device's copy (#4930): no changes, and no words on why, until the machine answers. */
+  waiting?: boolean; wrote: () => void;
 }) {
   const plan = useSignal<ForgePlan | null>(null);
   const problem = useSignal<string | null>(null);
@@ -280,7 +282,7 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
                 )}
                 {said.value && <p class={said.value.failed ? "hint failure small" : "quiet small"} role="status">{said.value.words}</p>}
               </div>
-            ) : !writes && p.item.state === "open" && !p.standing && (
+            ) : !writes && !waiting && !fromDevice.value && p.item.state === "open" && !p.standing && (
               <p class="work-plan-no-writes quiet small">No machine of yours can write to {forgeName(p.item.node.ref)}.</p>
             )}
           </div>

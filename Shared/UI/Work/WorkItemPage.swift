@@ -454,7 +454,7 @@ struct WorkItemPage: View {
         if let detail, WorkPlan.hasPlan(detail.got.item) {
             WorkPlanSection(model: model, host: detail.host, lineageHost: lineageHost, detail: detail.got, asked: asked,
                             estimates: estimate?.children ?? [], compact: compact,
-                            writes: writes, wrote: { Task { await reread() } })
+                            writes: writes, waiting: fromDevice, wrote: { Task { await reread() } })
         }
     }
 
@@ -524,7 +524,7 @@ struct WorkItemPage: View {
                 said = (words, failed)
                 if !failed { Task { await reread() } }
             }
-        } else if WorkLook.mergeBox(got) == nil {
+        } else if !fromDevice, WorkLook.mergeBox(got) == nil {
             Text("No machine of yours can write to \(WorkList.forgeName(node.ref)).")
                 .appText(.supporting).foregroundStyle(.secondary)
         }
@@ -547,7 +547,7 @@ struct WorkItemPage: View {
     }
 
     private func mergeBox(_ box: WorkLook.MergeBox, _ got: DaemonAPI.ForgeItemDetail, on host: MachineRef) -> some View {
-        WorkMergeBox(model: model, host: host, detail: got, box: box, writes: writes, compact: narrow) {
+        WorkMergeBox(model: model, host: host, detail: got, box: box, writes: writes, waiting: fromDevice, compact: narrow) {
             Task { await reread() }
         }
     }
