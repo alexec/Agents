@@ -67,6 +67,17 @@ struct RemoteSidebar: View {
         let groups = SidebarProjects.groups(folders)
         let labels = groupLabels(groups)
         List(selection: selection) {
+            // The ⌘K command menu from the search (#4792), for a phone with no keyboard: what
+            // is typed, found in the actions, folders, issues and pull requests too.
+            if !query.trimmingCharacters(in: .whitespaces).isEmpty {
+                Section {
+                    Button { model.commandMenu = query } label: {
+                        Label(CommandMenuWords.searchRow(query), systemImage: CommandFinder.Kind.action.symbol)
+                            .lineLimit(1)
+                    }
+                    .accessibilityHint(CommandMenuWords.label)
+                }
+            }
             // A machine asking to join as this person (#994): at the top, as it waits on
             // an answer and its code lasts ten minutes.
             let joining = model.people.open()

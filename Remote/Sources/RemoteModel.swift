@@ -601,6 +601,12 @@ final class RemoteModel {
     /// chat can ask it for that label.
     var sidebarSearch = ""
 
+    /// The ⌘K command menu (#4792) while it is open: what is typed in it to start with, the
+    /// sidebar's search when a phone with no keyboard opens it from there. Nil when shut.
+    var commandMenu: String?
+    /// What the command menu asked the open chat to do (#4792): the chat does it and clears it.
+    var chatAsk: RemoteChatAsk?
+
     /// What the sidebar has picked (#226), the Mac's one value for it: the first of what is
     /// open over the folder — a pinned page, a workflow, a chat — and what
     /// was opened from that is pushed over it in the detail. A folder chosen with nothing
@@ -5918,6 +5924,12 @@ final class RemoteModel {
                 try? await Task.sleep(for: .seconds(2))
                 movingToMachine = work.agent(agent.id)
             }
+        }
+        // `-command-menu WORDS`: the ⌘K command menu open with them typed, for a walk (#4792): the
+        // walk socket sends no ⌘K. An empty string opens it with nothing typed.
+        if let words = value("-command-menu") {
+            try? await Task.sleep(for: .seconds(1))
+            commandMenu = words
         }
         // `-problem WORDS`: a failure, as an action that failed reports it, for a walk of the
         // scene's failure toast (#4739).
