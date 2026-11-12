@@ -343,6 +343,14 @@ final class RemoteModel {
     let userScope = UserScopeState()
     /// What `control/status` last said: its version and capabilities, for Settings (#1748).
     private(set) var controlStatus: DaemonAPI.ControlStatus?
+    /// Where the control plane runs, for the words said when it can't be reached (#4916):
+    /// "your Mac" when it is in Agents on the home Mac, the control plane and its address
+    /// when it is not. Kept across launches, so a phone opened while nothing answers still
+    /// names the right one.
+    private(set) var controlPlaneReach = ControlPlaneReach(
+        onHomeMac: WindowDefaults.store.object(forKey: RemoteModel.planeOnMacKey) as? Bool ?? true,
+        address: ControlPlaneReach.address(of: RemoteControl.membership?.url))
+    private static let planeOnMacKey = "controlPlaneOnHomeMac"
 
     init(link: any DaemonLink) {
         baseLink = link
@@ -500,7 +508,7 @@ final class RemoteModel {
     /// Answers why it did not land, or nil.
     /// The editor's save that checks the file first (#1858).
     func writeArtifact(agentID: UUID, path: String, text: String, base: String) async -> SaveOutcome {
-        guard !isStale else { return .failed("Your Mac is not answering. What you typed is kept here.") }
+        guard !isStale else { return .failed(controlPlaneReach.notAnswering) }
         do {
             let request = DaemonAPI.ArtifactWriteRequest(agentID: agentID, path: path, text: text, base: base)
             try await client(for: request).call(DaemonAPI.Method.artifactWrite, request)
@@ -510,12 +518,12 @@ final class RemoteModel {
         } catch let error as JSONRPCError {
             return .failed(error.message)
         } catch {
-            return .failed("Your Mac is not answering. What you typed is kept here.")
+            return .failed(controlPlaneReach.notAnswering)
         }
     }
 
     func writeArtifact(agentID: UUID, path: String, text: String) async -> String? {
-        guard !isStale else { return "Your Mac is not answering. What you typed is kept here." }
+        guard !isStale else { return controlPlaneReach.notAnswering }
         do {
             let request = DaemonAPI.ArtifactWriteRequest(agentID: agentID, path: path, text: text)
             try await client(for: request).call(DaemonAPI.Method.artifactWrite, request)
@@ -523,7 +531,7 @@ final class RemoteModel {
         } catch let error as JSONRPCError {
             return error.message
         } catch {
-            return "Your Mac is not answering. What you typed is kept here."
+            return controlPlaneReach.notAnswering
         }
     }
 
@@ -3030,6 +3038,9 @@ final class RemoteModel {
         gitAsksAnswered.formIntersection(GitLendAsk.waiting(in: listed))
         controlHome = status.homeHost
         controlStatus = status
+        let onHomeMac = ControlPlaneReach.onHomeMac(status, hosts: listed)
+        WindowDefaults.store.set(onHomeMac, forKey: Self.planeOnMacKey)
+        controlPlaneReach = ControlPlaneReach(onHomeMac: onHomeMac, address: ControlPlaneReach.address(of: RemoteControl.membership?.url))
         OlderPeer.controlVersion = status.version
         OlderPeer.know(listed, home: status.homeHost)
         let others = listed.filter { $0.id != status.homeHost && $0.answers }
