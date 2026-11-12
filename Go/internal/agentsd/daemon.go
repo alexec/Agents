@@ -164,6 +164,9 @@ type Daemon struct {
 	SettingsDir string
 	// RaiseByHand lets events/raise make an event: an unreleased build on a scratch root.
 	RaiseByHand bool
+	// DiskOverride lets the root's disk-free-override say each volume's free space
+	// (#195, #4851): an unreleased build on a scratch root, as RaiseByHand.
+	DiskOverride bool
 	// HostKey keeps this machine's private key: control-host-key in the root unless the
 	// command sets the platform's store (controllink.HostKeyFor, the Keychain on a Mac).
 	HostKey controllink.HostKeyStore
