@@ -44,6 +44,7 @@ import { pageCrumbs } from "../model/crumbs";
 import { MultiplierPage } from "./Multiplier";
 import { lowWords, runtimeTally, setupRuntimes } from "../model/runtimes";
 import type { Session } from "../session";
+import { ask } from "./MessageKinds";
 
 /**
  * How many requests and sessions need the person, across every folder: Agents' count in the bar.
@@ -221,7 +222,7 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
               ))}
               {machinesHead(group) && makingRows(store.machinesMaking.value, store.providers.list.value, store.hosts.value)
                 .map((row) => <MakingRow key={`making-${row.provider}/${row.workspace}/${row.name}`} row={row}
-                  onDelete={() => { if (window.confirm(deleteMakingQuestion(row))) void store.deleteWorkspace(row.provider, row.workspace); }} />)}
+                  onDelete={async () => { if (await ask(deleteMakingQuestion(row))) void store.deleteWorkspace(row.provider, row.workspace); }} />)}
             </div>
           ))}
         </nav>

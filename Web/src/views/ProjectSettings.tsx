@@ -20,6 +20,7 @@ import { Modal } from "./Modal";
 import { ProjectModal } from "./ProjectPicker";
 import { ProjectAgentConfigModal } from "./AgentConfigEditor";
 import { addFolderOn, hostLabel } from "./NewFolder";
+import { ask } from "./MessageKinds";
 
 type Props = { store: Store; host: string; folder: string; summary: FolderSummary; down: boolean; close: () => void };
 
@@ -94,8 +95,8 @@ export function ProjectSettingsModal({ store, host, folder, summary, down, close
               <button type="button" onClick={() => openFolder(m.host, m.summary.folder.folder)}>{projectSettingsWords.folderMenuItem}</button>
               {mine.length + others.length > 1 && (
                 <button type="button" title={projectSettingsWords.removeHelp} disabled={off || !store.hostIsOnline(m.host)}
-                  onClick={() => {
-                    if (!window.confirm(removeQuestion(folderPathOf(m.summary.folder.folder)))) return;
+                  onClick={async () => {
+                    if (!await ask(removeQuestion(folderPathOf(m.summary.folder.folder)))) return;
                     void save(async () => {
                       await store.removeFolderFromProject(m.host, m.summary.folder.folder, m.summary.name);
                       left.value += 1;

@@ -13,6 +13,7 @@ import { askBeforeUseWords } from "../model/askBeforeUse";
 import { machineNames, onlyMachine, onlyMachineLine } from "../model/secretInfo";
 import { Modal } from "./Modal";
 import { SecretInfoLine } from "./SecretInfoLine";
+import { ask } from "./MessageKinds";
 
 function sentence(error: unknown): string {
   if (error instanceof CallFailed && error.code === methodNotFound) return "This control plane does not keep settings for you yet. Update it.";
@@ -102,7 +103,7 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
     }
   };
   const remove = async (a: OutsideAccount) => {
-    if (!window.confirm(`Remove ${a.service}? Only the record goes. The account itself, and its secrets, stay.`)) return;
+    if (!await ask(`Remove ${a.service}? Only the record goes. The account itself, and its secrets, stay.`)) return;
     const failed = await save(null, a);
     if (failed) store.say(failed);
   };

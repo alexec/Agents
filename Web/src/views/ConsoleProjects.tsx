@@ -10,6 +10,7 @@ import { describe } from "../model/errors";
 import { hostLabel } from "./NewFolder";
 import { projectFolders, projectOwner, projectsFoot, projectTaken, projectWords, removeQuestion, removeRefusal } from "../model/projects";
 import { DataTable } from "./DataTable";
+import { MessageBanner, ask } from "./MessageKinds";
 
 export function ProjectsPage({ store, down }: { store: Store; down: boolean }) {
   const projects = useSignal<Project[] | null>(null);
@@ -50,14 +51,14 @@ export function ProjectsPage({ store, down }: { store: Store; down: boolean }) {
       renaming.value = null;
     });
   };
-  const remove = (project: Project) => {
-    if (!window.confirm(removeQuestion(project))) return;
+  const remove = async (project: Project) => {
+    if (!await ask(removeQuestion(project))) return;
     void act(() => store.link.call("projects/remove", { id: project.id }));
   };
   const list = projects.value;
   return (
     <div class="console-projects">
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       {!list && !problem.value && <p class="hint">Loading…</p>}
       {list && (list.length === 0 ? <p class="hint">No projects yet. Each folder added makes one of its own name.</p> : (
         <DataTable id="projects" label="Projects" rows={list} rowKey={(p) => p.id} order={{ column: "name", dir: "asc" }}

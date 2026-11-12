@@ -26,6 +26,7 @@ import { Capability } from "../protocol/capabilities.generated";
 import { WorkflowFileModal } from "./AgentConfigEditor";
 import { PageTitle } from "./TopBar";
 import { navTitle } from "../model/nav";
+import { ask } from "./MessageKinds";
 
 export function WorkflowPage({ store, host, folder, folderName, workflowID, down }: {
   store: Store; host: string; folder: string; folderName: string; workflowID: string; down: boolean;
@@ -94,7 +95,7 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
   const change = (what: Parameters<Store["setWorkflowSettings"]>[2]) =>
     void store.setWorkflowSettings(host, summary, what).then((refusal) => { problem.value = refusal ? { workflowID, text: refusal } : null; });
   const deleteWorkflow = async () => {
-    if (confirm(`Delete "${workflow.name}"? Its file is removed from disk.\n\nThe file can be restored from the folder's git history.`)) {
+    if (await ask(`Delete "${workflow.name}"? Its file is removed from disk.\n\nThe file can be restored from the folder's git history.`)) {
       if (await store.deleteWorkflow(host, summary)) go({ host, folder: folder });
     }
   };

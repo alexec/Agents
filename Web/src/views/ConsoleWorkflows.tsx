@@ -9,6 +9,7 @@ import { fromWireDate } from "../protocol/dates";
 import { ago } from "../model/connectorSetup";
 import { failedWords, machineWords, noBots, runsWords, spendWords, teamStopQuestion, teamWorkflowsFoot } from "../model/console";
 import { DataTable } from "./DataTable";
+import { MessageBanner, ask } from "./MessageKinds";
 
 export function TeamWorkflowsPage({ store, down }: { store: Store; down: boolean }) {
   const board = useSignal<TeamWorkflows | null>(null);
@@ -39,7 +40,7 @@ export function TeamWorkflowsPage({ store, down }: { store: Store; down: boolean
   const shown = board.value;
   return (
     <div class="team-workflows">
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       {!shown && !problem.value && <p class="hint">Loading…</p>}
       {shown && shown.bots.length === 0 && <p class="hint">{noBots}</p>}
       {shown?.bots.map((bot) => (
@@ -66,7 +67,7 @@ export function TeamWorkflowsPage({ store, down }: { store: Store; down: boolean
                     Running {run.workflow ?? "an agent"} on {run.hostName}
                     {run.since !== undefined && <span class="quiet small"> · started {ago(fromWireDate(run.since))}</span>}
                   </span>
-                  <span class="request-actions"><button type="button" disabled={down} onClick={() => { if (window.confirm(teamStopQuestion(bot, run))) void stop(run); }}>Stop…</button></span>
+                  <span class="request-actions"><button type="button" disabled={down} onClick={async () => { if (await ask(teamStopQuestion(bot, run))) void stop(run); }}>Stop…</button></span>
                 </li>
               ))}
             </ul>

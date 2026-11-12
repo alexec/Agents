@@ -12,6 +12,7 @@ import { ago } from "../model/connectorSetup";
 import { DataTable } from "./DataTable";
 import { failedWords, liveCostWords, liveFoot, liveMachines, liveShortID, liveStateWords, liveStopLabel, liveStopQuestion, liveSummary,
   noLive } from "../model/console";
+import { MessageBanner, ask } from "./MessageKinds";
 
 export function LiveNowPage({ store, down, runtimeName }: { store: Store; down: boolean; runtimeName: (id: string) => string }) {
   const board = useSignal<LiveBoard | null>(null);
@@ -48,7 +49,7 @@ export function LiveNowPage({ store, down, runtimeName }: { store: Store; down: 
   const machines = shown ? liveMachines(shown) : [];
   return (
     <div class="team-workflows">
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       {!shown && !problem.value && <p class="hint">Loading…</p>}
       {shown && shown.agents.length === 0 && <p class="hint">{noLive}</p>}
       {shown && shown.agents.length > 0 && (
@@ -69,7 +70,7 @@ export function LiveNowPage({ store, down, runtimeName }: { store: Store; down: 
               { id: "cost", title: "So far", num: true, first: "desc", sort: (a) => Object.values(a.costToDate ?? {}).reduce((x, y) => x + y, 0), cell: (a) => liveCostWords(a.costToDate) },
               { id: "stop", title: "", cell: (a) => (
                 <button type="button" disabled={down || stopping.value.has(a.agent)} aria-label={liveStopLabel(a, runtimeName(a.runtime))}
-                  onClick={() => { if (window.confirm(liveStopQuestion(a, runtimeName(a.runtime)))) void stop([a]); }}>Stop…</button>) },
+                  onClick={async () => { if (await ask(liveStopQuestion(a, runtimeName(a.runtime)))) void stop([a]); }}>Stop…</button>) },
             ]} />
           {machines.some((m) => m.agents.length > 1) && (
             <ul class="request-list">
@@ -77,8 +78,8 @@ export function LiveNowPage({ store, down, runtimeName }: { store: Store; down: 
                 <li key={m.host} class="request">
                   <span>{m.agents.length} agents on {m.hostName}<span class="quiet small"> · {m.ownerName}</span></span>
                   <span class="request-actions">
-                    <button type="button" disabled={down} onClick={() => {
-                      if (window.confirm(`Stop all ${m.agents.length} agents on ${m.hostName}? Each one stops now, as Stop… does, and its owner reads that an admin stopped it.`)) void stop(m.agents);
+                    <button type="button" disabled={down} onClick={async () => {
+                      if (await ask(`Stop all ${m.agents.length} agents on ${m.hostName}? Each one stops now, as Stop… does, and its owner reads that an admin stopped it.`)) void stop(m.agents);
                     }}>Stop All on This Machine…</button>
                   </span>
                 </li>

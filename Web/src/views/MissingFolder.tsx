@@ -5,6 +5,7 @@ import type { Agent, Attachment } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { go } from "../route";
 import { archiveWithChildren } from "./SessionMenu";
+import { MessageBanner } from "./MessageKinds";
 import {
   continueInFolderLabel, folderIsMissing, folderPath, mayRecreateWorktree, missingFolderLabel, recreateWorktreeLabel,
 } from "../model/missingFolder";
@@ -31,11 +32,12 @@ function WaysOn({ store, host, agent, text, attachments, then }: {
 export function MissingFolderStrip({ store, host, agent }: { store: Store; host: string; agent: Agent | undefined }) {
   if (!agent || !folderIsMissing(agent)) return null;
   return (
-    <div class="missing-folder-strip" role="status">
-      <span class="what" title={folderPath(agent)}>⚠ {missingFolderLabel} <span class="quiet">· {folderPath(agent)}</span></span>
-      {/* Once, not twice: a refused send's notice above has the same ways on. */}
-      {store.folderGone.value?.agentID !== agent.id && <WaysOn store={store} host={host} agent={agent} />}
-    </div>
+    // A banner of the chat (docs/reference/design-system.md, "Messages"): attention, the person must choose.
+    // Once, not twice: a refused send's notice above has the same ways on.
+    <MessageBanner tone="attention" name="missing-folder-strip"
+      actions={store.folderGone.value?.agentID !== agent.id ? <WaysOn store={store} host={host} agent={agent} /> : undefined}>
+      <span class="what" title={folderPath(agent)}>{missingFolderLabel} <span class="quiet">· {folderPath(agent)}</span></span>
+    </MessageBanner>
   );
 }
 
@@ -45,12 +47,11 @@ export function FolderGoneNotice({ store, host, agent }: { store: Store; host: s
   if (!ask || !agent || ask.host !== host || ask.agentID !== agent.id) return null;
   const close = () => { store.folderGone.value = null; };
   return (
-    <div class="problem folder-gone" role="alert">
-      <span>{ask.message} What you typed is still in the prompt.</span>
-      <span class="ways-on">
-        <WaysOn store={store} host={host} agent={agent} text={ask.text} attachments={ask.attachments} then={close} />
-        <button class="link" onClick={close}>Cancel</button>
-      </span>
-    </div>
+    <MessageBanner tone="attention" name="folder-gone" actions={<>
+      <WaysOn store={store} host={host} agent={agent} text={ask.text} attachments={ask.attachments} then={close} />
+      <button class="link" onClick={close}>Cancel</button>
+    </>}>
+      {ask.message} What you typed is still in the prompt.
+    </MessageBanner>
   );
 }

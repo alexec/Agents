@@ -20,6 +20,7 @@ import { isMuted, muteHelp, muteLabel, unmuteLabel } from "../model/mute";
 import { Capability } from "../protocol/capabilities.generated";
 import { setShowsThoughts, showsThoughts, thoughtsItem } from "../model/thoughts";
 import { moveToMachine } from "./MoveToMachineDialog";
+import { ask } from "./MessageKinds";
 
 export type Action = "carryOn" | "agents/stop" | "stopAll" | "agents/archive" | "agents/unarchive"
   | "markRead" | "markUnread" | "mute" | "unmute" | "rename" | "pin" | "unpin" | "fork" | "moveToMachine" | "delete" | "keep";
@@ -271,7 +272,7 @@ export function runSessionAction(store: Store, host: string, agent: Agent, actio
   else if (action === "keep") void store.keepSession(host, agent);
   else if (action === "agents/archive") void archiveWithChildren(store, host, agent);
   else if (action === "stopAll") void stopAll(store, host, agent);
-  else if (action === "delete") { if (confirm(`${deleteTitle(agent.title)}\n\n${deleteMessageFor(agent)}`)) void remove(store, host, agent); }
+  else if (action === "delete") void ask(`${deleteTitle(agent.title)}\n\n${deleteMessageFor(agent)}`).then((yes) => { if (yes) void remove(store, host, agent); });
   else void store.perform(host, agent.id, action);
 }
 

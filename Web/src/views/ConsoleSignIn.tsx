@@ -12,6 +12,7 @@ import { checkWords, domainWords, domainsFoot, inOrder, issuerHints, joinNames, 
   presetNames, presets, previewWords, providerFormOf, providerOf, scimBaseURL, scimFoot, secretWords, tokenWords, withPreset } from "../model/orgSignIn";
 import type { ProviderForm } from "../model/orgSignIn";
 import { SignInSection } from "./SignInSection";
+import { MessageBanner, ask } from "./MessageKinds";
 
 type Open = { kind: "list" } | { kind: "edit"; kept: OrgProviderKept | null; form: ProviderForm } | { kind: "secret"; kept: OrgProviderKept; secret: string };
 
@@ -79,8 +80,8 @@ export function SignInPage({ store, down }: { store: Store; down: boolean }) {
     await load();
     return null;
   });
-  const remove = (kept: OrgProviderKept) => {
-    if (!window.confirm(`Remove ${kept.provider.name}?\n\nNobody can sign in with it again, and its domains and SCIM go with it. People with no other sign-in keep their clients until their keys end.`)) return;
+  const remove = async (kept: OrgProviderKept) => {
+    if (!await ask(`Remove ${kept.provider.name}?\n\nNobody can sign in with it again, and its domains and SCIM go with it. People with no other sign-in keep their clients until their keys end.`)) return;
     void run(async () => {
       await store.link.call("signIn/orgProviders/remove", { id: kept.provider.id, rev: kept.rev });
       await load();
@@ -93,7 +94,7 @@ export function SignInPage({ store, down }: { store: Store; down: boolean }) {
     <div class="model-access">
       <SignInSection store={store} down={down} />
       <h3 class="section-head">Your Organisation’s Providers</h3>
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       {said.value && <p class="quiet small" role="status">{said.value}</p>}
       {!shown && !problem.value && <p class="hint">Loading…</p>}
       {now.kind === "edit" && (
@@ -248,14 +249,14 @@ function Domains({ store, down, kept, domains, reload }: { store: Store; down: b
   const require = (d: DomainClaim, on: boolean) => run(async () => {
     if (on) {
       const preview = await store.link.call("signIn/domains/preview", { domain: d.domain });
-      if (!window.confirm(previewWords(d.domain, name, preview.people))) return;
+      if (!await ask(previewWords(d.domain, name, preview.people))) return;
     }
     await store.link.call("signIn/domains/set", { domain: d.domain, require: on });
   });
   return (
     <div class="org-domains">
       <h4 class="small strong">Domains</h4>
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       {domains.length === 0 && <p class="hint">No domains claimed for {name}.</p>}
       {domains.map((d) => (
         <div key={d.domain} class="request">
@@ -276,8 +277,8 @@ function Domains({ store, down, kept, domains, reload }: { store: Store; down: b
           </div>
           <span class="request-actions">
             <button type="button" class="link" disabled={down || busy.value} onClick={() => void run(() => store.link.call("signIn/domains/check", { domain: d.domain }).then(() => {}))}>Check</button>
-            <button type="button" class="link destructive" disabled={down || busy.value} onClick={() => {
-              if (window.confirm(`Remove the claim on ${d.domain}? Its switches go with it.`)) void run(() => store.link.call("signIn/domains/remove", { domain: d.domain }).then(() => {}));
+            <button type="button" class="link destructive" disabled={down || busy.value} onClick={async () => {
+              if (await ask(`Remove the claim on ${d.domain}? Its switches go with it.`)) void run(() => store.link.call("signIn/domains/remove", { domain: d.domain }).then(() => {}));
             }}>Remove…</button>
           </span>
         </div>
@@ -333,8 +334,8 @@ function Scim({ store, down, kept, reload }: { store: Store; down: boolean; kept
       await loadTokens();
     });
   };
-  const revoke = (t: SCIMToken) => {
-    if (!window.confirm(`Revoke ${t.name}? ${p.name} cannot change people with it again.`)) return;
+  const revoke = async (t: SCIMToken) => {
+    if (!await ask(`Revoke ${t.name}? ${p.name} cannot change people with it again.`)) return;
     void run(async () => {
       await store.link.call("scim/tokens/revoke", { id: t.id });
       await loadTokens();
@@ -346,7 +347,7 @@ function Scim({ store, down, kept, reload }: { store: Store; down: boolean; kept
   return (
     <div class="org-scim">
       <h4 class="small strong">SCIM</h4>
-      {problem.value && <p class="hint" role="alert">{problem.value}</p>}
+      {problem.value && <MessageBanner tone="failure">{problem.value}</MessageBanner>}
       <label class="setting">
         <span>Turn On SCIM</span>
         <input type="checkbox" role="switch" checked={on} disabled={down || busy.value} onChange={(e) => void set({ on: e.currentTarget.checked, match })} />

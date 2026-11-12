@@ -9,6 +9,7 @@ import type { ChannelLink, ChannelLinkRequest } from "../protocol/generated";
 import { describe } from "../model/errors";
 import { ask, detail, explanation, foot, linkDetail, linkTitle, liveRequests, none, removeMessage, removeTitle, title } from "../model/channelLinks";
 import { ApprovalMark } from "./Approval";
+import { ask as askAlert } from "./MessageKinds";
 
 function LinkCard({ store, request, down }: { store: Store; request: ChannelLinkRequest; down: boolean }) {
   const sendTo = useSignal("");
@@ -67,7 +68,7 @@ export function ChannelsSection({ store, down }: { store: Store; down: boolean }
   const changes = store.linksChanges.value;
   useEffect(() => { if (!down) void load(); }, [changes, down]);
   const remove = async (link: ChannelLink) => {
-    if (!window.confirm(`${removeTitle(link)} ${removeMessage}`)) return;
+    if (!await askAlert(`${removeTitle(link)} ${removeMessage}`)) return;
     try {
       await store.link.call("links/remove", { channel: link.channel, identity: link.identity });
     } catch (error) {

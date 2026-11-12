@@ -13,6 +13,7 @@ import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./Contex
 import { MachineSheetDialog, type MachineSheet } from "./MachineSheets";
 import { chooseSettingsMachine } from "./settings/SettingsMachine";
 import { go } from "../route";
+import { ask } from "./MessageKinds";
 
 /** Settings ▸ Machines' section for this machine (#3979): Backups… and Processes… open it there. */
 function openSettings(host: string, section: string) {
@@ -64,7 +65,7 @@ export function MachineRow({ store, host, on, open, children }: {
   const stop = async () => {
     const asked = await store.providers.stop(host);
     if (typeof asked === "string") store.say(asked);
-    else if (asked && window.confirm(`Stop ${row.name}? ${asked.question}`)) {
+    else if (asked && await ask(`Stop ${row.name}? ${asked.question}`)) {
       const again = await store.providers.stop(host, true);
       if (typeof again === "string") store.say(again);
     }
@@ -75,10 +76,10 @@ export function MachineRow({ store, host, on, open, children }: {
     start: () => void store.startHost(host),
     stop: () => void stop(),
     // Delete asks the machine first which worktrees have work not pushed (#3979).
-    delete: () => void store.deletePreview(host).then((preview) => {
-      if (window.confirm(deleteQuestion(row, sessions(), preview))) void store.deleteHost(host);
+    delete: () => void store.deletePreview(host).then(async (preview) => {
+      if (await ask(deleteQuestion(row, sessions(), preview))) void store.deleteHost(host);
     }),
-    remove: () => { if (window.confirm(removeQuestion(row))) void store.removeHost(host); },
+    remove: async () => { if (await ask(removeQuestion(row))) void store.removeHost(host); },
   };
   const items = (): MenuItem[] => [
     { label: "Open", run: open },
