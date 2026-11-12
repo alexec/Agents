@@ -256,8 +256,11 @@ type Service struct {
 	// The TLS listener's sockets still in accept: Stop waits for them, so none logs
 	// after it returns (#3869).
 	accepting sync.WaitGroup
-	ready     bool
-	loopback  *web.Listener
+	// The writes a socket starts and does not wait for (a member's epoch): Stop waits for
+	// them too, so none writes into the store after it returns (#5001).
+	writing  sync.WaitGroup
+	ready    bool
+	loopback *web.Listener
 	// One control/setWeb at a time (#4252).
 	webSwitch sync.Mutex
 	// The page at this copy's own origin (#1459), or nil.
@@ -610,6 +613,7 @@ func (s *Service) Stop() {
 		c.Close()
 	}
 	s.accepting.Wait()
+	s.writing.Wait()
 	if tunnels != nil {
 		tunnels.Stop()
 	}
@@ -1130,6 +1134,24 @@ func (s *Service) startAccept(c *Conn) bool {
 	return true
 }
 
+// inBackground runs a write that a socket does not wait for, counted for Stop to wait
+// for (#5001), unless Stop has begun: then the write is let go. The count is taken under
+// the lock Stop closes s.stop with, so Stop waits for every write it lets start.
+func (s *Service) inBackground(write func()) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	select {
+	case <-s.stop:
+		return
+	default:
+	}
+	s.writing.Add(1)
+	go func() {
+		defer s.writing.Done()
+		write()
+	}()
+}
+
 // adopt keeps a socket so Stop can close it.
 func (s *Service) adopt(c *Conn) *Conn {
 	s.mu.Lock()
@@ -1388,7 +1410,7 @@ func (s *Service) acceptVia(conn *Conn, webOrigin string, proved func(failed boo
 		if settings != nil && settings.Epoch != nil && *settings.Epoch > epoch {
 			epoch = *settings.Epoch
 		}
-		go s.methods.NoteEpoch(context.Background(), id, epoch)
+		s.inBackground(func() { s.methods.NoteEpoch(context.Background(), id, epoch) })
 	}
 	// A forwarding copy's ok gave the new list; that is all it has to say.
 	if phase == phaseForwarding && (id.Kind == 'c' || id.Kind == 'h') {
