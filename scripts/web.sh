@@ -57,6 +57,30 @@ use_nvm_node() {
 	export PATH
 }
 
+# A Mac whose first `node` on PATH is another version, but which has the pinned one installed as
+# well (an agent session puts its runtime's own Node first; #4904): put that one first. Homebrew
+# keeps each version under Cellar/node/<version>; its bin is checked last, as it may be a link
+# to another version.
+use_installed_node() {
+	have_pinned_node && return 0
+	version=$(cat Web/.node-version)
+	for dir in /opt/homebrew/Cellar/node/"$version"/bin /usr/local/Cellar/node/"$version"/bin \
+		/opt/homebrew/bin /usr/local/bin; do
+		[ -x "$dir/node" ] && [ -x "$dir/npm" ] || continue
+		[ "$("$dir/node" --version 2>/dev/null)" = "v$version" ] || continue
+		PATH="$dir:$PATH"
+		export PATH
+		return 0
+	done
+	return 0
+}
+
+# The pinned Node from nvm, or else from where it is usually installed.
+use_pinned_node() {
+	use_nvm_node "$@"
+	use_installed_node
+}
+
 # Web/dist is older than one of the inputs build.mjs hashes, or was never built.
 dist_stale() {
 	[ -f Web/dist/MANIFEST ] || return 0
@@ -76,14 +100,14 @@ types)
 	exec scripts/wire.sh gen
 	;;
 build)
-	use_nvm_node install
+	use_pinned_node install
 	need_node build
 	build
 	;;
 dist)
 	if ! dist_stale; then
 		exit 0
-	elif use_nvm_node && have_pinned_node; then
+	elif use_pinned_node && have_pinned_node; then
 		build
 	else
 		# "warning:" is how an Xcode script phase shows one in the build log.
@@ -92,7 +116,7 @@ dist)
 	fi
 	;;
 test)
-	use_nvm_node install
+	use_pinned_node install
 	need_node test
 	cd Web
 	[ -d node_modules ] || npm ci --ignore-scripts --no-audit --no-fund
@@ -100,7 +124,7 @@ test)
 	;;
 check)
 	scripts/wire.sh check
-	use_nvm_node install
+	use_pinned_node install
 	if have_node; then
 		build
 		scripts/build-cache.sh swift test --package-path Packages/AgentsKit --filter 'WebDistManifestTests|ControlAgreementVectorTests'
