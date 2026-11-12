@@ -62,3 +62,19 @@ func TestMatchedWordsSayAPayloadAsYAML(t *testing.T) {
 		t.Fatalf("plain matched words: %q", got)
 	}
 }
+
+// The wake message puts its details in a yaml code block, so the chat draws them as YAML;
+// the event's line and sentence stay above it as text.
+func TestWakeWordsFenceTheDetailsAsYAML(t *testing.T) {
+	msg := "see ```x```"
+	e := wire.Event{Name: "pr.merged", Position: 2, Sentence: "PR 5 merged.",
+		Details: map[string]string{"pr": "5"}, Message: &msg}
+	got := wakeWords(e, 0)
+	want := "\nPR 5 merged.\n\n````yaml\npr: 5\nmessage: see ```x```\n````"
+	if !strings.HasPrefix(got, "The event you were waiting for happened.\n\npr.merged at ") || !strings.HasSuffix(got, want) {
+		t.Fatalf("wake words:\n%s", got)
+	}
+	if got := wakeWords(wire.Event{Name: "mac.wake", Sentence: "The Mac woke."}, 0); strings.Contains(got, "```") {
+		t.Fatalf("no details, but a block: %q", got)
+	}
+}

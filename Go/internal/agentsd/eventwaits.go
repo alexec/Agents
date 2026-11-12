@@ -638,6 +638,7 @@ func wakeWords(e wire.Event, extra int) string {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
+	var fields []string
 	for _, k := range keys {
 		if k == "agent_title" {
 			continue
@@ -646,13 +647,17 @@ func wakeWords(e wire.Event, extra int) string {
 		if t, ok := e.Details["agent_title"]; k == "agent" && ok {
 			v = t + " (" + v + ")"
 		}
-		lines = append(lines, detailWords(k, v))
+		fields = append(fields, detailWords(k, v))
 	}
 	if e.Publisher != nil {
-		lines = append(lines, "published by: "+e.Publisher.Title)
+		fields = append(fields, "published by: "+e.Publisher.Title)
 	}
 	if e.Message != nil {
-		lines = append(lines, "message: "+*e.Message)
+		fields = append(fields, "message: "+*e.Message)
+	}
+	if len(fields) > 0 {
+		// A fenced block, so the chat draws the details as YAML, not as one run of prose.
+		lines = append(lines, "", yamlFence(fields))
 	}
 	if extra > 0 {
 		more := fmt.Sprintf("%d more matches arrived", extra)
