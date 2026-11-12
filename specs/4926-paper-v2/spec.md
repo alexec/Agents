@@ -17,14 +17,18 @@ Alex, 2026-11-12, on the first mock (handwriting): the goal is not handwriting. 
 
 ## Mock
 
-`mock.html` draws the session list and the chat, light and charcoal dark side by side (`?v=v1|A|B|C`). The pictures are in the PR (`pr-shots.sh`, branch `screenshots`, `pr-<n>/mock-*.png`). A, B and C have the v2 colours; only the face differs.
+**High fidelity (the pictures in the PR, `pr-<n>/web-*.png`):** the real web page, built from this branch, on a run-app scratch set-up (a scratch control plane and host, a demo repo `web-shop`, and three real Claude sessions). The new colours, the reading spacing and each face were put on the running page as a constructed stylesheet, with the fonts served from the page's own origin. Nothing in `Web/src` changed. One scratch-only card (a machine waiting to join) was hidden. Each look is shown in light and dark at 1280 × 800.
+
+**Low fidelity:** `mock.html` draws a simple session list and chat, light and dark side by side (`?v=v1|A|B|C`).
 
 | Variant | Text | Code |
 |---|---|---|
-| **today** (`v1`) | system sans (SF) | system mono |
+| **today** | system sans (SF) | system mono |
 | **A** | Atkinson Hyperlegible Next | Atkinson Hyperlegible Mono |
 | **B** | Lexend | system mono |
 | **C** | Figtree | system mono |
+
+A, B and C have the v2 colours; only the face differs.
 
 ## Fonts
 
