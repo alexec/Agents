@@ -327,3 +327,69 @@ func hoursWords(h *wire.WorkflowHours) string {
 	}
 	return out
 }
+
+// hoursLines is `hours:` as the settings write puts it in a file (#4820): between:, days:
+// and time-zone:, each checked as the file's own would be. nil is hours that limit nothing
+// (no between: and no days:, or every day), which the write takes out.
+func hoursLines(h wire.WorkflowHours) ([]string, error) {
+	between, zone := "", ""
+	if h.Between != nil {
+		between = strings.TrimSpace(*h.Between)
+	}
+	if h.TimeZone != nil {
+		zone = strings.TrimSpace(*h.TimeZone)
+	}
+	lines := []string{"hours:"}
+	if between != "" {
+		lines = append(lines, "  between: "+doubleQuoted(between))
+	}
+	if len(h.Days) > 0 {
+		named := make([]string, len(h.Days))
+		for i, d := range h.Days {
+			named[i] = string(d)
+		}
+		lines = append(lines, "  days: ["+strings.Join(named, ", ")+"]")
+	}
+	if zone != "" {
+		lines = append(lines, "  time-zone: "+quotedYAML(zone))
+	}
+	// The one reader checks it, so the page cannot write what the file would refuse.
+	w := parseWorkflow("---\n"+strings.Join(lines, "\n")+"\n---\nGo\n", "x", "/p")
+	if p := w.Problem; p != nil && p.Unreadable != nil {
+		return nil, refuse(p.Unreadable.Value)
+	}
+	if w.Hours == nil || w.Hours.Between == nil && w.Hours.Days == nil {
+		return nil, nil
+	}
+	if w.Hours.Days == nil && len(h.Days) > 0 {
+		// Every day is the same as none: leave the line out.
+		kept := lines[:0]
+		for _, l := range lines {
+			if !strings.HasPrefix(l, "  days:") {
+				kept = append(kept, l)
+			}
+		}
+		lines = kept
+	}
+	return lines, nil
+}
+
+// setHoursBlock puts `hours:` and the lines under it in place of the file's, or takes it
+// out with nil lines.
+func setHoursBlock(lines []string, source string) (string, error) {
+	all, nl, closing, err := splitSource(source)
+	if err != nil {
+		return "", err
+	}
+	has := false
+	for i := 1; i < closing; i++ {
+		has = has || isKeyLine(all[i], "hours")
+	}
+	if !has {
+		if lines == nil {
+			return source, nil
+		}
+		return strings.Join(insertLines(all, closing, lines...), nl), nil
+	}
+	return setFrontMatterBlock("hours", lines, source)
+}

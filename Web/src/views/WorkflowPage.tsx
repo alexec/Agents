@@ -17,8 +17,9 @@ import {
 import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
 import { rowExtras, SessionRow } from "./SessionRow";
-import { CooldownMenu, WhenDoneMenu, WorkflowSettingsForm } from "./WorkflowSettings";
+import { CooldownMenu, HoursSetting, WhenDoneMenu, WorkflowSettingsForm } from "./WorkflowSettings";
 import { picked, whenDoneSentence } from "../model/workflowSettings";
+import { hoursSentence } from "../model/workflowHours";
 import { workflowContinueSentence, workflowContinueSwitch } from "../model/continueWhenBack";
 import { BackToList } from "./BackToList";
 import { isWorkflowMuted, muteLabel, workflowMuteHelp } from "../model/mute";
@@ -284,6 +285,8 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
             )}
             <CooldownMenu summary={summary} disabled={locked} change={change} />
             <p class="quiet small">{cooldown ?? "No cooldown: every trigger runs it, one run at a time."}</p>
+            <HoursSetting summary={summary} disabled={locked} change={change} />
+            <p class="quiet small">{hoursSentence(workflow.hours)}</p>
             {workflow.mode !== "triggering" && (
               <>
                 <WhenDoneMenu summary={summary} disabled={locked} change={change} />

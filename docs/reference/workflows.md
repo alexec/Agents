@@ -387,6 +387,11 @@ hours:
 - A schedule runs only at a time that its own `between:` and `days:` and the `hours:`
   both let it. A schedule time outside the hours is not held.
 - **Run now** always runs, also outside the hours.
+- **On the workflow's page,** on the Mac and the web page, Configuration has an **Hours**
+  menu under the cooldown. **Some hours** writes working hours (09:00-17:00, Monday to
+  Friday). Then set **From** and **to** (each half hour, or **All day**), the days, and
+  the **Time zone** (**Your time zone** leaves `time-zone:` out). Each change writes
+  `hours:` into the file. **Any time** removes `hours:`.
 
 ## Limits
 

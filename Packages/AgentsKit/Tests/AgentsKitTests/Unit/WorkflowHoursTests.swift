@@ -62,3 +62,35 @@ struct WorkflowHoursTests {
         #expect(WorkflowRefusal.codes.contains("outside_hours"))
     }
 }
+
+/// The Hours setting (#4820): what each control writes, as the web page's twin does.
+@Suite("Workflow hours setting")
+struct WorkflowHoursSettingTests {
+    @Test func eachControlWritesAWholeHours() {
+        let any = WorkflowHours()
+        #expect(!any.limits)
+        #expect(WorkflowHours.sentence(nil) == "Any time: a trigger starts it at any hour.")
+        let working = WorkflowHours.working
+        #expect(WorkflowHours.sentence(working)
+                == "Starts only 09:00-17:00 on Mon, Tue, Wed, Thu, Fri. A trigger outside them waits, and starts it once they open.")
+        #expect(working.window?.from == 540 && working.window?.to == 1020)
+        // From keeps To; onto To, or from All day, eight hours.
+        #expect(working.starting(at: 18 * 60).between == "18:00-17:00")
+        #expect(working.starting(at: 17 * 60).between == "17:00-01:00")
+        #expect(working.starting(at: nil).between == nil)
+        #expect(any.starting(at: 22 * 60 + 30).between == "22:30-06:30")
+        #expect(working.ending(at: 9 * 60 + 30)?.between == "09:00-09:30")
+        #expect(working.ending(at: 9 * 60) == nil)
+        #expect(any.ending(at: 60) == nil)
+        // Days: every day is no days:, and the last one stays.
+        #expect(working.toggling(.sat)?.days == [.mon, .tue, .wed, .thu, .fri, .sat])
+        #expect(working.toggling(.sat)?.toggling(.sun)?.days == nil)
+        #expect(WorkflowHours(days: [.mon]).toggling(.mon) == nil)
+        #expect(any.toggling(.sun)?.days == [.mon, .tue, .wed, .thu, .fri, .sat])
+        #expect(any.admits(.sun) && !working.admits(.sun))
+        #expect(working.inZone("Europe/London").timeZone == "Europe/London")
+        #expect(WorkflowHours.zones(with: "Mars/Up").contains("Mars/Up"))
+        #expect(WorkflowHours.halfHours.count == 48)
+        #expect(WorkflowHours.halfHours.map(WorkflowHours.clockText).last == "23:30")
+    }
+}

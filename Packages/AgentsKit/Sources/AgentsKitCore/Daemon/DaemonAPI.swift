@@ -3111,6 +3111,10 @@ public enum DaemonAPI {
         /// the line out. Unlike the settings, left out means left alone, so a phone or
         /// page that does not show the cooldown cannot remove it by saving a mode.
         public var cooldown: String?
+        /// The `hours:` to write (#4820): `between:`, `days:` and `time-zone:`, and with no
+        /// `between:` and no `days:` the key comes out (Any time). Left out means left alone,
+        /// as the cooldown is.
+        public var hours: WorkflowHours?
         /// The `labels:` to write (#142), or empty to take the line out. Left out means
         /// left alone, as the cooldown is, so a phone or page from before the labels
         /// field cannot remove them by saving a mode.
@@ -3126,8 +3130,9 @@ public enum DaemonAPI {
         /// out means left alone, as `whenDone` is.
         public var continueWhenBack: Bool?
         public init(folder: URL, workflowID: String, settings: WorkflowSettings, cooldown: String? = nil,
-                    labels: [String]? = nil, runsOn: [String]? = nil, whenDone: String? = nil,
-                    continueWhenBack: Bool? = nil) {
+                    hours: WorkflowHours? = nil, labels: [String]? = nil, runsOn: [String]? = nil,
+                    whenDone: String? = nil, continueWhenBack: Bool? = nil) {
+            self.hours = hours
             self.whenDone = whenDone
             self.continueWhenBack = continueWhenBack
             self.folder = folder

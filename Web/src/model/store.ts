@@ -14,7 +14,7 @@ import type {
   PermissionNotification, PermissionRequest, FolderSummary, HelperLimits, DiskThresholds, NotCommittedResponse, TranscriptEntry, TranscriptPage, TurnsPage, TurnSummary,
   WorkflowSummary, Attachment, FilesChangedNotification, ShowFileNotification, WorkflowRemovedNotification, FolderRemovedNotification, DraftOptionsNotification, JSONValue, Methods, AccountProfile, RuntimeAccount, RuntimeSignInStep, RuntimeStatus,
   StartRequest, UUID, AutoMappings, AutoPreview, AutoPreviewRequest, AutoSettings, ClientPermissionMode, Levels, ModelLevel, PermissionLevel, WorktreesListResponse, Persona, FileStamp, WriteFailure, CloneNotification, CloneSummary, DirectoryListing, LeaseSnapshot, HostedMCPSnapshot, MCPHealthSnapshot, MCPToolsAnswer, ConnectorToolLevel, DiskState, CapacityState, StoreNotes,
-  CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings,
+  CostState, EventsPage, Event as ActivityEvent, ConfigOption, WorkflowSettings, WorkflowHours,
   PagesChangedNotification, PinsChangedNotification, PinView, ReviewPull, CheckSuggestion, ViewPin, ListCursor, ListRequest, FileMentionDTO, SandboxChoice, PolicySetBy, RuntimeAllowances,
   GuardedChange, GuardedChangeReading, MachineJoinStatus, RequiredCapabilities, KeptDelivered, KeptList, KeptRequest, Approval, ApprovalAction, UsageHistory, TimeHistory, VelocityHistory, Achievements, Multiplier,
   BuildOutputRemoved, FolderWorktrees, RemovalCheck, WorktreeSize, WorktreeSummary, WorktreesSized, FindResult,
@@ -3962,7 +3962,7 @@ export class Store extends Work {
    * the controls, or null.
    */
   setWorkflowSettings(host: string, summary: WorkflowSummary,
-                      change: { settings?: (s: WorkflowSettings) => WorkflowSettings; cooldown?: string; labels?: (labels: string[]) => string[]; runsOn?: string[]; whenDone?: WhenDone; continueWhenBack?: boolean }): Promise<string | null> {
+                      change: { settings?: (s: WorkflowSettings) => WorkflowSettings; cooldown?: string; hours?: WorkflowHours; labels?: (labels: string[]) => string[]; runsOn?: string[]; whenDone?: WhenDone; continueWhenBack?: boolean }): Promise<string | null> {
     const { folder, workflowID } = summary.workflow;
     const key = `${host}|${folderKey(folder)}|${workflowID}`;
     const send = async (): Promise<string | null> => {
@@ -3973,6 +3973,7 @@ export class Store extends Work {
         const updated = await this.link.call("workflows/settings", {
           folder, workflowID, settings,
           ...(change.cooldown !== undefined ? { cooldown: change.cooldown } : {}),
+          ...(change.hours !== undefined ? { hours: change.hours } : {}),
           ...(change.labels !== undefined ? { labels: change.labels(current.labels) } : {}),
           ...(change.runsOn !== undefined ? { runsOn: change.runsOn } : {}),
           ...(change.whenDone !== undefined ? { whenDone: change.whenDone } : {}),

@@ -447,6 +447,7 @@ struct WorkflowPage: View {
                 }
             }
             cooldown(summary)
+            hours(summary)
             whenDone(summary)
             continueWhenBack(summary)
         }
@@ -544,6 +545,85 @@ struct WorkflowPage: View {
             .pickerStyle(.menu)
             .fixedSize()
             .disabled(summary.workflow.settingsLocked)
+        }
+    }
+
+    /// When it may start (#4820): Any time, or a From and To time, days and a time zone, each
+    /// writing the whole `hours:` into the file. Any time takes the key out.
+    private func hours(_ summary: WorkflowSummary) -> some View {
+        let current = summary.workflow.hours ?? WorkflowHours()
+        let locked = summary.workflow.settingsLocked
+        let write: (WorkflowHours?) -> Void = { chosen in
+            guard let chosen, chosen != current else { return }
+            Task { await model.setWorkflowSettings(summary, summary.workflow.settings, hours: chosen) }
+        }
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "clock")
+                    .appText(.fine)
+                    .foregroundStyle(.secondary)
+                note(WorkflowHours.sentence(summary.workflow.hours))
+                Spacer(minLength: 12)
+                Picker("Hours", selection: Binding(
+                    get: { current.limits },
+                    set: { some in write(some ? .working : WorkflowHours()) })) {
+                    Text("Any time").tag(false)
+                    Text("Some hours").tag(true)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+                .disabled(locked)
+            }
+            if current.limits {
+                hoursDetail(current, write: write)
+                    .padding(.leading, 26)
+                    .disabled(locked)
+            }
+        }
+    }
+
+    /// From, To, the days and the time zone of a workflow's hours.
+    private func hoursDetail(_ current: WorkflowHours, write: @escaping (WorkflowHours?) -> Void) -> some View {
+        let window = current.window
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Picker("From", selection: Binding(get: { window?.from }, set: { write(current.starting(at: $0)) })) {
+                    Text("All day").tag(Int?.none)
+                    ForEach(WorkflowHours.halfHours, id: \.self) { m in
+                        Text(WorkflowHours.clockText(m)).tag(Int?.some(m))
+                    }
+                }
+                .fixedSize()
+                if let window {
+                    Picker("to", selection: Binding(get: { window.to }, set: { write(current.ending(at: $0)) })) {
+                        ForEach(WorkflowHours.halfHours.filter { $0 != window.from }, id: \.self) { m in
+                            Text(WorkflowHours.clockText(m)).tag(m)
+                        }
+                    }
+                    .fixedSize()
+                }
+                Picker("Time zone", selection: Binding(get: { current.timeZone }, set: { write(current.inZone($0)) })) {
+                    Text("Your time zone").tag(String?.none)
+                    Divider()
+                    ForEach(WorkflowHours.zones(with: current.timeZone), id: \.self) { zone in
+                        Text(zone).tag(String?.some(zone))
+                    }
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
+            .pickerStyle(.menu)
+            HStack(spacing: 4) {
+                ForEach(WorkflowHours.shownDays, id: \.self) { day in
+                    Toggle(WorkflowHours.dayName(day), isOn: Binding(get: { current.admits(day) },
+                                                                     set: { _ in write(current.toggling(day)) }))
+                        .toggleStyle(.button)
+                        .controlSize(.small)
+                        .help(current.admits(day) ? "Take \(WorkflowHours.dayName(day)) out of its hours"
+                                                  : "Put \(WorkflowHours.dayName(day)) in its hours")
+                }
+            }
         }
     }
 

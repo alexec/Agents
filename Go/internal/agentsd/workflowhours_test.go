@@ -292,3 +292,78 @@ func TestThePersonsTimeZone(t *testing.T) {
 		t.Fatal("a bad zone was taken")
 	}
 }
+
+// The Hours setting (#4820) writes `hours:` as a block, checked by the file's own reader,
+// and Any time takes it out.
+func TestWritingHours(t *testing.T) {
+	s := func(v string) *string { return &v }
+	src := "---\non: agent.finished\ncooldown: 2h\n---\nGo\n"
+	lines, err := hoursLines(wire.WorkflowHours{Between: s("18:00-09:00"), Days: []wire.Weekday{wire.WeekdayMon, wire.WeekdayFri}, TimeZone: s("Europe/London")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := setHoursBlock(lines, src)
+	want := "---\non: agent.finished\ncooldown: 2h\nhours:\n  between: \"18:00-09:00\"\n  days: [mon, fri]\n  time-zone: Europe/London\n---\nGo\n"
+	if err != nil || got != want {
+		t.Fatalf("%v\n%s", err, got)
+	}
+	// A second write replaces the block where it is, and keeps what follows it.
+	moved := strings.Replace(got, "---\nGo", "labels: [a]\n---\nGo", 1)
+	lines, _ = hoursLines(wire.WorkflowHours{Between: s("09:00-17:30")})
+	if got, err = setHoursBlock(lines, moved); err != nil || got != "---\non: agent.finished\ncooldown: 2h\nhours:\n  between: \"09:00-17:30\"\nlabels: [a]\n---\nGo\n" {
+		t.Fatalf("%v\n%s", err, got)
+	}
+	// Any time, and every day with no between:, take it out.
+	for _, h := range []wire.WorkflowHours{{}, {TimeZone: s("Europe/London")}, {Days: allWeekdays}} {
+		lines, err := hoursLines(h)
+		if err != nil || lines != nil {
+			t.Fatalf("%+v: %v %v", h, lines, err)
+		}
+		if out, err := setHoursBlock(lines, got); err != nil || out != "---\non: agent.finished\ncooldown: 2h\nlabels: [a]\n---\nGo\n" {
+			t.Fatalf("%v\n%s", err, out)
+		}
+		if out, _ := setHoursBlock(lines, src); out != src {
+			t.Fatalf("%s", out)
+		}
+	}
+	// Every day with a between: leaves days: out.
+	if lines, _ := hoursLines(wire.WorkflowHours{Between: s("9-17"), Days: allWeekdays}); strings.Join(lines, "\n") != "hours:\n  between: \"9-17\"" {
+		t.Fatalf("%v", lines)
+	}
+	for h, want := range map[*wire.WorkflowHours]string{
+		{Between: s("9-25")}:                         `"9-25" is not a range of times`,
+		{Between: s("09:00-09:00")}:                  "starts and ends at the same time",
+		{Days: []wire.Weekday{"someday"}}:            `"someday" is not a day of the week`,
+		{Between: s("9-17"), TimeZone: s("Mars/Up")}: `"Mars/Up" is not a time zone`,
+		{Between: s(`9-17"\n  x: 1`)}:                "is not a range of times",
+	} {
+		if _, err := hoursLines(*h); err == nil || !strings.Contains(err.Error(), want) {
+			t.Fatalf("%+v: %v", *h, err)
+		}
+	}
+}
+
+func TestTheSettingsWriteHours(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := folder(t, c, 1)
+	folder := store.FolderURL(dir)
+	os.MkdirAll(workflowsFolder(dir), 0o755)
+	path := filepath.Join(workflowsFolder(dir), "nightly.md")
+	os.WriteFile(path, []byte("---\non: agent.finished\n---\nLook.\n"), 0o644)
+	var s wire.WorkflowSummary
+	json.Unmarshal(c.call(t, 2, "workflows/settings", map[string]any{"folder": folder, "workflowID": "nightly", "settings": map[string]any{"options": map[string]any{}},
+		"hours": map[string]any{"between": "18:00-09:00", "days": []string{"sat", "sun"}}}), &s)
+	if h := s.Workflow.Hours; h == nil || *h.Between != "18:00-09:00" || len(h.Days) != 2 {
+		t.Fatalf("%+v", s.Workflow.Hours)
+	}
+	json.Unmarshal(c.call(t, 3, "workflows/settings", map[string]any{"folder": folder, "workflowID": "nightly", "settings": map[string]any{"options": map[string]any{}},
+		"hours": map[string]any{}}), &s)
+	if b, _ := os.ReadFile(path); strings.Contains(string(b), "hours") {
+		t.Fatalf("%s", b)
+	}
+	if e := c.callError(t, 4, "workflows/settings", map[string]any{"folder": folder, "workflowID": "nightly", "settings": map[string]any{"options": map[string]any{}},
+		"hours": map[string]any{"between": "9-25"}}); e == nil || !strings.Contains(e.Message, "is not a range of times") {
+		t.Fatalf("%+v", e)
+	}
+}
