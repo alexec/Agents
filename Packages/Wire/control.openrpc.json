@@ -325,6 +325,64 @@
       }
     },
     {
+      "name": "bus/deliver",
+      "x-capability": "events.bus/1",
+      "description": "To a machine, on its channel 0, which only the control plane writes (#4729, spec 4724-event-bus): an event on the bus that matched the machine's subscriptions. Best effort: a machine that is not connected misses it.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BusDelivery"
+          }
+        }
+      ]
+    },
+    {
+      "name": "bus/publish",
+      "x-capability": "events.bus/1",
+      "description": "A machine, on its channel 0 (#4729, spec 4724-event-bus): events it recorded, envelope only. The control plane keeps the first copy of each id in the bus log (the last 100,000 of each person's bus), drops and counts a later copy, and delivers it to each machine with a matching subscription (bus/deliver).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BusPublish"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BusPublished"
+        }
+      }
+    },
+    {
+      "name": "bus/subscribe",
+      "x-capability": "events.bus/1",
+      "description": "A machine, on its channel 0 (#4729, spec 4724-event-bus): all its subscriptions on its person's bus, replacing the ones it sent before. The copy that holds the machine keeps them until the machine goes.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BusSubscribe"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BusSubscribed"
+        }
+      }
+    },
+    {
       "name": "clients/announce",
       "x-capability": "clients/1",
       "description": "On a pairing connection, before any other.",

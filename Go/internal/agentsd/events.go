@@ -440,6 +440,7 @@ func (d *Daemon) raiseEnveloped(draft wire.EventDraft, actor *wire.AuditActor, s
 	d.eventMu.Lock()
 	t := nowFunc()
 	var e wire.Event
+	publish := false
 	if n := len(d.eventList); n > 0 && d.isRepeat(draft, actor, d.eventList[n-1], t) {
 		last := &d.eventList[n-1]
 		last.Count++
@@ -465,11 +466,17 @@ func (d *Daemon) raiseEnveloped(draft wire.EventDraft, actor *wire.AuditActor, s
 		}
 		d.eventList = append(d.eventList, e)
 		d.appendEventLocked(eventLine{Event: &e})
+		if server == nil || server.bus == nil {
+			publish = true
+		}
 		if len(d.eventList) > eventMaximum+eventCapMargin {
 			d.pruneEventsLocked()
 		}
 	}
 	d.eventMu.Unlock()
+	if publish {
+		d.publishSoon(e)
+	}
 	d.noteSecretRead(e)
 	d.tellEvents(&e)
 	d.matchWaits(e)

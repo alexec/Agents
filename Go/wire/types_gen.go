@@ -1694,6 +1694,83 @@ type BuildOutputRemoved struct {
 	Freed WorktreeSize `json:"freed"`
 }
 
+// bus/deliver (#4729): one event on the bus that matched subscriptions of this machine, and which ones. Best effort: usually once, sometimes never, rarely twice.
+type BusDelivery struct {
+	Event BusEvent `json:"event"`
+
+	Subscriptions []string `json:"subscriptions"`
+}
+
+// An event on the bus (#4729, spec 4724-event-bus, "The bus"): its envelope only. It carries no data and no details, so the control plane reads only refs, names and times (principle 7, #4726); a consumer reads the subject's state now, by its ref.
+type BusEvent struct {
+	// The CloudEvents version of the envelope (#4728, spec 4724-event-bus, "An event"): always "1.0".
+	Specversion string `json:"specversion"`
+
+	// The event's ref (#4728): the subject's ref, "@", the type, and, when the same type can happen again to that thing, "/" and the provider's key for this one, such as github:pr:alexec/agents#4702@pr.commented/2457. It comes from the provider's data only, never from the machine or the clock, so two machines make the same id for the same happening.
+	ID string `json:"id"`
+
+	// The event's type, noun.verbed (#4728): the same as name, which stays for one release.
+	Type string `json:"type"`
+
+	// Who the event is about (#4728): github, jira, slack and so on; agents for the app's own events; server:<name> for an MCP server's event that says no subject.
+	Provider string `json:"provider"`
+
+	// The provider's space (#4728, spec 4724-event-bus, "Topics"): a repo's full name, a Jira project, a Slack channel; the project or the machine for the app's own events. Lower case; can be empty.
+	Topic string `json:"topic"`
+
+	// The ref of the thing the event happened to (#4728). None for an MCP server's event that says no subject.
+	Subject *Ref `json:"subject,omitzero"`
+
+	// provider:topic, as CloudEvents asks for one (#4728).
+	Source string `json:"source"`
+
+	// When it happened, in RFC 3339 (#4728): the provider's own time when it says one.
+	Time string `json:"time"`
+
+	// The machine that raised it (#4728), as agents:machine:#<machine>. Not part of the event's identity.
+	Producer string `json:"producer"`
+}
+
+// bus/publish (#4729): events a machine recorded, at most 100 at a time, oldest first. Best effort: one not sent when it happened is never sent later.
+type BusPublish struct {
+	Events []BusEvent `json:"events"`
+}
+
+// bus/publish's answer (#4729): how many events were new on the bus, and how many were dropped as copies of one already on it (the same id).
+type BusPublished struct {
+	Kept int64 `json:"kept"`
+
+	Dropped int64 `json:"dropped"`
+}
+
+// bus/subscribe (#4729): every subscription of a machine, at most 1,000. It replaces the ones the machine sent before; an empty list ends them all. A machine sends it again after each connect, as the control plane keeps none across a restart.
+type BusSubscribe struct {
+	Subscriptions []BusSubscription `json:"subscriptions"`
+}
+
+// bus/subscribe's answer (#4729): how many subscriptions the control plane holds for the machine now.
+type BusSubscribed struct {
+	Count int64 `json:"count"`
+}
+
+// One subscription on the bus (#4729): a wait or a workflow trigger of a machine. Each field that is there must match the event's envelope; one that is not there matches every event.
+type BusSubscription struct {
+	// The machine's own name for it, sent back with each event it matches.
+	ID string `json:"id"`
+
+	// The event's provider: github, jira, agents and so on.
+	Provider *string `json:"provider,omitzero"`
+
+	// The event's type, noun.verbed, or noun.* for every type of that noun.
+	Type *string `json:"type,omitzero"`
+
+	// The topics it is about; none for every topic. Lower case.
+	Topics []string `json:"topics,omitzero"`
+
+	// The one thing it is about.
+	Subject *Ref `json:"subject,omitzero"`
+}
+
 type CancelWaitRequest struct {
 	AgentID UUID `json:"agentID"`
 }

@@ -34,11 +34,18 @@ type serverEnvelope struct {
 	server, eventID string
 	subject         *wire.Ref
 	key             string
+	// bus is the envelope of an event the bus delivered (#4729): it keeps it as it came.
+	bus *wire.BusEvent
 }
 
 // envelope gives an event its envelope: from what its server said for a server's
 // event, from its name, scope and details for the app's own.
 func (d *Daemon) envelope(e *wire.Event, server *serverEnvelope) {
+	if server != nil && server.bus != nil {
+		b := server.bus
+		setEnvelope(e, b.ID, b.Provider, b.Topic, b.Subject, b.Time, b.Producer, nil)
+		return
+	}
 	provider, topic, key := "agents", "", strconv.FormatInt(e.Position, 10)
 	var subject *wire.Ref
 	switch {
