@@ -22,11 +22,14 @@ import (
 // (as the disk's has a margin, #195), so it does not flap. machine.busy is raised when it
 // rises from ok, and machine.ok when it comes back to ok.
 
-// The lines. The spike (#4583) calibrates them.
+// The lines, from the spike (#4583): 14 days of this Mac's builds ran at the same throughput
+// with two or three at once, so near is about two builds' load and full about three. Memory
+// pressure warn and swap are reported but give no level: on a 16 GB Mac the kernel said warn
+// for minutes with 41% free and load 0.3 per core, and macOS keeps swap used long after the
+// pressure has gone (47% used with nothing running). Critical pressure still gives full.
 const (
-	capacityNearLoad    = 1.5
-	capacityFullLoad    = 2.5
-	capacityFullSwap    = 50.0
+	capacityNearLoad    = 2.0
+	capacityFullLoad    = 3.0
 	capacityEvery       = 15 * time.Second
 	capacityLooksToFall = 2
 )
@@ -60,19 +63,15 @@ func sampleCapacity(ctx context.Context) capacitySample {
 }
 
 // capacityTarget is the level one look gives, and the signal that gave it ("" for ok):
-// the worst of the three, and the first of load, memory_pressure and swap at that level.
+// the worst of load and critical memory pressure, load first.
 func capacityTarget(s capacitySample) (wire.CapacityLevel, string) {
 	switch {
 	case s.load1 > capacityFullLoad:
 		return wire.CapacityLevelFull, "load"
 	case s.pressure == wire.MemoryPressureCritical:
 		return wire.CapacityLevelFull, "memory_pressure"
-	case s.swap > capacityFullSwap:
-		return wire.CapacityLevelFull, "swap"
 	case s.load1 > capacityNearLoad:
 		return wire.CapacityLevelNear, "load"
-	case s.pressure == wire.MemoryPressureWarn:
-		return wire.CapacityLevelNear, "memory_pressure"
 	}
 	return wire.CapacityLevelOk, ""
 }
@@ -181,8 +180,6 @@ func signalWords(signal string, s capacitySample) string {
 	switch signal {
 	case "memory_pressure":
 		return "memory pressure " + string(s.pressure)
-	case "swap":
-		return fmt.Sprintf("swap %.0f%% used", s.swap)
 	}
 	return fmt.Sprintf("load %.1f per core", s.load1)
 }
