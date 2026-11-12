@@ -76,6 +76,8 @@ type Client struct {
 	// lock is its channel once a client opened one.
 	checked bool
 	lock    clientLock
+	// firstList counts the calls before the connection's first list (firstlist.go, #4891).
+	firstList firstList
 }
 
 func (c *Client) send(v any) {
@@ -162,6 +164,8 @@ func (d *Daemon) Accept(conn controllink.Conn) {
 		if m.Method == "" {
 			continue // a reply: nothing here asks a client anything yet
 		}
+		// In the order they come, before each runs on its own goroutine.
+		d.noteFirstList(c, m.Method, m.Params)
 		safe.Go("rpc "+m.Method, func() { d.dispatch(c, m) })
 	}
 }
