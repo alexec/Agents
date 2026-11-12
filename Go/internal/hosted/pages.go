@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/alexec/agents/Go/internal/controlplane/signin"
+	"github.com/alexec/agents/Go/internal/paperpage"
 )
 
 // The pages at the service's own domain (#1807):
@@ -415,6 +416,8 @@ func (s *Service) page(w http.ResponseWriter, status int, p page) {
 	}
 }
 
+// pageTemplate is every page on Paper (#4617): the design tokens and paperpage's rules,
+// then the few rules of these pages' own, which name no colour or font.
 var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 <html lang="en">
 <head>
@@ -422,21 +425,12 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}}</title>
 <style>
-  body { font: 16px/1.5 -apple-system, system-ui, sans-serif; max-width: 34rem; margin: 4rem auto; padding: 0 1.25rem; color: #1d1d1f; background: #fbfbf8; }
-  h1 { font-size: 1.6rem; margin-bottom: .25rem; }
-  .quiet { color: #6e6e73; }
-  .problem { color: #b3261e; }
+` + paperpage.Style + `
   a.signup, button.signup { min-width: 14rem; text-align: center; }
   form.signup { display: block; }
-  a.button, button { display: inline-block; font: inherit; padding: .5rem 1rem; border-radius: .5rem; border: 1px solid #c7c7cc; background: #fff; color: inherit; text-decoration: none; cursor: pointer; }
-  a.prominent, button.prominent { background: #2c5fd6; border-color: #2c5fd6; color: #fff; }
-  button.destructive { color: #b3261e; }
-  code { font-size: .95rem; background: #f0f0ec; padding: .1rem .3rem; border-radius: .25rem; }
   section { margin-top: 2rem; }
   form { display: inline; }
   td { padding: .15rem 1.5rem .15rem 0; }
-  input { font: inherit; padding: .4rem .5rem; border: 1px solid #c7c7cc; border-radius: .4rem; }
-  @media (prefers-color-scheme: dark) { body { background: #1c1c1e; color: #f2f2f7; } a.button, button, input { background: #2c2c2e; color: #f2f2f7; border-color: #48484a; } a.prominent, button.prominent { background: #2c5fd6; border-color: #2c5fd6; color: #fff; } code { background: #2c2c2e; } }
 </style>
 </head>
 <body>
