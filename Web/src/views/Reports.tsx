@@ -4,13 +4,13 @@
 // has a scope, Me, a group or the organisation, and names it.
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import { signal, useSignal } from "@preact/signals";
-import { go, routeHash } from "../route";
+import { go, route, routeHash } from "../route";
 import { hasPage } from "../model/work";
 import type { Store } from "../model/store";
 import type { FeatureUsage, LineageForecast, ReportDelivery, LineageForecastAssumes, LineageForecastWhatIfEffect, LineageNode, MachineRef, ReportFormat, ReportPage, ReportRange, ReportRow, ReportScope, ReportScopeOption, ReportValue, ReportValueRow, ReportView,
   UsageReport } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
-import { adoption, adoptionLine, barCaption, adoptionNote, budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote,
+import { adoption, adoptionLine, rangeAsked, barCaption, adoptionNote, budgetWords, dimensionTitle, empty, exportName, groupNote, hiddenNote, line, meNote,
   memberNote, noOutcomes, noWorkflows, outcomeLine, outcomeTotals, outcomesNote, rangeSpan, ranges, reportTotals, runtimeLine,
   runtimesNote, sameScope, spendBarCaption, scopeKey, scopeNote, scopedDimensions, share, timeLine, timeNote, utcNote, waitingShare, weekTitle, workflowLine,
   workflowRows, workflowsNote, deleteViewWords, digestText, noCopy, noViews, noViewsHere, viewBy, viewWords, viewsNote } from "../model/reports";
@@ -661,7 +661,9 @@ export function ReportsPage({ store, section, down }: { store: Store; section: S
     if (view) picked.value = scopeKey(view.scope);
     else if (opened.value && opened.value.page !== section.id) opened.value = null;
   }, [view?.id, section.id]);
-  const initial = view ? { range: view.range, by: viewBy(view) } : undefined;
+  // Cost's Open Reports on the Mac (#4938) names the range in the address: #/reports/spend?range=month.
+  const asked = rangeAsked(route.value.query);
+  const initial = view ? { range: view.range, by: viewBy(view) } : asked ? { range: asked } : undefined;
   const list = scopes.value ?? [];
   const option = list.find((o) => scopeKey(o.scope) === picked.value) ?? list[0];
   return (
@@ -677,7 +679,7 @@ export function ReportsPage({ store, section, down }: { store: Store; section: S
           kind={section.id as CountsKind} initial={initial} />
         : section.id === "value" ? <PlanningPane key={view?.id ?? ""} store={store} scope={option?.scope} initial={initial} />
         : section.id === "adoption" ? <AdoptionPane key={view?.id ?? ""} store={store} scope={option?.scope} initial={initial} />
-        : <ReportsPane key={view?.id ?? ""} store={store} runtimeName={runtimeNameIn(store)} scope={option?.scope} seesMore={list.length > 1} initial={initial} />)}
+        : <ReportsPane key={view?.id ?? asked ?? ""} store={store} runtimeName={runtimeNameIn(store)} scope={option?.scope} seesMore={list.length > 1} initial={initial} />)}
     </>
   );
 }
