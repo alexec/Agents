@@ -2126,7 +2126,7 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
   border-radius: var(--radius-control); background: none; color: inherit; cursor: pointer; }
 .work-refresh:hover { background: var(--paper-wash); }
 .work-refresh svg { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
-.work-refresh.busy svg { animation: work-spin 1s linear infinite; }
+.work-refresh.busy svg { transform-origin: 50% 50%; animation: work-spin 1s linear infinite; }
 @keyframes work-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .work-refresh.busy svg { animation-duration: 3s; } }
 /* The row: the icon, then two lines, then what is at the trailing edge. */

@@ -177,11 +177,12 @@ export function FilterMenu({ label, value, choices, any, always, standard, onPic
   );
 }
 
-/** Refresh (section 4): an arrow that spins while a read runs. */
+/** Refresh (section 4): the standard two-arrow circle (as the Mac's and the Remote's
+ * `arrow.triangle.2.circlepath`), which turns about its centre while a read runs. */
 export function RefreshButton({ busy, onClick }: { busy: boolean; onClick: () => void }) {
   return (
     <button type="button" class={`work-refresh${busy ? " busy" : ""}`} title="Refresh" aria-label={busy ? "Refreshing" : "Refresh"} onClick={onClick}>
-      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.25 8a5.25 5.25 0 1 1-1.54-3.71M13.5 2.5v3h-3" /></svg>
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.75 8a5.25 5.25 0 0 1 9.1-3.57M13.25 8a5.25 5.25 0 0 1-9.1 3.57M12.25 1.75v3h-3M3.75 14.25v-3h3" /></svg>
     </button>
   );
 }
