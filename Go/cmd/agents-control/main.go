@@ -65,6 +65,8 @@
 //	                            browser (#1486), and the mailto: or https: address a push
 //	                            service may write to about it
 //	AGENTS_CONTROL_LOG_FORMAT, AGENTS_CONTROL_LOG_LEVEL  as --log-format and --log-level
+//	AGENTS_CONTROL_LOG          a file that gets a copy of every line, rolled at 4 MB, while
+//	                            they still go to standard error (#4747); --log takes them instead
 //	AGENTS_CONTROL_METRICS      as --metrics: host:port, such as 127.0.0.1:9791; off when unset
 //	AGENTS_CONTROL_METRICS_TOKEN  the bearer token a scraper sends; needed on any address but
 //	                            loopback. AGENTS_CONTROL_METRICS_TOKEN_FILE reads it from a file
@@ -500,6 +502,12 @@ func serve() {
 	// Beside the rest of what it says, in control.log, rather than in the system log (#93).
 	if file := value("--log"); file != "" {
 		logs.Take(expand(file), controlplane.LogLimit)
+	} else if file := os.Getenv("AGENTS_CONTROL_LOG"); file != "" {
+		// A copy of every line in a file, as well as standard error (#4747): in a container,
+		// a file on its volume keeps the lines across a redeploy.
+		if err := logs.Copy(expand(file), controlplane.LogLimit); err != nil {
+			fail("the log %s: %v", file, err)
+		}
 	}
 	if err := logs.Configure(flagOrEnv("--log-format", "AGENTS_CONTROL_LOG_FORMAT"), flagOrEnv("--log-level", "AGENTS_CONTROL_LOG_LEVEL")); err != nil {
 		fail("%v", err)

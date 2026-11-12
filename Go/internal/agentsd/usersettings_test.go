@@ -1,9 +1,9 @@
 package agentsd
 
 import (
-	"fmt"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"

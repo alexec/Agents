@@ -13421,6 +13421,31 @@ export interface UserSuspended {
 }
 
 /**
+ * The PRs that landed in an hour or a day in one repository (#4596): merged is every PR the agents
+ * worked on that merged, merged reverts included; reverted is the merged reverts among them.
+ */
+export interface VelocityBucket {
+  merged: number;
+  reverted: number;
+}
+
+/**
+ * velocity/history's answer (#4596): the PRs that landed, by the hour (168 hours) and by the day
+ * (90 days), then by repository (github:alexec/agents), from this machine's lineage store. Shaped
+ * as usage/history is.
+ */
+export interface VelocityHistory {
+  hours: Record<string, Record<string, VelocityBucket>>;
+  days: Record<string, Record<string, VelocityBucket>>;
+  now: string;
+  /**
+   * The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day
+   * stamps are in (#1267). Absent from a host too old to say: read as the viewer's own.
+   */
+  timeZone?: string;
+}
+
+/**
  * What a third-party server's view waits on before it is drawn: the person's Show (#191). The data
  * of a viewNeedsShow failure.
  */
@@ -14568,6 +14593,7 @@ export interface Methods {
   "user/setSecret": { params: UserSecretSet; result: Empty };
   "user/setSettings": { params: UserSettingsPart; result: Empty };
   "user/settings": { params: Empty; result: UserSettings };
+  "velocity/history": { params: Empty; result: VelocityHistory };
   "views/call": { params: ViewCallRequest; result: JSONValue };
   "views/context": { params: ViewContextRequest; result: Empty };
   "views/log": { params: ViewLogRequest; result: Empty };
@@ -15001,6 +15027,7 @@ export const MethodTarget = {
   "user/setSecret": "control",
   "user/setSettings": "control",
   "user/settings": "control",
+  "velocity/history": "host",
   "views/call": "host",
   "views/context": "host",
   "views/log": "host",
@@ -16216,6 +16243,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserSettingsChanged: { required: [], optional: ["parts", "agentConfigFiles", "secrets"] },
   UserSettingsPart: { required: ["part", "value"], optional: [] },
   UserSuspended: { required: ["user", "provider", "at"], optional: ["off"] },
+  VelocityBucket: { required: ["merged", "reverted"], optional: [] },
+  VelocityHistory: { required: ["hours", "days", "now"], optional: ["timeZone"] },
   ViewAsk: { required: ["server", "uri", "hash", "isNew"], optional: [] },
   ViewCallRequest: { required: ["agentID", "viewID", "name"], optional: ["arguments", "feed", "server", "folder"] },
   ViewContextRequest: { required: ["agentID", "viewID"], optional: ["uri", "content", "structuredContent"] },

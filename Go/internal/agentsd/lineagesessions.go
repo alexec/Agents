@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/lineage"
 	"github.com/alexec/agents/Go/wire"
 )
 

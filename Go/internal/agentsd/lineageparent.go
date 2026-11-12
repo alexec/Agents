@@ -133,7 +133,7 @@ func (d *Daemon) askIssueParent(j parentJob) {
 			}
 		})
 	}
-// After the links are given: no longer waiting means they are in the linker's work.
+	// After the links are given: no longer waiting means they are in the linker's work.
 	d.issueMu.Lock()
 	defer d.issueMu.Unlock()
 	delete(d.issueWaiting, issue)

@@ -42,10 +42,31 @@ type machineNames struct {
 const keptFailedMakes = 5
 
 // failedMake is a make that failed (#3972): a row in the failed state with the provider's
-// reason, shown only to the person who made it, until the control plane restarts.
+// reason, shown only to the person who made it. The rows are kept in the store too
+// (#4747), at FailedMakesPrefix, so a restart or a redeploy does not lose the reason.
 type failedMake struct {
 	info   MachineInfo
 	person string
+}
+
+// FailedMakesPrefix is where each provider's failed makes are kept: one record a provider,
+// at most keptFailedMakes rows, the newest last.
+const FailedMakesPrefix = "v1/failed-makes/"
+
+// failedMakesKey is a provider's record of failed makes.
+func failedMakesKey(provider string) string {
+	return FailedMakesPrefix + url.PathEscape(provider) + ".json"
+}
+
+// keptFailedMake is a failed make as the store keeps it.
+type keptFailedMake struct {
+	Name   string `json:"name"`
+	Reason string `json:"reason"`
+	Person string `json:"person,omitempty"`
+}
+
+func failedRow(name, person, reason string) failedMake {
+	return failedMake{info: MachineInfo{ID: "failed-" + name, Name: name, State: "failed", Reason: &reason}, person: person}
 }
 
 // defaultProvider is the person's default provider: the one they made a machine on last or
@@ -306,18 +327,98 @@ func (p *Providers) takenNames(provider string) map[string]bool {
 	return taken
 }
 
-// failed keeps a make that failed as a row of the provider's, the oldest gone past
-// keptFailedMakes.
-func (p *Providers) failed(provider, name, person, reason string) {
-	row := failedMake{info: MachineInfo{ID: "failed-" + name, Name: name, State: "failed", Reason: &reason}, person: person}
-	p.mu.Lock()
-	kept := append(p.failedMakes[provider], row)
+// loadFailed reads the provider's failed makes back from the store, the newest last.
+func (p *Providers) loadFailed(provider string) {
+	object, err := p.store.Get(context.Background(), failedMakesKey(provider))
+	if err != nil || object == nil {
+		return
+	}
+	var kept []keptFailedMake
+	if json.Unmarshal(object.Data, &kept) != nil {
+		return
+	}
 	if len(kept) > keptFailedMakes {
 		kept = kept[len(kept)-keptFailedMakes:]
 	}
-	p.failedMakes[provider] = kept
+	rows := make([]failedMake, 0, len(kept))
+	for _, k := range kept {
+		rows = append(rows, failedRow(k.Name, k.Person, k.Reason))
+	}
+	p.mu.Lock()
+	p.failedMakes[provider] = rows
+	p.mu.Unlock()
+}
+
+// keepFailed adds a failed make to the provider's record in the store, the oldest gone
+// past keptFailedMakes, again when another copy wrote first, and returns the rows kept.
+// Another copy's rows come in too, as the record holds them.
+func (p *Providers) keepFailed(provider string, row keptFailedMake) ([]keptFailedMake, error) {
+	key := failedMakesKey(provider)
+	ctx := context.Background()
+	for range 5 {
+		var kept []keptFailedMake
+		when := store.Absent
+		object, err := p.store.Get(ctx, key)
+		if err != nil {
+			return nil, err
+		}
+		if object != nil {
+			_ = json.Unmarshal(object.Data, &kept)
+			when = store.Matching(object.ETag)
+		}
+		kept = append(kept, row)
+		if len(kept) > keptFailedMakes {
+			kept = kept[len(kept)-keptFailedMakes:]
+		}
+		data, _ := json.Marshal(kept)
+		if _, err := p.store.Put(ctx, key, data, when); err != nil {
+			var conflict *store.ConflictError
+			if errors.As(err, &conflict) {
+				continue
+			}
+			return nil, err
+		}
+		return kept, nil
+	}
+	return nil, errors.New("another copy kept changing the record")
+}
+
+// failed keeps a make that failed as a row of the provider's, the oldest gone past
+// keptFailedMakes: in the store, so a restart keeps it (#4747), and here. When the store
+// can't take it, the row is kept here only.
+func (p *Providers) failed(provider, name, person, reason string) {
+	row := keptFailedMake{Name: name, Reason: reason, Person: person}
+	kept, err := p.keepFailed(provider, row)
+	if err != nil {
+		p.log("workspace: could not keep the failed make " + name + " of " + provider + ": " + errorWords(err))
+		p.mu.Lock()
+		for _, f := range p.failedMakes[provider] {
+			kept = append(kept, keptFailedMake{Name: f.info.Name, Reason: deref(f.info.Reason), Person: f.person})
+		}
+		p.mu.Unlock()
+		kept = append(kept, row)
+		if len(kept) > keptFailedMakes {
+			kept = kept[len(kept)-keptFailedMakes:]
+		}
+	}
+	rows := make([]failedMake, 0, len(kept))
+	for _, k := range kept {
+		rows = append(rows, failedRow(k.Name, k.Person, k.Reason))
+	}
+	p.mu.Lock()
+	p.failedMakes[provider] = rows
 	p.mu.Unlock()
 	p.changed()
+}
+
+// forgetFailed deletes a provider's failed makes, when the provider goes.
+func (p *Providers) forgetFailed(provider string) {
+	p.mu.Lock()
+	delete(p.failedMakes, provider)
+	p.mu.Unlock()
+	if err := p.store.Delete(context.Background(), failedMakesKey(provider)); err != nil {
+		p.log("workspace: could not forget the failed makes of " + provider + ": " + errorWords(err))
+	}
 }
 
 // failedOwner is who made the failed row, and whether it is one.

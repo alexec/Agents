@@ -464,6 +464,9 @@ public enum DaemonAPI {
         /// Where the time of running chats went by hour and by day, per runtime (#852).
         /// No params.
         public static let timeHistory = "time/history"
+        /// The PRs the agents worked on that landed, by hour and by day, per repository
+        /// (#4596). No params.
+        public static let velocityHistory = "velocity/history"
         /// Which features this host counted (#2165), for Reports ▸ Features. No params.
         public static let reportsFeatures = "reports/features"
         /// Report a Problem (#3718): the person's words made into a GitHub new-issue link,
