@@ -87,10 +87,10 @@ export function deleteQuestion(host: ControlMachine, sessions: number, preview: 
  * and each other one has New Machine on ‹name›. `undefined` is the default provider. */
 export function newMachineItems(providers: readonly ProviderSummary[]): { label: string; provider?: string }[] {
   const can = makers(providers);
-  if (can.length < 2) return [{ label: "New Machine" }];
+  if (can.length < 2) return [{ label: "New Machine…" }];
   const chosen = can.find((p) => p.default) ?? can[0]!;
-  return [{ label: `New Machine (${chosen.name})` },
-    ...can.filter((p) => p.id !== chosen.id).map((p) => ({ label: `New Machine on ${p.name}`, provider: p.id as string }))];
+  return [{ label: `New Machine (${chosen.name})…` },
+    ...can.filter((p) => p.id !== chosen.id).map((p) => ({ label: `New Machine on ${p.name}…`, provider: p.id as string }))];
 }
 
 /** Remove's question, as Settings ▸ Machines asked it. */

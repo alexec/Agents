@@ -181,14 +181,14 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
   const list = pagesShown(section, admin, open?.id, more);
   const registering = useSignal(false);
   useUserScopeStatus(store, section === "status");
-  // The Machines header (#3974): + makes a machine with no questions; its menu also registers one.
+  // The Machines header (#3974): + opens New Machine's sheet (#4634); its menu also registers one.
   const machinesHead = (group: string) => section === "machines" && group === "Machines";
-  // With two or more providers, New Machine names the default, and New Machine on ‹name› makes it on another (#3979).
+  // With two or more providers, New Machine names the default, and New Machine on ‹name› opens the sheet on another (#3979).
   useEffect(() => {
     if (section === "machines" && store.providers.list.value === null) void store.providers.load();
   }, [section]);
   const headItems = (): MenuItem[] => [
-    ...newMachineItems(store.providers.list.value ?? []).map((item) => ({ label: item.label, run: () => void store.makeMachine(item.provider) })),
+    ...newMachineItems(store.providers.list.value ?? []).map((item) => ({ label: item.label, run: () => store.newMachine(item.provider) })),
     { label: addMachineWords.menuItem, run: () => { registering.value = true; } },
   ];
   return (
@@ -201,7 +201,7 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
                 <h2 class="section-head with-add" onContextMenu={(e) => openContextMenu(e, headItems())}>
                   {group}
                   <button type="button" class="head-add" title="New Machine" aria-label="New Machine"
-                    onClick={() => void store.makeMachine()}>+</button>
+                    onClick={() => store.newMachine()}>+</button>
                 </h2>
               ) : <h2 class="section-head">{group}</h2>}
               {pages.map((p) => p.draw.kind === "machine" ? (

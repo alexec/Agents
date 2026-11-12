@@ -334,12 +334,12 @@ final class ControlSettingsModel {
     /// as Joining… until their host joins and is linked.
     private(set) var joiningWorkspaces: Set<String> = []
 
-    /// The New Machine form's schema, or why it couldn't be read.
-    func workspaceOptions(_ provider: ProviderID) async -> Result<JSONValue, WorkspaceRefusal> {
+    /// The New Machine form and its starting values (#4634), or why it couldn’t be read.
+    func workspaceOptions(_ provider: ProviderID?) async -> Result<DaemonAPI.ProviderOptions, WorkspaceRefusal> {
         do {
             let options = try await client.call(DaemonAPI.Method.providersOptions, DaemonAPI.ProviderRequest(id: provider),
                                                 returning: DaemonAPI.ProviderOptions.self)
-            return .success(options.schema)
+            return .success(options)
         } catch let error as JSONRPCError {
             return .failure(WorkspaceRefusal(error.message))
         } catch {

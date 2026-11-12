@@ -61,3 +61,16 @@ test("the words say what happens next", () => {
   assert.match(m.machineWords.joining("agents-1", r), /clones alexec\/agents on its first boot/);
   assert.match(m.machineWords.notJoining("agents-1", "Codespaces"), /Add it as a machine in Settings ▸ Machine providers, with Add as Machine…/);
 });
+
+test("New Machine's sheet starts on what New Machine would make, and says each choice's cost (#4634)", () => {
+  const fields = m.formFields({ type: "object", properties: {
+    size: { type: "string", title: "Size", enum: ["s-1", "s-2"], "x-costs": { "s-2": "$12/month" } },
+    region: { type: "string", title: "Region", enum: ["nyc1", "sfo3"] },
+    note: { type: "string", title: "Note" },
+  } });
+  const filled = m.withValues(fields, { size: "s-2", gone: "x" });
+  assert.deepEqual(filled.map((f) => [f.key, f.value]), [["size", "s-2"], ["region", "nyc1"], ["note", ""]]);
+  const size = filled.find((f) => f.key === "size");
+  assert.equal(m.choiceLabel(size, "s-2"), "s-2 — $12/month");
+  assert.equal(m.choiceLabel(size, "s-1"), "s-1");
+});

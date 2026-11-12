@@ -2631,8 +2631,9 @@ final class RemoteModel {
     /// The providers New Machine can use (#3979), for the Machines header's menu.
     private(set) var machineProviders: [DaemonAPI.ProviderSummary] = []
 
-    /// A New Machine the provider could not make, with its reason, and Try Again.
-    var makeFailed: MachineMakeFailure?
+    /// The New Machine sheet (#4634), or nil while it is shut. A make the provider refused
+    /// opens it again on its choices, with the reason.
+    var newMachineAsk: NewMachineAsk?
 
     /// How many New Machine calls wait for the provider's answer (#4612, as the window's #4610):
     /// a *Making…* row each, until the control plane lists the machine as joining.
@@ -2710,26 +2711,51 @@ final class RemoteModel {
                                       returning: DaemonAPI.StartedMachinePreview.self)
     }
 
-    /// New Machine (#3973): the default provider makes `machine-N` with the options used last,
-    /// with no questions; New Machine on ▸ names the provider, which is then the default (#3979).
-    func newMachine(on provider: ProviderID? = nil) async {
+    /// New Machine (#3973, #4634): the sheet, on the default provider or the one New Machine
+    /// on ▸ names, with every field on what New Machine would make. Make confirms it.
+    func newMachine(on provider: ProviderID? = nil) {
+        newMachineAsk = NewMachineAsk(provider: provider)
+    }
+
+    /// The New Machine sheet's form (#4634): the provider's schema and the values to start with.
+    func newMachineForm(_ provider: ProviderID?) async -> Result<DaemonAPI.ProviderOptions, NewMachineRefusal> {
+        guard let control = controlPlane else {
+            return .failure(.init("The control plane isn’t answering, so no machine can be made."))
+        }
+        do {
+            return .success(try await control.call(DaemonAPI.Method.providersOptions, DaemonAPI.ProviderRequest(id: provider),
+                                                   returning: DaemonAPI.ProviderOptions.self))
+        } catch {
+            return .failure(.init(sentence(for: error)))
+        }
+    }
+
+    /// Make on the New Machine sheet (#4634): the sheet closes at once and a *Making…* row
+    /// takes over (#4612). A make the provider refuses opens the sheet again on the same
+    /// choices, with the provider's reason.
+    func makeMachine(_ draft: NewMachineDraft) {
         guard let control = controlPlane else {
             problem = "The control plane isn’t answering, so no machine can be made."
             return
         }
         machinesBeingMade += 1
-        defer { machinesBeingMade -= 1 }
-        do {
-            let made = try await control.call(DaemonAPI.Method.providersCreate, DaemonAPI.ProviderRequest(id: provider),
-                                              returning: DaemonAPI.ProviderCreated.self)
-            if made.workspace.state == "failed" {
-                makeFailed = MachineMakeFailure(reason: made.workspace.reason ?? "\(made.workspace.name) could not be made.",
-                                                provider: provider)
+        Task {
+            defer { machinesBeingMade -= 1 }
+            var refused: String?
+            do {
+                let made = try await control.call(
+                    DaemonAPI.Method.providersCreate,
+                    DaemonAPI.ProviderCreate(id: draft.provider, name: draft.name, options: .object(draft.values)),
+                    returning: DaemonAPI.ProviderCreated.self)
+                if made.workspace.state == "failed" {
+                    refused = made.workspace.reason ?? "\(made.workspace.name) could not be made."
+                }
+            } catch {
+                refused = sentence(for: error)
             }
-        } catch {
-            makeFailed = MachineMakeFailure(reason: sentence(for: error), provider: provider)
+            if let refused { newMachineAsk = NewMachineAsk(provider: draft.provider, again: draft, problem: refused) }
+            await loadMachineProviders()
         }
-        await loadMachineProviders()
     }
 
     private func heardProviders(_ params: JSONValue?) {

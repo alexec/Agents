@@ -142,8 +142,8 @@ struct AgentsCommands: Commands {
                     }
                 }
             }
-            // As the Machines header's `+` (#3973): the default provider, no questions.
-            Button("New Machine") { Task { await model.newMachine() } }
+            // As the Machines header's `+` (#3973): the sheet, on the default provider (#4634).
+            Button("New Machine…") { model.newMachine() }
                 .keyboardShortcut("m", modifiers: [.command, .shift])
                 .disabled(model.needsFirstRun || ControlConfig.endpoint == nil)
             // As Register a Machine… in the sidebar's Machines menu (#2755); a machine joins a control plane, so

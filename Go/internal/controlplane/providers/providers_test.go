@@ -770,6 +770,42 @@ func TestNewMachineTakesTheOptionsUsedLastOnItsProvider(t *testing.T) {
 	}
 }
 
+// The New Machine sheet starts with what New Machine would make (#4634).
+func TestTheFormSaysWhatNewMachineWouldMake(t *testing.T) {
+	h := newHarness(t)
+	id := h.add()
+	form := h.must(MethodProvidersOptions, map[string]any{}).(ProviderOptions)
+	if string(deref(form.ID)) != id || deref(form.Name) != "machine-1" {
+		t.Fatalf("with no id, the default provider and machine-1: %+v", form)
+	}
+	if got := valueOf(form.Values); !reflect.DeepEqual(got, map[string]any{"size": "small"}) {
+		t.Errorf("the first choice of each field: %v", got)
+	}
+	// Asking again keeps no name.
+	if again := h.must(MethodProvidersOptions, map[string]any{"id": id}).(ProviderOptions); deref(again.Name) != "machine-1" {
+		t.Errorf("a second ask: %v", deref(again.Name))
+	}
+	// The sheet makes with the name it was given; the counter goes past it, and the options
+	// used are the next form's values.
+	provider := wire.ProviderID(id)
+	name := "machine-1"
+	if _, err := h.call(MethodProvidersCreate, ProviderCreate{ID: &provider, Name: &name,
+		Options: wire.JSONValue(rawOf(map[string]any{"size": "large", "gone": "x"}))}); err != nil {
+		t.Fatal(err)
+	}
+	h.provider.mu.Lock()
+	h.provider.workspaces = nil
+	h.provider.mu.Unlock()
+	h.providers.Refresh("")
+	form = h.must(MethodProvidersOptions, map[string]any{"id": id}).(ProviderOptions)
+	if deref(form.Name) != "machine-2" {
+		t.Errorf("after machine-1 was made: %v", deref(form.Name))
+	}
+	if got := valueOf(form.Values); !reflect.DeepEqual(got, map[string]any{"size": "large"}) {
+		t.Errorf("the options used last, only the form's fields: %v", got)
+	}
+}
+
 func TestMakeDefaultAndTheLastMakeChooseNewMachinesProvider(t *testing.T) {
 	h := newHarness(t)
 	first := h.add()

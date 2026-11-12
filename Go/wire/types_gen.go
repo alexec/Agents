@@ -10595,12 +10595,21 @@ type ProviderList struct {
 	Providers []ProviderSummary `json:"providers"`
 }
 
-// providers/options: the New Machine form, a JSON Schema.
+// providers/options: the New Machine form, a JSON Schema, with what New Machine would make (#4634). With no `id`, the person's default provider.
 type ProviderOptions struct {
 	Schema JSONValue `json:"schema"`
+
+	// The provider the form is for: the one asked for, or else the person's default.
+	ID *ProviderID `json:"id,omitzero"`
+
+	// The values the form starts with: the options the person made a machine with last on this provider, over each field's `default` or else the first of its `enum`.
+	Values JSONValue `json:"values,omitzero"`
+
+	// The name New Machine would give: the person's next `machine-N`. Not kept until a make uses it.
+	Name *string `json:"name,omitzero"`
 }
 
-// providers/remove, providers/refresh, providers/options.
+// providers/remove, providers/refresh, providers/options (with no `id`, the default provider).
 type ProviderRequest struct {
 	ID *ProviderID `json:"id,omitzero"`
 }

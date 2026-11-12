@@ -459,6 +459,17 @@ struct FolderListView: View {
         }
         .sendToHostSheet(requests)
         .bringBackSheet(requests)
+        // New Machine (#4634): the defaults chosen, Make to confirm.
+        .sheet(item: Binding(get: { model.newMachineAsk }, set: { model.newMachineAsk = $0 })) { ask in
+            NewMachineSheet(providers: model.machineProviders, provider: ask.provider, again: ask.again,
+                            problem: ask.problem, load: { await model.newMachineForm($0) }) { draft in
+                model.makeMachine(draft)
+                return nil
+            }
+            // A refused make's ask is new: a sheet of its own, with its reason and choices.
+            .id(ask.id)
+            .paperSheet()
+        }
         // The sheet Register a Machine… shows (#503, #2755).
         .sheet(isPresented: Binding(get: { addingMachine != nil }, set: { if !$0 { addingMachine = nil } })) {
             if let control = addingMachine {
@@ -1055,7 +1066,7 @@ private extension FolderMenu {
 
 /// The sidebar's foot: the connection, then why the Mac is awake. Nothing at all when
 /// both have nothing to say.
-/// The Machines group's header (#3973): `+` on hover makes a machine with no questions, and
+/// The Machines group's header (#3973): `+` on hover opens New Machine's sheet (#4634), and
 /// its menu has New Machine, Register a Machine… and Machine Providers….
 private struct MachinesHeader: View {
     @Environment(AppModel.self) private var model
@@ -1068,9 +1079,9 @@ private struct MachinesHeader: View {
             Text("Machines").appText(.supporting)
             Spacer()
             if hovering, ControlConfig.endpoint != nil {
-                Button { Task { await model.newMachine() } } label: { Image(systemName: "plus") }
+                Button { model.newMachine() } label: { Image(systemName: "plus") }
                     .buttonStyle(.borderless)
-                    .help("New Machine: the default provider makes one, with the options used last")
+                    .help("New Machine: choose what the provider makes, starting from the options used last")
                     .accessibilityLabel("New Machine")
             }
         }
@@ -1084,15 +1095,15 @@ private struct MachinesHeader: View {
                 // on ▸ picks another, which is then the default (#3979).
                 if providers.count > 1 {
                     let chosen = providers.first { $0.default == true } ?? providers[0]
-                    Button("New Machine (\(chosen.name))") { Task { await model.newMachine() } }
+                    Button("New Machine (\(chosen.name))…") { model.newMachine() }
                     Menu("New Machine on") {
                         ForEach(providers) { provider in
                             Toggle(provider.name, isOn: Binding(get: { provider.id == chosen.id },
-                                                                set: { _ in Task { await model.newMachine(on: provider.id) } }))
+                                                                set: { _ in model.newMachine(on: provider.id) }))
                         }
                     }
                 } else {
-                    Button("New Machine") { Task { await model.newMachine() } }
+                    Button("New Machine…") { model.newMachine() }
                 }
                 Divider()
                 Button("Register a Machine…") { requests.folderSheet = .addMachine }

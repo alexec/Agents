@@ -36,7 +36,23 @@ struct AddMachineSheet: View {
             choose
         case .provider(let id):
             if let provider = control.providers.first(where: { $0.id == id }) {
-                NewMachineSheet(control: control, provider: provider) { prefill in step = .server(prefill) }
+                NewMachineSheet(providers: [provider], provider: provider.id, showsClones: true,
+                                load: { await control.workspaceOptions($0).mapError { NewMachineRefusal($0.message) } }) { draft in
+                    switch await control.makeMachine(draft.provider, name: draft.name, options: .object(draft.values),
+                                                     clones: draft.clones) {
+                    case .success(let made):
+                        // A workspace that can't install on its first boot is added over ssh,
+                        // as Add as Host… does.
+                        if !made.joining {
+                            step = .server(.init(destination: made.workspace.ssh ?? "", name: made.workspace.name,
+                                                 tunnel: made.workspace.tunnel ?? false, provider: provider.id,
+                                                 workspace: made.workspace.id))
+                        }
+                        return nil
+                    case .failure(let refusal):
+                        return refusal.message
+                    }
+                }
             } else {
                 choose
             }

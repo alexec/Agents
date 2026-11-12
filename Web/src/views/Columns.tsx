@@ -18,6 +18,7 @@ import { NewFolderDialog } from "./NewFolder";
 import { DropboxDialog } from "./DropboxDialog";
 import { ReportProblemDialog } from "./ReportProblemDialog";
 import { MoveToMachineDialog } from "./MoveToMachineDialog";
+import { NewMachineSheet } from "./NewMachineSheet";
 import { GitLendDialog } from "./GitLend";
 import { ExportImportDialog } from "./ExportImport";
 import { Problem } from "./Errors";
@@ -83,6 +84,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
       {down && <Banner session={session} />}
       <Problem store={store} />
+      {store.newMachineAsk.value && <NewMachineSheet key={JSON.stringify(store.newMachineAsk.value)} store={store} ask={store.newMachineAsk.value} />}
       <OrgPolicyStrip store={store} />
       <NavBar store={store} session={session} />
       {section === "overview" ? <div class="columns overview-columns console" aria-busy={down}><Overview store={store} down={down} /></div>

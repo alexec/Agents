@@ -719,14 +719,7 @@ func (p *Providers) answer(method string, params json.RawMessage, caller Caller,
 		if err := requireParams(params, &request, "ProviderRequest"); err != nil {
 			return nil, err
 		}
-		if deref(request.ID) == "" {
-			return nil, invalid("Which provider?")
-		}
-		schema, err := p.providerCall(string(*request.ID), func(c Provider) (any, error) { return c.Options() })
-		if err != nil {
-			return nil, err
-		}
-		return ProviderOptions{Schema: rawOf(schema)}, nil
+		return p.newMachineForm(caller.Person, string(deref(request.ID)))
 	case MethodProvidersCreate:
 		var request ProviderCreate
 		if err := requireParams(params, &request, "ProviderCreate"); err != nil {
@@ -1825,6 +1818,7 @@ func (p *Providers) create(request ProviderCreate, who string, caller *Caller) (
 		return nil, err
 	}
 	p.madeOn(person, id, used)
+	p.usedName(person, name)
 	p.Refresh(id)
 	p.mu.Lock()
 	var listedNow []MachineInfo
