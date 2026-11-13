@@ -486,6 +486,10 @@ struct ChatTranscript: View {
             // chat column itself.
             if !cards.isEmpty {
                 VStack(spacing: 12) {
+                    // The one label over the Asks, in the yellow of needs you (#5031).
+                    if cards.contains(where: \.asks) {
+                        WaitingForYouLabel().inColumn(column)
+                    }
                     ForEach(cards) { $0.view }
                 }
             }
@@ -946,10 +950,13 @@ private extension View {
 /// end of the conversation.
 struct WaitingCard: Identifiable {
     let id: String
+    /// An Ask (#5031): the person must answer. A live tile or the agent's own wait is not.
+    let asks: Bool
     let view: AnyView
 
-    init(id: String, @ViewBuilder _ view: () -> some View) {
+    init(id: String, asks: Bool = true, @ViewBuilder _ view: () -> some View) {
         self.id = id
+        self.asks = asks
         self.view = AnyView(view())
     }
 }

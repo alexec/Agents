@@ -27,6 +27,7 @@ import circleStop from "lucide:circle-stop";
 import circleX from "lucide:circle-x";
 import clock from "lucide:clock";
 import dot from "lucide:dot";
+import ellipsis from "lucide:ellipsis";
 import file from "lucide:file";
 import fileQuestionMark from "lucide:file-question-mark";
 import fileText from "lucide:file-text";
@@ -68,7 +69,7 @@ const icons = {
   "audio-waveform": audioWaveform, ban, bell, "bell-off": bellOff, "chart-column": chartColumn, check,
   "chevron-down": chevronDown, "chevron-left": chevronLeft, "chevron-right": chevronRight, "chevron-up": chevronUp,
   circle, "circle-check": circleCheck, "circle-dashed": circleDashed, "circle-dot": circleDot, "circle-help": circleHelp,
-  "circle-pause": circlePause, "circle-stop": circleStop, "circle-x": circleX, clock, dot, file,
+  "circle-pause": circlePause, "circle-stop": circleStop, "circle-x": circleX, clock, dot, ellipsis, file,
   "file-question-mark": fileQuestionMark, "file-text": fileText, folder, "git-pull-request": gitPullRequest, globe, hand,
   image, info, "layout-grid": layoutGrid, "list-ordered": listOrdered, lock, mail,
   "message-circle": messageCircle, "messages-square": messagesSquare, "octagon-alert": octagonAlert, paperclip,

@@ -716,3 +716,19 @@ export function turnParts(items: readonly Item[], isLive: boolean): TurnParts {
 export function isWorking(state: AgentState): boolean {
   return state === "running" || state === "starting" || state === "waitingOnUser";
 }
+
+/**
+ * The policy stop the agent is still stopped by (#3262, #5031): the last one, with no message of the
+ * person's after it, while the agent does not run. Its Ask for More is an Ask at the end of the chat.
+ */
+export function raisableStop(entries: readonly TranscriptEntry[], agent: { state: string } | undefined):
+  { id: string; refusal: Extract<TranscriptEntryKind, { policyStopped: unknown }>["policyStopped"]["_0"] } | undefined {
+  if (!agent || agent.state === "running" || agent.state === "starting" || agent.state === "archived") return undefined;
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const entry = entries[i]!;
+    if (kindOf(entry) === "userMessage") return undefined;
+    const stop = fields(entry, "policyStopped");
+    if (stop) return { id: entry.id, refusal: stop._0 };
+  }
+  return undefined;
+}
