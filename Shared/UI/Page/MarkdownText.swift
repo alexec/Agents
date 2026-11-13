@@ -104,7 +104,7 @@ struct MarkdownText: View {
             if selectsAcross, top, caret == nil {
                 // The words between code, tables and pictures as one text, so a drag
                 // selects across paragraphs (#5155).
-                ForEach(MarkdownBlock.segments(blocks), id: \.self) { segment in
+                ForEach(MarkdownBlock.segments(blocks, code: Self.codeInText), id: \.self) { segment in
                     switch segment {
                     case .prose(let range):
                         SelectableProse(blocks: Array(blocks[range]), fillsWidth: fillsWidth)
@@ -273,6 +273,15 @@ struct MarkdownText: View {
             PictureAlternative(source: source, alt: alt)
         }
     }
+
+    /// Whether a message's code goes in its one text too, so a drag goes from a paragraph
+    /// into the code (#5182). The Mac's text view draws the code's well, colours and Run;
+    /// the Remote's keeps each code block apart.
+    #if os(macOS)
+    private static let codeInText = true
+    #else
+    private static let codeInText = false
+    #endif
 
     /// Lists sit a little looser on a touch screen, where a line is a target.
     #if os(macOS)

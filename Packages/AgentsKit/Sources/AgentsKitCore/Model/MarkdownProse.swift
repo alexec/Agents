@@ -15,6 +15,12 @@ extension MarkdownBlock {
         }
     }
 
+    /// A code block that can be drawn as words in a text: not a Mermaid diagram.
+    public var isTextCode: Bool {
+        guard case .code(let language, _) = self else { return false }
+        return !MermaidDiagram.isFence(language)
+    }
+
     /// A message's blocks, in order, as runs of words and the other blocks between them.
     public enum Segment: Hashable, Sendable {
         /// Blocks next to each other that are all prose, drawn as one text.
@@ -24,11 +30,15 @@ extension MarkdownBlock {
     }
 
     /// The blocks, cut where a block that is not prose stands between the words.
-    public static func segments(_ blocks: [MarkdownBlock]) -> [Segment] {
+    ///
+    /// With `code`, a message's own code blocks go in the text too (#5182), so a drag
+    /// goes from a paragraph into the code under it. A Mermaid fence is its diagram, and
+    /// code inside a list or a quote keeps that block apart, as before.
+    public static func segments(_ blocks: [MarkdownBlock], code: Bool = false) -> [Segment] {
         var segments: [Segment] = []
         var start: Int?
         for (index, block) in blocks.enumerated() {
-            if block.isProse {
+            if block.isProse || (code && block.isTextCode) {
                 if start == nil { start = index }
                 continue
             }
