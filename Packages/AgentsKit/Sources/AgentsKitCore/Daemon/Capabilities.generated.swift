@@ -25,6 +25,7 @@ public enum Capability {
     public static let bringBack1 = "bring.back/1"
     public static let browser1 = "browser/1"
     public static let browser2 = "browser/2"
+    public static let buildsTrends1 = "builds.trends/1"
     public static let capacity1 = "capacity/1"
     public static let catalog1 = "catalog/1"
     public static let changesUndo1 = "changes.undo/1"
@@ -299,6 +300,8 @@ public enum Capability {
         "browser/watch": "browser/1",
         "browserControl/set": "host.drive-approval/1",
         "browserControl/state": "host.drive-approval/1",
+        "builds/history": "builds.trends/1",
+        "builds/run": "builds.trends/1",
         "capacity/state": "capacity/1",
         "catalog/destination-state": "catalog/1",
         "catalog/preview": "catalog/1",
