@@ -191,3 +191,20 @@ test("a server's event trigger's lines say what the Mac's say (#383)", () => {
     failure: { code: "badArguments", message: "b's checks.failed takes folder; not repo.", since: at("2026-10-06T12:01:00Z") } }] });
   assert.ok(lines.some((line) => line.text === "b's checks.failed takes folder; not repo." && line.tint === "failure"));
 });
+
+test("a one-time alarm says its time, and how late it ran (#4966)", () => {
+  const once = { unrecognised: { name: "once", keys: { at: "2026-11-13T09:15", "time-zone": "UTC", grace: "30m" } } };
+  assert.equal(w.triggerSummary(once), "Once, at 2026-11-13 09:15 (UTC), or up to 30 minutes late");
+  assert.equal(w.triggerSummary({ unrecognised: { name: "once", keys: { at: "2026-11-13T09:15" } } }),
+    "Once, at 2026-11-13 09:15 in your time zone, or up to 1 hour late");
+  assert.equal(w.isSupportedTrigger(once), true);
+  assert.match(w.resumedAgent(once), /never runs/);
+  assert.equal(w.scopeLine(once, "work", "this Mac"), "By the clock on this Mac");
+  const fired = { unrecognised: { name: "once", keys: { ...once.unrecognised.keys, due: "2026-11-13T09:15:00Z" } } };
+  assert.equal(w.causePhrase({ trigger: { _0: fired } }), "by its one-time alarm");
+  const firedAt = (Date.UTC(2026, 10, 13, 9, 27) - Date.UTC(2001, 0, 1)) / 1000;
+  const summary = { workflow: { workflowID: "a", triggers: [once], mode: "new", prompt: "", settings: {}, unknownFields: {} },
+    isArchived: true, isEnabled: true, isRunning: false, nextFireAtByTrigger: [], lastFiredAt: firedAt, lastFiredBy: { trigger: { _0: fired } } };
+  assert.match(w.lastRanLine(summary, new Date(Date.UTC(2026, 10, 13, 10))), /, by its one-time alarm, 12 minutes late$/);
+  assert.equal(w.lengthWords(125 * 60), "2 hours 5 minutes");
+});

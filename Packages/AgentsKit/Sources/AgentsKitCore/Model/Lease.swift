@@ -162,11 +162,10 @@ public struct LeaseRules: Codable, Hashable, Sendable {
 }
 
 extension ResourceKind {
-    /// Whether a name is one the Mac finds by itself — the screen, a simulator, a
-    /// browser or the person's booking (#4268) — and so cannot be declared.
+    /// Whether a name is one the Mac finds by itself — the screen, a simulator or a
+    /// browser — and so cannot be declared.
     public static func isFoundName(_ name: ResourceName) -> Bool {
         name == .screen || name.key.hasPrefix("simulator:") || name.key.hasPrefix("browser:")
-            || name.key == "person" || name.key.hasPrefix("person:")
     }
 }
 

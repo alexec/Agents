@@ -102,6 +102,9 @@ var browserTools = sync.OnceValues(func() ([]json.RawMessage, map[string]bool) {
 	// The app's own device profile (#4086), the same.
 	names[emulateDeviceName] = true
 	out = append(out, emulateDeviceTool)
+	// The app's own software passkey (#4085), the same.
+	names[passkeyName] = true
+	out = append(out, passkeyTool)
 	// The web page, paired (#4214), the same.
 	names[pairWebPageName] = true
 	out = append(out, pairWebPageTool)
@@ -227,6 +230,15 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	if a == nil {
 		return failed(leaseNoCall)
 	}
+	if _, inChrome := handOffPort(args); name == handToPersonName && inChrome {
+		// The step is in one of the agents' own Chrome windows (#5095), not the app's
+		// browser: no lease and no Playwright, only the card.
+		if d.isBot() {
+			return failed(noOneAnswersWords)
+		}
+		said, isError := d.handToPerson(ctx, agent, args)
+		return []any{map[string]any{"type": "text", "text": said}}, isError, said
+	}
 	if !d.browserAvailable() {
 		return failed("The browser can't be installed on " + thisMachine() + ".")
 	}
@@ -253,6 +265,11 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	}
 	if name == captureSecretName {
 		if refusal := d.captureSecretCheck(args); refusal != "" {
+			return failed(refusal)
+		}
+	}
+	if name == passkeyName {
+		if refusal := d.passkeyCheck(agent, args); refusal != "" {
 			return failed(refusal)
 		}
 	}
@@ -291,7 +308,7 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	defer d.browserDrove(agent)
 	if name == handToPersonName {
 		// The person drives: no Playwright is needed for it.
-		said, isError := d.handToPerson(agent, args)
+		said, isError := d.handToPerson(ctx, agent, args)
 		return []any{map[string]any{"type": "text", "text": said}}, isError, said
 	}
 	ctx, cancel := context.WithTimeout(ctx, browserCallLongest)
@@ -300,6 +317,11 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 		// A site whose bot check refuses headless Chrome: the browser starts again with a
 		// window off-screen (#4272), and browserDriveFor starts Playwright on it.
 		log.Printf("browser: a site that checks for bots, so the browser starts again headed")
+	}
+	if name == passkeyName && string(args["off"]) != "true" && d.browser.Passkeys() {
+		// A software passkey needs WebAuthn in the pages, which the browser starts with
+		// none of (#4084): it starts again with it (#4085), and its tabs close.
+		log.Printf("browser: a software passkey, so the browser starts again with WebAuthn")
 	}
 	drive, err := d.browserDriveFor(ctx, agent, folderPath(a))
 	if err != nil {
@@ -328,6 +350,10 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	}
 	if name == pairWebPageName {
 		return d.pairWebPage(ctx, drive)
+	}
+	if name == passkeyName {
+		said, isError := d.usePasskey(agent, args)
+		return []any{map[string]any{"type": "text", "text": said}}, isError, said
 	}
 	if name == emulateDeviceName {
 		said, isError := d.emulateDevice(agent, device)

@@ -3370,9 +3370,6 @@ type ControlPushItem struct {
 	Alert bool `json:"alert"`
 
 	Headline *Headline `json:"headline,omitzero"`
-
-	// Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push).
-	Timely *bool `json:"timely,omitzero"`
 }
 
 type ControlStatus struct {
@@ -4099,11 +4096,14 @@ type ElicitationAnswer struct {
 	Answer string `json:"answer"`
 }
 
-// An agent's hand_to_person (#3529): one step the person does on the page in the machine's browser (solve a CAPTCHA, sign in). The form's one choice is Done or Can't do it; a client that can show the machine's browser offers Open the page.
+// An agent's hand_to_person (#3529): one step the person does on the page in the machine's browser (solve a CAPTCHA, sign in). The form's one choice is Done or Can't do it; a client that can show the machine's browser offers Open the page, unless the step is in another window (window).
 type ElicitationHandOff struct {
 	Step string `json:"step"`
 
 	Reason *string `json:"reason,omitzero"`
+
+	// Where the person does the step when it is not in the machine's browser (#5095): one of the agents' own Chrome windows, as "the agents' Chrome (DevTools port 9233), at the tab “Create account”". A client then offers no Open the page and says this window instead.
+	Window *string `json:"window,omitzero"`
 }
 
 type ElicitationNotification struct {
@@ -8622,6 +8622,9 @@ type MessagingConversation struct {
 
 	LastActivity *string `json:"lastActivity,omitzero"`
 
+	// Who sent the newest message, so the list can say who a conversation is from. Absent when the service's list does not say (a Slack channel, a Google Chat space).
+	Sender *ChannelSender `json:"sender,omitzero"`
+
 	// The conversation on the service's own site or app. Absent when it has none.
 	Link *URL `json:"link,omitzero"`
 }
@@ -8921,9 +8924,6 @@ type Need struct {
 	RaisedAt Date `json:"raisedAt"`
 
 	Headline Headline `json:"headline"`
-
-	// Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push).
-	Timely *bool `json:"timely,omitzero"`
 }
 
 // NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what an agent told the person with `notify`: posted, never a Needs you row. A request (#4017) is a Needs you request posted so a phone can answer it: today only a secret's use (#4015), whose banner has its four answers.
@@ -11340,9 +11340,6 @@ type RelayDelivery struct {
 	Alert bool `json:"alert"`
 
 	Waiting *int64 `json:"waiting,omitzero"`
-
-	// Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push).
-	Timely *bool `json:"timely,omitzero"`
 }
 
 type RelayGrantReply struct {

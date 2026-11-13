@@ -20,7 +20,7 @@ extension WorkflowTrigger {
     /// does not know, which listens to nothing.
     public var listensIn: EventScopeKind? {
         switch self {
-        case .schedule, .unrecognised: return nil
+        case .schedule, .once, .unrecognised: return nil
         // A server's events are the folder's: its servers are found by its folder.
         case .serverEvent: return .folder
         case .event(let pattern):
@@ -36,7 +36,7 @@ extension WorkflowTrigger {
     /// sentence, or that there is none, in which case the trigger never runs it.
     public var resumedAgent: String {
         switch self {
-        case .schedule:
+        case .schedule, .once:
             return "A clock has no agent to resume, so this never runs it"
         case .unrecognised:
             return "Never runs it"
@@ -62,6 +62,7 @@ extension WorkflowCause {
         case .trigger(let trigger):
             switch trigger {
             case .schedule: return "on its schedule"
+            case .once: return "by its one-time alarm"
             case .event(let pattern): return "on \(pattern.label)"
             case .serverEvent(let event): return "on \(event.event)"
             default: return WorkflowTrigger.lowercasedFirst(trigger.summary)

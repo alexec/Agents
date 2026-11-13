@@ -60,6 +60,9 @@ type workflowState struct {
 	// DismissedFailure is the failure the person dismissed from Needs You (#989): its key.
 	// A new failure has a new key, and an outcome that is not the same refusal again clears it.
 	DismissedFailure *string `json:"dismissedFailure,omitempty"`
+	// AlarmHandled is the time of the one-time alarm (#4966) the clock last fired or
+	// missed, so a tick, or a restart before its workflow is archived, takes it once.
+	AlarmHandled *wire.Date `json:"alarmHandled,omitempty"`
 }
 
 type heldFire struct {
@@ -632,10 +635,18 @@ func (d *Daemon) summaryLocked(folder, id string, over map[string]wire.WorkflowL
 				if due, ok := nextDueOpen(t.Schedule.Value, win, time.Now()); ok {
 					v := wire.DateOf(due)
 					at = &v
-					if next == nil || v < *next {
-						next = &v
-					}
 				}
+			}
+			// An alarm's time (#4966), until it is handled.
+			if a, ok := alarmOf(t); ok {
+				if due, ok := a.due(d.personZone()); ok && time.Since(due) <= a.grace &&
+					(st == nil || st.AlarmHandled == nil || !st.AlarmHandled.Time().Equal(due)) {
+					v := wire.DateOf(due)
+					at = &v
+				}
+			}
+			if at != nil && (next == nil || *at < *next) {
+				next = at
 			}
 			s.NextFireAtByTrigger = append(s.NextFireAtByTrigger, at)
 		}

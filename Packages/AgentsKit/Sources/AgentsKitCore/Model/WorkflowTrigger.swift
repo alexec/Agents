@@ -16,6 +16,8 @@ import Foundation
 public enum WorkflowTrigger: Hashable, Sendable {
     /// On a clock.
     case schedule(WorkflowSchedule)
+    /// Once, at a set time (#4966): an alarm. The workflow archives itself after it.
+    case once(WorkflowAlarm)
     /// Any event in the catalogue, a whole subject, or a server's event, narrowed by
     /// details (042 FR-021): the same pattern a wait uses, so the two cannot drift.
     case event(EventPattern)
@@ -30,6 +32,7 @@ public enum WorkflowTrigger: Hashable, Sendable {
     public var name: String {
         switch self {
         case .schedule: return "schedule"
+        case .once: return WorkflowAlarm.name
         case .event(let pattern): return pattern.name
         case .serverEvent(let trigger): return trigger.event
         case .unrecognised(let name, _): return name
@@ -43,7 +46,7 @@ public enum WorkflowTrigger: Hashable, Sendable {
         switch self {
         case .event(let pattern): return [pattern]
         case .serverEvent(let trigger): return [EventPattern(trigger.event)]
-        case .schedule, .unrecognised: return []
+        case .schedule, .once, .unrecognised: return []
         }
     }
 
@@ -62,6 +65,12 @@ public enum WorkflowTrigger: Hashable, Sendable {
         return true
     }
 
+    /// The alarm this carries, if it is one.
+    public var alarm: WorkflowAlarm? {
+        if case .once(let alarm) = self { return alarm }
+        return nil
+    }
+
     /// The schedule this carries, if it is one.
     public var schedule: WorkflowSchedule? {
         if case .schedule(let schedule) = self { return schedule }
@@ -72,6 +81,7 @@ public enum WorkflowTrigger: Hashable, Sendable {
     public var summary: String {
         switch self {
         case .schedule(let schedule): return schedule.summary
+        case .once(let alarm): return alarm.summary
         case .event(let pattern): return "When " + Self.lowercasedFirst(pattern.summary)
         case .serverEvent(let trigger): return trigger.summary
         case .unrecognised(let name, _):
@@ -153,6 +163,11 @@ extension WorkflowTrigger: Codable {
         switch stored {
         case .schedule(let schedule): self = .schedule(schedule)
         case .unrecognised(let name, let keys):
+            // An alarm (#4966) goes as an unknown trigger does, and is read back by its name.
+            if name == WorkflowAlarm.name, let alarm = WorkflowAlarm(keys: keys) {
+                self = .once(alarm)
+                return
+            }
             // A server's event (#383) goes as an unknown trigger does, and is read back
             // as one by its name.
             if EventCatalogue.isServerEventName(name), let trigger = MCPEventTrigger(event: name, keys: keys) {
@@ -184,6 +199,7 @@ extension WorkflowTrigger: Codable {
             })
         // The same for a server's event: an older reader lists it as inert.
         case .serverEvent(let trigger): stored = .unrecognised(name: trigger.event, keys: trigger.keys)
+        case .once(let alarm): stored = .unrecognised(name: WorkflowAlarm.name, keys: alarm.keys)
         case .unrecognised(let name, let keys): stored = .unrecognised(name: name, keys: keys)
         }
         try stored.encode(to: encoder)

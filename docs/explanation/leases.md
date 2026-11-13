@@ -57,7 +57,7 @@ the same way, as well as its count. So an agent that leases `build` needs nothin
 - When the level is ok again, the line gets one grant for each look at the machine
   (each 15 seconds), the oldest first. Thus a burst does not make the machine full again
   at once.
-- The person's booking, the browser, the screen and the simulators are not compute.
+- The browser, the screen and the simulators are not compute.
   They do not wait for the machine.
 - The clients say when a wait is for the machine, not for a holder (#4748). The chat's
   lease line says "◷ Waiting for build · this Mac is near capacity · 1st", and a queued

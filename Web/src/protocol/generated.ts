@@ -3117,11 +3117,6 @@ export interface ControlPushItem {
   needID: NeedID;
   alert: boolean;
   headline?: Headline;
-  /**
-   * Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely
-   * (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push).
-   */
-  timely?: boolean;
 }
 
 export interface ControlStatus {
@@ -3784,11 +3779,17 @@ export interface ElicitationAnswer {
 /**
  * An agent's hand_to_person (#3529): one step the person does on the page in the machine's browser
  * (solve a CAPTCHA, sign in). The form's one choice is Done or Can't do it; a client that can show
- * the machine's browser offers Open the page.
+ * the machine's browser offers Open the page, unless the step is in another window (window).
  */
 export interface ElicitationHandOff {
   step: string;
   reason?: string;
+  /**
+   * Where the person does the step when it is not in the machine's browser (#5095): one of the
+   * agents' own Chrome windows, as "the agents' Chrome (DevTools port 9233), at the tab “Create
+   * account”". A client then offers no Open the page and says this window instead.
+   */
+  window?: string;
 }
 
 export interface ElicitationNotification {
@@ -7953,6 +7954,11 @@ export interface MessagingConversation {
   kind: MessagingConversationKind;
   unread?: number;
   lastActivity?: string;
+  /**
+   * Who sent the newest message, so the list can say who a conversation is from. Absent when the
+   * service's list does not say (a Slack channel, a Google Chat space).
+   */
+  sender?: ChannelSender;
   /** The conversation on the service's own site or app. Absent when it has none. */
   link?: URLString;
 }
@@ -8255,11 +8261,6 @@ export interface Need {
   kind: NeedKind;
   raisedAt: WireDate;
   headline: Headline;
-  /**
-   * Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely
-   * (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push).
-   */
-  timely?: boolean;
 }
 
 /**
@@ -10564,11 +10565,6 @@ export interface RelayDelivery {
   headline?: Headline;
   alert: boolean;
   waiting?: number;
-  /**
-   * Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely
-   * (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push).
-   */
-  timely?: boolean;
 }
 
 export interface RelayGrantReply {
@@ -16015,7 +16011,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ControlOK: { required: ["mac"], optional: ["host", "endpoints", "epoch", "newKey"] },
   ControlPerson: { required: ["id", "name", "role"], optional: ["localOwner"] },
   ControlPush: { required: ["sealed"], optional: [] },
-  ControlPushItem: { required: ["needID", "alert"], optional: ["headline", "timely"] },
+  ControlPushItem: { required: ["needID", "alert"], optional: ["headline"] },
   ControlStatus: { required: ["name", "version", "machineID"], optional: ["homeHost", "startedAt", "port", "you", "web", "restartable", "publicWeb", "publicViews", "thisMacHost", "folderDetection", "unjoinedTunnels", "capabilities", "required", "person", "joinCommand"] },
   Cost: { required: ["amount", "currency"], optional: [] },
   CostLimits: { required: [], optional: ["perAgent", "daily", "perAgentTokens", "dailyTokens"] },
@@ -16076,7 +16072,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EffectiveRule: { required: ["rule", "value", "words", "layers"], optional: ["decides", "cap", "capLine"] },
   EffectiveSandbox: { required: ["state", "requested"], optional: ["reason"] },
   ElicitationAnswer: { required: ["question", "answer"], optional: [] },
-  ElicitationHandOff: { required: ["step"], optional: ["reason"] },
+  ElicitationHandOff: { required: ["step"], optional: ["reason", "window"] },
   ElicitationNotification: { required: ["agentID", "requestID"], optional: ["request"] },
   ElicitationRequest: { required: ["id", "agentID", "mode", "scope", "askedAt"], optional: ["elicitationID", "message", "secret", "handOff"] },
   ElicitationSchema: { required: ["properties"], optional: ["title", "description"] },
@@ -16406,7 +16402,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MessagesReadRequest: { required: ["server", "folder", "conversation"], optional: ["cursor", "thread", "limit"] },
   MessagesReplied: { required: ["server", "folder", "conversation", "message"], optional: [] },
   MessagesReplyRequest: { required: ["server", "folder", "conversation", "text"], optional: ["thread"] },
-  MessagingConversation: { required: ["source", "id", "title", "kind"], optional: ["unread", "lastActivity", "link"] },
+  MessagingConversation: { required: ["source", "id", "title", "kind"], optional: ["unread", "lastActivity", "sender", "link"] },
   MessagingConversations: { required: ["conversations"], optional: ["cursor", "replyAs"] },
   MessagingListRequest: { required: [], optional: ["cursor", "limit", "unread"] },
   MessagingMessage: { required: ["id", "conversation", "sender", "time", "text"], optional: ["thread", "link"] },
@@ -16424,7 +16420,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MultiplierBaseline: { required: ["prsPerWeek", "hoursPerWeek", "source"], optional: ["line"] },
   MultiplierCountParams: { required: [], optional: ["timeZone", "prsPerWeek"] },
   NativeSetting: { required: [], optional: ["options", "sandbox", "clientPermission"] },
-  Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID", "timely"] },
+  Need: { required: ["id", "folder", "kind", "raisedAt", "headline"], optional: ["agentID"] },
   NotCommittedResponse: { required: ["isRepository", "paths", "more"], optional: [] },
   NoticeDelivered: { required: ["need", "to"], optional: [] },
   NoticeDelivery: { required: ["notice", "to"], optional: [] },
@@ -16621,7 +16617,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ReceiveState: { required: ["folder", "exists", "repository", "ownChanges", "heads"], optional: [] },
   ReceiveStateRequest: { required: ["folder"], optional: [] },
   ReceiveUploadRequest: { required: ["upload", "offset", "data"], optional: [] },
-  RelayDelivery: { required: ["needID", "device", "alert"], optional: ["publicKey", "headline", "waiting", "timely"] },
+  RelayDelivery: { required: ["needID", "device", "alert"], optional: ["publicKey", "headline", "waiting"] },
   RelayGrantReply: { required: ["runtime", "caCertificate", "standIn"], optional: [] },
   RelayGrantRequest: { required: ["runtime"], optional: [] },
   RelayOffer: { required: ["runtime", "socketPath", "caCertificate", "standIn"], optional: [] },

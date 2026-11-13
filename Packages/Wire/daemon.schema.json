@@ -7018,10 +7018,6 @@
         },
         "headline": {
           "$ref": "#/definitions/Headline"
-        },
-        "timely": {
-          "type": "boolean",
-          "description": "Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push)."
         }
       },
       "required": [
@@ -8680,13 +8676,17 @@
       "additionalProperties": false
     },
     "ElicitationHandOff": {
-      "description": "An agent's hand_to_person (#3529): one step the person does on the page in the machine's browser (solve a CAPTCHA, sign in). The form's one choice is Done or Can't do it; a client that can show the machine's browser offers Open the page.",
+      "description": "An agent's hand_to_person (#3529): one step the person does on the page in the machine's browser (solve a CAPTCHA, sign in). The form's one choice is Done or Can't do it; a client that can show the machine's browser offers Open the page, unless the step is in another window (window).",
       "type": "object",
       "properties": {
         "step": {
           "type": "string"
         },
         "reason": {
+          "type": "string"
+        },
+        "window": {
+          "description": "Where the person does the step when it is not in the machine's browser (#5095): one of the agents' own Chrome windows, as \"the agents' Chrome (DevTools port 9233), at the tab “Create account”\". A client then offers no Open the page and says this window instead.",
           "type": "string"
         }
       },
@@ -18794,6 +18794,10 @@
           "type": "string",
           "format": "date-time"
         },
+        "sender": {
+          "$ref": "#/definitions/ChannelSender",
+          "description": "Who sent the newest message, so the list can say who a conversation is from. Absent when the service's list does not say (a Slack channel, a Google Chat space)."
+        },
         "link": {
           "$ref": "#/definitions/URLString",
           "description": "The conversation on the service's own site or app. Absent when it has none."
@@ -19341,10 +19345,6 @@
         },
         "headline": {
           "$ref": "#/definitions/Headline"
-        },
-        "timely": {
-          "type": "boolean",
-          "description": "Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push)."
         }
       },
       "required": [
@@ -24668,10 +24668,6 @@
         },
         "waiting": {
           "type": "integer"
-        },
-        "timely": {
-          "type": "boolean",
-          "description": "Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push)."
         }
       },
       "required": [

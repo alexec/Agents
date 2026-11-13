@@ -32,10 +32,14 @@ public struct ElicitationRequest: Codable, Hashable, Sendable, Identifiable {
         public var step: String
         /// Why the agent needs them.
         public var reason: String?
+        /// Where the step is when it is not the machine's browser (#5095): one of the
+        /// agents' own Chrome windows. A client then offers no Open the page.
+        public var window: String?
 
-        public init(step: String, reason: String? = nil) {
+        public init(step: String, reason: String? = nil, window: String? = nil) {
             self.step = step
             self.reason = reason
+            self.window = window
         }
     }
 

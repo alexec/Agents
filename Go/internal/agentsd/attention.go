@@ -387,13 +387,8 @@ func (d *Daemon) needs() []wire.Need {
 		}
 		folder := folderPath(a)
 		agentID := a.ID
-		n := wire.Need{ID: id, AgentID: &agentID, Folder: fileURL(folder, true), Kind: kind, RaisedAt: raised,
-			Headline: truncating(wire.Headline{H1: filepath.Base(folder), H2: title, H3: wanted, Answers: answers})}
-		if d.holdsPerson(agentID) {
-			// The person's booking's holder asks (#4268): it comes through Focus.
-			n.Timely = new(true)
-		}
-		found = append(found, n)
+		found = append(found, wire.Need{ID: id, AgentID: &agentID, Folder: fileURL(folder, true), Kind: kind, RaisedAt: raised,
+			Headline: truncating(wire.Headline{H1: filepath.Base(folder), H2: title, H3: wanted, Answers: answers})})
 	}
 	for _, p := range d.pendingPermissions() {
 		if a := d.Store.Agent(p.AgentID); a != nil && !archived[folderPath(a)] {

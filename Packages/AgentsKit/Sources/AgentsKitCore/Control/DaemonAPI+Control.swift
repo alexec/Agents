@@ -583,17 +583,14 @@ public extension DaemonAPI {
         public var headline: Headline?
         public var alert: Bool
         public var waiting: Int?
-        /// The person's booking's holder asked it (#4268): Time Sensitive.
-        public var timely: Bool?
         public init(needID: NeedID, device: UUID, publicKey: Data? = nil, headline: Headline? = nil, alert: Bool = false,
-                    waiting: Int? = nil, timely: Bool? = nil) {
+                    waiting: Int? = nil) {
             self.needID = needID
             self.device = device
             self.publicKey = publicKey
             self.headline = headline
             self.alert = alert
             self.waiting = waiting
-            self.timely = timely
         }
     }
 }

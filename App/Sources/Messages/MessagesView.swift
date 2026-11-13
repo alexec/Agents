@@ -195,7 +195,8 @@ private struct MessagesListPane: View {
     }
 }
 
-/// A row: the service's icon, the conversation's title, its unread count and when it last moved.
+/// A row: the service's icon, who sent the newest message (when the service says), the conversation's title,
+/// its unread count and when it last moved.
 private struct ConversationRow: View {
     let row: MessagesList.Row
 
@@ -207,7 +208,13 @@ private struct ConversationRow: View {
                 .frame(width: 18)
                 .help(ChannelLinkWords.channel(c.source))
                 .accessibilityLabel(ChannelLinkWords.channel(c.source))
+            if let sender = c.sender {
+                Text(verbatim: MessagesList.sender(sender)).fontWeight(row.isUnread ? .semibold : .regular).lineLimit(1)
+                    .frame(maxWidth: 180, alignment: .leading)
+                    .help(sender.identity)
+            }
             Text(verbatim: c.title).fontWeight(row.isUnread ? .semibold : .regular).lineLimit(1)
+                .foregroundStyle(c.sender == nil ? .primary : .secondary)
             if let unread = MessagesList.unread(c) {
                 Text(unread).appText(.fine).foregroundStyle(.tint)
             }

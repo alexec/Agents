@@ -6,7 +6,8 @@
 Each screen of specs/071-web-remote/walks/parity.md is a file of its own under parity/. A
 row's verdict is its last cell: a row with any **delta** counts as delta, else one with
 **by design** as by design, else **same**. A row's tier is its second cell: Core,
-Mac + web, Web + Mac link (#4937) or One client. The script fails on a row with no tier it knows.
+Mac + web, Web + Mac link (#4937), Mac only, Web only or Remote only (#4759). The script
+fails on a row with no tier it knows, and names the tier to use for the old One client.
 """
 
 import glob
@@ -16,7 +17,8 @@ import sys
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 SCREENS = os.path.join(ROOT, "specs", "071-web-remote", "walks", "parity", "*.md")
 VERDICTS = ("same", "by design", "delta")
-TIERS = ("Core", "Mac + web", "Web + Mac link", "One client")
+TIERS = ("Core", "Mac + web", "Web + Mac link", "Mac only", "Web only", "Remote only")
+OLD = {"One client": "Mac only, Web only or Remote only (#4759)"}
 
 
 def verdict(row):
@@ -50,7 +52,11 @@ def main():
             if t in TIERS:
                 counts[t] += 1
             else:
-                bad.append(f"{os.path.relpath(path, ROOT)}:{n}: tier {t!r} is not one of {', '.join(TIERS)}")
+                where = f"{os.path.relpath(path, ROOT)}:{n}"
+                if t in OLD:
+                    bad.append(f"{where}: tier {t!r} is split now: use {OLD[t]}")
+                else:
+                    bad.append(f"{where}: tier {t!r} is not one of {', '.join(TIERS)}")
         for k in counts:
             totals[k] += counts[k]
         print(f"| {title} | " + " | ".join(str(counts[k]) for k in VERDICTS + TIERS) + " |")

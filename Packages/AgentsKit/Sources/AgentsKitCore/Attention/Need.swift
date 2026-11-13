@@ -133,18 +133,13 @@ public struct Need: Hashable, Sendable, Codable, Identifiable {
     public var kind: Kind
     public var raisedAt: Date
     public var headline: Headline
-    /// Asked by the agent that holds the person's booking (`person:<name>`, #4268): its
-    /// banner is Time Sensitive, so it comes through Focus. Nil is not.
-    public var timely: Bool?
 
-    public init(id: NeedID, agentID: UUID?, folder: URL, kind: Kind, raisedAt: Date, headline: Headline,
-                timely: Bool? = nil) {
+    public init(id: NeedID, agentID: UUID?, folder: URL, kind: Kind, raisedAt: Date, headline: Headline) {
         self.id = id
         self.agentID = agentID
         self.folder = folder
         self.kind = kind
         self.raisedAt = raisedAt
         self.headline = headline
-        self.timely = timely
     }
 }

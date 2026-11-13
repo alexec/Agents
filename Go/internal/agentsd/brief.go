@@ -56,12 +56,7 @@ const leasesBrief = "Lease a shared resource with lease_resource before using it
 	// The machine's capacity (#4579).
 	"A lease or a start can wait for the machine, not only for a holder: before heavy work " +
 	"that no declared resource names (a long test suite, a Chromium, a simulator, a script that " +
-	"builds), lease capacity, which goes in line while the machine is near or at capacity. " +
-	// The person's booking (#4268).
-	"Before a step that gives me a short time to act (a code sent by text or email, a " +
-	"sign-in to approve on my phone), book me with lease_resource on person: minutes is how " +
-	"long my step takes, by is when it stops mattering. Book first, then start the clock " +
-	"(press Send code), then hand the step over, and release it the moment it is done."
+	"builds), lease capacity, which goes in line while the machine is near or at capacity."
 
 // endingBrief names the three ways a turn ends (#1801). Without it an agent learnt about
 // archiving only from archive_session's description, and one that had finished with
@@ -340,6 +335,8 @@ func toolsBrief(browser, screen, bot, github bool) string {
 				"For a secret with Ask before use it waits on my approval; when it names a request, wait for it with wait_for_event, then call it again.",
 			"- generate_secret: make a new account's password, save it as one of my secrets and type it into the field. Never make a password yourself.",
 			"- capture_secret: save a value the page shows once (an app password, an API token) as one of my secrets. Never read it with browser_snapshot first.",
+			"- browser_passkey: a software passkey, kept as one of my secrets, for a site that takes only a passkey or asks for one to confirm access. "+
+				"Call it before you open the page. Use a password and TOTP where the site takes them.",
 			"- pair_web_page: open the app's web page in the browser, paired as me, for a step only the web page does (Connectors, Settings). Never ask me for a pairing code. "+
 				"Never approve a connector or turn on a workflow there for me: manage_connectors and manage_workflows ask me.")
 		if !bot {

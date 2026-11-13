@@ -10,3 +10,11 @@ export function handOffAnswer(done: boolean, note = ""): Record<string, JSONValu
   const said = note.trim();
   return said ? { outcome: "cannot", outcome_note: said } : { outcome: "cannot" };
 }
+
+/**
+ * Said in place of Open the page for a step in one of the agents' own Chrome windows (#5095),
+ * as the window's and the Remote's HandOffCard.inWindow say it.
+ */
+export function handOffWindowWords(window: string, recipient: string): string {
+  return `Do it in ${window} on ${recipient}.`;
+}

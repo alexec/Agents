@@ -121,6 +121,10 @@ func TestTheFrontOffersTheEventAndTools(t *testing.T) {
 		conv["lastActivity"] != "2026-10-20T09:30:00Z" {
 		t.Fatalf("a conversation: %v", conv)
 	}
+	// Who the newest mail is from, so the Messages list can say it.
+	if from, _ := conv["sender"].(map[string]any); from["identity"] != "gitlab@mg.gitlab.com" || from["name"] != "GitLab" {
+		t.Fatalf("a conversation's sender: %v", conv["sender"])
+	}
 	thread := tool(21, "read_messages", map[string]any{"conversation": conv["id"]})
 	got := thread["structuredContent"].(map[string]any)
 	msgs := got["messages"].([]any)

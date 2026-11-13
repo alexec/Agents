@@ -58,8 +58,10 @@ func addMessagingTools(server *mcp.Server, m *Mailbox) {
 			for _, t := range threads {
 				unread := int64(t.Unread)
 				last := t.Newest.Date.Format(time.RFC3339)
+				sender := contractSender(t.Newest)
 				out.Conversations = append(out.Conversations, wire.MessagingConversation{Source: source, ID: t.ID,
-					Title: t.Title, Kind: wire.MessagingConversationKindThread, Unread: &unread, LastActivity: &last})
+					Title: t.Title, Kind: wire.MessagingConversationKindThread, Unread: &unread, LastActivity: &last,
+					Sender: &sender})
 				fmt.Fprintf(&text, "%s\t%s\tunread %d\t%s\n", t.ID, last, t.Unread, t.Title)
 			}
 			if next != "" {

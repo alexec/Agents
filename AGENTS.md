@@ -30,13 +30,13 @@
     - shows only when the web page is served and this Mac can open it (the rule of **Edit in Console**). A Mac with no web page has no link and no feature;
     - opens the right place (the section, page, scope and range, as `#/reports/…`), not the Overview;
     - signs the browser in as **Open in Browser** does: with the control plane on this Mac, it pairs the default browser in the same step the first time; with the control plane somewhere else, the web page's own sign-in, which keeps the address through the sign-in. The link carries no code or token.
-  - **One client:** by design, no follow-up.
-  - A new feature that is on neither of the parity table's lists is Mac + web.
+  - **Mac only, Web only, Remote only (#4759; was One client):** one client only, by design, no follow-up. **Web only** is the web page with no link from the Mac: by #3224, reports, figures about other people and the Console's admin pages that the Mac has no part of, and the web's own frame and ways in. The parity table's Web only list names them.
+  - A new report, team or admin feature is Web only (#3224), unless Alex chooses Web + Mac link. Any other new feature that is on none of the parity table's lists is Mac + web.
 - **A change to any client's UI** (`App/Sources`, `Remote/Sources`, `Shared/UI` or `Web/src`) says, in its commit, what **each of the other two** does about it, one line each:
   - the same change in this branch: `remote: same`;
   - a parity issue filed: `web: #NNN`;
   - left out on purpose: `mac: by design (no swipe on Mac)`;
-  - not on the Remote because of its tier: `remote: tier mac+web`, or `remote: tier web+link`;
+  - not on the Remote because of its tier: `remote: tier mac+web`, or `remote: tier web+link`; not on a client because it is one client's only: `mac: tier web only`, `remote: tier web only`, or `web: tier mac only`;
   - a web change to a Web + Mac link feature: `mac: tier web+link` when the Mac's link still goes to the right place, else `mac: same` (the link changes in this branch) or `mac: #NNN`.
 - **For example,** a Mac sidebar change ends with `remote: #226` and `web: same`; a new Settings ▸ People control ends with `remote: tier mac+web` and `web: same`; a web-only fix ends with `mac: same, remote: same` when both already do it. A change to docs only says `mac: docs only, remote: docs only, web: docs only`.
 - **The table of where each client stands** is `specs/071-web-remote/walks/parity.md`, a file per screen under `walks/parity/` (Mac / Remote / web, a row per feature; #2020). `scripts/parity-counts.py` counts the verdicts and the tiers. A parity line that changes a row updates it in the same branch.

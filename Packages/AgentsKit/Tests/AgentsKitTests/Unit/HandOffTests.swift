@@ -25,6 +25,14 @@ struct HandOffTests {
         #expect(request.secret == nil)
     }
 
+    @Test("says the agents' own Chrome window it is in (#5095)")
+    func decodesWindow() throws {
+        let inChrome = Self.wire.replacingOccurrences(of: #""reason":"The sign-up form needs a person."}"#,
+                                                      with: #""reason":"The sign-up form needs a person.","window":"the agents' Chrome (DevTools port 9233)"}"#)
+        let request = try StoreCoding.decoder.decode(ElicitationRequest.self, from: Data(inChrome.utf8))
+        #expect(request.handOff?.window == "the agents' Chrome (DevTools port 9233)")
+    }
+
     @Test("is answered in one tap from a notification")
     func quickAnswers() throws {
         let request = try StoreCoding.decoder.decode(ElicitationRequest.self, from: Data(Self.wire.utf8))

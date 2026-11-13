@@ -367,7 +367,8 @@ private struct RuntimeStatusRow<Actions: View>: View {
 /// The sidebar's way into Status ▸ Runtimes (065, #3631). It says how many runtimes on this
 /// Mac can start a turn, out of how many are installed (#379), and a red dot only when
 /// none can: one being out does not matter, the work goes on on the others. One nearly
-/// used up gets the warning tint and a grey line (#3956).
+/// used up, or on course to run out before its week resets (#5000), gets the warning tint
+/// and a grey line (#3956).
 struct RuntimesRow: View {
     @Environment(AppModel.self) private var model
 
@@ -388,10 +389,11 @@ struct RuntimesRow: View {
                 Text(low).appText(.fine).foregroundStyle(.secondary).lineLimit(1)
             }
         }
-        .help(tally.map { [$0.lowWords, "\($0.working) of \($0.total) runtimes working. Your runtimes and accounts, and where each machine has them"]
+        // The detail ends in a full stop of its own (#5000): the join adds one.
+        .help(tally.map { [$0.lowDetail.map { $0.hasSuffix(".") ? String($0.dropLast()) : $0 }, "\($0.working) of \($0.total) runtimes working. Your runtimes and accounts, and where each machine has them"]
                     .compactMap { $0 }.joined(separator: ". ") }
               ?? "Your runtimes and accounts, and where each machine has them")
-        .accessibilityValue(tally.map { [$0.noneWorking ? "None of \($0.total) working" : "\($0.working) of \($0.total) working", $0.lowWords]
+        .accessibilityValue(tally.map { [$0.noneWorking ? "None of \($0.total) working" : "\($0.working) of \($0.total) working", $0.lowDetail]
                                 .compactMap { $0 }.joined(separator: ", ") } ?? "")
     }
 }

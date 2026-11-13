@@ -1257,13 +1257,17 @@ private struct RuntimesRow: View {
                 Spacer()
             }
             // An allowance nearly used up (#3956): the runtime, in grey under the title.
+            // On course to run out before the week resets (#5000) says so in the same place.
             if let low = tally?.lowWords {
                 Text(low).appText(.fine).foregroundStyle(.secondary).lineLimit(1)
+                    .accessibilityHidden(true)
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityValue(tally.map { $0.noneWorking ? "None of \($0.total) working"
-                                                       : "\($0.working) of \($0.total) working" } ?? "")
+        // VoiceOver hears the line with the reset (#5000), in place of the grey line.
+        .accessibilityValue(tally.map { [$0.noneWorking ? "None of \($0.total) working"
+                                                        : "\($0.working) of \($0.total) working", $0.lowDetail]
+                                .compactMap { $0 }.joined(separator: ", ") } ?? "")
         .accessibilityHint("Opens Runtimes")
     }
 }
