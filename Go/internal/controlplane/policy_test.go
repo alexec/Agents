@@ -550,9 +550,5 @@ func TestPolicySendsToOneMachineGoInOrder(t *testing.T) {
 	unlock()
 	<-second
 	other()
-	waitFor(t, func() bool {
-		book.mu.Lock()
-		defer book.mu.Unlock()
-		return len(book.sending) == 0
-	})
+	waitFor(t, func() bool { return book.sending.inUse() == 0 })
 }

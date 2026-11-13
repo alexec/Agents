@@ -100,40 +100,12 @@ type policyBook struct {
 	version          int64
 	requireFollowing bool
 	told             map[string][sha256.Size]byte
-	sending          map[string]*policySend
-}
-
-// policySend is one machine's send lock, and how many sends hold it or wait for it: the
-// entry goes when the count is 0, so the map holds only machines with a send now.
-type policySend struct {
-	mu    sync.Mutex
-	users int
+	sending          keyLocks
 }
 
 // lockSend waits for host's earlier sends to finish. Call the function it returns to let
 // the next one go.
-func (b *policyBook) lockSend(host string) func() {
-	b.mu.Lock()
-	if b.sending == nil {
-		b.sending = map[string]*policySend{}
-	}
-	send := b.sending[host]
-	if send == nil {
-		send = &policySend{}
-		b.sending[host] = send
-	}
-	send.users++
-	b.mu.Unlock()
-	send.mu.Lock()
-	return func() {
-		send.mu.Unlock()
-		b.mu.Lock()
-		if send.users--; send.users == 0 {
-			delete(b.sending, host)
-		}
-		b.mu.Unlock()
-	}
-}
+func (b *policyBook) lockSend(host string) func() { return b.sending.lock(host) }
 
 // keptPolicy is the policy as the store has it: the document's bytes, exactly as signed,
 // the document, its tag and its signature.
