@@ -449,6 +449,8 @@ $S/walk.py remote shot /tmp/remote.png
 $S/remote.sh down                                # quits and uninstalls it, shuts the simulator down
 ```
 
+`remote.sh up APP -- -fake-drop` is the canned daemon gone quiet 45 s after it connects, so the
+stale banner and "Last update …" show on every page (#5147).
 `AGENTS_WALK_SIM="iPad Pro 13-inch (M5) (16GB)"` gives a kept iPad simulator of its own.
 Without `--fake` the Remote is not paired: pair it with a scratch control plane's code
 (`code --client`) at launch, `remote.sh up APP -- -pair "$CODE"` (#1287; the sheet's Paste takes
