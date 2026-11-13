@@ -115,6 +115,8 @@ export interface MachineMaking {
   state: string;
   ssh: string | null;
   tunnel: boolean;
+  /** Whether its provider can delete a machine (`delete` in its capabilities). */
+  deletable: boolean;
 }
 
 /** How a click on a machine that never joined goes (#4978), as the window's MachineJoin. */
@@ -132,13 +134,14 @@ export function makingRows(making: readonly string[], providers: readonly Provid
     for (const w of p.workspaces) {
       if (w.host || w.state === "failed" || joined(w.name)) continue;
       rows.push({ provider: p.id, providerName: p.name, workspace: w.id, name: w.name, notJoined: w.notJoined ?? null,
-        joinable: !(w.joining || w.notJoined), state: w.state, ssh: w.ssh ?? null, tunnel: w.tunnel ?? false });
+        joinable: !(w.joining || w.notJoined), state: w.state, ssh: w.ssh ?? null, tunnel: w.tunnel ?? false,
+        deletable: p.capabilities.includes("delete") });
     }
   }
   for (const name of making) {
     if (joined(name) || rows.some((r) => r.name === name)) continue;
     rows.push({ provider: "", providerName: "", workspace: "", name, notJoined: null, joinable: false, state: "starting",
-      ssh: null, tunnel: false });
+      ssh: null, tunnel: false, deletable: false });
   }
   const rank = (r: MachineMaking) => r.joinable ? 2 : r.notJoined === null ? 0 : 1;
   return rows.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
@@ -198,7 +201,16 @@ export function joinTrustQuestion(row: MachineMaking, fingerprint: string): stri
   return `Trust ${row.name}’s host key? The control plane has not seen this key before: ${fingerprint}. Join only if it is ${row.name}’s.`;
 }
 
-/** Delete's question on a row the control plane gave up on (#4610). */
+/** Whether its menu and a swipe to the left offer Delete: once the control plane gave up on it, and on one that never
+ * joined, but not while New Machine makes it or a join runs, nor when its provider can't delete. */
+export function makingCanDelete(row: MachineMaking, join?: MachineJoin): boolean {
+  return row.deletable && (row.joinable || row.notJoined !== null) && !(join && "joining" in join);
+}
+
+/** Delete's question. Agents installed nothing on a machine it gave up on (#4610); one that never joined, such as a
+ * codespace made on github.com, can hold the person's own work. */
 export function deleteMakingQuestion(row: MachineMaking): string {
-  return `Delete ${row.name}? ${row.providerName} deletes it. Nothing was installed on it, so there is nothing to back up.`;
+  return row.joinable
+    ? `Delete ${row.name}? ${row.providerName} deletes ${row.name} and its disk. It never joined Agents, so it has no backup: work on it that is not pushed is lost.`
+    : `Delete ${row.name}? ${row.providerName} deletes it. Nothing was installed on it, so there is nothing to back up.`;
 }

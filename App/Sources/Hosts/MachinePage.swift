@@ -538,7 +538,7 @@ struct MakingMachineRow: View {
         let name = making?.name ?? "New machine"
         let line = making?.line(joined) ?? "Making…"
         let failed = making?.failed(joined) ?? false
-        let gaveUp = making?.joinable == false && making?.notJoined != nil
+        let canDelete = making?.canDelete(joined) ?? false
         let hint = joined?.isJoining == true ? nil : making?.joinHint
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             MachineIconView(symbol: "cloud", icon: making?.icon(joined) ?? .busy)
@@ -562,9 +562,15 @@ struct MakingMachineRow: View {
         .accessibilityLabel("\(name), \(line)")
         .accessibilityHint(hint ?? "")
         .accessibilityAction { join(trust: nil) }
+        // A swipe to the right joins it, as a click does.
+        .swipeActions(edge: .leading) {
+            if hint != nil {
+                Button(failed ? "Join Again" : "Join", icon: "arrow.right.circle") { join(trust: nil) }.tint(Paper.accent)
+            }
+        }
         // A full swipe never deletes: Delete asks first.
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if gaveUp {
+            if canDelete {
                 Button("Delete", icon: "trash", role: .destructive) { deleting = true }
             }
         }
@@ -572,7 +578,8 @@ struct MakingMachineRow: View {
             if hint != nil {
                 Button(failed ? "Join \(name) Again" : "Join \(name)") { join(trust: nil) }
             }
-            if gaveUp {
+            if canDelete {
+                if hint != nil { Divider() }
                 Button("Delete \(name)…", role: .destructive) { deleting = true }
             }
         }

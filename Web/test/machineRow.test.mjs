@@ -63,7 +63,7 @@ test("a machine being made has a row until one of its name joins", () => {
   assert.deepEqual(names(m.makingRows(["", "machine-2", "machine-1"], null, [{ name: "machine-1" }])), ["", "machine-2"]);
   // The control plane's list (#4610): Making… while it waits, the reason once it gave up; a linked one, and one a
   // machine of the name joined as, have no row; the page's own name goes once the list has it.
-  const providers = [{ id: "do", name: "Do", workspaces: [
+  const providers = [{ id: "do", name: "Do", capabilities: ["create", "delete"], workspaces: [
     { id: "ws-2", name: "machine-2", state: "running", notJoined: "Made at Do, but it didn’t join in 10 minutes." },
     { id: "ws-1", name: "machine-1", state: "starting", joining: true },
     { id: "ws-3", name: "machine-3", state: "running", host: "h3", joining: true },
@@ -72,20 +72,20 @@ test("a machine being made has a row until one of its name joins", () => {
   const rows = m.makingRows(["machine-1", ""], providers, [{ name: "machine-4" }]);
   assert.deepEqual(names(rows), ["", "machine-1", "machine-2"]);
   assert.deepEqual(rows[1], { provider: "do", providerName: "Do", workspace: "ws-1", name: "machine-1", notJoined: null,
-    joinable: false, state: "starting", ssh: null, tunnel: false });
+    joinable: false, state: "starting", ssh: null, tunnel: false, deletable: true });
   assert.equal(rows[2].notJoined, "Made at Do, but it didn’t join in 10 minutes.");
   assert.equal(m.deleteMakingQuestion(rows[2]),
     "Delete machine-2? Do deletes it. Nothing was installed on it, so there is nothing to back up.");
 });
 
 test("every machine the person has shows, also one Agents did not make, and a click joins it (#4978)", () => {
-  const providers = [{ id: "cs", name: "Codespaces", workspaces: [
+  const providers = [{ id: "cs", name: "Codespaces", capabilities: ["delete"], workspaces: [
     { id: "cs-2", name: "beta", state: "stopped", ssh: "cs.cs-2.main" },
     { id: "cs-3", name: "gamma", state: "running" },
     { id: "failed-x", name: "x", state: "failed", reason: "No quota." },
     { id: "cs-1", name: "alpha", state: "running", ssh: "cs.cs-1.main", tunnel: true },
     { id: "ws-1", name: "machine-1", state: "starting", joining: true },
-  ] }, { id: "other", name: "Other", mayUse: false, workspaces: [{ id: "o", name: "o", state: "running", ssh: "o" }] }];
+  ] }, { id: "other", name: "Other", mayUse: false, capabilities: [], workspaces: [{ id: "o", name: "o", state: "running", ssh: "o" }] }];
   const rows = m.makingRows([], providers, []);
   assert.deepEqual(rows.map((r) => r.name), ["machine-1", "alpha", "beta", "gamma"]);
   const [making, alpha, beta, gamma] = rows;
@@ -109,6 +109,14 @@ test("every machine the person has shows, also one Agents did not make, and a cl
   assert.ok(m.makingFailed(beta, { failed: "no" }));
   assert.equal(m.makingLine(beta, { needsTrust: "SHA256:abc" }), "Its ssh host key is new to the control plane: SHA256:abc");
   assert.match(m.joinTrustQuestion(beta, "SHA256:abc"), /^Trust beta’s host key\?/);
+  // Delete is on every row that is not being made, and not while a join runs.
+  assert.equal(m.makingCanDelete(making), false);
+  assert.ok(m.makingCanDelete(alpha) && m.makingCanDelete(gamma));
+  assert.equal(m.makingCanDelete(alpha, { joining: null }), false);
+  assert.ok(m.makingCanDelete(alpha, { failed: "no" }));
+  assert.equal(m.makingCanDelete({ ...alpha, deletable: false }), false, "a provider that can't delete offers no Delete");
+  assert.equal(m.deleteMakingQuestion(alpha), "Delete alpha? Codespaces deletes alpha and its disk. It never joined Agents, "
+    + "so it has no backup: work on it that is not pushed is lost.");
 });
 
 test("the icon's colour says the state, the most urgent first (#4113)", () => {
