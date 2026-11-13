@@ -11,6 +11,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statS
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
+import { lucide } from "./lucide.mjs";
 
 const web = dirname(fileURLToPath(import.meta.url));
 const repo = dirname(web);
@@ -24,7 +25,7 @@ if (process.versions.node !== wanted) {
 }
 
 // The files whose bytes decide dist's. Keep in step with WebDistManifestTests.inputs.
-const fixedInputs = ["index.html", "sandbox.html", "build.mjs", "tsconfig.json", "package.json", "package-lock.json", ".node-version"];
+const fixedInputs = ["index.html", "sandbox.html", "build.mjs", "lucide.mjs", "tsconfig.json", "package.json", "package-lock.json", ".node-version"];
 const inputFolders = ["src", "assets"];
 
 function files(folder) {
@@ -52,6 +53,7 @@ const common = {
   target: ["safari18", "chrome130", "firefox130"],
   logLevel: "warning",
   absWorkingDir: web,
+  plugins: [lucide],
 };
 await esbuild.build({
   ...common,

@@ -84,7 +84,7 @@ use_pinned_node() {
 # Web/dist is older than one of the inputs build.mjs hashes, or was never built.
 dist_stale() {
 	[ -f Web/dist/MANIFEST ] || return 0
-	[ -n "$(find Web/src Web/assets Web/index.html Web/sandbox.html Web/build.mjs Web/tsconfig.json \
+	[ -n "$(find Web/src Web/assets Web/index.html Web/sandbox.html Web/build.mjs Web/lucide.mjs Web/tsconfig.json \
 		Web/package.json Web/package-lock.json Web/.node-version -newer Web/dist/MANIFEST 2>/dev/null | head -1)" ]
 }
 

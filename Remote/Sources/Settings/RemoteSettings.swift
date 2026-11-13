@@ -19,12 +19,12 @@ struct RemoteSettings: View {
                     NavigationLink {
                         RemoteSecretsPage()
                     } label: {
-                        Label(UserScopeWords.secretsTitle, systemImage: "key")
+                        Label(UserScopeWords.secretsTitle, icon: "key")
                     }
                     NavigationLink {
                         RemoteAccountsPage()
                     } label: {
-                        Label(AccountsWords.title, systemImage: "person.crop.rectangle.stack")
+                        Label(AccountsWords.title, icon: "person.crop.rectangle.stack")
                     }
                 }
                 .paperListRow()
@@ -45,7 +45,7 @@ struct RemoteSettings: View {
                             .navigationTitle(PolicyLayersWords.title)
                             .navigationBarTitleDisplayMode(.inline)
                     } label: {
-                        Label(PolicyLayersWords.title, systemImage: PolicyLayersWords.symbol)
+                        Label(PolicyLayersWords.title, icon: PolicyLayersWords.symbol)
                     }
                 }
                 .paperListRow()
@@ -58,7 +58,7 @@ struct RemoteSettings: View {
                 // The docs site (#1327), as the Mac's Help ▸ Agents Help.
                 Section {
                     Link(destination: HelpSite.url) {
-                        Label("Help", systemImage: "questionmark.circle")
+                        Label("Help", icon: "questionmark.circle")
                     }
                 }
             }

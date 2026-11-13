@@ -17,6 +17,7 @@ import { SecretInfoLine } from "../SecretInfoLine";
 import { hint, sessionLine, sessionNotBackedUp } from "../../model/secretInfo";
 import { useSettingsMachine } from "./SettingsMachine";
 import { ask } from "../MessageKinds";
+import { Icon } from "../Icon";
 
 const lists = signal<Record<string, SessionSecrets | null>>({});
 const adding = signal(false);
@@ -64,7 +65,7 @@ export function SessionSecretsSection({ store, down }: { store: Store; down: boo
             <code>{s.name}</code> <code class="faint small" aria-label={s.hint ? `Ends in ${s.hint}` : "Value hidden"}>{hint(s.hint)}</code><br />
             <span class="faint small">{about(s.description)}</span><br />
             <SecretInfoLine parts={sessionLine(s)} class="faint small" /><br />
-            <span class="small secret-warning"><span aria-hidden="true">⚠ </span>{sessionNotBackedUp}</span>
+            <span class="small secret-warning"><Icon name="triangle-alert" />{" "}{sessionNotBackedUp}</span>
           </span>
           {offersAsk && (
             <label title={askBeforeUseHint(s.needsApproval === true)}>

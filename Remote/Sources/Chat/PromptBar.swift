@@ -300,7 +300,7 @@ struct PromptBar: View {
                             if acting == .stop {
                                 ProgressView()
                             } else {
-                                Image(systemName: PromptWords.stopSymbol)
+                                Image(icon: PromptWords.stopSymbol)
                                     .appText(.reading).fontWeight(.semibold)
                             }
                         }
@@ -318,7 +318,7 @@ struct PromptBar: View {
                 } else {
                     // No spinner: the prompt is in the chat at once, as the person's bubble (#4814).
                     Button(action: send) {
-                        Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
+                        Image(icon: PromptWords.sendSymbol(willQueue: willQueue))
                             .appText(.reading).fontWeight(.semibold)
                             .frame(width: 22, height: 22)
                     }
@@ -686,7 +686,7 @@ private struct PromptHead: View {
         } else {
             Button { editingLabels = true } label: {
                 if agent.labels.isEmpty {
-                    Label("Add label", systemImage: "plus")
+                    Label("Add label", icon: "plus")
                         .labelStyle(.titleAndIcon)
                         .appText(.fine)
                         .foregroundStyle(Paper.secondary)

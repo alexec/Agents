@@ -105,7 +105,7 @@ struct ArtifactsList: View {
         Group {
             if artifacts.isEmpty {
                 ContentUnavailableView("Nothing exchanged",
-                                       systemImage: "doc",
+                                       icon: "doc",
                                        description: Text("A file attached to a prompt, or one an agent "
                                                          + "hands back by name, shows up here."))
             } else {

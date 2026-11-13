@@ -20,7 +20,7 @@ struct SettingsPageLink<Content: View>: View {
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
         } label: {
-            Label(title, systemImage: systemImage)
+            Label(title, icon: systemImage)
         }
     }
 }

@@ -23,7 +23,7 @@ struct AgentBrowserPane: View {
         if let browser = model.machineBrowser(for: agent.id) {
             content(browser)
         } else {
-            ContentUnavailableView("The machine can't be reached", systemImage: "wifi.slash",
+            ContentUnavailableView("The machine can't be reached", icon: "wifi.slash",
                                    description: Text("The browser shows here when the machine is back."))
         }
     }
@@ -86,7 +86,7 @@ struct AgentBrowserPane: View {
     /// session's own tab stays below, to look at and use.
     private func holderLine(_ browser: MachineBrowser, _ holder: UUID) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: "cursorarrow.rays")
+            Image(icon: "cursorarrow.rays")
                 .foregroundStyle(Paper.secondary)
             Button { model.open(holder) } label: {
                 Text(browser.state.holderTitle ?? "Another session").truncationMode(.middle)
@@ -107,15 +107,15 @@ struct AgentBrowserPane: View {
         let running = browser.state.status == .running && !browser.state.sessionHasNoTab
         return HStack(spacing: 12) {
             Button { Task { await browser.navigate(.back) } } label: {
-                Label("Back", systemImage: "chevron.left").labelStyle(.iconOnly)
+                Label("Back", icon: "chevron.left").labelStyle(.iconOnly)
             }
             .disabled(!running)
             Button { Task { await browser.navigate(.forward) } } label: {
-                Label("Forward", systemImage: "chevron.right").labelStyle(.iconOnly)
+                Label("Forward", icon: "chevron.right").labelStyle(.iconOnly)
             }
             .disabled(!running)
             Button { Task { await browser.navigate(.reload) } } label: {
-                Label("Reload", systemImage: "arrow.clockwise").labelStyle(.iconOnly)
+                Label("Reload", icon: "arrow.clockwise").labelStyle(.iconOnly)
             }
             .disabled(!running)
             TextField("Address", text: $typed)
@@ -134,7 +134,7 @@ struct AgentBrowserPane: View {
                 }
             Button { typing.toggle() } label: {
                 Label(typing ? "Hide Keyboard" : "Type in the Page",
-                      systemImage: typing ? "keyboard.chevron.compact.down" : "keyboard")
+                      icon: typing ? "keyboard.chevron.compact.down" : "keyboard")
                     .labelStyle(.iconOnly)
             }
             .disabled(!running)
@@ -149,7 +149,7 @@ struct AgentBrowserPane: View {
     private func page(_ browser: MachineBrowser) -> some View {
         switch browser.state.status {
         case .running where browser.state.sessionHasNoTab:
-            ContentUnavailableView("This session's agent has not used the browser", systemImage: "cursorarrow.rays",
+            ContentUnavailableView("This session's agent has not used the browser", icon: "cursorarrow.rays",
                                    description: Text("When it opens a page, you see it here and can use it. To open one yourself, type an address above."))
         case .running:
             if let frame = browser.frame {
@@ -172,10 +172,10 @@ struct AgentBrowserPane: View {
         case .starting:
             BrowserWaiting(words: browser.state.detail ?? "Starting the browser")
         case .failed:
-            ContentUnavailableView("The browser didn't start", systemImage: "exclamationmark.triangle",
+            ContentUnavailableView("The browser didn't start", icon: "exclamationmark.triangle",
                                    description: Text(browser.state.detail ?? "Try the address again."))
         case .stopped:
-            ContentUnavailableView("The browser isn't running", systemImage: "cursorarrow.rays",
+            ContentUnavailableView("The browser isn't running", icon: "cursorarrow.rays",
                                    description: Text("When an agent opens a page on this machine, you see it here and can use it. To open one yourself, type an address above."))
         }
     }

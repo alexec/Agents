@@ -4,6 +4,7 @@
 // or a click elsewhere closes it, and the keys move through its items.
 import { signal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
+import { Icon } from "./Icon";
 
 export interface MenuItem {
   label: string;
@@ -158,7 +159,7 @@ export function ContextMenu() {
         : (
           <button key={item.label} role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"} aria-checked={item.checked}
             title={item.help} disabled={item.disabled} onClick={() => { close(); item.run(); }}>
-            {item.checked !== undefined && <span class="tick" aria-hidden="true">{item.checked ? "✓" : ""}</span>}{item.label}
+            {item.checked !== undefined && <span class="tick" aria-hidden="true">{item.checked && <Icon name="check" />}</span>}{item.label}
             {item.shortcut && <MenuKey keys={item.shortcut} />}</button>
         ))}
     </div>

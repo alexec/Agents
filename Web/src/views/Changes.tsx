@@ -12,6 +12,7 @@ import { describe } from "../model/errors";
 import { canOpenInFiles, changeStep, changeStops, lineDiff, markWords, offersDiffChoice, otherAgentsNote, shownDiff, unavailableNote, type DiffShown } from "../model/diff";
 import { nameOf, paneOf, setPane } from "./files/paneState";
 import { build, lines, sameFile, statusGlyph, statusPhrase, totals, type Totals } from "../model/changeTree";
+import { Icon } from "./Icon";
 
 /** A changed file's square, in its status colour, with the status in words for a reader (#63). */
 export function StatusSquare({ file }: { file: ChangedFile }) {
@@ -208,7 +209,7 @@ export function Changes({ store, host, session }: { store: Store; host: string; 
           <li key={`folder:${node.key}`}>
             <button class="row tree-row folder" style={{ paddingLeft: `${8 + depth * 14}px` }} aria-expanded={!collapsed.value.has(node.key)}
               onClick={() => toggle(node.key)}>
-              <span class="chevron" aria-hidden="true">{collapsed.value.has(node.key) ? "▸" : "▾"}</span>
+              <Icon name={collapsed.value.has(node.key) ? "chevron-right" : "chevron-down"} class="chevron" />
               <span class="title">{node.name}</span>
               {folderCounts(node.totals)}
             </button>

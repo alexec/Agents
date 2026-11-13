@@ -11,6 +11,7 @@ import { canonical, fileWords, totalWords, type Totals } from "../../model/chang
 import { flatten, keyAction, reveal, sorted, unread, visibleFolders, windowOf, type TreeLine } from "../../model/fileTree";
 import { Counts, StatusSquare } from "../Changes";
 import { nameOf, paneOf, setPane } from "./paneState";
+import { Icon } from "../Icon";
 
 /** Every row is this tall, so the rows in view can be worked out from the scroll alone. */
 const rowHeight = 26;
@@ -176,9 +177,9 @@ export function Tree({ store, host, session, root, marks, changedAt, hidden }: {
             aria-expanded={entry.isDirectory ? isOpen : undefined} aria-selected={marked}
             class={`row tree-row entry${marked ? " chosen" : ""}${cursor === path ? " cursor" : ""}`} style={top}
             onClick={() => open(line)}>
-            <span class="chevron" aria-hidden="true">{entry.isDirectory ? (isOpen ? "▾" : "▸") : ""}</span>
+            <span class="chevron" aria-hidden="true">{entry.isDirectory && <Icon name={isOpen ? "chevron-down" : "chevron-right"} />}</span>
             <span class="title" aria-hidden="true">
-              {changed ? <StatusSquare file={changed} /> : <span class="icon">{entry.isDirectory ? "📁" : "📄"}</span>} {entry.name}
+              {changed ? <StatusSquare file={changed} /> : <Icon name={entry.isDirectory ? "folder" : "file"} />} {entry.name}
             </span>
             <span aria-hidden="true">{changed ? <Counts added={changed.added} removed={changed.removed} />
               : total ? <Counts added={total.added} removed={total.removed} /> : null}</span>

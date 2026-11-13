@@ -362,7 +362,7 @@ struct StartAgentView: View {
                                 if model.isStarting {
                                     ProgressView()
                                 } else {
-                                    Image(systemName: "arrow.up")
+                                    Image(icon: "arrow.up")
                                         .appText(.reading).fontWeight(.semibold)
                                 }
                             }

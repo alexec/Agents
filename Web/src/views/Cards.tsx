@@ -28,6 +28,7 @@ import { handOffAnswer, handOffWindowWords } from "../model/handOff";
 import { openTakeOver, route } from "../route";
 import { keepingForSession, sessionOnlyField, sessionSecretWords } from "../model/sessionSecrets";
 import { askBeforeUseHint, askBeforeUseWords, needsApprovalField } from "../model/askBeforeUse";
+import { Icon } from "./Icon";
 
 type Held = (
   | { kind: "permission"; request: PermissionRequest }
@@ -548,7 +549,7 @@ function HandOffField({ handOff, inert, open, recipient, done, cannot, send }: {
   const note = useSignal("");
   return (
     <>
-      <p class="strong secret"><span aria-hidden="true">✋ </span>{handOff.step}</p>
+      <p class="strong secret"><Icon name="hand" />{" "}{handOff.step}</p>
       {handOff.reason && <p class="secret">{handOff.reason}</p>}
       {/* A step in one of the agents' own Chrome windows (#5095): no page here, so say where. */}
       {handOff.window && <p class="small quiet">{handOffWindowWords(handOff.window, recipient)}</p>}
@@ -606,7 +607,7 @@ function SecretField({ secret, reason, recipient, inert, save, decline, sayWhy, 
   const link = getIt(secret.url);
   return (
     <>
-      <p class="strong secret"><span aria-hidden="true">🔒 </span><code>{secret.name}</code></p>
+      <p class="strong secret"><Icon name="lock" />{" "}<code>{secret.name}</code></p>
       {reason && <p class="secret">{reason}</p>}
       {link && secret.url && <p class="secret"><a href={secret.url} target="_blank" rel="noopener noreferrer">{link}</a></p>}
       <label class="field">

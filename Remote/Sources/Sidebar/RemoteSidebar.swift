@@ -72,7 +72,7 @@ struct RemoteSidebar: View {
             if !query.trimmingCharacters(in: .whitespaces).isEmpty {
                 Section {
                     Button { model.commandMenu = query } label: {
-                        Label(CommandMenuWords.searchRow(query), systemImage: CommandFinder.Kind.action.symbol)
+                        Label(CommandMenuWords.searchRow(query), icon: CommandFinder.Kind.action.symbol)
                             .lineLimit(1)
                     }
                     .accessibilityHint(CommandMenuWords.label)
@@ -264,7 +264,7 @@ struct RemoteSidebar: View {
                         let row = model.controlHost(host)
                         HStack(spacing: 8) {
                             Label(OfflineWords.footLine(name: model.hostLabel(host), row: row),
-                                  systemImage: "bolt.horizontal.circle")
+                                  icon: "bolt.horizontal.circle")
                                 .appText(.fine)
                                 .foregroundStyle(Paper.secondary)
                                 .accessibilityElement(children: .combine)
@@ -288,7 +288,7 @@ struct RemoteSidebar: View {
             if !model.work.storeNotes.isEmpty {
                 Section {
                     ForEach(model.work.storeNotes, id: \.self) { note in
-                        Label(note, systemImage: "exclamationmark.triangle")
+                        Label(note, icon: "exclamationmark.triangle")
                             .appText(.fine)
                             .foregroundStyle(Paper.secondary)
                             .accessibilityElement(children: .combine)
@@ -522,18 +522,18 @@ private struct RemoteApprovalRow: View {
             .paperTag(item)
             .swipeActions(edge: .leading, allowsFullSwipe: false) {
                 if approval.actions.contains(.approve) {
-                    Button(approval.word(for: .approve), systemImage: "checkmark") { answerNow(.approve) }
+                    Button(approval.word(for: .approve), icon: "checkmark") { answerNow(.approve) }
                         .tint(Paper.accent)
                 }
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                 if approval.actions.contains(.deny) {
-                    Button(approval.word(for: .deny), systemImage: "xmark") { answerNow(.deny) }
+                    Button(approval.word(for: .deny), icon: "xmark") { answerNow(.deny) }
                         .tint(StateTint.failure.color)
                 }
             }
             .contextMenu {
-                Button("Review…", systemImage: "doc.text.magnifyingglass") { model.sidebarItem = item }
+                Button("Review…", icon: "doc.text.magnifyingglass") { model.sidebarItem = item }
                 if approval.actions.contains(.approve) {
                     Button(approval.word(for: .approve)) { answerNow(.approve) }
                 }
@@ -568,12 +568,12 @@ private struct RemoteReviewPullRow: View {
         }
         .buttonStyle(.plain)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button("Dismiss", systemImage: "xmark") { dismissNow() }
+            Button("Dismiss", icon: "xmark") { dismissNow() }
                 .tint(.gray)
         }
         .contextMenu {
-            Button("Open Pull Request", systemImage: "arrow.up.right.square", action: open)
-            Button("Dismiss", systemImage: "xmark") { dismissNow() }
+            Button("Open Pull Request", icon: "arrow.up.right.square", action: open)
+            Button("Dismiss", icon: "xmark") { dismissNow() }
         }
         .accessibilityAction(named: "Dismiss", dismissNow)
     }
@@ -606,19 +606,19 @@ private struct RemoteCheckSuggestionRow: View {
         }
         .buttonStyle(.plain)
         .swipeActions(edge: .leading, allowsFullSwipe: true) {
-            Button("Start", systemImage: "play") { startNow() }
+            Button("Start", icon: "play") { startNow() }
                 .tint(Paper.accent)
         }
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button("Dismiss", systemImage: "xmark") { dismissNow() }
+            Button("Dismiss", icon: "xmark") { dismissNow() }
                 .tint(.gray)
         }
         .contextMenu {
-            Button("Start Session", systemImage: "play") { startNow() }
+            Button("Start Session", icon: "play") { startNow() }
             if let link = suggestion.link {
-                Button("Open Link", systemImage: "arrow.up.right.square") { openURL(link) }
+                Button("Open Link", icon: "arrow.up.right.square") { openURL(link) }
             }
-            Button("Dismiss", systemImage: "xmark") { dismissNow() }
+            Button("Dismiss", icon: "xmark") { dismissNow() }
         }
         .accessibilityAction(named: "Start", startNow)
         .accessibilityAction(named: "Dismiss", dismissNow)
@@ -660,20 +660,20 @@ private struct RemoteRequestRow: View {
         row
             .swipeActions(edge: .leading, allowsFullSwipe: false) {
                 if request.secretUse != nil {
-                    Button(NeedRequest.Action.once.word, systemImage: "checkmark") { answerNow(.once) }
+                    Button(NeedRequest.Action.once.word, icon: "checkmark") { answerNow(.once) }
                         .tint(Paper.accent)
                 }
                 if request.isDeferred {
-                    Button("Bring Back", systemImage: "arrow.uturn.up") { bringBack() }
+                    Button("Bring Back", icon: "arrow.uturn.up") { bringBack() }
                         .tint(Paper.accent)
                 }
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                 if request.secretUse != nil {
-                    Button(NeedRequest.Action.deny.word, systemImage: "xmark") { answerNow(.deny) }
+                    Button(NeedRequest.Action.deny.word, icon: "xmark") { answerNow(.deny) }
                         .tint(StateTint.failure.color)
                 }
-                Button("Later", systemImage: "clock") { asksWhen = true }
+                Button("Later", icon: "clock") { asksWhen = true }
                     .tint(.indigo)
             }
             .contextMenu {
@@ -684,9 +684,9 @@ private struct RemoteRequestRow: View {
                     Divider()
                 }
                 if request.isDeferred {
-                    Button("Bring Back Now", systemImage: "arrow.uturn.up") { bringBack() }
+                    Button("Bring Back Now", icon: "arrow.uturn.up") { bringBack() }
                 }
-                Menu("Later", systemImage: "clock") { laterButtons }
+                Menu("Later", icon: "clock") { laterButtons }
             }
             .confirmationDialog("Later", isPresented: $asksWhen, titleVisibility: .visible) {
                 laterButtons
@@ -723,7 +723,7 @@ private struct RemoteLaterRows: View {
         if !requests.isEmpty {
             Button { withAnimation(ResponseMotion.snappy) { open.toggle() } } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "chevron.right")
+                    Image(icon: "chevron.right")
                         .imageScale(.small)
                         .rotationEffect(.degrees(open ? 90 : 0))
                         .frame(width: 16)
@@ -765,16 +765,16 @@ private struct RemoteFailedWorkflowRow: View {
             .paperTag(item)
             .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                 if approval.actions.contains(.dismiss) {
-                    Button(approval.word(for: .dismiss), systemImage: "xmark") { dismissNow() }
+                    Button(approval.word(for: .dismiss), icon: "xmark") { dismissNow() }
                         .tint(.gray)
                 }
             }
             .contextMenu {
                 if approval.agentID != nil {
-                    Button("Open Workflow", systemImage: "flowchart") { model.sidebarItem = workflow }
+                    Button("Open Workflow", icon: "flowchart") { model.sidebarItem = workflow }
                 }
                 if approval.actions.contains(.dismiss) {
-                    Button(approval.word(for: .dismiss), systemImage: "xmark") { dismissNow() }
+                    Button(approval.word(for: .dismiss), icon: "xmark") { dismissNow() }
                 }
             }
     }
@@ -1028,7 +1028,7 @@ private struct FolderPageRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: systemImage)
+            Image(icon: systemImage)
                 .sidebarMark(Paper.accent)
                 .frame(width: 20)
                 .accessibilityHidden(true)
@@ -1083,7 +1083,7 @@ private struct SidebarFoldRow: View {
     var body: some View {
         Button(action: toggle) {
             HStack(spacing: 10) {
-                Image(systemName: "chevron.right")
+                Image(icon: "chevron.right")
                     .rotationEffect(.degrees(isOpen ? 90 : 0))
                     .appText(.fine)
                     .foregroundStyle(Paper.secondary)
@@ -1114,7 +1114,7 @@ private extension View {
     /// `tint` is the attention orange for a page that only warns (#4161).
     func activityIcon(_ systemImage: String, warns: Bool = false, tint: StateTint = .failure) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: systemImage)
+            Image(icon: systemImage)
                 .sidebarMark(warns ? tint.style(or: .primary) : AnyShapeStyle(Paper.accent))
                 .frame(width: 20)
                 .accessibilityHidden(true)
@@ -1174,7 +1174,7 @@ private struct FolderMenuItems: View {
         }
         ShowHiddenViewsButton(summary: summary)
         // Work at Once, Sessions and Policy (#2798 kept the rest of it on the Mac and the web).
-        Button(RemoteProjectSettingsWords.menuItem, systemImage: "gearshape") {
+        Button(RemoteProjectSettingsWords.menuItem, icon: "gearshape") {
             model.projectSettingsFolder = summary.key
         }
         .disabled(model.hostIsOffline(summary.host))
@@ -1183,7 +1183,7 @@ private struct FolderMenuItems: View {
             Task { await model.setPinned(!summary.folder.isPinned, for: summary) }
         } label: {
             Label(summary.folder.isPinned ? "Unpin" : "Pin",
-                  systemImage: summary.folder.isPinned ? "pin.slash" : "pin")
+                  icon: summary.folder.isPinned ? "pin.slash" : "pin")
         }
         .disabled(model.isStale(on: summary.host))
     }
@@ -1198,7 +1198,7 @@ struct NewSessionButton: View {
         Button {
             model.sidebarItem = .folder(folder)
         } label: {
-            Label("New Session", systemImage: "plus")
+            Label("New Session", icon: "plus")
         }
         .disabled(model.isStale)
     }
@@ -1214,7 +1214,7 @@ private struct NewSessionTopRow: View {
     var body: some View {
         let folder = model.newSessionFolder
         HStack(spacing: 8) {
-            Image(systemName: "square.and.pencil")
+            Image(icon: "square.and.pencil")
                 .sidebarMark(Paper.accent)
                 .frame(width: 20)
                 .accessibilityHidden(true)

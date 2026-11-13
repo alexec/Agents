@@ -9,6 +9,7 @@ import { flowButtons, isBad, keepsOpen, lineMark, memberState, planeMoveWords as
 import type { Store } from "../../model/store";
 import { Modal } from "../Modal";
 import { MessageBanner, ask as askAlert } from "../MessageKinds";
+import { Glyph } from "../Icon";
 
 export function PlaneMoveSection({ store, down }: { store: Store; down: boolean }) {
   const report = store.planeMoveReport.value;
@@ -97,7 +98,7 @@ function PlaneMoveDialog({ flow, down, ask }: { flow: PlaneMoveFlow; down: boole
           <ul class="plane-move-lines">
             {flow.lines.map((line) => (
               <li key={line.label} class={`line-${isBad(line) ? "bad" : line.state}`}>
-                <span class="mark" aria-hidden="true">{lineMark(line)}</span>
+                <Glyph of={lineMark(line)} class="mark" />
                 <span>
                   {line.label}
                   {showsNote(line) && <span class="hint">{line.note}</span>}

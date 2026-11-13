@@ -3,25 +3,21 @@ import SwiftUI
 /// Paper v2's one icon set (#4976; specs/4926-paper-v2/spec.md, Icons): Lucide at a 1.5 stroke.
 ///
 /// The model still names an icon by its SF Symbol, as it did before; a view draws it with
-/// `Image(icon:)`, `Label(_:icon:)` or `Button(_:icon:action:)`, and on the Mac that draws the
+/// `Image(icon:)`, `Label(_:icon:)` or `Button(_:icon:action:)`, and on the Mac and the Remote that draws the
 /// Lucide symbol of the same meaning from Icons.xcassets (`design/icons.json`, made by
 /// `scripts/design.sh icons`). Each is a symbol image, so it takes the text's size, scale and
 /// colour as an SF Symbol does. A name with no Lucide meaning yet draws its SF Symbol.
 ///
-/// The Remote draws the SF Symbols until its own story (#4996) turns them on there.
+/// The Remote draws them too (#4996). The RemoteWidget does not compile this file.
 enum PaperIcon {
     /// The Lucide symbol to draw for an SF Symbol's name, or nil to draw the SF Symbol.
     static func lucide(_ systemName: String) -> String? {
-        #if os(macOS)
         LucideIcons.bySystemName[systemName]
-        #else
-        nil
-        #endif
     }
 }
 
 extension Image {
-    /// The icon for an SF Symbol's name: on the Mac, its Lucide symbol (#4976).
+    /// The icon for an SF Symbol's name: its Lucide symbol (#4976, #4996).
     init(icon systemName: String) {
         if let name = PaperIcon.lucide(systemName) {
             self.init(name)
@@ -43,8 +39,11 @@ extension Image {
             self.init(nsImage: image)
             return
         }
-        #endif
         self.init(systemName: systemName)
+        #else
+        // UIKit draws a toolbar's symbol image from an asset catalogue as it draws an SF Symbol.
+        self.init(icon: systemName)
+        #endif
     }
 }
 
