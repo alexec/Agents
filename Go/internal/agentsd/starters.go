@@ -14,8 +14,8 @@ import (
 )
 
 // Starters for a new app (#3707, #4561, specs/3656-new-app/spec.md): a starter is a GitHub
-// template repository, such as alexec/iphone-app-starter (TestFlight and the App Store) or
-// alexec/web-service-starter (Cloud Run), each with its deploy workflows, the deploy notice
+// template repository, such as agentloops-dev/iphone-app-starter (TestFlight and the App Store) or
+// agentloops-dev/web-service-starter (Cloud Run), each with its deploy workflows, the deploy notice
 // that Lineage reads and Sentry's SDK. make_app_repository fetches its default branch, fills
 // its placeholders and pushes the result as the new repository's first commit. A file names
 // what the person chose with a placeholder, __NAME__ in capitals, such as __BUNDLE_ID__.
@@ -26,8 +26,8 @@ import (
 
 // starterShortNames are our starters, by the short names the tool takes.
 var starterShortNames = map[string]string{
-	"iphone-app":  "alexec/iphone-app-starter",
-	"web-service": "alexec/web-service-starter",
+	"iphone-app":  "agentloops-dev/iphone-app-starter",
+	"web-service": "agentloops-dev/web-service-starter",
 }
 
 // starterGitBase is where a starter's repository is cloned from: GitHub, or a folder of bare
