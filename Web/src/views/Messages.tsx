@@ -154,7 +154,8 @@ function ConversationRow({ row }: { row: MessagesRow }) {
         onClick={() => go({ nav: "messages", section: "messages", item: row.key })}>
         <span class="work-row-head">
           <span class="messages-source" title={channelName(c.source)} aria-label={channelName(c.source)}>{sourceGlyph(c.source)}</span>
-          <span class="work-title messages-title">{c.title}</span>
+          {c.sender && <span class="messages-sender" title={c.sender.identity}>{senderName(c.sender)}</span>}
+          <span class={`work-title messages-title${c.sender ? " quiet" : ""}`}>{c.title}</span>
           {unread && <span class="messages-unread small">{unread}</span>}
           {c.lastActivity && <span class="quiet small docs-updated">{ago(new Date(c.lastActivity))}</span>}
         </span>

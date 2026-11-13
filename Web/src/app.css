@@ -2090,6 +2090,8 @@ button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, 
 .messages-row .work-row-head { flex-wrap: nowrap; }
 .messages-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-weight: normal; }
 .messages-row.unread .messages-title { font-weight: 600; }
+.messages-sender { flex: 0 1 auto; max-width: 30%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.messages-row.unread .messages-sender { font-weight: 600; }
 .messages-unread { color: var(--accent); white-space: nowrap; }
 .messages-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .messages-rows { list-style: none; margin: 8px 0; padding: 0; }

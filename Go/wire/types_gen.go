@@ -8625,6 +8625,9 @@ type MessagingConversation struct {
 
 	LastActivity *string `json:"lastActivity,omitzero"`
 
+	// Who sent the newest message, so the list can say who a conversation is from. Absent when the service's list does not say (a Slack channel, a Google Chat space).
+	Sender *ChannelSender `json:"sender,omitzero"`
+
 	// The conversation on the service's own site or app. Absent when it has none.
 	Link *URL `json:"link,omitzero"`
 }
