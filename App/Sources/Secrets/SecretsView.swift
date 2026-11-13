@@ -7,11 +7,14 @@ import SwiftUI
 /// the same in Settings ▸ You ▸ Secrets.
 struct SecretsView: View {
     @Environment(AppModel.self) private var model
+    /// Reveal and Copy (#5115), opened with this window's own key.
+    @State private var show = SecretShowState { ControlConfig.sealing() }
 
     var body: some View {
         // Through the window's own connection, which hears when they change (#1760).
         SecretsPane(control: model.controlRequests, state: model.userScope,
-                    machineNames: SecretInfoWords.names(model.controlPlaneHosts ?? [], thisMac: model.thisMacHostID)) {
+                    machineNames: SecretInfoWords.names(model.controlPlaneHosts ?? [], thisMac: model.thisMacHostID),
+                    show: show) {
                         SessionSecretsSection(model: model)
                         LocalSecretsSection(model: model)
                     }

@@ -1350,6 +1350,14 @@ dialog.image-viewer .image-viewer-frame:hover .image-viewer-arrow, dialog.image-
 /* A secret's last 4 and its not-backed-up line (#4159). */
 .secret-hint { margin-inline-start: 6px; }
 .secret-warning { color: var(--tint-warning); }
+/* A secret's value shown (#5115): in a well, wraps at any character, and can not be selected, so Copy is the only way
+   to copy it and each copy is in the audit log. */
+.secret-shown { display: block; margin: 4px 0; padding: 6px 8px; background: var(--paper-well); border-radius: var(--radius-control);
+  font-family: var(--font-mono); font-size: 0.75rem; overflow-wrap: anywhere; user-select: none; -webkit-user-select: none; }
+.secret-shown .card-part { display: flex; align-items: center; gap: 8px; }
+.secret-shown .card-part .part-label { min-width: 96px; font-family: var(--font-text); opacity: 0.7; }
+.secret-shown .card-part .part-value { flex: 1; }
+.sub-app .settings-body .hint.vouched { color: var(--tint-vouched); }
 .sub-app .settings-body .join-command { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .sub-app .settings-body .join-command-line { display: flex; align-items: flex-start; gap: 6px; }
 .sub-app .settings-body .join-command .code-text { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.6875rem;
