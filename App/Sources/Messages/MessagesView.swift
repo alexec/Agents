@@ -164,7 +164,8 @@ private struct MessagesListPane: View {
                 .listStyle(.inset)
             }
         } else {
-            ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            // The first read: placeholder rows, as Work draws them, no spinner in the middle.
+            List { WorkPlaceholderRows() }.listStyle(.inset).disabled(true)
         }
     }
 
@@ -269,7 +270,7 @@ private struct ConversationPage: View {
                 }
                 .listStyle(.inset)
             } else {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                List { WorkPlaceholderRows(count: 4) }.listStyle(.inset).disabled(true)
             }
             if let replyAs = row.item.replyAs, problem == nil, messages != nil {
                 Divider()
