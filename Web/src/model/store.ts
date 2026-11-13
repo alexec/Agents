@@ -3765,6 +3765,24 @@ export class Store extends Work {
     }
   }
 
+  /** A host's runtimes read again alone, for a page waiting on an install or a sign-in made elsewhere (#5054). */
+  async reloadRuntimeList(host: string): Promise<void> {
+    const list = await this.link.call("runtimes/list", {}, host).catch(() => null);
+    if (list) this.runtimes.value = { ...this.runtimes.value, [host]: sortedRuntimes(list) };
+  }
+
+  /** Whether a host's github connector is connected (#5054); undefined when it could not be read. */
+  async githubConnected(host: string): Promise<boolean | undefined> {
+    if (!this.has(host, Capability.connections1)) return undefined;
+    try {
+      const { connections } = await this.link.call("connections/list", {}, host);
+      this.knowConnections(host, connections);
+      return connections.some((c) => c.provider === "github" && c.state === "connected");
+    } catch {
+      return undefined;
+    }
+  }
+
   /** One runtime's status, in place of the one the page had. */
   private noteRuntime(host: string, status: RuntimeStatus): void {
     const list = this.runtimes.value[host] ?? [];
