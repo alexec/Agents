@@ -42,6 +42,33 @@ enum WalkEvents {
         return "clicked \(view.className) at \(Int(point.x)),\(Int(point.y)); active \(NSApp.isActive), key \(window.isKeyWindow)"
     }
 
+    /// A drag from one point to another with the button down (#5155), as a person selects
+    /// words. Handed to the view under the start, as a web view's click is: the window is
+    /// not key, and would keep a first click. The drags and the up wait in this app's queue
+    /// for the view's own loop, which follows the mouse until the button comes up.
+    static func drag(_ window: NSWindow, from: CGPoint, to: CGPoint) throws -> String {
+        guard let frameView = window.contentView?.superview else { throw WalkError("no window to drag in") }
+        let start = CGPoint(x: from.x, y: window.frame.height - from.y)
+        let end = CGPoint(x: to.x, y: window.frame.height - to.y)
+        guard let view = frameView.hitTest(start) else { throw WalkError("nothing at \(Int(from.x)),\(Int(from.y))") }
+        guard let down = mouse(.leftMouseDown, at: start, in: window, count: 1) else { throw WalkError("no event") }
+        let steps = 8
+        for step in 1...steps {
+            let part = Double(step) / Double(steps)
+            let point = CGPoint(x: start.x + (end.x - start.x) * part, y: start.y + (end.y - start.y) * part)
+            if let moved = mouse(.leftMouseDragged, at: point, in: window, count: 1) {
+                NSApp.postEvent(moved, atStart: false)
+            }
+        }
+        guard let up = mouse(.leftMouseUp, at: end, in: window, count: 1) else { throw WalkError("no event") }
+        NSApp.postEvent(up, atStart: false)
+        view.mouseDown(with: down)
+        // What the view's loop did not take is not left for the next walk step.
+        while NSApp.nextEvent(matching: [.leftMouseDragged, .leftMouseUp], until: .distantPast,
+                              inMode: .default, dequeue: true) != nil {}
+        return "dragged in \(view.className) from \(Int(from.x)),\(Int(from.y)) to \(Int(to.x)),\(Int(to.y))"
+    }
+
     /// The web view the view is, or is in.
     static func webView(at view: NSView) -> WKWebView? {
         var current: NSView? = view
@@ -55,7 +82,7 @@ enum WalkEvents {
     private static func mouse(_ type: NSEvent.EventType, at point: CGPoint, in window: NSWindow, count: Int) -> NSEvent? {
         NSEvent.mouseEvent(with: type, location: point, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
                            windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: count,
-                           pressure: type == .leftMouseDown ? 1 : 0)
+                           pressure: type == .leftMouseUp ? 0 : 1)
     }
 
     /// A key, down and up, to the window's first responder: `return`, `escape`, `tab`,

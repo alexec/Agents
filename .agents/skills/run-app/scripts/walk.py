@@ -19,6 +19,7 @@
     walk.py ROOT context TEXT [ITEM…]            TEXT's context menu (#1123): its items, or ITEM chosen
     walk.py ROOT click TEXT [--count 2]          a click on TEXT's middle, for a tap gesture
     walk.py ROOT click --x X --y Y               a click at a point of the shot
+    walk.py ROOT drag X Y TOX TOY                a drag with the button down, as a selection is made (#5155)
     walk.py ROOT key return|escape|right|pageup|end|a… [--mods cmd,shift]   a key to the window
     walk.py ROOT info TEXT                       the match and what is above it: class, actions
     walk.py ROOT views [DEPTH] | layers [DEPTH] --view CLASS[#N]   when a shot or press goes wrong
@@ -201,6 +202,8 @@ def main(argv):
         args["text"], args["path"] = positional[0], positional[1:]
     elif verb == "key":
         args["key"] = positional[0]
+    elif verb == "drag":
+        args["x"], args["y"], args["toX"], args["toY"] = (float(v) for v in positional[:4])
     elif verb == "notify":
         args["method"] = positional[0]
         args["params"] = json.loads(positional[1]) if len(positional) > 1 else None
