@@ -56,12 +56,7 @@ const leasesBrief = "Lease a shared resource with lease_resource before using it
 	// The machine's capacity (#4579).
 	"A lease or a start can wait for the machine, not only for a holder: before heavy work " +
 	"that no declared resource names (a long test suite, a Chromium, a simulator, a script that " +
-	"builds), lease capacity, which goes in line while the machine is near or at capacity. " +
-	// The person's booking (#4268).
-	"Before a step that gives me a short time to act (a code sent by text or email, a " +
-	"sign-in to approve on my phone), book me with lease_resource on person: minutes is how " +
-	"long my step takes, by is when it stops mattering. Book first, then start the clock " +
-	"(press Send code), then hand the step over, and release it the moment it is done."
+	"builds), lease capacity, which goes in line while the machine is near or at capacity."
 
 // endingBrief names the three ways a turn ends (#1801). Without it an agent learnt about
 // archiving only from archive_session's description, and one that had finished with

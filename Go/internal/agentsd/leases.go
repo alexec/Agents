@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
@@ -119,8 +118,6 @@ type leaseState struct {
 	book      *leaseBook
 	declared  []wire.DeclaredResource
 	leaseTick *time.Timer
-	// personHolder is who holds the person's booking (#4268), read by the needs.
-	personHolder atomic.Pointer[wire.UUID]
 	capacityState
 }
 
@@ -178,9 +175,7 @@ func (d *Daemon) loadLeases() []leaseEvent {
 	for _, r := range d.declared {
 		events = append(events, d.setRules(r.Name, rulesOf(r))...)
 	}
-	events = append(events, d.lapse(now().Time())...)
-	d.notePersonHolder()
-	return events
+	return append(events, d.lapse(now().Time())...)
 }
 
 func rulesOf(r wire.DeclaredResource) leaseRules {
@@ -302,7 +297,6 @@ func (d *Daemon) nextDeadline() (time.Time, bool) {
 // Called with leaseMu held.
 func (d *Daemon) leasesChanged() {
 	d.saveLeases()
-	d.notePersonHolder()
 	snap := d.leaseSnapshot()
 	safe.Go("resources/changed", func() { Broadcast(d, wire.NotifyResourcesChanged, snap) })
 	// The Agent Browser panes say which session holds the browser (#3916).
@@ -517,11 +511,6 @@ func (d *Daemon) leaseSnapshot() wire.LeaseSnapshot {
 		rows = append(rows, row(capacityResource, "named", capacityDisplay(), false, nil))
 		drawn[capacityResource] = true
 	}
-	// The person's booking (#4268): named, so a client from before it reads it as any other.
-	if p, display := d.personLease(); !drawn[p] {
-		rows = append(rows, row(p, "named", display, false, nil))
-		drawn[p] = true
-	}
 	for name, e := range d.book.Entries {
 		if !drawn[name] {
 			rows = append(rows, row(name, e.Kind, e.DisplayName, e.Kind != "named", nil))
@@ -555,7 +544,7 @@ func declaredProblem(r wire.DeclaredResource) string {
 	case strings.TrimSpace(r.DisplayName) == "":
 		return "Give it a name."
 	case r.Name == "screen" || strings.HasPrefix(string(r.Name), "simulator:") || strings.HasPrefix(string(r.Name), "browser:") ||
-		isPersonLease(r.Name) || r.Name == capacityResource:
+		r.Name == capacityResource:
 		return r.DisplayName + " is found on the Mac by itself; choose another name."
 	case strings.TrimSpace(r.Description) == "":
 		return "Say what it is for, so agents know when to take it."

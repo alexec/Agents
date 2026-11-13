@@ -7018,10 +7018,6 @@
         },
         "headline": {
           "$ref": "#/definitions/Headline"
-        },
-        "timely": {
-          "type": "boolean",
-          "description": "Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push)."
         }
       },
       "required": [
@@ -19341,10 +19337,6 @@
         },
         "headline": {
           "$ref": "#/definitions/Headline"
-        },
-        "timely": {
-          "type": "boolean",
-          "description": "Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push)."
         }
       },
       "required": [
@@ -24668,10 +24660,6 @@
         },
         "waiting": {
           "type": "integer"
-        },
-        "timely": {
-          "type": "boolean",
-          "description": "Asked by an agent that holds the person's booking (person:<name>, #4268): notify it as timely (Time Sensitive on iOS, an alert on the Mac, an urgent Web Push)."
         }
       },
       "required": [

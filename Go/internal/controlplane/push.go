@@ -139,7 +139,7 @@ func (p *pushes) queueLocked(push apns.Push, device string) {
 // its words are legible only to the device. One too big for APNs loses its buttons, then
 // its words, before it is not sent.
 func sealPush(d notices.RelayDelivery, publicKey []byte, token records.PushToken) (apns.Push, error) {
-	item := wire.ControlPushItem{NeedID: d.NeedID, Alert: d.Alert && d.Headline != nil, Timely: d.Timely}
+	item := wire.ControlPushItem{NeedID: d.NeedID, Alert: d.Alert && d.Headline != nil}
 	var tries []*wire.Headline
 	if d.Headline != nil {
 		full := apns.Truncated(*d.Headline)
@@ -158,7 +158,7 @@ func sealPush(d notices.RelayDelivery, publicKey []byte, token records.PushToken
 			return apns.Push{}, err
 		}
 		push := apns.Push{Token: token.Token, Environment: wire.PushEnvironment(token.Environment), Alert: item.Alert,
-			Timely: item.Alert && d.Timely != nil && *d.Timely, CollapseID: apns.CollapseID(d.NeedID), Sealed: sealed}
+			CollapseID: apns.CollapseID(d.NeedID), Sealed: sealed}
 		if len(push.Payload()) <= apns.MaxPayload {
 			return push, nil
 		}
