@@ -93,6 +93,12 @@ export function ImageViewer({ images, start, close }: {
     return () => watcher.disconnect();
   }, []);
 
+  // An arrow that was clicked is gone at an end: focus stays in the viewer, so ← and → still work.
+  useEffect(() => {
+    const d = dialog.current;
+    if (d && !d.contains(document.activeElement)) d.focus();
+  }, [at.value]);
+
   // After a zoom, the point the zoom started from goes back under the pointer.
   useLayoutEffect(() => {
     const el = stage.current, at = anchor.current;
@@ -168,7 +174,7 @@ export function ImageViewer({ images, start, close }: {
   }, []);
 
   return (
-    <dialog class="image-viewer" ref={dialog} aria-label={label} onClose={close}
+    <dialog class="image-viewer" ref={dialog} aria-label={label} onClose={close} tabIndex={-1}
       style={{ width: `${size.w}px`, height: `${size.h}px` }}
       // A click on the backdrop is a click on the dialog itself: outside, so it closes.
       onClick={(event) => { if (event.target === dialog.current) close(); }}

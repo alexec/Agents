@@ -28,6 +28,8 @@ struct ImageViewer: View {
     #if os(macOS)
     @State private var overImage = false
     #endif
+    /// The viewer holds the keys, so ← and → reach it: nothing else in it takes them.
+    @FocusState private var holdsKeys: Bool
 
     init(images: [ViewedImage.Item], start: Int) {
         self.images = images
@@ -55,28 +57,52 @@ struct ImageViewer: View {
         #endif
     }
 
-    /// The previous and the next arrows, and ← and → for them. An arrow at an end is not there.
+    /// ← and → go to the previous and the next image. Held by the viewer itself rather than as
+    /// the arrows' shortcuts: a plain arrow key is not a key equivalent AppKit sends reliably.
+    private func stepsWithKeys<Content: View>(_ content: Content) -> some View {
+        content
+            .focusable()
+            .focusEffectDisabled()
+            .focused($holdsKeys)
+            .onAppear { holdsKeys = true }
+            .onKeyPress(.leftArrow) { step(previous) }
+            .onKeyPress(.rightArrow) { step(following) }
+    }
+
+    private func step(_ target: Int?) -> KeyPress.Result {
+        guard target != nil else { return .ignored }
+        show(target)
+        return .handled
+    }
+
+    /// Dark over the Mac's sheet, light over the Remote's black, as its Done is.
+    #if os(macOS)
+    private static let arrowFill = Color.black.opacity(0.45)
+    #else
+    private static let arrowFill = Color.white.opacity(0.2)
+    #endif
+
+    /// The previous and the next arrows. An arrow at an end is not there.
     private var arrows: some View {
         HStack {
-            arrow(previous, icon: "chevron.left", name: "Previous Image", key: .leftArrow)
+            arrow(previous, icon: "chevron.left", name: "Previous Image", key: "←")
             Spacer(minLength: 0)
-            arrow(following, icon: "chevron.right", name: "Next Image", key: .rightArrow)
+            arrow(following, icon: "chevron.right", name: "Next Image", key: "→")
         }
         .padding(12)
     }
 
-    private func arrow(_ target: Int?, icon: String, name: String, key: KeyEquivalent) -> some View {
+    private func arrow(_ target: Int?, icon: String, name: String, key: String) -> some View {
         Button { show(target) } label: {
             Image(icon: icon)
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
-                .background(.black.opacity(0.45), in: Circle())
+                .background(Self.arrowFill, in: Circle())
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .keyboardShortcut(key, modifiers: [])
-        .help("\(name) (\(key == .leftArrow ? "←" : "→"))")
+        .help("\(name) (\(key))")
         .accessibilityLabel(name)
         .opacity(target == nil ? 0 : 1)
         .disabled(target == nil)
@@ -85,7 +111,7 @@ struct ImageViewer: View {
 
     var body: some View {
         #if os(macOS)
-        VStack(spacing: 0) {
+        stepsWithKeys(VStack(spacing: 0) {
             ZoomingImage(image: image, zoom: zoom, label: label)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay {
@@ -137,11 +163,11 @@ struct ImageViewer: View {
                     .opacity(0)
                     .accessibilityHidden(true)
             }
-        }
+        })
         .frame(minWidth: 480, idealWidth: idealSize.width, minHeight: 360, idealHeight: idealSize.height)
         .presentationSizing(.fitted)
         #else
-        ZStack(alignment: .topTrailing) {
+        stepsWithKeys(ZStack(alignment: .topTrailing) {
             Color.black.ignoresSafeArea()
                 .opacity(1 - min(0.6, max(0, offset.height) / 400))
             // The screen is the window: the image is fitted to all of it.
@@ -171,7 +197,7 @@ struct ImageViewer: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.white.opacity(0.2))
                 .padding()
-        }
+        })
         .statusBarHidden()
         #endif
     }

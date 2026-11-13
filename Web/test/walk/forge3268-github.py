@@ -59,6 +59,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.answer(404, {"message": "Not Found"})
         q, v = b.get("query", ""), b.get("variables", {})
         n = v.get("number")
+        # An item's own query asks for its sub-issues too (`children: subIssues(`), so it goes first.
+        if "issueOrPullRequest" in q:
+            got = None
+            if n in ITEMS:
+                got = {**node(n), "body": ITEMS[n].get("body", ""), "comments": {"pageInfo": {"hasPreviousPage": False, "startCursor": None}, "nodes": []}}
+            return self.answer(200, {"data": {"repository": {"issueOrPullRequest": got}}})
         if "subIssues(" in q:
             if n not in ITEMS:
                 return self.answer(200, {"data": {"repository": {"issue": None}}})
@@ -67,11 +73,6 @@ class Handler(BaseHTTPRequestHandler):
                 {"number": x, "state": ITEMS[x]["state"], "repository": {"nameWithOwner": REPO}} for x in c.get("blockedBy", [])]}}
                 for k, c in ITEMS.items() if c.get("parent") == n]}
             return self.answer(200, {"data": {"repository": {"issue": epic}}})
-        if "issueOrPullRequest" in q:
-            got = None
-            if n in ITEMS:
-                got = {**node(n), "body": ITEMS[n].get("body", ""), "comments": {"pageInfo": {"hasPreviousPage": False, "startCursor": None}, "nodes": []}}
-            return self.answer(200, {"data": {"repository": {"issueOrPullRequest": got}}})
         if "search(" in q:
             ns = [k for k, i in ITEMS.items() if i["state"] == "OPEN"]
             return self.answer(200, {"data": {"search": {"pageInfo": {"hasNextPage": False, "endCursor": None},

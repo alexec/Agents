@@ -1162,22 +1162,24 @@ dialog.image-viewer {
   overflow: hidden;
 }
 dialog.image-viewer[open] { display: flex; flex-direction: column; }
+/* The viewer holds the focus after a step (#4954); it draws no ring for that. */
+dialog.image-viewer:focus { outline: none; }
 dialog.image-viewer::backdrop { background: color-mix(in srgb, var(--paper-scrim) 45%, transparent); }
 /* The image, with the previous and the next arrows over its sides (#4954). */
 .image-viewer-frame { position: relative; flex: 1; min-height: 0; display: flex; }
 .image-viewer-stage { flex: 1; min-height: 0; display: flex; overflow: auto; touch-action: none; user-select: none; }
-.image-viewer-arrow {
+dialog.image-viewer .image-viewer-arrow {
   position: absolute; top: 50%; transform: translateY(-50%);
   width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%;
   font-size: 28px; line-height: 40px; color: var(--paper-on-fill);
   background: color-mix(in srgb, var(--paper-scrim) 55%, transparent);
   opacity: 0; transition: opacity 150ms ease-out; cursor: pointer;
 }
-.image-viewer-arrow.previous { left: 12px; }
-.image-viewer-arrow.next { right: 12px; }
-.image-viewer-frame:hover .image-viewer-arrow, .image-viewer-arrow:focus-visible { opacity: 1; }
+dialog.image-viewer .image-viewer-arrow.previous { left: 12px; }
+dialog.image-viewer .image-viewer-arrow.next { right: 12px; }
+dialog.image-viewer .image-viewer-frame:hover .image-viewer-arrow, dialog.image-viewer .image-viewer-arrow:focus-visible { opacity: 1; }
 /* A touch screen has no pointer to be over the image: the arrows show always. */
-@media (hover: none) { .image-viewer-arrow { opacity: 1; } }
+@media (hover: none) { dialog.image-viewer .image-viewer-arrow { opacity: 1; } }
 .image-viewer-bar .counter { flex: none; font-variant-numeric: tabular-nums; }
 .image-viewer-stage.zoomed { cursor: grab; }
 .image-viewer-stage.zoomed:active { cursor: grabbing; }
