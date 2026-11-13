@@ -12,7 +12,7 @@ import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import {
   cooldownSentence, labelsNote, mcpMissedWords, mcpTriggerWords, agentModeWords, unknownLines, isUnapproved, canBeApproved, canBeDenied, workflowStatusLines, takeReadyMadeTitle, takeReadyMadeHelp, keepEditedTitle, keepEditedHelp, isOn, isSupportedTrigger, switchesSentence, scopeSentence, lastRanLine, nextLine, resumedAgent, scopeLine, triggerFilters, triggerGlyph,
-  runsOnParts, triggerSummary, workflowRunsOnSentence, workflowHostChoices, workflowSummary,
+  runsOnParts, triggerSummary, workflowRunsOnSentence, workflowHostChoices, workflowSummary, alarmOf,
 } from "../model/workflows";
 import { go } from "../route";
 import { RunNow } from "./WorkflowRow";
@@ -258,7 +258,7 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
                         {scope && <span class="quiet small">{scope}</span>}
                         {workflow.mode === "triggering" && isSupportedTrigger(trigger) && <span class="quiet small">{resumedAgent(trigger)}</span>}
                       </span>
-                      {"schedule" in trigger && <span class="next quiet small">{nextLine(summary, index)}</span>}
+                      {("schedule" in trigger || alarmOf(trigger)) && <span class="next quiet small">{nextLine(summary, index)}</span>}
                     </li>
                   );
                 })}

@@ -763,6 +763,20 @@ func wakeWords(e wire.Event, extra int) string {
 
 func timedOutWords(w *wire.EventWait, at wire.Date) string {
 	if isTimeWait(w) {
+		// A time that came while the Mac was off or asleep, or Agents stopped (#4966): past
+		// the grace, the agent hears that it passed, and how late it is.
+		if w.Deadline != nil {
+			late := at.Time().Sub(w.Deadline.Time())
+			if late > onceGrace {
+				return "The time you asked for (" + clock(*w.Deadline) + ") passed while Agents was off or the Mac was asleep: it is now " +
+					clock(at) + ", " + lateWords(late) + " late. Check the state of what you were waiting for now: what you meant to do " +
+					"at that time may no longer fit, so carry on, wait again, or tell the person."
+			}
+			if late >= time.Minute {
+				return "The time you asked for has come (" + clock(*w.Deadline) + "), " + lateWords(late) + " late, as Agents was off or the Mac " +
+					"was asleep. Check the state of what you were waiting for now, then carry on or wait again."
+			}
+		}
 		return "The time you asked for has come (" + clock(at) + "). Check the state of what you were waiting for now, " +
 			"then carry on or wait again."
 	}
@@ -1521,6 +1535,16 @@ func (d *Daemon) armWaitTimer() {
 		return
 	}
 	d.waitTimer = time.AfterFunc(max(0, time.Until(*next))+20*time.Millisecond, d.waitDeadlinesPassed)
+}
+
+// waitDeadlineDue says an open wait's deadline has come by at.
+func (d *Daemon) waitDeadlineDue(at time.Time) bool {
+	for _, a := range d.Store.LiveAgents() {
+		if w := a.EventWait; w != nil && w.Ending == nil && w.Deadline != nil && !w.Deadline.Time().After(at) {
+			return true
+		}
+	}
+	return false
 }
 
 // waitDeadlinesPassed ends every open wait whose deadline has come, timed out: an open call

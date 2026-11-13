@@ -43,7 +43,53 @@ export function scheduleSummary(s: WorkflowSchedule): string {
 }
 
 function isSupported(trigger: WorkflowTriggerStored): boolean {
-  return !("unrecognised" in trigger) || isEvent(trigger);
+  return !("unrecognised" in trigger) || isEvent(trigger) || alarmOf(trigger) !== null;
+}
+
+/** WorkflowAlarm (#4966): a one-time trigger, `once:`, which goes as `unrecognised` named "once". */
+export interface Alarm { at: string; timeZone: string | null; grace: string | null; due: Date | null }
+
+export function alarmOf(trigger: WorkflowTriggerStored): Alarm | null {
+  if (!("unrecognised" in trigger) || trigger.unrecognised.name !== "once") return null;
+  const keys = trigger.unrecognised.keys;
+  const text = (k: string) => (typeof keys[k] === "string" ? (keys[k] as string) : null);
+  const at = text("at");
+  if (!at) return null;
+  const due = text("due");
+  return { at, timeZone: text("time-zone"), grace: text("grace"), due: due ? new Date(due) : null };
+}
+
+/** WorkflowAlarm.lengthWords: "12 minutes", "2 hours 5 minutes", "3 days". */
+export function lengthWords(seconds: number): string {
+  const m = Math.round(seconds / 60);
+  const unit = (n: number, one: string) => (n === 1 ? `1 ${one}` : `${n} ${one}s`);
+  if (m < 1) return "less than a minute";
+  if (m < 60) return unit(m, "minute");
+  if (m < 48 * 60) return m % 60 === 0 ? unit(m / 60, "hour") : `${unit(Math.floor(m / 60), "hour")} ${unit(m % 60, "minute")}`;
+  return unit(Math.round(m / 1440), "day");
+}
+
+/** `grace:` in seconds, as `cooldown:` reads it; an hour when it says none or cannot be read. */
+function graceSeconds(grace: string | null): number {
+  const t = (grace ?? "").replace(/\s/g, "");
+  if (!/^(\d+[mhd])+$/.test(t)) return 3600;
+  let total = 0;
+  for (const [, n, u] of t.matchAll(/(\d+)([mhd])/g)) total += Number(n) * ({ m: 60, h: 3600, d: 86400 } as Record<string, number>)[u!]!;
+  return total || 3600;
+}
+
+/** WorkflowAlarm.summary. */
+export function alarmSummary(a: Alarm): string {
+  let where = a.timeZone ? ` (${a.timeZone})` : " in your time zone";
+  if (/(Z|[+-]\d\d:\d\d)$/.test(a.at)) where = "";
+  return `Once, at ${a.at.replace("T", " ")}${where}, or up to ${lengthWords(graceSeconds(a.grace))} late`;
+}
+
+/** WorkflowAlarm.lateness: "on time" or "12 minutes late"; null when the cause does not say. */
+export function alarmLateness(a: Alarm, firedAt: Date): string | null {
+  if (!a.due) return null;
+  const late = (firedAt.getTime() - a.due.getTime()) / 1000;
+  return late < 60 ? "on time" : `${lengthWords(late)} late`;
 }
 
 /** An event trigger, as the wire carries it: `unrecognised` with a dotted name (042 FR-025). */
@@ -151,6 +197,8 @@ export function eventMeaning(name: string): string {
 /** WorkflowTrigger.summary, with an event said by its catalogue meaning and filters in words. */
 export function triggerSummary(trigger: WorkflowTriggerStored): string {
   if ("schedule" in trigger) return scheduleSummary(trigger.schedule._0);
+  const alarm = alarmOf(trigger);
+  if (alarm) return alarmSummary(alarm);
   const { name } = trigger.unrecognised;
   const server = serverEvent(trigger);
   if (server) return serverEventSummary(server);
@@ -423,7 +471,7 @@ export function listensIn(trigger: WorkflowTriggerStored): "mac" | "folder" | "e
 
 /** "In work, on this Mac", as the window's scopeLine says it; null for nothing to say. */
 export function scopeLine(trigger: WorkflowTriggerStored, folder: string, host: string): string | null {
-  if ("schedule" in trigger) return `By the clock on ${host}`;
+  if ("schedule" in trigger || alarmOf(trigger)) return `By the clock on ${host}`;
   switch (listensIn(trigger)) {
     case "folder": return `In ${folder}, on ${host}`;
     case "mac": return `Anywhere on ${host}, so it runs in every folder`;
@@ -434,7 +482,7 @@ export function scopeLine(trigger: WorkflowTriggerStored, folder: string, host: 
 
 /** WorkflowTrigger.resumedAgent: which agent a `triggering` run resumes. */
 export function resumedAgent(trigger: WorkflowTriggerStored): string {
-  if ("schedule" in trigger) return "A clock has no agent to resume, so this never runs it";
+  if ("schedule" in trigger || alarmOf(trigger)) return "A clock has no agent to resume, so this never runs it";
   if (!isEvent(trigger)) return "Never runs it";
   if (serverEvent(trigger)) return "A server's events are about no agent, so this never runs it";
   const name = trigger.unrecognised.name;
@@ -449,6 +497,7 @@ export function resumedAgent(trigger: WorkflowTriggerStored): string {
 /** The symbol beside a trigger, as a glyph (the window's symbol(for:)). */
 export function triggerGlyph(trigger: WorkflowTriggerStored): string {
   if ("schedule" in trigger) return "⏰\uFE0E";
+  if (alarmOf(trigger)) return "📅\uFE0E";
   if (!("unrecognised" in trigger)) return "●";
   if (!isEvent(trigger)) return "?";
   const subject = trigger.unrecognised.name.split(".")[0];
@@ -489,6 +538,7 @@ export function causePhrase(cause: WorkflowCause): string {
   if ("byHand" in cause) return "by hand, with Run now";
   const trigger = cause.trigger._0;
   if ("schedule" in trigger) return "on its schedule";
+  if (alarmOf(trigger)) return "by its one-time alarm";
   const server = serverEvent(trigger);
   if (server) return `on ${server.name}`;
   if (isEvent(trigger) && "unrecognised" in trigger) {
@@ -501,8 +551,13 @@ export function causePhrase(cause: WorkflowCause): string {
 /** "Last ran 2 hours ago, on its schedule", or that it has not. */
 export function lastRanLine(summary: WorkflowSummary, now = new Date()): string {
   if (summary.lastFiredAt === undefined) return "Has not run yet.";
-  const when = `Last ran ${namedRelative(fromWireDate(summary.lastFiredAt), now)}`;
-  return summary.lastFiredBy ? `${when}, ${causePhrase(summary.lastFiredBy)}` : when;
+  const firedAt = fromWireDate(summary.lastFiredAt);
+  const when = `Last ran ${namedRelative(firedAt, now)}`;
+  if (!summary.lastFiredBy) return when;
+  // An alarm's run also says how late it fired (#4966).
+  const alarm = "trigger" in summary.lastFiredBy ? alarmOf(summary.lastFiredBy.trigger._0) : null;
+  const late = alarm ? alarmLateness(alarm, firedAt) : null;
+  return `${when}, ${causePhrase(summary.lastFiredBy)}${late ? `, ${late}` : ""}`;
 }
 
 /** The person's workflow limit is applied separately in each folder (#506). */

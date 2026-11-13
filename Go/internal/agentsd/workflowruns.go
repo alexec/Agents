@@ -705,6 +705,8 @@ func (d *Daemon) runPrompt(w wire.Workflow, fr fireRequest) string {
 		text += started + "the agent " + d.agentWords(*fr.byAgent) + " (id " + string(*fr.byAgent) + ") ran it.)"
 	case fr.byHand:
 		text += started + "the person ran it by hand, with Run now.)"
+	case fr.trigger.Unrecognised != nil && fr.trigger.Unrecognised.Name == onceTrigger:
+		text += started + alarmPromptWords(fr, d.personZone(), time.Now())
 	case fr.trigger.Schedule != nil && fr.dueAt != nil:
 		text += started + "of its schedule: the " + fr.dueAt.Local().Format("15:04") + " run.)"
 	case fr.trigger.Schedule != nil:
@@ -1074,7 +1076,17 @@ func (d *Daemon) workflowTickOnce(at time.Time) {
 			}
 		}
 	}
+	alarms := d.alarmsDueLocked(at)
 	d.workflowMu.Unlock()
+	for _, of := range alarms {
+		of := of
+		safe.Go("workflow alarm", func() { d.runAlarm(of) })
+	}
+	// A wait's timer does not count the time the Mac slept: the clock, which reads the
+	// wall, ends the waits whose time came meanwhile (#4966).
+	if d.waitDeadlineDue(at) {
+		d.waitDeadlinesPassed()
+	}
 	for k := range held {
 		folder, id := k[:strings.LastIndex(k, "/")], k[strings.LastIndex(k, "/")+1:]
 		if !d.runningOf(folder, id) {
