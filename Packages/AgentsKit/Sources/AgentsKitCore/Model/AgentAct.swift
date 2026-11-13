@@ -7,6 +7,8 @@ public enum AgentAct: Sendable, Hashable {
     case archive
     /// A queued prompt sent into the running turn, by its id.
     case sendNow(UUID)
+    /// A queued session started at once, past the running limit (#5156).
+    case startNow
 
     /// The change it draws on the agent's record before the host answers (#4786).
     public var write: AgentWrite {
@@ -14,6 +16,7 @@ public enum AgentAct: Sendable, Hashable {
         case .stop: return .stop
         case .archive: return .archive
         case .sendNow(let promptID): return .sendNow(promptID)
+        case .startNow: return .startNow
         }
     }
 
@@ -23,6 +26,7 @@ public enum AgentAct: Sendable, Hashable {
         case .stop: return "Stopping"
         case .archive: return "Archiving"
         case .sendNow: return "Sending"
+        case .startNow: return "Starting"
         }
     }
 }

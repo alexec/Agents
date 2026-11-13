@@ -1594,13 +1594,13 @@ export class Work {
 }
 
 /** Something a person asked of a whole agent, on its way to its host (#87; AgentAct.swift). */
-export type AgentAct = "agents/stop" | "agents/archive" | "agents/unarchive"
+export type AgentAct = "agents/stop" | "agents/archive" | "agents/unarchive" | "agents/startNow"
   | { sendNow: string };
 
 /** What the pending mark says it is doing, before "telling your Mac" (AgentAct.doing). */
 export function actDoing(act: AgentAct): string {
   if (typeof act !== "string") return "Sending";
-  return { "agents/stop": "Stopping", "agents/archive": "Archiving", "agents/unarchive": "Unarchiving" }[act];
+  return { "agents/stop": "Stopping", "agents/archive": "Archiving", "agents/unarchive": "Unarchiving", "agents/startNow": "Starting" }[act];
 }
 
 /** Telling.words: "Archiving — telling your Mac", or "telling your Mac" beside a button that says what. */
@@ -3911,6 +3911,13 @@ export class Store extends Work {
   async continueWhenBack(host: string, agentID: string, on: boolean): Promise<void> {
     const agent = await this.act(on ? "agents/continueWhenBack" : "agents/cancelContinue", { agentID: agentID as UUID }, host);
     if (agent) this.apply("agent/changed", agent, host);
+  }
+
+  /** Start now (#5156): a queued session at once, past the running limit; the host refuses it past the total, and says why. */
+  async startNow(host: string, agentID: string): Promise<void> {
+    const write: AgentWrite = { kind: "startNow" };
+    await this.acting(agentID, "agents/startNow", () => this.optimistic(host, agentID, write, async () =>
+      await this.act("agents/startNow", { agentID: agentID as UUID }, host, write) !== null));
   }
 
   async sendNow(host: string, agentID: string, promptID: string): Promise<void> {

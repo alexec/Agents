@@ -369,6 +369,8 @@ public extension DaemonAPI {
                 Row(Method.agentsBranchFrom, params: BranchFromRequest.self, result: UUID.self, kind: .hostRequest),
                 Row(Method.agentsPrewarm, params: PrewarmRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsUnarchive, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
+                // Start now (#5156): a queued session, at once, by the person's click.
+                Row(Method.agentsStartNow, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsSetLabels, params: SetLabelsRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetCeiling, params: SetCeilingRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetSandbox, params: SetSandboxRequest.self, result: Agent.self, kind: .hostRequest),

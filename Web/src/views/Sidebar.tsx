@@ -1064,7 +1064,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
     // Beside this tab or in a window of its own (#826), as the Mac's Open in New Window.
     { label: "Open in New Tab", help: "Open this session in a new browser tab", run: () => openInNewTab(host, agent) },
     ...sessionActions(agent, store.sessionPinsIn(host, folder).includes(agent.id), startedBy(store, host, agent),
-      store.has(host, Capability.mute1), canMoveOn(store, host)).map(({ action, label: words, help, shortcut }) => ({
+      store.has(host, Capability.mute1), canMoveOn(store, host), store.has(host, Capability.agentsStartNow1)).map(({ action, label: words, help, shortcut }) => ({
       label: words, help, disabled: down || !!store.onItsWay.value[agent.id], ...shortcut ? { shortcut } : {},
       run: () => runSessionAction(store, host, agent, action),
     })),

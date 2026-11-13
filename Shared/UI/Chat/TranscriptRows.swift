@@ -1074,6 +1074,39 @@ struct QuietLine: View {
     }
 }
 
+/// Start now under a queued session (#5156): it starts at once, past the running limit, as
+/// Send now sends a queued prompt at once. While it goes, it says so and holds.
+struct StartNowLine: View {
+    let agentID: UUID
+    let startNow: @MainActor (UUID) async -> Void
+    @Environment(\.chatActions) private var actions
+
+    var body: some View {
+        let acting = actions.acting(agentID)
+        let going = acting == .startNow
+        Button {
+            Task { await startNow(agentID) }
+        } label: {
+            Group {
+                if going {
+                    Telling(host: actions.recipient(agentID), doing: acting?.doing)
+                } else {
+                    Label(HelperLimit.startNowLabel, icon: "play")
+                        .appText(.supporting)
+                }
+            }
+            #if os(iOS)
+            .frame(minHeight: 44)
+            .contentShape(.rect)
+            #endif
+        }
+        .buttonStyle(.borderless)
+        .disabled(acting != nil)
+        .help(HelperLimit.startNowHelp)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 /// The chat is being picked back up by the daemon, and nobody typed for it.
 struct ComingBackLine: View {
     var body: some View {

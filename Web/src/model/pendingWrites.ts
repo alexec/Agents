@@ -14,7 +14,8 @@ export type AgentWrite =
   | { kind: "rename"; title: string }
   | { kind: "labels"; add: string[]; remove: string[] }
   | { kind: "mute"; muted: boolean }
-  | { kind: "sendNow"; promptID: string };
+  | { kind: "sendNow"; promptID: string }
+  | { kind: "startNow" };
 
 /** The verb for the line that says what failed: "Could not archive". */
 export function writeVerb(write: AgentWrite): string {
@@ -22,6 +23,7 @@ export function writeVerb(write: AgentWrite): string {
     case "labels": return "change the labels";
     case "mute": return write.muted ? "mute" : "unmute";
     case "sendNow": return "send now";
+    case "startNow": return "start it now";
     default: return write.kind;
   }
 }
@@ -88,6 +90,8 @@ export function applyWrite(agent: Agent, write: AgentWrite, now = new Date()): A
       return { ...agent, isMuted: write.muted };
     case "sendNow":
       return { ...agent, queuedPrompts: (agent.queuedPrompts ?? []).filter((p) => p.id !== (write.promptID as UUID)) };
+    case "startNow":
+      return agent.state === "queued" ? { ...agent, state: "starting" } : agent;
   }
 }
 
@@ -107,6 +111,7 @@ export function isSettled(agent: Agent, write: AgentWrite): boolean {
     }
     case "mute": return !!agent.isMuted === write.muted;
     case "sendNow": return !(agent.queuedPrompts ?? []).some((p) => p.id === (write.promptID as UUID));
+    case "startNow": return agent.state !== "queued";
   }
 }
 

@@ -472,6 +472,10 @@ struct ChatTranscript: View {
                 if let leases = actions.leaseStatus(agent.id)?.without(agent.eventWait) {
                     LeaseLine(status: leases, open: actions.openLease)
                 }
+                // A queued session the person may start at once (#5156).
+                if HelperLimit.canStartNow(agent), let startNow = actions.startNow {
+                    StartNowLine(agentID: agent.id, startNow: startNow)
+                }
                 // A queued start the machine holds says why, as a lease's wait does (#4748).
                 if let start = actions.capacityStart(agent) {
                     Text(start)

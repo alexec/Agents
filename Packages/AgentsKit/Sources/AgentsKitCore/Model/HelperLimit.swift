@@ -100,6 +100,17 @@ public enum HelperLimit {
         return "Queued, \(ordinal(position))"
     }
 
+    /// Start now (#5156): the person starts a queued session at once, past the running
+    /// limit, in all three clients' row menus and chats.
+    public static let startNowLabel = "Start Now"
+    public static let startNowHelp = "Start this session now, ahead of the queue and past the running limit"
+
+    /// Whether Start now is offered: a session an agent started that waits in the queue.
+    /// The host still refuses it when the folder's total is full, and says why.
+    public static func canStartNow(_ agent: Agent) -> Bool {
+        agent.state == .queued && agent.startedByAgent != nil
+    }
+
     public static func ordinal(_ n: Int) -> String {
         let tens = n % 100
         let suffix = (11...13).contains(tens) ? "th"

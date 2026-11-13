@@ -5570,6 +5570,17 @@ final class RemoteModel {
                   DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
     }
 
+    /// Start now (#5156): a queued session started at once, past the running limit, by the
+    /// person's tap. The Mac refuses it when the folder's total is full, and says why.
+    func startNow(_ agentID: UUID) async {
+        await act(.startNow, on: agentID, DaemonAPI.Method.agentsStartNow, DaemonAPI.AgentRequest(agentID: agentID))
+    }
+
+    /// Whether Start now is offered on this session: queued by an agent, on a host that has it.
+    func canStartNow(_ agent: Agent) -> Bool {
+        HelperLimit.canStartNow(agent) && self.agent(agent.id, has: Capability.agentsStartNow1)
+    }
+
     /// What a command an agent ran has printed, as far as this phone heard it.
     func terminalOutput(_ terminalID: String) -> String { work.terminalOutput[terminalID] ?? "" }
 
@@ -6018,7 +6029,9 @@ final class RemoteModel {
             // that host is away (#208).
             try await sendOnce(method, request)
             return true
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.folderGone {
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.folderGone
+                    || error.code == DaemonAPI.Failure.notAllowed {
+            // The Mac's own reason: a folder gone, or Start now past the total (#5156).
             problem = error.message
             return false
         } catch {

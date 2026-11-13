@@ -42,6 +42,10 @@ func (d *Daemon) registerAgents() {
 	On(d, wire.CallAgentsSendNow, func(ctx context.Context, c *Client, r wire.UnqueueRequest) (wire.Empty, error) {
 		return wire.Empty{}, d.sendNow(ctx, r)
 	})
+	On(d, wire.CallAgentsStartNow, func(ctx context.Context, c *Client, r wire.AgentRequest) (wire.Empty, error) {
+		d.actedOn(r.AgentID, c.actor())
+		return wire.Empty{}, d.startNow(r.AgentID)
+	})
 	On(d, wire.CallAgentsRename, func(ctx context.Context, c *Client, r wire.RenameRequest) (wire.Agent, error) {
 		return d.rename(r)
 	})

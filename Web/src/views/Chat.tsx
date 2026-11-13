@@ -47,7 +47,7 @@ import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { ViewDiff } from "./chat/ViewDiff";
 import { offerStart } from "./NewAgent";
 import { BackToList } from "./BackToList";
-import { comingBackDescription, footStatusWords } from "../model/status";
+import { canStartNow, comingBackDescription, footStatusWords, startNowHelp, startNowLabel } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { DesktopControlPauseCard } from "./DesktopControlPauseCard";
 import { SecretUseCard } from "./SecretUseCard";
@@ -668,6 +668,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             live region reads a change to its text, not to an aria-label, nor a node just drawn (#2391). */}
         <p class="visually-hidden" role="status">{agent ? footStatusWords(agent, store.isComingBack(host, agent.id)) : ""}</p>
         {/* What it holds and waits for in line: what the agent is doing now, as the working line says (#2344). */}
+        {/* A queued session the person may start at once (#5156), as Send now sends a queued prompt. */}
+        {agent && <StartNowLine store={store} host={host} agent={agent} disabled={down} />}
         {agent && <LeaseLine store={store} host={host} agent={agent} />}
         {/* After all of it, where the reader is (#1995). */}
         {cards.length > 0 && (
@@ -883,6 +885,19 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
  * What the open agent holds and waits for in line, with the working line (036; LeaseLine.swift,
  * #2344): one line each, a way to the Resources on its machine's page (#3629), with a chevron and a row's hit area (#2448). What it waits for on events is a card (#1995).
  */
+function StartNowLine({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent; disabled: boolean }) {
+  if (!canStartNow(agent) || !store.has(host, Capability.agentsStartNow1)) return null;
+  const acting = store.onItsWay.value[agent.id];
+  return (
+    <div class="start-now">
+      {acting === "agents/startNow" ? <Telling recipient={store.recipient(host)} doing="Starting" /> : (
+        <button class="link" disabled={disabled || !!acting} title={startNowHelp}
+          onClick={() => void store.startNow(host, agent.id)}>▶ {startNowLabel}</button>
+      )}
+    </div>
+  );
+}
+
 function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
   // A place in line that the wait card says is left to the card (#2361).
   const leases = leaseMark(agent.id, store.leases.value[host], (id) => store.agent(host, id)?.title, lineResource(agent));
