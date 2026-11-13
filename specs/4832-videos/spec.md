@@ -220,7 +220,7 @@ row above.
 next take starts only after Alex's watch of the one before it. A lesson from one rework then
 is in every later script, not found again in each.
 
-**The short set for 1.0**, eight videos after F1 (done), in this order:
+**The short set for 1.0**, nine videos after F1 (done), in this order (Alex approved this catalogue, 2026-11-12, by a form on #5074):
 
 | Order | Video | Size | Why here |
 |---|---|---|---|
