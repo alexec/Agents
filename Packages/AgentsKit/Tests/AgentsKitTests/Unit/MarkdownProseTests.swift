@@ -15,10 +15,11 @@ struct MarkdownProseTests {
         #expect(MarkdownBlock.segments(blocks) == [.prose(0..<1), .block(1), .prose(2..<4)])
     }
 
-    @Test func aListWithCodeInItIsNotProse() {
+    @Test func aListWithCodeInItIsNotProse() throws {
         let blocks = MarkdownBlock.parse("- step\n\n  ```\n  make\n  ```\n- done")
+        let list = try #require(blocks.first)
         #expect(blocks.count == 1)
-        #expect(!blocks[0].isProse)
+        #expect(!list.isProse)
         #expect(MarkdownBlock.segments(blocks) == [.block(0)])
     }
 
