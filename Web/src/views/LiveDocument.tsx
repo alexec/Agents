@@ -12,7 +12,7 @@ import { describe } from "../model/errors";
 import { idle, reveal, shown as shownOf, skip, tick, typingTick, type Caret } from "../model/caret";
 import { pictureFromReading } from "../model/pageImage";
 import { indexContaining, merge, split, type Passage } from "../model/passages";
-import { Markdown, type PageImages } from "../render/markdown";
+import { Markdown, type PageImages, type PageLinks } from "../render/markdown";
 import { nameOf } from "./files/paneState";
 import { usePageZoom } from "./files/pageZoomKeys";
 
@@ -49,8 +49,12 @@ export interface PageSource {
   readOnly?: boolean | undefined;
 }
 
-export function LiveDocument({ store, host, agentID, path, line, source }: {
+/** Where a file a link on the page names opens (#5068); a file `takes` refuses stays words. */
+export type OpenPageFile = Omit<PageLinks, "document">;
+
+export function LiveDocument({ store, host, agentID, path, line, source, opens }: {
   store: Store; host: string; agentID: string; path: string; line?: number | undefined; source?: PageSource | undefined;
+  opens?: OpenPageFile | undefined;
 }) {
   const loaded = useSignal<Loaded>({ kind: "reading" });
   const editing = useSignal<Editing | null>(null);
@@ -221,6 +225,16 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
     if (el && document.activeElement !== el) el.focus();
   };
 
+  // A relative link is read against this page (#5068). The same object while the page is the same,
+  // so a passage is not drawn again for it; it reads the latest `opens` when clicked.
+  const opener = useRef(opens);
+  opener.current = opens;
+  const hasOpens = !!opens;
+  const links: PageLinks | undefined = useMemo(() => (hasOpens ? {
+    document: path,
+    open: (file) => opener.current?.open(file),
+    takes: (file) => opener.current?.takes?.(file) ?? true,
+  } : undefined), [path, hasOpens]);
   // Pictures beside this page, read again when its folder changes. A remote one stays a placeholder.
   const images: PageImages = useMemo(() => ({
     document: path,
@@ -241,7 +255,7 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
       {theirs.value && (
         <div class="note switch" role="status">
           <p class="strong">The agent changed this passage while you were typing. What it wrote:</p>
-          <div class="quiet"><Markdown text={theirs.value} images={images} /></div>
+          <div class="quiet"><Markdown text={theirs.value} images={images} links={links} /></div>
           <button class="link" onClick={() => (theirs.value = null)}>OK</button>
         </div>
       )}
@@ -273,7 +287,7 @@ export function LiveDocument({ store, host, agentID, path, line, source }: {
                   open(passage, index);
                 }
               }}>
-              <Markdown text={shownOf(caret.value, index, passage.source)} images={images} />
+              <Markdown text={shownOf(caret.value, index, passage.source)} images={images} links={links} />
             </div>
           );
         })}
