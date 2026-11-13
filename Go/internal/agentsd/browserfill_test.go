@@ -29,6 +29,7 @@ type fillPage struct {
 	noMask   bool   // the page will not let the field be masked
 	navigate bool   // the page went somewhere else
 	site     string // the field's domain, shop.example.com when left out
+	noCheck  bool   // the filled check fails, as on a page that is closing
 }
 
 func (p *fillPage) callTool(_ context.Context, name string, args map[string]json.RawMessage) (*mcp.CallToolResult, error) {
@@ -53,6 +54,8 @@ func (p *fillPage) callTool(_ context.Context, name string, args map[string]json
 		case fn == maskField:
 			p.filled = true
 			return text("### Result\n\"agents-masked\""), nil
+		case fn == filledCheck && p.noCheck:
+			return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: "Error: page closed"}}}, nil
 		case fn == filledCheck && p.filled && !p.navigate:
 			return text("### Result\n\"agents-filled\""), nil
 		case fn == filledCheck:
@@ -169,6 +172,48 @@ func TestFillSecretTypesTheValueAndNeverSaysIt(t *testing.T) {
 	}
 	// The record has the name and the field, never the value.
 	assertNotUnder(t, d.Store.Loc.Root, filledValue)
+}
+
+// One lane's fill does not hold every lane's screenshot files until Chromium stops (#5186):
+// a screenshot's file is refused only on a page with a filled field, or when the check
+// cannot tell; a file of text stays refused while any value is filled, and says what
+// clears it.
+func TestAScreenshotFileIsRefusedOnlyOnAFilledPage(t *testing.T) {
+	m, page, _ := fillSetUp(t, map[string]string{"GITLAB_PASSWORD": filledValue})
+	if r := m.browserTool(2, "fill_secret", map[string]any{"secret": "GITLAB_PASSWORD", "target": "e12"}); r.IsError {
+		t.Fatalf("%+v", r)
+	}
+	shot := map[string]any{"filename": "build/web-login.png"}
+	if r := m.browserTool(3, "browser_take_screenshot", shot); !r.IsError || !strings.Contains(replyText(r), "navigate away") {
+		t.Fatalf("%+v", r)
+	}
+	// The element's own page is checked when the screenshot names one.
+	if r := m.browserTool(4, "browser_take_screenshot", map[string]any{"filename": "f.png", "target": "e12", "element": "Password field"}); !r.IsError {
+		t.Fatalf("%+v", r)
+	}
+	page.mu.Lock()
+	last := page.calls[len(page.calls)-1]
+	page.mu.Unlock()
+	if string(last["target"]) != `"e12"` {
+		t.Fatalf("%s", last["target"])
+	}
+	m.browserTool(5, "browser_navigate", map[string]any{"url": "https://example.com"})
+	if r := m.browserTool(6, "browser_take_screenshot", shot); r.IsError {
+		t.Fatalf("%+v", r)
+	}
+	if got := page.asked(); got[len(got)-1] != "browser_take_screenshot" {
+		t.Fatal(got)
+	}
+	page.mu.Lock()
+	page.noCheck = true
+	page.mu.Unlock()
+	if r := m.browserTool(7, "browser_take_screenshot", shot); !r.IsError {
+		t.Fatalf("%+v", r)
+	}
+	if r := m.browserTool(8, "browser_snapshot", map[string]any{"filename": "page.yml"}); !r.IsError ||
+		!strings.Contains(replyText(r), "once the browser stops, after 15 minutes") {
+		t.Fatalf("%+v", r)
+	}
 }
 
 func TestFillSecretAsksForAMissingSecretFirst(t *testing.T) {
