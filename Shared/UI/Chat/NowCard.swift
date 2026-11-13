@@ -264,7 +264,7 @@ private struct GoalRow: View {
 
     var body: some View {
         Button {
-            withAnimation(ResponseMotion.response) { isExpanded.toggle() }
+            openOrClose($isExpanded)
         } label: {
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -326,7 +326,7 @@ private struct PlanRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(ResponseMotion.response) { isExpanded.toggle() }
+                openOrClose($isExpanded)
             } label: {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -400,12 +400,28 @@ struct PlanLine: View {
     }
 }
 
+/// Opens or closes a row of the top card. On the Mac it is not animated (#5189): the card
+/// is the chat's top safe-area inset, and an animated inset re-measured the transcript's
+/// scroll view on every frame of the animation. While a turn ran, AppKit's layout pass
+/// then never settled ("more Update Constraints in Window passes than there are views"),
+/// and the window quit. The chevron still turns with the motion; a rotation changes no
+/// layout. On the phone and iPad the inset is UIKit's, which settles, so it eases there.
+@MainActor
+private func openOrClose(_ isOpen: Binding<Bool>) {
+    #if os(macOS)
+    isOpen.wrappedValue.toggle()
+    #else
+    withAnimation(ResponseMotion.response) { isOpen.wrappedValue.toggle() }
+    #endif
+}
+
 @MainActor
 private func chevron(_ isOpen: Bool) -> some View {
     Image(icon: "chevron.right")
         .appText(.fine)
         .foregroundStyle(.secondary)
         .rotationEffect(.degrees(isOpen ? 90 : 0))
+        .animation(ResponseMotion.response, value: isOpen)
         .accessibilityHidden(true)
 }
 
