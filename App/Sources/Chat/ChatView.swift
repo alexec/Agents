@@ -391,6 +391,32 @@ struct ChatView: View {
                 })
             }
         }
+        // The sandbox failure it waits on, once in the transcript, is an Ask here (#5031).
+        if let record = agent.pendingSandboxFailure, let keepStopped = sandboxAnswer(carryOn: false) {
+            cards.append(WaitingCard(id: "sandbox:" + agent.id.uuidString) {
+                SandboxAsk(record: record, setBy: model.sandboxSettings.setBy,
+                           keepStopped: keepStopped, continueWithout: sandboxAnswer(carryOn: true))
+                    .chatColumn()
+                    .disabled(selectedHostOffline)
+                    .help(selectedHostOffline ? offlineHelp : "")
+            })
+        }
+        // A policy stop that can still be raised, once in the transcript, is an Ask here (#5031).
+        if let askForMore = chatActions.askForMore,
+           let stop = PolicyStopAsks.shared.raisable((popped?.work ?? model.work).entries, agent: agent) {
+            cards.append(WaitingCard(id: "policy:" + stop.id.uuidString) {
+                PolicyStopAsk(refusal: stop.refusal, entryID: stop.id, askForMore: askForMore,
+                              openPolicy: chatActions.openPolicy)
+                    .chatColumn()
+            })
+        }
+        // A view's Show or Send, once in its row, is an Ask here (#5031).
+        for host in views.asking {
+            cards.append(WaitingCard(id: "view:" + host.call.id.uuidString) {
+                AppViewAsk(host: host)
+                    .chatColumn()
+            })
+        }
         // An ask to be archived waits the same way, last when asked at once (#827).
         if agent.asksToArchive {
             cards.append(WaitingCard(id: "archive:" + agent.id.uuidString) {
@@ -407,7 +433,7 @@ struct ChatView: View {
         // (#4141), also from a chat in a window of its own.
         let liveFrames = model.work.liveFrames.filter { $0.value.frame.agentID == agent.id }
         if agent.state == .running, !liveFrames.isEmpty {
-            cards.append(WaitingCard(id: "live:" + agent.id.uuidString) {
+            cards.append(WaitingCard(id: "live:" + agent.id.uuidString, asks: false) {
                 LiveTile(frames: liveFrames, open: { [openWindow] source in
                     openWindow(id: TakeOverKey.sceneID, value: TakeOverKey(agentID: agent.id, source: source))
                 })
@@ -428,7 +454,7 @@ struct ChatView: View {
         // A wait on sessions or on a time, the same card in the same place (#2750): it was
         // a strip under the chat's head with Carry on.
         if let (report, block) = model.work.openBlock(agent) {
-            cards.append(WaitingCard(id: "block:" + agent.id.uuidString) {
+            cards.append(WaitingCard(id: "block:" + agent.id.uuidString, asks: false) {
                 BlockWaitCard(block: block, since: report.at, lines: model.blockLines(agent),
                               stop: { await model.carryOn(agent.id) },
                               help: AgentsModel.carryOnHelp(for: agent),
@@ -440,7 +466,7 @@ struct ChatView: View {
         // The agent's wait on events, under the questions (#1995): it was a capsule over
         // the prompt.
         if agent.eventWait?.isOpen == true, let status = model.work.waitStatus(of: agent) {
-            cards.append(WaitingCard(id: "wait:" + agent.id.uuidString) {
+            cards.append(WaitingCard(id: "wait:" + agent.id.uuidString, asks: agent.eventWait?.lineResource == nil && agent.eventWait?.personLine != nil) {
                 WaitCard(status: status, eventWait: agent.eventWait,
                          lines: model.work.waitEventLines(of: agent),
                          continueNow: { await model.continueWaiting(of: agent.id, line: agent.eventWait?.lineResource) },

@@ -42,6 +42,9 @@ struct AppViewRecipient: Equatable {
 final class AppViewStore {
     /// The view drawn in the chat's place, if one is.
     var fullscreen: UUID?
+    /// The views that ask the person now (Show, or Send), oldest first, for the chat's
+    /// "Waiting for you" (#5031).
+    private(set) var asking: [AppViewHost] = []
     @ObservationIgnored private var hosts: [UUID: AppViewHost] = [:]
     @ObservationIgnored private var order: [UUID] = []
     static let limit = 8
@@ -62,6 +65,7 @@ final class AppViewStore {
         while order.count > Self.limit, let oldest = order.first {
             order.removeFirst()
             if let gone = hosts.removeValue(forKey: oldest) {
+                asking.removeAll { $0 === gone }
                 Task { await gone.tearDown(reason: "Too many views were open in this conversation.") }
             }
         }
@@ -69,6 +73,14 @@ final class AppViewStore {
     }
 
     func existing(_ id: UUID) -> AppViewHost? { hosts[id] }
+
+    /// A host's ask came or went.
+    func noteAsks(_ host: AppViewHost) {
+        let asks = hosts[host.call.id] === host && host.asksPerson
+        let listed = asking.contains { $0 === host }
+        if asks, !listed { asking.append(host) }
+        if !asks, listed { asking.removeAll { $0 === host } }
+    }
 
     /// Whether any of its views is in a window now: drawn, or about to be.
     var anyInWindow: Bool { hosts.values.contains { $0.inWindow } }
@@ -84,6 +96,7 @@ final class AppViewStore {
         let all = hosts.values
         hosts = [:]
         order = []
+        asking = []
         fullscreen = nil
         for host in all { Task { await host.tearDown(reason: reason) } }
     }
@@ -96,11 +109,11 @@ final class AppViewHost {
     enum Phase: Equatable { case loading, asking(DaemonAPI.ViewAsk), ready, failed(String), gone }
 
     private(set) var call: AppViewCall
-    private(set) var phase: Phase = .loading
+    private(set) var phase: Phase = .loading { didSet { store?.noteAsks(self) } }
     /// The height the view asked for, inline.
     private(set) var height: CGFloat = 96
     /// A `ui/message` waiting on the person's yes or no.
-    private(set) var askedMessage: String?
+    private(set) var askedMessage: String? { didSet { store?.noteAsks(self) } }
     /// For an `agents/message-agent` (#837): the session it goes to, not this chat's.
     private(set) var askedRecipient: AppViewRecipient?
     /// What the agent will be told with the person's next message, as the view last said.
@@ -148,6 +161,12 @@ final class AppViewHost {
     }
 
     var isFullscreen: Bool { store?.fullscreen == call.id }
+
+    /// It waits on the person: Show or Don't Show, or a message to send (#5031).
+    var asksPerson: Bool {
+        if case .asking = phase { return true }
+        return askedMessage != nil
+    }
 
     static func title(for call: AppViewCall) -> String {
         if call.tool == "show_test_view" { return "Test view" }

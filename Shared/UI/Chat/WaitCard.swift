@@ -36,6 +36,68 @@ struct WaitCard: View {
     @State private var confirmingEnd = false
 
     var body: some View {
+        if let personLine, let eventWait, eventWait.isOpen {
+            personAsk(personLine, eventWait)
+        } else {
+            waitBody
+        }
+    }
+
+    /// A wait only the person can settle (#3147) is an Ask (#5031): what it asks of them as the
+    /// title, how long as the asker's place, End Wait on the left, Carry On and Open on the right.
+    private func personAsk(_ title: String, _ wait: EventWait) -> some View {
+        TimelineView(.periodic(from: .now, by: 20)) { context in
+            let total = wait.deadline.map { max(1, Int(ceil($0.timeIntervalSince(wait.since) / 60))) }
+            let elapsed = max(0, Int(context.date.timeIntervalSince(wait.since) / 60))
+            AskCard(icon: "questionmark.circle", title: title,
+                    asker: WaitStatus.cardTime(elapsed: elapsed, total: total)) {
+                ForEach(lines) { line in
+                    eventLine(line)
+                        .appText(.fine)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .help(line.events.joined(separator: ", "))
+                }
+            } decline: {
+                if status.cancellable {
+                    AskDecline(Self.endWait) {
+                        #if os(iOS)
+                        confirmingEnd = true
+                        #else
+                        end()
+                        #endif
+                    }
+                    .help(Self.endWaitHelp)
+                    .disabled(busy || isDisabled)
+                }
+            } buttons: {
+                if status.cancellable {
+                    if personURL == nil {
+                        Button(Self.carryOn, action: carryOn)
+                            .buttonStyle(.paperProminent)
+                            .help(Self.carryOnHelp)
+                            .disabled(busy || isDisabled)
+                    } else {
+                        Button(Self.carryOn, action: carryOn)
+                            .buttonStyle(.paper)
+                            .help(Self.carryOnHelp)
+                            .disabled(busy || isDisabled)
+                    }
+                }
+                if let url = personURL {
+                    Link("Open", destination: url)
+                        .buttonStyle(.paperProminent)
+                        .help("Open \(url.absoluteString) in the browser.")
+                }
+            }
+        }
+        .confirmationDialog("End this wait?", isPresented: $confirmingEnd, titleVisibility: .visible) {
+            Button(Self.endWait, role: .destructive) { end() }
+        } message: {
+            Text("Nothing will start the agent again for it. Carry On starts it now instead.")
+        }
+    }
+
+    private var waitBody: some View {
         VStack(alignment: .leading, spacing: 10) {
             if let eventWait, eventWait.isOpen, !isLineWait {
                 TimelineView(.periodic(from: .now, by: 20)) { context in
@@ -102,6 +164,14 @@ struct WaitCard: View {
     private var isLineWait: Bool { lineResource != nil }
     private var personLine: String? { isLineWait ? nil : eventWait?.personLine }
     private var personURL: URL? { isLineWait ? nil : eventWait?.personURL }
+
+    private func carryOn() {
+        busy = true
+        Task {
+            await continueNow()
+            busy = false
+        }
+    }
 
     private func end() {
         busy = true

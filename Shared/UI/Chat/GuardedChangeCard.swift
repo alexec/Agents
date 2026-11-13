@@ -26,48 +26,36 @@ struct GuardedChangeCard: View {
     @State private var busy = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(change.headline, icon: "exclamationmark.shield")
-                .appText(.reading).fontWeight(.semibold)
-                .tinted(.attention)
+        // An Ask (#5031): who changed what as the title, the counts where the asker goes,
+        // Review… on the left, Undo and Keep on the right.
+        AskCard(icon: "doc.text", title: change.headline, asker: counts) {
             // A folder's policy (#2957, frame D): which rules the change makes looser.
             if let policy = change.policy {
                 Text(policy.words)
                     .appText(.reading)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            HStack(spacing: 10) {
-                if let counts = reading?.counts {
-                    Text("+\(counts.added) −\(counts.removed)")
-                        .appText(.fine)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .accessibilityLabel("\(counts.added) lines added, \(counts.removed) removed")
-                } else {
-                    ProgressView().controlSize(.small)
-                }
-                Spacer()
-                Button(change.policy == nil ? "Review…" : "Show Change", action: review)
+        } decline: {
+            AskDecline(change.policy == nil ? "Review…" : "Show Change", action: review)
+        } buttons: {
+            Group {
+                Button(change.policy?.keepTitle ?? "Undo") { answer(keep: false) }
                     .buttonStyle(.paper)
-                Group {
-                    Button(change.policy?.keepTitle ?? "Undo") { answer(keep: false) }
-                        .buttonStyle(.paper)
-                    Button(change.policy == nil ? "Keep" : "Approve") { answer(keep: true) }
-                        .buttonStyle(.paperProminent)
-                }
-                .disabled(reading == nil || busy || isOffline)
+                Button(change.policy == nil ? "Keep" : "Approve") { answer(keep: true) }
+                    .buttonStyle(.paperProminent)
             }
+            .disabled(reading == nil || busy || isOffline)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        // A request, not a warning (#5016): the card's own paper, and the yellow line.
-        .background(Paper.raised, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Paper.lineAttention))
-        .accessibilityElement(children: .contain)
         .accessibilityLabel(change.question)
         .task(id: change) {
             reading = await read()
         }
+    }
+
+    /// +12 −3, or nil while the change is read.
+    private var counts: String? {
+        guard let counts = reading?.counts else { return nil }
+        return "+\(counts.added) −\(counts.removed)"
     }
 
     private func answer(keep: Bool) {

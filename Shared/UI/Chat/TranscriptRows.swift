@@ -466,7 +466,7 @@ private struct EntryRow: View {
             SandboxFailureCard(record: record)
 
         case .policyStopped(let refusal):
-            PolicyStopCard(refusal: refusal)
+            PolicyStopCard(refusal: refusal, entryID: entry.id)
 
         case .background(let item):
             BackgroundEntryLine(item: item)

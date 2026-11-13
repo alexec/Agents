@@ -5,7 +5,8 @@ import { createContext } from "preact";
 import { useContext, useLayoutEffect, useRef } from "preact/hooks";
 import type { AppViewCall } from "../../protocol/generated";
 import { canPin, viewTitle } from "./appViewBridge";
-import type { ViewActions, ViewLayer } from "./viewLayer";
+import type { HostedView, ViewActions, ViewLayer } from "./viewLayer";
+import { Ask } from "../Ask";
 
 export const ViewLayerContext = createContext<{ layer: ViewLayer; actions: ViewActions } | null>(null);
 
@@ -56,34 +57,14 @@ export function AppView({ call }: { call: AppViewCall }) {
           {result && <pre class="view-result">{result}</pre>}
         </>
       )}
-      {view.phase.value === "asking" && view.ask.value && (
-        <div class="view-ask">
-          <p>{view.ask.value.isNew ? `${view.ask.value.server} wants to show a view here.`
-            : `${view.ask.value.server}'s view has changed since you said Show.`}</p>
-          <p class="faint">It is drawn in a sandbox, and reaches only what it declared.</p>
-          <p class="buttons">
-            <button class="prominent" onClick={() => void view.answerShow(true)}>Show</button>
-            <button onClick={() => void view.answerShow(false)}>Don't Show</button>
-          </p>
-        </div>
-      )}
+      {/* Its Show / Don't Show is an Ask under "Waiting for you" (#5031): the row says one line. */}
+      {view.phase.value === "asking" && view.ask.value && <p class="quiet">{viewWaitsWords}</p>}
       {view.phase.value === "gone" && <p class="quiet">This view was closed.</p>}
       {full && (
         <p class="quiet"><button class="plain" onClick={() => hosting.layer.setFullscreen(null)}>Showing full screen. Back to the chat</button></p>
       )}
       <div ref={slot} class="view-slot" style={{ height: full || view.phase.value !== "ready" ? 0 : `${view.height.value}px` }} />
-      {view.askedMessage.value !== null && (
-        <div class="view-ask">
-          <p class="faint">{view.askedRecipient.value
-            ? `The view asks to send this to “${view.askedRecipient.value.name}” as your message:`
-            : "The view asks to send this as your message:"}</p>
-          <p>{view.askedMessage.value}</p>
-          <p class="buttons">
-            <button class="prominent" onClick={() => view.answerMessage(true)}>Send</button>
-            <button onClick={() => view.answerMessage(false)}>Don't Send</button>
-          </p>
-        </div>
-      )}
+      {view.askedMessage.value !== null && <p class="quiet">{viewWaitsWords}</p>}
       {view.contextLine.value !== null && (
         <p class="view-context faint">
           With your next message the agent is told: {view.contextLine.value}{" "}
@@ -91,6 +72,35 @@ export function AppView({ call }: { call: AppViewCall }) {
         </p>
       )}
     </div>
+  );
+}
+
+/** What a view's row says while its ask waits at the end of the chat. */
+const viewWaitsWords = "Waiting for you, at the end of the chat.";
+
+/** A view's ask (#191, #837), as an Ask (#5031): Show / Don't Show, or Send / Don't Send. */
+export function ViewAsk({ view }: { view: HostedView }) {
+  const ask = view.ask.value;
+  if (view.phase.value === "asking" && ask) {
+    const title = ask.isNew ? `Show the view “${view.title}”?` : `${ask.server}'s view has changed. Show it again?`;
+    return (
+      <Ask glyph="layout-grid" title={title} asker={ask.server} label={title}
+        decline={<button class="link" onClick={() => void view.answerShow(false)}>Don't Show</button>}
+        buttons={<button class="prominent" data-default="" onClick={() => void view.answerShow(true)}>Show</button>}>
+        <p class="quiet small">It is drawn in a sandbox, and reaches only what it declared.</p>
+      </Ask>
+    );
+  }
+  const message = view.askedMessage.value;
+  if (message === null) return null;
+  const to = view.askedRecipient.value;
+  const title = to ? `Send this to “${to.name}” as your message?` : "Send this as your message?";
+  return (
+    <Ask glyph="layout-grid" title={title} asker={view.title} label={title}
+      decline={<button class="link" onClick={() => view.answerMessage(false)}>Don't Send</button>}
+      buttons={<button class="prominent" data-default="" onClick={() => view.answerMessage(true)}>Send</button>}>
+      <p>{message}</p>
+    </Ask>
   );
 }
 
