@@ -10,4 +10,4 @@ The Mac window is for the engineer who runs the agents: their own day-to-day usa
 
 **Why:** Alex wants the Mac app focused (2026-11-01).
 
-**How to apply:** a new report or team or admin feature is tier "One client" (web), not Mac + web. Give the Mac only what helps one engineer personally. Related: [[milestones-to-1-0]].
+**How to apply:** a new report or team or admin feature is tier "Web only" (#4759; was "One client"), or "Web + Mac link" when Alex chooses a link (#4936), not Mac + web. Give the Mac only what helps one engineer personally. Related: [[milestones-to-1-0]].
