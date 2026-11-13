@@ -162,14 +162,6 @@ struct FolderListView: View {
                     }
                 }
             }
-            // A newcomer's checklist (#982), above everything until it has gone.
-            if model.showsGetStarted {
-                Section {
-                    GetStartedCard(isChoosingFolder: $isChoosingFolder)
-                        .listRowSeparator(.hidden)
-                        .selectionDisabled()
-                }
-            }
             // An achievement just earned (#984): once, until closed or opened.
             if let achievement = model.achievementCard {
                 Section {

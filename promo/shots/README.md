@@ -15,8 +15,7 @@ again when the UI changes, with the run-app skill:
    (weather-app, recipe-box, billing-service) and starts small Claude agents in them. Say yes
    to their permissions (`rpc.py … call permissions/pending`, then `permissions/answer`), and
    leave the currency question unanswered: it is the "Needs you" agent.
-3. **Mac**: `walk.py /tmp/run-promo size 1440 900`, put away the Get started and milestone
-   cards, unfold the folders, select an agent, and `walk.py … shot`. On a 1× screen the shot
+3. **Mac**: `walk.py /tmp/run-promo size 1440 900`, put away the milestone card, unfold the folders, select an agent, and `walk.py … shot`. On a 1× screen the shot
    is 1440×900; on a Retina screen it is 2880×1800. Both are App Store sizes.
 4. **Web**: a browser code (`agents-control code --client --browser --home /tmp/run-promo/control`)
    and `scripts/video/web.mjs` at 1440×900.

@@ -90,6 +90,12 @@ public struct Achievements: Codable, Hashable, Sendable {
 
     // MARK: Deriving
 
+    /// Whether an agent has run a turn to its end: any time after its creation, and no
+    /// turn in flight now.
+    public static func hasRunATurn(_ agent: Agent) -> Bool {
+        agent.lastActivityAt > agent.createdAt && !agent.state.hasTurnInFlight && agent.state != .queued
+    }
+
     /// What the host already keeps that says an achievement was earned, and when, for the
     /// ones it can tell from records: on the first run, so what was earned before #984
     /// shipped is back-filled, and whenever those records change.
@@ -118,7 +124,7 @@ public struct Achievements: Codable, Hashable, Sendable {
         /// Time page's days and records (#985).
         public init(agents: some Sequence<Agent>, devices: some Sequence<Device>, hasWorkflow: Bool,
                     time: TimeHistory, calendar: Calendar = .current) {
-            firstAgent = agents.filter(GetStarted.hasRunATurn).map(\.createdAt).min()
+            firstAgent = agents.filter(Achievements.hasRunATurn).map(\.createdAt).min()
             firstPairing = devices.map(\.announcedAt).min()
             self.hasWorkflow = hasWorkflow
             firstLandedPR = time.recap.filter { ($0.value.prsMerged ?? 0) > 0 }.keys.min()

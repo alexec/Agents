@@ -86,4 +86,17 @@ struct AchievementsTests {
         #expect(achievements.has(.firstAgent))
         #expect(achievements.ordered.count == Achievement.allCases.count)
     }
+
+    @Test func aTurnHasRunOnlyOnceOneHasEnded() {
+        let start = Date(timeIntervalSince1970: 1000)
+        let cwd = URL(filePath: "/tmp/folder")
+        let fresh = Agent(runtimeID: "claude", cwd: cwd, state: .starting, createdAt: start, lastActivityAt: start)
+        let running = Agent(runtimeID: "claude", cwd: cwd, state: .running, createdAt: start, lastActivityAt: start + 5)
+        let queued = Agent(runtimeID: "claude", cwd: cwd, state: .queued, createdAt: start, lastActivityAt: start + 5)
+        let finished = Agent(runtimeID: "claude", cwd: cwd, state: .finished, createdAt: start, lastActivityAt: start + 60)
+        #expect(!Achievements.hasRunATurn(fresh))
+        #expect(!Achievements.hasRunATurn(running))
+        #expect(!Achievements.hasRunATurn(queued))
+        #expect(Achievements.hasRunATurn(finished))
+    }
 }

@@ -56,8 +56,7 @@ Real Claude agents run in the scenes, on scratch folders: a few cents a video. O
 the person is called Sam (`launch.sh --person`), and the scratch machine is "Sam's Mac"
 (`HOST_NAME`). Its join card (the machine lock) is approved and the recovery key skipped
 before the recording starts. The scratch root asks to say it has 500 GB free, but the Go
-host does not read that yet (#4851): the machine's row shows the real disk. A scene's
-`GET_STARTED = True` keeps the Get started card, which is otherwise put away. A scratch
+host does not read that yet (#4851): the machine's row shows the real disk. A scratch
 agent still reads the person's own `~/.claude/CLAUDE.md`: each folder tells it never to
 name an instructions file, and a take whose window shows the person's name or their own
 instructions fails.

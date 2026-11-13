@@ -1,12 +1,10 @@
-"""U1 Your first agent (Tutorials ▸ First agent): the Get started card, add a folder, New
+"""U1 Your first agent (Tutorials ▸ First agent): add a folder, New
 Session, say what you want, answer the agent, watch its steps, its reply and its Changes.
 The script is section 2.1 of specs/4832-videos/spec.md (#4835)."""
 GROUP = "usage"
 LAYOUT = "mac"
 TITLE = "Your first agent"
 WINDOW = (1360, 820)
-# The card is the story here: make.py and v.tidy() leave it showing.
-GET_STARTED = True
 DOCS = "tutorials/first-agent/"  # the docs page, on docs.agentloops.dev (upload.py)
 
 # Directed lines (voice.py, #4964): pauses, pace and tone, as Alex heard them on 2026-11-12.
@@ -81,8 +79,8 @@ PROMPT = "Fix the Celsius conversion and run the tests."
 
 
 def setup(v):
-    # Nothing added yet: the window is empty but for the Get started card.
-    v.wait_until(lambda: v.find("Get started"), timeout=30, what="the Get started card")
+    # Nothing added yet: the window is empty but for the empty folder list (#5057).
+    v.wait_until(lambda: v.find("Add Folder…"), timeout=30, what="the empty folder list")
 
 
 def rest_of(v, key, spent):
@@ -94,7 +92,7 @@ def run(v):
     v.sleep(1.0)
     v.say("intro")
 
-    # 2. Add a folder: the card's step, then the folder in the sidebar and the step ticked.
+    # 2. Add a folder, then the folder in the sidebar.
     v.say("folder", wait=False)
     v.sleep(1.5)
     v.add_folder("weather", FILES)
@@ -148,6 +146,6 @@ def run(v):
     v.press("Forecast.swift, changed", wait=3)
     rest_of(v, "reply", 4.1)
 
-    # 9. Done, and the card ticks Start your first agent.
+    # 9. Done.
     v.say("end")
     v.sleep(1.5)
