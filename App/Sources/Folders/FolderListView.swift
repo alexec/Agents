@@ -218,7 +218,7 @@ struct FolderListView: View {
             // person's connectors, secrets and outside accounts are in Settings ▸ You.
             Section(isExpanded: $showsStatus) {
                 RuntimesRow().activityIcon("cpu", warns: runtimesTally.map { $0.noneWorking || $0.isLow } ?? false,
-                                           tint: runtimesTally?.isLow == true ? .attention : .failure)
+                                           tint: runtimesTally?.isLow == true ? .warning : .failure)
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
                 EventsRow().activityIcon("list.bullet.rectangle")
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)

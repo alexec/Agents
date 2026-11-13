@@ -120,7 +120,7 @@ struct SessionSecretsSection<Source: SessionSecretsSource>: View {
             Text(UserScopeWords.about(secret.description)).appText(.fine).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             SecretInfoLine(parts: SecretInfoWords.line(secret))
-            Text("⚠ " + SecretInfoWords.sessionNotBackedUp).appText(.fine).tinted(.attention)
+            Text("⚠ " + SecretInfoWords.sessionNotBackedUp).appText(.fine).tinted(.warning)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }

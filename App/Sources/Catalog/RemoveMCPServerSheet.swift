@@ -58,7 +58,7 @@ struct RemoveMCPServerSheet: View {
                 Text("Its secrets stay in your secrets.").appText(.fine).foregroundStyle(.secondary)
             }
             if let failure {
-                Text(failure).appText(.fine).foregroundStyle(SharedInk.attention)
+                Text(failure).appText(.fine).foregroundStyle(SharedInk.warning)
             }
             HStack {
                 Spacer()

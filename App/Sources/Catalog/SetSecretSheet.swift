@@ -28,7 +28,7 @@ struct SetSecretSheet: View {
                     .textFieldStyle(.roundedBorder)
             }
             if let failure {
-                Text(failure).appText(.fine).foregroundStyle(SharedInk.attention)
+                Text(failure).appText(.fine).foregroundStyle(SharedInk.warning)
             }
             HStack {
                 Spacer()

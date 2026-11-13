@@ -29,14 +29,18 @@
   --accent: #1a52c0;
   /* The chosen thing, a link card. */
   --line-accent: #a9c2ee;
-  /* Needs you. */
-  --line-attention: #ebbf9f;
+  /* Needs you: the yellow's line (#5016). */
+  --line-attention: #e3d196;
+  /* A warning: the orange's line (#5016). */
+  --line-warning: #ebbf9f;
   /* Done, approved. */
   --line-vouched: #a9d3bb;
   /* Failed. */
   --line-failure: #eeb0b3;
-  /* Needs you; the only tint drawn in a list. */
-  --tint-attention: #a3400e;
+  /* Needs you: a question, a request, a wait only the person can settle; the only tint drawn in a list. Yellow, never the warning's orange (#5016). */
+  --tint-attention: #7a6200;
+  /* A warning: something is wrong or nearly so, and a person should know. Not a request (#5016). */
+  --tint-warning: #a3400e;
   /* Failed. */
   --tint-failure: #b0222a;
   /* Approved, done: an ending the app can vouch for. */
@@ -158,10 +162,12 @@
     --paper-selection: #363633;
     --accent: #86b4ff;
     --line-accent: #3d5687;
-    --line-attention: #6b4a33;
+    --line-attention: #615326;
+    --line-warning: #6b4a33;
     --line-vouched: #36614d;
     --line-failure: #6b3a3d;
-    --tint-attention: #f3a672;
+    --tint-attention: #e6c04f;
+    --tint-warning: #f3a672;
     --tint-failure: #f4878d;
     --tint-vouched: #92ccad;
     --label-issue: #73cbe0;

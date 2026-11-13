@@ -67,7 +67,8 @@ enum Paper {
     /// A state's line (`design/tokens.json`'s `color.line`): a state shows its colour in
     /// its text, its icon and this line, never in a fill.
     static let lineAccent = Color(light: 0xA9C2EE, dark: 0x3D5687)
-    static let lineAttention = Color(light: 0xEBBF9F, dark: 0x6B4A33)
+    static let lineAttention = Color(light: 0xE3D196, dark: 0x615326)
+    static let lineWarning = Color(light: 0xEBBF9F, dark: 0x6B4A33)
     static let lineVouched = Color(light: 0xA9D3BB, dark: 0x36614D)
     static let lineFailure = Color(light: 0xEEB0B3, dark: 0x6B3A3D)
 

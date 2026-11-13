@@ -152,7 +152,7 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
               <SecretInfoLine parts={accountLine(a)} />
               {accountAsks(a) && <p class="hint">{askBeforeUseWords.asks}</p>}
               {soon && <p class="hint attention">{soon}</p>}
-              {warning && <p class="hint attention"><span aria-hidden="true">⚠ </span>{warning}</p>}
+              {warning && <p class="hint warning"><span aria-hidden="true">⚠ </span>{warning}</p>}
               <span class="row-actions">
                 <button type="button" disabled={down} onClick={() => { editing.value = a; }}>Edit…</button>
                 <button type="button" class="destructive" disabled={down} onClick={() => void remove(a)}>Remove…</button>

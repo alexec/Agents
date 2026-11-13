@@ -60,8 +60,9 @@ struct GuardedChangeCard: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(StateTint.attention.color?.opacity(0.07) ?? .clear, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder((StateTint.attention.color ?? .secondary).opacity(0.25)))
+        // A request, not a warning (#5016): the card's own paper, and the yellow line.
+        .background(Paper.raised, in: RoundedRectangle(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Paper.lineAttention))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(change.question)
         .task(id: change) {

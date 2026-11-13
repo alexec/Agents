@@ -120,7 +120,7 @@ struct SignInButtons: View {
                     .disabled(busy != nil || !email.contains("@"))
             }
             if let emailProblem {
-                Text(emailProblem).appText(.supporting).tinted(.attention).fixedSize(horizontal: false, vertical: true)
+                Text(emailProblem).appText(.supporting).tinted(.warning).fixedSize(horizontal: false, vertical: true)
             }
         }
     }

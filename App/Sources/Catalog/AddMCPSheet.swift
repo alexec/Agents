@@ -147,7 +147,7 @@ struct AddMCPSheet: View {
                             .padding(.horizontal, 6).background(Color.secondary.opacity(0.12), in: Capsule())
                     }
                     if let host = result.remoteHost {
-                        Text("remote · \(host)").appText(.fine).tinted(.attention)
+                        Text("remote · \(host)").appText(.fine).tinted(.warning)
                     }
                 }
             }

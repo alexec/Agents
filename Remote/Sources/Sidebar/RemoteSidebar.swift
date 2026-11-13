@@ -195,7 +195,7 @@ struct RemoteSidebar: View {
                         .activityIcon("arrow.triangle.merge").appText(.supporting).tag(SidebarItem.velocity)
                     EventsRow().activityIcon("list.bullet.rectangle").appText(.supporting).tag(SidebarItem.events)
                     RuntimesRow().activityIcon("cpu", warns: runtimesTally.map { $0.noneWorking || $0.isLow } ?? false,
-                                               tint: runtimesTally?.isLow == true ? .attention : .failure)
+                                               tint: runtimesTally?.isLow == true ? .warning : .failure)
                         .appText(.supporting).tag(SidebarItem.runtimes)
                     // What happened last to the person's secrets and accounts (#4161), as the window's.
                     ForEach([StatusSecretsKind.secrets, .accounts], id: \.self) { kind in

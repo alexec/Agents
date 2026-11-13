@@ -109,7 +109,7 @@ struct YourConnectionsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(ConnectorSetupWords.connectionTitle(c)).appText(.supporting).fontWeight(.semibold)
                 Text(ConnectorSetupWords.connectionNote(c)).appText(.fine)
-                    .tinted(c.state == .signInAgain ? .attention : .none)
+                    .tinted(c.state == .signInAgain ? .warning : .none)
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 8)

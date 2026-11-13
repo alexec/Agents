@@ -31,9 +31,10 @@ agree with it, so this page cannot drift from the code.
   from the network: no web font, on any surface.
 - **One accent.** The cobalt of the app icon is for links, focus, controls and the
   prominent button. Nothing is drawn in the accent on a selection, where it is too faint.
-- **Three state tints, and only Needs you in colour in a list.** Orange means that a
-  person is needed, red means that something failed, and green means an ending that the
-  app can vouch for (approved, done). In a list, only **Needs you** is drawn in colour.
+- **Four state tints, and only Needs you in colour in a list.** Yellow means that a
+  person is needed, orange is a warning, red means that something failed, and green means
+  an ending that the app can vouch for (approved, done) (#5016). In a list, only **Needs
+  you** is drawn in colour.
 - **Label hues never read as a state.** A session label that names an issue (`#12`) is
   teal, and one that names a pull request (`P#12`) is violet. Neither is a tint.
 - **Every text colour can be read.** Each one (ink, secondary, tertiary, the accent, the
@@ -64,10 +65,12 @@ Mac window and the iPhone and iPad app hold the same value.
 | selection | `--paper-selection` | `Paper.selection` | `#ebe9e4` | `#363633` | The picked row, with a 3px accent bar at its edge. Every text colour is 4.5:1 or more on it. |
 | accent | `--accent` | `AccentColor.colorset` | `#1a52c0` | `#86b4ff` | The app icon's cobalt: links, focus, the chosen control, a switch that is on. |
 | line.accent | `--line-accent` | `Paper.lineAccent` | `#a9c2ee` | `#3d5687` | The chosen thing, a link card. |
-| line.attention | `--line-attention` | `Paper.lineAttention` | `#ebbf9f` | `#6b4a33` | Needs you. |
+| line.attention | `--line-attention` | `Paper.lineAttention` | `#e3d196` | `#615326` | Needs you: the yellow's line (#5016). |
+| line.warning | `--line-warning` | `Paper.lineWarning` | `#ebbf9f` | `#6b4a33` | A warning: the orange's line (#5016). |
 | line.vouched | `--line-vouched` | `Paper.lineVouched` | `#a9d3bb` | `#36614d` | Done, approved. |
 | line.failure | `--line-failure` | `Paper.lineFailure` | `#eeb0b3` | `#6b3a3d` | Failed. |
-| tint.attention | `--tint-attention` | `StateTint.orange` | `#a3400e` | `#f3a672` | Needs you; the only tint drawn in a list. |
+| tint.attention | `--tint-attention` | `StateTint.yellow` | `#7a6200` | `#e6c04f` | Needs you: a question, a request, a wait only the person can settle; the only tint drawn in a list. Yellow, never the warning's orange (#5016). |
+| tint.warning | `--tint-warning` | `StateTint.orange` | `#a3400e` | `#f3a672` | A warning: something is wrong or nearly so, and a person should know. Not a request (#5016). |
 | tint.failure | `--tint-failure` | `StateTint.red` | `#b0222a` | `#f4878d` | Failed. |
 | tint.vouched | `--tint-vouched` | `StateTint.green` | `#25684f` | `#92ccad` | Approved, done: an ending the app can vouch for. |
 | label.issue | `--label-issue` | `Paper.issue` | `#0c6278` | `#73cbe0` | A label naming an issue, #12. |
@@ -203,10 +206,12 @@ because no control is in view to change.
 | **Failure** | Something failed: a read, an action, a limit that stopped the work. | `tint.failure` | `xmark.octagon.fill` | ✕ |
 | **Success** | An ending that the app can vouch for: done, sent, archived. | `tint.vouched` | `checkmark.circle.fill` | ✓ |
 
-- **There is no warning tone.** A warning is a status (neutral) or a failure. Yellow and
-  amber are not message colours: `forge.waiting` is for a check that runs, not a message.
-- **Orange means only that a person is needed** (specs/018 FR-006a). A cost limit that
-  stopped the work is a failure, not attention.
+- **There is no warning tone.** A message is a status (neutral) or a failure. Outside
+  messages, a warning line (a field that would fail, an allowance nearly spent, a disk
+  that runs low) draws `tint.warning`, the orange.
+- **Yellow means only that a person is needed** (specs/018 FR-006a; #5016). Orange is a
+  warning, red is a failure: a request never reads as a warning. A cost limit that stopped
+  the work is a failure, not attention.
 - **The tint is on the icon only.** The words are in `ink`, the ground is `well` (a banner)
   or `raised` (a toast). A message never fills its ground with a tint.
 - **Never colour alone.** Each message has an icon and words.

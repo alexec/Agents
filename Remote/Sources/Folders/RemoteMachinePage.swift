@@ -171,7 +171,7 @@ struct RemoteMachinePage: View {
     private static func tint(_ level: DaemonAPI.CapacityLevel?) -> StateTint {
         switch level {
         case .ok, nil: .none
-        case .near: .attention
+        case .near: .warning
         case .full: .failure
         }
     }
@@ -179,7 +179,7 @@ struct RemoteMachinePage: View {
     private static func tint(_ level: DiskLevel) -> StateTint {
         switch level {
         case .ok: .none
-        case .low: .attention
+        case .low: .warning
         case .critical: .failure
         }
     }

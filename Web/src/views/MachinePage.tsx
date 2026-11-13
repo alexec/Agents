@@ -23,7 +23,7 @@ import { forCleanup, pageLine, tally, worktreesIntro } from "../model/worktrees"
 
 const disksHelp = "Each disk its agents write to. Low and almost full are the lines set in Folder Settings ▸ Disk Space.";
 
-const levelClass = (disk: DiskAlarm) => disk.level === "critical" ? "failure" : disk.level === "low" ? "tinted" : "";
+const levelClass = (disk: DiskAlarm) => disk.level === "critical" ? "failure" : disk.level === "low" ? "warning" : "";
 
 export function MachinePage({ store, host }: { store: Store; host: string }) {
   const hosts = store.hosts.value;

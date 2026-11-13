@@ -283,7 +283,7 @@ struct DesignTokensTests {
             return try #require(dark ? token.string("dev.agentloops.dark") : token.fields["$value"] as? String)
         }
         let surfaces = ["ground", "sidebar", "raised", "well", "wash", "selection"]
-        let texts = ["ink", "secondary", "tertiary", "accent", "tint.attention", "tint.failure", "tint.vouched",
+        let texts = ["ink", "secondary", "tertiary", "accent", "tint.attention", "tint.warning", "tint.failure", "tint.vouched",
                      "label.issue", "label.pull"]
         var low: [String] = []
         for dark in [false, true] {

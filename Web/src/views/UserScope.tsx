@@ -164,7 +164,7 @@ function SecretItem({ row, replace, remove, down, names, oneMachine }: { row: Us
       {row.needsApproval && <span class="hint"><span aria-hidden="true">✋ </span>{askBeforeUseWords.asks}</span>}
       {waiting && <p class="hint attention">{waiting}</p>}
       {left && <p class="hint attention">{left}</p>}
-      {warning && <p class="hint attention"><span aria-hidden="true">⚠ </span>{warning}</p>}
+      {warning && <p class="hint warning"><span aria-hidden="true">⚠ </span>{warning}</p>}
       <span class="row-actions">
         <button type="button" disabled={down} onClick={replace}>Replace…</button>
         <button type="button" class="destructive" disabled={down} onClick={remove}>Remove…</button>

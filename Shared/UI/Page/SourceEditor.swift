@@ -279,7 +279,7 @@ private struct ProblemsList: View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             Image(icon: symbol(problem.severity))
                 .foregroundStyle((problem.severity == "error" ? StateTint.failure
-                    : problem.severity == "warning" ? .attention : .none).style(or: .secondary))
+                    : problem.severity == "warning" ? .warning : .none).style(or: .secondary))
                 .accessibilityLabel(problem.severity)
             Text("\(problem.line):\(problem.column)")
                 .appText(.fine)
@@ -780,7 +780,7 @@ private struct ChangedOnDiskStrip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Label(SourceEditorWords.changed, icon: "exclamationmark.triangle")
-                .tinted(.attention)
+                .tinted(.warning)
             HStack(spacing: 8) {
                 Button(comparing ? SourceEditorWords.hideCompare : SourceEditorWords.compare) { comparing.toggle() }
                     .help("Your text beside the file on disk")
