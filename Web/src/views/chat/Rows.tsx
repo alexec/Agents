@@ -34,6 +34,7 @@ import { TurnChangesCard } from "./TurnChangesCard";
 import { memo } from "../../render/memo";
 import { terminalOutput } from "../../model/onTheMac";
 import { Icon } from "../Icon";
+import { nowPlan } from "../../model/nowWords";
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
 export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
@@ -98,6 +99,20 @@ function stateWords(state: AgentState, reason: EndedReason | undefined): string 
 function Exchanged({ title, value }: { title: string; value: JSONValue }) {
   const { text, structured } = readable(value);
   return <div><p class="faint">{title}</p>{structured ? <pre class="code">{highlightCode(text, "yaml")}</pre> : <pre>{text}</pre>}</div>;
+}
+
+/** The plan as the agent sent it, in the transcript: one line, "Plan · 5 steps", that opens to the steps then. */
+function PlanLine({ plan }: { plan: Plan }) {
+  const open = useSignal(false);
+  return (
+    <div class="plan-line-entry">
+      <button class="plan-line-head" aria-expanded={open.value} onClick={() => (open.value = !open.value)}>
+        <Icon name="square-check" /> <span>{nowPlan(plan)}</span>
+        <Icon name={open.value ? "chevron-down" : "chevron-right"} class="chevron" />
+      </button>
+      {open.value && <PlanView plan={plan} />}
+    </div>
+  );
 }
 
 /** ChatBlocks' PlanView: a withdrawn plan is struck through, and says the agent dropped it (#252). */
@@ -387,7 +402,8 @@ function entryBody(entry: TranscriptEntry, from: (sender: MessageSender | undefi
     case "toolCallUpdate":
       return <p class="quiet">{callLine((fields(entry, "toolCall") ?? fields(entry, "toolCallUpdate"))!._0)}</p>;
     case "planUpdated":
-      return <PlanView plan={fields(entry, "planUpdated")!._0} />;
+      // One line that opens to the steps (#5033): the plan as it is now is in the top Now card.
+      return <PlanLine plan={fields(entry, "planUpdated")!._0} />;
     case "servedRequest": {
       const request = fields(entry, "servedRequest")!._0;
       const what = "readFile" in request.kind ? `Read ${request.kind.readFile.path.split("/").pop()}`

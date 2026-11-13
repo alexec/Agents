@@ -312,15 +312,6 @@ struct PromptBar: View {
 
     // MARK: The folder, and what runs in it
 
-    /// What a row over the prompt does on a Mac (057): Stop, the subagent's steps in
-    /// the sidebar, and the output in TextEdit.
-    private func backgroundActions(_ agent: Agent) -> BackgroundActions {
-        BackgroundActions(
-            stop: { [model] item in await model.stopBackground(item, of: agent.id) },
-            steps: { [chatActions] item in chatActions.subagentSteps?(item.id) },
-            output: { [model] item in Task { await BackgroundOutput.open(item, of: agent, model: model) } })
-    }
-
     private var whereAndWhat: some View {
         // Top for a chat, so its runtime sits level with the first line however tall the
         // header grows; the new chat's row of controls stays centred.
@@ -336,9 +327,6 @@ struct PromptBar: View {
                         SessionLabelEditor(agent: agent)
                             .fixedSize(horizontal: true, vertical: false)
                     }
-                PromptHeader(agent: agent,
-                             background: agent.background,
-                             backgroundActions: backgroundActions(agent))
                 }
                 .task(id: "\(agent.id)-\(agent.cwd.path)") { await model.loadAgentWorktrees(of: agent) }
                 Spacer(minLength: 0)

@@ -456,43 +456,21 @@ struct ChatTranscript: View {
                 ForEach(actions.kept(agent.id)) { kept in
                     KeptPromptRow(kept: kept)
                 }
-                // Live, and so at the foot rather than in the record: the chat itself says
-                // what the row in the list says, and it stops saying it the moment the
-                // prompt lands.
-                if isComingBack {
-                    ComingBackLine()
-                } else if agent.state == .running || agent.state == .starting {
-                    // The one working mark on the page, always here: never in a tool's or a
-                    // thought's line, where it moved the words and jumped about (#2831).
-                    WorkingLine(tool: RunningToolWords.tool(agent))
-                }
-                // What it holds and waits for in line: what the agent is doing now, as the
-                // working line says, so here and not over the prompt (#2344). A place in line
-                // that its wait card says is left to the card (#2361).
-                if let leases = actions.leaseStatus(agent.id)?.without(agent.eventWait) {
-                    LeaseLine(status: leases, open: actions.openLease)
-                }
-                // A queued start the machine holds says why, as a lease's wait does (#4748).
-                if let start = actions.capacityStart(agent) {
-                    Text(start)
-                        .appText(.fine)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
             }
             .inColumn(column)
             // Last, after everything the agent said and everything waiting to be sent
             // (#1995): what waits on the person is where the reader is. Each card keeps the
             // chat column itself.
-            if !cards.isEmpty {
+            if !askCards.isEmpty {
                 VStack(spacing: 12) {
                     // The one label over the Asks, in the yellow of needs you (#5031).
-                    if cards.contains(where: \.asks) {
-                        WaitingForYouLabel().inColumn(column)
-                    }
-                    ForEach(cards) { $0.view }
+                    WaitingForYouLabel().inColumn(column)
+                    ForEach(askCards) { $0.view }
                 }
             }
+            // What it does or waits on now, the last thing before the prompt bar (#5033): the
+            // working line, the wait or the live picture, with its leases and background work.
+            nowCard.inColumn(column)
             VStack(alignment: .leading, spacing: 0) {
                 if let quietSince {
                     QuietLine(since: quietSince, startedAt: agent.createdAt)
@@ -503,6 +481,28 @@ struct ChatTranscript: View {
         }
         .padding(.bottom, 20)
         .frame(maxWidth: .infinity)
+    }
+
+    /// The cards that are Asks (#5031); the rest are parts of the Now card (#5033).
+    private var askCards: [WaitingCard] { cards.filter(\.asks) }
+
+    private var nowCard: NowCard {
+        let agentID = agent.id
+        let stop = actions.stopBackground
+        let steps = actions.subagentSteps
+        var background = BackgroundActions(output: actions.backgroundOutput)
+        if let stop {
+            background.stop = { item in await stop(item, agentID) }
+        }
+        if let steps {
+            background.steps = { item in steps(item.id) }
+        }
+        return NowCard(agent: agent, isComingBack: isComingBack,
+                       parts: cards.filter { !$0.asks },
+                       leases: actions.leaseStatus(agentID)?.without(agent.eventWait),
+                       capacityStart: actions.capacityStart(agent),
+                       background: background,
+                       openLease: actions.openLease)
     }
 
     /// The turns among the rows drawn, as indices into the turns: the rows less the head
@@ -603,6 +603,8 @@ struct ChatTranscript: View {
     /// while the agent is at work or coming back, where the foot says so already (#1564).
     private var quietSince: Date? {
         guard !isComingBack, agent.state != .running, agent.state != .starting else { return nil }
+        // The quiet line takes the Now card's place, never sits under it (#5033).
+        guard !nowCard.isShown else { return nil }
         return lastEntryAt ?? agent.lastActivityAt
     }
 

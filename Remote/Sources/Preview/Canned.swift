@@ -86,17 +86,27 @@ enum Canned {
                   usage: Usage(used: 92_000, size: 200_000,
                                cost: Cost(amount: 1.84, currency: "USD")),
                   costToDate: ["USD": 1.84]),
-            Agent(id: working, runtimeID: "claude", cwd: agentsFolder,
-                  title: "Split the package in two", state: .running,
-                  createdAt: ago(18), lastActivityAt: ago(1),
-                  usage: Usage(used: 41_000, size: 200_000),
-                  costToDate: ["USD": 0.62],
-                  plans: [Plan(planID: "p1", entries: [
-                      PlanEntry(content: "Move the model across", status: .completed),
-                      PlanEntry(content: "Split the client in two", status: .completed),
-                      PlanEntry(content: "Build both platforms", status: .inProgress),
-                      PlanEntry(content: "Run the tests", status: .pending),
-                  ])]),
+            {
+                var agent = Agent(id: working, runtimeID: "claude", cwd: agentsFolder,
+                                  title: "Split the package in two", state: .running,
+                                  createdAt: ago(18), lastActivityAt: ago(1),
+                                  usage: Usage(used: 41_000, size: 200_000),
+                                  costToDate: ["USD": 0.62],
+                                  plans: [Plan(planID: "p1", entries: [
+                                      PlanEntry(content: "Move the model across", status: .completed),
+                                      PlanEntry(content: "Split the client in two", status: .completed),
+                                      PlanEntry(content: "Build both platforms", status: .inProgress),
+                                      PlanEntry(content: "Run the tests", status: .pending),
+                                  ])])
+                // The goal over the plan, one Now card at the top (#5033), and a subagent
+                // in the background, the Now card's detail at the foot.
+                agent.goal = Goal(objective: "Both platforms build from one package", status: .active,
+                                  tokensUsed: 41_000, tokenBudget: 200_000)
+                agent.background = [BackgroundItem(id: "sub-1", kind: .subagent, name: "reviewer",
+                                                   detail: "Review the split for missing imports",
+                                                   startedAt: ago(2))]
+                return agent
+            }(),
             Agent(id: crashed, runtimeID: "copilot", cwd: agentsFolder,
                   title: "Rename the suggestion service", state: .stopped,
                   createdAt: ago(190), lastActivityAt: ago(140),

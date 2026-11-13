@@ -1775,25 +1775,44 @@ button.plain { background: none; border: none; padding: 0; color: inherit; opaci
 button.plain:hover { opacity: 1; }
 .view-context { font-size: 0.75rem; }
 .view-box[hidden] { display: none !important; }
-/* The plan in force, a card under the chat's head, opened to every step (#341). On the well,
-   with a bar in the accent rather than a state colour, so it is not missed (#776). */
-.plan-strip { padding: 6px 16px; }
-.plan-card { background: var(--paper-well); border-radius: 10px; padding: 10px 14px; }
-.plan-strip .plan-summary { display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left;
-  background: none; border: none; padding: 0; color: inherit; font: inherit; font-size: 0.8125rem; cursor: pointer; }
-.plan-strip .plan-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.plan-strip .plan-step { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.plan-strip .plan-count, .plan-strip .chevron { font-size: 0.75rem; opacity: 0.6; white-space: nowrap;
+/* The Now card (#5033, specs/session-cards/spec.md, family 5), as NowCard.swift: a card on the well
+   with a mark, a bold line and a quiet detail, the meta on the right, a chevron when it has more, and a
+   bar in the accent, never a state colour (#776). At the top: the goal and the plan, two rows. At the
+   foot: what the agent does or waits on now, the last thing before the prompt bar. */
+.now-card { background: var(--paper-well); border-radius: var(--radius-card); padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 10px; font-size: 0.8125rem; }
+.now-top { padding: 6px 16px; }
+.now-top .now-card { gap: 0; }
+.now-top .plan-row { border-top: 1px solid var(--paper-rule); margin-top: 8px; padding-top: 8px; }
+.now-top .goal-row + .plan-row { margin-top: 8px; }
+.now-top .now-card > .plan-row:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+.now-row, .now-head { display: flex; width: 100%; text-align: left; background: none; border: none; padding: 0;
+  color: inherit; font: inherit; }
+button.now-row, button.now-head { cursor: pointer; }
+.now-row { flex-direction: column; gap: 8px; }
+.now-line, .now-head { align-items: center; gap: 8px; min-width: 0; }
+.now-line { display: flex; }
+.now-mark { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; }
+.now-step, .now-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-what strong { font-weight: 600; }
+.now-detail, .now-meta, .now-card .chevron, .now-sub { color: var(--paper-ink); opacity: .68; }
+.now-meta, .now-card .chevron { font-size: 0.75rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.now-sub { font-size: 0.75rem; padding-left: 26px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-variant-numeric: tabular-nums; }
-.plan-strip .plan-bar { display: block; height: 4px; border-radius: 2px; background: var(--paper-rule); overflow: hidden; }
-.plan-strip .plan-bar > span { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
-.plan-strip .plan-block { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--paper-rule); font-size: 0.8125rem; }
-/* The goal card over the plan's (#2742), in its look: why it stopped, and how far, in grey. */
-.goal-strip { padding-bottom: 0; }
-.goal-strip .goal-reason, .goal-strip .goal-progress { font-size: 0.75rem; opacity: 0.6; overflow: hidden;
-  text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.goal-strip .open .plan-step, .goal-strip .open .goal-reason { white-space: normal; }
-.goal-strip .plan-summary { gap: 6px; }
+.goal-row.open .now-step, .goal-row.open .now-sub { white-space: normal; }
+.now-bar { display: block; height: 4px; border-radius: 2px; background: var(--paper-rule); overflow: hidden; }
+.now-bar > span { display: block; height: 100%; border-radius: 2px; background: var(--accent); transition: width .15s linear; }
+.now-top .plan-block { margin-top: 8px; font-size: 0.8125rem; }
+.now-part { display: flex; flex-direction: column; gap: 8px; }
+.now-part p { margin: 0; }
+.now-answers { display: flex; justify-content: flex-end; gap: 10px; }
+.now-rows { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--paper-rule); padding-top: 8px; }
+.now-rows .background { margin: 0; }
+.now-foot .working-ring { --well: 16px; opacity: 0.6; }
+/* The plan as it was sent, in the transcript: one line that opens to its steps (#5033). */
+.plan-line-head { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 0;
+  color: var(--paper-ink); opacity: .68; font: inherit; cursor: pointer; }
+.plan-line-entry .plan-block { margin-top: 6px; }
 .plan .in_progress .content { font-weight: 600; }
 .plan-block.withdrawn .plan .in_progress .content { font-weight: inherit; }
 /* With the working line: what the open agent holds and waits for in line (036, #2344). Untinted. */
