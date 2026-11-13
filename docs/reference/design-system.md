@@ -294,6 +294,27 @@ On the Mac and the Remote, the kinds are `PaneBanner`, `FieldNote`, `SheetNote` 
 3. Run `DesignTokensTests`, and change the Swift files or the AccentColor assets that it
    names.
 
+## How fresh the data is
+
+Alex, 2026-11-12 (#5139): every page that shows cached data says how old it is, with
+**"Last update <time ago>"**. Then the person knows how fresh the data is.
+
+- **Cached data** is data from an earlier read: the local copy, a read that is shown while
+  its source does not answer, a read when the page opens, or a poll of 30 s or more. A
+  page that reads again every 5 s or less shows the line only after a read fails.
+- **The time is the time of the read,** not the time of the content (a PR's `updatedAt`)
+  and not the time the link went down. When parts of a page were read at different
+  times, show the oldest.
+- **The words are the same on every client:** "Last update just now" (under 1 minute),
+  "Last update 5 min ago", "Last update 2 h ago", "Last update yesterday", then "Last
+  update 3 Nov". Do not show a clock time ("Updated 14:02") for the age of a list.
+- **It ticks:** every 10 s for the first minute, then once a minute.
+- **Where:** in the pane's banner, after its words, when the pane has one; when not, at
+  the top of the pane in `ink.secondary` at the caption step (at the trailing end of the
+  pane's header when it has one). It is a status line, not a control.
+
+The pages and the plan are in `specs/5139-last-update/spec.md`.
+
 ## Marks
 
 The Blob, the app's mark, has one source: `scripts/design.sh marks` draws it, and writes
