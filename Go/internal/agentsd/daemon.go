@@ -89,6 +89,7 @@ type Daemon struct {
 	appToolsState
 	gitCredentialState
 	screenDriveState
+	handOffWindowState
 	browserDriveState
 	browserTabState
 	hostUserState

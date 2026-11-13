@@ -97,22 +97,47 @@ func pid(ofApp name: String) -> pid_t? {
 /// land in whatever app is frontmost. `type`, `key` and `click x,y` go only after this
 /// returns nil, so they reach the app the call names and the transcript's words are true.
 func frontmost(app name: String) -> String? {
-    guard let pid = pid(ofApp: name),
-          let running = NSRunningApplication(processIdentifier: pid) else {
+    guard let pid = pid(ofApp: name) else {
         return "no running app named \"\(name)\"."
+    }
+    return frontmost(pid: pid, named: name)
+}
+
+/// The pid of the app in front now, or 0 when none is (`front`, #5208).
+func frontmostPid() -> pid_t {
+    NSWorkspace.shared.frontmostApplication?.processIdentifier ?? 0
+}
+
+/// Brings the app with this pid to the front, and says why not when it cannot (`front`,
+/// #5208, and frontmost(app:)).
+func frontmost(pid: pid_t, named name: String? = nil) -> String? {
+    let said = name ?? "the app with pid \(pid)"
+    guard let running = NSRunningApplication(processIdentifier: pid) else {
+        return "no running app has pid \(pid)."
     }
     if NSWorkspace.shared.frontmostApplication?.processIdentifier != pid {
         running.activate()
-        // Activation lands through the run loop: wait for it, briefly.
-        let deadline = Date().addingTimeInterval(1)
-        while NSWorkspace.shared.frontmostApplication?.processIdentifier != pid, Date() < deadline {
-            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        if !cameToFront(pid) {
+            // macOS 14 and later activate an app only when the app in front lets them, and
+            // this helper is never in front. With Accessibility, the app's AXFrontmost does
+            // what System Events' "set frontmost" does (#5208).
+            AXUIElementSetAttributeValue(AXUIElementCreateApplication(pid), kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+            _ = cameToFront(pid)
         }
     }
     guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else {
-        return "\(name) is not frontmost, so nothing was sent: another app would have had it."
+        return "\(said) is not frontmost, so nothing was sent: another app would have had it."
     }
     return nil
+}
+
+/// Whether pid is in front within a second: activation lands through the run loop.
+private func cameToFront(_ pid: pid_t) -> Bool {
+    let deadline = Date().addingTimeInterval(1)
+    while NSWorkspace.shared.frontmostApplication?.processIdentifier != pid, Date() < deadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    }
+    return NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
 }
 
 /// The accessibility tree, indented, for `read`: role, label and frame, as ui.swift's
