@@ -18,6 +18,7 @@ import {
   sourceGlyph, unreadWords, type HostConversations, type MessagesRow,
 } from "../model/messages";
 import { go } from "../route";
+import { PlaceholderRows } from "./WorkParts";
 import { renderMarkdown } from "../render/markdown";
 
 /** The list's state, for the tab: a conversation's page goes back to it as it was left. */
@@ -123,7 +124,7 @@ export function MessagesList({ store }: { store: Store }) {
         <button type="button" class="link" onClick={() => { asked.value++; }}>Refresh</button>
       </div>
       {hosts.length === 0 ? <p class="hint">{noMachine}</p>
-        : l === null ? <p class="hint">Loading…</p>
+        : l === null ? <PlaceholderRows />
         : noConnectorIn(l) && !unreadOnly.value ? (
           <div class="messages-empty">
             <p class="hint">{noConnector}</p>
@@ -214,7 +215,7 @@ export function ConversationPage({ store, conversationKey }: { store: Store; con
   };
   useEffect(() => { messages.value = null; problem.value = null; void read(false); }, [row?.key, row?.host]);
 
-  if (l === null) return <p class="hint">Loading…</p>;
+  if (l === null) return <PlaceholderRows count={4} />;
   if (!row) return <p class="hint">This conversation is not in the list any more. <button type="button" class="link" onClick={() => go({ nav: "messages" })}>Messages</button></p>;
   const c = row.item.conversation;
   return (
@@ -233,7 +234,7 @@ export function ConversationPage({ store, conversationKey }: { store: Store; con
       </header>
       <p class="hint">{outside}</p>
       {problem.value ? <p class="hint">{problem.value}</p>
-        : messages.value === null ? <p class="hint">Loading…</p>
+        : messages.value === null ? <PlaceholderRows count={4} />
         : messages.value.length === 0 ? <p class="hint">{noMessages}</p>
         : (
           <ul class="messages-rows">
