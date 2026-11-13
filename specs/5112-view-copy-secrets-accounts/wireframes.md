@@ -11,6 +11,39 @@ and Accounts on the Mac and the web page (#5115, #5116). All names and values be
 - Tier Mac + web: the Mac window and the web page. `remote: tier mac+web`.
 - Agents never get a value from these screens or their method.
 
+## Hi-fi
+
+Alex, 2026-11-12: "Hi-fi wireframes pls." Drawn in the app's paper tokens (`design/tokens.json`):
+ground, raised, well, rule, the cobalt accent, the attention tint and the vouched green. Made-up data.
+The text sections below give the rules for each state.
+
+**Mac, Settings ▸ You ▸ Secrets:** shown (1), copied (2), Ask before use (3), and no copy for this app
+yet, with its (⋯) menu open (4). Sections 1, 2, 3, 5 and 6.
+
+![Mac: Settings ▸ You ▸ Secrets](hifi-mac-secrets.svg)
+
+**Mac, a card shown:** each part with its own Copy, the CVC just copied. Section 4.
+
+![Mac: a card shown](hifi-mac-card.svg)
+
+**Mac, Settings ▸ You ▸ Accounts ▸ Details…:** each field, Copy for the plain ones, Reveal and Copy for
+the secret, the address just copied. Section 7.
+
+![Mac: an account's details](hifi-mac-account.svg)
+
+**Mac, an account's secret shown, and an account with no secret** (it bills a card, which it can reveal).
+Sections 7 and 8.
+
+![Mac: an account's secret shown, and an account with no secret](hifi-mac-account-states.svg)
+
+**Web page, Settings ▸ You ▸ Secrets:** the same four states, with text buttons in the row's actions.
+
+![Web: Settings ▸ You ▸ Secrets](hifi-web-secrets.svg)
+
+**Web page, Settings ▸ You ▸ Accounts ▸ Details…:** the modal, the secret shown, the address copied.
+
+![Web: an account's details](hifi-web-account.svg)
+
 ## 0. Where the value comes from
 
 The control plane cannot open a person's secret: it keeps only copies sealed to each of the person's
