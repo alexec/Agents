@@ -156,6 +156,15 @@ public enum ClientSealing {
         return out
     }
 
+    /// `user/sealedSecret`'s copy (#5114, #5115), opened with this client's own key, to reveal or
+    /// copy it: in memory only. `user` is the person (`user/secretRecipients`'s `user`).
+    public static func open(_ secret: DaemonAPI.UserSealedSecret, user: String, with key: DeviceKey, client: UUID) throws -> String {
+        let plain = try key.open(secret.sealed, info: userSecretPurpose,
+                                 authenticating: userSecretAD(user: user, recipient: clientRecipient(client), name: secret.name,
+                                                              version: secret.version, ask: secret.needsApproval == true))
+        return String(decoding: plain, as: UTF8.self)
+    }
+
     /// What `sealing/work` asks, sealed for each recipient missing. An item whose copy does not
     /// open here (its route's address changed since an admin sealed it) is left out.
     public static func seal(_ work: DaemonAPI.SealingWork, with key: DeviceKey, client: UUID) -> [DaemonAPI.SealingAddItem] {

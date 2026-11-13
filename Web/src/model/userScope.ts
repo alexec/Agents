@@ -5,9 +5,41 @@ import type { SecretsLeft, UserSecretRow } from "../protocol/generated";
 
 export const secretsTitle = "Secrets";
 export const addSecret = "Add a Secret…";
-export const secretsFoot = "A secret is sealed in this app to each of your own machines, and only agentsd opens it "
-  + "there; the control plane cannot. Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, "
-  + "you included: to change it, replace it.";
+export const secretsFoot = "A secret is sealed in this app to each of your own machines and apps; the control plane "
+  + "cannot open it. Write ${NAME} for it in an MCP server's env or headers. You can reveal and copy it here, and each "
+  + "reveal and copy is in the audit log. Agents never get a value from here. To change it, replace it.";
+
+// Reveal and Copy (#5112, #5115; specs/5112-view-copy-secrets-accounts/wireframes.md), as UserScopeWords.
+export type CardPart = "number" | "expiry" | "cvc" | "name" | "zip";
+export const cardParts: CardPart[] = ["number", "expiry", "cvc", "name", "zip"];
+/** How long a value shows, how long until the clipboard is cleared, and how long Copy says Copied, in seconds. */
+export const shownSeconds = 30;
+export const clipboardSeconds = 90;
+export const copiedSeconds = 2;
+
+/** Under a shown value, with the seconds left. */
+export function shownFor(left: number, card: boolean): string {
+  return `Shown for ${shownSeconds} s (${Math.max(left, 0)} s left). `
+    + (card ? "Each reveal and copy is in the audit log." : "Your reveal is in the audit log.");
+}
+
+/** Under a row just copied: the whole value, or one part of a card. */
+export function copiedLine(part: CardPart | null = null): string {
+  return (part ? `Copied ${partWords[part]}.` : "Copied.") + ` The clipboard clears in ${clipboardSeconds} s.`;
+}
+
+export const asksForAgents = "Asks before use: for agents. You reveal and copy at once.";
+export const noCopyYet = "This browser has no copy yet. It gets one when another app of yours is online.";
+export const didNotOpen = "This browser's copy did not open. Replace the secret to seal it again.";
+export const copyRefused = "This browser did not let the page copy.";
+export const revealNeedsNewerPlane = "This control plane cannot show or copy a secret yet. Update it.";
+
+export const partLabels: Record<CardPart, string> = {
+  number: "Card number", expiry: "Expiry", cvc: "CVC", name: "Name on card", zip: "Billing ZIP",
+};
+const partWords: Record<CardPart, string> = {
+  number: "the card number", expiry: "the expiry", cvc: "the CVC", name: "the name on card", zip: "the billing ZIP",
+};
 export const thisMacOnly = "This Mac's";
 
 /** Under thisMacOnly at the top of the ~/.agents editors (#2766, #2704): what goes to the other machines. A
@@ -123,6 +155,22 @@ export function cardProblem(card: Card): string | null {
 }
 
 /** The secret's value: one line of JSON with its keys in order, the same bytes as the window's. */
+/** A card's value as it was sealed (#5115), or null when it is not a card's. */
+export function parseCard(value: string): Card | null {
+  try {
+    const card = JSON.parse(value) as Partial<Card>;
+    if (typeof card !== "object" || card === null || typeof card.number !== "string") return null;
+    return { number: card.number, expiry: card.expiry ?? "", cvc: card.cvc ?? "", name: card.name ?? "", zip: card.zip ?? "" };
+  } catch {
+    return null;
+  }
+}
+
+/** The card number in groups of four, as a reveal shows it. */
+export function spacedNumber(number: string): string {
+  return number.replace(/(.{4})(?=.)/g, "$1 ");
+}
+
 export function cardValue(card: Card): string {
   const { cvc, expiry, name, number, zip } = card;
   return JSON.stringify({ cvc, expiry, name, number, zip });

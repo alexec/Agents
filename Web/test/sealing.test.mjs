@@ -130,3 +130,13 @@ test("a new route's id is the control plane's, and a save seals again only when 
   const bare = { ...link, keyRecord: async () => null };
   assert.deepEqual(await o.sealedFor(bare, movedRoute, kept, {}, ["apiKey"]), { problem: o.noCopyHere });
 });
+
+test("user/sealedSecret's copy opens with this page's own key, to reveal or copy (#5115)", async () => {
+  const page = await pageKey("abab-5115");
+  const values = await s.sealSecret("ada", "GITHUB_TOKEN", 4, "ghp_shown", [page.recipient], true);
+  const secret = { name: "GITHUB_TOKEN", version: 4, needsApproval: true, sealed: values[page.recipient.id] };
+  assert.equal(await s.openSealedSecret(page.record, "ada", secret), "ghp_shown");
+  await assert.rejects(s.openSealedSecret(page.record, "kim", secret));
+  await assert.rejects(s.openSealedSecret(page.record, "ada", { ...secret, needsApproval: undefined }));
+  await assert.rejects(s.openSealedSecret(page.record, "ada", { ...secret, version: 5 }));
+});

@@ -4,7 +4,7 @@
 // is Go's controllink.OrgRouteAD and UserSecretAD, byte for byte; AgentsKit's Sealing.swift is
 // the same. HPKE is @hpke/core over WebCrypto: DHKEM(P-256, HKDF-SHA256), HKDF-SHA256, AES-256-GCM.
 import { Aes256Gcm, CipherSuite, DhkemP256HkdfSha256, HkdfSha256 } from "@hpke/core";
-import type { Base64, OrgRouteKind, OrgRouteSettings, OrgRouteVendor, SealedEnvelope, SealingAddItem, SealingItem, SealRecipient,
+import type { Base64, OrgRouteKind, UserSealedSecret, OrgRouteSettings, OrgRouteVendor, SealedEnvelope, SealingAddItem, SealingItem, SealRecipient,
   SealingWork } from "../protocol/generated";
 import { base64, hex, utf8 } from "./bytes";
 import type { KeyRecord } from "./keys";
@@ -112,6 +112,13 @@ export async function openItem(record: KeyRecord, item: SealingItem): Promise<Re
     out[field] = new TextDecoder().decode(plain);
   }
   return out;
+}
+
+/** user/sealedSecret's copy (#5114, #5115), opened with this page's own key, to reveal or copy: in memory only. user is
+ * the person (user/secretRecipients' user). */
+export async function openSealedSecret(record: KeyRecord, user: string, secret: UserSealedSecret): Promise<string> {
+  const ad = userSecretAD(user, clientRecipient(record.client), secret.name, secret.version, secret.needsApproval === true);
+  return new TextDecoder().decode(await open(record, userSecretPurpose, ad, secret.sealed));
 }
 
 /** What sealing/work asks, sealed for each recipient missing; an item whose copy does not open here is left out. */
