@@ -33,7 +33,7 @@ A survey of `git grep alexec` on main (1431 files). Most of them need no change.
 | Ruleset `main` (incl. *Require approval of changes not attributed to a person*) | Moves. A bypass actor that is a user App may need to be added again. | Check the ruleset after. |
 | Dependabot (config, alerts, security advisories) | Moves. | none |
 | The agents' GitHub App `alexec-agents` (#3858, #3926) | **Does not move.** It is owned by the user `alexec` and is private, so it cannot be installed on another account. | Alex transfers the App's ownership to `agentloops-dev` (App settings ▸ Advanced ▸ Transfer ownership), then installs it on the organisation for this repo. The App's id and key stay; the credential helper finds the new installation by itself (`connections/githubbot.go` lists `/app/installations`). |
-| Container image `ghcr.io/alexec/agents-control` (#2140) | **Does not move.** A package belongs to its owner, not the repo. | The first release after the move pushes `ghcr.io/agentloops-dev/agents-control`. Alex makes that package public. The live control plane then pulls the new name (`deploy/gcp/common.sh`). |
+| Container image `ghcr.io/alexec/agents-control` (#2140) | **Does not move.** A package belongs to its owner, not the repo. | The first release after the move pushes `ghcr.io/agentloops-dev/agents-control`. After Alex's yes by a form, an agent makes that package public (#5066). The live control plane then pulls the new name (`deploy/gcp/common.sh`). |
 | GitHub Pages, docs.agentloops.dev (#1549) | The Pages site moves. The DNS name points at `alexec.github.io`. | Point the `docs` CNAME at `agentloops-dev.github.io` (`deploy/cloudflare/dns.sh --names docs --cname agentloops-dev.github.io`), and verify agentloops.dev in the organisation's Pages settings. |
 | The app's folder record and every clone's `origin` | Git still works by the redirect. | `git remote set-url origin https://github.com/agentloops-dev/Agents.git` in the main checkout (worktrees share it). |
 | The app's stored refs: lineage (`github:pr:alexec/agents#…`, about 12 000 lines), `workflows.json`, `mcp-events.json` | **Old refs do not match new events.** A PR opened before the move and merged after it has two refs, and a `wait_for_event` that names the old repo never wakes. | Follow-up 1: a repo alias (old owner → new owner) when the daemon reads refs, made from GitHub's own redirect. It must land before the transfer. |
@@ -72,8 +72,12 @@ Two kinds, so the PR is safe to merge at any time:
    environments are there, the bot posts as `alexec-agents[bot]`, a release dry run passes.
 6. **The links PR lands** (follow-up 2): www, mkdocs, docs, skills, `deploy/` GHCR name,
    the docs CNAME.
-7. **The next release** pushes `ghcr.io/agentloops-dev/agents-control`; Alex makes it public;
-   `ship-app --control-plane` moves the live control plane to the new image.
+7. **The next release** pushes `ghcr.io/agentloops-dev/agents-control`. The release skill
+   (step 8, item 2, #5066) finds it private with
+   `.agents/skills/release/scripts/ghcr-public.sh`; Alex says yes by a form (it cannot be
+   undone); then an agent makes it public in the agents' browser, signed in as `alexec`
+   (package settings ▸ Change visibility; no API), and checks again. Only then does the
+   release's deploy move the live control plane to the new image.
 8. **The other repos move** (if Alex says so): see below.
 
 ## How it fits #1064, #2145 and #2147

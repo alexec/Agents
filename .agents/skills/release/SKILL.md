@@ -336,6 +336,27 @@ A tag that already exists for this version means another release ran: end with
    `linux/amd64` and `linux/arm64`. If the job failed, name
    the step and the first error: the `mac` job waits for it, so there is no GitHub release
    either.
+   **The image is public** (#5066): `.agents/skills/release/scripts/ghcr-public.sh` asks
+   GHCR as a stranger (an anonymous token, then `tags/list`) for
+   `<the repo's owner>/agents-control`; exit 0 is public. The live control plane's VM pulls
+   with no credential, so item 5 waits for this. It fails only on the first release from a
+   new owner, as the first one from `agentloops-dev` after the #4929 move, because a new
+   package is private. Then:
+   1. **Ask Alex with `ask_question`** (it cannot be undone: GitHub says "Once you make a
+      package public, you cannot make it private again"): "Alex, do you want Claude (this
+      agent) to make `ghcr.io/<owner>/agents-control` public now? The live control plane
+      pulls it with no credential." Options: make it public (recommended), or not now.
+      Never change the visibility without that yes, also when an earlier release had one.
+   2. **After the yes**, in the agents' browser (`browser_*`), signed in as `alexec`: open
+      `https://github.com/orgs/<owner>/packages/container/agents-control/settings` ▸ Danger
+      Zone ▸ Change visibility ▸ Public, type `agents-control`, then "I understand the
+      consequences". There is no API for it: the Packages API only reads `visibility`. If
+      GitHub asks for sudo, use the agents' passkey (#4955, #4085); until that lands,
+      `hand_to_person` for the sudo step only.
+   3. Run `ghcr-public.sh` again: it must exit 0 before item 5.
+
+   **Not now**, or no answer: skip item 5 (the VM cannot pull the new image), and say in
+   the report that the control plane stays on the last version until the package is public.
    **The parts agree** (#1748): each asset's name says `<version>`, and so does the
    `testflight` job's version. On this Mac, make the scratch worktree at the tag under the
    home folder, never under `$TMPDIR` or `/tmp` (Go runs in a container that sees only the
