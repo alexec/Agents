@@ -38,6 +38,7 @@ import { SecretsSection } from "./UserScope";
 import { AccountsSection } from "./Accounts";
 import { StatusListMark, StatusListLastLine, StatusSecretsPage, useUserScopeStatus } from "./StatusSecrets";
 import { SessionSecretsSection } from "./settings/SessionSecrets";
+import { LocalSecretsSection } from "./settings/LocalSecrets";
 import { WorkflowRow } from "./WorkflowRow";
 import { BackToList } from "./BackToList";
 import { DataTable } from "./DataTable";
@@ -300,8 +301,10 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "machine" ? <MachinePage key={page.draw.host} store={store} host={page.draw.host} />
         : page.draw.kind === "features" ? <WorkFeatures store={store} />
         : page.draw.kind === "timeline" ? <WorkTimeline store={store} />
-        // The person's secrets and cards (#1760), then a machine's for one session (#3548); were in Settings ▸ Machines.
-        : page.draw.kind === "secrets" ? <><SecretsSection store={store} down={down} /><SessionSecretsSection store={store} down={down} /></>
+        // The person's secrets and cards (#1760), then a machine's for one session (#3548), then what agents saved
+        // on that machine (#5122); were in Settings ▸ Machines.
+        : page.draw.kind === "secrets" ? <><SecretsSection store={store} down={down} /><SessionSecretsSection store={store} down={down} />
+          <LocalSecretsSection store={store} down={down} /></>
         : page.draw.kind === "accounts" ? <AccountsSection store={store} down={down} />
         : page.draw.kind === "statusList" ? <StatusSecretsPage store={store} list={page.draw.list} />
         : page.draw.kind === "docs" ? (route.value.item

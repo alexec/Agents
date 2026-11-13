@@ -7037,6 +7037,29 @@ const LiveSourceScreen LiveSource = "screen"
 const LiveSourceBrowser LiveSource = "browser"
 const LiveSourceSimulator LiveSource = "simulator"
 
+// A secret this machine keeps for itself (#5122): an agent saved it (ask_secret, capture_secret, generate_secret) or a connector's form set it. Every session's agent on this machine can name it. No value.
+type LocalSecret struct {
+	Name string `json:"name"`
+
+	SetAt Date `json:"setAt"`
+
+	LastOp *SecretLastOp `json:"lastOp,omitzero"`
+
+	// Always false: a secret this machine keeps for itself is on this machine only.
+	BackedUp *bool `json:"backedUp,omitzero"`
+
+	// Ask before use (#4014): a person approves each use (#4015). Left out is off.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
+
+	// A secret's description (#4167): one or two sentences on what it is and what it is for, such as which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a value. Left out when it has none.
+	Description *string `json:"description,omitzero"`
+}
+
+// secrets/localList (#5122): every secret this machine keeps for itself, by name. No value.
+type LocalSecrets struct {
+	Secrets []LocalSecret `json:"secrets"`
+}
+
 // A person's machine lock (#3399, specs/3399-machine-lock): its chain of entries, the root first. lock/get, and machine/lock to a machine.
 type Lock struct {
 	Person string `json:"person"`
