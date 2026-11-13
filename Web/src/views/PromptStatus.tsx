@@ -18,7 +18,7 @@ export const costLimitWords = {
   dayTokens: "The day's token limit has been reached",
   daySpending: "The day's spending limit has been reached",
   waits: "Anything you send waits until you allow more.",
-  dayDetail: "What you send waits here, and goes when the day rolls over.",
+  dayDetail: "What you send goes when the day rolls over",
 };
 
 /** Whether the agent, or the day, is at its limit. */
@@ -39,10 +39,11 @@ export function CostLimitStrip({ agent, costs, goOn }: { agent: Agent; costs: Co
   const amount = Object.entries(agent.costToDate ?? {}).sort(([a], [b]) => a.localeCompare(b))
     .map(([currency, value]) => new Intl.NumberFormat(undefined, { style: "currency", currency }).format(value)).join(" · ");
   // Money, else tokens (#838): in the words of the limit it reached.
-  const used = !atMoney && atAgentLimit ? `${(agent.tokensToDate ?? 0).toLocaleString()} tokens used.` : `${amount || ""} spent.`;
+  const used = !atMoney && atAgentLimit ? `${(agent.tokensToDate ?? 0).toLocaleString()} tokens used` : `${amount || ""} spent`;
   const raise = { label: costLimitWords.raise, title: costLimitWords.raiseHelp, run: () => go({ nav: "settings", section: "agentsPolicy" }) };
   return atAgentLimit
-    ? <Strip tone="warning" name="cost-limit" icon="coins" line={costLimitWords.atItsLimit} detail={`${used} ${costLimitWords.waits}`}
+    ? <Strip tone="warning" name="cost-limit" icon="coins" line={costLimitWords.atItsLimit} detail={used}
+      title={`${costLimitWords.atItsLimit} · ${used}. ${costLimitWords.waits}`}
       primary={{ label: costLimitWords.goOn, title: costLimitWords.goOnHelp, run: goOn }} second={raise} />
     : <Strip tone="warning" name="cost-limit" icon="coins" line={dayTokenLimitReached(costs) ? costLimitWords.dayTokens : costLimitWords.daySpending}
       detail={costLimitWords.dayDetail} primary={raise} />;

@@ -93,6 +93,7 @@ struct CostLimitStrip: View {
         if agent.isAtCostLimit(under: limits) {
             Strip(tone: .warning, symbol: "dollarsign.circle", line: PromptWords.atItsCostLimit,
                   detail: CostLimitWords.spent(agent.spentWords(under: limits), raisesHere: raise != nil),
+                  help: CostLimitWords.waits,
                   primary: StripButton(title: CostLimitWords.goOn, help: CostLimitWords.goOnHelp, action: goOn),
                   second: raiseButton)
         } else if costState?.dayLimitReached == true {
@@ -116,13 +117,17 @@ enum CostLimitWords {
     /// Where a client with no limits page of its own says they are changed.
     static let raiseOnTheMac = "Change the limit in Settings on your Mac."
 
-    /// "$4.20 spent. Anything you send waits until you allow more."
+    /// Said in the strip's help: what the limit holds back.
+    static let waits = "Anything you send waits until you allow more."
+
+    /// "$4.20 spent", or on a phone with "Change the limit in Settings on your Mac." after it.
     static func spent(_ spent: String, raisesHere: Bool) -> String {
-        spent + " Anything you send waits until you allow more." + (raisesHere ? "" : " " + raiseOnTheMac)
+        let amount = spent.hasSuffix(".") ? String(spent.dropLast()) : spent
+        return raisesHere ? amount : amount + ". " + raiseOnTheMac
     }
 
     static func dayDetail(raisesHere: Bool) -> String {
-        "What you send waits here, and goes when the day rolls over." + (raisesHere ? "" : " " + raiseOnTheMac)
+        "What you send goes when the day rolls over" + (raisesHere ? "" : ". " + raiseOnTheMac)
     }
 }
 

@@ -345,7 +345,6 @@ struct ChatView: View {
         }
         .chatColumn()
         .padding(.top, kinds.isEmpty ? 0 : 8)
-        .animation(ResponseMotion.response, value: kinds)
     }
 
     /// What can be done to the chat as a whole, at the right-hand edge of its column.

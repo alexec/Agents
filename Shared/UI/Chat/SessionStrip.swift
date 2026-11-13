@@ -59,42 +59,41 @@ struct Strip<Accessory: View>: View {
     var busy = false
     let line: String
     var detail: String?
+    /// More than the line holds, said on hover and to VoiceOver.
+    var help: String?
     var primary: StripButton?
     var second: StripButton?
     var more: [StripButton] = []
     @ViewBuilder let accessory: () -> Accessory
 
     @Environment(\.stripMore) private var stripMore
-    /// The strip's width, which picks one row or two.
-    @State private var width: CGFloat = .infinity
-    /// Under this, the buttons go under the words (rule 5).
-    private static var oneRowWidth: CGFloat { 480 }
-
-    private var words: String { [line, detail].compactMap { $0 }.joined(separator: " · ") }
+    private var words: String {
+        [[line, detail].compactMap { $0 }.joined(separator: " · "), help].compactMap { $0 }.joined(separator: ". ")
+    }
 
     var body: some View {
-        Group {
-            if width >= Self.oneRowWidth {
-                HStack(alignment: .center, spacing: 10) {
+        // One row; when it does not fit (the phone, a large text size) the buttons go under
+        // the words (rule 5). ViewThatFits, not a measured width: a width kept in state
+        // changed the strip's height in a second pass, under the chat's top inset (#5189).
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 10) {
+                glyph
+                text(lines: 1)
+                    .frame(minWidth: 200, maxWidth: .infinity, alignment: .leading)
+                controls
+                moreLink
+            }
+            VStack(alignment: .trailing, spacing: 8) {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
                     glyph
-                    text(lines: 1)
-                    controls
+                    text(lines: 3)
                     moreLink
                 }
-            } else {
-                VStack(alignment: .trailing, spacing: 8) {
-                    HStack(alignment: .firstTextBaseline, spacing: 10) {
-                        glyph
-                        text(lines: 3)
-                        moreLink
-                    }
-                    if hasControls {
-                        HStack(spacing: 8) { controls }
-                    }
+                if hasControls {
+                    HStack(spacing: 8) { controls }
                 }
             }
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .buttonStyle(.paper)
         .appText(.supporting)
         .padding(.horizontal, 12)
@@ -103,7 +102,6 @@ struct Strip<Accessory: View>: View {
         .paperWell(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
         .accessibilityElement(children: .contain)
         .onAppear { AccessibilityNotification.Announcement(words).post() }
-        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     private var hasControls: Bool {
@@ -122,22 +120,18 @@ struct Strip<Accessory: View>: View {
     }
 
     private func text(lines: Int) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 0) {
-            Text(line)
-                .foregroundStyle(Paper.ink)
-                .layoutPriority(1)
-            if let detail, !detail.isEmpty {
-                Text(" · " + detail)
-                    .foregroundStyle(Paper.secondary)
-                    .truncationMode(.middle)
-            }
+        // One Text, so the detail wraps after the line rather than in a column of its own.
+        var shown = Text(line).foregroundStyle(Paper.ink)
+        if let detail, !detail.isEmpty {
+            shown = Text("\(shown)\(Text(" · " + detail).foregroundStyle(Paper.secondary))")
         }
-        .lineLimit(lines)
-        .fixedSize(horizontal: false, vertical: lines > 1)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .help(words)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(words)
+        return shown
+            .lineLimit(lines)
+            .truncationMode(.tail)
+            .fixedSize(horizontal: false, vertical: lines > 1)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .help(words)
+            .accessibilityLabel(words)
     }
 
     @ViewBuilder private var controls: some View {
@@ -176,7 +170,7 @@ struct Strip<Accessory: View>: View {
     @ViewBuilder private var moreLink: some View {
         if let stripMore {
             Button(stripMore.isOpen ? StripWords.showLess : StripWords.more(stripMore.count)) {
-                withAnimation(ResponseMotion.response) { stripMore.toggle() }
+                stripMore.toggle()
             }
             .buttonStyle(.plain)
             .appText(.fine)
@@ -188,8 +182,8 @@ struct Strip<Accessory: View>: View {
 
 extension Strip where Accessory == EmptyView {
     init(tone: StripTone, symbol: String? = nil, busy: Bool = false, line: String, detail: String? = nil,
-         primary: StripButton? = nil, second: StripButton? = nil, more: [StripButton] = []) {
-        self.init(tone: tone, symbol: symbol, busy: busy, line: line, detail: detail,
+         help: String? = nil, primary: StripButton? = nil, second: StripButton? = nil, more: [StripButton] = []) {
+        self.init(tone: tone, symbol: symbol, busy: busy, line: line, detail: detail, help: help,
                   primary: primary, second: second, more: more) { EmptyView() }
     }
 }

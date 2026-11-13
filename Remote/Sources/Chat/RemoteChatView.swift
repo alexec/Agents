@@ -904,7 +904,6 @@ extension RemoteChatView {
         }
         .paneBannerInset()
         .remoteBannerGround()
-        .animation(ResponseMotion.response, value: kinds)
     }
 }
 
