@@ -1,7 +1,7 @@
 // Settings ▸ You ▸ Accounts (#3967), as the window's (App/Sources/Accounts): the person's outside accounts, the
 // accounts part of their settings, which go to every machine of theirs as their secrets do. A record holds no
 // secret, only the name of one in Settings ▸ You ▸ Secrets.
-import { useEffect } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
 import type { JSONValue, OutsideAccount, OutsideAccounts, UserSecretRow } from "../protocol/generated";
@@ -14,6 +14,11 @@ import { machineNames, onlyMachine, onlyMachineLine } from "../model/secretInfo"
 import { Modal } from "./Modal";
 import { SecretInfoLine } from "./SecretInfoLine";
 import { ask } from "./MessageKinds";
+import { type CardPart, auditAccount, cardParts, copiedSeconds, copyText, detailsLabel, type DetailField, identityFields, named,
+  type Named, noSecretLine, notInSecrets, parseCard, recordFields, revealFailure, revealSecret, revealWords, shownSeconds,
+  tokenExpiry } from "../model/reveal";
+import { hint as secretHint } from "../model/secretInfo";
+import type { UserSealedSecretPart, UserSealedSecretPurpose } from "../protocol/generated";
 
 function sentence(error: unknown): string {
   if (error instanceof CallFailed && error.code === methodNotFound) return "This control plane does not keep settings for you yet. Update it.";
@@ -22,6 +27,7 @@ function sentence(error: unknown): string {
 
 const FIELDS: [key: string, label: string, hint: string][] = [
   ["service", "Service", "gitlab.com"], ["address", "Address", "name@example.com"],
+  ["username", "User name", "When it is not the address"],
   ["description", "Description", "What it is for, and who uses it"], ["plan", "Plan", "Free"],
   ["cost", "Monthly cost (USD)", "0"], ["card", "Card", "The card's name in Secrets"], ["secret", "Secret", "The token's name in Secrets"],
   ["twoFactor", "Two-factor", "TOTP, passkey, SMS"], ["issue", "Issue", "#12"], ["made", "Made", "YYYY-MM-DD"],
@@ -67,6 +73,159 @@ function AccountSheet({ editing, save, close }: { editing: OutsideAccount | null
   );
 }
 
+/**
+ * Settings ▸ You ▸ Accounts ▸ Details… (#5116, specs/5112-view-copy-secrets-accounts, section 7), as the window's
+ * AccountDetailsSheet: each field, Copy for each plain one with a value, and Reveal and Copy for the secret and the
+ * card it names. A reveal or a copy of a value goes in the audit log; a copy of a plain field does not.
+ */
+function AccountDetails({ store, account, rows, close, edit }: {
+  store: Store; account: OutsideAccount; rows: UserSecretRow[]; close: () => void; edit: () => void;
+}) {
+  // The one value shown (section 2: one at a time), by its slot, "secret" or "card".
+  const shown = useSignal<{ slot: string; value: string } | null>(null);
+  const busy = useSignal<string | null>(null);
+  const copied = useSignal<{ key: string; line: string } | null>(null);
+  const problems = useSignal<Record<string, string>>({});
+  const timer = useRef<number | undefined>(undefined);
+  const hide = () => {
+    shown.value = null;
+    window.clearTimeout(timer.current);
+  };
+  // Hidden again when the tab is hidden, the secret changes, or the modal closes (section 2).
+  useEffect(() => {
+    const away = () => { if (document.visibilityState !== "visible") hide(); };
+    document.addEventListener("visibilitychange", away);
+    return () => { document.removeEventListener("visibilitychange", away); hide(); };
+  }, []);
+  useEffect(hide, [rows]);
+  const problem = (slot: string, line: string | null) => {
+    const next = { ...problems.value };
+    if (line) next[slot] = line; else delete next[slot];
+    problems.value = next;
+  };
+  const flash = (key: string, line: string) => {
+    copied.value = { key, line };
+    window.setTimeout(() => { if (copied.value?.key === key) copied.value = null; }, copiedSeconds * 1000);
+  };
+  const request = (name: string, purpose: UserSealedSecretPurpose, part?: UserSealedSecretPart) =>
+    ({ name, purpose, ...(part ? { part } : {}), account: auditAccount(account) });
+  const reveal = async (slot: string, row: UserSecretRow) => {
+    hide();
+    busy.value = `${slot}.reveal`;
+    try {
+      shown.value = { slot, value: await revealSecret(store.link, request(row.name, "reveal")) };
+      problem(slot, null);
+      timer.current = window.setTimeout(hide, shownSeconds * 1000);
+    } catch (error) {
+      problem(slot, revealFailure(error));
+    } finally {
+      busy.value = null;
+    }
+  };
+  const copySecret = async (slot: string, key: string, row: UserSecretRow, part?: UserSealedSecretPart) => {
+    busy.value = key;
+    try {
+      let value = await revealSecret(store.link, request(row.name, "copy", part));
+      if (part) {
+        const card = parseCard(value);
+        if (!card) { problem(slot, revealWords.notCard); return; }
+        value = cardParts(card).find((p) => p.part === part)?.value ?? "";
+      }
+      const line = await copyText(value, true);
+      value = "";
+      problem(slot, null);
+      flash(key, line);
+    } catch (error) {
+      problem(slot, error instanceof Error && error.message === revealWords.noClipboard ? revealWords.noClipboard : revealFailure(error));
+    } finally {
+      busy.value = null;
+    }
+  };
+  const copyPlain = async (key: string, text: string) => {
+    try {
+      flash(key, await copyText(text, false));
+    } catch {
+      flash(key, revealWords.noClipboard);
+    }
+  };
+  const copyButton = (key: string, label: string, onClick: () => void) => (
+    <button type="button" aria-label={label} disabled={busy.value === key} onClick={onClick}>
+      {copied.value?.key === key ? "Copied ✓" : "Copy"}
+    </button>
+  );
+  const field = (f: DetailField) => (
+    <div class="detail-row" key={f.label}>
+      <dt>{f.label}</dt>
+      <dd>{f.text}</dd>
+      <dd class="detail-actions">{f.copies && copyButton(f.label, `Copy ${f.label}`, () => void copyPlain(f.label, f.text))}</dd>
+    </div>
+  );
+  const slot = (label: string, key: string, n: Named) => {
+    if (n.kind === "none") {
+      return <div class="detail-row" key={key}><dt>{label}</dt><dd class="hint">{key === "secret" ? `— ${noSecretLine}` : "—"}</dd><dd /></div>;
+    }
+    if (n.kind === "elsewhere") {
+      return (
+        <div class="detail-row" key={key}>
+          <dt>{label}</dt><dd class="hint">{n.text} · {notInSecrets}</dd>
+          <dd class="detail-actions">{copyButton(key, `Copy ${label}`, () => void copyPlain(key, n.text))}</dd>
+        </div>
+      );
+    }
+    const row = n.row;
+    const value = shown.value?.slot === key ? shown.value.value : null;
+    const card = value === null ? null : parseCard(value);
+    const isCard = row.kind === "card";
+    return (
+      <>
+        <div class="detail-row" key={key}>
+          <dt>{label}</dt>
+          <dd><code>{row.name}</code>{value === null && <code class="hint secret-hint"> {secretHint(row.hint)}</code>}</dd>
+          <dd class="detail-actions">
+            <button type="button" aria-label={`${value === null ? "Reveal" : "Hide"} ${row.name}`} disabled={busy.value === `${key}.reveal`}
+              onClick={() => { if (value === null) void reveal(key, row); else hide(); }}>
+              {busy.value === `${key}.reveal` ? "…" : value === null ? "Reveal" : "Hide"}
+            </button>
+            {copyButton(key, `Copy ${row.name}`, () => void copySecret(key, key, row, isCard ? "number" : undefined))}
+          </dd>
+        </div>
+        {card && cardParts(card).map((p: CardPart) => (
+          <div class="detail-row detail-part" key={`${key}.${p.part}`}>
+            <dt>{p.label}</dt><dd><code class="no-select">{p.text}</code></dd>
+            <dd class="detail-actions">{copyButton(`${key}.${p.part}`, `Copy ${p.label}`, () => void copySecret(key, `${key}.${p.part}`, row, p.part))}</dd>
+          </div>
+        ))}
+        {value !== null && !card && <p class="detail-value"><code class="no-select">{value}</code></p>}
+        {value !== null && <p class="hint">{revealWords.shown}</p>}
+        {problems.value[key] && <p class="hint failure" role="alert">{problems.value[key]}</p>}
+      </>
+    );
+  };
+  const expiry = tokenExpiry(account, Date.now());
+  return (
+    <Modal label={account.service} close={close}>
+      <div class="sheet-body account-details">
+        <h2>{account.service}</h2>
+        <dl class="details">{identityFields(account, accountAbout(account)).map(field)}</dl>
+        <hr />
+        <dl class="details">
+          {slot("Secret", "secret", named(account.secret, rows))}
+          {slot("Card", "card", named(account.card, rows))}
+          {expiry && <div class="detail-row"><dt>Token expires</dt><dd>{expiry}</dd><dd /></div>}
+        </dl>
+        <hr />
+        <dl class="details">{recordFields(account).map(field)}</dl>
+        <SecretInfoLine parts={accountLine(account)} />
+        <p class="hint" role="status">{copied.value?.line ?? ""}</p>
+        <div class="sheet-actions">
+          <button type="button" onClick={() => { edit(); close(); }}>Edit…</button>
+          <button type="button" class="prominent" autofocus onClick={close}>Done</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export function AccountsSection({ store, down }: { store: Store; down: boolean }) {
   const all = useSignal<OutsideAccount[]>([]);
   const secrets = useSignal<UserSecretRow[]>([]);
@@ -74,6 +233,7 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
   const project = useSignal("");
   const adding = useSignal(false);
   const editing = useSignal<OutsideAccount | null>(null);
+  const details = useSignal<OutsideAccount | null>(null);
   const load = async () => {
     try {
       const settings = await store.link.call("user/settings", {});
@@ -154,6 +314,7 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
               {soon && <p class="hint attention">{soon}</p>}
               {warning && <p class="hint warning"><span aria-hidden="true">⚠ </span>{warning}</p>}
               <span class="row-actions">
+                <button type="button" disabled={down} onClick={() => { details.value = a; }}>{detailsLabel}</button>
                 <button type="button" disabled={down} onClick={() => { editing.value = a; }}>Edit…</button>
                 <button type="button" class="destructive" disabled={down} onClick={() => void remove(a)}>Remove…</button>
               </span>
@@ -164,6 +325,8 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
       <button type="button" disabled={down} onClick={() => { adding.value = true; }}>Add Account…</button>
       <p class="hint">{accountsFoot(shown)}</p>
       {adding.value && <AccountSheet editing={null} save={(a) => save(a, null)} close={() => { adding.value = false; }} />}
+      {details.value && <AccountDetails store={store} account={details.value} rows={rows}
+        close={() => { details.value = null; }} edit={() => { editing.value = details.value; }} />}
       {editing.value && <AccountSheet editing={editing.value} save={(a) => save(a, editing.value)} close={() => { editing.value = null; }} />}
     </section>
   );

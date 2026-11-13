@@ -1332,6 +1332,20 @@ dialog.image-viewer .image-viewer-frame:hover .image-viewer-arrow, dialog.image-
 /* A secret's last 4 and its not-backed-up line (#4159). */
 .secret-hint { margin-inline-start: 6px; }
 .secret-warning { color: var(--tint-warning); }
+/* Settings ▸ You ▸ Accounts ▸ Details… (#5116): each field, its value, and its Copy (or Reveal) at the end. */
+dialog.sheet:has(.account-details) { width: min(600px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
+.account-details hr { border: none; border-top: 1px solid var(--paper-rule); width: 100%; margin: 0; }
+.details { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 6px 12px; margin: 0; align-items: baseline; }
+.detail-row { display: contents; }
+.detail-row dt { color: var(--paper-secondary); }
+.detail-row dd { margin: 0; overflow-wrap: anywhere; }
+.detail-part dt { padding-inline-start: 12px; }
+.detail-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.detail-value { margin: 0; overflow-wrap: anywhere; word-break: break-all; }
+/* A value shown, its line and a problem take the whole row of the grid. */
+.details > p { grid-column: 1 / -1; margin: 0; }
+/* A revealed value can not be selected: Copy is the only way, so each copy is audited (#5112). */
+.no-select { user-select: none; -webkit-user-select: none; }
 .sub-app .settings-body .join-command { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .sub-app .settings-body .join-command-line { display: flex; align-items: flex-start; gap: 6px; }
 .sub-app .settings-body .join-command .code-text { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.6875rem;

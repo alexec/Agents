@@ -49,6 +49,10 @@ func TestAccounts(t *testing.T) {
 		if !errors.Is(err, ErrInvalid) {
 			t.Fatal(secret, err)
 		}
+		// A user name (#5116) is plain text too.
+		if _, _, err := b.AddAccounts(ctx, "ana", []wire.OutsideAccount{{Service: "x.com", Username: &notes}}, made); !errors.Is(err, ErrInvalid) {
+			t.Fatal("username", secret, err)
+		}
 	}
 	if _, err := b.SetPart(ctx, "ana", wire.UserSettingsPartNameAccounts, []byte(`{"accounts":[{"plan":"Free"}]}`)); !errors.Is(err, ErrInvalid) {
 		t.Fatal(err)

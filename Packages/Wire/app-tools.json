@@ -146,6 +146,10 @@
               "type": "string",
               "description": "The address it signs in with."
             },
+            "username": {
+              "type": "string",
+              "description": "The user name it signs in with, when that is not the address. Never a secret."
+            },
             "plan": {
               "type": "string",
               "description": "Free, Pro…"
