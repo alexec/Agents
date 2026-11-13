@@ -8,8 +8,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controlplane/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Ask for More (#3262, spec 998 FR-019): a person at the organisation's budget asks an admin

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // hand_to_person (#3529, spike #3527): the agent gives the person one step on the page in

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/githubmcp"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The fakes' writes (#3130): each says what it was asked in wrote.

@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // folder.idle (#1368), as DaemonCore+FolderIdle: once a busy period, after the settle,

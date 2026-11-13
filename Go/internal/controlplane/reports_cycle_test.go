@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #3562: an issue's cycle time is from the first start of work on it or its PRs to its last

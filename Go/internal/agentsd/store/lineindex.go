@@ -7,8 +7,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/diskjson"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A transcript read in part (TranscriptReader, #91): where each line ends, found once

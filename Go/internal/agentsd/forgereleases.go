@@ -9,10 +9,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/forgejomcp"
-	"github.com/alexec/agents/Go/internal/gitlabmcp"
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/forgejomcp"
+	"github.com/agentloops-dev/agents/Go/internal/gitlabmcp"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The forge's releases (#4426, specs/4328-work-look/milestones.md, task 6): forge/releases lists

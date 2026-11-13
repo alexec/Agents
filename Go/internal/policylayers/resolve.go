@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Resolve finds the effective policy for a folder (or, with no folder layer, for "no

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/githubmcp"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 func (f *fakeForgeGitHub) MakeRepository(_ context.Context, owner, name, _ string) (githubmcp.Repository, bool, error) {

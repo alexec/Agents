@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Lineage asks Bitbucket Cloud (#3879) what it asks Forgejo (lineageforgejo.go), by the

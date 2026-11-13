@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mac"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/mac"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // registerWake serves wake/state, wake/settings and wake/set, and keeps the Mac awake

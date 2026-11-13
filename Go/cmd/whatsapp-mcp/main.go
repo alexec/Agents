@@ -29,8 +29,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/alexec/agents/Go/internal/buildinfo"
-	"github.com/alexec/agents/Go/internal/whatsappmcp"
+	"github.com/agentloops-dev/agents/Go/internal/buildinfo"
+	"github.com/agentloops-dev/agents/Go/internal/whatsappmcp"
 )
 
 func main() {

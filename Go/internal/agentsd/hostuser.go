@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The user this machine belongs to (#1761, spec 736 US6): machine/user, which the control

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // The daemon's forge reads (#3209, after GitHub's in #3129): the issues or merge requests of

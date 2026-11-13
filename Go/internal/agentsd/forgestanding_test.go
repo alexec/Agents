@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/githubmcp"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #3661: the standing block's fields, case-insensitive, with lanes 1 when not said; no block, a

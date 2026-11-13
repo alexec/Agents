@@ -8,10 +8,10 @@ import (
 	"slices"
 	"sort"
 
-	"github.com/alexec/agents/Go/internal/agentsd/acp"
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/policylayers"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/acp"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/policylayers"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Allow, Ask or Off for each tool of a connector (#4099). The levels are the policy's

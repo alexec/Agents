@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #3726, #3877: an agent's worktree goes when it is archived or deleted, merged or not,

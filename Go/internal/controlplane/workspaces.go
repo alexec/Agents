@@ -6,9 +6,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controlplane/providers"
-	"github.com/alexec/agents/Go/internal/controlplane/records"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/providers"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Machine providers (#691), as ControlService.takeUp wires them: on a single copy, beside

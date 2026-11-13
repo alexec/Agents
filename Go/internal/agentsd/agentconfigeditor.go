@@ -8,10 +8,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/agentsd/yamlnode"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/skillcatalog"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/yamlnode"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The editor has a small, scoped file API. In particular, it never accepts an

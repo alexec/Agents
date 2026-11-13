@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/githubmcp"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 func (f *fakeForgeGitHub) CreateIssue(_ context.Context, repo, title string, labels []string) (int, string, error) {

@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Ports ACPToolShapeTests, AppViewPolicyTests and ThirdPartyViewsTests: a person's server's

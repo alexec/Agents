@@ -13,9 +13,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/controlplane/store"
-	"github.com/alexec/agents/Go/internal/machinelock"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/machinelock"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Prefix is where every person's lock is in the store.

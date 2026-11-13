@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/browser"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/browser"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The machine's browser (#3533): one Chromium, started on first use and stopped when

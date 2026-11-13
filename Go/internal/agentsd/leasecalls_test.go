@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Ports LeaseCallTests: an agent's lease, refused or waited for in line, its place a wait

@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/policylayers"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/policylayers"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A folder's own layer (#2957, US3): .agents/policy.json, committed with the folder's

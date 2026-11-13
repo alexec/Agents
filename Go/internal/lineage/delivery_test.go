@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #4552: a repo's delivery figures over the 4 weeks before now, from its nodes and its tags.

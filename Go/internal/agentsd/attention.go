@@ -15,10 +15,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/noticebucket"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/diskjson"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/noticebucket"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // What wants the person ("Needs you"), as DaemonCore+Attention derives and routes it on a

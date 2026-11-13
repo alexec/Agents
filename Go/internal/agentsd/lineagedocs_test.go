@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 func writeDoc(t *testing.T, root, rel string) string {

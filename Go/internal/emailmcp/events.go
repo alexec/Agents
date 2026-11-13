@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/wire"
 
 	"github.com/emersion/go-imap/v2"
 )

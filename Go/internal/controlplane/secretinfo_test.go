@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #4158: a row has when its name was first set, the hint a machine with a copy sent, its

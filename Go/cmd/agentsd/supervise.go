@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/rolllog"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/rolllog"
 )
 
 // supervise runs (a box with no systemd: under systemd, Restart=always does this) `agentsd <args>` and starts it again when it crashes (#1125: a host on a box

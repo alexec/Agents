@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
 )
 
 // countingStore counts List calls, the ones each running copy makes every 15 s.

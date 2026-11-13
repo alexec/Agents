@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Capabilities is this host's list (#1748): each capability whose methods it registers,

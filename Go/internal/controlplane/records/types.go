@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Client kinds, as ClientRecord.Kind says them. A kind a later build added reads as

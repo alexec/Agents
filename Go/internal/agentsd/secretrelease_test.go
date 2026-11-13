@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/machinelock"
-	"github.com/alexec/agents/Go/internal/secretrelease"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/machinelock"
+	"github.com/agentloops-dev/agents/Go/internal/secretrelease"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // fakeRelease is the control plane's half of #4058: it keeps the release key, and gives one

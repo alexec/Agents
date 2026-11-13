@@ -6,8 +6,8 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/controlplane/store"
-	"github.com/alexec/agents/Go/internal/controlplane/webpush"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/webpush"
 )
 
 // serviceKey is a VAPID key that sends nothing.

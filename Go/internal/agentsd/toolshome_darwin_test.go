@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // On a Mac the app's own toolsets are in the root's cache, where the Swift host put them:

@@ -1,6 +1,6 @@
 package policylayers
 
-import "github.com/alexec/agents/Go/wire"
+import "github.com/agentloops-dev/agents/Go/wire"
 
 // WithCaps fills each rule's cap and capLine for the layer a client edits, the lowest of
 // the layers eff was resolved from (data-model.md "EffectiveRule"): the tightest value of

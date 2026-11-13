@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The limits a paired client, and anyone on the internet, is held to (#2150).

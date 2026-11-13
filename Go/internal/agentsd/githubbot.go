@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/connections"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/connections"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The person's agents' bot (#3858, spec 3856 §4). A client asks this host for the App's

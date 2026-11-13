@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A session search for #<n> (#3899): the sessions on issue n, on its sub-issues (the issues

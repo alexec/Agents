@@ -3,7 +3,7 @@ package lineage
 import (
 	"testing"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #4529: an open epic's spend is its own and its children's, with their PRs, against the

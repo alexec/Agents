@@ -11,10 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/connections"
-	"github.com/alexec/agents/Go/internal/githubmcp"
-	"github.com/alexec/agents/Go/internal/gitlabmcp"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/connections"
+	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
+	"github.com/agentloops-dev/agents/Go/internal/gitlabmcp"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // fakeSetupGitHub answers the set-up's reads; err names a slot's error.

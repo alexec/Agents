@@ -17,7 +17,7 @@ import (
 
 	sdk "github.com/coder/acp-go-sdk"
 
-	"github.com/alexec/agents/Go/internal/agentsd/mcpcatalog"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/mcpcatalog"
 )
 
 // A check of an MCP server as a session would reach it (MCPClient, #753): started or

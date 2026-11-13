@@ -5,7 +5,7 @@ import (
 	"io"
 	"log/slog"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 
 	ghErrors "github.com/github/github-mcp-server/v2/pkg/errors"
 	"github.com/modelcontextprotocol/go-sdk/mcp"

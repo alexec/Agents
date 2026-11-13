@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/controlplane/records"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // required is the least the control plane needs of a peer to route for it (#1748,

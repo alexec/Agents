@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/githubmcp"
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // githubForge is GitHub on the forge interface (#4329, #4352): the host's GitHub connection

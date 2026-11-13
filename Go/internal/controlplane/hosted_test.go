@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
 )
 
 // #1807: a copy we run for an account has no ssh: no tunnels, and no machine installed,

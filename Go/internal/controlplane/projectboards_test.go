@@ -6,9 +6,9 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #3282: a board's address names its forge and the board there, in one form.

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The lock vectors (#3490): a chain Go signed, one with a forged entry, and a join's

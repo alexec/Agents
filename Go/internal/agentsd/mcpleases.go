@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Producer leases (#4731, spec 4724-event-bus, "The bus", step 6). Before each poll of a

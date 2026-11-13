@@ -16,9 +16,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/skillcatalog"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // agents-secret NAME from a terminal (#4179, step D of the spike #4168): a call with no

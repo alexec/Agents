@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // P20261031-1: a pr.commented wait with pr: N, over the real client, against a fake of GitHub

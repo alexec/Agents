@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Estimates from past work (#3559; the rule is the spike's, specs/3557-estimates/spec.md):
