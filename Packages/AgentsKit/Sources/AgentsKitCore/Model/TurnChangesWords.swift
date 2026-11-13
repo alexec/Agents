@@ -3,7 +3,7 @@ import Foundation
 /// The words of the Changed files card at the end of a turn (#3437), on the Mac and the
 /// Remote. `Web/src/model/turnChanges.ts` says the same on the web page.
 public enum TurnChangesWords {
-    public static let symbol = "doc.on.doc"
+    public static let symbol = "square.and.pencil"
     public static let undo = "Undo These Changes"
     public static let undoHelp = "Put these files back as they were before this turn"
     public static let undoing = "Undoing…"
@@ -16,6 +16,16 @@ public enum TurnChangesWords {
     public static func title(_ changes: TurnChanges) -> String {
         let n = changes.count
         return n == 1 ? "Changed 1 file" : "Changed \(n) files"
+    }
+
+    /// What the Object card's › does (#5035): it opens the files in Changes.
+    public static let openHelp = "Open these files in Changes"
+
+    /// The Object card's quiet line (#5035): the files by name, "a.txt, new.txt and 3 more".
+    public static func names(_ changes: TurnChanges) -> String {
+        let names = changes.files.map { URL(filePath: $0.path).lastPathComponent }
+        guard let more = changes.more, more > 0 else { return names.formatted(.list(type: .and)) }
+        return names.joined(separator: ", ") + " " + Self.more(more)
     }
 
     /// "and 12 more", under the files listed.

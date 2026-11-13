@@ -20,6 +20,16 @@ export function changedTitle(changes: TurnChanges): string {
   return n === 1 ? "Changed 1 file" : `Changed ${n} files`;
 }
 
+/** What the Object card's › does (#5035): it opens the files in Changes. */
+export const openHelp = "Open these files in Changes";
+
+/** The Object card's quiet line (#5035): the files by name, "a.txt, n.txt and 3 more". */
+export function fileNames(changes: TurnChanges): string {
+  const base = changes.files.map((f) => f.path.split("/").pop() ?? f.path);
+  if ((changes.more ?? 0) > 0) return `${base.join(", ")} ${moreWords(changes.more!)}`;
+  return new Intl.ListFormat("en", { type: "conjunction" }).format(base);
+}
+
 export function moreWords(n: number): string {
   return `and ${n} more`;
 }

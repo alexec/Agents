@@ -192,6 +192,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         setPane(session, { tab: "changes", changed: diff.path });
         showPane();
       },
+      // A turn's Changed files card (#5035): Changes, at the file or its list.
+      showChanges: (path) => {
+        setPane(session, { tab: "changes", changed: path ?? undefined });
+        showPane();
+      },
       // Into this chat's prompt bar, after what is typed there (#1553).
       quote: (words) => { store.offeredQuote.value = { draftKey: `${host}|${session}`, words }; },
       // Branch from Here on the person's prompt (#1658): never on an archived session, as Branch,

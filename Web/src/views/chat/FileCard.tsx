@@ -1,6 +1,6 @@
-// A file an agent showed with `show_file`, where it showed it (#836): Shared/UI/Chat/FileCard.swift
-// for the page. Layout A of specs/836-file-card/layout.svg: a chart, a diagram (#853) or a picture
-// has its preview above the name; anything else is one line. A click opens it in the Files pane at its line.
+// A file an agent showed with `show_file`, where it showed it (#836), as an Object card (#5035):
+// Shared/UI/Chat/FileCard.swift for the page. A chart, a diagram (#853) or a picture has its preview
+// above the name; anything else is one row. A click opens it in the Files pane at its line.
 import { useSignal } from "@preact/signals";
 import { useContext, useEffect } from "preact/hooks";
 import { markWords, problemWords, type ChartSpec } from "../../model/chart";
@@ -10,7 +10,8 @@ import { cardLine, look, type Look, type Shown } from "../../model/shownFile";
 import { ChartView, readChart } from "../files/ChartView";
 import { MermaidView } from "../../render/MermaidView";
 import { CallActionsContext } from "./Rows";
-import { Glyph, Icon } from "../Icon";
+import type { IconName } from "../Icon";
+import { ObjectCard } from "./ObjectCard";
 
 type Preview =
   | { kind: "loading" }
@@ -20,7 +21,8 @@ type Preview =
   | { kind: "words"; words: string }
   | { kind: "gone" };
 
-const symbols: Record<Look, string> = { chart: "📊", diagram: "🔀", picture: "🖼", page: "📄", file: "📄" };
+// The window's symbols, as Lucide icons (FileCard.swift).
+const icons: Record<Look, IconName> = { chart: "chart-column", diagram: "workflow", picture: "image", page: "file-text", file: "file-text" };
 
 function nameOf(path: string): string {
   return path.split("/").filter(Boolean).pop() ?? path;
@@ -72,28 +74,17 @@ export function FileCard({ file }: { file: Shown }) {
     : shown.kind === "chart" && !file.chart ? cardLine(file).replace(/^Chart/, markWords(shown.spec.mark))
     : cardLine(file);
   const open = actions?.showFile;
-  const body = (
-    <>
-      {previewed && shown.kind !== "gone" && (
-        <span class="file-card-preview" aria-hidden="true">
+  return (
+    <ObjectCard icon={icons[kind]} title={name} detail={detail} openTitle={`Open ${name} in Files`}
+      open={open ? () => open(file) : undefined}
+      preview={previewed && shown.kind !== "gone" ? (
+        <>
           {shown.kind === "loading" && <span class="quiet small">Reading…</span>}
           {shown.kind === "chart" && <ChartView spec={shown.spec} compact />}
           {shown.kind === "diagram" && <MermaidView diagram={shown.diagram} compact />}
           {shown.kind === "picture" && <img src={shown.src} alt="" />}
           {shown.kind === "words" && <span class="quiet small">{shown.words}</span>}
-        </span>
-      )}
-      <span class="file-card-line">
-        <Glyph of={symbols[kind]} class="file-card-symbol" />
-        <span class="file-card-words">
-          <span class="file-card-name">{name}</span>
-          <span class="file-card-detail quiet small">{detail}</span>
-        </span>
-        {open && <Icon name="chevron-right" class="file-card-chevron" />}
-      </span>
-    </>
+        </>
+      ) : undefined} />
   );
-  return open
-    ? <button class="file-card" title={`Open ${name} in Files`} aria-label={`${name}, ${detail}`} onClick={() => open(file)}>{body}</button>
-    : <div class="file-card" aria-label={`${name}, ${detail}`}>{body}</div>;
 }
