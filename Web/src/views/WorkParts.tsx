@@ -5,6 +5,7 @@ import type { ComponentChildren } from "preact";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { ForgeLabel } from "../protocol/generated";
+import { LastUpdate } from "./LastUpdate";
 import { MessageBanner } from "./MessageKinds";
 import { avatarHue, chipColours, labelScope, stateGlyph, stateGlyphWords, type StateGlyph } from "../model/work";
 
@@ -218,15 +219,17 @@ export function EmptyState({ kind, title, line, action }: {
  * nothing, a heading first ("Could not read issues", lists.md section 5), and `also` beside Try again (Settings ▸
  * Connectors, for a credential the forge refused). */
 /** A Work page drawn from this device's copy (#4930) while its machine is asked again: a neutral banner with a spinner,
- * gone when the machine answers. The window says the same (WorkLook.fromDevice). */
-export function FromDeviceStrip({ on }: { on: boolean }) {
-  if (!on) return null;
-  return <MessageBanner tone="neutral" name="work-from-device" busy><strong>From this device.</strong> Reading it again.</MessageBanner>;
+ * gone when the machine answers, that says when the copy was read (#5142). The window says the same (WorkLook.fromDevice). */
+export function FromDeviceStrip({ at }: { at: number | undefined }) {
+  if (at === undefined) return null;
+  return <MessageBanner tone="neutral" name="work-from-device" busy><strong>From this device.</strong> Reading it again. <LastUpdate at={at} /></MessageBanner>;
 }
 
-export function ErrorStrip({ lines, retry, middle, title, also }: {
+export function ErrorStrip({ lines, retry, middle, title, also, at }: {
   lines: readonly string[]; retry: () => void; middle?: boolean; title?: string | undefined;
   also?: { words: string; run: () => void } | undefined;
+  /** What is shown is an earlier read (#5142): "Last update 5 min ago" after the words. */
+  at?: number | undefined;
 }) {
   if (lines.length === 0) return null;
   return (
@@ -236,6 +239,7 @@ export function ErrorStrip({ lines, retry, middle, title, also }: {
       {also && <button type="button" onClick={also.run}>{also.words}</button>}
     </>}>
       {title && <span class="strong">{title}</span>}{lines.map((l) => <span key={l}>{l}</span>)}
+      {at !== undefined && <LastUpdate at={at} />}
     </MessageBanner>
   );
 }

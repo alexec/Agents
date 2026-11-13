@@ -33,7 +33,7 @@ import { ago } from "../model/connectorSetup";
 import { fromWireDate } from "../protocol/dates";
 import { type ForgeImages, Markdown } from "../render/markdown";
 import { bytesOf } from "../model/pageImage";
-import { keepWork, keptPicture, keptWork } from "../model/localCopy";
+import { keepWork, keptPicture, keptWorkRead } from "../model/localCopy";
 import { forgeMarkdown } from "../model/forgeMarkdown";
 import { ForgeTitle } from "../render/ForgeTitle";
 import {
@@ -214,8 +214,8 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
               also={problems.some(credentialProblem) ? { words: "Settings ▸ Connectors", run: connectors } : undefined} />
         : (
           <>
-            <FromDeviceStrip on={l.fromDevice.value} />
-            <ErrorStrip lines={problems} retry={refresh} />
+            <FromDeviceStrip at={l.fromDevice.value ? l.readAt.value : undefined} />
+            <ErrorStrip lines={problems} retry={refresh} at={stale.size > 0 ? l.readAt.value : undefined} />
             {rows.length === 0
               ? <EmptyState kind={kind} title={empty.title}
                   line={narrowed ? setFilters(filter_, offeredProjects.find((p) => p.id === filter_.project)?.name, filter_.board ? boardName(boards.value, filter_.board) : undefined) : empty.line}
@@ -319,6 +319,10 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const reading = useSignal(false);
   /** The item on screen came from this device's copy (#4930): no writes until its machine answers. */
   const fromDevice = useSignal(false);
+  /** When the item on screen was read (#5142): this device's copy's time, or the last read that worked. */
+  const detailAt = useSignal<number | undefined>(undefined);
+  /** When the plan drawn from this device's copy was read, until its machine answers (#5142). */
+  const planCopyAt = useSignal<number | undefined>(undefined);
   const older = useSignal(false);
   const estimate = useSignal<LineageEstimate | null>(null);
   const forecast = useSignal<LineageForecast | null>(null);
@@ -354,15 +358,15 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     void (async () => {
       // Seen before: this device's copy at once, until a machine answers (#4930).
       if (!detail.peek()) {
-        const kept = await keptWork<{ host: string; got: ForgeItemDetail }>("item", ref);
-        if (current && kept && !detail.peek()) { detail.value = kept; fromDevice.value = true; }
+        const kept = await keptWorkRead<{ host: string; got: ForgeItemDetail }>("item", ref);
+        if (current && kept && !detail.peek()) { detail.value = kept.value; detailAt.value = kept.at; fromDevice.value = true; }
       }
       let last: string | null = null;
       for (const h of forgeHosts) {
         try {
           const got = await store.link.call(kind === "pr" ? "forge/pull" : "forge/issue", { node }, h.id);
           if (current) {
-            detail.value = { host: h.id, got }; fromDevice.value = false; forgeProblem.value = null;
+            detail.value = { host: h.id, got }; detailAt.value = Date.now(); fromDevice.value = false; forgeProblem.value = null;
             keepWork("item", ref, { host: h.id, got });
           }
           return;
@@ -429,6 +433,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     try {
       const got = await store.link.call(kind === "pr" ? "forge/pull" : "forge/issue", { node }, had.host);
       detail.value = { host: had.host, got };
+      detailAt.value = Date.now();
       fromDevice.value = false;
       keepWork("item", ref, { host: had.host, got });
     } catch (e) {
@@ -437,6 +442,9 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   };
   // None while the page is this device's copy (#4930): a write acts on the machine's own answer.
   const writes = detail.value !== null && !fromDevice.value && store.has(detail.value.host, Capability.forgeWrite1);
+  // The page's one "From this device" strip (#5142): the oldest of the item's and the plan's copies on screen.
+  const copyReads = [fromDevice.value ? detailAt.value : undefined, planCopyAt.value].filter((at): at is number => at !== undefined);
+  const copyAt = forgeProblem.value || copyReads.length === 0 ? undefined : Math.min(...copyReads);
   // A write from the header or the side panel (the status menu, a label); what it did is the line under the comment box.
   const act = async (method: "forge/close" | "forge/label", params: ForgeCloseRequest | ForgeLabelRequest) => {
     const host = detail.value?.host;
@@ -617,9 +625,9 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
         {narrowStart && <div class="narrow-only">{narrowStart}</div>}
       </header>
       {detail.value && forgeProblem.value && (
-        <div class="work-problem"><ErrorStrip lines={[forgeProblem.value]} retry={() => { asked.value++; }} /></div>
+        <div class="work-problem"><ErrorStrip lines={[forgeProblem.value]} retry={() => { asked.value++; }} at={detailAt.value} /></div>
       )}
-      {fromDevice.value && !forgeProblem.value && <div class="work-problem"><FromDeviceStrip on /></div>}
+      {copyAt !== undefined && <div class="work-problem"><FromDeviceStrip at={copyAt} /></div>}
       {/* A pull request under 700 px (pull-request.md, Narrow): the merge box at the top, then Files changed as a row. */}
       {isPull && detail.value && (
         <div class="work-pull-top work-narrow-only">
@@ -663,7 +671,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
         {detail.value && hasPlan(detail.value.got.item) && (
           <WorkPlan store={store} host={detail.value.host} lineageHost={lineageHost} detail={detail.value.got} asked={asked.value}
             estimates={estimate.value?.children ?? []}
-            writes={writes} waiting={fromDevice.value} wrote={() => void reread()} />
+            writes={writes} waiting={fromDevice.value} wrote={() => void reread()} fromCopy={(at) => { planCopyAt.value = at; }} />
         )}
         {loading && (
           <div class="work-timeline" aria-hidden="true">

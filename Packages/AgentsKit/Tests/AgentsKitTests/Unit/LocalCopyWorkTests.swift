@@ -33,6 +33,17 @@ struct LocalCopyWorkTests {
         #expect(await copy.work(DaemonAPI.ForgePlan.self, .list, "issue|open|newest|") == nil)
     }
 
+    @Test func anAnswerComesBackWithWhenItWasRead() async {
+        let copy = LocalCopy(folder: folder(), cap: LocalCopy.macCap)
+        defer { Task { await copy.forget() } }
+        let read = Date(timeIntervalSince1970: 1_800_000_000)
+        await copy.keepWork(item(1), .item, "github:alexec/Agents#1", readAt: read)
+        let got = await copy.workRead(DaemonAPI.ForgeItem.self, .item, "github:alexec/Agents#1")
+        #expect(got?.value == item(1))
+        #expect(got?.at == read)
+        #expect(await copy.workRead(DaemonAPI.ForgeItem.self, .item, "github:alexec/Agents#2") == nil)
+    }
+
     @Test func aPictureIsKeptByItsURL() async {
         let copy = LocalCopy(folder: folder(), cap: LocalCopy.macCap)
         defer { Task { await copy.forget() } }

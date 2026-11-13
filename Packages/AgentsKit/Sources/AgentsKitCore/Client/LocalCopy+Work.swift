@@ -54,15 +54,25 @@ extension LocalCopy {
 
     /// The last answer kept for what was asked; nil with none, or one of another form.
     public func work<Value: Codable & Sendable>(_: Value.Type, _ group: WorkGroup, _ asked: String) -> Value? {
-        let ref = Self.workRef(group, asked)
-        guard let record = read(Value.self, at: workFile(ref, group)), record.ref == ref else { return nil }
-        return record.value
+        workRead(Value.self, group, asked)?.value
     }
 
-    /// A host's answer, kept, then the copy trimmed to its caps.
-    public func keepWork<Value: Codable & Sendable>(_ value: Value, _ group: WorkGroup, _ asked: String) {
+    /// The last answer kept for what was asked, with when the client read it from its host
+    /// (#5142), for the "Last update" line; nil with none, or one of another form. A file
+    /// written before the time was kept gives the file's own time.
+    public func workRead<Value: Codable & Sendable>(_: Value.Type, _ group: WorkGroup, _ asked: String) -> (value: Value, at: Date)? {
         let ref = Self.workRef(group, asked)
-        write(Record(ref: ref, value: value), to: workFile(ref, group))
+        let url = workFile(ref, group)
+        guard let record = read(Value.self, at: url), record.ref == ref else { return nil }
+        let written = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+        return (record.value, record.at ?? written ?? .distantPast)
+    }
+
+    /// A host's answer, kept, then the copy trimmed to its caps. `at` is when the client read
+    /// it from its host; now when not given.
+    public func keepWork<Value: Codable & Sendable>(_ value: Value, _ group: WorkGroup, _ asked: String, readAt at: Date = Date()) {
+        let ref = Self.workRef(group, asked)
+        write(Record(ref: ref, value: value, at: at), to: workFile(ref, group))
         trim()
     }
 
