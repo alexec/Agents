@@ -104,7 +104,7 @@ struct PairingView: View {
             ProgressView("Pairing…")
                 .appText(.fine)
         case .paired:
-            Label("Paired", systemImage: "checkmark.circle")
+            Label("Paired", icon: "checkmark.circle")
                 .appText(.fine)
         case .failed(let why):
             // The pairing's note (#4737), in place of its spinner.
@@ -126,7 +126,7 @@ private struct ScanSheet: View {
                         .ignoresSafeArea()
                 } else {
                     ContentUnavailableView("Can't use the camera",
-                                           systemImage: "camera",
+                                           icon: "camera",
                                            description: Text("Allow Agents to use the camera in Settings, "
                                                              + "then try again."))
                 }

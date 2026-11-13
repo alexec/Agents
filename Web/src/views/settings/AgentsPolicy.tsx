@@ -25,6 +25,7 @@ import { PolicySource } from "./PolicySource";
 import { GuardedChangeCard } from "../GuardedChange";
 import { useSettingsMachine } from "./SettingsMachine";
 import { MessageBanner } from "../MessageKinds";
+import { Icon } from "../Icon";
 
 export function AgentsPolicySection({ store, down }: { store: Store; down: boolean }) {
   const item = route.value.nav === "settings" ? route.value.item : undefined;
@@ -229,7 +230,7 @@ function RuleRow({ row, rule, folder, yours, editable, set }: { row: Row; rule: 
         <span>{row.title}</span>
         <Control id={id} row={row} rule={rule} folder={folder} yours={yours} editable={editable} set={set} />
       </label>
-      {rule?.capLine && <p class="hint"><span aria-hidden="true">🔒 </span>{rule.capLine}</p>}
+      {rule?.capLine && <p class="hint"><Icon name="lock" />{" "}{rule.capLine}</p>}
       {rule && kept && <p class="hint">{folder ? cappedByYours : keptNotUsed}. {rule.words} applies.</p>}
       <button type="button" class="link small" aria-expanded={open.value} disabled={!rule} onClick={() => { open.value = !open.value; }}>
         {whereFrom}

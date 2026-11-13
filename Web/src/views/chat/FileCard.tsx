@@ -10,6 +10,7 @@ import { cardLine, look, type Look, type Shown } from "../../model/shownFile";
 import { ChartView, readChart } from "../files/ChartView";
 import { MermaidView } from "../../render/MermaidView";
 import { CallActionsContext } from "./Rows";
+import { Glyph, Icon } from "../Icon";
 
 type Preview =
   | { kind: "loading" }
@@ -83,12 +84,12 @@ export function FileCard({ file }: { file: Shown }) {
         </span>
       )}
       <span class="file-card-line">
-        <span class="file-card-symbol" aria-hidden="true">{symbols[kind]}</span>
+        <Glyph of={symbols[kind]} class="file-card-symbol" />
         <span class="file-card-words">
           <span class="file-card-name">{name}</span>
           <span class="file-card-detail quiet small">{detail}</span>
         </span>
-        {open && <span class="file-card-chevron" aria-hidden="true">›</span>}
+        {open && <Icon name="chevron-right" class="file-card-chevron" />}
       </span>
     </>
   );

@@ -40,7 +40,7 @@ struct PagePane: View {
             if let url {
                 page(url)
             } else {
-                ContentUnavailableView("No page yet", systemImage: "doc.richtext",
+                ContentUnavailableView("No page yet", icon: "doc.richtext",
                                        description: Text("A Markdown file the agent shows, or one you open in Files, reads here."))
             }
         }
@@ -107,7 +107,7 @@ struct PagePane: View {
                 Text(url.lastPathComponent).appText(.fine).foregroundStyle(Paper.secondary)
                     .lineLimit(1).truncationMode(.middle)
                 Spacer()
-                Button(pinned ? "Unpin" : "Pin to Folder", systemImage: pinned ? "pin.slash" : "pin") {
+                Button(pinned ? "Unpin" : "Pin to Folder", icon: pinned ? "pin.slash" : "pin") {
                     Task {
                         if pinned { await model.unpin(path, in: agent.folderPath) }
                         else { await model.pin(path, in: agent.folderPath) }

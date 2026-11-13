@@ -49,6 +49,7 @@ import { eventsWaitingLine } from "../model/eventsWaiting";
 import type { Session } from "../session";
 import { ask } from "./MessageKinds";
 import { CommandMenu } from "./CommandMenu";
+import { Icon } from "./Icon";
 
 /**
  * How many requests and sessions need the person, across every folder: Agents' count in the bar.
@@ -117,7 +118,7 @@ export function NavBar({ store, session }: { store: Store; session: Session }) {
         <div class="nav-items wide-only">{shown.map(item)}</div>
         <div class="nav-menu narrow-only">
           <button type="button" class="nav-menu-button" aria-expanded={menuOpen.value} onClick={() => { menuOpen.value = !menuOpen.value; }}>
-            {navTitle[current]} {menuOpen.value ? "▴" : "▾"}
+            {navTitle[current]} <Icon name={menuOpen.value ? "chevron-up" : "chevron-down"} />
             {!menuOpen.value && shown.some((s) => countOf(store, s, admin) > 0) && <span class="sub-app-count" aria-hidden="true">•</span>}
           </button>
           {menuOpen.value && <div class="nav-menu-list">{shown.map(item)}</div>}

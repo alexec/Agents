@@ -28,15 +28,15 @@ struct RemoteChangesPane: View {
                 .id(selectedPath)
             } else if let list {
                 if list.files.isEmpty, !list.reportsEdits, case .unavailable(let why) = list.git {
-                    ContentUnavailableView("Changes unavailable", systemImage: "arrow.triangle.2.circlepath",
+                    ContentUnavailableView("Changes unavailable", icon: "arrow.triangle.2.circlepath",
                                            description: Text(Self.unavailable(why)))
                 } else if list.files.isEmpty {
-                    ContentUnavailableView("No changes yet", systemImage: "checkmark.circle")
+                    ContentUnavailableView("No changes yet", icon: "checkmark.circle")
                 } else {
                     files(list)
                 }
             } else if let problem {
-                ContentUnavailableView("Changes could not be read", systemImage: "exclamationmark.triangle",
+                ContentUnavailableView("Changes could not be read", icon: "exclamationmark.triangle",
                                        description: Text(problem))
             } else {
                 ProgressView()

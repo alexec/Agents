@@ -383,7 +383,9 @@ private final class BeaconView: ClockedLayersView {
         return fit.cgImage(forProposedRect: &pixels, context: nil, hints: nil)
         #else
         let config = UIImage.SymbolConfiguration(pointSize: side, weight: .medium)
-        guard let symbol = UIImage(systemName: name, withConfiguration: config) else { return nil }
+        // The Lucide symbol of the same meaning (#4996), as `Image(icon:)` draws it
+        guard let symbol = PaperIcon.lucide(name).flatMap({ UIImage(named: $0, in: nil, with: config) })
+            ?? UIImage(systemName: name, withConfiguration: config) else { return nil }
         let format = UIGraphicsImageRendererFormat()
         format.scale = scale
         return UIGraphicsImageRenderer(size: symbol.size, format: format).image { _ in

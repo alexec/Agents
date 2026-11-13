@@ -7,6 +7,7 @@ import { useSignal } from "@preact/signals";
 import type { Agent } from "../protocol/generated";
 import { planDone, planInForce, planStep, planSummary } from "../model/currentPlan";
 import { PlanView } from "./chat/Rows";
+import { Icon } from "./Icon";
 
 export function CurrentPlanStrip({ agent }: { agent: Agent | undefined }) {
   const open = useSignal(false);
@@ -20,10 +21,10 @@ export function CurrentPlanStrip({ agent }: { agent: Agent | undefined }) {
         <button class="plan-summary" aria-expanded={open.value} aria-label={planSummary(plan)}
           onClick={() => (open.value = !open.value)}>
           <span class="plan-line">
-            <span class="plan-icon" aria-hidden="true">☑</span>
+            <Icon name="square-check" class="plan-icon" />
             <span class="plan-step">{planStep(plan)}</span>
             <span class="plan-count">{done} of {total}</span>
-            <span class="chevron" aria-hidden="true">{open.value ? "▾" : "▸"}</span>
+            <Icon name={open.value ? "chevron-down" : "chevron-right"} class="chevron" />
           </span>
           <span class="plan-bar" aria-hidden="true"><span style={{ width: `${(done / total) * 100}%` }} /></span>
         </button>

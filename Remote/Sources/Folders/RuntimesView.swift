@@ -61,7 +61,7 @@ struct RuntimesView: View {
                         }
                     }
                 } label: {
-                    Label("Add Account", systemImage: "person.badge.plus")
+                    Label("Add Account", icon: "person.badge.plus")
                 }
             }
         }
@@ -171,7 +171,7 @@ private struct ReachesTheModelByMenu: View {
     }
 
     @ViewBuilder private func label(_ title: String, chosen: Bool) -> some View {
-        if chosen { Label(title, systemImage: "checkmark") } else { Text(title) }
+        if chosen { Label(title, icon: "checkmark") } else { Text(title) }
     }
 
     private func set(_ accountID: String?) {
@@ -216,13 +216,13 @@ struct RuntimesLink: View {
     var body: some View {
         NavigationLink { RuntimesView() } label: {
             HStack {
-                Label("Runtimes", systemImage: "cpu")
+                Label("Runtimes", icon: "cpu")
                 Spacer()
                 if model.runtimeAllowances?.anyOut == true {
                     Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 8, height: 8)
                         .accessibilityLabel("A runtime is out")
                 }
-                Image(systemName: "chevron.right").foregroundStyle(Paper.tertiary)
+                Image(icon: "chevron.right").foregroundStyle(Paper.tertiary)
             }
             .contentShape(Rectangle())
         }

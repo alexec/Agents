@@ -39,6 +39,7 @@ import { Overview } from "./Overview";
 import { navPages } from "../model/nav";
 import { sectionOf } from "../route";
 import { OrgPolicyStrip } from "./OrgPolicyLine";
+import { Icon } from "./Icon";
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
@@ -150,7 +151,7 @@ function MissingSession({ store, looked }: { store: Store; looked: boolean }) {
   if (!looked && failure) {
     return (
       <section class="chat empty session-not-loaded" aria-label="Session did not load">
-        <span class="glyph" aria-hidden="true">⚠︎</span>
+        <Icon name="triangle-alert" class="glyph" />
         <h2>This session did not load</h2>
         <p role="status">{failure.reason}</p>
         <p><button class="link" onClick={() => { void store.reloadTranscript(); }}>Try Again</button></p>
@@ -160,7 +161,7 @@ function MissingSession({ store, looked }: { store: Store; looked: boolean }) {
   if (!looked) return <section class="chat empty" aria-label="Loading" aria-busy="true"><span class="spinner" aria-hidden="true" /></section>;
   return (
     <section class="chat empty session-deleted" aria-label="Session deleted">
-      <span class="glyph" aria-hidden="true">🗑</span>
+      <Icon name="trash-2" class="glyph" />
       <h2>This session was deleted</h2>
       <p>There is nothing left of it to show. Pick another session on the left.</p>
     </section>
