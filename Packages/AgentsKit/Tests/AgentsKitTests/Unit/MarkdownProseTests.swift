@@ -33,4 +33,19 @@ struct MarkdownProseTests {
         #expect(MarkdownBlock.segments(blocks) == [.block(0), .block(1)])
         #expect(MarkdownBlock.segments([]) == [])
     }
+
+    @Test func codeJoinsTheWordsWhenAsked() {
+        let blocks = MarkdownBlock.parse("Before.\n\n```swift\nlet x = 1\n```\n\nAfter.")
+        #expect(MarkdownBlock.segments(blocks, code: true) == [.prose(0..<3)])
+    }
+
+    @Test func aDiagramAndATableStillStandAloneWithCode() {
+        let blocks = MarkdownBlock.parse("Before.\n\n```mermaid\ngraph TD\nA-->B\n```\n\n```sh\nmake\n```\n\n| a |\n|---|\n| 1 |")
+        #expect(MarkdownBlock.segments(blocks, code: true) == [.prose(0..<1), .block(1), .prose(2..<3), .block(3)])
+    }
+
+    @Test func codeInAListStaysApartWithCode() {
+        let blocks = MarkdownBlock.parse("- step\n\n  ```\n  make\n  ```\n- done")
+        #expect(MarkdownBlock.segments(blocks, code: true) == [.block(0)])
+    }
 }
