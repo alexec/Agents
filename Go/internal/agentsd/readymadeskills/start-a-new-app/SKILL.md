@@ -28,6 +28,61 @@ Rules for every step:
   ask you to go on later. Then end.
 - **Tell the person what you do,** in one short line per step. In voice mode, keep it
   shorter.
+- **Keep the task list below as your plan** (next section), and tick each task as you go.
+
+## The task list
+
+Write the task list of the kind of app as your plan, with your runtime's own to-do list
+(Claude's `TodoWrite`, Codex's `update_plan`), as soon as you know the kind. Use these words
+exactly, in this order, and add no other task: a first build's plan page finds each task
+by its words. Write it again each time a task's state changes:
+
+- a task is `completed` when its step is done, or was done before you came to it;
+- the task of the step that you do now is `in_progress`, also while a card waits for the
+  person: only one task at a time;
+- the other tasks are `pending`.
+
+The first two tasks are the app's, done before you start: write them as `completed`.
+
+**iPhone app** (`iphone-app`):
+
+| # | Task | Done when |
+| --- | --- | --- |
+| 1 | Set up the agent runtime | already done |
+| 2 | Connect GitHub | already done |
+| 3 | Make the repository from alexec/iphone-app-starter | steps 2 and 3 |
+| 4 | Join the Apple Developer Program | step 4.1 |
+| 5 | Put the App Store Connect key in the repository's CI | steps 4.2 to 4.7 |
+| 6 | Set up Sentry | step 6 |
+| 7 | Send the first build to TestFlight | step 7.1 |
+| 8 | Approve the first build | steps 7.2 and 7.3: the run succeeded |
+
+**Web service** (`web-service`):
+
+| # | Task | Done when |
+| --- | --- | --- |
+| 1 | Set up the agent runtime | already done |
+| 2 | Connect GitHub | already done |
+| 3 | Make the repository from alexec/web-service-starter | steps 2 and 3 |
+| 4 | Set up Google Cloud (Cloud Run) | step 5 |
+| 5 | Set up Sentry | step 6 |
+| 6 | Deploy the first version | step 7.1 |
+| 7 | Approve the first deploy | steps 7.2 and 7.3: the run succeeded |
+
+For **Both**, write the iPhone app's list, then the web service's tasks 3 to 7, each with
+` (web)` at its end. With a template repository of the person's own, put its `owner/name`
+in task 3 in place of ours.
+
+When the flow stops (**Can't do it**, or a failure), leave the plan as it is: the task
+that stopped stays `in_progress`. When the person asks you to go on, look at what is
+there, write the plan again from what you find, and go on from the first task that is not
+done.
+
+**A first build** (#5048) starts with a prompt from the app: `Build my first app with the
+start-a-new-app skill. The idea: <idea>. The kind: <kind>; the starter: <starter>. Keep the
+first-build task list as your plan.` Then the kind is answered: skip step 1.1, write the
+plan at once, and take the app's name from step 1.2, with a short name made from the idea
+as your suggestion in the question.
 
 ## 1. The kind of app and its name
 
