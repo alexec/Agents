@@ -16,6 +16,7 @@ import { Modal } from "./Modal";
 import { MachineDialog } from "./MachineDialog";
 import { machineWords } from "../model/machineFromRepository";
 import { projectWords } from "../model/projects";
+import { firstBuild, newAppItem } from "../model/firstBuild";
 
 type Adding = { kind: "folder" | "clone"; host: string } | { kind: "machine" };
 
@@ -85,6 +86,8 @@ export function NewFolderMenu({ store, newSession }: { store: Store; newSession?
           {/* As the sidebar's top row starts one, in the folder last started in (#628). */}
           <button role="menuitem" disabled={!newSession} onClick={() => { open.value = false; newSession?.(); }}>New Session</button>
           <NewFolderItems store={store} onChoose={() => (open.value = false)} />
+          {/* Let's build your idea, again (#5132), as the window's File ▸ New App…, after the folders' items. */}
+          <button role="menuitem" onClick={() => { open.value = false; firstBuild.newApp(); }}>{newAppItem}</button>
           {/* A machine of its own for a repository (#1809), made by a machine provider. */}
           <button role="menuitem" onClick={() => { open.value = false; adding.value = { kind: "machine" }; }}>{machineWords.menuItem}</button>
         </div>

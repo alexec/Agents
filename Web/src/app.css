@@ -2945,6 +2945,8 @@ dialog.message-alert { width: min(420px, calc(100vw - 32px)); }
 .first-build-idea.still { transition: none; }
 @media (prefers-reduced-motion: reduce) { .first-build-idea { transition: none; } }
 .first-build-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; }
+/* New App…'s Cancel (#5132) sits beside Submit, at the right, as on the Mac. */
+.first-build-foot > [role="status"] { margin-right: auto; }
 
 /* The plan page (#5054): after Submit, the whole page, as the Mac window's (#5053). The plan on top,
    the first-build session's chat under it. */

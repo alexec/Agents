@@ -22,9 +22,18 @@ your first app, deployed, and an agent does them with you (#5048).
 
 ## Who sees the question page
 
-Only a newcomer: a control plane with no folder, on which no agent ever ran. A person who
-is set up already never sees it. A new Mac that joins a control plane with work on it, a
-second browser, and a person who chose **Open Agents** on the plan page do not see it.
+On its own, only a newcomer: a control plane with no folder, on which no agent ever ran. A
+new Mac that joins a control plane with work on it, a second browser, and a person who chose
+**Open Agents** on the plan page do not see it.
+
+A person who is set up already opens it with **New App…** (#5132):
+
+- On the Mac: **File ▸ New App…** (⇧⌘A), or **New App…** in the command menu (⌘K).
+- On the web page: **New App…** in the **+** menu at the top of the folders column, or in
+  the command menu (⌘K).
+
+Opened this way, the page has **Cancel** (or press Escape), which goes back to the window as
+it was. Each idea you submit this way is a new first-build session of its own.
 
 In a browser on a hosted account, you first add a machine, because an agent needs one.
 Then the question page shows.
@@ -121,8 +130,9 @@ Choose **Open Agents**, at the top right of the plan page, at any time. The usua
 list. The plan page does not come back by itself. It also goes when you archive the
 first-build session.
 
-To make another app later, ask any agent: "Make me an app that …". The agent follows the
-same skill.
+To make another app later, choose **New App…** (see
+[Who sees the question page](#who-sees-the-question-page)), or ask any agent: "Make me an
+app that …". The agent follows the same skill.
 
 ## If something goes wrong
 

@@ -127,3 +127,28 @@ test("Submit keeps the starter the words pick; Back gives the words back; Open A
   assert.equal(unfit.draft.value, "a game about frogs");
   assert.equal(unfit.kept.value, "showing");
 });
+
+test("New App… opens the question page for a person who is set up, and Cancel closes it (#5132)", () => {
+  const setUp = { ...newcomer, hasFolder: true, ranAgent: true };
+  const kept = storage();
+  const page = new m.FirstBuildStore(kept);
+  page.take(setUp);
+  assert.equal(page.kept.value, "gone");
+  page.newApp();
+  page.take(setUp);
+  assert.equal(page.kept.value, "showing");
+  assert.equal(page.another.value, true);
+  assert.equal(page.sent.value, null);
+  page.send("A website for my book club's reading list");
+  page.started({ host: "mac", id: "a2" });
+  const again = new m.FirstBuildStore(kept);
+  again.take(setUp);
+  assert.equal(again.kept.value, "showing");
+  assert.equal(again.another.value, true);
+  again.leave();
+  assert.equal(again.another.value, false);
+  const after = new m.FirstBuildStore(kept);
+  after.take(setUp);
+  assert.equal(after.kept.value, "gone");
+  assert.equal(after.another.value, false);
+});

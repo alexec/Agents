@@ -4742,7 +4742,7 @@ type FindResult struct {
 	More bool `json:"more"`
 }
 
-// firstBuild/start (#5056, spec 5048 section 7): the newcomer's idea, as typed, the starter the plan page shows, and the runtime its first task set up. The host makes the folder ~/.agents/first-build when it is not there, writes the first prompt itself, so every client sends the same, and labels the session first-build. It answers with the session's id. While a first-build session that is not archived is there, it refuses with firstBuildRunning, with that session's id as the data.
+// firstBuild/start (#5056, spec 5048 section 7): the newcomer's idea, as typed, the starter the plan page shows, and the runtime its first task set up. The host makes the folder ~/.agents/first-build when it is not there, writes the first prompt itself, so every client sends the same, and labels the session first-build. It answers with the session's id. While a first-build session that is not archived is there, it refuses with firstBuildRunning, with that session's id as the data, unless another is true (New App…, #5132).
 type FirstBuildStartRequest struct {
 	// The person's words, as typed. Not empty.
 	Idea string `json:"idea"`
@@ -4751,6 +4751,9 @@ type FirstBuildStartRequest struct {
 
 	// The runtime that the plan page's first task set up, as agents/start takes it.
 	RuntimeID string `json:"runtimeID"`
+
+	// New App… (#5132): start one more first build, also while a first-build session is there. Absent or false keeps the newcomer's rule: refuse with firstBuildRunning.
+	Another *bool `json:"another,omitzero"`
 }
 
 // The starter that a first build begins from (#5048): iphone-app is alexec/iphone-app-starter, web-service is alexec/web-service-starter, as make_app_repository names them.

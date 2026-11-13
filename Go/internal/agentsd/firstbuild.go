@@ -33,7 +33,7 @@ func (d *Daemon) registerFirstBuild() {
 
 // startFirstBuild adds the folder ~/.agents/first-build when it is not there and starts the
 // agent in it, labelled first-build. While a first-build session that is not archived is
-// there, it refuses with that session's id.
+// there, it refuses with that session's id, unless the request asks for another (New App…).
 func (d *Daemon) startFirstBuild(r wire.FirstBuildStartRequest, actor *wire.AuditActor) (wire.UUID, error) {
 	idea := strings.TrimSpace(r.Idea)
 	if idea == "" {
@@ -48,7 +48,9 @@ func (d *Daemon) startFirstBuild(r wire.FirstBuildStartRequest, actor *wire.Audi
 	}
 	firstBuildMu.Lock()
 	defer firstBuildMu.Unlock()
-	if id, ok := d.firstBuildSession(); ok {
+	// New App… (#5132) asks for one more on purpose: only the newcomer's Submit is one per control plane.
+	another := r.Another != nil && *r.Another
+	if id, ok := d.firstBuildSession(); ok && !another {
 		return "", &Error{Code: wire.FailureFirstBuildRunning,
 			Message: "A first build is there already: session " + string(id) + ".",
 			Data:    map[string]any{"agentID": id}}

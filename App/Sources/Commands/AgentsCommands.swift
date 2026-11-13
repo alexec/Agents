@@ -131,6 +131,10 @@ struct AgentsCommands: Commands {
                 .keyboardShortcut(MenuKeys.addFolder)
             Button("Clone Folder from Git URL…") { requests.folderSheet = .clone() }
                 .keyboardShortcut(MenuKeys.cloneFolder)
+            // Let's build your idea, again (#5132): the question page, for a person who is set up.
+            Button(FirstBuild.newAppItem) { newApp() }
+                .keyboardShortcut(MenuKeys.newApp)
+                .disabled(model.needsFirstRun || model.asksFirstBuild)
             // On a server (037).
             if !model.hosts.servers.isEmpty {
                 Menu("Add Folder On") {
@@ -512,6 +516,12 @@ struct AgentsCommands: Commands {
 
     // MARK: Command menu
 
+    /// New App… (#5132): the question page in the main window, in front.
+    private func newApp() {
+        if popped != nil || folderWindow != nil { model.bringMainWindowForward(opening: openWindow) }
+        model.newApp()
+    }
+
     /// ⌘K (#4787): the main window's command menu, in front, with the actions that can be
     /// done now. A folder's or a session's own window brings the main window forward.
     private func openCommandMenu() {
@@ -585,6 +595,8 @@ struct AgentsCommands: Commands {
             when: keyTerminal.isOpen || keyFolder?.exists == true) { keyTerminal.toggle() }
         add("Add Folder…", MenuKeys.addFolder) { requests.folderSheet = .chooseFolder() }
         add("Clone Folder from Git URL…", MenuKeys.cloneFolder) { requests.folderSheet = .clone() }
+        add(FirstBuild.newAppItem, MenuKeys.newApp, keywords: ["Let's build your idea", "first build"],
+            when: !model.needsFirstRun && !model.asksFirstBuild) { newApp() }
         add("Show in Finder", when: folderForFinder != nil) { showInFinder() }
         add("Events", MenuKeys.events) { model.showEvents() }
         add("Resources", MenuKeys.resources) { model.showResources() }
