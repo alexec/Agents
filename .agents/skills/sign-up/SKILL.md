@@ -144,6 +144,20 @@ agentloops@fastmail.com where the site lets you, or ask Alex with `ask_question`
   again with the same secret and choose "Sign in with a passkey". Record the second factor as
   "software passkey" in `manage_accounts`. The Okta walk's own Chrome still uses
   `scripts/okta-signin.mjs`, which keeps its key in `~/.agents/secrets/okta-integrator-passkey.json`.
+- **GitHub sudo on `alexec` (#5096):** GitHub asks for "Confirm access" before a sensitive
+  setting page (tokens, Apps, Danger Zone, a new organisation). Do not ask Alex for an email
+  code or GitHub Mobile. Use the software passkey **Agents browser software passkey 5096**,
+  kept as the secret `GITHUB_ALEXEC_PASSKEY` (Ask before use, so each use waits for Alex's
+  approval in the app):
+  1. `browser_navigate` to the sudo page, so that the session's tab is open.
+  2. `browser_passkey` with `secret` `GITHUB_ALEXEC_PASSKEY` and `site` `github.com`. When it
+     says to wait, wait with `wait_for_event` on `request.answered` for the request it names,
+     then call it again.
+  3. Load the page again, then "Use your passkey" ▸ "Use passkey". The page goes on at once.
+     When the page shows "Waiting for input from browser interaction" for more than a few
+     seconds, the passkey is not on that tab (#5196): do steps 2 and 3 again.
+  4. Do the step, then `browser_passkey` with `off`. Never add or remove a passkey or change
+     a 2FA method on `alexec`: they are Alex's.
 - **Accounts:** `manage_accounts` with action `add` (#3967): service, a description (what it is
   for and who uses it, so another agent can tell it from the other accounts of the service, #4164), address, plan, monthly
   cost, card (its name in Settings ▸ You ▸ Secrets), secret (its name there, or where it is), the
@@ -188,9 +202,9 @@ accounts", and only for this step.
   personal account**", and the terms (accept them for Alex). Untick any marketing box. Skip
   "add members".
 - **CAPTCHA or sudo:** GitHub's docs list no sudo step for this page. If GitHub shows a
-  CAPTCHA, or asks for sudo (its email code goes to Alex's address), do only that step with
-  `hand_to_person`, then add it to #5064 (or the open automation issue for it under #3905).
-  The software passkey of #4085 is the sudo factor Alex chose (#4955).
+  CAPTCHA, do only that step with `hand_to_person`, then add it to #5064 (or the open
+  automation issue for it under #3905). If GitHub asks for sudo, pass it with the agents'
+  passkey ("GitHub sudo on `alexec`", above; #4955, #5096).
 - **Check after:** `gh api orgs/<name>` gives 200 and `type` `Organization`; Alex's own `gh`
   on `user/memberships/orgs/<name>` gives `role` `admin` and `state` `active`, and on
   `orgs/<name> --jq .plan.name` gives `free`. A plan that is not `free` is a charge: tell
