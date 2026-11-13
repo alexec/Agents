@@ -635,7 +635,7 @@ struct WorkflowPage: View {
                 }
             }
             Spacer(minLength: 12)
-            if trigger.schedule != nil {
+            if trigger.schedule != nil || trigger.alarm != nil {
                 Text(nextLine(at: index, summary))
                     .appText(.fine)
                     .foregroundStyle(.secondary)
@@ -649,6 +649,7 @@ struct WorkflowPage: View {
     private func symbol(for trigger: WorkflowTrigger) -> String {
         switch trigger {
         case .schedule: return "alarm"
+        case .once: return "calendar"
         case .event(let pattern):
             switch EventSubject(name: pattern.name) {
             case .agent: return "person.crop.circle"
@@ -670,7 +671,7 @@ struct WorkflowPage: View {
         let host = model.isOnThisMac(place.host)
             ? "this Mac" : model.hosts.label(place.host)
         let folder = place.folder?.lastPathComponent ?? "this folder"
-        if trigger.schedule != nil { return "By the clock on \(host)" }
+        if trigger.schedule != nil || trigger.alarm != nil { return "By the clock on \(host)" }
         switch trigger.listensIn {
         case .folder?: return "In \(folder), on \(host)"
         case .mac?: return "Anywhere on \(host), so it runs in every folder"
@@ -702,7 +703,12 @@ struct WorkflowPage: View {
     private func lastRan(_ summary: WorkflowSummary) -> some View {
         if let at = summary.lastFiredAt {
             let when = at.formatted(.relative(presentation: .named))
-            note(["Last ran \(when)", summary.lastFiredBy?.phrase].compactMap { $0 }.joined(separator: ", ") + ".")
+            // An alarm's run also says how late it fired (#4966).
+            let late: String? = {
+                guard case .trigger(let trigger)? = summary.lastFiredBy else { return nil }
+                return trigger.alarm?.lateness(firedAt: at)
+            }()
+            note(["Last ran \(when)", summary.lastFiredBy?.phrase, late].compactMap { $0 }.joined(separator: ", ") + ".")
         } else {
             note("Has not run yet.")
         }

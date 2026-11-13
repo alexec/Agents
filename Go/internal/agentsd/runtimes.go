@@ -342,6 +342,11 @@ func (d *Daemon) launchOn(r *runtimeDef, dir string, account *wire.AccountProfil
 	root := d.Store.Loc.Root
 	switch r.ID {
 	case "claude":
+		// Claude Code gives a model newer than claude-opus-4-7 no to-do tools unless this
+		// is set (2.1.318, #5093). With it, a session has TaskCreate and TaskUpdate, which
+		// the adapter sends as the session's plan: the plan strip and a first build's plan
+		// page read it. The person's own value, when set, is kept.
+		env = withClaudeTodoTools(env)
 		if rl := d.relayFor("claude"); rl != nil && account == nil {
 			env = without(env, "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX",
 				"ANTHROPIC_BASE_URL", "CLAUDE_CODE_OAUTH_TOKEN", "NODE_EXTRA_CA_CERTS")
@@ -449,6 +454,17 @@ func (d *Daemon) needsSignIn(runtimeID string) error {
 // kept. Cursor has no lever (its permission vocabulary names no tool), and Antigravity has
 // nothing to take away since sub-agents and task lists came back (2026-09-29): an empty deny
 // list or policy file is not sent, as Swift did not send one.
+
+// claudeTodoTools turns Claude Code's task tools on for every model (#5093).
+const claudeTodoTools = "CLAUDE_CODE_ENABLE_TODO_TOOLS"
+
+// withClaudeTodoTools is env with claudeTodoTools on, unless the person set it.
+func withClaudeTodoTools(env []string) []string {
+	if hasVariable(env, claudeTodoTools) {
+		return env
+	}
+	return append(without(env, claudeTodoTools), claudeTodoTools+"=1")
+}
 
 // toolPolicyEnv is the environmentJSON lever: JSON in a variable the runtime reads at
 // start, compact with sorted keys, the person's own replaced.

@@ -4099,11 +4099,14 @@ type ElicitationAnswer struct {
 	Answer string `json:"answer"`
 }
 
-// An agent's hand_to_person (#3529): one step the person does on the page in the machine's browser (solve a CAPTCHA, sign in). The form's one choice is Done or Can't do it; a client that can show the machine's browser offers Open the page.
+// An agent's hand_to_person (#3529): one step the person does on the page in the machine's browser (solve a CAPTCHA, sign in). The form's one choice is Done or Can't do it; a client that can show the machine's browser offers Open the page, unless the step is in another window (window).
 type ElicitationHandOff struct {
 	Step string `json:"step"`
 
 	Reason *string `json:"reason,omitzero"`
+
+	// Where the person does the step when it is not in the machine's browser (#5095): one of the agents' own Chrome windows, as "the agents' Chrome (DevTools port 9233), at the tab “Create account”". A client then offers no Open the page and says this window instead.
+	Window *string `json:"window,omitzero"`
 }
 
 type ElicitationNotification struct {
