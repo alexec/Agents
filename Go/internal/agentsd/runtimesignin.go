@@ -236,7 +236,15 @@ func (d *Daemon) finishHeadlessSignIn(ctx context.Context, r wire.RuntimeSignInF
 			return wire.RuntimeStatus{}, Invalid("Paste the code the sign-in page gave.")
 		}
 		before := len(s.out.text())
-		if _, err := io.WriteString(s.tty, code+"\r"); err != nil {
+		// The code, then Enter by itself once Claude shows the code (#5202). Ink takes a
+		// long write as a paste and drops an Enter in it: with code+"\r" in one write, a
+		// real code (92 characters) waited at the prompt until the sign-in ran out.
+		_, err := io.WriteString(s.tty, code)
+		if err == nil {
+			s.await(ctx, 2*time.Second, func(text string) bool { return len(text) > before })
+			_, err = io.WriteString(s.tty, "\r")
+		}
+		if err != nil {
 			d.dropHeadless(s)
 			return wire.RuntimeStatus{}, &Error{Code: CodeServer, Message: "Claude's sign-in has stopped. Start it again."}
 		}

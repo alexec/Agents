@@ -17,8 +17,17 @@ import (
 
 const fakeClaudeTool = `#!/bin/sh
 [ "$1" = setup-token ] || exit 2
+stty raw -echo 2>/dev/null
 printf 'Browser did not open? Use the url below to sign in:\n\n\033]8;;https://claude.ai/oauth/authorize?code=true&state=x\007https://claude.ai/oauth/authorize?code=true&state=x\033]8;;\007\n\nPaste code here if prompted > '
-read code
+# As Claude's Ink prompt (#5202): a chunk with text in it is a paste, and an Enter in a
+# paste is dropped; only an Enter by itself submits. Each chunk shows as a star.
+cr=$(printf '\r'); code=
+while :; do
+  chunk=$(dd bs=512 count=1 2>/dev/null)
+  [ "$chunk" = "$cr" ] && break
+  code="$code$(printf '%s' "$chunk" | tr -d '\r')"
+  printf '*'
+done
 if [ "$code" = good ]; then
   printf '\n\033[32mLong-lived authentication token created\033[0m\n\nsk-ant-oat01-abc_DEF-123\n'
   sleep 30
