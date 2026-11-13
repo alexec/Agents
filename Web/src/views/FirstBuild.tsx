@@ -1,6 +1,7 @@
 // The question page (#5051, spec 5048-first-build section 1): a newcomer's first open on the
 // web page, as the Mac window's. The Huddle, "Let's build your idea.", and one prompt box whose
-// placeholder rotates through ideas. No sidebar, no toolbar, no way past it.
+// placeholder rotates through ideas. No sidebar, no toolbar, no way past it. New App… (#5132) opens it
+// again for a person who is set up, with Cancel.
 import { useEffect, useRef, useState } from "preact/hooks";
 import { firstBuild, firstBuildIdeas, ideaInterval, nextIdea, type FirstBuildFacts } from "../model/firstBuild";
 import type { Store } from "../model/store";
@@ -33,6 +34,7 @@ function reducedMotion(): boolean {
 
 export function QuestionPage() {
   const sent = firstBuild.sent.value;
+  const another = firstBuild.another.value;
   // Back from the plan page: the words are still in the box (section 4).
   const [words, setWords] = useState(sent ?? firstBuild.draft.peek());
   const [focused, setFocused] = useState(false);
@@ -57,6 +59,12 @@ export function QuestionPage() {
 
   const keyDown = (e: KeyboardEvent) => {
     if (e.isComposing) return;
+    if (e.key === "Escape" && another) {
+      // Escape is Cancel, as in a dialog.
+      e.preventDefault();
+      firstBuild.leave();
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       submit();
@@ -91,6 +99,8 @@ export function QuestionPage() {
             <span class="quiet small" role="status">
               {sent ? "Making your plan…" : ""}
             </span>
+            {/* Only after New App… (#5132): a newcomer's first open has no way past it. */}
+            {another && <button type="button" onClick={() => firstBuild.leave()}>Cancel</button>}
             <button type="submit" class="prominent" disabled={empty || sent !== null}>Submit</button>
           </div>
         </form>

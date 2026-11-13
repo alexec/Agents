@@ -19,8 +19,30 @@ extension AppModel {
         if firstBuildPlanning, let id = FirstBuildStore.agentID, let agent = work.agent(id), !agent.isFirstBuild {
             leaveFirstBuildPlan()
         }
-        guard asksFirstBuild, !needsFirstRun, hasLoadedFolders, hasLoadedAgents else { return }
+        // New App… opened the page on purpose: a person with work on this Mac is meant to see it.
+        guard asksFirstBuild, !firstBuildAnother, !needsFirstRun, hasLoadedFolders, hasLoadedAgents else { return }
         if !liveFolders.isEmpty || !agents.isEmpty { leaveFirstBuildQuestion() }
+    }
+
+    /// **New App…** (#5132): the question page again, for a person who is set up, with an empty
+    /// box and Cancel. Submit starts one more first build, in a session of its own.
+    func newApp() {
+        guard !needsFirstRun else { return }
+        leaveFirstBuildPlan()
+        firstBuildIdea = nil
+        FirstBuildStore.idea = nil
+        chooseFirstBuildStarter(nil)
+        firstBuildProblem = nil
+        setFirstBuildAnother(true)
+        keepAskingFirstBuild()
+    }
+
+    /// The question page's **Cancel**, after New App…: the usual window, as it was.
+    func cancelNewApp() {
+        leaveFirstBuildQuestion()
+        setFirstBuildAnother(false)
+        firstBuildIdea = nil
+        FirstBuildStore.idea = nil
     }
 
     /// Submit, once the window is paired: the plan page takes the question page's place, with
@@ -48,7 +70,9 @@ extension AppModel {
     /// **Back**, for an idea neither starter fits (section 4): the question page again, with
     /// the words still in the box.
     func backToFirstBuildQuestion() {
+        let another = firstBuildAnother
         leaveFirstBuildPlan()
+        setFirstBuildAnother(another)
         keepAskingFirstBuild()
     }
 
@@ -60,9 +84,16 @@ extension AppModel {
         if let session { openAgent(session) }
     }
 
-    /// The first-build session on this Mac: labelled `first-build`, not archived.
+    /// The first-build session on this Mac: the one the plan page started or found, while it is
+    /// not archived; else, for a newcomer, any labelled `first-build` (a second client's Submit).
+    /// After New App…, only its own: the earlier first builds are other apps.
     var firstBuildAgent: Agent? {
-        agents.first { $0.host == .mac && $0.isFirstBuild }
+        if let id = firstBuildAgentID, let agent = agents.first(where: { $0.id == id }) {
+            // By its id: a record heard before its labels is still it, until it is archived.
+            return agent.state != .archived && agent.archivedAt == nil ? agent : nil
+        }
+        if firstBuildAnother { return nil }
+        return agents.first { $0.host == .mac && $0.isFirstBuild }
     }
 
     /// The runtime the first task sets up, as this Mac lists it.
@@ -90,7 +121,8 @@ extension AppModel {
     /// Starts the agent once the app's two tasks are done and a starter is chosen (section 7).
     /// A first build there already (a second client's Submit) is the session the page shows.
     func startFirstBuildIfReady() async {
-        guard firstBuildPlanning, firstBuildAgent == nil, !firstBuildStarting, firstBuildProblem == nil,
+        // One start per page: a session kept by its id that the list does not have yet is no gap.
+        guard firstBuildPlanning, firstBuildAgent == nil, firstBuildAgentID == nil, !firstBuildStarting, firstBuildProblem == nil,
               let idea = firstBuildIdea, let starter = firstBuildStarter,
               let runtime = firstBuildRuntime, FirstBuild.canStart(firstBuildFacts),
               let wireStarter = DaemonAPI.FirstBuildStartRequest.Starter(rawValue: starter.rawValue) else { return }
@@ -99,7 +131,8 @@ extension AppModel {
         do {
             let id = try await client(for: .mac).call(DaemonAPI.Method.firstBuildStart,
                                                          DaemonAPI.FirstBuildStartRequest(idea: idea, starter: wireStarter,
-                                                                                          runtimeID: runtime.id),
+                                                                                          runtimeID: runtime.id,
+                                                                                          another: firstBuildAnother ? true : nil),
                                                          returning: UUID.self)
             keepFirstBuildSession(id)
         } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.firstBuildRunning {
@@ -119,6 +152,7 @@ extension AppModel {
     }
 
     private func keepFirstBuildSession(_ id: UUID) {
+        firstBuildAgentID = id
         FirstBuildStore.agentID = id
         if selection != id { selection = id }
     }
@@ -131,7 +165,14 @@ extension AppModel {
     private func leaveFirstBuildPlan() {
         firstBuildPlanning = false
         FirstBuildStore.planning = false
+        firstBuildAgentID = nil
         FirstBuildStore.agentID = nil
+        setFirstBuildAnother(false)
+    }
+
+    private func setFirstBuildAnother(_ another: Bool) {
+        firstBuildAnother = another
+        FirstBuildStore.another = another
     }
 }
 
@@ -157,6 +198,11 @@ enum FirstBuildStore {
     static var starter: FirstBuild.Starter? {
         get { WindowDefaults.store.string(forKey: "firstBuild.starter").flatMap(FirstBuild.Starter.init(rawValue:)) }
         set { WindowDefaults.store.set(newValue?.rawValue, forKey: "firstBuild.starter") }
+    }
+
+    static var another: Bool {
+        get { WindowDefaults.store.bool(forKey: "firstBuild.another") }
+        set { WindowDefaults.store.set(newValue, forKey: "firstBuild.another") }
     }
 
     static var agentID: UUID? {

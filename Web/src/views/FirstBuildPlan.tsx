@@ -44,6 +44,8 @@ function firstBuildAgent(store: Store, host: string): Agent | undefined {
     // The kept one by its id: a record heard before its labels is still it, until it is archived.
     if (agent) return isArchived(agent) ? undefined : agent;
   }
+  // After New App… (#5132), only its own: the earlier first builds are other apps.
+  if (firstBuild.another.value) return undefined;
   return (store.agents.value[host] ?? []).find(isFirstBuild);
 }
 
@@ -125,10 +127,11 @@ export function PlanPage({ store, down }: { store: Store; down: boolean }) {
 
   // The agent starts once the page's tasks are done and a starter is chosen (section 7).
   const start = async () => {
-    if (!host || !starter || !runtime || agent || starting) return;
+    // One start per page: a session kept that the list does not have yet is no gap.
+    if (!host || !starter || !runtime || agent || starting || firstBuild.session.peek()) return;
     setStarting(true);
     try {
-      const id: UUID = await store.link.call("firstBuild/start", { idea, starter, runtimeID: runtime.runtime.id }, host);
+      const id: UUID = await store.link.call("firstBuild/start", { idea, starter, runtimeID: runtime.runtime.id, ...firstBuild.another.peek() ? { another: true } : {} }, host);
       firstBuild.started({ host, id });
     } catch (e) {
       // A first build there already is the session the page shows.

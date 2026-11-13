@@ -44,6 +44,11 @@ final class AppModel {
     var firstBuildPlanning = FirstBuildStore.planning
     /// The starter the plan page shows: picked from the words, or chosen there.
     var firstBuildStarter: FirstBuild.Starter? = FirstBuildStore.starter
+    /// The pages were opened by **New App…** (#5132), not a newcomer's first open: the question
+    /// page has Cancel, and Submit starts one more first build.
+    var firstBuildAnother = FirstBuildStore.another
+    /// The session the plan page started or found, so a second app's page shows its own.
+    var firstBuildAgentID: UUID? = FirstBuildStore.agentID
     /// The runtime the plan page's first task sets up: Claude unless the person picks another.
     var firstBuildRuntimeID = "claude"
     /// The `github` connector on this Mac is connected: the plan page's second task.

@@ -4,13 +4,15 @@ import SwiftUI
 /// The question page (#5050, `specs/5048-first-build/spec.md`, sections 1, 2 and 8): a
 /// newcomer's first open, the whole window. The Huddle, **Let's build your idea.** and one
 /// prompt box whose placeholder goes round the ideas. Nothing else, and no way past it.
-/// Submit gives the plan page (`FirstBuildPlanView`, #5053) its place.
+/// Submit gives the plan page (`FirstBuildPlanView`, #5053) its place. **New App…** (#5132)
+/// opens it again for a person who is set up, with no set-up behind it and **Cancel**.
 ///
 /// The first open's set-up (#4226) runs behind it, so the person can type at once. Its line
 /// shows under the box only when it is slow (5 s) or fails, and at once after a Submit that
 /// waits for it. Submit goes on when the window is paired.
 struct FirstBuildQuestionView: View {
-    let firstOpen: FirstOpen
+    /// The first open's set-up behind the page; nil after New App…, which has none.
+    let firstOpen: FirstOpen?
 
     @Environment(AppModel.self) private var model
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -61,12 +63,14 @@ struct FirstBuildQuestionView: View {
             guard model.needsFirstRun else { return }
             // A walk's window pairs itself from AGENTS_CONTROL; nothing else sets it.
             await model.pairForWalk()
-            guard model.needsFirstRun else { return }
+            guard model.needsFirstRun, let firstOpen else { return }
             await firstOpen.run(pair: pair)
         }
-        .task(id: firstOpen.needsApproval) {
-            if model.needsFirstRun, firstOpen.needsApproval { await firstOpen.waitForApproval(pair: pair) }
+        .task(id: firstOpen?.needsApproval) {
+            if model.needsFirstRun, let firstOpen, firstOpen.needsApproval { await firstOpen.waitForApproval(pair: pair) }
         }
+        // Escape is Cancel, as in a sheet.
+        .onExitCommand { if model.firstBuildAnother { model.cancelNewApp() } }
         // Its line only after 5 s of work.
         .task {
             try? await Task.sleep(for: .seconds(5))
@@ -117,9 +121,15 @@ struct FirstBuildQuestionView: View {
                     return .handled
                 }
                 .disabled(submitted != nil)
-            Button("Submit", action: submit)
-                .buttonStyle(.paperProminent)
-                .disabled(!canSubmit)
+            HStack(spacing: 8) {
+                // Only after New App…: a newcomer's first open has no way past it.
+                if model.firstBuildAnother {
+                    Button("Cancel") { model.cancelNewApp() }
+                }
+                Button("Submit", action: submit)
+                    .buttonStyle(.paperProminent)
+                    .disabled(!canSubmit)
+            }
         }
         .padding(14)
         .paperRaised(in: RoundedRectangle(cornerRadius: 18))
@@ -143,7 +153,7 @@ struct FirstBuildQuestionView: View {
     /// once the window is paired.
     @ViewBuilder
     private var setUpLine: some View {
-        if model.needsFirstRun {
+        if model.needsFirstRun, let firstOpen {
             switch firstOpen.step {
             case .working(let words):
                 if submitted != nil || slow {
@@ -154,7 +164,7 @@ struct FirstBuildQuestionView: View {
                     }
                 }
             case .failed(let line, let details):
-                failed(line: line, details: details)
+                failed(firstOpen, line: line, details: details)
             case .elsewhere:
                 // ContentView shows the first open's Connect page in this page's place.
                 EmptyView()
@@ -162,7 +172,7 @@ struct FirstBuildQuestionView: View {
         }
     }
 
-    private func failed(line: String, details: String) -> some View {
+    private func failed(_ firstOpen: FirstOpen, line: String, details: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Label(line, icon: "exclamationmark.triangle")

@@ -210,6 +210,9 @@ extension FirstBuild {
             .replacingOccurrences(of: "\u{2019}", with: "'")
     }
 
+    /// The menu item that opens the question page again for a person who is set up (#5132).
+    public static let newAppItem = "New App…"
+
     /// The label `firstBuild/start` gives the session, by which the plan page finds it.
     public static let label = "first-build"
 }

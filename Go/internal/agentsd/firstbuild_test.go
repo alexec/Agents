@@ -97,6 +97,14 @@ func TestFirstBuildStart(t *testing.T) {
 	if again == "" || again == id || added() != 1 {
 		t.Fatalf("again %q, added %d", again, added())
 	}
+
+	// New App… (#5132): another first build starts while one is there, in the same folder.
+	var another wire.UUID
+	json.Unmarshal(c.call(t, 5, "firstBuild/start", map[string]any{"idea": "An iPhone app that logs my runs",
+		"starter": "iphone-app", "runtimeID": "claude", "another": true}), &another)
+	if another == "" || another == again || added() != 1 || d.Store.Agent(again).ArchivedAt != nil {
+		t.Fatalf("another %q, added %d", another, added())
+	}
 }
 
 // The prompt is the host's, the same from every client (spec 5048 §7).

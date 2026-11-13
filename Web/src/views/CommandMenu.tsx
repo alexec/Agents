@@ -19,6 +19,7 @@ import {
   appleKeys, commandFound, commandKey, commandKindWord, commandMenuWords, isCommandMenuKey, type CommandItem,
 } from "../model/commandMenu";
 import { orderedFolders } from "./Sidebar";
+import { firstBuild, newAppItem } from "../model/firstBuild";
 import { archiveAndLeave, runSessionAction } from "./SessionMenu";
 import { laterRequestOf } from "./ListKeys";
 import { laterTime, listKeyGlyph } from "../model/listKeys";
@@ -97,6 +98,7 @@ export function commandItems(store: Store, apple: boolean): { items: CommandItem
     add("Next Session", () => pressBare("j"), listKeyGlyph.next);
     add("Previous Session", () => pressBare("k"), listKeyGlyph.previous);
   }
+  add(newAppItem, () => firstBuild.newApp(), undefined, ["Let's build your idea", "first build"]);
   if (store.archiveUndo.value) add("Undo Archive", () => void store.undoArchive(), commandKey("z", apple));
   // The same for Unarchive, Rename, the labels, Mute and Later (#4793).
   const change = store.changeUndo.value;

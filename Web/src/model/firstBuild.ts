@@ -177,6 +177,10 @@ const keptKey = "agents.firstBuild.page";
 const ideaKey = "agents.firstBuild.idea";
 const starterKey = "agents.firstBuild.starter";
 const sessionKey = "agents.firstBuild.session";
+const anotherKey = "agents.firstBuild.another";
+
+/** The menu item that opens the question page again for a person who is set up (#5132), as the window's. */
+export const newAppItem = "New App…";
 
 /** The first-build session this browser started or found: the machine it runs on, and its id. */
 export interface FirstBuildSession { host: string; id: string }
@@ -195,6 +199,8 @@ export class FirstBuildStore {
   readonly session = signal<FirstBuildSession | null>(null);
   /** The words Back takes to the question page's box (section 4); not kept. */
   readonly draft = signal("");
+  /** New App… opened the pages (#5132): the question page has Cancel, and Submit starts one more first build. */
+  readonly another = signal(false);
 
   constructor(private readonly storage: Storage | undefined) {
     const kept = storage?.getItem(keptKey);
@@ -207,10 +213,13 @@ export class FirstBuildStore {
       const session = JSON.parse(storage?.getItem(sessionKey) ?? "null") as FirstBuildSession | null;
       if (session && typeof session.host === "string" && typeof session.id === "string") this.session.value = session;
     } catch { /* none kept */ }
+    this.another.value = storage?.getItem(anotherKey) === "true";
   }
 
   /** What the page knows now; a change is kept at once. */
   take(facts: FirstBuildFacts): void {
+    // New App… opened the page on purpose: a person who is set up is meant to see it.
+    if (this.another.peek()) return;
     const kept = weigh(this.kept.peek(), facts, this.sent.peek() !== null);
     if (kept === this.kept.peek()) return;
     this.kept.value = kept;
@@ -247,11 +256,28 @@ export class FirstBuildStore {
     this.choose(null);
   }
 
-  /** Open Agents, or the session archived (section 5): the usual page, and the plan page does not come back. */
+  /** New App… (#5132): the question page again, with an empty box and Cancel. */
+  newApp(): void {
+    this.leave();
+    this.draft.value = "";
+    this.another.value = true;
+    this.write(anotherKey, "true");
+    this.kept.value = "showing";
+    this.write(keptKey, "showing");
+  }
+
+  /**
+   * Open Agents, the session archived (section 5), or Cancel after New App…: the usual page, and
+   * the plan page does not come back.
+   */
   leave(): void {
     this.kept.value = "gone";
     this.write(keptKey, "gone");
-    for (const key of [ideaKey, starterKey, sessionKey]) this.write(key, null);
+    this.sent.value = null;
+    this.starter.value = null;
+    this.session.value = null;
+    this.another.value = false;
+    for (const key of [ideaKey, starterKey, sessionKey, anotherKey]) this.write(key, null);
   }
 
   private write(key: string, value: string | null): void {

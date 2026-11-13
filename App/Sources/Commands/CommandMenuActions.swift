@@ -9,6 +9,8 @@ enum MenuKeys {
     static let newWorktreeSession = KeyboardShortcut("n", modifiers: [.command, .option])
     static let addFolder = KeyboardShortcut("o")
     static let cloneFolder = KeyboardShortcut("o", modifiers: [.command, .shift])
+    /// New App… (#5132): Let's build your idea, again.
+    static let newApp = KeyboardShortcut("a", modifiers: [.command, .shift])
     static let findInChat = KeyboardShortcut("f")
     /// Find Session stays on ⌥⌘F for one release, then goes: ⌘K finds sessions (#4787).
     static let findSession = KeyboardShortcut("f", modifiers: [.command, .option])

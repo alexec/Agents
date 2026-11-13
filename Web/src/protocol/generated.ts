@@ -4277,7 +4277,7 @@ export interface FindResult {
  * ~/.agents/first-build when it is not there, writes the first prompt itself, so every client sends
  * the same, and labels the session first-build. It answers with the session's id. While a
  * first-build session that is not archived is there, it refuses with firstBuildRunning, with that
- * session's id as the data.
+ * session's id as the data, unless another is true (New App…, #5132).
  */
 export interface FirstBuildStartRequest {
   /** The person's words, as typed. Not empty. */
@@ -4285,6 +4285,11 @@ export interface FirstBuildStartRequest {
   starter: FirstBuildStarter;
   /** The runtime that the plan page's first task set up, as agents/start takes it. */
   runtimeID: string;
+  /**
+   * New App… (#5132): start one more first build, also while a first-build session is there. Absent
+   * or false keeps the newcomer's rule: refuse with firstBuildRunning.
+   */
+  another?: boolean;
 }
 
 /**
@@ -16114,7 +16119,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FindMatch: { required: ["index", "entryID", "line"], optional: [] },
   FindRequest: { required: ["agentID", "text"], optional: ["limit"] },
   FindResult: { required: ["matches", "more"], optional: [] },
-  FirstBuildStartRequest: { required: ["idea", "starter", "runtimeID"], optional: [] },
+  FirstBuildStartRequest: { required: ["idea", "starter", "runtimeID"], optional: ["another"] },
   FleetBoard: { required: ["machines"], optional: [] },
   FleetMachine: { required: ["host", "ownerName", "bot"], optional: ["running", "heardAt"] },
   Folder: { required: ["folder", "addedAt"], optional: ["archivedAt", "helperLimits", "diskSpace", "pinned", "prCostComment", "workingHours"] },

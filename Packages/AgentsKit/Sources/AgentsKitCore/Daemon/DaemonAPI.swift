@@ -1077,11 +1077,15 @@ public enum DaemonAPI {
         public var idea: String
         public var starter: Starter
         public var runtimeID: String
+        /// New App… (#5132): one more first build, also while one is there. Nil (left out of
+        /// the JSON) keeps the newcomer's rule.
+        public var another: Bool?
 
-        public init(idea: String, starter: Starter, runtimeID: String) {
+        public init(idea: String, starter: Starter, runtimeID: String, another: Bool? = nil) {
             self.idea = idea
             self.starter = starter
             self.runtimeID = runtimeID
+            self.another = another
         }
     }
 
