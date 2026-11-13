@@ -279,19 +279,28 @@ jobs:
       # Only when both app builds actually ran. They are skipped whenever an earlier
       # step fails, and a skipped step used to read as "not successful", so a job that
       # died long before them saved whatever DerivedData it happened to be holding.
+      #
+      # Only on a push to main, as the golangci-lint cache (2026-11-13). This graph is
+      # 1.9 GB, and each pull request saved one of its own under its merge ref, which no
+      # other pull request can read: five open ones were 9.5 GB of the 10 GB the repo
+      # may keep, and GitHub evicted the small caches to make room. The SwiftPM cache was
+      # missing in most runs, and `go-apps` and AgentsKit in some, which made those runs
+      # the slowest (20 minutes and more). A pull request still restores main's newest
+      # graph through the restore-keys above, so it starts as warm as before; a second
+      # push to the same pull request starts from main's graph, not its own.
       - name: Record the AgentsKit sources this graph was built from
-        if: ${{ always() && steps.xcode-cache.outputs.cache-hit != 'true' && steps.build-mac.outcome == 'success' && steps.build-remote.outcome == 'success' }}
+        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.xcode-cache.outputs.cache-hit != 'true' && steps.build-mac.outcome == 'success' && steps.build-remote.outcome == 'success' }}
         run: echo "${{ steps.keys.outputs.agentskit }}" > build/DD/agentskit-sources
 
       - name: Save Xcode build cache
-        if: ${{ always() && steps.xcode-cache.outputs.cache-hit != 'true' && steps.build-mac.outcome == 'success' && steps.build-remote.outcome == 'success' }}
+        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.xcode-cache.outputs.cache-hit != 'true' && steps.build-mac.outcome == 'success' && steps.build-remote.outcome == 'success' }}
         uses: actions/cache/save@v5
         with:
           path: build/DD
           key: macos-xcode-27-derived-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.xcode }}
 
       - name: Prune old Xcode caches for this ref
-        if: ${{ always() && steps.build-mac.outcome == 'success' && steps.build-remote.outcome == 'success' && steps.xcode-cache.outputs.cache-hit != 'true' }}
+        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.build-mac.outcome == 'success' && steps.build-remote.outcome == 'success' && steps.xcode-cache.outputs.cache-hit != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash scripts/prune-ci-caches.sh macos-xcode-27-derived- 'macos-xcode-27-derived-${{ steps.keys.outputs.base }}-${{ steps.keys.outputs.xcode }}' "$GITHUB_REF"
