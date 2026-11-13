@@ -87,7 +87,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
       <NavBar store={store} session={session} />
       {/* The page's banners, under its toolbar (docs/reference/design-system.md, "Messages"). */}
-      {down && <Banner session={session} />}
+      {down && <Banner session={session} store={store} />}
       <OrgPolicyStrip store={store} />
       {store.newMachineAsk.value && <NewMachineSheet key={JSON.stringify(store.newMachineAsk.value)} store={store} ask={store.newMachineAsk.value} />}
       {section === "overview" ? <div class="columns overview-columns console" aria-busy={down}><Overview store={store} down={down} /></div>

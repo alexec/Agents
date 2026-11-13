@@ -1334,6 +1334,9 @@ final class AppModel {
     private(set) var controlPlaneReachable = false
     /// A try to reach the control plane failed. Stays quiet during the first try.
     private(set) var controlPlaneMissed = false
+    /// When the window last read from the control plane (#5141): it is live until its link
+    /// goes, so the time it went, or the first answer. Nil before it answered once.
+    private(set) var controlPlaneReadAt: Date?
     /// The address itself refused the connection (suspended, over a plan's limit,
     /// #2235): its words, shown in the away strip in place of "can't reach".
     private(set) var controlPlaneRefusalLine: String?
@@ -1483,6 +1486,10 @@ final class AppModel {
 
     /// The control plane was reached and then was not, or the first try failed (frame H).
     var controlPlaneAway: Bool { controlLink != nil && controlPlaneMissed && !controlPlaneReachable }
+
+    /// The time of the last read that what the window shows comes from, for the away strip's
+    /// "Last update" line (#5141): the control plane's, or this device's copy before it answered.
+    var controlPlaneAwayReadAt: Date? { controlPlaneReadAt ?? work.copyReadAt }
 
     /// Frame H's sentence, naming where the window expected the control plane.
     /// This Mac's host answers directly, over its local socket: `.mac` through `client`, or,
@@ -3618,6 +3625,7 @@ final class AppModel {
         controlPlaneListed = false
         controlPlaneReachable = false
         controlPlaneMissed = false
+        controlPlaneReadAt = nil
         controlPlaneRefusalLine = nil
         directHost = nil
         keptHost = nil
@@ -4101,6 +4109,7 @@ final class AppModel {
     }
 
     private func controlPlaneDidAnswer() {
+        controlPlaneReadAt = Date()
         controlPlaneReachable = true
         controlPlaneMissed = false
         controlPlaneRefusalLine = nil
@@ -4111,6 +4120,7 @@ final class AppModel {
         people.went()
         signIn.went()
         lock.went()
+        if controlPlaneReachable { controlPlaneReadAt = Date() }
         controlPlaneReachable = false
         controlPlaneMissed = true
     }

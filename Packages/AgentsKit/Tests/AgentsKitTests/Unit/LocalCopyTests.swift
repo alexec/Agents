@@ -43,6 +43,25 @@ struct LocalCopyTests {
         #expect(read.first?.folders.count == 1)
     }
 
+    /// Each machine keeps when it was read (#5141), and the screen says the oldest until its
+    /// host answers.
+    @Test func aMachineKeepsWhenItWasRead() async {
+        let model = AgentsModel()
+        let keeper = LocalCopyKeeper(copy: LocalCopy(folder: folder(), cap: LocalCopy.macCap), work: model)
+        defer { Task { await keeper.forget() } }
+        let older = Date(timeIntervalSince1970: 1_794_000_000)
+        let newer = older.addingTimeInterval(600)
+        await keeper.copy.keep(LocalCopy.Machine(host: devbox, folders: [summary()], agents: [agent("a")]), readAt: older)
+        await keeper.copy.keep(LocalCopy.Machine(host: .mac, folders: [summary()], agents: [agent("b")]), readAt: newer)
+        #expect(await keeper.copy.machinesRead().first { $0.machine.host == devbox }?.at == older)
+        await keeper.drawMachines()
+        #expect(model.copyReadAt == older)
+        model.replaceAgents([agent("live")], from: devbox)
+        #expect(model.copyReadAt == newer)
+        model.replaceAgents([agent("live")], from: .mac)
+        #expect(model.copyReadAt == nil)
+    }
+
     @Test func aTranscriptKeepsItsEndOnly() async {
         let copy = LocalCopy(folder: folder(), cap: LocalCopy.macCap)
         defer { Task { await copy.forget() } }

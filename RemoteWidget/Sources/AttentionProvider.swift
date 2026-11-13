@@ -28,17 +28,28 @@ struct AttentionProvider: TimelineProvider {
         completion(AttentionEntry(date: Date(), snapshot: AttentionSnapshotStore.read()))
     }
 
-    /// A second entry at the moment the number turns stale (#1163), so "Updated 14:02"
-    /// becomes "Updated 15 min ago" then and not at the next reading.
+    /// An entry each time the "Last update" words change (#5141), so "Last update 5 min ago"
+    /// goes on counting between readings: each minute for the first hour, then each hour.
     func getTimeline(in context: Context, completion: @escaping (Timeline<AttentionEntry>) -> Void) {
         let now = Date()
         let snapshot = AttentionSnapshotStore.read()
-        var entries = [AttentionEntry(date: now, snapshot: snapshot)]
-        if let staleAt = snapshot.map({ $0.writtenAt.addingTimeInterval(AttentionSnapshot.staleness + 1) }),
-           staleAt > now {
-            entries.append(AttentionEntry(date: staleAt, snapshot: snapshot))
+        let dates = snapshot.map { Self.changes(since: $0.readAt(now: now), from: now) } ?? [now]
+        completion(Timeline(entries: dates.map { AttentionEntry(date: $0, snapshot: snapshot) },
+                            policy: .after(now.addingTimeInterval(15 * 60))))
+    }
+
+    /// Now, then each minute of the age up to an hour, then each hour up to a day.
+    static func changes(since read: Date, from now: Date) -> [Date] {
+        var dates = [now]
+        for minute in 1...60 {
+            let at = read.addingTimeInterval(TimeInterval(minute * 60))
+            if at > now { dates.append(at) }
         }
-        completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(15 * 60))))
+        for hour in 2...24 {
+            let at = read.addingTimeInterval(TimeInterval(hour * 3600))
+            if at > now { dates.append(at) }
+        }
+        return dates
     }
 }
 

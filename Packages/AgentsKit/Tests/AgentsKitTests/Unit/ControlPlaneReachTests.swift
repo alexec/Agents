@@ -40,8 +40,8 @@ struct ControlPlaneReachTests {
         let reach = ControlPlaneReach()
         #expect(reach.title == "Can't reach your Mac")
         #expect(reach.detail.hasPrefix("It needs to be awake"))
-        #expect(reach.banner(lastHeard: nil) == "Not connected to your Mac yet")
-        #expect(reach.banner(lastHeard: "5 min ago") == "Last heard from your Mac 5 min ago")
+        #expect(reach.banner(read: nil) == "Not connected to your Mac yet")
+        #expect(reach.banner(read: Date().addingTimeInterval(-5 * 60 - 5)) == "Can't reach your Mac. Last update 5 min ago")
         #expect(reach.notAnswering.hasPrefix("Your Mac is not answering."))
     }
 
@@ -50,8 +50,8 @@ struct ControlPlaneReachTests {
         #expect(reach.title == "Can't reach the control plane")
         #expect(reach.detail.hasPrefix("The control plane at control.example.com does not answer."))
         #expect(!reach.detail.contains("Mac"))
-        #expect(reach.banner(lastHeard: "5 min ago") == "Last heard from the control plane 5 min ago")
-        #expect(reach.banner(lastHeard: nil) == "Not connected to the control plane yet")
+        #expect(reach.banner(read: Date().addingTimeInterval(-5 * 60 - 5)) == "Can't reach the control plane. Last update 5 min ago")
+        #expect(reach.banner(read: nil) == "Not connected to the control plane yet")
         #expect(reach.notAnswering.hasPrefix("The control plane is not answering."))
         #expect(ControlPlaneReach(onHomeMac: false).detail.hasPrefix("The control plane does not answer."))
     }
