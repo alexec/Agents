@@ -252,7 +252,7 @@ The stories add a new page, controls and a link, so each PR waits for Alex with 
 1. ~~Where is the Mac link?~~ **Answered (Alex, 2026-11-13):** the Pipeline line of a PR's or release's Work page, after *CI run* (board 5). The other choices were the Work ▸ Releases toolbar and the Cost page.
 2. ~~Forge API or extend the `ci-run` nodes?~~ **Decided (Alex, 2026-11-13):** a timing store of its own, keyed by the `ci-run` ref (see "Where the timings live"). The spike (#5176) answered the data, the bounds and the fill (see "The data spike"); Alex chose where it lives: the machine, with a copy on the control plane.
 3. ~~What is a deploy?~~ **Out of this epic** (Alex, 2026-11-13): the later Release × Environment epic.
-4. **The detector's floor** (30 s and 20 %, a score of 8) and its library. Otava is Python. The timing task looks for a Go library first (AGENTS.md, "Libraries before our own code").
+4. ~~The detector's floor and its library?~~ **Answered (#5177):** no Go library fits AGENTS.md's rule (pgregory.net/changepoint was last updated in 2023, github.com/lytics/impact in 2015; Otava is Python), so `Go/internal/citimings/changes.go` has its own binary segmentation, as `derive.py`. The floor stays 30 s and 20 % with a score of 8: on the spike's cache it finds the same 8 changes in 90 days, `go-darwin` on 8 November among them, with its 6 runs between.
 5. ~~Should a change found on `main` tell someone?~~ **Yes (Alex, 2026-11-13):** the daemon sends `ci.slowed` (see "A slowdown makes an event"). Open: the event's final name and fields, in #5200.
 
 ## Sizes
