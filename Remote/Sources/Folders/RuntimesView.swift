@@ -61,7 +61,7 @@ struct RuntimesView: View {
                         }
                     }
                 } label: {
-                    Label("Add Account", systemImage: "person.badge.plus")
+                    Label("Add Account", icon: "person.badge.plus")
                 }
             }
         }
@@ -171,7 +171,7 @@ private struct ReachesTheModelByMenu: View {
     }
 
     @ViewBuilder private func label(_ title: String, chosen: Bool) -> some View {
-        if chosen { Label(title, systemImage: "checkmark") } else { Text(title) }
+        if chosen { Label(title, icon: "checkmark") } else { Text(title) }
     }
 
     private func set(_ accountID: String?) {
