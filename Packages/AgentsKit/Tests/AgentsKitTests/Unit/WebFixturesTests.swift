@@ -1614,6 +1614,33 @@ struct WebFixturesTests {
         }
     }
 
+    /// The plan page's starter from the words (#5053, section 3): the web page's
+    /// `firstBuildStarter` is held to the same cases (#5054).
+    @Test func firstBuildStarters() throws {
+        let typed = FirstBuild.ideas.map(\.words) + [
+            "an iOS thing for my cat", "Something in the App Store", "an API for my recipes",
+            "a site, then an iPhone app", "an app for my dog", "a game about frogs",
+            "a Mac app with a web page", "web pages",
+        ]
+        try pin("first-build/starters.json", typed.map { Case(name: $0, input: .string($0)) }) { input in
+            let pick = FirstBuild.starter(for: input.stringValue ?? "")
+            switch pick {
+            case .starter(let starter): return .string(starter.rawValue)
+            case .unknown: return .string("unknown")
+            case .neither: return .string("neither")
+            }
+        }
+    }
+
+    /// The plan page's two task lists, in the skill's words (#5053, section 6).
+    @Test func firstBuildTasks() throws {
+        try pin("first-build/tasks.json", FirstBuild.Starter.allCases.map {
+            Case(name: $0.rawValue, input: .string($0.rawValue))
+        }) { input in
+            try Self.encode(FirstBuild.tasks(for: FirstBuild.Starter(rawValue: input.stringValue ?? "") ?? .iphoneApp))
+        }
+    }
+
     @Test func overrideSamples() throws {
         let stamp = FileStamp(size: 12, modifiedAt: Self.base)
         let text = Data("hi".utf8)

@@ -1,0 +1,74 @@
+[
+  {
+    "expected" : [
+      {
+        "doer" : "app",
+        "words" : "Set up the agent runtime"
+      },
+      {
+        "doer" : "app",
+        "words" : "Connect GitHub"
+      },
+      {
+        "doer" : "agent",
+        "words" : "Make the repository from alexec/iphone-app-starter"
+      },
+      {
+        "doer" : "agent",
+        "words" : "Join the Apple Developer Program"
+      },
+      {
+        "doer" : "agent",
+        "words" : "Put the App Store Connect key in the repository's CI"
+      },
+      {
+        "doer" : "agent",
+        "words" : "Set up Sentry"
+      },
+      {
+        "doer" : "agent",
+        "words" : "Send the first build to TestFlight"
+      },
+      {
+        "doer" : "agent",
+        "words" : "Approve the first build"
+      }
+    ],
+    "input" : "iphone-app",
+    "name" : "iphone-app"
+  },
+  {
+    "expected" : [
+      {
+        "doer" : "app",
+        "words" : "Set up the agent runtime"
+      },
+      {
+        "doer" : "app",
+        "words" : "Connect GitHub"
+      },
+      {
+        "doer" : "agent",
+        "words" : "Make the repository from alexec/web-service-starter"
+      },
+      {
+        "doer" : "agent",
+        "words" : "Set up Google Cloud (Cloud Run)"
+      },
+      {
+        "doer" : "agent",
+        "words" : "Set up Sentry"
+      },
+      {
+        "doer" : "agent",
+        "words" : "Deploy the first version"
+      },
+      {
+        "doer" : "agent",
+        "words" : "Approve the first deploy"
+      }
+    ],
+    "input" : "web-service",
+    "name" : "web-service"
+  }
+]

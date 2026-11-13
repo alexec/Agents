@@ -4,6 +4,7 @@ import SwiftUI
 /// The question page (#5050, `specs/5048-first-build/spec.md`, sections 1, 2 and 8): a
 /// newcomer's first open, the whole window. The Huddle, **Let's build your idea.** and one
 /// prompt box whose placeholder goes round the ideas. Nothing else, and no way past it.
+/// Submit gives the plan page (`FirstBuildPlanView`, #5053) its place.
 ///
 /// The first open's set-up (#4226) runs behind it, so the person can type at once. Its line
 /// shows under the box only when it is slow (5 s) or fails, and at once after a Submit that
@@ -49,7 +50,11 @@ struct FirstBuildQuestionView: View {
         .onContinuousHover(coordinateSpace: .global) { phase in
             if case let .active(location) = phase { pointer = location } else { pointer = nil }
         }
-        .onAppear { focused = true }
+        .onAppear {
+            // Back from the plan page: the words are still in the box (section 4).
+            if text.isEmpty, let idea = model.firstBuildIdea { text = idea }
+            focused = true
+        }
         // The set-up, behind the page, only while the window has no control plane: a
         // newcomer who quit before Submit is paired already.
         .task {
