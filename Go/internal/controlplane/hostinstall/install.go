@@ -309,6 +309,9 @@ func (i *Installer) run(ctx context.Context, request Request, personsKnownHosts 
 	// it holds. One that cannot be installed leaves the host without that runtime, not
 	// without a host: the runtime says why when it is chosen.
 	i.installToolsets(ctx, server, found, folder, name)
+	// Google Chrome and Xvfb for the agents' browser (#5228), before the host starts, so
+	// its browser finds them. A server without them keeps Chrome for Testing headless.
+	server.installBrowser(ctx, i.Log, name)
 
 	// An update keeps the host's membership and root: it stops and starts again, as itself.
 	if updating != "" {
