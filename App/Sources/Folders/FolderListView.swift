@@ -1458,21 +1458,6 @@ private struct SidebarInk: ViewModifier {
     }
 }
 
-/// The selection grey with the accent's bar, inset as the system's sidebar selection is.
-struct PaperSelectionRow: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: Paper.Radius.control)
-            .fill(Paper.selection)
-            .overlay(alignment: .leading) {
-                UnevenRoundedRectangle(topLeadingRadius: Paper.Radius.control,
-                                       bottomLeadingRadius: Paper.Radius.control)
-                    .fill(Paper.accent)
-                    .frame(width: 3)
-            }
-            .padding(.horizontal, 10)
-    }
-}
-
 /// Turns off the sidebar table's own selection fill, so the row's `PaperSelectionRow`
 /// shows. The table still keeps the selection, the keyboard and VoiceOver's "selected".
 struct SidebarHighlightOff: NSViewRepresentable {

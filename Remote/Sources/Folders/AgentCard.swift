@@ -92,7 +92,7 @@ struct AgentCard: View {
                         if let workflowName = startedByWorkflowName {
                             Image(systemName: "flowchart")
                                 .appText(.fine)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(Paper.tertiary)
                                 .accessibilityLabel("started by the workflow \(workflowName)")
                         }
                         // Mute Notifications (#2003), as the Mac's row marks it (#2085):
@@ -100,7 +100,7 @@ struct AgentCard: View {
                         if agent.isMuted {
                             Image(systemName: MuteWords.symbol)
                                 .appText(.fine)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(Paper.tertiary)
                                 .accessibilityLabel(MuteWords.muted)
                         }
                         // Started by another agent (028), marked as the Mac's row
@@ -108,7 +108,7 @@ struct AgentCard: View {
                         if let starter = model.startedByAgentLabel(agent) {
                             Image(systemName: AgentsModel.startedByAgentSymbol)
                                 .appText(.fine)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(Paper.tertiary)
                                 // Said, as the workflow mark is and the Mac's row says it (#1326).
                                 .accessibilityLabel(starter)
                         }
@@ -117,14 +117,14 @@ struct AgentCard: View {
                         if let file = FileToSeeWords.line(agent) {
                             Image(systemName: FileToSeeWords.symbol)
                                 .appText(.fine)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Paper.secondary)
                                 .accessibilityLabel(file)
                         }
                         // Its folder gone (#119), as the Mac's row and a folder's say it.
                         if agent.missingFolder != nil, agent.state != .archived {
                             Label(MissingFolderWords.label, systemImage: "exclamationmark.triangle")
                                 .appText(.fine)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Paper.secondary)
                         }
                         // Working in a worktree (030), named as on the Mac's row. A
                         // folder that has gone is the Mac's to say, above.
@@ -134,7 +134,7 @@ struct AgentCard: View {
                                 Text(worktree.name).lineLimit(1)
                             }
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Paper.tertiary)
                             .strikethrough(agent.missingFolder != nil)
                             .help(agent.missingFolder != nil
                                   ? "\(worktree.branch ?? "detached") — \(worktree.root.path), which is not there any more"
@@ -157,12 +157,12 @@ struct AgentCard: View {
                         // Its place in the queue (#362), as the Mac's row says it.
                         Text(queued)
                             .appText(.supporting)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                     } else if let report = FileToSeeWords.reportLine(agent) {
                         // A file to see is named here first, as on the Mac (#1873).
                         Text(report)
                             .appText(.supporting)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -172,7 +172,7 @@ struct AgentCard: View {
                     if let running = BackgroundWords.mark(agent.background) {
                         Label(running, systemImage: "apple.terminal")
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .lineLimit(1)
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel(running)
@@ -187,14 +187,14 @@ struct AgentCard: View {
                     if let wait = model.work.waitMark(of: agent) {
                         Text(wait.line)
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .lineLimit(1)
                     }
                     // While the sidebar searches: the line it said that matches (#1585).
                     if let said = model.work.saidLines[agent.id] {
                         Text(said)
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .lineLimit(1)
                     }
                     // As on the Mac's row (#584). Archive itself is the swipe and the menu:
@@ -202,7 +202,7 @@ struct AgentCard: View {
                     if let line = ArchiveRequestWords.line(agent) {
                         Label(line, systemImage: ArchiveRequestWords.symbol)
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                     }
                 }
                 Spacer(minLength: 0)

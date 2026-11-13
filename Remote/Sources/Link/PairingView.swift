@@ -44,7 +44,7 @@ struct PairingView: View {
     @ViewBuilder private var signIn: some View {
         Text("Type your control plane’s address. Sign in with an account added to your person there.")
             .appText(.fine)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Paper.secondary)
             .multilineTextAlignment(.center)
         SignInToPair(pair: { url, signIn, waiting in
             try await model.pairBySigningIn(at: url, with: signIn, waiting: waiting)
@@ -72,7 +72,7 @@ struct PairingView: View {
              : "On your Mac, choose Pair a Phone or iPad… in Agents’ menu bar item, or Pair a Device in "
                + "Agents ▸ Settings. Then scan the code it shows.")
             .appText(.fine)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Paper.secondary)
             .multilineTextAlignment(.center)
         Button {
             model.forgetPairingOutcome()

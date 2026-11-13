@@ -332,7 +332,7 @@ struct WorkItemPage: View {
             Button { startLead(start) } label: {
                 Label("Start lead", icon: "sparkle").frame(maxWidth: narrow ? .infinity : nil)
             }
-            .buttonStyle(.borderedProminent)
+            .buttonStyle(.paperProminent)
             .controlSize(compact ? .large : .regular)
             .help("The new-session form in this epic's folder, filled in for a lead with the lead skill")
         }
@@ -363,7 +363,7 @@ struct WorkItemPage: View {
         Button { startAgent(start) } label: {
             Label("Start Agent", icon: "sparkle").frame(maxWidth: narrow ? .infinity : nil)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.paperProminent)
         .controlSize(compact ? .large : .regular)
         .help("The new-agent form in this issue's folder, filled in for it")
     }

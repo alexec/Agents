@@ -76,7 +76,7 @@ struct RemoteMachineRow: View {
                 if let words {
                     Text(words)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .lineLimit(3)
                 }
             }
@@ -183,10 +183,10 @@ struct RemoteMakingMachineRow: View {
                 .frame(width: 20)
             VStack(alignment: .leading, spacing: 2) {
                 Text(name).lineLimit(1)
-                    .foregroundStyle(making?.joinable == true && joined == nil ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                    .foregroundStyle(making?.joinable == true && joined == nil ? AnyShapeStyle(Paper.secondary) : AnyShapeStyle(.primary))
                 Text(line)
                     .appText(.fine)
-                    .foregroundStyle(failed ? StateTint.failure.style(or: .secondary) : AnyShapeStyle(.secondary))
+                    .foregroundStyle(failed ? StateTint.failure.style(or: .secondary) : AnyShapeStyle(Paper.secondary))
                     .lineLimit(3)
             }
             Spacer(minLength: 0)

@@ -478,7 +478,7 @@ struct StartChip: View {
                 Image(systemName: systemImage)
                     // Decorative: the chip's words say what it is (FR-015).
                     .glyph(size: 11, weight: .semibold)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             }
             if let title {
                 Text(title)
@@ -489,7 +489,7 @@ struct StartChip: View {
             if locked {
                 Image(systemName: "lock.fill")
                     .glyph(size: 8, weight: .semibold)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             }
             if badge > 0 {
                 Text("\(badge)")
@@ -503,11 +503,11 @@ struct StartChip: View {
             if chevron {
                 Image(systemName: "chevron.down")
                     .glyph(size: 8, weight: .semibold)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             }
         }
         .appText(.fine)
-        .foregroundStyle(plain ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+        .foregroundStyle(plain ? AnyShapeStyle(Paper.secondary) : AnyShapeStyle(.primary))
         .padding(.horizontal, 10)
         .frame(minHeight: 32)
         .contentShape(Capsule())

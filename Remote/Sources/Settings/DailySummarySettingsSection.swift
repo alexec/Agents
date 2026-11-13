@@ -15,7 +15,7 @@ struct DailySummarySettingsSection: View {
                 }
             } else {
                 Text("The Mac's host does not say. It may be too old for the daily summary.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             }
         } header: {
             Text("Daily summary")
@@ -26,7 +26,7 @@ struct DailySummarySettingsSection: View {
                 Text(DailySummaryControls.footer(for: model.dailySummarySettings?.mode ?? .off))
             }
             .appText(.fine)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Paper.secondary)
         }
         .paperListRow()
         .task { await model.refreshDailySummarySettings() }

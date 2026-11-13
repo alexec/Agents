@@ -59,7 +59,7 @@ struct MoreSheet: View {
             case .loading:
                 Label("Asking \(runtimeName) what it offers…", systemImage: "hourglass")
                     .appText(.supporting)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             case .failed(let reason):
                 VStack(alignment: .leading, spacing: 6) {
                     SheetNote(text: reason, reservesSpace: false)
@@ -71,7 +71,7 @@ struct MoreSheet: View {
                 if model.startOptions.isEmpty {
                     Text("\(runtimeName) has nothing to adjust.")
                         .appText(.supporting)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                 }
                 ForEach(model.startOptions, id: \.id) { option in
                     row(for: option)
@@ -121,7 +121,7 @@ struct MoreSheet: View {
                     }
                 } label: {
                     LabeledContent(LevelWords.requestsField) {
-                        Text(ClientPermissionWords.title(mode)).foregroundStyle(.secondary)
+                        Text(ClientPermissionWords.title(mode)).foregroundStyle(Paper.secondary)
                     }
                     .appText(.reading)
                 }
@@ -148,7 +148,7 @@ struct MoreSheet: View {
         Section("Reach") {
             // By name, as the title says it: the whole path is the long part of every row.
             LabeledContent(folder.lastPathComponent) {
-                Text("This folder").foregroundStyle(.secondary)
+                Text("This folder").foregroundStyle(Paper.secondary)
             }
             .lineLimit(1)
             ForEach(model.startFolders, id: \.self) { added in
@@ -228,7 +228,7 @@ struct MoreSheet: View {
                 }
             } label: {
                 LabeledContent(option.name) {
-                    Text(option.closedTitle(for: chosen)).foregroundStyle(.secondary)
+                    Text(option.closedTitle(for: chosen)).foregroundStyle(Paper.secondary)
                 }
                 .appText(.reading)
             }

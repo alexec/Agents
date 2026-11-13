@@ -45,7 +45,7 @@ struct AgentBrowserPane: View {
             Divider()
             Text(browser.problem ?? " ")
                 .appText(.fine)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -87,13 +87,13 @@ struct AgentBrowserPane: View {
     private func holderLine(_ browser: MachineBrowser, _ holder: UUID) -> some View {
         HStack(spacing: 4) {
             Image(systemName: "cursorarrow.rays")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
             Button { model.open(holder) } label: {
                 Text(browser.state.holderTitle ?? "Another session").truncationMode(.middle)
             }
             .accessibilityHint("Goes to this session")
             Text("is using the browser")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
                 .fixedSize()
             Spacer(minLength: 0)
         }
@@ -196,7 +196,7 @@ private struct BrowserWaiting: View {
             ProgressView()
             Text(words)
                 .appText(.fine)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Paper.ground)

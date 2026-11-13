@@ -43,11 +43,11 @@ struct ChannelLinkCard: View {
                 HStack(spacing: 8) {
                     if request.forUser == nil {
                         Button("Send") { answer(true, sendTo) }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.paperProminent)
                             .disabled(sendTo.isEmpty)
                     } else {
                         Button("Approve") { answer(true, nil) }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(.paperProminent)
                     }
                     Button("Deny") { answer(false, nil) }
                         .buttonStyle(.bordered)

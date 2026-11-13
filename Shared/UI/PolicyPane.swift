@@ -114,7 +114,7 @@ struct PolicyPane: View {
                 }
                 HStack {
                     Button(PolicyLayersWords.signAgain) { Task { await settle(copy, sign: true) } }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.paperProminent)
                     Button(PolicyLayersWords.setAside) { Task { await settle(copy, sign: false) } }
                 }
                 .disabled(isSaving)

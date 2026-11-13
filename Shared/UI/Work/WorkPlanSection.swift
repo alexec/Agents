@@ -429,7 +429,7 @@ struct WorkPlanSection: View {
             .disabled(names)
             .help(names ? "An issue that is there keeps its labels" : "The new child's level")
             Button("Add", action: add)
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.paperProminent)
                 .disabled(busy || newChild.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .help(names ? "Make this issue a child of the epic" : "Open a new issue as a child of the epic, in its feature")
             if busy { ProgressView().controlSize(.small) }

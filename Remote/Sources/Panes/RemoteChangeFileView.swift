@@ -131,7 +131,7 @@ struct RemoteChangeFileView: View {
                     if let file, let mark = Self.mark(for: file) {
                         Text(mark)
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                     }
                 }
                 if let file {
@@ -201,7 +201,7 @@ struct RemoteChangeFileView: View {
         VStack(alignment: .leading, spacing: 4) {
             Text("This file has changed since the agent's last edit, in ways it didn't report.")
                 .appText(.fine)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if canShowWhole, view != .whole {
                 Button("See the whole file") { chosen = .whole }
@@ -242,7 +242,7 @@ struct RemoteChangeFileView: View {
                          ? "An edit to this file is still being made."
                          : "The agent reported no edits to this file. Whole file shows what changed.")
                         .appText(.supporting)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                 }
                 ForEach(Array(edits.enumerated()), id: \.element.id) { number, edit in
                     VStack(alignment: .leading, spacing: 4) {
@@ -252,7 +252,7 @@ struct RemoteChangeFileView: View {
                             if edit.oldText == nil { Text("· made the file") }
                         }
                         .appText(.fine)
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Paper.tertiary)
                         DiffView(diff: edit.diff, maxHeight: nil, showsPath: false)
                     }
                 }
@@ -290,7 +290,7 @@ struct RemoteChangeFileView: View {
         } else if let wholeProblem {
             Text(wholeProblem)
                 .appText(.supporting)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
                 .padding(24)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -303,7 +303,7 @@ struct RemoteChangeFileView: View {
         VStack(spacing: 10) {
             Text(said)
                 .appText(.supporting)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
             Button("Show changes") { drawAnyway = true }
         }
         .padding(24)

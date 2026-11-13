@@ -209,7 +209,7 @@ private struct RemoteFolderSidebar: View {
             Section {
                 Label("New Session", systemImage: "square.and.pencil")
                     .appText(.supporting)
-                    .tag(SidebarItem.folder(summary.key))
+                    .paperTag(SidebarItem.folder(summary.key))
             }
             ForEach(SidebarSmartRow.allCases.filter(groups.contains), id: \.self) { row in
                 RemoteSmartFold(row: row, folders: [summary], folds: folds, query: "", groups: groups)
@@ -218,6 +218,7 @@ private struct RemoteFolderSidebar: View {
                               smartGroups: groups, inScene: true)
             ElsewhereRow(key: summary.key, back: back)
         }
+        .environment(\.sidebarPick, state.pick)
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)

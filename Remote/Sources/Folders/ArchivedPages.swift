@@ -181,7 +181,7 @@ private struct ArchivedFooter: View {
             Spacer(minLength: 0)
         }
         .appText(.supporting)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(Paper.secondary)
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
     }

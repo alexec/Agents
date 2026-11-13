@@ -64,7 +64,7 @@ struct RuntimeSignInSheet: View {
                     Section {
                         HStack(spacing: 8) {
                             ProgressView()
-                            Text(RuntimeSignInWords.asking(runtime.name)).foregroundStyle(.secondary)
+                            Text(RuntimeSignInWords.asking(runtime.name)).foregroundStyle(Paper.secondary)
                         }
                     }
                 }

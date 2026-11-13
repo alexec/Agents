@@ -27,15 +27,15 @@ struct RemoteMachinePage: View {
             List {
                 Section {
                     Text(words ?? (offline ? "Offline" : "Online"))
-                        .foregroundStyle(offline ? StateTint.failure.style(or: .secondary) : AnyShapeStyle(.secondary))
+                        .foregroundStyle(offline ? StateTint.failure.style(or: .secondary) : AnyShapeStyle(Paper.secondary))
                     if offline {
-                        Text("\(name) is offline, so it can’t say how it is doing now.").foregroundStyle(.secondary)
+                        Text("\(name) is offline, so it can’t say how it is doing now.").foregroundStyle(Paper.secondary)
                     } else if !answersUsage {
-                        Text("Update Agents on \(name) to see its CPU, memory and disks here.").foregroundStyle(.secondary)
+                        Text("Update Agents on \(name) to see its CPU, memory and disks here.").foregroundStyle(Paper.secondary)
                     } else if let usage {
                         summary(usage)
                     } else if let failure {
-                        Text(failure).foregroundStyle(.secondary)
+                        Text(failure).foregroundStyle(Paper.secondary)
                     } else {
                         ProgressView()
                     }
@@ -43,7 +43,7 @@ struct RemoteMachinePage: View {
                 if !offline, let usage {
                     Section("Disks") {
                         if usage.disks.isEmpty {
-                            Text("No disk looked at yet. \(name) looks every minute.").foregroundStyle(.secondary)
+                            Text("No disk looked at yet. \(name) looks every minute.").foregroundStyle(Paper.secondary)
                         }
                         ForEach(usage.disks.sorted { $0.level > $1.level }) { disk in
                             LabeledContent {
@@ -62,7 +62,7 @@ struct RemoteMachinePage: View {
                     Section("Runtimes") {
                         let runtimes = model.runtimes(on: host).filter(\.isInstalled)
                         if runtimes.isEmpty {
-                            Text("None installed here yet.").foregroundStyle(.secondary)
+                            Text("None installed here yet.").foregroundStyle(Paper.secondary)
                         }
                         ForEach(runtimes) { status in runtimeRow(status) }
                     }
@@ -105,9 +105,9 @@ struct RemoteMachinePage: View {
         VStack(alignment: .leading, spacing: 6) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(status.runtime.name)
-                Text(status.machineLine).appText(.fine).foregroundStyle(.secondary)
+                Text(status.machineLine).appText(.fine).foregroundStyle(Paper.secondary)
                 if host == .mac, status.needsSignIn {
-                    Text(RuntimeSignInWords.onTheMac).appText(.fine).foregroundStyle(.secondary)
+                    Text(RuntimeSignInWords.onTheMac).appText(.fine).foregroundStyle(Paper.secondary)
                 }
             }
             .accessibilityElement(children: .combine)
@@ -161,7 +161,7 @@ struct RemoteMachinePage: View {
             let waits = [CapacityWords.queued(model.work.agents.count { $0.host == host && $0.state == .queued }),
                          CapacityWords.leasesInLine(leases)].compactMap { $0 }
             if !waits.isEmpty {
-                Text(waits.joined(separator: " · ")).foregroundStyle(.secondary)
+                Text(waits.joined(separator: " · ")).foregroundStyle(Paper.secondary)
             }
         }
         .monospacedDigit()

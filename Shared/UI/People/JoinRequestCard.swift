@@ -35,7 +35,7 @@ struct JoinRequestCard: View {
                     .accessibilityLabel(PeopleWords.joinCode(request))
                 HStack(spacing: 8) {
                     Button("Approve") { answer(true) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.paperProminent)
                     Button("Deny") { answer(false) }
                         .buttonStyle(.bordered)
                     if isAnswering { ProgressView().controlSize(.small) }

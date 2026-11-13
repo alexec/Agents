@@ -105,7 +105,7 @@ private struct AddFolderForm: View {
                             Label(parent.lastPathComponent.isEmpty ? "/" : parent.lastPathComponent,
                                   systemImage: "chevron.left")
                         }
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                     }
                     ForEach(entries) { entry in
                         if entry.isDirectory {
@@ -117,7 +117,7 @@ private struct AddFolderForm: View {
                             .foregroundStyle(.primary)
                         } else {
                             Label(entry.name, systemImage: "doc")
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(Paper.tertiary)
                         }
                     }
                 }

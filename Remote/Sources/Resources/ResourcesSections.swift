@@ -24,7 +24,7 @@ struct ResourcesSections: View {
         Section {
             if declared.isEmpty {
                 Text("Nothing declared. Declare resources in Settings \u{25B8} Resources on the Mac.")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             }
             ForEach(declared) { ResourceListRow(state: $0, at: model.work.leases?.at ?? Date()) }
         } header: {
@@ -52,24 +52,24 @@ private struct ResourceListRow: View {
                 Text(state.displayName).fontWeight(.semibold)
                 Spacer()
                 Text(state.heldCount ?? (state.holds.isEmpty ? "Free" : "Held"))
-                    .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
+                    .appText(.fine).monospacedDigit().foregroundStyle(Paper.secondary)
             }
             if let declared = state.declared {
-                Text(declared.description).appText(.fine).foregroundStyle(.secondary)
+                Text(declared.description).appText(.fine).foregroundStyle(Paper.secondary)
             }
             ForEach(state.holds, id: \.holder) { lease in
                 Text("\(name(lease.holder)) until \(LeaseWords.clock(lease.expiresAt)) \u{00B7} "
                      + "\(LeaseWords.minutesLeft(until: lease.expiresAt, now: at)) min left")
-                    .appText(.fine).foregroundStyle(.secondary)
+                    .appText(.fine).foregroundStyle(Paper.secondary)
             }
             if !state.line.isEmpty {
                 Text("\(state.line.count) waiting: " + state.line.map { name($0.agentID) }.joined(separator: ", "))
-                    .appText(.fine).foregroundStyle(.secondary)
+                    .appText(.fine).foregroundStyle(Paper.secondary)
             }
             // A line that waits for the machine, not for a holder (#4748).
             if let why = state.capacityWait {
                 Text(CapacityWords.heldForCapacity(why))
-                    .appText(.fine).foregroundStyle(.secondary)
+                    .appText(.fine).foregroundStyle(Paper.secondary)
             }
         }
         .accessibilityElement(children: .combine)

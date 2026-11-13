@@ -41,7 +41,7 @@ struct SignInButtons: View {
                     Button { Task { await signInWithOrg(org.id) } } label: {
                         Label(SignInWords.orgButton(org.name), icon: "building.2").frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.paperProminent)
                     .controlSize(.large)
                     .disabled(busy != nil)
                 }

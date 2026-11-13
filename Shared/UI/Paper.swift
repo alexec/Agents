@@ -410,6 +410,24 @@ extension View {
     }
 }
 
+/// A picked sidebar row (Paper v2, #4977, #4993): the selection grey with a 3px bar in the
+/// accent at its leading edge, inset as the system's sidebar selection is. The row's text
+/// stays ink. The Mac's sidebar and the Remote's both draw it, in place of the system's
+/// accent fill.
+struct PaperSelectionRow: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: Paper.Radius.control)
+            .fill(Paper.selection)
+            .overlay(alignment: .leading) {
+                UnevenRoundedRectangle(topLeadingRadius: Paper.Radius.control,
+                                       bottomLeadingRadius: Paper.Radius.control)
+                    .fill(Paper.accent)
+                    .frame(width: 3)
+            }
+            .padding(.horizontal, 10)
+    }
+}
+
 /// A sheet laid out the same way every time: title, body, then Cancel / primary actions.
 struct PaperSheet<Content: View, Actions: View>: View {
     let title: String

@@ -41,11 +41,11 @@ struct FolderRow: View {
                 if !summary.exists {
                     Text("Folder is missing")
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                 } else if isFolded, !asHeading, let subtitle {
                     Text(subtitle)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .lineLimit(1)
                 }
             }
@@ -127,7 +127,7 @@ struct Waiting: View {
                 Text("Add a folder on your Mac, or clone one from a Git URL.")
             } actions: {
                 Button("Add Folder…") { adding = .folder(.mac, "This Mac") }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.paperProminent)
                 Button("Clone Git URL…") { adding = .clone(.mac, "This Mac") }
             }
             .sheet(item: $adding) { NewFolderSheet(kind: $0) }

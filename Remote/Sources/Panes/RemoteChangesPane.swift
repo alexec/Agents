@@ -70,9 +70,9 @@ struct RemoteChangesPane: View {
         return List {
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(list.files.count) \(list.files.count == 1 ? "file" : "files") · +\(added) −\(removed)")
-                    .appText(.fine).foregroundStyle(.secondary)
+                    .appText(.fine).foregroundStyle(Paper.secondary)
                 if let source = Self.source(list.git) {
-                    Text(source).appText(.fine).foregroundStyle(.tertiary)
+                    Text(source).appText(.fine).foregroundStyle(Paper.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -93,7 +93,7 @@ struct RemoteChangesPane: View {
             }
             if let more = list.more, more > 0 {
                 Text(more == 1 ? "and 1 more file" : "and \(more) more files")
-                    .appText(.fine).foregroundStyle(.secondary)
+                    .appText(.fine).foregroundStyle(Paper.secondary)
             }
         }
         .listStyle(.plain)
