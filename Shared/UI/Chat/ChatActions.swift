@@ -53,6 +53,9 @@ struct ChatActions {
     var subagentSteps: (@MainActor (String) -> Void)? = nil
     /// Open what a background task printed, from its output file (057).
     var backgroundOutput: (@MainActor (BackgroundItem) -> Void)? = nil
+    /// Stop one background task of an agent, by the agent's id (057), from the Now card's
+    /// detail (#5033). Nil offers no Stop.
+    var stopBackground: (@MainActor (BackgroundItem, UUID) async -> Void)? = nil
     /// A finished turn's entries, by where it sits in the transcript, for a turn the
     /// chat opens from its summary: the last page of them, whose `firstIndex` says
     /// whether there are earlier steps to ask for (#519). Nil when they did not come (#400).

@@ -43,6 +43,15 @@ enum LiveTileWords {
         }
     }
 
+    /// The Now card's line while it drives one (#5033): "Driving the screen".
+    static func driving(_ frame: LiveFrame) -> String {
+        switch frame.source {
+        case .screen: "Driving the screen"
+        case .browser: "Driving the browser"
+        case .simulator: "Driving the simulator"
+        }
+    }
+
     static func waiting(_ source: LiveSource) -> String {
         switch source {
         case .screen: "Waiting for the first look at the screen…"
@@ -76,45 +85,49 @@ struct LiveTile: View {
     var open: ((LiveSource) -> Void)?
 
     @State private var chosen: LiveSource?
+    @Environment(\.nowOpen) private var nowOpen
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let fresh = LiveTiles.fresh(frames, now: context.date)
             if let shown = LiveTiles.shown(frames, chosen: chosen, now: context.date) {
                 tile(shown.frame, sources: fresh.map(\.frame.source))
+            } else {
+                // Its frames stopped: the Now card's working line, until the agent is done.
+                NowHead(title: NowWords.working) { WorkingRing(size: 16, doing: true) }
             }
         }
     }
 
+    /// A part of the Now card (#5033): "Driving the browser · what it did last" as its head,
+    /// and, while the card is open (it opens with a picture), the picture, the switch and Open.
     private func tile(_ frame: LiveFrame, sources: [LiveSource]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Label(LiveTileWords.name(frame), icon: LiveTileWords.symbol(frame.source))
-                    .appText(.supporting).fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Spacer(minLength: 8)
-                if sources.count > 1 {
-                    switcher(frame.source, sources: sources)
-                }
-                if frame.source != .screen, let open {
-                    Button(LiveTileWords.open) { open(frame.source) }
-                        .buttonStyle(.paper)
-                        .help(LiveTileWords.openHelp(frame.source))
-                }
+            NowHead(title: LiveTileWords.driving(frame), detail: frame.locked == true ? LiveTileWords.locked : frame.narration) {
+                Image(icon: LiveTileWords.symbol(frame.source)).foregroundStyle(.secondary)
             }
-            picture(frame)
-            if let narration = frame.narration {
-                Text(narration)
-                    .appText(.reading)
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .accessibilityHidden(true)
+            if nowOpen?.wrappedValue ?? true {
+                picture(frame)
+                if sources.count > 1 || (frame.source != .screen && open != nil) {
+                    HStack(spacing: 8) {
+                        Text(LiveTileWords.name(frame))
+                            .appText(.fine)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        if sources.count > 1 {
+                            switcher(frame.source, sources: sources)
+                        }
+                        if frame.source != .screen, let open {
+                            Button(LiveTileWords.open) { open(frame.source) }
+                                .buttonStyle(.paper)
+                                .help(LiveTileWords.openHelp(frame.source))
+                        }
+                    }
+                }
             }
         }
-        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .contain)
     }
 

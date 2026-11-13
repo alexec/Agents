@@ -63,34 +63,6 @@ enum PromptWords {
     }
 }
 
-/// Where the agent is working, how full it is, and what runs it: the row above the
-/// field once an agent exists.
-///
-/// What the agent runs in the background, above the prompt. What it waits for on events
-/// is a card at the end of the chat (#1995), and what it holds and waits for in line is
-/// with the working line (#2344).
-/// Live, so shown only while it is so. The settled facts — its place, its runtime,
-/// what it has used — are not drawn here: the pills under the prompt are the settings.
-struct PromptHeader: View {
-    let agent: Agent
-    /// What it has running in the background (057): a block of
-    /// rows, or on a phone one line that opens them (`compactBackground`).
-    var background: [BackgroundItem] = []
-    var backgroundActions = BackgroundActions()
-    var compactBackground = false
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if compactBackground {
-                BackgroundLine(items: background, actions: backgroundActions)
-            } else {
-                BackgroundBlock(items: background, actions: backgroundActions)
-            }
-        }
-    }
-
-}
-
 /// Said above the field when the open agent may take no more prompts, with exactly two
 /// ways out: raise the limit, or let this one agent go on.
 ///

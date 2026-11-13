@@ -239,9 +239,8 @@ struct RemoteChatView: View {
                 // Under the banner, not over it: when the Mac has gone quiet, what
                 // the agent last said it would do is the less urgent of the two.
                 if let agent {
-                    // The goal it keeps working towards over the plan, as the window has them (#2742).
-                    GoalCard(agent: agent)
-                    CurrentPlanStrip(agent: agent)
+                    // What it works towards: the goal (#2742) and the plan, one Now card (#5033).
+                    NowTopCard(agent: agent)
                 }
                 // The agent asked to be looked at while something was being typed: said
                 // here, to be opened when the person chooses (034 FR-005). The main scene's.
@@ -433,7 +432,6 @@ struct RemoteChatView: View {
                 LiveTile(frames: liveFrames, open: { [openTakeOver] source in
                     openTakeOver(TakeOverKey(agentID: agent.id, source: source))
                 })
-                .chatColumn()
                 .transition(.opacity)
             })
         }
@@ -444,7 +442,6 @@ struct RemoteChatView: View {
                                         resume: { await model.resumeDesktopControl(agent.id) },
                                         takeOver: { await model.takeOverDesktopControl(agent.id) },
                                         isDisabled: model.isStale(agent))
-                    .chatColumn()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             })
         }
@@ -456,19 +453,21 @@ struct RemoteChatView: View {
                               stop: { await model.carryOn(agent.id) },
                               help: AgentsModel.carryOnHelp(for: agent),
                               isDisabled: model.isStale(agent))
-                    .chatColumn()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             })
         }
         // The agent's wait on events, under the questions, as on the Mac (#1995).
         if agent.eventWait?.isOpen == true, let status = model.work.waitStatus(of: agent) {
-            cards.append(WaitingCard(id: "wait:" + agent.id.uuidString, asks: agent.eventWait?.lineResource == nil && agent.eventWait?.personLine != nil) {
+            // A wait only the person can settle is an Ask (#5031), in the chat column; any other
+            // is a part of the Now card (#5033), which keeps the column itself.
+            let asks = agent.eventWait?.lineResource == nil && agent.eventWait?.personLine != nil
+            cards.append(WaitingCard(id: "wait:" + agent.id.uuidString, asks: asks) {
                 WaitCard(status: status, eventWait: agent.eventWait,
                          lines: model.work.waitEventLines(of: agent),
                          continueNow: { await model.continueWaiting(of: agent.id, line: agent.eventWait?.lineResource) },
                          stop: { await model.cancelWait(of: agent.id) },
                          isDisabled: model.isStale(agent))
-                    .chatColumn()
+                    .chatColumn(asks)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             })
         }
@@ -573,6 +572,7 @@ struct RemoteChatView: View {
             // A subagent's own steps, in a sheet: the Mac's Background pane, on a phone
             // (057, frame E).
             subagentSteps: { id in subagentOnScreen = id },
+            stopBackground: { [model] item, agentID in await model.stopBackground(item, of: agentID) },
             turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) },
             reloadTranscript: { [model, popped] in
                 if let popped { await model.loadTranscript(of: popped) } else { await model.loadTranscript() }

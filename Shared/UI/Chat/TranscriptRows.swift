@@ -399,7 +399,8 @@ private struct EntryRow: View {
             Text(call.line).appText(.reading).foregroundStyle(.secondary)
 
         case .planUpdated(let plan):
-            PlanView(plan: plan)
+            // One line that opens to the steps (#5033): the plan as it is now is in the top card.
+            PlanLine(plan: plan)
 
         case .usageRecorded:
             // Dropped by `TranscriptEntry.display` before it gets here. The cost of a
@@ -1047,23 +1048,6 @@ private extension JSONValue {
     }
 }
 
-/// The agent is at work and the person is waiting: the same mark the sidebar row shows,
-/// in step with it (#2044), at the foot of the conversation, so the chat itself moves
-/// while nothing else on it does: the ring spins while it thinks or replies, and also
-/// pivots while it runs a tool (#2332). Live rather than recorded — it is there exactly as long as the wait is,
-/// and it rides the end of the transcript as the reply arrives.
-struct WorkingLine: View {
-    /// The tool it runs, or nil while it thinks (`RunningToolWords.tool`).
-    var tool: String?
-
-    var body: some View {
-        WorkingRing(size: 16, doing: tool != nil)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 2)
-            .accessibilityLabel(tool.map(RunningToolWords.label) ?? "Working")
-    }
-}
-
 /// How long the chat has been quiet and how old it is, at its foot: "Last activity 12
 /// minutes ago · started 3 hours ago" (#1564). Nothing under five minutes. Read again on
 /// the minute, as `ActivityTime` is.
@@ -1081,15 +1065,6 @@ struct QuietLine: View {
                     .padding(.bottom, 14)
             }
         }
-    }
-}
-
-/// The chat is being picked back up by the daemon, and nobody typed for it.
-struct ComingBackLine: View {
-    var body: some View {
-        Label(AgentsModel.comingBackDescription, icon: AgentsModel.comingBackSymbol)
-            .appText(.reading)
-            .foregroundStyle(.secondary)
     }
 }
 

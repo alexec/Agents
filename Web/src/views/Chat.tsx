@@ -20,8 +20,9 @@ import { KeptBubbles } from "./Kept";
 import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
 import { AccountMoveStrip } from "./AccountMove";
 import { ContinueStrip } from "./ContinueStrip";
-import { CurrentPlanStrip } from "./PlanStrip";
-import { GoalCard } from "./GoalCard";
+import { NowBar, NowFoot, NowHead, NowTop, useNowOpen } from "./Now";
+import { nowBackground, nowWorking } from "../model/nowWords";
+import { freshFrames } from "../model/liveTile";
 import { Telling } from "./Telling";
 import { Labels } from "./Labels";
 import { Prompt } from "./Prompt";
@@ -49,7 +50,7 @@ import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { ViewDiff } from "./chat/ViewDiff";
 import { offerStart } from "./NewAgent";
 import { BackToList } from "./BackToList";
-import { comingBackDescription, footStatusWords } from "../model/status";
+import { comingBackDescription, footStatusWords, startingLabel } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { DesktopControlPauseCard } from "./DesktopControlPauseCard";
 import { SecretUseCard } from "./SecretUseCard";
@@ -503,15 +504,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       key: `secretUse:${request.id}`,
       node: <SecretUseCard store={store} host={host} request={request} disabled={down} />,
     })),
-    // It drives the screen, the browser or a simulator (#3004, #4140): the live tile, above any
-    // pause card. Open takes over the browser or the simulator in a tab of its own (#4141).
-    ...(agent && agent.state === "running" ? [{
-      key: `live:${agent.id}`,
-      node: <LiveTile store={store} host={host} agentID={agent.id} open={(source) => {
-        if (source === "screen") return;
-        openTakeOver(host, route.peek().folder ?? agent.worktree?.folder ?? agent.cwd, agent.id, source);
-      }} />,
-    }] : []),
     // Its drive_screen paused by the person's touch (#3004, US3): Resume or Take Over.
     ...(agent?.desktopControlPause ? [{
       key: `screen:${agent.id}`,
@@ -527,6 +519,40 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       node: <ArchiveCard store={store} host={host} agent={agent} disabled={down} />,
     }] : []),
   ];
+
+  // What it does or waits on now, the last thing before the prompt bar (#5033): the live picture
+  // when it drives the screen (#3004, #4140), a wait on sessions or a time (#2750), the agent's own
+  // wait on events (#1995); else the working line. Its leases and background work are its detail.
+  const comingBack = !!agent && store.isComingBack(host, agent.id);
+  const working = !!agent && (agent.state === "running" || agent.state === "starting");
+  const drives = !!agent && agent.state === "running" && freshFrames(store.liveFrames.value, host, agent.id, Date.now()).length > 0;
+  const nowParts = agent ? [
+    ...(drives ? [<LiveTile key="live" store={store} host={host} agentID={agent.id} open={(source) => {
+      // Open takes over the browser or the simulator in a tab of its own (#4141).
+      if (source === "screen") return;
+      openTakeOver(host, route.peek().folder ?? agent.worktree?.folder ?? agent.cwd, agent.id, source);
+    }} />] : []),
+    ...(openBlock(agent) ? [<BlockWaitCard key="block" store={store} host={host} agent={agent} disabled={down} />] : []),
+    ...(waitCard && !personWait ? [<Fragment key="wait">{waitCard}</Fragment>] : []),
+  ] : [];
+  const leases = agent ? leaseMark(agent.id, store.leases.value[host], (id) => store.agent(host, id)?.title, lineResource(agent)) : null;
+  const startWords = agent?.state === "queued" ? store.capacity.value[host]?.words : undefined;
+  const start = startWords ? startLineWords(startWords) : null;
+  const nowSummary = leases?.lines[0] ?? (background.length ? nowBackground(background.length) : null);
+  const nowHead = !agent ? null
+    : comingBack ? <NowHead mark={<Icon name="rotate-cw" />} title={comingBackDescription} meta={nowSummary} />
+    : working ? <NowHead mark={<WorkingMark tool={runningTool(agent)} />} title={agent.state === "starting" ? startingLabel : nowWorking}
+      detail={runningTool(agent)} meta={nowSummary} />
+    : start ? <NowHead mark={<Icon name="clock" />} title={start} meta={nowSummary} />
+    : leases && !background.length ? <NowHead mark={<Icon name="lock" />} title={leases.lines[0] ?? leases.full} />
+    : background.length ? <NowHead mark={<Icon name="layers" />} title={nowBackground(background.length)} meta={leases?.lines[0]} />
+    : null;
+  const nowDetail = agent && (leases || background.length) ? (
+    <div class="now-rows">
+      {leases && <LeaseLine host={host} leases={leases} />}
+      <BackgroundRows store={store} host={host} agent={agent} disabled={down} steps={(item) => (subagent.value = item)} />
+    </div>
+  ) : null;
 
   const toEnd = () => {
     const el = scroller.current;
@@ -650,10 +676,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       <MissingFolderStrip store={store} host={host} agent={agent} />
       <AccountMoveStrip store={store} host={host} agent={agent} />
       <ContinueStrip store={store} host={host} agent={agent} disabled={down} />
-      {/* What it keeps working towards (#2742), then what it said it would do, under what it
-          waits on, as the Remote has them (#341). */}
-      <GoalCard agent={agent} />
-      <CurrentPlanStrip agent={agent} />
+      {/* What it works towards: the goal (#2742) and the plan (#341), one Now card (#5033). */}
+      <NowTop agent={agent} />
       {finding.value && agent && <FindBar store={store} host={host} agentID={agent.id} close={() => (finding.value = false)} />}
       <CallActionsContext.Provider value={callActions}>
       <ViewLayerContext.Provider value={viewHosting}>
@@ -683,17 +707,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         ))}
         {agent && <Queued store={store} host={host} agent={agent} disabled={down} draftKey={`${host}|${session}`} />}
         {agent && <KeptBubbles store={store} kept={store.keptFor(host, agent.id)} />}
-        {/* Live, at the foot: what the row says, until the prompt lands (ChatTranscript, #251). The one
-            working mark on the page, never in a tool's or a thought's line (#2831). */}
-        {agent && store.isComingBack(host, agent.id) ? <p class="working coming-back" aria-hidden="true">↻ {comingBackDescription}</p>
-          : agent && (agent.state === "running" || agent.state === "starting") && (
-          <p class="working" aria-hidden="true"><WorkingMark tool={runningTool(agent)} /></p>
-        )}
         {/* What the foot says to a screen reader, as text, in one node that is always there: a
             live region reads a change to its text, not to an aria-label, nor a node just drawn (#2391). */}
         <p class="visually-hidden" role="status">{agent ? footStatusWords(agent, store.isComingBack(host, agent.id)) : ""}</p>
-        {/* What it holds and waits for in line: what the agent is doing now, as the working line says (#2344). */}
-        {agent && <LeaseLine store={store} host={host} agent={agent} />}
         {/* After all of it, where the reader is (#1995). */}
         {cards.length > 0 && (
           <div class="waiting" role="group" aria-label={waitingForYou}>
@@ -701,13 +717,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             {cards.map((card) => <Fragment key={card.key}>{card.node}</Fragment>)}
           </div>
         )}
-        {/* A wait on sessions or on a time, the same card in the same place (#2750): it was a strip
-            under the chat's head with Carry on. */}
-        {agent && openBlock(agent) && <BlockWaitCard store={store} host={host} agent={agent} disabled={down} />}
-        {/* Under them, and not in "Waiting for you": the agent waits, not the person (#2084), except a
-            wait only the person can settle (#3147), which is an Ask among them (#5031). Only while the
-            wait is open: an ended one stays on the record until the agent goes on (#2749). */}
-        {waitCard && !personWait && waitCard}
+        {/* Last before the prompt bar: what it does or waits on now (#5033). A wait only the person
+            can settle is an Ask among the cards above (#3147, #5031). */}
+        {agent && <NowFoot live={drives} parts={nowParts} head={nowHead} detail={nowDetail} />}
         {agent && !store.isComingBack(host, agent.id) && agent.state !== "running" && agent.state !== "starting" && (
           <QuietLine since={lastEntryAt(store.entries.value, store.turns.value) ?? fromWireDate(agent.lastActivityAt)}
             startedAt={fromWireDate(agent.createdAt)} />
@@ -725,7 +737,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         </button>
       )}
       <footer class="foot">
-        <BackgroundRows store={store} host={host} agent={agent} disabled={down} steps={(item) => (subagent.value = item)} />
         <Prompt store={store} draftKey={`${host}|${session}`} placeholder={refusedHere ?? promptPlaceholder(agent)}
           disabled={(down && !keeps) || !agent || refusedHere !== null}
           stop={agent && hasTurnInFlight(agent) ? () => void store.perform(host, agent.id, "agents/stop") : undefined}
@@ -899,21 +910,15 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
 }
 
 /**
- * What the open agent holds and waits for in line, with the working line (036; LeaseLine.swift,
- * #2344): one line each, a way to the Resources on its machine's page (#3629), with a chevron and a row's hit area (#2448). What it waits for on events is a card (#1995).
+ * What the open agent holds and waits for in line (036; LeaseLine.swift, #2344), in the Now card's
+ * detail (#5033): one line each, a way to the Resources on its machine's page (#3629), with a
+ * chevron and a row's hit area (#2448).
  */
-function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: Agent }) {
-  // A place in line that the wait card says is left to the card (#2361).
-  const leases = leaseMark(agent.id, store.leases.value[host], (id) => store.agent(host, id)?.title, lineResource(agent));
-  // A queued start the machine holds says why, as a lease's wait does (#4748).
-  const words = agent.state === "queued" ? store.capacity.value[host]?.words : undefined;
-  const start = words ? startLineWords(words) : null;
-  if (!leases && !start) return null;
+function LeaseLine({ host, leases }: { host: string; leases: NonNullable<ReturnType<typeof leaseMark>> }) {
   return (
-    <div class="lease-line" role="status" aria-label={[leases?.full, start].filter(Boolean).join(" ")}>
-      {start && <span class="words">{start}</span>}
-      {(leases?.lines ?? []).map((text) => (
-        <button key={text} class="link" title={leases?.full}
+    <div class="lease-line" role="status" aria-label={leases.full}>
+      {leases.lines.map((text) => (
+        <button key={text} class="link" title={leases.full}
           onClick={() => { resourcesAsked.value = true; location.hash = routeHash({ nav: "machines", section: `machine-${host}` }); }}>
           <span class="words">{text}</span><Icon name="chevron-right" class="chevron" />
         </button>
@@ -940,6 +945,7 @@ function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent;
   disabled: boolean; continueNow: () => Promise<void>; stop: () => Promise<void> }) {
   const busy = useSignal(false);
   const now = useSignal(Date.now());
+  const open = useNowOpen();
   useEffect(() => {
     const timer = window.setInterval(() => { now.value = Date.now(); }, 20_000);
     return () => window.clearInterval(timer);
@@ -981,29 +987,23 @@ function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent;
       </Ask>
     );
   }
+  // Any other wait is a part of the Now card (#5033): the waiting mark of #5022, what, how long,
+  // the bar to its deadline, its events when opened, and End Wait and Carry On, the primary last.
   return (
-    <div class="cards">
-      <div class="card wait-card">
-        {isLine ? <p class="strong">{line}</p> : <>
-          <div class="wait-card-heading">
-            <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon kind={eventWaitKind(agent)} /></span>{eventWaitCardTitle(wait)}</span>
-            <span class="wait-card-time">{eventWaitTime(elapsed, total)}</span>
-          </div>
-          {summary}
-          {percent !== undefined && <div class="wait-card-progress" role="progressbar" aria-label="Event wait time"
-            aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
-            <span style={{ width: `${percent}%` }} />
-          </div>}
-        </>}
-        <p class="wait-answers">
-          <button disabled={disabled || busy.value}
-            title={resource === undefined ? waitWords.carryOnHelp : `Leave the line for ${resource} and carry on now, without it.`}
-            onClick={carryOn}>
-            {resource === undefined ? waitWords.carryOn : `Carry on without ${resource}`}</button>
-          <button class="destructive" disabled={disabled || busy.value} title={waitWords.endWaitHelp}
-            onClick={endWait}>{waitWords.endWait}</button>
-        </p>
-      </div>
+    <div class="now-part wait-card">
+      {isLine ? <NowHead mark={<Icon name="clock" />} title={line ?? ""} /> : <>
+        <NowHead mark={<span class="wait-card-broadcast waiting-beacon"><Beacon kind={eventWaitKind(agent)} /></span>}
+          title={eventWaitCardTitle(wait)} meta={eventWaitTime(elapsed, total)} />
+        {percent !== undefined && <NowBar fraction={percent / 100} label="Event wait time" />}
+        {open && summary}
+      </>}
+      <p class="now-answers">
+        <button disabled={disabled || busy.value} title={waitWords.endWaitHelp} onClick={endWait}>{waitWords.endWait}</button>
+        <button class="prominent" disabled={disabled || busy.value}
+          title={resource === undefined ? waitWords.carryOnHelp : `Leave the line for ${resource} and carry on now, without it.`}
+          onClick={carryOn}>
+          {resource === undefined ? waitWords.carryOn : `Carry on without ${resource}`}</button>
+      </p>
     </div>
   );
 }
@@ -1019,6 +1019,7 @@ function BlockWaitCard({ store, host, agent, disabled }: { store: Store; host: s
     const timer = window.setInterval(() => { now.value = Date.now(); }, 20_000);
     return () => window.clearInterval(timer);
   }, []);
+  const open = useNowOpen();
   const block = openBlock(agent);
   if (!block || !agent.report) return null;
   const since = fromWireDate(agent.report.at).getTime();
@@ -1027,22 +1028,17 @@ function BlockWaitCard({ store, host, agent, disabled }: { store: Store; host: s
   const elapsed = Math.max(0, Math.floor((now.value - since) / 60_000));
   const share = deadline === undefined || deadline <= since ? undefined : Math.min(100, Math.max(0, (now.value - since) / (deadline - since) * 100));
   return (
-    <div class="cards">
-      <div class="card wait-card block-wait-card">
-        <div class="wait-card-heading">
-          <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon kind="agents" /></span>{cardTitle(block)}</span>
-          <span class="wait-card-time">{eventWaitTime(elapsed, total)}</span>
-        </div>
-        <div class="wait-card-events">
-          {store.waitsOf(host, agent).map((line) => <p class="wait-card-event" key={line}>{line}</p>)}
-        </div>
-        {share !== undefined && <div class="wait-card-progress" role="progressbar" aria-label="Wait time"
-          aria-valuemin={0} aria-valuemax={100} aria-valuenow={share}><span style={{ width: `${share}%` }} /></div>}
-        <p class="wait-answers">
-          <button disabled={disabled || busy.value} title={carryOnHelp(agent)}
-            onClick={() => { busy.value = true; void store.prompt(host, agent.id, carryOnPrompt, []).finally(() => (busy.value = false)); }}>{waitWords.carryOn}</button>
-        </p>
-      </div>
+    <div class="now-part wait-card block-wait-card">
+      <NowHead mark={<span class="wait-card-broadcast waiting-beacon"><Beacon kind="agents" /></span>}
+        title={cardTitle(block)} meta={eventWaitTime(elapsed, total)} />
+      {share !== undefined && <NowBar fraction={share / 100} label="Wait time" />}
+      {open && <div class="wait-card-events">
+        {store.waitsOf(host, agent).map((line) => <p class="wait-card-event" key={line}>{line}</p>)}
+      </div>}
+      <p class="now-answers">
+        <button class="prominent" disabled={disabled || busy.value} title={carryOnHelp(agent)}
+          onClick={() => { busy.value = true; void store.prompt(host, agent.id, carryOnPrompt, []).finally(() => (busy.value = false)); }}>{waitWords.carryOn}</button>
+      </p>
     </div>
   );
 }

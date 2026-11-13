@@ -63,13 +63,6 @@ struct PromptBar: View {
                 // Where it works, its labels and its runtime, over the field as on the
                 // window and the page (#108, #242).
                 PromptHead(agent: agent)
-                PromptHeader(agent: agent,
-                             background: agent.background,
-                             backgroundActions: BackgroundActions(
-                                stop: { [model] item in await model.stopBackground(item, of: agent.id) },
-                                steps: { [chatActions] item in chatActions.subagentSteps?(item.id) }),
-                             // One line on a phone, the Mac's rows on an iPad (frame E).
-                             compactBackground: sizeClass == .compact)
                 CostLimitBanner(agent: agent, limits: model.costLimits, costState: model.costState,
                                 goOn: { Task { await model.letThisAgentGoOn(agent) } }) {
                     RaiseTheLimitOnTheMac()

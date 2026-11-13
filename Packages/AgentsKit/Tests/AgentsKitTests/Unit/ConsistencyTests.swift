@@ -392,7 +392,7 @@ struct ConsistencyTests {
     /// a chevron and an "N more" the Mac never had.
     private static let sharedChatTypes = [
         "EntryRow", "ToolRunRow", "ToolCallLine", "StateLine", "WorkReportLine",
-        "QueuedPromptRow", "WorkingLine", "ComingBackLine", "JumpToEnd", "BlocksView",
+        "QueuedPromptRow", "NowCard", "NowTopCard", "PlanLine", "JumpToEnd", "BlocksView",
         "DiffView", "PlanView", "TerminalOutputView", "ServedRequestLine", "CommandList",
         "MentionList", "OptionMenu", "SelectCapsule", "Dictation",
     ]

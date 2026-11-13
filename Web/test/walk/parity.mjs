@@ -109,12 +109,12 @@ for (const scene of scenes) {
       if (!(await page.eval(`!!(${pick})`))) await page.eval(`document.querySelector(".row.folder .pick, .row.folder button")?.click()`);
       await page.waitFor(`!!(${pick})`, 30_000);
       await page.eval(`(${pick}).click()`);
-      await page.waitFor(`document.querySelector(".plan-strip .plan-card")`, 30_000);
-      say(`card: ${JSON.stringify(await visible(".plan-strip .plan-line"))}`);
-      say(`bar: ${await page.eval(`document.querySelector(".plan-strip .plan-bar > span").style.width`)}`);
+      await page.waitFor(`document.querySelector(".now-top .now-card")`, 30_000);
+      say(`card: ${JSON.stringify(await visible(".now-top .plan-row .now-line"))}`);
+      say(`bar: ${await page.eval(`document.querySelector(".now-top .plan-row .now-bar > span").style.width`)}`);
       await shot("plan");
-      await page.eval(`document.querySelector(".plan-strip .plan-summary").click()`);
-      say(`steps: ${JSON.stringify(await visible(".plan-strip .plan li"))}`);
+      await page.eval(`document.querySelector(".now-top .plan-row .now-row").click()`);
+      say(`steps: ${JSON.stringify(await visible(".now-top .plan li"))}`);
       await shot("plan-open");
     } else if (scene === "margin") {
       // #112: a turn's steps are a run of lines with no chevron; a step still opens. Takes the

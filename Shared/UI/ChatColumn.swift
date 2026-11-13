@@ -21,6 +21,13 @@ extension View {
     func chatColumn() -> some View {
         modifier(ChatColumnModifier())
     }
+
+    /// In the chat column only when `fits`: a card that is sometimes an Ask, in the column,
+    /// and sometimes a part of the Now card, which keeps the column itself (#5033).
+    @ViewBuilder
+    func chatColumn(_ fits: Bool) -> some View {
+        if fits { chatColumn() } else { self }
+    }
 }
 
 private struct ChatColumnModifier: ViewModifier {

@@ -57,10 +57,9 @@ struct ChatView: View {
                                                 go: { [model] match in await model.reveal(match) },
                                                 close: { finding = false })
                                 }
-                                // What it keeps working towards (#2742), then what it said
-                                // it would do, as the phone has them (#341).
-                                GoalCard(agent: agent)
-                                CurrentPlanStrip(agent: agent)
+                                // What it works towards: the goal (#2742) and the plan
+                                // (#341), one Now card with two rows (#5033).
+                                NowTopCard(agent: agent)
                             }
                             // On the page's own paper, across the whole pane: the
                             // transcript scrolls under this strip, and without a ground
@@ -227,6 +226,7 @@ struct ChatView: View {
                 guard let agent else { return }
                 Task { await BackgroundOutput.open(item, of: agent, model: model) }
             },
+            stopBackground: { [model] item, agentID in await model.stopBackground(item, of: agentID) },
             turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) },
             reloadTranscript: { [model, popped] in
                 if let popped { await model.loadTranscript(of: popped) } else { await model.loadTranscript() }
@@ -437,7 +437,6 @@ struct ChatView: View {
                 LiveTile(frames: liveFrames, open: { [openWindow] source in
                     openWindow(id: TakeOverKey.sceneID, value: TakeOverKey(agentID: agent.id, source: source))
                 })
-                .chatColumn()
             })
         }
         // Its drive_screen paused by the person's touch (#3004, US3): Resume or Take Over.
@@ -447,7 +446,6 @@ struct ChatView: View {
                                         resume: { await model.resumeDesktopControl(agent.id) },
                                         takeOver: { await model.takeOverDesktopControl(agent.id) },
                                         isDisabled: selectedHostOffline)
-                    .chatColumn()
                     .help(selectedHostOffline ? offlineHelp : "")
             })
         }
@@ -459,20 +457,22 @@ struct ChatView: View {
                               stop: { await model.carryOn(agent.id) },
                               help: AgentsModel.carryOnHelp(for: agent),
                               isDisabled: selectedHostOffline)
-                    .chatColumn()
                     .help(selectedHostOffline ? offlineHelp : "")
             })
         }
         // The agent's wait on events, under the questions (#1995): it was a capsule over
         // the prompt.
         if agent.eventWait?.isOpen == true, let status = model.work.waitStatus(of: agent) {
-            cards.append(WaitingCard(id: "wait:" + agent.id.uuidString, asks: agent.eventWait?.lineResource == nil && agent.eventWait?.personLine != nil) {
+            // A wait only the person can settle is an Ask (#5031), in the chat column; any other
+            // is a part of the Now card (#5033), which keeps the column itself.
+            let asks = agent.eventWait?.lineResource == nil && agent.eventWait?.personLine != nil
+            cards.append(WaitingCard(id: "wait:" + agent.id.uuidString, asks: asks) {
                 WaitCard(status: status, eventWait: agent.eventWait,
                          lines: model.work.waitEventLines(of: agent),
                          continueNow: { await model.continueWaiting(of: agent.id, line: agent.eventWait?.lineResource) },
                          stop: { await model.cancelWait(of: agent.id) },
                          isDisabled: selectedHostOffline)
-                    .chatColumn()
+                    .chatColumn(asks)
                     .help(selectedHostOffline ? offlineHelp : "")
             })
         }
