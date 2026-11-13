@@ -14,7 +14,9 @@ import type { FileStamp, PinView } from "../protocol/generated";
 import { go } from "../route";
 import { fromWireDate } from "../protocol/dates";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
-import { LiveDocument, type PageSource } from "./LiveDocument";
+import { LiveDocument, type OpenPageFile, type PageSource } from "./LiveDocument";
+import { isPageFile, pathInFolder } from "../model/pageLink";
+import { pathOf } from "./files/paneState";
 import { BackToList } from "./BackToList";
 import { PinnedViewPage } from "./PinnedViewPage";
 import { Icon, type IconName } from "./Icon";
@@ -189,6 +191,12 @@ function PinnedFilePage({ store, host, folder, path, down }: {
     watch: () => () => {},
     changed: revision,
   };
+  // A page in the folder that a link names opens in this one's place, as on the Mac (#5068).
+  const inFolder = (file: string) => pathInFolder(file, pathOf(folder));
+  const opens: OpenPageFile = {
+    takes: (file) => { const page = inFolder(file); return page !== null && isPageFile(page); },
+    open: (file) => { const page = inFolder(file); if (page) go({ host, folder, page }); },
+  };
   const now = shown.value;
   return (
     <section class="chat pinned-page" aria-label={title}>
@@ -205,7 +213,7 @@ function PinnedFilePage({ store, host, folder, path, down }: {
       {pin?.missing ? (
         <p class="hint">{missingWords(path, "")}</p>
       ) : !isHTML ? (
-        <LiveDocument store={store} host={host} agentID="" path={path} source={page} />
+        <LiveDocument store={store} host={host} agentID="" path={path} source={page} opens={opens} />
       ) : now.kind === "problem" ? (
         <p class="hint">{now.why}</p>
       ) : now.kind === "reading" || now.path !== path ? (

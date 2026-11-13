@@ -45,7 +45,8 @@ function OpenFile({ store, host, session, file, line, back }: {
       </div>
       {/* Markdown reads as the live page, in place, and follows the file as the agent writes it. */}
       {textShownAs(file) === "page"
-        ? <LiveDocument store={store} host={host} agentID={session} path={file} line={line} />
+        ? <LiveDocument store={store} host={host} agentID={session} path={file} line={line}
+            opens={{ open: (linked) => setPane(session, { file: linked, fileLine: undefined, last: linked }) }} />
         : <FileView store={store} host={host} agentID={session} path={file} line={line} />}
     </div>
   );
@@ -152,7 +153,10 @@ export function FilesPane({ store, host, session }: { store: Store; host: string
         {/* Keyed by session, so one session's list never shows under the next (#4020). */}
         {pane.tab === "changes" && <Changes key={session} store={store} host={host} session={session} />}
         {pane.tab === "page" && (pane.page
-          ? <LiveDocument store={store} host={host} agentID={session} path={pane.page} line={pane.line} />
+          ? <LiveDocument store={store} host={host} agentID={session} path={pane.page} line={pane.line}
+              opens={{ open: (linked) => setPane(session, textShownAs(linked) === "page"
+                ? { page: linked, line: undefined }
+                : { tab: "files", file: linked, fileLine: undefined, last: linked }) }} />
           : <p class="hint">A Markdown file the agent shows reads here.</p>)}
         {pane.tab === "exchanged" && <Exchanged store={store} host={host} session={session} />}
         {pane.tab === "simulator" && (store.has(host, Capability.simulators1)
