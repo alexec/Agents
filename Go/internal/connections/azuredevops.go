@@ -22,10 +22,15 @@ import (
 const AzureDevOps = "azuredevops"
 
 // The Entra sign-in (#3921). An Entra app is a public client ("Allow public client flows"),
-// so the device flow and its refresh need no client secret. Agents has no app of its own on
-// Entra yet: the host reads one from the person's secrets, AZURE_DEVOPS_CLIENT_ID (and
-// AZURE_DEVOPS_TENANT, a tenant id or domain, when the app is in one tenant only).
+// so the device flow and its refresh need no client secret. The host uses the Agents app,
+// AzureDevOpsClientID, unless the person's secrets name another: AZURE_DEVOPS_CLIENT_ID (and
+// AZURE_DEVOPS_TENANT, a tenant id or domain, when that app is in one tenant only).
 const (
+	// AzureDevOpsClientID is the Agents app on Microsoft Entra (#4873, made by
+	// scripts/entra-app.py in the agents' tenant, agentloopsfastmail.onmicrosoft.com): any
+	// work or school account, public client flows on, Azure DevOps's user_impersonation. A
+	// public client has no secret, so the client id is public.
+	AzureDevOpsClientID = "ecc894b9-d854-42e4-80cc-59fbaeebc144"
 	AzureDevOpsClientIDName = "AZURE_DEVOPS_CLIENT_ID"
 	AzureDevOpsTenantName   = "AZURE_DEVOPS_TENANT"
 	// EntraLogin is Microsoft Entra's sign-in root; a walk gives a fake one.

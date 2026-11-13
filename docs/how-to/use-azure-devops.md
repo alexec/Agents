@@ -31,11 +31,12 @@ DevOps…** on the web page's Connectors. The sheet has two ways in:
 - **Microsoft Entra** (#3921), for `dev.azure.com` only: give the organization and choose
   **Sign In with Microsoft**. Agents shows a code and opens Microsoft's device page; type the
   code there and approve. The machine keeps the sign-in and renews it by itself, and the row
-  says **Microsoft Entra · renews by itself**. This way needs an Entra app on the machine:
-  set `AZURE_DEVOPS_CLIENT_ID` in the machine's secrets to the client id of an app
-  registration with **Allow public client flows** on and the Azure DevOps permission
-  `user_impersonation`. Set `AZURE_DEVOPS_TENANT` too when the app is for one tenant only.
-  Without it, the sheet says to use a personal access token.
+  says **Microsoft Entra · renews by itself**. It signs in with the Agents app on Entra
+  (#4873), which takes any work or school account; your organization's admin may have to
+  approve it the first time. To use an app of your own, set `AZURE_DEVOPS_CLIENT_ID` in the
+  machine's secrets to the client id of an app registration with **Allow public client
+  flows** on and the Azure DevOps permission `user_impersonation`, and `AZURE_DEVOPS_TENANT`
+  too when that app is for one tenant only. `scripts/entra-app.py` makes such an app.
 
 ## Before you start
 
