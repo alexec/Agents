@@ -393,17 +393,10 @@ struct AttentionSnapshotTests {
     }
 
     @Test(arguments: [0.0, 60, 14 * 60, 15 * 60 + 1, 3 * 3600, 3 * 86_400, -30] as [TimeInterval])
-    func theUpdatedLineIsSaidAtEveryAge(age: TimeInterval) {
+    func theLastUpdateIsNeverLaterThanNow(age: TimeInterval) {
         let now = Date()
         let snapshot = AttentionSnapshot(writtenAt: now.addingTimeInterval(-age), total: 1, sessions: [])
-        switch snapshot.updated(at: now) {
-        case .at(let when):
-            #expect(age <= AttentionSnapshot.staleness, "the time of day only while fresh")
-            #expect(when <= now)
-        case .ago(let when):
-            #expect(age > AttentionSnapshot.staleness, "how long ago once stale")
-            #expect(when <= now)
-        }
+        #expect(snapshot.readAt(now: now) == min(now, now.addingTimeInterval(-age)))
     }
 
     // MARK: The link

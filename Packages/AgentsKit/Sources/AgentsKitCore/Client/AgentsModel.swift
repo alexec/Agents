@@ -204,7 +204,16 @@ public final class AgentsModel {
 
     /// The machines whose folders and sessions on screen are this device's copy (#4791),
     /// drawn before their host answered. A host's own list takes its machine out.
-    public private(set) var drawnFromCopy: Set<MachineRef> = []
+    public private(set) var drawnFromCopy: Set<MachineRef> = [] {
+        didSet { copyReads = copyReads.filter { drawnFromCopy.contains($0.key) } }
+    }
+    /// When each machine drawn from the copy was read from its host (#5141).
+    @ObservationIgnored private var copyReads: [MachineRef: Date] = [:]
+    /// The oldest read of what is on screen from this device's copy, for the "Last update"
+    /// line (#5141): nil once every host drawn from it has answered.
+    public var copyReadAt: Date? {
+        drawnFromCopy.compactMap { copyReads[$0] }.min()
+    }
     /// Each host's point in its order of changes, as its last catch-up said (#4794).
     @ObservationIgnored private var listPoints: [MachineRef: DaemonAPI.ListRevision] = [:]
     /// How many entries the open chat's host had when it last gave a page of it (#4794):
@@ -1302,13 +1311,14 @@ public final class AgentsModel {
 
     /// A machine as this device last kept it (#4791), drawn before its host answers: taken
     /// only when nothing of that machine is held, so a host's own list always wins.
-    public func takeCopy(_ machine: LocalCopy.Machine) {
+    public func takeCopy(_ machine: LocalCopy.Machine, readAt: Date? = nil) {
         guard !holdsFolders(of: machine.host), !agents.contains(where: { $0.host == machine.host }) else { return }
         let listed = onListed
         onListed = nil
         defer { onListed = listed }
         replaceFolders(machine.folders, from: machine.host)
         replaceAgents(machine.agents, from: machine.host)
+        if let readAt { copyReads[machine.host] = readAt }
         drawnFromCopy.insert(machine.host)
         // The host's first catch-up asks only for what changed since the copy (#4794).
         listPoints[machine.host] = machine.point

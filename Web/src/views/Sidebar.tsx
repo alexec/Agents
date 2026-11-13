@@ -33,7 +33,8 @@ import { folderLine, groupLabel, keeper, keepsInUnread, machineMark, machineStat
   connectorsPlace, folderSessions, projectGroups, rememberedFolder, rememberFolder, sharedProjects, smartAgents, smartApprovals, smartPulls,
   smartSuggestions, smartRows, smartTitles, withKept, groupsByIssue, issueGroups, type FolderKey, type ProjectGroup, type SmartRow } from "../model/sidebar";
 import { endedLine } from "../model/connectorSetup";
-import { updatedLine } from "../model/updated";
+import { lastUpdateSpoken, pageReadAt } from "../model/lastUpdate";
+import { LastUpdate } from "./LastUpdate";
 import { namedRelative, workflowSummary } from "../model/workflows";
 import { fromWireDate } from "../protocol/dates";
 import type { Agent, AgentsExportRequest, ControlMachine, FolderSummary, Request as PersonRequest, WorkflowSummary } from "../protocol/generated";
@@ -261,7 +262,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
             each that is on in this browser's Settings (#846). */}
         {folders.length > 0 && smartRows.filter((row) => smartGroupsOn.value.has(row) && (!held || aloneRows.has(row))).map((row) => (
           <SmartFold key={row} row={row} store={store} folders={folders} places={places} query={query} linkDown={linkDown}
-            downSince={session.state.value.kind === "down" ? session.state.value.since : undefined} />
+            readSince={pageReadAt(session.state.value, store.copyAt.value)} />
         ))}
         {/* One group per project (#495, #3278), its name the group's heading, its sessions the rows. A
             project with one folder is that folder's group, as before. */}
@@ -490,12 +491,13 @@ type SmartLine = Placed & ({ kind: "session"; agent: Agent } | { kind: "workflow
  * searching only with a match (#507); Unread still is while it keeps the open session. Folded, it
  * lists nothing but counts.
  */
-function SmartFold({ row, store, folders, places, query, linkDown, downSince }: {
+function SmartFold({ row, store, folders, places, query, linkDown, readSince }: {
   row: SmartRow; store: Store; folders: Placed[]; query: string; linkDown: boolean;
   /** Each folder's group name (#3278), which a row says after its title. */
   places: ReadonlyMap<string, string>;
   /** When the link was lost: Needs You says its count was last true then (#1163). */
-  downSince?: number | undefined;
+  /** When what the page shows was read, while it is not live (#5141). */
+  readSince?: number | undefined;
 }) {
   const r = route.value;
   const parsed = query ? { ...parseQuery(query), said: store.saidLines.value, onIssue: store.issueSessions.value, issueHeadings: store.issueHeadings.value } : undefined;
@@ -592,7 +594,9 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
   if (parsed ? lines.length === 0 && asked.length === 0 && later.length === 0 && approvals.length === 0 && pulls.length === 0 && suggestions.length === 0
     : count === 0 && !keptPlace && deferred.length === 0) return null;
   const title = smartTitles[row];
-  const updated = row === "needsYou" && downSince !== undefined ? updatedLine(downSince) : null;
+  // How old the count is while the link is lost (#1163, #5141).
+  const readAt = row === "needsYou" ? readSince : undefined;
+  const updated = readAt !== undefined ? lastUpdateSpoken(readAt) : null;
   return (
     <details class={`smart ${row}`} role="group" aria-label={title} open={open}
       onToggle={(e) => {
@@ -602,7 +606,7 @@ function SmartFold({ row, store, folders, places, query, linkDown, downSince }: 
       <summary class="sidebar-head-label" data-fold={`smart.${row}`}
         aria-label={[title, count > 0 ? `${count}` : "none", updated].filter(Boolean).join(", ")}>
         {title}
-        {updated && <span class="updated">{updated}</span>}
+        {readAt !== undefined && <LastUpdate at={readAt} />}
         {count > 0 && <span class={`count${row === "needsYou" ? " needs" : ""}`}>{count}</span>}
       </summary>
       {open && asked.map(({ host: on, folder: placed, request }) => {

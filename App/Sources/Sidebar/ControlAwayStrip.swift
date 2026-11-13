@@ -15,10 +15,15 @@ struct ControlAwayStrip: View {
         let line = model.controlPlaneAwayLine ?? "Can’t reach the control plane. Your agents are still working."
         // A hosted account's refusal names its account page (#3153): one click to it.
         let account = model.controlPlaneAwayLine.flatMap(ControlRefusal.link(in:))
-        Strip(tone: account == nil ? .neutral : .warning,
-              symbol: account == nil ? MessageTone.offlineSymbol : nil, line: line,
-              primary: StripButton(title: "Try Again") { model.tryControlPlaneAgain() },
-              second: account.map { url in StripButton(title: "Open Account") { openURL(url) } })
-            .paneBannerInset()
+        // How old what the window shows is (#5141): after the words, ticking.
+        let read = model.controlPlaneAwayReadAt
+        LastUpdateTimeline(read: read ?? .distantPast) { now in
+            Strip(tone: account == nil ? .neutral : .warning,
+                  symbol: account == nil ? MessageTone.offlineSymbol : nil,
+                  line: LastUpdate.banner(line, read: read, now: now),
+                  primary: StripButton(title: "Try Again") { model.tryControlPlaneAgain() },
+                  second: account.map { url in StripButton(title: "Open Account") { openURL(url) } })
+        }
+        .paneBannerInset()
     }
 }
