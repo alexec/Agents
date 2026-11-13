@@ -203,10 +203,12 @@ because no control is in view to change.
 |---|---|---|---|---|
 | **Neutral** | A status: offline, stale, in progress, set by your organisation. | None: `ink` on the `well`. | `info.circle`, or `wifi.slash` when offline | ⓘ |
 | **Attention** | A person is needed: pair, sign in, approve, choose the folder again. | `tint.attention` | `exclamationmark.circle.fill` | ⚠︎ |
+| **Warning** | The session's place is not right: a Strip (specs/session-cards, #5029). Not a request. | `tint.warning` | (#5034) | ⛔ |
 | **Failure** | Something failed: a read, an action, a limit that stopped the work. | `tint.failure` | `xmark.octagon.fill` | ✕ |
 | **Success** | An ending that the app can vouch for: done, sent, archived. | `tint.vouched` | `checkmark.circle.fill` | ✓ |
 
-- **There is no warning tone.** A message is a status (neutral) or a failure. Outside
+- **The warning tone is for a Strip only** (specs/session-cards, Decided). The web's account
+  move strip has it first (#5029); #5034 moves the other strips, on all three clients. Outside
   messages, a warning line (a field that would fail, an allowance nearly spent, a disk
   that runs low) draws `tint.warning`, the orange.
 - **Yellow means only that a person is needed** (specs/018 FR-006a; #5016). Orange is a
@@ -250,7 +252,8 @@ The client stories (#4600) move each pattern to its kind. Inline error text in a
 | `.offline-strip` (`OfflineStrip.tsx`), its orange dot | Web | Banner | Neutral (the dot is not orange) |
 | `ArchivedStaleStrip`, `.offline-strip.archived-stale` | All | Banner | Neutral |
 | `MissingFolderStrip`, `RemoteMissingFolderStrip`, `.problem.folder-gone` | All | Banner | Attention |
-| `AccountMoveStrip`, `RemoteAccountMoveStrip` | Mac, Remote | Banner | Attention |
+| `AccountMoveStrip`, `RemoteAccountMoveStrip` | Mac, Remote | Banner | Attention (warning in #5034) |
+| `.account-move-strip` (`AccountMove.tsx`) | Web | Banner | Warning |
 | `ContinueWhenBackStrip`, `RemoteContinueWhenBackStrip` | Mac, Remote | Banner | Neutral |
 | `CostLimitBanner` | Mac, Remote | Banner | Failure |
 | `OrgPolicyStrip`, `.policy-banner` | All | Banner | Neutral |
