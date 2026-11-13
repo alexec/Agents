@@ -30,3 +30,16 @@ export function LastUpdate({ at }: { at: number }) {
     </span>
   );
 }
+
+/**
+ * A section's heading with the line at its trailing end (#5146), for a pane read when it opens. The line is
+ * beside the heading, not in it, so the section's name stays the heading's words alone.
+ */
+export function HeadWithUpdate({ id, title, at }: { id: string; title: string; at: number | undefined }) {
+  return (
+    <div class="section-head-row">
+      <h3 class="section-head" id={id}>{title}</h3>
+      {at !== undefined && <LastUpdate at={at} />}
+    </div>
+  );
+}

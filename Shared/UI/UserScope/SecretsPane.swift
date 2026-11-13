@@ -36,6 +36,10 @@ struct SecretsPane<Extra: View>: View {
 
     var body: some View {
         Form {
+            // Read when it opens and on each change (#5146): how old the names are, at the top.
+            if let readAt = state.readAt {
+                Section {} header: { LastUpdateText(read: readAt) }
+            }
             if let problem = problem ?? state.problem {
                 Section {
                     Text(problem).appText(.supporting).tinted(.failure)

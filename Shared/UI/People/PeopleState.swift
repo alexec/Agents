@@ -31,6 +31,8 @@ final class PeopleState {
     /// The people this client may see (#2055): every one for an admin, a member only
     /// themselves. Nil until the control plane answers.
     private(set) var list: DaemonAPI.PeopleList?
+    /// When `list` was last read (#5146), for Settings ▸ People's "Last update" line.
+    private(set) var listAt: Date?
     /// Why `list` could not be loaded, in the control plane's words.
     private(set) var listProblem: String?
     /// The org providers' names by id (#1002), for Managed by and Set by. Loaded with `list`.
@@ -77,6 +79,7 @@ final class PeopleState {
         do {
             list = try await control.call(DaemonAPI.Method.peopleList, DaemonAPI.Empty(),
                                           returning: DaemonAPI.PeopleList.self)
+            listAt = Date()
             listProblem = nil
         } catch {
             listProblem = PeopleWords.refusal(error)

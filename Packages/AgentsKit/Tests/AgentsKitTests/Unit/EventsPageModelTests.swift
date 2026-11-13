@@ -112,6 +112,21 @@ struct EventsPageModelTests {
         #expect(!model.moreEventsAnywhere)
     }
 
+    /// The Events page's "Last update" line (#5146) is the time of the newest page's read: a
+    /// page from further back leaves it, and a new list clears it.
+    @Test func theBusLogKeepsWhenItsNewestPageWasRead() {
+        let model = AgentsModel()
+        #expect(model.busReadAt == nil)
+        let before = Date()
+        model.takeBusLog(DaemonAPI.BusLogPage(events: [bus(1, at: 10)], next: "x", hasMore: true))
+        let read = model.busReadAt
+        #expect(read.map { $0 >= before } == true)
+        model.takeBusLog(DaemonAPI.BusLogPage(events: [bus(2, at: 1)], hasMore: false), appending: true)
+        #expect(model.busReadAt == read)
+        model.clearEvents()
+        #expect(model.busReadAt == nil)
+    }
+
     @Test func theEnvelopesFieldsNarrowTheList() {
         let model = AgentsModel()
         model.takeBusLog(DaemonAPI.BusLogPage(events: [bus(1, at: 3), bus(2, at: 2, type: "issue.created", provider: "jira")],
