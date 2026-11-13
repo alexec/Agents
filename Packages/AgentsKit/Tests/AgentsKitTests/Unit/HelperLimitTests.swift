@@ -61,7 +61,7 @@ struct HelperLimitTests {
     @Test func aHelperThatWaitsIsNotRunning() {
         var blocked = helper(.finished)
         blocked.report = WorkReport(outcome: .waiting, message: "Waiting on the build", at: Date(),
-                                    block: Block(checkAgainAt: Date().addingTimeInterval(600)))
+                                    block: Block(deadline: Date().addingTimeInterval(600)))
         #expect(!HelperLimit.isRunning(blocked))
 
         var onEvents = helper(.finished)

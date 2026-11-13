@@ -2783,8 +2783,9 @@
             "$ref": "#/definitions/Wait"
           }
         },
-        "checkAgainAt": {
-          "$ref": "#/definitions/WireDate"
+        "deadline": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When the wait ends if its sessions have not (#5152; was checkAgainAt)."
         },
         "wakeOn": {
           "$ref": "#/definitions/BlockWakeOn"

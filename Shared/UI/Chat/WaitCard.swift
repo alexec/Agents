@@ -170,15 +170,15 @@ struct WaitCard: View {
 }
 
 /// A wait on sessions (`wait_for_event` on `agent.ended`), drawn as the wait on
-/// events is (#2750): the same card at the foot of the chat, with what it waits on, when it
-/// checks again as its deadline, and one way to stop it. It was a strip under the chat's
+/// events is (#2750): the same card at the foot of the chat, with what it waits on, its
+/// deadline, and one way to stop it. It was a strip under the chat's
 /// head with Carry on. Carry On carries the agent on now, as Carry On does on the wait on
 /// events (#3152). The web page's is `BlockWaitCard` in `Chat.tsx`.
 struct BlockWaitCard: View {
     let block: Block
     /// When it began to wait: its report's time.
     let since: Date
-    /// `AgentsModel.blockLines`: any of or all of, one line a session, and when it checks again.
+    /// `AgentsModel.blockLines`: any of or all of, one line a session, and its deadline.
     let lines: [String]
     let stop: () async -> Void
     var help = "Stop waiting and carry on now"
@@ -213,7 +213,7 @@ struct BlockWaitCard: View {
 
     @ViewBuilder
     private func content(now: Date) -> some View {
-        let deadline = block.checkAgainAt
+        let deadline = block.deadline
         let total = deadline.map { max(1, Int(ceil($0.timeIntervalSince(since) / 60))) }
         let elapsed = max(0, Int(now.timeIntervalSince(since) / 60))
         VStack(alignment: .leading, spacing: 9) {

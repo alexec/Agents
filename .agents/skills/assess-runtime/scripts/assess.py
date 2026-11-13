@@ -124,7 +124,7 @@ def follow(client, runtime, agent, model, report_path, minutes):
         # or agents to wait on (#3698). A wait on time.reached is an eventWait (#4843).
         block = report.get("block") or {}
         checking = (record or {}).get("state") != "archived" and report.get("outcome") == "waiting" \
-            and (block.get("checkAgainAt") or block.get("waits"))
+            and (block.get("deadline") or block.get("waits"))
         if record and record.get("state") in ("finished", "stopped", "archived") and report.get("outcome") not in ("blocked", "partly_done") and not waiting and not checking:
             break
     else:

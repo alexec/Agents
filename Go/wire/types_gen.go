@@ -1373,7 +1373,8 @@ func (v *BackupTarget) UnmarshalJSON(b []byte) error {
 type Block struct {
 	Waits []Wait `json:"waits"`
 
-	CheckAgainAt *Date `json:"checkAgainAt,omitzero"`
+	// When the wait ends if its sessions have not (#5152; was checkAgainAt).
+	Deadline *Date `json:"deadline,omitzero"`
 
 	WakeOn *BlockWakeOn `json:"wakeOn,omitzero"`
 

@@ -3,7 +3,7 @@
     "expected" : {
       "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : true,
       "lines" : [
         "Carries on when all of these have finished",
@@ -123,7 +123,7 @@
     "expected" : {
       "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : true,
       "lines" : [
         "Carries on when all of these have finished",
@@ -244,7 +244,7 @@
     "expected" : {
       "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : true,
       "lines" : [
         "Carries on when any of these finishes",
@@ -365,7 +365,7 @@
     "expected" : {
       "cardTitle" : "Waiting for a session",
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : true,
+      "hasDeadline" : true,
       "isBlocked" : true,
       "lines" : [
         "Haiku one, renamed — still working"
@@ -440,7 +440,7 @@
           "report" : {
             "at" : 812500060,
             "block" : {
-              "checkAgainAt" : 812505400,
+              "deadline" : 812505400,
               "waits" : [
                 {
                   "agentID" : "00000000-0000-0000-0000-000000000060",
@@ -472,7 +472,7 @@
     "expected" : {
       "cardTitle" : "Waiting until a set time",
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : true,
+      "hasDeadline" : true,
       "isBlocked" : true,
       "lines" : [
 
@@ -547,7 +547,7 @@
           "report" : {
             "at" : 812500060,
             "block" : {
-              "checkAgainAt" : 812505400,
+              "deadline" : 812505400,
               "waits" : [
 
               ]
@@ -575,7 +575,7 @@
     "expected" : {
       "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : true,
       "lines" : [
         "Carries on when any of these finishes",
@@ -768,7 +768,7 @@
     "expected" : {
       "cardTitle" : null,
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : false,
       "lines" : [
 
@@ -888,7 +888,7 @@
     "expected" : {
       "cardTitle" : null,
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : false,
       "lines" : [
 
@@ -985,7 +985,7 @@
     "expected" : {
       "cardTitle" : null,
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : false,
       "lines" : [
 

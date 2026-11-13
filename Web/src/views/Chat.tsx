@@ -974,8 +974,8 @@ function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent;
 }
 
 /**
- * A wait on sessions or on a time (BlockWaitCard in WaitCard.swift, #2750), drawn as WaitCard is:
- * what it waits on, since when, when it checks again, and Carry On, which carries it on now (#3152).
+ * A wait on sessions (BlockWaitCard in WaitCard.swift, #2750), drawn as WaitCard is:
+ * what it waits on, since when, its deadline, and Carry On, which carries it on now (#3152).
  */
 function BlockWaitCard({ store, host, agent, disabled }: { store: Store; host: string; agent: Agent; disabled: boolean }) {
   const busy = useSignal(false);
@@ -987,7 +987,7 @@ function BlockWaitCard({ store, host, agent, disabled }: { store: Store; host: s
   const block = openBlock(agent);
   if (!block || !agent.report) return null;
   const since = fromWireDate(agent.report.at).getTime();
-  const deadline = block.checkAgainAt === undefined ? undefined : fromWireDate(block.checkAgainAt).getTime();
+  const deadline = block.deadline === undefined ? undefined : fromWireDate(block.deadline).getTime();
   const total = deadline === undefined ? undefined : Math.max(1, Math.ceil((deadline - since) / 60_000));
   const elapsed = Math.max(0, Math.floor((now.value - since) / 60_000));
   const share = deadline === undefined || deadline <= since ? undefined : Math.min(100, Math.max(0, (now.value - since) / (deadline - since) * 100));

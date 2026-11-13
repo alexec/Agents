@@ -96,7 +96,7 @@ struct WebFixturesTests {
     /// `StatusShape.init`, each named for what it shows.
     static var agents: [(String, Agent)] {
         let waits = Block(waits: [Wait(agentID: id(77), nameAtReport: "Build")])
-        let later = Block(checkAgainAt: at(60))
+        let later = Block(deadline: at(60))
         let cleared = Block(waits: [Wait(agentID: id(77), nameAtReport: "Build")], clearedAt: at(2), clearedBy: .waits)
         return [
             ("starting", agent(1, .starting)),
@@ -279,8 +279,7 @@ struct WebFixturesTests {
             ("all of two, one finished", Block(waits: [one, two])),
             ("all of two, written out", Block(waits: [one, two], wakeOn: .all)),
             ("any of two", Block(waits: [one, two], wakeOn: .any)),
-            ("one, with a time to check again", Block(waits: [one], checkAgainAt: Self.at(90), wakeOn: .any)),
-            ("only a time", Block(checkAgainAt: Self.at(90))),
+            ("one, with a deadline", Block(waits: [one], deadline: Self.at(90), wakeOn: .any)),
             ("every way to end", Block(waits: [
                 Wait(agentID: Self.id(70), nameAtReport: "No outcome", ending: ended(.finished(outcome: nil, message: nil))),
                 Wait(agentID: Self.id(71), nameAtReport: "Asked", ending: ended(.finished(outcome: .needsAnswer, message: nil))),
@@ -308,12 +307,12 @@ struct WebFixturesTests {
             model.replaceAgents(agents)
             let agent = agents.first { $0.id.uuidString == input["agentID"]!.stringValue! }!
             var lines = model.blockLines(agent)
-            let checksAgain = model.openBlock(agent)?.block.checkAgainLine() != nil
-            if checksAgain { lines.removeLast() }
-            // The row's one line (#582), where it names someone: a time alone is the reader's own.
+            let hasDeadline = model.openBlock(agent)?.block.deadlineLine() != nil
+            if hasDeadline { lines.removeLast() }
+            // The row's one line (#582), where it names someone.
             let names = model.openBlock(agent)?.block.waits.isEmpty == false
             return .object(["isBlocked": .bool(model.openBlock(agent) != nil),
-                            "lines": .array(lines.map(JSONValue.string)), "checksAgain": .bool(checksAgain),
+                            "lines": .array(lines.map(JSONValue.string)), "hasDeadline": .bool(hasDeadline),
                             "waitLine": names ? .string(model.waitMark(of: agent)?.line ?? "") : .null,
                             "carryOnHelp": .string(AgentsModel.carryOnHelp(for: agent)),
                             "cardTitle": model.openBlock(agent).map { .string($0.block.cardTitle()) } ?? .null])

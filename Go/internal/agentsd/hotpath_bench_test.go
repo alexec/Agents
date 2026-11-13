@@ -110,7 +110,7 @@ func BenchmarkArmBlockTimer(b *testing.B) {
 	d, id := hotPathStore(b)
 	d.change(id, func(a *wire.Agent) {
 		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: "Waiting for CI.", At: now(),
-			Block: &wire.Block{Waits: []wire.Wait{}, CheckAgainAt: new(wire.DateOf(time.Now().Add(-time.Minute)))}}
+			Block: &wire.Block{Waits: []wire.Wait{{AgentID: store.NewUUID(), NameAtReport: "CI watcher"}}, Deadline: new(wire.DateOf(time.Now().Add(-time.Minute)))}}
 	})
 	l := d.live(id)
 	l.mu.Lock()
