@@ -15,6 +15,11 @@ import WidgetKit
 /// Out of Scope.
 @main
 struct AttentionWidgetBundle: WidgetBundle {
+    /// The app's faces (#4992), before the first widget draws.
+    init() {
+        PaperFonts.register()
+    }
+
     var body: some Widget {
         AttentionWidget()
         // A turn sent from here, on the Lock Screen and in the Dynamic Island (#1657).

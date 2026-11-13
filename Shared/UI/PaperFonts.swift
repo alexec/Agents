@@ -4,10 +4,8 @@ import Foundation
 /// Paper v2's two faces (#4975; specs/4926-paper-v2/spec.md, "Fonts"): Atkinson
 /// Hyperlegible Next for every word a person reads, and Atkinson Hyperlegible Mono for
 /// code. Both are SIL OFL 1.1, from the Braille Institute, and live in `design/fonts/`
-/// with their licence; the app carries them in its bundle's `fonts` folder.
-///
-/// Only the Mac draws in them so far. The Remote follows in #4992; until then its
-/// `TypeScale` branch stays on the system faces, and its bundle has no `fonts` folder.
+/// with their licence; the Mac app, the Remote and the Remote's widget carry them in their
+/// bundle's `fonts` folder (#4992), and each registers them at launch.
 enum PaperFonts {
     /// The family names `TypeScale` asks for. A face that is not registered (a test, a
     /// preview, a bundle with no `fonts` folder) falls back to the system's, so the
@@ -16,7 +14,7 @@ enum PaperFonts {
     static let mono = "Atkinson Hyperlegible Mono"
 
     /// Registers the faces for this process, once, before the first window draws.
-    /// Process scope: nothing is installed on the Mac, and nothing outlives the app.
+    /// Process scope: nothing is installed on the device, and nothing outlives the app.
     static func register(from bundle: Bundle = .main) {
         guard !registered else { return }
         registered = true

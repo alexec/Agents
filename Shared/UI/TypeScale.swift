@@ -29,10 +29,10 @@ import AppKit
 ///     fine          .subheadline  11     .footnote     13
 ///     code          .body    mono 13     .subheadline mono 15
 ///
-/// Paper v2 (#4975) sets `title`, `reading`, `supporting` and `fine` in Atkinson
-/// Hyperlegible Next and `code` in Atkinson Hyperlegible Mono on the Mac, at the same
-/// sizes and still relative to the platform's text styles. The phone keeps the system
-/// faces until #4992. `PaperFonts` registers the faces at launch.
+/// Paper v2 sets `title`, `reading`, `supporting` and `fine` in Atkinson Hyperlegible
+/// Next and `code` in Atkinson Hyperlegible Mono, at the same sizes and still relative to
+/// the platform's text styles: the Mac since #4975, the phone and its widget since #4992.
+/// `PaperFonts` registers the faces at launch.
 ///
 /// There is no `heading` step. A heading is `reading` with a weight on it, which is how
 /// `.headline` has always related to `.body` on Apple's platforms, and one fewer name
@@ -72,11 +72,11 @@ enum TextStep {
         }
         #else
         switch self {
-        case .title: return .system(.title)
-        case .reading: return .system(.body)
-        case .supporting: return .system(.subheadline)
-        case .fine: return .footnote
-        case .code: return .subheadline.monospaced()
+        case .title: return .paperText(.title)
+        case .reading: return .paperText(.body)
+        case .supporting: return .paperText(.subheadline)
+        case .fine: return .paperText(.footnote)
+        case .code: return .paperMono(.subheadline)
         }
         #endif
     }
@@ -281,11 +281,7 @@ extension TextStep {
     }
 
     fileprivate static func sized(_ points: CGFloat, monospaced: Bool) -> Font {
-        #if os(macOS)
         .custom(monospaced ? PaperFonts.mono : PaperFonts.text, fixedSize: points)
-        #else
-        monospaced ? .system(size: points, design: .monospaced) : .system(size: points)
-        #endif
     }
 }
 
@@ -315,8 +311,7 @@ extension TextStep {
         return Font.paperText(style).weight(.semibold)
         #else
         let style: Font.TextStyle = level <= 1 ? .title : level == 2 ? .title2 : .body
-        let font = Font.system(style)
-        return font.weight(.semibold)
+        return Font.paperText(style).weight(.semibold)
         #endif
     }
 
@@ -366,49 +361,108 @@ private struct FigureText: ViewModifier {
 }
 
 #if os(iOS)
+extension Font {
+    /// Atkinson Hyperlegible Next at a text style's size on the phone at the default text
+    /// size, and relative to that style, so Dynamic Type scales it as it did `.system(style)`.
+    static func paperText(_ style: Font.TextStyle) -> Font {
+        .custom(PaperFonts.text, size: TextStep.points(style), relativeTo: style)
+    }
+
+    /// Atkinson Hyperlegible Mono the same way, for `code`.
+    static func paperMono(_ style: Font.TextStyle) -> Font {
+        .custom(PaperFonts.mono, size: TextStep.points(style), relativeTo: style)
+    }
+}
+
+extension UIFont {
+    /// The UIKit side of `Font.paperText`, at a size: the regular weight of the family, or
+    /// the system face when the font is not registered.
+    static func paper(size: CGFloat) -> UIFont {
+        named(PaperFonts.text, size: size) ?? .systemFont(ofSize: size)
+    }
+
+    /// The same for `code`.
+    static func paperMono(size: CGFloat) -> UIFont {
+        named(PaperFonts.mono, size: size) ?? .monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+
+    /// The family's regular weight. By family, not by name: a variable font's default
+    /// instance is not always its regular one.
+    private static func named(_ family: String, size: CGFloat) -> UIFont? {
+        guard !UIFont.fontNames(forFamilyName: family).isEmpty else { return nil }
+        let descriptor = UIFontDescriptor(fontAttributes: [
+            .family: family,
+            .traits: [UIFontDescriptor.TraitKey.weight: UIFont.Weight.regular],
+        ])
+        return UIFont(descriptor: descriptor, size: size)
+    }
+}
+
 extension TextStep {
+    /// A SwiftUI text style's size on the phone at the default text size (`.large`), which
+    /// `Font.custom(_:size:relativeTo:)` then scales.
+    static func points(_ style: Font.TextStyle) -> CGFloat {
+        UIFont.preferredFont(forTextStyle: uiStyle(style),
+                             compatibleWith: UITraitCollection(preferredContentSizeCategory: .large)).pointSize
+    }
+
+    private static func uiStyle(_ style: Font.TextStyle) -> UIFont.TextStyle {
+        switch style {
+        case .largeTitle: .largeTitle
+        case .title: .title1
+        case .title2: .title2
+        case .title3: .title3
+        case .headline: .headline
+        case .subheadline: .subheadline
+        case .callout: .callout
+        case .footnote: .footnote
+        case .caption: .caption1
+        case .caption2: .caption2
+        default: .body
+        }
+    }
+
+    /// The UIKit text style this step is relative to.
+    private var uiStyle: UIFont.TextStyle {
+        switch self {
+        case .title: .title1
+        case .reading: .body
+        case .supporting, .code: .subheadline
+        case .fine: .footnote
+        }
+    }
+
+    /// The step's face at a size.
+    private func face(_ size: CGFloat) -> UIFont {
+        self == .code ? .paperMono(size: size) : .paper(size: size)
+    }
+
+    /// The step at the default text size, before Dynamic Type.
+    private var atDefault: UIFont {
+        let size = UIFont.preferredFont(forTextStyle: uiStyle,
+                                        compatibleWith: UITraitCollection(preferredContentSizeCategory: .large)).pointSize
+        return face(size)
+    }
+
     /// The same step for a UIKit text view: the page's passage editor (034). The
     /// phone's side of `nsFont`, resolved here for the same reason.
     var uiFont: UIFont {
-        switch self {
-        case .title: return .preferredFont(forTextStyle: .title1)
-        case .reading: return .preferredFont(forTextStyle: .body)
-        case .supporting: return .preferredFont(forTextStyle: .subheadline)
-        case .fine: return .preferredFont(forTextStyle: .footnote)
-        case .code: return .monospacedSystemFont(ofSize: UIFont.preferredFont(forTextStyle: .subheadline).pointSize,
-                                                  weight: .regular)
-        }
+        UIFontMetrics(forTextStyle: uiStyle).scaledFont(for: atDefault)
     }
 
     /// The same at the text size SwiftUI's environment says, which a zoomed page
     /// (#1419) multiplies.
     func uiFont(dynamicType: DynamicTypeSize) -> UIFont {
         let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicType))
-        let style: UIFont.TextStyle
-        switch self {
-        case .title: style = .title1
-        case .reading: style = .body
-        case .supporting, .code: style = .subheadline
-        case .fine: style = .footnote
-        }
-        let base = UIFont.preferredFont(forTextStyle: style, compatibleWith: traits)
-        return self == .code ? .monospacedSystemFont(ofSize: base.pointSize, weight: .regular) : base
+        return UIFontMetrics(forTextStyle: uiStyle).scaledFont(for: atDefault, compatibleWith: traits)
     }
 
     /// The same on a zoomed page (#1419), for the passage editor. Scaled through the
     /// step's own metrics, so the text view still follows Dynamic Type.
     func uiFont(zoom: CGFloat) -> UIFont {
         guard zoom != 1 else { return uiFont }
-        let style: UIFont.TextStyle = switch self {
-        case .title: .title1
-        case .reading: .body
-        case .supporting, .code: .subheadline
-        case .fine: .footnote
-        }
-        let atDefault = UIFont.preferredFont(forTextStyle: style,
-                                             compatibleWith: UITraitCollection(preferredContentSizeCategory: .large))
-        return UIFontMetrics(forTextStyle: style).scaledFont(for: atDefault.withSize(atDefault.pointSize * zoom))
+        let base = atDefault
+        return UIFontMetrics(forTextStyle: uiStyle).scaledFont(for: base.withSize(base.pointSize * zoom))
     }
-
 }
 #endif
