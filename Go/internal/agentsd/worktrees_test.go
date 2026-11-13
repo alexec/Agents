@@ -157,3 +157,24 @@ func TestBuildOutputIsCleared(t *testing.T) {
 		t.Fatalf("%+v", out)
 	}
 }
+
+// A plain name that is not there yet makes a new worktree with that name (#5185):
+// the lead skill starts lanes in fix-github-issue-<n>. A name with a slash is a
+// branch, so one that is not there is still refused.
+func TestAHelperNamesANewWorktree(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := repo(t)
+	choice, err := d.helperWorktree("fix-github-issue-4706", dir)
+	if err != nil || choice == nil || choice.Named == nil || choice.Named.Value != "fix-github-issue-4706" {
+		t.Fatalf("%+v %v", choice, err)
+	}
+	if choice, err := d.helperWorktree("New", dir); err != nil || choice.New == nil {
+		t.Fatalf("%+v %v", choice, err)
+	}
+	for _, refused := range []string{"agents/no-such-branch", "Fix Issue"} {
+		if _, err := d.helperWorktree(refused, dir); err == nil || !strings.Contains(err.Error(), "there is no worktree called") {
+			t.Fatalf("%s: %v", refused, err)
+		}
+	}
+}
