@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -17,8 +18,9 @@ import (
 // fakeMessagingMCP is a server that follows the messaging contract (#4338) over streamable
 // HTTP: list_conversations pages its conversations (newest first) by an offset cursor, and
 // read_messages gives two messages of any conversation. A slack one also has reply (#4345),
-// which gives back what it sent; the email one, as the real one, cannot send.
-func fakeMessagingMCP(t *testing.T, source string, conversations []wire.MessagingConversation) *httptest.Server {
+// which gives back what it sent; the email one, as the real one, cannot send, and has
+// mark_conversation_read (#5137), whose calls go in marks when it is given.
+func fakeMessagingMCP(t *testing.T, source string, conversations []wire.MessagingConversation, marks ...*fakeMarks) *httptest.Server {
 	s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
 			return
@@ -34,6 +36,7 @@ func fakeMessagingMCP(t *testing.T, source string, conversations []wire.Messagin
 					Conversation string `json:"conversation"`
 					Thread       string `json:"thread"`
 					Text         string `json:"text"`
+					All          bool   `json:"all"`
 				} `json:"arguments"`
 			} `json:"params"`
 		}
@@ -52,6 +55,9 @@ func fakeMessagingMCP(t *testing.T, source string, conversations []wire.Messagin
 			}
 			if source == "slack" {
 				tools = append(tools, map[string]any{"name": "reply", "inputSchema": map[string]any{"type": "object"}, "_meta": meta})
+			}
+			if source == "email" {
+				tools = append(tools, map[string]any{"name": "mark_conversation_read", "inputSchema": map[string]any{"type": "object"}, "_meta": meta})
 			}
 			result = map[string]any{"tools": tools}
 		case "tools/call":
@@ -85,6 +91,15 @@ func fakeMessagingMCP(t *testing.T, source string, conversations []wire.Messagin
 					sent.Thread = &a.Thread
 				}
 				result = map[string]any{"content": []any{}, "structuredContent": sent}
+			case "mark_conversation_read":
+				said := a.Conversation
+				if a.All {
+					said = "all"
+				}
+				for _, m := range marks {
+					m.add(said)
+				}
+				result = map[string]any{"content": []any{}, "structuredContent": wire.MessagingMarkedRead{Marked: 3}}
 			}
 		}
 		b, _ := json.Marshal(result)
@@ -93,6 +108,24 @@ func fakeMessagingMCP(t *testing.T, source string, conversations []wire.Messagin
 	}))
 	t.Cleanup(s.Close)
 	return s
+}
+
+// fakeMarks is what a fake's mark_conversation_read was asked to mark: a conversation, or all.
+type fakeMarks struct {
+	mu   sync.Mutex
+	said []string
+}
+
+func (m *fakeMarks) add(s string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.said = append(m.said, s)
+}
+
+func (m *fakeMarks) String() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return fmt.Sprint(m.said)
 }
 
 func conversationAt(source, id, at string) wire.MessagingConversation {
@@ -226,5 +259,67 @@ func TestMergeMessagesPages(t *testing.T) {
 	}
 	if len(out.Errors) != 1 || out.Errors[0].Server != "gmail" {
 		t.Fatalf("errors: %+v", out.Errors)
+	}
+}
+
+// Marking read (#5137): messages/read marks a conversation read on a connector that has
+// mark_conversation_read when it reads its newest page, and says so; an older page, one
+// thread and a connector with no such tool mark nothing. messages/markAllRead marks all of
+// every connector that can, and leaves the others out.
+func TestMessagesMarkRead(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("AGENTS_PERSONAL_HOME", home)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	folder := gitFolder(t, "")
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + folder})
+
+	marks := &fakeMarks{}
+	slack := fakeMessagingMCP(t, "slack", []wire.MessagingConversation{conversationAt("slack", "C5", "2026-11-09T10:05:00Z")})
+	email := fakeMessagingMCP(t, "email", []wire.MessagingConversation{conversationAt("email", "T4", "2026-11-09T10:04:00Z")}, marks)
+	os.MkdirAll(filepath.Join(home, ".agents"), 0o755)
+	os.WriteFile(filepath.Join(home, ".agents", "mcp.json"), []byte(`{"mcpServers": {
+		"slack": {"type": "http", "url": "`+slack.URL+`"},
+		"email": {"type": "http", "url": "`+email.URL+`"},
+		"gmail": {"type": "http", "url": "http://127.0.0.1:1/mcp"}}}`), 0o644)
+
+	read := func(id int, params map[string]any) wire.MessagesRead {
+		var r wire.MessagesRead
+		if err := json.Unmarshal(c.call(t, id, "messages/read", params), &r); err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	if r := read(2, map[string]any{"server": "email", "folder": folder, "conversation": "T4"}); r.MarkedRead == nil || !*r.MarkedRead || len(r.Messages) != 2 {
+		t.Fatalf("the newest page: %+v", r)
+	}
+	if r := read(3, map[string]any{"server": "email", "folder": folder, "conversation": "T4", "cursor": "older"}); r.MarkedRead != nil {
+		t.Fatalf("an older page: %+v", r)
+	}
+	if r := read(4, map[string]any{"server": "email", "folder": folder, "conversation": "T4", "thread": "m1"}); r.MarkedRead != nil {
+		t.Fatalf("one thread: %+v", r)
+	}
+	if r := read(5, map[string]any{"server": "slack", "folder": folder, "conversation": "C5"}); r.MarkedRead != nil || len(r.Messages) != 2 {
+		t.Fatalf("no mark tool: %+v", r)
+	}
+	if marks.String() != "[T4]" {
+		t.Fatalf("marked: %v", marks)
+	}
+
+	var all wire.MessagesMarkedAllRead
+	if err := json.Unmarshal(c.call(t, 6, "messages/markAllRead", map[string]any{}), &all); err != nil {
+		t.Fatal(err)
+	}
+	if len(all.Marked) != 1 || all.Marked[0].Server != "email" || all.Marked[0].Folder != folder || all.Marked[0].Marked != 3 {
+		t.Fatalf("marked all: %+v", all.Marked)
+	}
+	if len(all.Errors) != 1 || all.Errors[0].Server != "gmail" {
+		t.Fatalf("errors: %+v", all.Errors)
+	}
+	if marks.String() != "[T4 all]" {
+		t.Fatalf("marked: %v", marks)
+	}
+	if e := c.callError(t, 7, "messages/markAllRead", map[string]any{"folder": "/nowhere"}); e == nil || e.Code != CodeInvalidParams {
+		t.Fatalf("not a folder: %+v", e)
 	}
 }

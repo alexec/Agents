@@ -83,6 +83,50 @@ struct MessagesListTests {
                               against: "MessagesReplyRequest") == [])
         let replied = DaemonAPI.MessagesReplied(server: "slack", folder: "/p", conversation: "C1", message: try #require(read.messages.first))
         #expect(schema.errors(try JSONValue.encoding(replied), against: "MessagesReplied") == [])
+
+        var marked = read
+        marked.markedRead = true
+        #expect(schema.errors(try JSONValue.encoding(marked), against: "MessagesRead") == [])
+        #expect(schema.errors(try JSONValue.encoding(DaemonAPI.MessagesMarkAllReadRequest(folder: "/p")),
+                              against: "MessagesMarkAllReadRequest") == [])
+        let all = DaemonAPI.MessagesMarkedAllRead(marked: [.init(server: "email", folder: "/p", marked: 3)],
+                                                  errors: [.init(server: "mail", folder: "/p", message: "No answer.")])
+        #expect(schema.errors(try JSONValue.encoding(all), against: "MessagesMarkedAllRead") == [])
+    }
+
+    /// Next (#5137): the row after the open one, in the list as it is filtered now; none at the end.
+    @Test func nextIsTheRowAfterInTheListAsItIsNow() {
+        let lists: [MessagesList.HostConversations] = [
+            .init(host: Self.mac, name: "This Mac", conversations: [Self.item("slack", "C1", at: 300), Self.item("email", "t1", at: 200),
+                                                                     Self.item("slack", "C2", at: 100)]),
+        ]
+        let all = MessagesList.merged(lists)
+        #expect(MessagesList.next(after: "slack:C1", in: all)?.conversation.id == "t1")
+        #expect(MessagesList.next(after: "slack:C2", in: all) == nil)
+        #expect(MessagesList.next(after: "slack:C1", in: MessagesList.merged(lists, source: "slack"))?.conversation.id == "C2")
+        #expect(MessagesList.next(after: "slack:gone", in: all) == nil)
+    }
+
+    /// Marking read (#5137): one conversation on every machine that has it, or all; a count the service never gave
+    /// stays absent.
+    @Test func markedReadSetsTheCountToNought() {
+        let lists: [MessagesList.HostConversations] = [
+            .init(host: Self.mac, name: "This Mac", conversations: [Self.item("email", "t1", at: 2, unread: 2),
+                                                                     Self.item("email", "t2", at: 1, unread: 1)]),
+            .init(host: Self.box, name: "Box", conversations: [Self.item("email", "t1", at: 2, unread: 2),
+                                                               Self.item("slack", "C1", at: 3)]),
+        ]
+        #expect(MessagesList.hasUnread(lists))
+        let one = MessagesList.markedRead(lists, key: "email:t1")
+        #expect(one.flatMap { $0.conversations.map(\.conversation.unread) } == [0, 1, 0, nil])
+        #expect(MessagesList.unreadTotal(one) == 1)
+        let all = MessagesList.markedRead(lists)
+        #expect(MessagesList.unreadTotal(all) == 0)
+        #expect(!MessagesList.hasUnread(all))
+        #expect(MessagesList.markProblems([
+            (name: "This Mac", marked: .init(errors: [.init(server: "mail", folder: "/p", message: "No answer.")]), problem: nil),
+            (name: "Box", marked: nil, problem: "Offline."),
+        ]) == ["This Mac ▸ mail: No answer.", "Box: Offline."])
     }
 
     /// The reply field (#4345): what it sends, and who it says the reply goes as.

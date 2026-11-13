@@ -6273,6 +6273,31 @@
       }
     },
     {
+      "name": "messages/markAllRead",
+      "x-capability": "messages.mark-read/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MessagesMarkAllReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MessagesMarkedAllRead"
+        }
+      }
+    },
+    {
       "name": "messages/read",
       "x-capability": "messages/1",
       "tags": [

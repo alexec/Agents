@@ -385,8 +385,8 @@ the IMAP server, the user and an app password), or `EMAIL_IMAP_URL`, `EMAIL_USER
   most), so a quiet poll asks the server nothing and the pace is 10 s; with no IDLE, 60 s.
 - **Tools:** `list_folders`, `list_messages`, `search_messages`, `read_message` (its text
   inside `<untrusted-content source="email">`, as outside content), `mark_read` and
-  `move_message`; and the messaging contract's `list_conversations` and `read_messages`
-  (#4340, `docs/reference/messaging-contract.md`, `_meta` `"agents/messaging": 1`). A
+  `move_message`; and the messaging contract's `list_conversations`, `read_messages` and
+  `mark_conversation_read` (#5137: a thread's unread mail, or with `all` the folder's) (#4340, `docs/reference/messaging-contract.md`, `_meta` `"agents/messaging": 1`). A
   conversation is a thread, made from `References`, `In-Reply-To`, and the subject of a
   reply that has neither (`threads.go`): `list_conversations` groups a window of the folder's
   newest mail (ten for each conversation asked for, 500 at most) and leaves out a thread that

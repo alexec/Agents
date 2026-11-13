@@ -7129,6 +7129,12 @@ final class AppModel {
             .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
     }
 
+    /// The machines that mark all their messages read (#5137), in messagesMachines' order.
+    var messagesMarkMachines: [(id: MachineRef, name: String)] {
+        let marks = Set((controlPlaneHosts ?? []).filter { $0.has(Capability.messagesMarkRead1) }.map(\.id))
+        return messagesMachines.filter { marks.contains($0.id) }
+    }
+
     /// Open in Files on a doc's page (#3321): the file as its folder's own page, as a pinned page
     /// opens. The folder as this window knows it, so the page finds it; false when it knows none.
     func showDocFile(_ path: String, folder: String, on host: MachineRef) -> Bool {

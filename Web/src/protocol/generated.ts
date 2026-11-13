@@ -7915,9 +7915,39 @@ export interface MessagesError {
 }
 
 /**
+ * messages/markAllRead (#5137): mark every conversation of folder's messaging connectors read, or
+ * of every folder's when folder is absent.
+ */
+export interface MessagesMarkAllReadRequest {
+  folder?: string;
+}
+
+/**
+ * One connector that messages/markAllRead marked read (#5137): its name in mcp.json, a folder that
+ * reaches it, and how many messages it marked.
+ */
+export interface MessagesMarked {
+  server: string;
+  folder: string;
+  marked: number;
+}
+
+/**
+ * messages/markAllRead (#5137): the connectors that marked their conversations read, and those that
+ * could not, with why. A connector with no mark_conversation_read (its service gives no read state)
+ * is in neither.
+ */
+export interface MessagesMarkedAllRead {
+  marked: MessagesMarked[];
+  errors?: MessagesError[];
+}
+
+/**
  * messages/read (#4343): one page of a conversation's messages, newest first, as the connector's
  * read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true:
- * every text is outside content.
+ * every text is outside content. markedRead (#5137): the connector's mark_conversation_read marked
+ * the conversation read on its service, so a client sets its unread count to 0; absent when the
+ * connector cannot mark read, on an older page, and on one thread's read.
  */
 export interface MessagesRead {
   server: string;
@@ -7926,6 +7956,7 @@ export interface MessagesRead {
   messages: MessagingMessage[];
   cursor?: string;
   untrusted: boolean;
+  markedRead?: boolean;
 }
 
 /**
@@ -8019,6 +8050,21 @@ export interface MessagingListRequest {
   cursor?: string;
   limit?: number;
   unread?: boolean;
+}
+
+/**
+ * mark_conversation_read's input (#5137, docs/reference/messaging-contract.md): conversation, a
+ * conversation's id from list_conversations, marks its messages read on the service; all: true
+ * marks every conversation that list_conversations lists with no input. One of the two.
+ */
+export interface MessagingMarkReadRequest {
+  conversation?: string;
+  all?: boolean;
+}
+
+/** mark_conversation_read's structuredContent (#5137): how many messages it marked read. */
+export interface MessagingMarkedRead {
+  marked: number;
 }
 
 /**
@@ -15156,6 +15202,7 @@ export interface Methods {
   "mcp/setToolLevel": { params: MCPSetToolLevelRequest; result: MCPToolsAnswer };
   "mcp/tools": { params: MCPToolsRequest; result: MCPToolsAnswer };
   "messages/conversations": { params: MessagesConversationsRequest; result: MessagesConversations };
+  "messages/markAllRead": { params: MessagesMarkAllReadRequest; result: MessagesMarkedAllRead };
   "messages/read": { params: MessagesReadRequest; result: MessagesRead };
   "messages/reply": { params: MessagesReplyRequest; result: MessagesReplied };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
@@ -15597,6 +15644,7 @@ export const MethodTarget = {
   "mcp/setToolLevel": "host",
   "mcp/tools": "host",
   "messages/conversations": "host",
+  "messages/markAllRead": "host",
   "messages/read": "host",
   "messages/reply": "host",
   "modes/remembered": "host",
@@ -16484,13 +16532,18 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MessagesConversations: { required: ["conversations"], optional: ["cursor", "errors"] },
   MessagesConversationsRequest: { required: [], optional: ["folder", "cursor", "limit", "unread"] },
   MessagesError: { required: ["server", "folder", "message"], optional: [] },
-  MessagesRead: { required: ["server", "folder", "conversation", "messages", "untrusted"], optional: ["cursor"] },
+  MessagesMarkAllReadRequest: { required: [], optional: ["folder"] },
+  MessagesMarked: { required: ["server", "folder", "marked"], optional: [] },
+  MessagesMarkedAllRead: { required: ["marked"], optional: ["errors"] },
+  MessagesRead: { required: ["server", "folder", "conversation", "messages", "untrusted"], optional: ["cursor", "markedRead"] },
   MessagesReadRequest: { required: ["server", "folder", "conversation"], optional: ["cursor", "thread", "limit"] },
   MessagesReplied: { required: ["server", "folder", "conversation", "message"], optional: [] },
   MessagesReplyRequest: { required: ["server", "folder", "conversation", "text"], optional: ["thread"] },
   MessagingConversation: { required: ["source", "id", "title", "kind"], optional: ["unread", "lastActivity", "sender", "link"] },
   MessagingConversations: { required: ["conversations"], optional: ["cursor", "replyAs"] },
   MessagingListRequest: { required: [], optional: ["cursor", "limit", "unread"] },
+  MessagingMarkReadRequest: { required: [], optional: ["conversation", "all"] },
+  MessagingMarkedRead: { required: ["marked"], optional: [] },
   MessagingMessage: { required: ["id", "conversation", "sender", "time", "text"], optional: ["thread", "link"] },
   MessagingMessages: { required: ["conversation", "messages", "untrusted"], optional: ["cursor"] },
   MessagingReadRequest: { required: ["conversation"], optional: ["cursor", "thread", "limit"] },

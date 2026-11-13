@@ -18,8 +18,10 @@ Why messaging is a contract over MCP, and the forges are not, is in
 The shapes are in `Packages/Wire/daemon.schema.json` (#1135), so the Go servers, the daemon
 and the clients use one type: `MessagingListRequest`, `MessagingConversations`,
 `MessagingConversation`, `MessagingConversationKind`, `MessagingReadRequest`,
-`MessagingMessages`, `MessagingMessage` and `MessagingReplyRequest`; the daemon's are
-`MessagesConversations`, `MessagesRead`, `MessagesReplyRequest` and `MessagesReplied`.
+`MessagingMessages`, `MessagingMessage`, `MessagingReplyRequest`, `MessagingMarkReadRequest` and
+`MessagingMarkedRead`; the daemon's are `MessagesConversations`, `MessagesRead`,
+`MessagesReplyRequest`, `MessagesReplied`, `MessagesMarkAllReadRequest` and
+`MessagesMarkedAllRead`.
 
 ## How a server says that it follows the contract
 
@@ -31,7 +33,7 @@ Each tool of the contract has this key in its `_meta`, in `tools/list`:
 
 The number is the contract's version. This page is version 1. A server follows the contract
 when `list_conversations` and `read_messages` both have the key. `reply` has it only when the
-server can send. The Messaging slot (#1787) reads `tools/list` already, so it knows which
+server can send, and `mark_conversation_read` only when its service keeps a read state. The Messaging slot (#1787) reads `tools/list` already, so it knows which
 connectors the page can read, with no extra call.
 
 A later version adds only optional input and optional fields. A change that is not
@@ -44,6 +46,7 @@ compatible takes the next number, and the daemon reads each version that it know
 | `list_conversations` | `MessagingListRequest` | `MessagingConversations` | `readOnlyHint` |
 | `read_messages` | `MessagingReadRequest` | `MessagingMessages` | `readOnlyHint` |
 | `reply` (#4345) | `MessagingReplyRequest` | the sent message, a `MessagingMessage` | none: it sends |
+| `mark_conversation_read` (#5137) | `MessagingMarkReadRequest` | `MessagingMarkedRead` | `idempotentHint`, not destructive |
 
 Each tool also gives a `content` text block, for an agent that calls it. The page reads only
 `structuredContent`. A server can have other tools of its own (`send_message`,
@@ -105,8 +108,8 @@ newest message first. Each message:
 | `thread` | no | The id of the message that starts its thread. Absent when it is in no thread |
 | `link` | no | The message on the service's own site or app |
 
-`read_messages` reads only. It never marks a message as read (see
-[Unread state](#unread-state-the-services-own)).
+`read_messages` reads only. It never marks a message as read: the daemon calls
+`mark_conversation_read` for that (see [Unread state](#unread-state-the-services-own)).
 
 ### reply
 
@@ -122,6 +125,19 @@ sends it as what it signs in as (the bot, the number), and says so in `replyAs`.
 | Google Chat | the Chat app | `spaces/…/threads/…` |
 | WhatsApp | the business number, within 24 hours of the person's last message | a message to quote (WhatsApp has no threads) |
 | Email | no `reply`: the server cannot send yet (#1780) | |
+
+### mark_conversation_read
+
+Input: `conversation` (a conversation's `id`: its messages are marked read on the service) or
+`all: true` (every conversation that `list_conversations` lists with no input), one of the two.
+Its `structuredContent` is `{ "marked": n }`, how many messages it marked read. A server whose
+service gives no read state (Slack's bot, Google Chat's app, WhatsApp, which marks each message
+read as it comes) has no such tool.
+
+| Server | Marks |
+|---|---|
+| Email | `\Seen` on the thread's unread mail in its folder; with `all`, on every unread mail of the folder (INBOX when left out) |
+| Slack, Google Chat, WhatsApp | no `mark_conversation_read`: the service gives them no read state |
 
 ## Paging
 
@@ -148,6 +164,12 @@ Each machine's daemon has two methods for the Messages page (#4343,
   connector, and gives the sent message. `messages/conversations` gives each conversation a
   `replyAs` only when its connector's `reply` has the contract's `_meta` (the server's own
   words, else the connector's name), so a client shows a reply field only then.
+- **Marking read** (#5137): `messages/read` of a conversation's newest page (no `cursor`, no
+  `thread`) also calls `mark_conversation_read` on its connector, in the same connection, when
+  the connector has it, and says `markedRead: true`; a mark that fails leaves the conversation
+  unread and the read still comes. **`messages/markAllRead`** (capability
+  `messages.mark-read/1`) calls it with `all` on every connector that has it, and gives each
+  one's count, or its error. A connector without it is in neither.
 
 The clients merge the machines' answers, one copy per conversation. The control plane only
 relays them and never stores message text (`docs/explanation/direction.md`).
@@ -204,9 +226,10 @@ are in it (#4340). Alex can overrule.
 Decided: `unread` is the **service's own** state (IMAP `\Seen`, Slack's unread count, Google
 Chat's read state), and Agents keeps no read mark of its own, because the person's other
 apps then agree with the page, and Agents stores nothing (no message text on the control
-plane, `docs/explanation/direction.md`). Reading on the page marks nothing. A later Mark
-read control calls the server's own `mark_read`, as the email server has now. A service that
-gives no unread state leaves `unread` out. Alex can overrule.
+plane, `docs/explanation/direction.md`). Since #5137, reading a conversation's newest page
+with `messages/read` marks it read on the service, by the contract's `mark_conversation_read`,
+as a person who opens it in the service's own app does, and Mark All as Read marks all. A
+service that gives no unread state leaves `unread` out. Alex can overrule.
 
 ### History that a service does not give
 

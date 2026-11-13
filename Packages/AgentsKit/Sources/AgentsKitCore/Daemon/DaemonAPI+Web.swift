@@ -311,6 +311,7 @@ public extension DaemonAPI {
                     kind: .hostRequest),
                 Row(Method.messagesRead, params: MessagesReadRequest.self, result: MessagesRead.self, kind: .hostRequest),
                 Row(Method.messagesReply, params: MessagesReplyRequest.self, result: MessagesReplied.self, kind: .hostRequest),
+                Row(Method.messagesMarkAllRead, params: MessagesMarkAllReadRequest.self, result: MessagesMarkedAllRead.self, kind: .hostRequest),
                 // Work ▸ Timeline on the web page (#4206).
                 Row(Method.workTimeline, params: WorkTimelineRequest.self, result: WorkTimeline.self, kind: .hostRequest),
                 // Work ▸ Features as a delivery view (#4586).

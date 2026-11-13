@@ -13,9 +13,10 @@ import { hostAnswers } from "../model/capabilities";
 import { channelName } from "../model/channelLinks";
 import { ago } from "../model/connectorSetup";
 import {
-  inThread, lastConsequence, leaveThread, mergeConversations, messagesStatusLine, unreadTotal, messagesProblems, messagesSources, noConnector, noConnectorIn, noConversations, noMachine,
-  noMessages, noUnread, outside, replyInThread, replyLabel, replyPlaceholder, replyText, send, senderName, sending, sentAs, setUp,
-  sourceGlyph, unreadWords, type HostConversations, type MessagesRow,
+  hasUnread, inThread, lastConsequence, leaveThread, markAllHelp, markAllRead, markedRead, markingAllRead, markProblems, mergeConversations,
+  messagesStatusLine, unreadTotal, messagesProblems, messagesSources, nextConversation, nextHelp, nextRow, noConnector, noConnectorIn,
+  noConversations, noMachine, noMessages, noUnread, outside, replyInThread, replyLabel, replyPlaceholder, replyText, send, senderName,
+  sending, sentAs, setUp, sourceGlyph, unreadWords, type HostConversations, type MessagesRow,
 } from "../model/messages";
 import { go } from "../route";
 import { PlaceholderRows } from "./WorkParts";
@@ -26,8 +27,33 @@ const lists = signal<HostConversations[] | null>(null);
 const source = signal("");
 const unreadOnly = signal(false);
 const asked = signal(0);
+/** Goes up each time a conversation or all of them were marked read (#5137), so the grey line reads its count again. */
+const marked = signal(0);
+const markingAll = signal(false);
+const markLines = signal<string[]>([]);
 
 const messagesHosts = (store: Store) => store.hosts.value.filter((h) => hostAnswers(h.state) && store.has(h.id, Capability.messages1));
+const markHosts = (store: Store) => messagesHosts(store).filter((h) => store.has(h.id, Capability.messagesMarkRead1));
+
+/** Mark all as read (#5137): every machine that can marks every conversation of its connectors read; then the list is
+ * read again, as the services now say. */
+async function markAll(store: Store) {
+  if (markingAll.value) return;
+  markingAll.value = true;
+  markLines.value = [];
+  const answers = await Promise.all(markHosts(store).map(async (h) => {
+    const name = h.name || h.id;
+    try {
+      return { name, marked: await store.link.call("messages/markAllRead", {}, h.id) };
+    } catch (e) {
+      return { name, problem: describe(e) };
+    }
+  }));
+  markLines.value = markProblems(answers);
+  markingAll.value = false;
+  marked.value++;
+  asked.value++;
+}
 
 async function readLists(store: Store, hosts: { id: string; name: string }[], cursors?: Map<string, string>): Promise<HostConversations[]> {
   return Promise.all(hosts.map(async (h): Promise<HostConversations> => {
@@ -85,7 +111,7 @@ function MessagesStatusLine({ store }: { store: Store }) {
     void read();
     const timer = setInterval(() => { void read(); }, statusEvery);
     return () => { current = false; clearInterval(timer); };
-  }, [hostKey]);
+  }, [hostKey, marked.value]);
   if (hosts.length === 0) return null;
   const events = hosts.flatMap((h) => store.events.value[h.id]?.events ?? []);
   const line = messagesStatusLine(unread.value, lastConsequence(events), now.value);
@@ -121,6 +147,10 @@ export function MessagesList({ store }: { store: Store }) {
         </select></label>
         <label><input type="checkbox" checked={unreadOnly.value}
           onChange={(e) => { unreadOnly.value = (e.target as HTMLInputElement).checked; }} /> Unread</label>
+        {markHosts(store).length > 0 && (
+          <button type="button" class="link" title={markAllHelp} disabled={markingAll.value || !hasUnread(l ?? [])}
+            onClick={() => { void markAll(store); }}>{markingAll.value ? markingAllRead : markAllRead}</button>
+        )}
         <button type="button" class="link" onClick={() => { asked.value++; }}>Refresh</button>
       </div>
       {hosts.length === 0 ? <p class="hint">{noMachine}</p>
@@ -132,7 +162,7 @@ export function MessagesList({ store }: { store: Store }) {
               onClick={() => go({ host: firstFolder.host, folder: firstFolder.folder, mcp: true })}>{setUp}</button>}
           </div>
         ) : <>
-          {messagesProblems(l).map((p) => <p key={p} class="hint">{p}</p>)}
+          {[...messagesProblems(l), ...markLines.value].map((p) => <p key={p} class="hint">{p}</p>)}
           {rows.length === 0 ? <p class="hint">{unreadOnly.value ? noUnread : noConversations}</p> : (
             <ul class="work-rows">
               {rows.map((r) => <ConversationRow key={r.key} row={r} />)}
@@ -180,6 +210,16 @@ export function ConversationPage({ store, conversationKey }: { store: Store; con
   const sendProblem = useSignal<string | null>(null);
   const l = lists.value;
   const row = l ? mergeConversations(l).find((r) => r.key === conversationKey) : undefined;
+  // Next (#5137): the next conversation in the list as it is filtered and sorted now.
+  const next = l ? nextRow(mergeConversations(l, source.value), conversationKey) : undefined;
+  const goNext = () => { if (next) go({ nav: "messages", section: "messages", item: next.key }); };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowDown" && e.altKey && (e.metaKey || e.ctrlKey) && !e.shiftKey) { e.preventDefault(); goNext(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); };
+  }, [next?.key]);
   const replyAs = row?.item.replyAs;
   const reply = async () => {
     const text = replyText(draft.value);
@@ -208,6 +248,10 @@ export function ConversationPage({ store, conversationKey }: { store: Store; con
       }, row.host);
       messages.value = [...older ? messages.value ?? [] : [], ...got.messages];
       cursor.value = got.cursor;
+      if (got.markedRead && lists.value) {
+        lists.value = markedRead(lists.value, row.key);
+        marked.value++;
+      }
     } catch (e) {
       problem.value = describe(e);
     }
@@ -224,6 +268,7 @@ export function ConversationPage({ store, conversationKey }: { store: Store; con
         <button type="button" title="Back" aria-label="Back" onClick={() => history.back()}>‹</button>
         <button type="button" title="Forward" aria-label="Forward" onClick={() => history.forward()}>›</button>
         <button type="button" class="link" onClick={() => go({ nav: "messages" })}>All messages</button>
+        <button type="button" class="link" title={nextHelp} disabled={!next} onClick={goNext}>{nextConversation} ↓</button>
       </div>
       <header class="work-page-head">
         <h2><span class="work-title">{c.title}</span></h2>

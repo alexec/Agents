@@ -1,7 +1,7 @@
 // The Messages page (#4344), as the window's (AgentsKitCore's MessagesList): every machine's conversations
 // from messages/conversations in one list, each conversation once, the newest first, and its words; the
 // reply field's too (#4345).
-import type { ChannelSender, Event, MessagesConversation, MessagesError, MessagingConversation } from "../protocol/generated";
+import type { ChannelSender, Event, MessagesConversation, MessagesError, MessagesMarkedAllRead, MessagingConversation } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 import { channelName } from "./channelLinks";
 import { shortAgo } from "./statusSecrets";
@@ -134,3 +134,36 @@ export function messagesStatusLine(unread: number | undefined, last: LastConsequ
   const parts = [unread ? `${unread} unread` : null, last ? `${last.words} ${shortAgo(last.at, now)}` : null].filter((p): p is string => !!p);
   return parts.length ? parts.join(" · ") : undefined;
 }
+
+// Next and Mark All as Read (#5137), as the window's.
+
+/** The row after `key` in `rows` (the list as it is filtered and sorted now); undefined at the end, or when `key` is not in it. */
+export function nextRow(rows: MessagesRow[], key: string): MessagesRow | undefined {
+  const at = rows.findIndex((r) => r.key === key);
+  return at >= 0 ? rows[at + 1] : undefined;
+}
+
+/** The lists with the conversation `key` read on every machine that has it, or every conversation when `key` is absent.
+ * A count the service never gave stays absent. */
+export function markedRead(lists: HostConversations[], key?: string): HostConversations[] {
+  return lists.map((l) => ({
+    ...l,
+    conversations: l.conversations.map((c) => (key === undefined || conversationKey(c.conversation) === key) && c.conversation.unread !== undefined
+      ? { ...c, conversation: { ...c.conversation, unread: 0 } } : c),
+  }));
+}
+
+/** Whether Mark All as Read has something to do: a loaded row is unread, or a page is still to come. */
+export const hasUnread = (lists: HostConversations[]): boolean =>
+  mergeConversations(lists).some((r) => (r.item.conversation.unread ?? 0) > 0) || lists.some((l) => !!l.cursor);
+
+/** What Mark All as Read could not do: a machine, or a connector on one. */
+export function markProblems(answers: { name: string; marked?: MessagesMarkedAllRead | undefined; problem?: string | undefined }[]): string[] {
+  return answers.flatMap((a) => a.problem ? [`${a.name}: ${a.problem}`] : (a.marked?.errors ?? []).map((e) => `${a.name} ▸ ${e.server}: ${e.message}`));
+}
+
+export const nextConversation = "Next conversation";
+export const nextHelp = "The next conversation in the list (⌥⌘↓)";
+export const markAllRead = "Mark all as read";
+export const markingAllRead = "Marking…";
+export const markAllHelp = "Mark every conversation read, on each machine and service that keeps a read state";
