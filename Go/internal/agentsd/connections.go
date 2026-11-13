@@ -64,7 +64,7 @@ import (
 // (connections/sign-in/token) and keeps it with its address. The token has no refresh: it ends
 // on the date the person gave it. On dev.azure.com it also signs in with Microsoft Entra
 // (#3921): Entra's device flow (connections/sign-in with the organization as url), with the
-// Entra app in the person's secrets (connections.AzureDevOpsClientIDName). The host checks the
+// Agents app on Entra, or one in the person's secrets (connections.AzureDevOpsClientIDName). The host checks the
 // access token with the organization, keeps the pair, and renews it, as GitHub's.
 
 var (
@@ -280,7 +280,7 @@ func (d *Daemon) atlassianApp() (id, secret string) {
 
 // azureDevOpsApp is the Entra app's client id and tenant for Azure DevOps's sign-in (#3921):
 // AGENTS_AZURE_DEVOPS_CLIENT_ID and AGENTS_AZURE_DEVOPS_TENANT in the host's environment (a
-// scratch root's), else the person's secrets.env. No id: Connect Azure DevOps takes a token only.
+// scratch root's), else the person's secrets.env, else the Agents app (#4873).
 func (d *Daemon) azureDevOpsApp() (id, tenant string) {
 	id, tenant = os.Getenv("AGENTS_"+connections.AzureDevOpsClientIDName), os.Getenv("AGENTS_"+connections.AzureDevOpsTenantName)
 	if id == "" {
@@ -290,7 +290,10 @@ func (d *Daemon) azureDevOpsApp() (id, tenant string) {
 			log.Printf("connections: the Entra app's %s has Ask before use, so Connect Azure DevOps does not use it: turn Ask before use off for it", connections.AzureDevOpsClientIDName)
 		}
 	}
-	return strings.TrimSpace(id), strings.TrimSpace(tenant)
+	if id = strings.TrimSpace(id); id == "" {
+		return connections.AzureDevOpsClientID, ""
+	}
+	return id, strings.TrimSpace(tenant)
 }
 
 // isLoopbackRoot is an http root on this machine: a fake Azure DevOps in a test or a walk.
@@ -435,10 +438,6 @@ func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider
 	}
 
 	flow := d.deviceFlow(p)
-	if flow.ClientID == "" && p == wire.ConnectionProviderAzuredevops {
-		return wire.ConnectionSignIn{}, invalid("This machine has no Entra app for Azure DevOps: connect with a personal access token, " +
-			"or set " + connections.AzureDevOpsClientIDName + " in its secrets to the client id of an Entra app that allows public client flows.")
-	}
 	if flow.ClientID == "" {
 		return wire.ConnectionSignIn{}, invalid("This build has no Agents application on " + flow.Name + ": connect with a personal access token.")
 	}
