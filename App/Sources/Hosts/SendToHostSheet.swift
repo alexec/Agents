@@ -175,12 +175,6 @@ extension View {
     }
 }
 
-/// A send that stops before it starts, in words.
-struct SendFailure: Error, CustomStringConvertible {
-    let message: String
-    var description: String { message }
-}
-
 /// The sheet: the folder on the host, the branches to send, and whether the uncommitted
 /// changes go too. Sending again brings the host's copy up to date with only what it lacks.
 struct SendToHostSheet: View {
