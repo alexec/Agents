@@ -3995,6 +3995,31 @@
       }
     },
     {
+      "name": "firstBuild/start",
+      "x-capability": "first-build/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/FirstBuildStartRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
       "name": "folder/changed",
       "x-capability": "folder/1",
       "tags": [
@@ -10789,6 +10814,10 @@
       "fileNotReadable": {
         "code": -32033,
         "message": "fileNotReadable"
+      },
+      "firstBuildRunning": {
+        "code": -32106,
+        "message": "firstBuildRunning"
       },
       "folderGone": {
         "code": -32004,

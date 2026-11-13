@@ -66,6 +66,7 @@ public enum Capability {
     public static let filesComplete1 = "files.complete/1"
     public static let filesDiagnostics1 = "files.diagnostics/1"
     public static let files1 = "files/1"
+    public static let firstBuild1 = "first-build/1"
     public static let folder1 = "folder/1"
     public static let foldersNotCommitted1 = "folders.not-committed/1"
     public static let foldersToMachine1 = "folders.to-machine/1"
@@ -359,6 +360,7 @@ public enum Capability {
         "files/unwatch": "files/1",
         "files/watch": "files/1",
         "files/write": "files/1",
+        "firstBuild/start": "first-build/1",
         "folders/add": "folders/1",
         "folders/archive": "folders/1",
         "folders/bringBack": "folders/1",

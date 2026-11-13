@@ -435,6 +435,8 @@ public extension DaemonAPI {
                 // as the window's folders column has them.
                 Row(Method.filesBrowse, params: FilesBrowseRequest.self, result: DirectoryListing.self, kind: .hostRequest),
                 Row(Method.foldersAdd, params: AddFolderRequest.self, result: FolderSummary.self, kind: .hostRequest),
+                // The plan page's Submit (#5056): the first-build agent, in its own folder.
+                Row(Method.firstBuildStart, params: FirstBuildStartRequest.self, result: UUID.self, kind: .hostRequest),
                 // Choose Folders… on a machine's row (#4122): the git repositories under its auto-detect paths.
                 Row(Method.foldersFind, params: FoldersFindRequest.self, result: [FoundFolder].self, kind: .hostRequest),
                 Row(Method.foldersClone, params: CloneRequest.self, result: FolderSummary.self, kind: .hostRequest),

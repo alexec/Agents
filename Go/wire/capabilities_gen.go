@@ -65,6 +65,7 @@ const CapFeatures1 = "features/1"
 const CapFilesComplete1 = "files.complete/1"
 const CapFilesDiagnostics1 = "files.diagnostics/1"
 const CapFiles1 = "files/1"
+const CapFirstBuild1 = "first-build/1"
 const CapFolder1 = "folder/1"
 const CapFoldersNotCommitted1 = "folders.not-committed/1"
 const CapFoldersToMachine1 = "folders.to-machine/1"
@@ -358,6 +359,7 @@ var HostCapabilities = pairs([][2]string{
 	{"files/unwatch", "files/1"},
 	{"files/watch", "files/1"},
 	{"files/write", "files/1"},
+	{"firstBuild/start", "first-build/1"},
 	{"folders/add", "folders/1"},
 	{"folders/archive", "folders/1"},
 	{"folders/bringBack", "folders/1"},

@@ -234,6 +234,9 @@ public enum DaemonAPI {
         // A folder is a directory. These five are everything that can be done to one,
         // which is to say: notice it, put it away, and forget it.
         public static let foldersList = "folders/list"
+        /// The first build (#5056): the newcomer's idea starts one agent with the
+        /// start-a-new-app skill, in the folder the host makes for it.
+        public static let firstBuildStart = "firstBuild/start"
         public static let foldersAdd = "folders/add"
         public static let foldersArchive = "folders/archive"
         public static let foldersUnarchive = "folders/unarchive"
@@ -1058,6 +1061,27 @@ public enum DaemonAPI {
             options = try c.decodeIfPresent([ConfigOption].self, forKey: .options) ?? []
             commands = try c.decodeIfPresent([SlashCommand].self, forKey: .commands) ?? []
             failure = try c.decodeIfPresent(String.self, forKey: .failure)
+        }
+    }
+
+    /// `firstBuild/start` (#5056, spec 5048 §7): the idea as typed, the starter the plan page
+    /// shows, and the runtime its first task set up. The host makes the folder, writes the
+    /// prompt and labels the session `first-build`; it answers with the session's id, or
+    /// refuses with `firstBuildRunning` and the id of the one that is there.
+    public struct FirstBuildStartRequest: Codable, Sendable, Hashable {
+        public enum Starter: String, Codable, Sendable, Hashable {
+            case iphoneApp = "iphone-app"
+            case webService = "web-service"
+        }
+
+        public var idea: String
+        public var starter: Starter
+        public var runtimeID: String
+
+        public init(idea: String, starter: Starter, runtimeID: String) {
+            self.idea = idea
+            self.starter = starter
+            self.runtimeID = runtimeID
         }
     }
 
@@ -3015,6 +3039,9 @@ public enum DaemonAPI {
         /// `agents/list` with a `changedSince` this host cannot vouch for (#4785): too old,
         /// or of another epoch. Ask for the whole list.
         public static let revisionGone = -32105
+        /// `firstBuild/start` while a first-build session that is not archived is there
+        /// (#5056): the error's data has its `agentID`, so the client opens it.
+        public static let firstBuildRunning = -32106
     }
 
     // MARK: Workflows
