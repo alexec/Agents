@@ -157,11 +157,11 @@ struct ChoiceChips: View {
         return model.startRuntime?.runtime.name ?? "None set up on \(model.startHost == .mac ? "the Mac" : model.hostName(model.startHost))"
     }
 
-    /// The mark on the Runtime chip: red when Auto picks nothing (#2658), orange when the
+    /// The mark on the Runtime chip: red when Auto picks nothing (#2658), orange (a warning) when the
     /// runtime chosen is out (052, 065).
     private var runtimeDot: StateTint {
         if model.startAutoPicksNothing { return .failure }
-        if model.startRuntimeOut != nil { return .attention }
+        if model.startRuntimeOut != nil { return .warning }
         return .none
     }
 

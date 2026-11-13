@@ -167,7 +167,7 @@ struct FirstBuildQuestionView: View {
             HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Label(line, icon: "exclamationmark.triangle")
                     .appText(.supporting)
-                    .tinted(.attention)
+                    .tinted(.warning)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
                 if firstOpen.needsApproval {

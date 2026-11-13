@@ -16,7 +16,7 @@ export function levelWords(level: CapacityLevel | undefined): string | null {
 
 /** The class for the level's tint: attention at near, failure at full. */
 export function levelClass(level: CapacityLevel | undefined): string {
-  return level === "full" ? "failure" : level === "near" ? "tinted" : "";
+  return level === "full" ? "failure" : level === "near" ? "warning" : "";
 }
 
 /** The warning at near and full: "This Mac is near capacity: load 2.4 per core." null at ok. machine.busy says the same. */

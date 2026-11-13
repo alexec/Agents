@@ -83,7 +83,7 @@ struct PolicyPane: View {
                         .appText(.fine).foregroundStyle(.secondary)
                 }
                 if let behind = PolicyLayersWords.behindLine(effective.behind) {
-                    Text(behind).appText(.fine).tinted(.attention)
+                    Text(behind).appText(.fine).tinted(.warning)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let problem {
@@ -102,7 +102,7 @@ struct PolicyPane: View {
         Section {
             VStack(alignment: .leading, spacing: 6) {
                 Label(PolicyLayersWords.untrustedTitle, icon: "exclamationmark.shield")
-                    .appText(.reading).fontWeight(.semibold).tinted(.attention)
+                    .appText(.reading).fontWeight(.semibold).tinted(.warning)
                 Text(PolicyLayersWords.untrustedLine(copy)).appText(.fine)
                     .fixedSize(horizontal: false, vertical: true)
                 if copy.lines.isEmpty {

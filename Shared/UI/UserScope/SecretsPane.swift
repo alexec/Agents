@@ -41,7 +41,7 @@ struct SecretsPane<Extra: View>: View {
             }
             if let left = state.left {
                 Section {
-                    Text(UserScopeWords.secretsLeft(left)).appText(.supporting).tinted(.attention)
+                    Text(UserScopeWords.secretsLeft(left)).appText(.supporting).tinted(.warning)
                         .fixedSize(horizontal: false, vertical: true)
                     Button("OK") { state.left = nil }
                 }
@@ -50,7 +50,7 @@ struct SecretsPane<Extra: View>: View {
             if let only = SecretInfoWords.onlyMachine(state.secrets?.secrets ?? []) {
                 Section {
                     Label(SecretInfoWords.onlyMachineLine(only, names: machineNames), icon: "exclamationmark.triangle")
-                        .appText(.supporting).tinted(.attention)
+                        .appText(.supporting).tinted(.warning)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .paperListRow()
@@ -134,11 +134,11 @@ struct SecretsPane<Extra: View>: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if let left = UserScopeWords.leftOn(row) {
-                        Text(left).appText(.fine).tinted(.attention)
+                        Text(left).appText(.fine).tinted(.warning)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     if !oneMachine, let warning = SecretInfoWords.notBackedUp(row, names: machineNames) {
-                        Text("⚠ " + warning).appText(.fine).tinted(.attention)
+                        Text("⚠ " + warning).appText(.fine).tinted(.warning)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }

@@ -10,13 +10,13 @@
   --color-background-info: color-mix(in srgb, var(--accent) 14%, var(--paper-ground));
   --color-background-danger: color-mix(in srgb, var(--tint-failure) 14%, var(--paper-ground));
   --color-background-success: color-mix(in srgb, var(--tint-vouched) 14%, var(--paper-ground));
-  --color-background-warning: color-mix(in srgb, var(--tint-attention) 14%, var(--paper-ground));
+  --color-background-warning: color-mix(in srgb, var(--tint-warning) 14%, var(--paper-ground));
   --color-text-primary: var(--paper-ink);
   --color-text-secondary: color-mix(in srgb, var(--paper-ink) 66%, transparent);
   --color-text-info: var(--accent);
   --color-text-danger: var(--tint-failure);
   --color-text-success: var(--tint-vouched);
-  --color-text-warning: var(--tint-attention);
+  --color-text-warning: var(--tint-warning);
   --color-border-primary: var(--paper-rule);
   --color-border-info: var(--accent);
   --font-sans: var(--font-text);

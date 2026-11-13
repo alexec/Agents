@@ -220,7 +220,7 @@ struct FirstBuildPlanView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Label(problem, icon: "exclamationmark.triangle")
                         .appText(.supporting)
-                        .tinted(.attention)
+                        .tinted(.warning)
                         .fixedSize(horizontal: false, vertical: true)
                     Spacer(minLength: 8)
                     Button("Try Again") { Task { await model.retryFirstBuildStart() } }

@@ -19,7 +19,7 @@ struct CapReachedCard: View {
             Image(icon: "dollarsign.circle")
                 // Decorative: the card says what it is in words.
                 .glyph(size: 13)
-                .foregroundStyle(StateTint.attention.style(or: .primary))
+                .foregroundStyle(StateTint.warning.style(or: .primary))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(BotWords.capReachedTitle(reached)).fontWeight(.semibold)

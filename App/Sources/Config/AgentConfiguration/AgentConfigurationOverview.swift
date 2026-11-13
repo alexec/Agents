@@ -54,7 +54,7 @@ struct AgentConfigurationOverview: View {
                 SharedRow(chosen: false, label: "\(kind.title): \(what). Show.", action: { page = kind }) {
                     HStack(spacing: 10) {
                         Text(kind.title).fontWeight(.semibold).frame(minWidth: 120, alignment: .leading)
-                        Text(what).foregroundStyle(kind.warns(in: snapshot) ? AnyShapeStyle(SharedInk.attention)
+                        Text(what).foregroundStyle(kind.warns(in: snapshot) ? AnyShapeStyle(SharedInk.warning)
                                                                              : AnyShapeStyle(.secondary))
                             .lineLimit(1)
                         Spacer(minLength: 8)
@@ -168,7 +168,7 @@ struct AgentConfigurationOverview: View {
     private var legend: some View {
         HStack(spacing: 18) {
             Text("\(Text("✓ / n").foregroundStyle(SharedInk.reach)) gets it")
-            Text("\(Text("2 of 3").foregroundStyle(SharedInk.attention)) some left out, see why")
+            Text("\(Text("2 of 3").foregroundStyle(SharedInk.warning)) some left out, see why")
             Text("— has no way to take it")
             Text("? not checked yet")
         }
@@ -198,7 +198,7 @@ extension AgentConfigurationOverview.Cell: View {
     var body: some View {
         Text(text)
             .fontWeight(tone == .gets ? .semibold : .regular)
-            .foregroundStyle(tone == .gets ? SharedInk.reach : tone == .attention ? SharedInk.attention : .secondary)
+            .foregroundStyle(tone == .gets ? SharedInk.reach : tone == .attention ? SharedInk.warning : .secondary)
             .monospacedDigit()
     }
 }

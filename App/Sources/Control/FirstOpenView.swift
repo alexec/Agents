@@ -61,7 +61,7 @@ struct FirstOpenView: View {
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Label(line, icon: "exclamationmark.triangle")
                     .appText(.reading)
-                    .tinted(.attention)
+                    .tinted(.warning)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 8)
                 if firstOpen.needsApproval {

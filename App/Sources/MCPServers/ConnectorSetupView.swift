@@ -465,7 +465,7 @@ private struct SlotCard: View {
             Text(slot.slot == .workspace ? place.line
                  : ConnectorSetupWords.line(slot, folder: folderName, repository: setup.repository, forge: setup.forgeOrGitHub))
                 .appText(.fine)
-                .tinted([.failed, .refused, .noRemote].contains(slot.state) ? .attention : .none)
+                .tinted([.failed, .refused, .noRemote].contains(slot.state) ? .warning : .none)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -523,7 +523,7 @@ private struct SlotMark: View {
             case .read:
                 Image(icon: "checkmark.circle.fill").foregroundStyle(Paper.accent)
             case .failed, .refused:
-                Image(icon: "exclamationmark.circle").tinted(.attention)
+                Image(icon: "exclamationmark.circle").tinted(.warning)
             case .skipped:
                 Circle().strokeBorder(style: StrokeStyle(lineWidth: 1.2, dash: [2.5, 2])).foregroundStyle(.secondary)
                     .frame(width: 13, height: 13)

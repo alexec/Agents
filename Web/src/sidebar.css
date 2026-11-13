@@ -130,7 +130,7 @@
 /* For Review's suggestions of the daily checks (#3331): the accent, an urgent one the attention tint;
    Start and Dismiss over the time on hover, as a pull request's Dismiss. */
 .sidebar-mark.suggestion { color: var(--accent); }
-.sidebar-mark.suggestion.urgent { color: var(--tint-attention); }
+.sidebar-mark.suggestion.urgent { color: var(--tint-warning); }
 .nav-item.check-suggestion { position: relative; }
 .check-suggestion > .actions { display: none; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); gap: 4px; }
 .check-suggestion > .actions > button { border: 0; border-radius: 5px; padding: 2px 8px;
@@ -220,7 +220,7 @@
 /* The share of the plan window used (#1097), under the reading's words. */
 .runtime-list .allowance-bar { max-width: 240px; height: 4px; margin: 4px 0 2px; border-radius: 2px; background: var(--paper-rule); overflow: hidden; }
 .runtime-list .allowance-bar > span { display: block; height: 100%; background: var(--accent); }
-.runtime-list .allowance-bar.nearly-spent > span { background: var(--tint-attention); }
+.runtime-list .allowance-bar.nearly-spent > span { background: var(--tint-warning); }
 .runtime-list .allowance-bar.spent > span { background: var(--tint-failure); }
 .runtime-list .past-weeks { margin: 6px 0 2px; }
 .runtime-list .past-weeks > p { margin: 0 0 2px; }
@@ -237,7 +237,7 @@
 .other-runtimes { margin-top: 12px; }
 .other-runtimes > summary { cursor: pointer; padding: 4px 0; }
 .runtime-list .past-weeks .week-bar > span { display: block; flex: none; width: 100%; background: var(--accent); }
-.runtime-list .past-weeks .week-bar.nearly-spent > span { background: var(--tint-attention); }
+.runtime-list .past-weeks .week-bar.nearly-spent > span { background: var(--tint-warning); }
 .runtime-list .past-weeks .week-bar.spent > span { background: var(--tint-failure); }
 .runtime-list .past-weeks .small { font-variant-numeric: tabular-nums; }
 .with-sidebar .spending-today { font-size: 1.25rem; margin: 8px 0 4px; }
@@ -378,6 +378,7 @@
 .group-people legend { padding: 0; font-size: 0.8125rem; opacity: 0.7; }
 /* A bot stopped at its cap (#1761), for an admin. */
 .with-sidebar .settings-body .hint.attention { color: var(--tint-attention); }
+.with-sidebar .settings-body .hint.warning { color: var(--tint-warning); }
 button.destructive { color: var(--tint-failure); }
 button.prominent.destructive { background: var(--tint-failure); border-color: var(--tint-failure); color: var(--paper-ground); }
 .invite-code .code-text { font-family: var(--font-mono); padding: 6px 8px; border: 1px solid var(--paper-rule);
