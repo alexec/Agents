@@ -19,8 +19,6 @@ public struct RuntimeAllowances: Codable, Hashable, Sendable {
         self.shared = shared
     }
 
-    public var anyOut: Bool { rows.contains { $0.state.isOut } }
-
     /// Whether this runtime's plan is spent, on any of its own credentials. A chooser asks
     /// this to put a runtime in its out run: a spent plan cannot take a turn, but it is
     /// still worth naming rather than hiding, because that is the only way back to it.
