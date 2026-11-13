@@ -85,6 +85,7 @@ nav:
   - How-to guides:
       - how-to/index.md
       - how-to/set-up-on-this-mac.md
+      - how-to/build-your-first-app.md
       - how-to/connect-a-window-or-phone.md
       - how-to/sign-in-with-google-apple-or-github.md
       - how-to/sign-in-with-your-organisation.md

@@ -98,7 +98,7 @@ Open issues: `is:open label:integration install`.
 | npm toolset locks | Mac, server | built | — | `scripts/update-toolset.sh` | |
 | Antigravity from dl.google.com | Mac | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/ArchiveToolset.swift` | |
 | OpenCode from GitHub releases | Mac, server | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/ArchiveToolset.swift` | |
-| Grok, Copilot and Cursor install scripts | Mac, server | built | — | `App/Sources/AppModel+GetStarted.swift`, `Go/internal/agentsd/install.go` | |
+| Grok, Copilot and Cursor install scripts | Mac, server | built | — | `Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/RuntimeCatalog.swift`, `Go/internal/agentsd/install.go` | |
 
 ## Machine providers
 
