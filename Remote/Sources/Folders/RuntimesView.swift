@@ -61,7 +61,7 @@ struct RuntimesView: View {
                         }
                     }
                 } label: {
-                    Label("Add Account", icon: "person.badge.plus")
+                    Label("Add Account", systemImage: "person.badge.plus")
                 }
             }
         }
@@ -171,7 +171,7 @@ private struct ReachesTheModelByMenu: View {
     }
 
     @ViewBuilder private func label(_ title: String, chosen: Bool) -> some View {
-        if chosen { Label(title, icon: "checkmark") } else { Text(title) }
+        if chosen { Label(title, systemImage: "checkmark") } else { Text(title) }
     }
 
     private func set(_ accountID: String?) {
@@ -206,26 +206,5 @@ private struct RuntimeAllowanceRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-    }
-}
-
-/// The link to it at the foot of Spending, with the Mac's red dot when a runtime is out.
-struct RuntimesLink: View {
-    @Environment(RemoteModel.self) private var model
-
-    var body: some View {
-        NavigationLink { RuntimesView() } label: {
-            HStack {
-                Label("Runtimes", icon: "cpu")
-                Spacer()
-                if model.runtimeAllowances?.anyOut == true {
-                    Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 8, height: 8)
-                        .accessibilityLabel("A runtime is out")
-                }
-                Image(icon: "chevron.right").foregroundStyle(Paper.tertiary)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
     }
 }
