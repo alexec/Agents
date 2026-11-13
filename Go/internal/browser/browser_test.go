@@ -15,6 +15,7 @@ import (
 
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 )
 
@@ -26,6 +27,8 @@ type fake struct {
 	launches atomic.Int32
 	headed   atomic.Int32
 	webauthn atomic.Int32
+	chrome   atomic.Int32
+	profiles []string
 	stops    atomic.Int32
 	crash    chan struct{}
 	busy     atomic.Bool
@@ -56,8 +59,14 @@ func newFake(t *testing.T) *fake {
 		}
 		return "", errors.New("no PLAYWRIGHT_BROWSERS_PATH")
 	}
+	// No Google Chrome unless a test gives one (#5207): Chrome for Testing, as on Linux.
+	f.m.chrome = func() string { return "" }
 	f.m.launch = func(exe, profile string, env []string, how mode) (*process, error) {
 		n := f.launches.Add(1)
+		if how.chrome {
+			f.chrome.Add(1)
+			f.profiles = append(f.profiles, profile)
+		}
 		if how.headed {
 			f.headed.Add(1)
 		}
@@ -66,7 +75,7 @@ func newFake(t *testing.T) *fake {
 		}
 		f.crash = make(chan struct{})
 		return &process{endpoint: "ws://127.0.0.1:9222/devtools/browser/" + string(rune('a'+n-1)), pid: 1000 + int(n),
-			done: f.crash, stop: func() { f.stops.Add(1) }, headed: how.headed, webauthn: how.webauthn}, nil
+			done: f.crash, stop: func() { f.stops.Add(1) }, headed: how.headed, chrome: how.chrome, webauthn: how.webauthn}, nil
 	}
 	t.Cleanup(f.m.Shutdown)
 	return f
@@ -223,6 +232,64 @@ func TestAFailedHeadedStartIsHeadless(t *testing.T) {
 	f.m.Headed()
 	if _, err := f.m.Endpoint(nil); err != nil || f.launches.Load() != 1 {
 		t.Fatal(err, f.launches.Load())
+	}
+}
+
+// With Google Chrome on the machine, the browser is that Chrome (#5207): headed, on its own
+// profile, with nothing downloaded, for every site; a passkey still starts it again.
+func TestGoogleChromeIsTheBrowser(t *testing.T) {
+	f := newFake(t)
+	f.m.chrome = func() string { return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" }
+	if !f.m.Installed() {
+		t.Fatal("Google Chrome is a browser to start")
+	}
+	var said []string
+	if _, err := f.m.Endpoint(func(s string) { said = append(said, s) }); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(said, "; ") != "Starting the browser" || f.chrome.Load() != 1 || f.headed.Load() != 1 {
+		t.Fatal("not Google Chrome, headed, with no download:", said, f.chrome.Load(), f.headed.Load())
+	}
+	if f.profiles[0] != f.m.ChromeProfile() || f.m.ChromeProfile() == f.m.Profile {
+		t.Fatal("not Google Chrome's own profile:", f.profiles)
+	}
+	if fi, err := os.Stat(f.m.ChromeProfile()); err != nil || fi.Mode().Perm() != 0o700 {
+		t.Fatal("the profile is the person's alone", err)
+	}
+	if f.m.Headed() || f.stops.Load() != 0 {
+		t.Fatal("a site that checks for bots started Google Chrome again")
+	}
+	if !f.m.Passkeys() {
+		t.Fatal("a passkey did not start it again")
+	}
+	mustStart(t, f.m)
+	if f.chrome.Load() != 2 || f.webauthn.Load() != 1 {
+		t.Fatal(f.chrome.Load(), f.webauthn.Load())
+	}
+	// Stopped, the next start is Google Chrome again, with no Headed first.
+	f.m.Stop()
+	if f.m.Headed() {
+		t.Fatal("Headed stopped a browser that is not running")
+	}
+	mustStart(t, f.m)
+	if f.chrome.Load() != 3 || f.headed.Load() != 3 {
+		t.Fatal(f.chrome.Load(), f.headed.Load())
+	}
+}
+
+// A Google Chrome that does not start leaves Chrome for Testing, as with no Chrome.
+func TestAFailedGoogleChromeStartsChromeForTesting(t *testing.T) {
+	f := newFake(t)
+	f.m.chrome = func() string { return "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" }
+	launch := f.m.launch
+	f.m.launch = func(exe, profile string, env []string, how mode) (*process, error) {
+		if how.chrome {
+			return nil, errors.New("no Chrome")
+		}
+		return launch(exe, profile, env, how)
+	}
+	if _, err := f.m.Endpoint(nil); err != nil || f.launches.Load() != 1 || f.headed.Load() != 0 {
+		t.Fatal(err, f.launches.Load(), f.headed.Load())
 	}
 }
 
@@ -403,6 +470,91 @@ func TestARealHeadedChromium(t *testing.T) {
 	}
 	if len(where) != 3 || where[0] > -1000 && where[1] > -1000 || where[2] < 1000 {
 		t.Fatalf("the window is not off-screen: %v", where)
+	}
+}
+
+// TestARealGoogleChrome starts the Google Chrome in AGENTS_TEST_GOOGLE_CHROME as the
+// agents' browser (#5207) on a scratch profile, and checks that it says the Chrome it is,
+// that its window is below every screen, that it has no test flags, and that a screencast
+// (the chat tile, #4138) still paints from there.
+func TestARealGoogleChrome(t *testing.T) {
+	exe := os.Getenv("AGENTS_TEST_GOOGLE_CHROME")
+	if exe == "" {
+		t.Skip("set AGENTS_TEST_GOOGLE_CHROME to Google Chrome to start a real one")
+	}
+	p, err := launchChromium(exe, t.TempDir(), os.Environ(), mode{chrome: true, headed: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		p.stop()
+		<-p.done
+	}()
+	ctx := p.store.(cdpStore).ctx
+	// userAgentData is only in a secure context, which about:blank is not.
+	if _, err := chromedp.Run(ctx, chromedp.Navigate("https://example.com/")); err != nil {
+		t.Fatal(err)
+	}
+	says, err := chromedp.Run(ctx, chromedp.Evaluate[[]any](`[navigator.userAgentData.brands.map(b => b.brand).join(","), navigator.webdriver, navigator.userAgent, typeof PublicKeyCredential]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("it says %v", says)
+	if cmd, err := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(p.pid)).Output(); err == nil {
+		t.Logf("it runs as %s", cmd)
+	}
+	if !strings.Contains(says[0].(string), "Google Chrome") || says[1] != false || strings.Contains(says[2].(string), "Headless") || says[3] != "undefined" {
+		t.Fatalf("not the Chrome it is, or WebAuthn on: %v", says)
+	}
+	// At most one point across shows, at the screen's left edge, or none below it.
+	where, err := chromedp.Run(ctx, chromedp.Evaluate[[]float64](`[window.screenX, window.screenY, window.outerWidth, screen.availLeft, screen.height]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("the window is at %v", where)
+	if len(where) != 5 || where[0]+where[2]-where[3] > 1 && where[1] < where[4] {
+		t.Fatalf("the window is on the screen: %v", where)
+	}
+	out, err := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(p.pid)).Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, flag := range []string{"use-mock-keychain", "password-store", "enable-automation", "disable-sync", "disable-extensions", "headless", "user-agent", "mute-audio", "hide-scrollbars"} {
+		if strings.Contains(string(out), flag) {
+			t.Errorf("it has the test flag %s: %s", flag, out)
+		}
+	}
+	// The chat tile's screencast (#4138) paints from below the screen while the page changes.
+	frames := chromedp.Events(ctx, page.ScreencastFrame)
+	var painted atomic.Int32
+	go func() {
+		for ev, err := range frames {
+			if err != nil {
+				return
+			}
+			painted.Add(1)
+			_, _ = chromedp.Call(ctx, page.ScreencastFrameAck, page.ScreencastFrameAckParams{SessionID: ev.SessionID})
+		}
+	}()
+	if _, err := chromedp.Call(ctx, page.StartScreencast, page.StartScreencastParams{Format: page.StartScreencastFormatJpeg, EveryNthFrame: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := chromedp.Run(ctx, chromedp.Evaluate[any](`setInterval(() => document.body.style.background = '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0'), 50)`)); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(3 * time.Second)
+	t.Logf("the screencast painted %d frames in 3 s", painted.Load())
+	if painted.Load() < 10 {
+		t.Fatalf("the screencast painted %d frames in 3 s", painted.Load())
+	}
+	if url := os.Getenv("AGENTS_TEST_BOT_CHECK"); url != "" {
+		// One page that checks, opened once: what it says after the check.
+		if _, err := chromedp.Run(ctx, chromedp.Navigate(url)); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(15 * time.Second)
+		said, err := chromedp.Run(ctx, chromedp.Evaluate[[]any](`[document.title, location.href, document.body.innerText.slice(0, 300)]`))
+		t.Logf("%v (err %v)", said, err)
 	}
 }
 
