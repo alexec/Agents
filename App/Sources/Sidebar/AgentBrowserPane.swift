@@ -36,15 +36,20 @@ struct AgentBrowserPane: View {
                 page
                     .onChange(of: geometry.size, initial: true) { _, size in area = size }
             }
-            if let problem = browser.problem {
-                Divider()
-                Text(problem)
-                    .appText(.supporting)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-            }
+            // The status line is always on, one line high: a line that came and went with
+            // each problem changed the page's height, and each new height laid the page out
+            // again, so the page flickered.
+            Divider()
+            Text(browser.problem ?? " ")
+                .appText(.supporting)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .help(browser.problem ?? "")
+                .accessibilityHidden(browser.problem == nil)
         }
         .task(id: WatchKey(session: agent.id, visible: isVisible, width: Int(area.width), height: Int(area.height))) {
             if isVisible, area.width > 0, area.height > 0 {

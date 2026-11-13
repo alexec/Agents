@@ -40,15 +40,18 @@ struct AgentBrowserPane: View {
                 page(browser)
                     .onChange(of: geometry.size, initial: true) { _, size in area = size }
             }
-            if let problem = browser.problem {
-                Divider()
-                Text(problem)
-                    .appText(.fine)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
-            }
+            // Always on, one line high: a line that came and went changed the page's height,
+            // and each new height laid the page out again, so the page flickered.
+            Divider()
+            Text(browser.problem ?? " ")
+                .appText(.fine)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .accessibilityHidden(browser.problem == nil)
         }
         // Inactive is still on screen (a notification over it, the app switcher): only the
         // background stops the frames.
