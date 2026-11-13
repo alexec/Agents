@@ -39,6 +39,11 @@ final class AppModel {
     /// An agent has run a turn on this root, once seen: archived agents are not listed,
     /// and the step stays ticked when the first one is archived.
     var hasSeenAgentRun = GetStartedStore.ranAgent
+    /// The question page shows after the window has paired, until Submit (#5050). Kept on
+    /// this root, so a newcomer who quits before Submit sees it again. See `AppModel+FirstBuild`.
+    var asksFirstBuild = FirstBuildStore.asking
+    /// The idea a newcomer submitted on the question page, for the plan page (#5053).
+    var firstBuildIdea: String?
     /// The achievements this window has shown a card for (#984); nil before its first look
     /// on this root. See `AppModel+Achievements`.
     var achievementsSeen: Set<String>? = AchievementsSeenStore.seen
@@ -3124,6 +3129,7 @@ final class AppModel {
             hasLoadedFolders = true
             settleFolderSelection()
             weighGetStarted()
+            weighFirstBuild()
         } catch {
             // A list that failed is not worth an alert: the notification that follows
             // the next change will bring it back.
@@ -4858,6 +4864,7 @@ final class AppModel {
             }
             self.hasLoadedAgents = true
             self.weighGetStarted()
+            self.weighFirstBuild()
             Perf.sinceLaunch("first-list")
             // Whatever the list already shows was spent before this window opened, so
             // the session total starts from here rather than from the beginning of time.

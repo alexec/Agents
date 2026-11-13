@@ -1606,6 +1606,14 @@ struct WebFixturesTests {
     /// A Swift-encoded sample of every case of each type whose Swift encoder is written by
     /// hand, so `Web/test/shapes.test.mjs`, `WireSchemaTests` and `Go/wire` can hold the
     /// schema's shape to real JSON (T020, T042, #1135).
+    /// The question page's ideas and their starters (#5050): the web page's list is the
+    /// same, in the same order (`Web/src/model/`, #5051).
+    @Test func firstBuildIdeas() throws {
+        try pin("first-build/ideas.json", [Case(name: "the ideas, in order", input: .null)]) { _ in
+            try Self.encode(FirstBuild.ideas)
+        }
+    }
+
     @Test func overrideSamples() throws {
         let stamp = FileStamp(size: 12, modifiedAt: Self.base)
         let text = Data("hi".utf8)

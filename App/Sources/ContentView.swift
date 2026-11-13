@@ -311,7 +311,12 @@ struct ContentView: View {
         // The organisation stopped all agent work, or this Mac follows no policy it can trust (#998).
         OrgPolicyStrip(state: model.policyState)
         Group {
-            if model.needsFirstRun {
+            if let firstOpen = HostScenes.firstOpen, firstOpen.step != .elsewhere,
+               model.needsFirstRun || model.asksFirstBuild {
+                // A newcomer's first open in the one app: the question page, with the
+                // set-up behind it (#5050, spec 5048 section 8).
+                FirstBuildQuestionView(firstOpen: firstOpen)
+            } else if model.needsFirstRun {
                 // No control plane yet: the first open sets one up on this Mac and pairs
                 // the window, with no sidebar or toolbar until it has (#4226).
                 FirstOpenView()

@@ -1,0 +1,32 @@
+[
+  {
+    "expected" : [
+      {
+        "starter" : "iphone-app",
+        "words" : "An iPhone app that shows the weather where I am"
+      },
+      {
+        "starter" : "web-service",
+        "words" : "A web page that shows this week's weather for my town"
+      },
+      {
+        "starter" : "iphone-app",
+        "words" : "An iPhone app that reminds me to water my plants"
+      },
+      {
+        "starter" : "web-service",
+        "words" : "A website for my book club's reading list"
+      },
+      {
+        "starter" : "iphone-app",
+        "words" : "An iPhone app that logs my runs"
+      },
+      {
+        "starter" : "web-service",
+        "words" : "A web service that emails me a daily summary of my GitHub"
+      }
+    ],
+    "input" : null,
+    "name" : "the ideas, in order"
+  }
+]
