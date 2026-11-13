@@ -2,13 +2,14 @@ import AgentsKitCore
 import SwiftUI
 #if os(macOS)
 import AppKit
+#else
+import UIKit
 #endif
 
 extension EnvironmentValues {
     /// Whether a message's words are drawn as one selectable text, so a drag goes across
-    /// its paragraphs, headings, lists and quotes (#5155). The Mac only, for now: the
-    /// Remote keeps a `Text` for each block. The chat sets it; a document
-    /// page, with its caret and zoom, keeps a `Text` for each block.
+    /// its paragraphs, headings, lists and quotes (#5155, the Remote #5181). The chat sets
+    /// it; a document page, with its caret and zoom, keeps a `Text` for each block.
     @Entry var selectsAcrossBlocks = false
     /// The message is the app's, not the person's or the agent's, and its words are drawn
     /// in the secondary ink (`.foregroundStyle(.secondary)` around it), which an AppKit
@@ -35,6 +36,7 @@ struct SelectableProse: NSViewRepresentable {
     @Environment(\.lineSpacing) private var lineSpacing
     @Environment(\.quietProse) private var quiet
     @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var dynamicType
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -67,7 +69,7 @@ struct SelectableProse: NSViewRepresentable {
     private func update(_ view: ProseTextView, context: Context) {
         let coordinator = context.coordinator
         coordinator.openURL = openURL
-        let style = ProseStyle(zoom: zoom, lineSpacing: lineSpacing, quiet: quiet)
+        let style = ProseStyle(zoom: zoom, lineSpacing: lineSpacing, quiet: quiet, dynamicType: dynamicType)
         let key = Coordinator.Key(blocks: blocks, style: style)
         guard coordinator.key != key else { return }
         coordinator.key = key
@@ -132,13 +134,6 @@ struct SelectableProse: NSViewRepresentable {
             return true
         }
     }
-}
-
-/// What the words are drawn with, from the environment around them.
-struct ProseStyle: Equatable {
-    var zoom: CGFloat
-    var lineSpacing: CGFloat
-    var quiet: Bool
 }
 
 /// The read-only text view, which hands its right click to the message's own menu.
@@ -216,6 +211,37 @@ final class ProseTextView: NSTextView {
         }
     }
 }
+
+#endif
+
+/// What the words are drawn with, from the environment around them.
+struct ProseStyle: Equatable {
+    var zoom: CGFloat
+    var lineSpacing: CGFloat
+    var quiet: Bool
+    /// The phone's text size; the Mac's fonts follow its own setting.
+    var dynamicType: DynamicTypeSize = .large
+}
+
+#if os(macOS)
+typealias ProseFont = NSFont
+typealias ProseFontDescriptor = NSFontDescriptor
+typealias ProseColor = NSColor
+typealias ProseUnderline = NSUnderlineStyle
+private enum ProseInk {
+    static var primary: NSColor { .labelColor }
+    static var secondary: NSColor { .secondaryLabelColor }
+}
+#else
+typealias ProseFont = UIFont
+typealias ProseFontDescriptor = UIFontDescriptor
+typealias ProseColor = UIColor
+typealias ProseUnderline = NSUnderlineStyle
+private enum ProseInk {
+    static var primary: UIColor { .label }
+    static var secondary: UIColor { .secondaryLabel }
+}
+#endif
 
 extension NSAttributedString.Key {
     /// Where a quote's bars go, as distances from the text's left edge.
@@ -307,7 +333,7 @@ enum ProseString {
             emit(item.blocks, inner, style, into: &pieces)
             if first < pieces.count {
                 let mark = NSMutableAttributedString(string: markers[index] + "\t", attributes: [
-                    .font: font, .foregroundColor: NSColor.secondaryLabelColor,
+                    .font: font, .foregroundColor: ProseInk.secondary,
                 ])
                 pieces[first].text.insert(mark, at: 0)
                 pieces[first].firstIndent = context.indent
@@ -327,17 +353,23 @@ enum ProseString {
     }
 
     /// A Markdown heading's font, from the same ladder as `TextStep.heading`.
-    private static func heading(_ level: Int, _ style: ProseStyle) -> NSFont {
+    private static func heading(_ level: Int, _ style: ProseStyle) -> ProseFont {
+        #if os(macOS)
         let textStyle: NSFont.TextStyle = level <= 1 ? .title1 : level == 2 ? .title2 : .title3
         let font = NSFont.paper(textStyle)
+        #else
+        let textStyle: UIFont.TextStyle = level <= 1 ? .title1 : level == 2 ? .title2 : .body
+        let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(style.dynamicType))
+        let font = UIFont.paper(size: UIFont.preferredFont(forTextStyle: textStyle, compatibleWith: traits).pointSize)
+        #endif
         return weighted(font.withSize(font.pointSize * style.zoom), .semibold)
     }
 
     /// A block's words with their inline marks: emphasis, strong, code, struck and links.
-    private static func inline(_ text: AttributedString, font: NSFont, _ context: Context,
+    private static func inline(_ text: AttributedString, font: ProseFont, _ context: Context,
                                _ style: ProseStyle) -> NSMutableAttributedString {
         let result = NSMutableAttributedString()
-        let ink: NSColor = context.secondary ? .secondaryLabelColor : .labelColor
+        let ink: ProseColor = context.secondary ? ProseInk.secondary : ProseInk.primary
         let reading = regular(.reading, style).pointSize
         let kern = style.lineSpacing > 0 ? TextStep.readingTracking * font.pointSize : 0
         for run in text.runs {
@@ -351,7 +383,7 @@ enum ProseString {
             if intent.contains(.emphasized) { drawn = italic(drawn) }
             var attributes: [NSAttributedString.Key: Any] = [.font: drawn, .foregroundColor: ink]
             if kern > 0 { attributes[.kern] = kern }
-            if intent.contains(.strikethrough) { attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
+            if intent.contains(.strikethrough) { attributes[.strikethroughStyle] = ProseUnderline.single.rawValue }
             if let link = run.link { attributes[.link] = link }
             result.append(NSAttributedString(string: String(text[run.range].characters), attributes: attributes))
         }
@@ -360,23 +392,259 @@ enum ProseString {
 
     /// The font's family at a weight. By family, not by name, as `UIFont.paper` does: a
     /// variable font's default instance is not its regular one, and drew every word bold.
-    private static func weighted(_ font: NSFont, _ weight: NSFont.Weight) -> NSFont {
-        guard let family = font.familyName else { return font }
-        let descriptor = NSFontDescriptor(fontAttributes: [
+    private static func weighted(_ font: ProseFont, _ weight: ProseFont.Weight) -> ProseFont {
+        guard let family = font.familyName as String? else { return font }
+        let descriptor = ProseFontDescriptor(fontAttributes: [
             .family: family,
-            .traits: [NSFontDescriptor.TraitKey.weight: weight],
+            .traits: [ProseFontDescriptor.TraitKey.weight: weight],
         ])
+        #if os(macOS)
         return NSFont(descriptor: descriptor, size: font.pointSize) ?? font
+        #else
+        return UIFont(descriptor: descriptor, size: font.pointSize)
+        #endif
     }
 
-    private static func italic(_ font: NSFont) -> NSFont {
+    private static func italic(_ font: ProseFont) -> ProseFont {
+        #if os(macOS)
         let descriptor = font.fontDescriptor.withSymbolicTraits(font.fontDescriptor.symbolicTraits.union(.italic))
         return NSFont(descriptor: descriptor, size: font.pointSize) ?? font
+        #else
+        guard let descriptor = font.fontDescriptor.withSymbolicTraits(font.fontDescriptor.symbolicTraits.union(.traitItalic))
+        else { return font }
+        return UIFont(descriptor: descriptor, size: font.pointSize)
+        #endif
     }
 
     /// A step's font at its regular weight.
-    private static func regular(_ step: TextStep, _ style: ProseStyle) -> NSFont {
+    private static func regular(_ step: TextStep, _ style: ProseStyle) -> ProseFont {
+        #if os(macOS)
         weighted(step.nsFont(zoom: style.zoom), .regular)
+        #else
+        // The phone's step at the text size SwiftUI's environment says, times the zoom.
+        let font = step.uiFont(dynamicType: style.dynamicType)
+        return style.zoom == 1 ? font : font.withSize(font.pointSize * style.zoom)
+        #endif
+    }
+}
+
+#if os(iOS)
+
+/// Blocks that are only words, drawn as one read-only `UITextView` (#5181), as the Mac
+/// draws them as one `NSTextView` (#5155).
+///
+/// On the phone a selectable `Text` gives only a long press that copies one whole `Text`,
+/// one paragraph. In one text view, a long press and the handles select a part of a
+/// message across its paragraphs. A long press is then the text view's, not the
+/// message's menu, so the message's actions (`MessageMenu`) are in the text view's edit
+/// menu, beside Copy.
+///
+/// TextKit 2. The height is measured apart from the view, at the width SwiftUI offers.
+struct SelectableProse: UIViewRepresentable {
+    let blocks: [MarkdownBlock]
+    /// As wide as offered, or as wide as its words (the person's own message).
+    let fillsWidth: Bool
+    @Environment(\.textZoom) private var zoom
+    @Environment(\.lineSpacing) private var lineSpacing
+    @Environment(\.quietProse) private var quiet
+    @Environment(\.openURL) private var openURL
+    @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(\.messageMenu) private var messageMenu
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeUIView(context: Context) -> ProseUITextView {
+        // The designated init, which runs this class's own: `init(usingTextLayoutManager:)`
+        // does not, and left its bars unset. A text view with no container is TextKit 2.
+        let view = ProseUITextView(frame: .zero, textContainer: nil)
+        view.isEditable = false
+        view.isSelectable = true
+        view.isScrollEnabled = false
+        view.backgroundColor = .clear
+        view.textContainerInset = .zero
+        view.textContainer.lineFragmentPadding = 0
+        view.adjustsFontForContentSizeCategory = false
+        view.delegate = context.coordinator
+        view.tintColor = UIColor(Paper.accent)
+        view.linkTextAttributes = [.foregroundColor: UIColor(Paper.accent)]
+        view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        view.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        update(view, context: context)
+        return view
+    }
+
+    func updateUIView(_ view: ProseUITextView, context: Context) {
+        update(view, context: context)
+    }
+
+    private func update(_ view: ProseUITextView, context: Context) {
+        let coordinator = context.coordinator
+        coordinator.openURL = openURL
+        coordinator.menu = messageMenu
+        let style = ProseStyle(zoom: zoom, lineSpacing: lineSpacing, quiet: quiet, dynamicType: dynamicType)
+        let key = Coordinator.Key(blocks: blocks, style: style)
+        guard coordinator.key != key else { return }
+        coordinator.key = key
+        let text = ProseString.make(blocks, style: style)
+        view.attributedText = text
+        coordinator.measure(text)
+        view.setNeedsLayout()
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView view: ProseUITextView,
+                      context: Context) -> CGSize? {
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 10_000
+        let used = context.coordinator.size(at: width)
+        return CGSize(width: fillsWidth ? width : min(width, used.width), height: used.height)
+    }
+
+    /// Holds what the view was last given, and measures it apart from the view, so a
+    /// proposal SwiftUI only asks about does not change the width the view wraps at.
+    @MainActor
+    final class Coordinator: NSObject, UITextViewDelegate {
+        struct Key: Equatable {
+            let blocks: [MarkdownBlock]
+            let style: ProseStyle
+        }
+
+        var key: Key?
+        var openURL: OpenURLAction?
+        var menu: MessageMenu?
+        private let content = NSTextContentStorage()
+        private let manager = NSTextLayoutManager()
+        private let container = NSTextContainer(size: .zero)
+        private var sizes: [CGFloat: CGSize] = [:]
+
+        override init() {
+            super.init()
+            container.lineFragmentPadding = 0
+            manager.textContainer = container
+            content.addTextLayoutManager(manager)
+        }
+
+        func measure(_ text: NSAttributedString) {
+            content.attributedString = text
+            sizes = [:]
+        }
+
+        func size(at width: CGFloat) -> CGSize {
+            if let known = sizes[width] { return known }
+            container.size = CGSize(width: width, height: 0)
+            manager.ensureLayout(for: manager.documentRange)
+            let used = manager.usageBoundsForTextContainer
+            // Rounded up, and a point more across, so the words wrap at the width they
+            // were measured at when the view is given it.
+            let size = CGSize(width: ceil(used.width) + 1, height: ceil(used.height))
+            sizes[width] = size
+            return size
+        }
+
+        /// A link opens as the chat's other links do, through the scene's openURL (058).
+        func textView(_ textView: UITextView, primaryActionFor textItem: UITextItem,
+                      defaultAction: UIAction) -> UIAction? {
+            guard case .link(let url) = textItem.content, let openURL else { return defaultAction }
+            return UIAction { _ in openURL(url) }
+        }
+
+        /// The edit menu, with the message's own actions after Copy and Select All.
+        func textView(_ textView: UITextView, editMenuForTextIn range: NSRange,
+                      suggestedActions: [UIMenuElement]) -> UIMenu? {
+            ProseEditMenu.make(suggested: suggestedActions, menu: menu,
+                               selected: (textView.text as NSString?)?.substring(with: range))
+        }
+    }
+}
+
+/// The edit menu of a message's words: the system's, with the message's actions after its
+/// standard edit items (#5181).
+@MainActor
+enum ProseEditMenu {
+    static func make(suggested: [UIMenuElement], menu: MessageMenu?, selected: String?) -> UIMenu {
+        guard let menu else { return UIMenu(children: suggested) }
+        var own: [UIMenuElement] = [UIAction(title: "Copy Message") { _ in menu.copy() }]
+        if let quote = menu.quote {
+            // The words selected, as the Mac quotes them (#1553); the message when none are.
+            let words = selected.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+            own.append(UIAction(title: "Quote in Prompt") { _ in quote(words ?? menu.text) })
+        }
+        if let branch = menu.branch {
+            own.append(UIAction(title: "Branch from Here") { _ in branch() })
+        } else if menu.branchGreyed {
+            own.append(UIAction(title: "Branch from Here", attributes: .disabled) { _ in })
+        }
+        let mine = UIMenu(options: .displayInline, children: own)
+        var children = suggested
+        let edit = children.firstIndex { ($0 as? UIMenu)?.identifier == .standardEdit }
+        children.insert(mine, at: edit.map { $0 + 1 } ?? min(1, children.count))
+        return UIMenu(children: children)
+    }
+}
+
+/// The read-only text view. One selection in the chat at a time: a text view that lets go
+/// of the focus (a press in another message, the prompt) lets go of its words too.
+final class ProseUITextView: UITextView {
+    private var bars: [CALayer] = []
+
+    override init(frame: CGRect, textContainer: NSTextContainer?) {
+        super.init(frame: frame, textContainer: textContainer)
+        // The bars' ink is resolved for light or dark, so it is set again on a change.
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: ProseUITextView, _) in
+            view.setNeedsLayout()
+        }
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("not from a coder") }
+
+    override func resignFirstResponder() -> Bool {
+        let resigned = super.resignFirstResponder()
+        if resigned { selectedRange = NSRange(location: 0, length: 0) }
+        return resigned
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        placeQuoteBars()
+    }
+
+    /// A quote's bar, at the left of its lines, as the `Text` blocks drew it.
+    private func placeQuoteBars() {
+        var frames: [CGRect] = []
+        if let manager = textLayoutManager, let content = manager.textContentManager, textStorage.length > 0 {
+            let origin = CGPoint(x: textContainerInset.left, y: textContainerInset.top)
+            textStorage.enumerateAttribute(.proseQuoteBars, in: NSRange(location: 0, length: textStorage.length)) { value, range, _ in
+                guard let xs = value as? [CGFloat], !xs.isEmpty,
+                      let start = content.location(content.documentRange.location, offsetBy: range.location),
+                      let end = content.location(start, offsetBy: range.length),
+                      let textRange = NSTextRange(location: start, end: end) else { return }
+                manager.ensureLayout(for: textRange)
+                var span = CGRect.null
+                manager.enumerateTextSegments(in: textRange, type: .standard, options: []) { _, frame, _, _ in
+                    if frame.width > 0 { span = span.union(frame) }
+                    return true
+                }
+                guard !span.isNull else { return }
+                for x in xs {
+                    frames.append(CGRect(x: origin.x + x, y: origin.y + span.minY, width: 2, height: span.height))
+                }
+            }
+        }
+        while bars.count < frames.count {
+            let bar = CALayer()
+            layer.insertSublayer(bar, at: 0)
+            bars.append(bar)
+        }
+        let ink = UIColor.quaternaryLabel.resolvedColor(with: traitCollection).cgColor
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for (index, bar) in bars.enumerated() {
+            bar.isHidden = index >= frames.count
+            if index < frames.count {
+                bar.frame = frames[index]
+                bar.backgroundColor = ink
+            }
+        }
+        CATransaction.commit()
     }
 }
 #endif

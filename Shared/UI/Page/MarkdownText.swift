@@ -34,9 +34,7 @@ struct MarkdownText: View {
     /// A page's zoom (#1419), which headings take as the steps do.
     @Environment(\.textZoom) private var zoom
     @Environment(\.dynamicTypeSize) private var dynamicType
-    #if os(macOS)
     @Environment(\.selectsAcrossBlocks) private var selectsAcross
-    #endif
     let markdown: String
     /// The document's own location, when there is one, so a relative image can be
     /// found. Nil in the conversation, where there is no document to be relative to —
@@ -103,7 +101,6 @@ struct MarkdownText: View {
     @ViewBuilder
     private func stack(_ blocks: [MarkdownBlock], caret: CursorFlag?, top: Bool) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            #if os(macOS)
             if selectsAcross, top, caret == nil {
                 // The words between code, tables and pictures as one text, so a drag
                 // selects across paragraphs (#5155).
@@ -118,9 +115,6 @@ struct MarkdownText: View {
             } else {
                 each(blocks, caret: caret)
             }
-            #else
-            each(blocks, caret: caret)
-            #endif
         }
         .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
     }

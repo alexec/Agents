@@ -1237,6 +1237,12 @@ struct CopiesMessage: ViewModifier {
             // On a host too old to branch, greyed and saying why (#1866).
             let greyedBranch = prompt != nil && branch == nil && actions.branchNeedsUpdate
             content
+                #if os(iOS)
+                // A long press on the words is the text view's, so its edit menu has these
+                // too (#5181).
+                .environment(\.messageMenu, MessageMenu(text: text, copy: { Self.copy(text) }, quote: quote,
+                                                         branch: branch, branchGreyed: greyedBranch))
+                #endif
                 .contextMenu {
                     Button("Copy Message") { Self.copy(text) }
                     if let quote {
@@ -1271,10 +1277,26 @@ struct CopiesMessage: ViewModifier {
     }
 }
 
+/// A message's actions, for the text view that draws its words on the phone (#5181): a long
+/// press there is the text view's, so its edit menu carries them, beside Copy.
+struct MessageMenu {
+    let text: String
+    let copy: () -> Void
+    let quote: ((String) -> Void)?
+    let branch: (() -> Void)?
+    /// Branch from Here, greyed: the host is too old to branch (#1866).
+    let branchGreyed: Bool
+}
+
+extension EnvironmentValues {
+    @Entry var messageMenu: MessageMenu? = nil
+}
+
 /// The words selected in a reply, for Quote in Prompt (#1553). Selectable text tells no one
 /// its selection, but it answers Copy: so it is asked to copy, and the pasteboard is put back
-/// as it was. The prompt bar's own words are not a reply's. The Remote has no such way, and
-/// quotes the whole message.
+/// as it was. The prompt bar's own words are not a reply's. On the Remote, the
+/// message's menu quotes the whole message; its words' edit menu quotes the words selected
+/// (`ProseEditMenu`, #5181).
 enum ChatSelection {
     @MainActor static func text() -> String? {
         #if os(macOS)
