@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="560" viewBox="0 0 1240 560" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+<defs><filter id="shadow" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.18"/></filter><pattern id="queue" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#E3E6EA"/><rect width="2.4" height="6" fill="#9AA1AB"/></pattern></defs>
+<rect width="1240" height="560" fill="#E7EAEE"/>
+<text x="24.0" y="34.0" font-size="15" fill="#1C1D20" font-weight="600">4 · Empty states, a forge with no CI data, and the way in from Planning</text>
+<text x="24.0" y="54.0" font-size="12" fill="#5B616B" >The repositories on these cards are scratch. The Delivery row's first card is today's (#4555); the link under it is new.</text>
+<rect x="24.0" y="90.0" width="287.5" height="210.0" rx="8" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+<text x="36.0" y="112.0" font-size="11" fill="#5B616B" font-weight="600">Loading</text>
+<text x="36.0" y="140.0" font-size="12" fill="#5B616B" >Loading…</text>
+<circle cx="299.5" cy="102.0" r="9" fill="#B35900"/>
+<text x="299.5" y="106.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">1</text>
+<rect x="325.5" y="90.0" width="287.5" height="210.0" rx="8" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+<text x="337.5" y="112.0" font-size="11" fill="#5B616B" font-weight="600">No runs in the range</text>
+<text x="337.5" y="140.0" font-size="10" fill="#5B616B" font-weight="600">TIME TO GREEN · MEDIAN</text>
+<text x="337.5" y="166.0" font-size="22" fill="#1C1D20" font-weight="600">–</text>
+<text x="337.5" y="194.0" font-size="12" fill="#5B616B" >No ci runs on main finished in</text>
+<text x="337.5" y="210.0" font-size="12" fill="#5B616B" >the last 7 days.</text>
+<text x="337.5" y="226.0" font-size="12" fill="#5B616B" ></text>
+<text x="337.5" y="242.0" font-size="12" fill="#5B616B" >Try a longer range, or Branch ▸</text>
+<text x="337.5" y="258.0" font-size="12" fill="#5B616B" >Pull requests.</text>
+<circle cx="601.0" cy="102.0" r="9" fill="#B35900"/>
+<text x="601.0" y="106.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">2</text>
+<rect x="627.0" y="90.0" width="287.5" height="210.0" rx="8" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+<text x="639.0" y="112.0" font-size="11" fill="#5B616B" font-weight="600">No CI data from the forge</text>
+<text x="639.0" y="140.0" font-size="10" fill="#5B616B" font-weight="600">TIME TO GREEN · MEDIAN</text>
+<text x="639.0" y="166.0" font-size="22" fill="#1C1D20" font-weight="600">–</text>
+<text x="639.0" y="194.0" font-size="12" fill="#5B616B" >alexec/agents-walk has no GitHub</text>
+<text x="639.0" y="210.0" font-size="12" fill="#5B616B" >Actions runs. Builds</text>
+<text x="639.0" y="226.0" font-size="12" fill="#5B616B" >come from the forge's CI runs.</text>
+<circle cx="902.5" cy="102.0" r="9" fill="#B35900"/>
+<text x="902.5" y="106.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">3</text>
+<rect x="928.5" y="90.0" width="287.5" height="210.0" rx="8" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+<text x="940.5" y="112.0" font-size="11" fill="#5B616B" font-weight="600">A forge Agents does not read CI from</text>
+<text x="940.5" y="140.0" font-size="10" fill="#5B616B" font-weight="600">TIME TO GREEN · MEDIAN</text>
+<text x="940.5" y="166.0" font-size="22" fill="#1C1D20" font-weight="600">–</text>
+<text x="940.5" y="194.0" font-size="12" fill="#5B616B" >Forgejo: Agents does not read</text>
+<text x="940.5" y="210.0" font-size="12" fill="#5B616B" >its CI runs yet, so there is</text>
+<text x="940.5" y="226.0" font-size="12" fill="#5B616B" >nothing to draw for</text>
+<text x="940.5" y="242.0" font-size="12" fill="#5B616B" >codeberg.org/scratch/app.</text>
+<circle cx="1204.0" cy="102.0" r="9" fill="#B35900"/>
+<text x="1204.0" y="106.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">4</text>
+<text x="24.0" y="340.0" font-size="13" fill="#1C1D20" font-weight="600">Reports ▸ Planning, the Delivery row (#4555), with the way in</text>
+<rect x="24.0" y="354.0" width="760.0" height="150.0" rx="8" fill="#F7F8F9" stroke="#DDE1E6" stroke-width="1"/>
+<text x="40.0" y="380.0" font-size="15" fill="#1C1D20" font-weight="700">Delivery</text>
+<rect x="40.0" y="394.0" width="170.0" height="76.0" rx="6" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="50.0" y="412.0" font-size="10" fill="#5B616B" font-weight="600">CI TIME TO GREEN</text>
+<text x="50.0" y="438.0" font-size="18" fill="#1C1D20" font-weight="600">14.2 min</text>
+<text x="50.0" y="460.0" font-size="12" fill="#0A6CDB" font-weight="600">Build trends ›</text>
+<rect x="222.0" y="394.0" width="170.0" height="76.0" rx="6" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="232.0" y="412.0" font-size="10" fill="#5B616B" font-weight="600">DEPLOYMENT FREQUENCY</text>
+<text x="232.0" y="438.0" font-size="18" fill="#1C1D20" font-weight="600">5.1 a week</text>
+<rect x="404.0" y="394.0" width="170.0" height="76.0" rx="6" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="414.0" y="412.0" font-size="10" fill="#5B616B" font-weight="600">LEAD TIME</text>
+<text x="414.0" y="438.0" font-size="18" fill="#1C1D20" font-weight="600">…</text>
+<rect x="586.0" y="394.0" width="170.0" height="76.0" rx="6" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="596.0" y="412.0" font-size="10" fill="#5B616B" font-weight="600">CHANGE FAILURE RATE</text>
+<text x="596.0" y="438.0" font-size="18" fill="#1C1D20" font-weight="600">…</text>
+<circle cx="202.0" cy="456.0" r="9" fill="#B35900"/>
+<text x="202.0" y="460.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">5</text>
+<text x="40.0" y="492.0" font-size="11" fill="#5B616B" >The link names the repository and the range: #/reports/value/builds?repo=github:alexec/agents&amp;range=month.</text>
+<text x="820.0" y="380.0" font-size="12" fill="#5B616B" >With no CI data in any repository of the scope,</text>
+<text x="820.0" y="396.0" font-size="12" fill="#5B616B" >the card says so and the link still opens the page</text>
+<text x="820.0" y="412.0" font-size="12" fill="#5B616B" >(card 3 says why there is nothing).</text>
+<text x="24.0" y="540.0" font-size="12" fill="#5B616B" font-weight="600">Loading is the Reports pages' own Loading…; an error is their hint line. No toast, no modal.</text>
+</svg>
