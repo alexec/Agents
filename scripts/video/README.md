@@ -18,17 +18,19 @@ of any group (below).
 
 ## What it does
 
-1. **Voice** (`voice.py`): each line of the scene is said by Kokoro's built-in voice
-   **Heart** (Apache-2.0, through `mlx-audio`; Alex, 2026-11-12, #4964), from a directed
-   script: a line is plain words, or a small part of SSML, the standard markup for a
-   synthetic voice: `<break time="500ms"/>` a pause, `<prosody rate="90%">` slower,
-   `<emphasis>` a stressed word, and a tone (`style="calm|warm|bright"` on `<speak>`). Kokoro
-   has no stress or tone, so those marks change only the pace; they stay in the script for
-   the person who reads it. Each phrase between pauses is said on its own, the pauses are
-   silence, and the scene waits 0.9 s after each line. Whisper (`mlx-whisper`) hears each
-   line, and a line with more than one word in ten wrong stops the take. The phrases are
-   kept in `~/.cache/agents-video/voice`, so a phrase that has not changed is not said again.
-   `python3 scripts/video/voice.py` tests the markup.
+1. **Voice** (`voice.py`): each line of the scene is said by Qwen3-TTS CustomVoice 1.7B's
+   built-in speaker **Aiden** (Apache-2.0, through `mlx-audio`; Alex, 2026-11-12, #5062,
+   #5079), from a directed script: a line is plain words, or a small part of SSML, the
+   standard markup for a synthetic voice: `<break time="500ms"/>` a pause,
+   `<prosody rate="90%">` slower, `<emphasis>` a stressed word, and a tone
+   (`style="calm|warm|bright"` on `<speak>`). Each phrase between pauses is said on its own,
+   with an instruction made from its marks: the tone ("Warm and welcoming…"), "a little
+   slower" for a slow rate, and "Stress the words 'New Session'". The pauses are silence, and
+   the scene waits 0.9 s after each line. The model samples, so Whisper (`mlx-whisper`) hears
+   each phrase, and one it does not hear is said again with a new seed, at most 3 times, then
+   the take stops. Whisper then hears each line, and a line with more than one word in ten
+   wrong stops the take. The phrases are kept in `~/.cache/agents-video/voice`, so a phrase
+   that has not changed is not said again. `python3 scripts/video/voice.py` tests the markup.
 2. **Recording** (`make.py`): run-app launches a scratch set-up on `/tmp/run-vid-<id>`,
    never the live app, with the window opened from outside the checkout so that its
    title names no worktree. The window is recorded through its **walk socket** (#1172):
@@ -216,8 +218,9 @@ run-app skill's "A silent clip" says when and how to put it on a PR.
 ## What it needs
 
 - `ffmpeg` (Homebrew), `uv`, Node and Chrome. The first run makes
-  `~/.cache/agents-video/venv` with mlx-audio (Kokoro), misaki, spaCy's small English
-  model and mlx-whisper.
+  `~/.cache/agents-video/venv` with mlx-audio and mlx-whisper, and fetches the voice's
+  weights (`mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-bf16`, about 4 GB) into the
+  Hugging Face cache, once. `--preflight` prints a `note:` when they are not there yet.
 - Apple's iPhone 17 Pro bezel (Silver, portrait) from
   [Apple Design Resources](https://developer.apple.com/design/resources/), in
   `~/.agents/video/assets/`. Its licence lets it be shown in our videos but not given

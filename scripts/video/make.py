@@ -821,7 +821,8 @@ def preflight(scene_ids):
     YouTube refresh token works and is the Loops channel's, the scene's GROUP has a playlist, and the
     scene's video Chrome profile is signed in to its site. Each failure adds one line to
     Alex's checklist on #1793 (once) and fails that scene. Prints `ready <id>` or
-    `skip <id>: <why>` per scene; exits 3 when any is skipped."""
+    `skip <id>: <why>` per scene; exits 3 when any is skipped. It also prints a `note:` when
+    the voice's weights are not in the cache, which skips nothing: make.sh fetches them."""
     import upload
     youtube = None
     try:
@@ -830,6 +831,9 @@ def preflight(scene_ids):
         youtube = str(why)
     except Exception as error:
         youtube = f"the YouTube refresh token does not work ({error})"
+    weights = voice.missing()
+    if weights:  # it needs no hands, so it skips no scene: the take fetches them (#5079)
+        print(f"note: {weights}", flush=True)
     skipped = 0
     for scene_id in scene_ids:
         scene = load_scene(scene_id)
