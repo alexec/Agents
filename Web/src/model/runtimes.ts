@@ -7,6 +7,7 @@ import { fromWireDate } from "../protocol/dates";
 import { fromOrganisation, noPlanLimit, requires, routeMissing, routeRemoved } from "./orgAccounts";
 import { hasTurnInFlight } from "./promptWords";
 import { autoID } from "./levels";
+import { switchTime } from "./switchNote";
 
 export function byName(a: { name: string; id: string }, b: { name: string; id: string }): number {
   return a.name.localeCompare(b.name, undefined, { sensitivity: "base", numeric: true })
@@ -106,33 +107,68 @@ export function runtimeTally(runtimes: readonly RuntimeStatus[],
   const installed = runtimes.filter((r) => "available" in r.availability || "needsSignIn" in r.availability || "failed" in r.availability);
   const low = installed.filter((r) => "available" in r.availability).flatMap((r): LowAllowance[] => {
     const allowances = allowancesOf(r.runtime.id);
-    const reading = allowances && ownRow(allowances.rows, r.runtime.id)?.state.reading;
-    if (!allowances || !reading) return [];
-    if (reading.resetsAt !== undefined && fromWireDate(reading.resetsAt).getTime() <= fromWireDate(allowances.at).getTime()) return [];
-    const used = reading.spent ? 1 : reading.used;
-    if (used !== undefined) return used >= lowUsed ? [{ runtimeID: r.runtime.id, left: 1 - used }] : [];
-    return reading.nearlySpent ? [{ runtimeID: r.runtime.id }] : [];
+    const state = allowances && ownRow(allowances.rows, r.runtime.id)?.state;
+    if (!allowances || !state) return [];
+    const at = fromWireDate(allowances.at);
+    const reading = state.reading;
+    if (reading && (reading.resetsAt === undefined || fromWireDate(reading.resetsAt).getTime() > at.getTime())) {
+      const used = reading.spent ? 1 : reading.used;
+      if (used !== undefined && used >= lowUsed) return [{ runtimeID: r.runtime.id, left: 1 - used }];
+      if (used === undefined && reading.nearlySpent) return [{ runtimeID: r.runtime.id }];
+    }
+    // On course to run out before the week resets (#5000): less than 10% left wins.
+    const pace = allowancePace(state, at);
+    const week = pace?.current;
+    if (!pace?.onCourseToRunOut || !week) return [];
+    const used = week.spent ? 1 : week.used!;
+    if (used >= lowUsed) return [{ runtimeID: r.runtime.id, left: 1 - used }];
+    return [{ runtimeID: r.runtime.id, left: 1 - used, ...(pace.runsOutAt ? { runsOutAt: pace.runsOutAt } : {}),
+      resetsAt: fromWireDate(week.resetsAt!) }];
   });
   return { working: installed.filter((r) => "available" in r.availability && !r.isOut).length, total: installed.length, low };
 }
 
 export interface RuntimeTally { working: number; total: number; low: LowAllowance[] }
 
-/** One runtime with little allowance left: `left` from 0 to 1, none when it said nearly used up and no amount. */
-export interface LowAllowance { runtimeID: string; left?: number }
+/**
+ * One runtime with little allowance left: `left` from 0 to 1, none when it said nearly used up and no amount.
+ * `runsOutAt` and `resetsAt` when the week is on course to run out before it resets (#5000).
+ */
+export interface LowAllowance { runtimeID: string; left?: number; runsOutAt?: Date; resetsAt?: Date }
 
 /** Used from here on is low: less than 10% left (Alex, #3956), not the Runtimes bar's 80%. RuntimeTally.lowUsed. */
 export const lowUsed = 0.9;
 
 /**
  * The grey line under Status ▸ Runtimes (#3956), RuntimeTally.lowWords: `Claude: 8% left`, `Claude: nearly used up`,
- * or for two or more `Claude, Codex: low allowance`. Undefined when nothing is low, or none work: then the red wins.
+ * `Claude: runs out Fri at this pace` (#5000), or for two or more `Claude, Codex: low allowance`. Undefined when nothing is low, or none work: then the red wins.
  */
-export function lowWords(tally: RuntimeTally | undefined): string | undefined {
+export function lowWords(tally: RuntimeTally | undefined, now: Date = new Date()): string | undefined {
   const one = tally?.low[0];
   if (!tally || tally.working === 0 || !one) return undefined;
   if (tally.low.length > 1) return `${tally.low.map((l) => runtimeName(l.runtimeID)).join(", ")}: low allowance`;
+  if (one.runsOutAt) return `${runtimeName(one.runtimeID)}: runs out ${runsOutWords(one.runsOutAt, now)} at this pace`;
   return one.left === undefined ? `${runtimeName(one.runtimeID)}: nearly used up` : `${runtimeName(one.runtimeID)}: ${Math.round(one.left * 100)}% left`;
+}
+
+/**
+ * The title's and a screen reader's words (#5000), RuntimeTally.lowDetail: for one on course to run out, with the
+ * reset, `Claude runs out Fri at this pace; it resets Sun 09:00. 55% left.`; else the grey line.
+ */
+export function lowDetail(tally: RuntimeTally | undefined, now: Date = new Date()): string | undefined {
+  const one = tally?.low[0];
+  if (!tally || tally.working === 0 || tally.low.length !== 1 || !one?.runsOutAt) return lowWords(tally, now);
+  let words = `${runtimeName(one.runtimeID)} runs out ${runsOutWords(one.runsOutAt, now)} at this pace`;
+  if (one.resetsAt) words += `; it resets ${switchTime(one.resetsAt, now)}`;
+  words += ".";
+  if (one.left !== undefined) words += ` ${Math.round(one.left * 100)}% left.`;
+  return words;
+}
+
+/** When a week runs out at its pace (#5000), PoolWords.runsOut: the day, "Fri", or the time, "15:00", under a day away. */
+export function runsOutWords(date: Date, now: Date): string {
+  if (date.getTime() - now.getTime() < 86_400_000) return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleDateString([], { weekday: "short" });
 }
 
 /** The name the account picker gives a runtime's own sign-in (#840, #999), AccountProfile.defaultName. */
@@ -449,7 +485,8 @@ const week = 7 * 86400;
  * Grok's `weekly` window first, then the newest window kept. Null when it kept no week.
  */
 export function allowancePace(state: AllowanceState | undefined, now: Date):
-  { current?: AllowanceReading; past: AllowanceReading[]; evenLeft?: number; verdict?: "faster" | "even" | "slower" } | null {
+  { current?: AllowanceReading; past: AllowanceReading[]; evenLeft?: number; verdict?: "faster" | "even" | "slower";
+    runsOutAt?: Date; onCourseToRunOut?: boolean } | null {
   const weeks = state?.weeks ?? [];
   const windows = weeks.map((w) => w.window).filter((w): w is string => !!w);
   const window = ["seven_day", "weekly"].find((w) => windows.includes(w)) ?? windows[windows.length - 1];
@@ -463,8 +500,21 @@ export function allowancePace(state: AllowanceState | undefined, now: Date):
   const evenLeft = Math.min(Math.max((current.resetsAt! - current.at) / week, 0), 1);
   const left = current.spent ? 0 : 1 - current.used!;
   const verdict = left < evenLeft - 0.05 ? "faster" : left > evenLeft + 0.05 ? "slower" : "even";
-  return { current, past, evenLeft, verdict };
+  // On course to run out before it resets (#5000), as AllowancePace.runsOutAt and onCourseToRunOut: at this pace
+  // all used at least 12 hours before the reset, with a day gone and 10% used.
+  const used = 1 - left;
+  const elapsed = current.at - (current.resetsAt! - week);
+  if (used <= 0 || elapsed <= 0) return { current, past, evenLeft, verdict, onCourseToRunOut: false };
+  const runsOutAt = new Date(fromWireDate(current.at).getTime() + (1 - used) * elapsed / used * 1000);
+  const onCourseToRunOut = elapsed >= paceStart && used >= paceUsed
+    && runsOutAt.getTime() <= fromWireDate(current.resetsAt!).getTime() - paceMargin * 1000;
+  return { current, past, evenLeft, verdict, runsOutAt, onCourseToRunOut };
 }
+
+/** AllowancePace.paceStart, paceUsed and paceMargin (#5000): a day gone, 10% used, 12 hours before the reset. */
+const paceStart = 86400;
+const paceUsed = 0.1;
+const paceMargin = 12 * 3600;
 
 const percent = (fraction: number) => `${Math.round(fraction * 100)}%`;
 
@@ -495,6 +545,7 @@ export function allowancePaceLine(state: AllowanceState | undefined, now: Date):
   if (!sameWeek) parts.push(left <= 0 ? "None left this week" : `${percent(left)} left this week`);
   parts.push(toGo((fromWireDate(current.resetsAt!).getTime() - now.getTime()) / 1000));
   parts.push(pace.verdict === "even" ? "on an even pace" : `used ${pace.verdict} than an even pace (${percent(pace.evenLeft)} left)`);
+  if (pace.onCourseToRunOut && pace.runsOutAt) parts.push(`runs out ${runsOutWords(pace.runsOutAt, now)} at this pace`);
   return parts.join(" · ");
 }
 

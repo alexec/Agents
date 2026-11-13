@@ -40,6 +40,36 @@ public struct AllowancePace: Hashable, Sendable {
         if left > even + 0.05 { return .slower }
         return .even
     }
+
+    /// When the current week gets to all used if it goes on at its pace so far (#5000):
+    /// the person is taken to use it evenly. Nil with no amount, none used yet, or when
+    /// the week has not started at its reading.
+    public var runsOutAt: Date? {
+        guard let current, let used = current.usedFraction, used > 0, let resetsAt = current.resetsAt else { return nil }
+        let elapsed = current.at.timeIntervalSince(resetsAt.addingTimeInterval(-Self.week))
+        guard elapsed > 0 else { return nil }
+        return current.at.addingTimeInterval((1 - used) * elapsed / used)
+    }
+
+    /// On course to run out before the week resets (#5000): at this pace it is all used at
+    /// least 12 hours before the reset, and at least a day of the week has gone and 10% is
+    /// used, so one heavy first morning does not warn. `current` is a reading that has not
+    /// reset yet.
+    public var onCourseToRunOut: Bool {
+        guard let current, let used = current.usedFraction, let resetsAt = current.resetsAt,
+              let runsOutAt else { return false }
+        let elapsed = current.at.timeIntervalSince(resetsAt.addingTimeInterval(-Self.week))
+        return elapsed >= Self.paceStart && used >= Self.paceUsed
+            && runsOutAt <= resetsAt.addingTimeInterval(-Self.paceMargin)
+    }
+
+    /// How much of the week must have gone before the pace can warn (#5000).
+    public static let paceStart: TimeInterval = 86400
+    /// How much must be used before the pace can warn (#5000).
+    public static let paceUsed = 0.1
+    /// How long before the reset it must run out at this pace to warn (#5000), so that a
+    /// week on course for 101% does not.
+    public static let paceMargin: TimeInterval = 12 * 3600
 }
 
 extension PoolWords {
@@ -63,7 +93,17 @@ extension PoolWords {
         case .slower: parts.append("used slower than an even pace (\(percent(even)) left)")
         case .even: parts.append("on an even pace")
         }
+        if pace.onCourseToRunOut, let runsOutAt = pace.runsOutAt {
+            parts.append("runs out \(runsOut(runsOutAt, now: now)) at this pace")
+        }
         return parts.joined(separator: " · ")
+    }
+
+    /// When a week runs out at its pace (#5000): the day, "Fri", or the time, "15:00",
+    /// when that is under a day away.
+    public static func runsOut(_ date: Date, now: Date) -> String {
+        if date.timeIntervalSince(now) < 86400 { return date.formatted(date: .omitted, time: .shortened) }
+        return date.formatted(.dateTime.weekday(.abbreviated))
     }
 
     /// The past weeks in words, for VoiceOver and the chart's label: "Past weeks: 62%,
