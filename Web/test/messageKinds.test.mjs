@@ -11,11 +11,11 @@ const m = await load("src/model/messageKinds.ts");
 
 test("a failure is an alert to a screen reader; the other tones are a status", () => {
   assert.equal(m.toneRole("failure"), "alert");
-  for (const tone of ["neutral", "attention", "success"]) assert.equal(m.toneRole(tone), "status");
+  for (const tone of ["neutral", "attention", "warning", "success"]) assert.equal(m.toneRole(tone), "status");
 });
 
 test("each tone has its own icon, so it is never colour alone", () => {
-  assert.equal(new Set(Object.values(m.toneGlyph)).size, 4);
+  assert.equal(new Set(Object.values(m.toneGlyph)).size, 5);
 });
 
 test("a success goes after 4 s, one with Undo after 8 s, a failure stays", () => {

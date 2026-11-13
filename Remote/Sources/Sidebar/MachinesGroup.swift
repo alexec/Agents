@@ -15,7 +15,7 @@ struct NewMachineRow: View {
             if let chosen = providers.first(where: { $0.default == true }) ?? providers.first {
                 Button { model.newMachine() } label: {
                     HStack(spacing: 8) {
-                        Image(systemName: "plus")
+                        Image(icon: "plus")
                             .sidebarMark(Paper.accent)
                             .frame(width: 20)
                             .accessibilityHidden(true)
@@ -28,12 +28,12 @@ struct NewMachineRow: View {
                 .appText(.supporting)
                 .accessibilityHint("Opens New Machine on \(chosen.name), with the options used last")
                 .contextMenu {
-                    Button("New Machine (\(chosen.name))…", systemImage: "plus") { model.newMachine() }
+                    Button("New Machine (\(chosen.name))…", icon: "plus") { model.newMachine() }
                     if providers.count > 1 {
                         Menu("New Machine on") {
                             ForEach(providers) { provider in
                                 if provider.id == chosen.id {
-                                    Button(provider.name, systemImage: "checkmark") { model.newMachine(on: provider.id) }
+                                    Button(provider.name, icon: "checkmark") { model.newMachine(on: provider.id) }
                                 } else {
                                     Button(provider.name) { model.newMachine(on: provider.id) }
                                 }
@@ -89,32 +89,32 @@ struct RemoteMachineRow: View {
         .accessibilityHint("Opens \(name)’s page: its CPU, memory, disks and runtimes")
         .swipeActions(edge: .leading) {
             if actions.start {
-                Button("Start", systemImage: "play") { Task { await model.startHost(host) } }.tint(Paper.accent)
+                Button("Start", icon: "play") { Task { await model.startHost(host) } }.tint(Paper.accent)
             } else if actions.stop {
-                Button("Stop", systemImage: "stop") { Task { await stop() } }.tint(Paper.accent)
+                Button("Stop", icon: "stop") { Task { await stop() } }.tint(Paper.accent)
             }
         }
         // A full swipe never deletes: Delete and Remove ask first.
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if actions.delete {
-                Button("Delete", systemImage: "trash") { askDelete() }.tint(StateTint.failure.color)
+                Button("Delete", icon: "trash") { askDelete() }.tint(StateTint.failure.color)
             } else if actions.remove {
-                Button("Remove", systemImage: "minus.circle") { removing = true }.tint(.gray)
+                Button("Remove", icon: "minus.circle") { removing = true }.tint(.gray)
             }
         }
         .contextMenu {
-            Button("Open", systemImage: "arrow.up.forward.app") { model.sidebarItem = .machine(host) }
+            Button("Open", icon: "arrow.up.forward.app") { model.sidebarItem = .machine(host) }
             if actions.start {
-                Button("Start", systemImage: "play") { Task { await model.startHost(host) } }
+                Button("Start", icon: "play") { Task { await model.startHost(host) } }
             } else if actions.stop {
-                Button("Stop", systemImage: "stop") { Task { await stop() } }
+                Button("Stop", icon: "stop") { Task { await stop() } }
             }
             if actions.delete {
                 Divider()
-                Button("Delete \(name)…", systemImage: "trash", role: .destructive) { askDelete() }
+                Button("Delete \(name)…", icon: "trash", role: .destructive) { askDelete() }
             } else if actions.remove {
                 Divider()
-                Button("Remove \(name)…", systemImage: "minus.circle") { removing = true }
+                Button("Remove \(name)…", icon: "minus.circle") { removing = true }
             }
         }
         .confirmationDialog("Delete \(name)?", isPresented: $deleting, titleVisibility: .visible) {
@@ -207,21 +207,21 @@ struct RemoteMakingMachineRow: View {
         // A swipe to the right joins it, as a tap does.
         .swipeActions(edge: .leading) {
             if hint != nil {
-                Button(failed ? "Join Again" : "Join", systemImage: "arrow.right.circle") { join(trust: nil) }.tint(Paper.accent)
+                Button(failed ? "Join Again" : "Join", icon: "arrow.right.circle") { join(trust: nil) }.tint(Paper.accent)
             }
         }
         // A full swipe never deletes: Delete asks first.
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             if canDelete {
-                Button("Delete", systemImage: "trash") { deleting = true }.tint(StateTint.failure.color)
+                Button("Delete", icon: "trash") { deleting = true }.tint(StateTint.failure.color)
             }
         }
         .contextMenu {
             if hint != nil {
-                Button(failed ? "Join \(name) Again" : "Join \(name)", systemImage: "arrow.right.circle") { join(trust: nil) }
+                Button(failed ? "Join \(name) Again" : "Join \(name)", icon: "arrow.right.circle") { join(trust: nil) }
             }
             if canDelete {
-                Button("Delete \(name)…", systemImage: "trash", role: .destructive) { deleting = true }
+                Button("Delete \(name)…", icon: "trash", role: .destructive) { deleting = true }
             }
         }
         .confirmationDialog("Trust \(name)’s host key?",

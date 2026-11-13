@@ -67,6 +67,7 @@ import { composerReason } from "../model/orgPolicy";
 import { autoHeader, cellOf } from "../model/levels";
 import { PageTitle, chatCrumbs } from "./TopBar";
 import { startLineWords } from "../model/capacity";
+import { Icon } from "./Icon";
 
 /** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
 interface HeldTurn {
@@ -702,7 +703,7 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       {/* As JumpToEnd: one arrow to the end, shown whenever the reader is away from it (#1515). */}
       {away.value && (
         <button class="jump" onClick={toEnd} title="Go to the end" aria-label="Go to the end of the conversation">
-          <span aria-hidden="true">↓</span>
+          <Icon name="arrow-down" />
         </button>
       )}
       <footer class="foot">
@@ -896,7 +897,7 @@ function LeaseLine({ store, host, agent }: { store: Store; host: string; agent: 
       {(leases?.lines ?? []).map((text) => (
         <button key={text} class="link" title={leases?.full}
           onClick={() => { resourcesAsked.value = true; location.hash = routeHash({ nav: "machines", section: `machine-${host}` }); }}>
-          <span class="words">{text}</span><span class="chevron" aria-hidden="true">›</span>
+          <span class="words">{text}</span><Icon name="chevron-right" class="chevron" />
         </button>
       ))}
     </div>

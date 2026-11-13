@@ -6273,6 +6273,31 @@
       }
     },
     {
+      "name": "messages/markAllRead",
+      "x-capability": "messages.mark-read/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/MessagesMarkAllReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/MessagesMarkedAllRead"
+        }
+      }
+    },
+    {
       "name": "messages/read",
       "x-capability": "messages/1",
       "tags": [
@@ -8818,6 +8843,32 @@
         "name": "result",
         "schema": {
           "$ref": "daemon.schema.json#/definitions/SecretGrants"
+        }
+      }
+    },
+    {
+      "name": "secrets/localList",
+      "x-capability": "host.local-secrets/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Settings ▸ You ▸ Secrets ▸ On This Machine (#5122): every secret this machine keeps for itself, which an agent saved (ask_secret, capture_secret, generate_secret) or a connector's form set, by name. Not the person's (user/secretNames) and not a session's own (secrets/sessionList). No value. The person's own clients only (the control and device roles).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/LocalSecrets"
         }
       }
     },

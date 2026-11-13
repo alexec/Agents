@@ -157,7 +157,7 @@ struct ShellScreen: View {
     /// printed is still readable, and a new shell is one tap away (FR-022).
     private func ended(_ client: ShellClient) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.circle")
+            Image(icon: "exclamationmark.circle")
                 .foregroundStyle(Paper.secondary)
                 .accessibilityHidden(true)
             Text(client.state.explanation ?? "The shell is no longer running.")
@@ -347,7 +347,7 @@ private struct Trouble: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle")
+            Image(icon: "exclamationmark.triangle")
                 .appText(.title)
                 .foregroundStyle(Paper.tertiary)
                 .accessibilityHidden(true)

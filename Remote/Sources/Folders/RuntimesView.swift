@@ -208,24 +208,3 @@ private struct RuntimeAllowanceRow: View {
         .accessibilityElement(children: .combine)
     }
 }
-
-/// The link to it at the foot of Spending, with the Mac's red dot when a runtime is out.
-struct RuntimesLink: View {
-    @Environment(RemoteModel.self) private var model
-
-    var body: some View {
-        NavigationLink { RuntimesView() } label: {
-            HStack {
-                Label("Runtimes", systemImage: "cpu")
-                Spacer()
-                if model.runtimeAllowances?.anyOut == true {
-                    Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 8, height: 8)
-                        .accessibilityLabel("A runtime is out")
-                }
-                Image(systemName: "chevron.right").foregroundStyle(Paper.tertiary)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}

@@ -116,7 +116,7 @@ struct RemoteChangeFileView: View {
     private var header: some View {
         HStack(spacing: 10) {
             Button(action: back) {
-                Image(systemName: "chevron.left")
+                Image(icon: "chevron.left")
             }
             .buttonStyle(.borderless)
             .accessibilityLabel("All changed files")
@@ -174,14 +174,14 @@ struct RemoteChangeFileView: View {
             Button {
                 go(to: current.map { stops[max($0 - 1, 0)] } ?? stops[0])
             } label: {
-                Image(systemName: "chevron.up")
+                Image(icon: "chevron.up")
             }
             .accessibilityLabel("Previous change")
             .disabled(current == nil || current == 0)
             Button {
                 go(to: current.map { stops[min($0 + 1, stops.count - 1)] } ?? stops[0])
             } label: {
-                Image(systemName: "chevron.down")
+                Image(icon: "chevron.down")
             }
             .accessibilityLabel("Next change")
             .disabled(current == stops.count - 1)

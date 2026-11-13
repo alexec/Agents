@@ -12,6 +12,7 @@
   "dependencies": {
     "@hpke/core": "1.10.0",
     "@preact/signals": "2.11.3",
+    "lucide-static": "1.72.0",
     "markdown-it": "15.0.3",
     "preact": "11.0.0",
     "uqr": "0.1.3",

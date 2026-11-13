@@ -37,6 +37,13 @@ import (
 // on the page only when its reply tool has the contract's _meta too, so the list says, per
 // conversation, who a reply goes as (replyAs), and the email server, which cannot send, has
 // none.
+//
+// Marking read (#5137): a connector whose mark_conversation_read has the contract's _meta keeps
+// its service's read state in step with the page. messages/read marks the conversation read
+// when it reads its newest page (not an older page, nor one thread), in the same connection,
+// and says so in markedRead; messages/markAllRead marks every conversation of every such
+// connector read. A connector with no such tool (its service gives no read state, as Slack,
+// Google Chat and WhatsApp give a bot or an app none) is left as it is.
 const (
 	// messagesMost bounds a page; messagesDefault is a page when not said (the contract's).
 	messagesMost    = 100
@@ -61,6 +68,9 @@ func (d *Daemon) registerMessages() {
 	})
 	On(d, wire.CallMessagesReply, func(ctx context.Context, _ *Client, r wire.MessagesReplyRequest) (wire.MessagesReplied, error) {
 		return d.messagesReply(ctx, r)
+	})
+	On(d, wire.CallMessagesMarkAllRead, func(ctx context.Context, _ *Client, r wire.MessagesMarkAllReadRequest) (wire.MessagesMarkedAllRead, error) {
+		return d.messagesMarkAllRead(ctx, r)
 	})
 }
 
@@ -306,15 +316,81 @@ func (d *Daemon) messagesRead(ctx context.Context, r wire.MessagesReadRequest) (
 	if t := deref(r.Thread); t != "" {
 		args["thread"] = t
 	}
+	// The newest page of the whole conversation is what a person reads: it marks it read.
+	var then *messagingCall
+	if deref(r.Cursor) == "" && deref(r.Thread) == "" {
+		then = &messagingCall{tool: markReadTool, args: map[string]any{"conversation": r.Conversation}}
+	}
 	var page wire.MessagingMessages
+	var marked wire.MessagingMarkedRead
 	c := messagesConnector{name: r.Server, folder: r.Folder}
-	if _, err := d.callMessaging(ctx, c, "read_messages", args, d.secrets(), &page); err != nil {
+	s, cwd, err := d.docsServerFor(c.name, c.folder, d.secrets())
+	if err != nil {
+		return wire.MessagesRead{}, &Error{Code: CodeServer, Message: r.Server + ": " + err.Error()}
+	}
+	raw, thenRaw, _, err := callMessagingTools(ctx, s, cwd, messagingCall{tool: "read_messages", args: args}, then, messagesTimeout)
+	if err == nil {
+		err = messagingResult(raw, &page)
+	}
+	if err != nil {
 		return wire.MessagesRead{}, &Error{Code: CodeServer, Message: r.Server + ": " + err.Error()}
 	}
 	out := wire.MessagesRead{Server: r.Server, Folder: r.Folder, Conversation: r.Conversation,
 		Messages: page.Messages, Cursor: page.Cursor, Untrusted: true}
 	if out.Messages == nil {
 		out.Messages = []wire.MessagingMessage{}
+	}
+	// A mark that failed leaves the conversation unread, and the read still comes.
+	if thenRaw != nil && messagingResult(thenRaw, &marked) == nil {
+		yes := true
+		out.MarkedRead = &yes
+	}
+	return out, nil
+}
+
+// markReadTool is the contract's tool that marks a conversation, or every one, read (#5137).
+const markReadTool = "mark_conversation_read"
+
+// messagesMarkAllRead marks every conversation of r.folder's connectors read, or of every
+// folder's, by each connector's mark_conversation_read with all.
+func (d *Daemon) messagesMarkAllRead(ctx context.Context, r wire.MessagesMarkAllReadRequest) (wire.MessagesMarkedAllRead, error) {
+	const method = "messages/markAllRead"
+	folders := d.folderPaths()
+	if f := deref(r.Folder); f != "" {
+		if !slices.Contains(folders, f) {
+			return wire.MessagesMarkedAllRead{}, Invalid("%s: %s is not a folder on this machine", method, f)
+		}
+		folders = []string{f}
+	}
+	secrets := d.secrets()
+	connectors := d.messagesConnectors(folders)
+	marked := make([]*wire.MessagingMarkedRead, len(connectors))
+	errs := make([]error, len(connectors))
+	var wg sync.WaitGroup
+	at := make(chan struct{}, messagesAtOnce)
+	for i, c := range connectors {
+		wg.Go(func() {
+			at <- struct{}{}
+			defer func() { <-at }()
+			var got wire.MessagingMarkedRead
+			if _, err := d.callMessaging(ctx, c, markReadTool, map[string]any{"all": true}, secrets, &got); err != nil {
+				errs[i] = err
+				return
+			}
+			marked[i] = &got
+		})
+	}
+	wg.Wait()
+	out := wire.MessagesMarkedAllRead{Marked: []wire.MessagesMarked{}}
+	for i, c := range connectors {
+		switch {
+		case errors.Is(errs[i], errNotContract):
+			// No read state to mark.
+		case errs[i] != nil:
+			out.Errors = append(out.Errors, wire.MessagesError{Server: c.name, Folder: c.folder, Message: errs[i].Error()})
+		default:
+			out.Marked = append(out.Marked, wire.MessagesMarked{Server: c.name, Folder: c.folder, Marked: marked[i].Marked})
+		}
 	}
 	return out, nil
 }
@@ -379,9 +455,24 @@ func (d *Daemon) callMessaging(ctx context.Context, c messagesConnector, tool st
 	return tools, messagingResult(raw, into)
 }
 
+// messagingCall is one contract tool to call, with its input.
+type messagingCall struct {
+	tool string
+	args map[string]any
+}
+
 // callMessagingTool connects, checks that the server follows the messaging contract, calls
 // tool once with args, and ends: what the call answered, and the server's contract tools.
 func callMessagingTool(ctx context.Context, s sdk.McpServer, cwd, tool string, args map[string]any, timeout time.Duration) (json.RawMessage, map[string]bool, error) {
+	raw, _, contract, err := callMessagingTools(ctx, s, cwd, messagingCall{tool, args}, nil, timeout)
+	return raw, contract, err
+}
+
+// callMessagingTools is callMessagingTool for first, and then, in the same connection, for
+// then when it is given and the server has it with the contract's _meta: what each answered
+// (nil for a then that was not called or failed).
+func callMessagingTools(ctx context.Context, s sdk.McpServer, cwd string, first messagingCall, then *messagingCall, timeout time.Duration) (json.RawMessage, json.RawMessage, map[string]bool, error) {
+	tool, args := first.tool, first.args
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	var c mcpConn
@@ -389,13 +480,13 @@ func callMessagingTool(ctx context.Context, s sdk.McpServer, cwd, tool string, a
 	case s.Stdio != nil:
 		sc, err := startStdioMCP(s.Stdio, cwd)
 		if err != nil {
-			return nil, nil, docsSearchError(mcpFailureOf(err).sentence(timeout))
+			return nil, nil, nil, docsSearchError(mcpFailureOf(err).sentence(timeout))
 		}
 		c = sc
 	case s.Http != nil:
 		c = &httpMCP{url: s.Http.Url, headers: s.Http.Headers}
 	default:
-		return nil, nil, docsSearchError("What came back was not MCP.")
+		return nil, nil, nil, docsSearchError("What came back was not MCP.")
 	}
 	defer c.end()
 	failed := func(err error) error {
@@ -406,10 +497,10 @@ func callMessagingTool(ctx context.Context, s sdk.McpServer, cwd, tool string, a
 	}
 	if _, err := c.call(ctx, 1, "initialize", map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{},
 		"clientInfo": map[string]any{"name": "Agents", "version": "1"}}); err != nil {
-		return nil, nil, failed(err)
+		return nil, nil, nil, failed(err)
 	}
 	if err := c.notify(ctx, "notifications/initialized"); err != nil {
-		return nil, nil, failed(err)
+		return nil, nil, nil, failed(err)
 	}
 	contract := map[string]bool{}
 	id := 2
@@ -420,7 +511,7 @@ func callMessagingTool(ctx context.Context, s sdk.McpServer, cwd, tool string, a
 		}
 		raw, err := c.call(ctx, id, "tools/list", params)
 		if err != nil {
-			return nil, nil, failed(err)
+			return nil, nil, nil, failed(err)
 		}
 		var page struct {
 			Tools []struct {
@@ -432,7 +523,7 @@ func callMessagingTool(ctx context.Context, s sdk.McpServer, cwd, tool string, a
 			NextCursor string `json:"nextCursor"`
 		}
 		if json.Unmarshal(raw, &page) != nil {
-			return nil, nil, docsSearchError("What came back was not MCP.")
+			return nil, nil, nil, docsSearchError("What came back was not MCP.")
 		}
 		for _, t := range page.Tools {
 			if t.Meta.Messaging == messagingContractVersion {
@@ -445,13 +536,17 @@ func callMessagingTool(ctx context.Context, s sdk.McpServer, cwd, tool string, a
 		cursor = page.NextCursor
 	}
 	if !contract["list_conversations"] || !contract["read_messages"] || !contract[tool] {
-		return nil, nil, errNotContract
+		return nil, nil, nil, errNotContract
 	}
 	raw, err := c.call(ctx, id+1, "tools/call", map[string]any{"name": tool, "arguments": args})
 	if err != nil {
-		return nil, nil, failed(err)
+		return nil, nil, nil, failed(err)
 	}
-	return raw, contract, nil
+	var thenRaw json.RawMessage
+	if then != nil && contract[then.tool] {
+		thenRaw, _ = c.call(ctx, id+2, "tools/call", map[string]any{"name": then.tool, "arguments": then.args})
+	}
+	return raw, thenRaw, contract, nil
 }
 
 // messagingResult reads a contract tool's structuredContent into into, or says why it could

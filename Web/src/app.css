@@ -30,6 +30,16 @@ body {
   background: var(--paper-selection);
 }
 
+/* Paper v2's icons (#4996; src/views/Icon.tsx): Lucide at a 1.5 stroke, about the size of the text
+   around it (16 in a row of 13px text, 18 in a control) and in its colour, on the text's line. */
+svg.lucide {
+  display: inline-block;
+  flex: none;
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.25em;
+}
+
 button {
   font: inherit;
   color: inherit;
@@ -900,7 +910,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 /* A host down (OfflineStrip.tsx, a message banner, #83): how long a workspace's start has taken, after the words (#691). */
 .offline-strip .elapsed { font-variant-numeric: tabular-nums; opacity: 0.7; }
 /* An agent whose folder has gone (#119): which, and the ways on, as the window's strip. */
-.missing-folder-strip .what { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.missing-folder-strip .what, .account-move-strip .what { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .missing-folder-strip .quiet { color: var(--paper-secondary); }
 .ways-on { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 /* Open File: the file changed on disk under unsaved typing (#1858). */
@@ -988,7 +998,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .client-permission-choice:hover, .client-permission-choice[aria-pressed=true] { background: var(--paper-selection); }
 .client-permission-choice:disabled { opacity: 0.55; cursor: default; }
 .client-permission-title { display: flex; gap: 7px; align-items: baseline; }
-.client-permission-title > span { width: 10px; }
+.client-permission-title > span { width: 1.15em; }
 .client-permission-menu > p { margin: 5px 8px 3px; }
 .client-permission-confirm { padding: 4px 8px; }
 .client-permission-confirm > p { margin: 0 0 6px; }
@@ -2939,6 +2949,7 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
    are ink, on the well (a banner) or raised (a toast). A message never pushes what the person reads. */
 .message-icon { flex: none; width: 1.1em; text-align: center; font-weight: 600; }
 .message-icon.tone-attention { color: var(--tint-attention); }
+.message-icon.tone-warning { color: var(--tint-warning); }
 .message-icon.tone-failure { color: var(--tint-failure); }
 .message-icon.tone-success { color: var(--tint-vouched); }
 .message-icon.tone-neutral { color: var(--paper-secondary); }
@@ -2951,6 +2962,7 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
   border-radius: var(--radius-card); animation: message-in 150ms ease-out; }
 /* Paper v2 (#4993): a tinted notice has a line in its colour and a 3px bar, as PaneBanner (#4999). */
 .message-banner.tone-attention { border-color: var(--line-attention); box-shadow: inset 3px 0 0 var(--tint-attention); }
+.message-banner.tone-warning { border-color: var(--line-warning); box-shadow: inset 3px 0 0 var(--tint-warning); }
 .message-banner.tone-failure { border-color: var(--line-failure); box-shadow: inset 3px 0 0 var(--tint-failure); }
 .message-banner.tone-success { border-color: var(--line-vouched); box-shadow: inset 3px 0 0 var(--tint-vouched); }
 .message-toast.tone-success .message-icon { color: var(--tint-vouched); }

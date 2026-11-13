@@ -16,6 +16,7 @@ import { AskBeforeUseCheck } from "./AskBeforeUse";
 import { Modal } from "./Modal";
 import { SecretDescriptionField } from "./SecretDescription";
 import { ask } from "./MessageKinds";
+import { Icon } from "./Icon";
 
 function sentence(error: unknown): string {
   if (error instanceof CallFailed && error.code === methodNotFound) return "This control plane does not keep settings for you yet. Update it.";
@@ -161,10 +162,10 @@ function SecretItem({ row, replace, remove, down, names, oneMachine }: { row: Us
       <code class="hint secret-hint" aria-label={row.hint ? `Ends in ${row.hint}` : "Value hidden"}>{hint(row.hint)}</code>
       <p class="hint">{about(row.description)}</p>
       <SecretInfoLine parts={rowLine(row)} />
-      {row.needsApproval && <span class="hint"><span aria-hidden="true">✋ </span>{askBeforeUseWords.asks}</span>}
+      {row.needsApproval && <span class="hint"><Icon name="hand" />{" "}{askBeforeUseWords.asks}</span>}
       {waiting && <p class="hint attention">{waiting}</p>}
       {left && <p class="hint attention">{left}</p>}
-      {warning && <p class="hint warning"><span aria-hidden="true">⚠ </span>{warning}</p>}
+      {warning && <p class="hint warning"><Icon name="triangle-alert" />{" "}{warning}</p>}
       <span class="row-actions">
         <button type="button" disabled={down} onClick={replace}>Replace…</button>
         <button type="button" class="destructive" disabled={down} onClick={remove}>Remove…</button>
@@ -219,7 +220,7 @@ export function SecretsSection({ store, down }: { store: Store; down: boolean })
           <button type="button" onClick={() => { store.secretsLeft.value = null; }}>OK</button>
         </div>
       )}
-      {only && <p class="hint attention"><span aria-hidden="true">⚠ </span>{onlyMachineLine(only, hostNames)}</p>}
+      {only && <p class="hint attention"><Icon name="triangle-alert" />{" "}{onlyMachineLine(only, hostNames)}</p>}
       <ul class="user-secrets">
         {rows.map((row) => (
           <SecretItem key={row.name} row={row} down={down} names={hostNames} oneMachine={only !== null}

@@ -41,14 +41,14 @@ struct LucideIconsTests {
         }
     }
 
-    /// A view draws an icon through `Image(icon:)` and its kin, so the Mac draws Lucide's; a bare
+    /// A view draws an icon through `Image(icon:)` and its kin, so the Mac and the Remote draw Lucide's; a bare
     /// SF Symbol would draw Apple's set beside it.
-    @Test("the Mac's views draw icons through Image(icon:)")
+    @Test("the Mac's and the Remote's views draw icons through Image(icon:)")
     func viewsDrawThroughTheSet() throws {
         let allowed = ["Shared/UI/PaperIcon.swift", "Shared/UI/WorkingMarks.swift"]
         let pattern = /Image\(systemName:|NSImage\(systemSymbolName:|(Label|Button|Menu|Toggle|ContentUnavailableView)\([^\n]*\bsystemImage:/
         var found: [String] = []
-        for folder in ["App/Sources", "Shared/UI"] {
+        for folder in ["App/Sources", "Remote/Sources", "Shared/UI"] {
             let base = Self.root.appending(path: folder)
             let files = FileManager.default.enumerator(atPath: base.path(percentEncoded: false))?
                 .compactMap { $0 as? String }.filter { $0.hasSuffix(".swift") } ?? []

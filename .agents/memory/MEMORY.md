@@ -77,3 +77,4 @@ What agents learnt about this repo: its code, tools, process and decisions. One 
 - [New names for each round of PR shots](pr-shots-need-new-names-each-round.md) — GitHub caches images by URL; a re-run of pr-shots.sh under the same names showed Alex old pictures (#4933)
 - [Toolbar draws catalogue symbols empty](toolbar-draws-catalogue-symbols-empty.md) — macOS 27 toolbar items lose Image("lucide.x"); use Image(toolbarIcon:) there, Image(icon:) elsewhere (#4976)
 - [Outside code is not built here](outside-code-is-not-built-here.md) — cloning/building SwiftDraw or running picosvg was refused; data tarballs are fine; prefer platform libraries (#4976)
+- [Never link node_modules into a worktree](never-link-node-modules-into-a-worktree.md) — the AgentsHost build's npm ci empties the link's target, the main checkout's packages (#5137)

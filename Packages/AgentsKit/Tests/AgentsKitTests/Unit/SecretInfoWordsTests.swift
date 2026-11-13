@@ -80,4 +80,13 @@ struct SecretInfoWordsTests {
                                    lastOp: .init(what: "read", at: now.addingTimeInterval(-1200)), backedUp: false)
         #expect(SecretInfoWords.joined(SecretInfoWords.line(secret, now: now)) == "Fix the shop sign-in · Added 1 h ago · Used 20 min ago")
     }
+
+    /// #5122: a secret an agent saved on the machine says when it was set and used.
+    @Test func aMachinesOwnSecretSaysWhenSetAndUsed() {
+        let secret = LocalSecret(name: "GITHUB_SAM_TOKEN", setAt: now.addingTimeInterval(-3600),
+                                 lastOp: .init(what: "read", at: now.addingTimeInterval(-1200)), backedUp: false, needsApproval: true)
+        #expect(SecretInfoWords.joined(SecretInfoWords.line(secret, now: now)) == "Set 1 h ago · Used 20 min ago")
+        #expect(secret.asksBeforeUse)
+        #expect(LocalSecretWords.header == "On This Machine")
+    }
 }

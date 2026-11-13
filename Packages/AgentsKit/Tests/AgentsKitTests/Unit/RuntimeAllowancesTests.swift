@@ -31,7 +31,6 @@ struct RuntimeAllowancesTests {
         let rows = RuntimeAllowances(rows: [row("claude:sign-in")], at: now)
         #expect(rows.startingOnOut("claude") == nil)
         #expect(rows.startingOnOut("grok") == nil)
-        #expect(!rows.anyOut)
     }
 
     @Test func aRowKnowsItsRuntimeFromItsCredentialKey() {

@@ -88,6 +88,7 @@ public enum Capability {
     public static let hostBrowserSettings1 = "host.browser-settings/1"
     public static let hostDesktopControl1 = "host.desktop-control/1"
     public static let hostDriveApproval1 = "host.drive-approval/1"
+    public static let hostLocalSecrets1 = "host.local-secrets/1"
     public static let hostLock1 = "host.lock/1"
     public static let hostLock2 = "host.lock/2"
     public static let hostLock3 = "host.lock/3"
@@ -133,6 +134,7 @@ public enum Capability {
     public static let marketplaces1 = "marketplaces/1"
     public static let mcpToolLevels1 = "mcp.tool-levels/1"
     public static let mcp1 = "mcp/1"
+    public static let messagesMarkRead1 = "messages.mark-read/1"
     public static let messagesReply1 = "messages.reply/1"
     public static let messages1 = "messages/1"
     public static let modes1 = "modes/1"
@@ -455,6 +457,7 @@ public enum Capability {
         "mcp/tools": "mcp.tool-levels/1",
         "mcp/verify": "mcp/1",
         "messages/conversations": "messages/1",
+        "messages/markAllRead": "messages.mark-read/1",
         "messages/read": "messages/1",
         "messages/reply": "messages.reply/1",
         "modes/remembered": "modes/1",
@@ -549,6 +552,7 @@ public enum Capability {
         "sandbox/state": "sandbox/1",
         "secrets/addGrant": "host.secret-grants/1",
         "secrets/grants": "host.secret-grants/1",
+        "secrets/localList": "host.local-secrets/1",
         "secrets/removeGrant": "host.secret-grants/1",
         "secrets/sessionList": "host.session-secrets/1",
         "secrets/sessionRemove": "host.session-secrets/1",

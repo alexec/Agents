@@ -75,3 +75,29 @@ test("the line at the head of Messages says the unread and what the last message
   assert.equal(m.unreadTotal(lists), 7);
   assert.equal(m.unreadTotal([{ host: "mac", name: "This Mac", conversations: [item("email", "t")], errors: [] }]), undefined);
 });
+
+test("next is the row after in the list as it is filtered now, and marking read sets the count to nought (#5137)", () => {
+  const lists = [
+    { host: "mac", name: "This Mac", conversations: [item("slack", "C1", "2026-11-10T09:00:00Z"), item("email", "t1", "2026-11-10T08:00:00Z", 2),
+      item("slack", "C2", "2026-11-10T07:00:00Z")], errors: [] },
+    { host: "box", name: "Box", conversations: [item("email", "t1", "2026-11-10T08:00:00Z", 2), item("email", "t2", "2026-11-10T06:00:00Z", 1)], errors: [] },
+  ];
+  const all = m.mergeConversations(lists);
+  assert.equal(m.nextRow(all, "slack:C1")?.key, "email:t1");
+  assert.equal(m.nextRow(all, "email:t2"), undefined);
+  assert.equal(m.nextRow(m.mergeConversations(lists, "slack"), "slack:C1")?.key, "slack:C2");
+  assert.equal(m.nextRow(all, "slack:gone"), undefined);
+
+  assert.equal(m.hasUnread(lists), true);
+  const one = m.markedRead(lists, "email:t1");
+  assert.deepEqual(one.flatMap((l) => l.conversations.map((c) => c.conversation.unread)), [undefined, 0, undefined, 0, 1]);
+  assert.equal(m.unreadTotal(one), 1);
+  const none = m.markedRead(lists);
+  assert.equal(m.unreadTotal(none), 0);
+  assert.equal(m.hasUnread(none), false);
+  assert.equal(m.hasUnread([{ ...none[0], cursor: "more" }]), true);
+  assert.deepEqual(m.markProblems([
+    { name: "This Mac", marked: { marked: [], errors: [{ server: "mail", folder: "/p", message: "No answer." }] } },
+    { name: "Box", problem: "Offline." },
+  ]), ["This Mac ▸ mail: No answer.", "Box: Offline."]);
+});

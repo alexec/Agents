@@ -18,15 +18,15 @@ struct AttachButton: View {
 
     var body: some View {
         Menu {
-            Button { choosingPhotos = true } label: { Label("Photo Library", systemImage: "photo") }
-            Button { choosingFiles = true } label: { Label("Files", systemImage: "folder") }
+            Button { choosingPhotos = true } label: { Label("Photo Library", icon: "photo") }
+            Button { choosingFiles = true } label: { Label("Files", icon: "folder") }
             // A copied screenshot is the picture most often meant. There is no paste
             // into a text field for pictures on a phone, so it is offered here (033).
             if UIPasteboard.general.hasImages {
-                Button { pastePicture() } label: { Label("Paste Picture", systemImage: "doc.on.clipboard") }
+                Button { pastePicture() } label: { Label("Paste Picture", icon: "doc.on.clipboard") }
             }
         } label: {
-            Image(systemName: "paperclip")
+            Image(icon: "paperclip")
                 .appText(.reading).fontWeight(.semibold)
                 .frame(width: 22, height: 22)
         }
@@ -150,7 +150,7 @@ struct AttachmentStrip: View {
                 ForEach(attachments) { attachment in
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
-                            Image(systemName: icon(for: attachment))
+                            Image(icon: icon(for: attachment))
                                 .accessibilityHidden(true)
                             // Two lines before it gives up, so a long name at the largest
                             // text size still says which file it is.
@@ -159,7 +159,7 @@ struct AttachmentStrip: View {
                             Button {
                                 attachments.removeAll { $0.id == attachment.id }
                             } label: {
-                                Image(systemName: "xmark.circle.fill")
+                                Image(icon: "xmark.circle.fill")
                             }
                             .buttonStyle(.plain)
                             .foregroundStyle(Paper.secondary)

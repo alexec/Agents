@@ -17,7 +17,8 @@ import { CallFailed } from "../wire/link";
 import { describe } from "../model/errors";
 import { Failure } from "../protocol/generated";
 import { isSafeLink } from "../render/markdown";
-import { Blocks, EditDiff, elicitationTitle } from "./chat/Rows";
+import { Blocks, EditDiff } from "./chat/Rows";
+import { askHead } from "../model/askHead";
 import { askerFor } from "../model/asker";
 import { planOf } from "../model/plan";
 import { Markdown } from "../render/markdown";
@@ -28,6 +29,7 @@ import { handOffAnswer, handOffWindowWords } from "../model/handOff";
 import { openTakeOver, route } from "../route";
 import { keepingForSession, sessionOnlyField, sessionSecretWords } from "../model/sessionSecrets";
 import { askBeforeUseHint, askBeforeUseWords, needsApprovalField } from "../model/askBeforeUse";
+import { Icon } from "./Icon";
 
 type Held = (
   | { kind: "permission"; request: PermissionRequest }
@@ -367,7 +369,8 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
   const step = useSignal(0);
   // No, because… (#4039): the decline being explained, by its key, while the card asks why.
   const because = useSignal<string | null>(null);
-  const title = elicitationTitle(request);
+  // The one question of a confirm card is its title (#5028).
+  const { title, message } = askHead(request);
   const go = (key: string, action: Action, content: Record<string, JSONValue> = {}, reason?: string) =>
     !inert && answer(key, action, content, reason?.trim() || undefined);
   /** One of the card's answers, by its key: its class beside `base`, held state and pending mark. */
@@ -490,7 +493,7 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
     <section ref={card} class={cardClass(hold)} aria-label="Question">
       {asker && <p class="quiet small asker">{asker}</p>}
       {((!request.secret && !request.handOff) || because.value !== null) && <div class="strong"><Markdown text={title} /></div>}
-      {!request.secret && !request.handOff && because.value === null && request.message && request.message !== title && <Markdown text={request.message} />}
+      {!request.secret && !request.handOff && because.value === null && message && <Markdown text={message} />}
       {body}
       <AnsweredNote answered={hold.answered} />
     </section>
@@ -548,7 +551,7 @@ function HandOffField({ handOff, inert, open, recipient, done, cannot, send }: {
   const note = useSignal("");
   return (
     <>
-      <p class="strong secret"><span aria-hidden="true">✋ </span>{handOff.step}</p>
+      <p class="strong secret"><Icon name="hand" />{" "}{handOff.step}</p>
       {handOff.reason && <p class="secret">{handOff.reason}</p>}
       {/* A step in one of the agents' own Chrome windows (#5095): no page here, so say where. */}
       {handOff.window && <p class="small quiet">{handOffWindowWords(handOff.window, recipient)}</p>}
@@ -606,7 +609,7 @@ function SecretField({ secret, reason, recipient, inert, save, decline, sayWhy, 
   const link = getIt(secret.url);
   return (
     <>
-      <p class="strong secret"><span aria-hidden="true">🔒 </span><code>{secret.name}</code></p>
+      <p class="strong secret"><Icon name="lock" />{" "}<code>{secret.name}</code></p>
       {reason && <p class="secret">{reason}</p>}
       {link && secret.url && <p class="secret"><a href={secret.url} target="_blank" rel="noopener noreferrer">{link}</a></p>}
       <label class="field">

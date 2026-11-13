@@ -321,7 +321,7 @@ struct RemoteChatView: View {
                         let state = model.panes.state(for: agent.id)
                         if state.pane == nil { state.show(state.defaultPane) } else { state.pane = nil }
                     } label: {
-                        Label("Panes", systemImage: "sidebar.right")
+                        Label("Panes", icon: "sidebar.right")
                     }
                     .accessibilityHint("Shows the page, files and terminal for this agent")
                 }
@@ -710,7 +710,7 @@ private struct ChatMenu: View, Equatable {
         Menu {
             // Blocked (039): first, on a phone. The card in the chat keeps its own (#981).
             if sizeClass != .regular, state.isBlocked {
-                Button(AgentsModel.carryOnLabel, systemImage: "play.circle") {
+                Button(AgentsModel.carryOnLabel, icon: "play.circle") {
                     Task { await model.carryOn(id) }
                 }
                 .disabled(state.isStale)
@@ -724,29 +724,29 @@ private struct ChatMenu: View, Equatable {
                         Text("Find in Chat")
                         if !state.findsOnHost { Text(UpdateWords.hostNeedsUpdate) }
                     } icon: {
-                        Image(systemName: "text.magnifyingglass")
+                        Image(icon: "text.magnifyingglass")
                     }
                 }
                 .disabled(!state.findsOnHost)
-                Button("Prompts", systemImage: "list.number", action: prompts)
+                Button("Prompts", icon: "list.number", action: prompts)
             }
-            Button("Open File…", systemImage: "magnifyingglass", action: openFile)
-            Button(ChatThoughts.menuTitle(showsThoughts: showsThoughts), systemImage: "brain") { showsThoughts.toggle() }
+            Button("Open File…", icon: "magnifyingglass", action: openFile)
+            Button(ChatThoughts.menuTitle(showsThoughts: showsThoughts), icon: "brain") { showsThoughts.toggle() }
                 .accessibilityHint(ChatThoughts.menuHelp)
             // One menu in the bar, not two (#2808); Control-` still opens it from a keyboard.
             if let folderTerminal, state.hasFolderTerminal {
-                Button("Folder Terminal", systemImage: "apple.terminal") { folderTerminal() }
+                Button("Folder Terminal", icon: "apple.terminal") { folderTerminal() }
             }
             // The main scene's chat, in a scene of its own (#888), where the device has more
             // than one.
             if !state.isPopped, supportsMultipleWindows {
-                Button("Open in New Window", systemImage: "macwindow.badge.plus") {
+                Button("Open in New Window", icon: "macwindow.badge.plus") {
                     openWindow(id: PoppedChat.sceneID, value: id)
                 }
             }
             if !state.isArchived {
                 // As the Mac's Session menu has them (#342, #751).
-                Button("Rename…", systemImage: "pencil") {
+                Button("Rename…", icon: "pencil") {
                     if let agent = model.work.agent(id) { model.askToRename(agent) }
                 }
                 .disabled(state.isStale)
@@ -754,7 +754,7 @@ private struct ChatMenu: View, Equatable {
                     Button {
                         Task { await model.setMuted(id, !state.isMuted) }
                     } label: {
-                        Label(MuteWords.label(muted: state.isMuted), systemImage: MuteWords.symbol(muted: state.isMuted))
+                        Label(MuteWords.label(muted: state.isMuted), icon: MuteWords.symbol(muted: state.isMuted))
                         // What it does, under it (#2086): iOS menus draw a second Text as a subtitle.
                         Text(MuteWords.help(muted: state.isMuted))
                     }
@@ -763,7 +763,7 @@ private struct ChatMenu: View, Equatable {
                 Button {
                     Task { await model.fork(id) }
                 } label: {
-                    Label("Branch", systemImage: "arrow.triangle.branch")
+                    Label("Branch", icon: "arrow.triangle.branch")
                 }
                 .disabled(state.isStale)
                 // To another of the person's machines, with its unpushed work (#4037).
@@ -774,25 +774,25 @@ private struct ChatMenu: View, Equatable {
                         guard let agent = model.work.agent(id) else { return }
                         Task { await model.setPinned(agent, !state.isPinned) }
                     } label: {
-                        Label(state.isPinned ? "Unpin" : "Pin", systemImage: state.isPinned ? "pin.slash" : "pin")
+                        Label(state.isPinned ? "Unpin" : "Pin", icon: state.isPinned ? "pin.slash" : "pin")
                     }
                     .disabled(state.isStale)
                     Button {
                         Task { await model.archive(id, andLeave: state.leavesChat) }
                     } label: {
-                        Label("Archive", systemImage: "archivebox")
+                        Label("Archive", icon: "archivebox")
                     }
                     .disabled(state.isStale || state.isActing)
                 }
             } else {
                 Divider()
-                Button("Unarchive", systemImage: "tray.and.arrow.up") {
+                Button("Unarchive", icon: "tray.and.arrow.up") {
                     Task { await model.unarchive(id) }
                 }
                 .disabled(state.isStale)
             }
         } label: {
-            Label("Actions", systemImage: "ellipsis.circle")
+            Label("Actions", icon: "ellipsis.circle")
         }
     }
 }
@@ -868,7 +868,7 @@ private struct OfferedFileStrip: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: ShownFile.isMarkdown(file.url) ? "doc.richtext" : "doc.text")
+            Image(icon: ShownFile.isMarkdown(file.url) ? "doc.richtext" : "doc.text")
                 .foregroundStyle(Paper.secondary)
                 .accessibilityHidden(true)
             Text("Wants you to see \(Text(file.name).fontWeight(.semibold))")
@@ -881,7 +881,7 @@ private struct OfferedFileStrip: View {
             Button {
                 model.dismissOfferedFile()
             } label: {
-                Label("Not now", systemImage: "xmark")
+                Label("Not now", icon: "xmark")
                     .labelStyle(.iconOnly)
             }
             .buttonStyle(.borderless)

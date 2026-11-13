@@ -58,7 +58,7 @@ struct RemoteProjectSettings: View {
                 if let summary {
                     page(summary)
                 } else {
-                    ContentUnavailableView(RemoteProjectSettingsWords.missing, systemImage: "folder.badge.questionmark")
+                    ContentUnavailableView(RemoteProjectSettingsWords.missing, icon: "folder.badge.questionmark")
                 }
             }
             .scrollContentBackground(.hidden)
@@ -138,7 +138,7 @@ struct RemoteProjectSettings: View {
                         .navigationTitle(PolicyLayersWords.title)
                         .navigationBarTitleDisplayMode(.inline)
                 } label: {
-                    Label(PolicyLayersWords.title, systemImage: PolicyLayersWords.symbol)
+                    Label(PolicyLayersWords.title, icon: PolicyLayersWords.symbol)
                 }
             } footer: {
                 Text(RemoteProjectSettingsWords.writtenIn(summary.folder.folder.path, on: model.machineName(summary.host))

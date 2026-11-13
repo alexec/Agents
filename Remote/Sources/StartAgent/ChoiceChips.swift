@@ -437,7 +437,7 @@ struct ChoiceChips: View {
 
     @ViewBuilder
     private func choiceLabel(_ title: String, chosen: Bool) -> some View {
-        if chosen { Label(title, systemImage: "checkmark") } else { Text(title) }
+        if chosen { Label(title, icon: "checkmark") } else { Text(title) }
     }
 
     /// Its branch, git status, who is in it, and with `size` how much it holds (#790).
@@ -475,7 +475,7 @@ struct StartChip: View {
     var body: some View {
         HStack(spacing: 4) {
             if let systemImage {
-                Image(systemName: systemImage)
+                Image(icon: systemImage)
                     // Decorative: the chip's words say what it is (FR-015).
                     .glyph(size: 11, weight: .semibold)
                     .foregroundStyle(Paper.secondary)
@@ -487,7 +487,7 @@ struct StartChip: View {
                     .frame(maxWidth: maxTitleWidth, alignment: .leading)
             }
             if locked {
-                Image(systemName: "lock.fill")
+                Image(icon: "lock.fill")
                     .glyph(size: 8, weight: .semibold)
                     .foregroundStyle(Paper.secondary)
             }
@@ -501,7 +501,7 @@ struct StartChip: View {
                     .background(Paper.accent, in: Capsule())
             }
             if chevron {
-                Image(systemName: "chevron.down")
+                Image(icon: "chevron.down")
                     .glyph(size: 8, weight: .semibold)
                     .foregroundStyle(Paper.secondary)
             }

@@ -32,6 +32,7 @@ import { PolicyStopCard } from "./PolicyStopCard";
 import { TurnChangesCard } from "./TurnChangesCard";
 import { memo } from "../../render/memo";
 import { terminalOutput } from "../../model/onTheMac";
+import { Icon } from "../Icon";
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
 export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
@@ -100,7 +101,7 @@ function Exchanged({ title, value }: { title: string; value: JSONValue }) {
 
 /** ChatBlocks' PlanView: a withdrawn plan is struck through, and says the agent dropped it (#252). */
 export function PlanView({ plan }: { plan: Plan }) {
-  const marks = { pending: "○", in_progress: "◐", completed: "●" } as const;
+  const marks = { pending: "circle", in_progress: "circle-dot", completed: "circle-check" } as const;
   const spoken = { pending: "To do", in_progress: "Doing now", completed: "Done" } as const;
   const withdrawn = plan.state === "withdrawn";
   return (
@@ -108,7 +109,7 @@ export function PlanView({ plan }: { plan: Plan }) {
       <ul class="plan" aria-label="Plan">
         {plan.entries.map((entry, index) => (
           <li key={index} class={entry.status} aria-label={`${withdrawn ? "Dropped" : spoken[entry.status]}: ${entry.content}`}>
-            <span class="mark" aria-hidden="true">{marks[entry.status]}</span> <span class="content">{entry.content}</span>
+            <Icon name={marks[entry.status]} class="mark" /> <span class="content">{entry.content}</span>
           </li>
         ))}
       </ul>
@@ -447,7 +448,7 @@ function entryBody(entry: TranscriptEntry, from: (sender: MessageSender | undefi
       const notice = fields(entry, "notified")!._0;
       return (
         <div class="notice-line">
-          <span class="notice-bell" aria-hidden="true">🔔︎</span>
+          <Icon name="bell" class="notice-bell" />
           <div>
             <p class="notice-title">{notice.title}</p>
             {notice.body !== undefined && <p class="notice-body">{notice.body}</p>}

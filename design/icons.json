@@ -112,6 +112,14 @@
       ]
     },
     {
+      "lucide": "folder-plus",
+      "group": "Actions",
+      "meaning": "Add a folder",
+      "sf": [
+        "folder.badge.plus"
+      ]
+    },
+    {
       "lucide": "workflow",
       "group": "Things",
       "meaning": "Workflow",
@@ -346,6 +354,14 @@
       ]
     },
     {
+      "lucide": "clipboard-paste",
+      "group": "Actions",
+      "meaning": "Paste",
+      "sf": [
+        "doc.on.clipboard"
+      ]
+    },
+    {
       "lucide": "square-terminal",
       "group": "Things",
       "meaning": "Terminal, command",
@@ -395,11 +411,27 @@
       ]
     },
     {
+      "lucide": "camera",
+      "group": "Things",
+      "meaning": "Camera",
+      "sf": [
+        "camera"
+      ]
+    },
+    {
       "lucide": "link",
       "group": "Things",
       "meaning": "Link",
       "sf": [
         "link"
+      ]
+    },
+    {
+      "lucide": "scan-qr-code",
+      "group": "Actions",
+      "meaning": "Scan a code to pair",
+      "sf": [
+        "qrcode.viewfinder"
       ]
     },
     {
@@ -558,6 +590,14 @@
       ]
     },
     {
+      "lucide": "brain",
+      "group": "Things",
+      "meaning": "Thoughts, the agent's reasoning",
+      "sf": [
+        "brain"
+      ]
+    },
+    {
       "lucide": "paintbrush",
       "group": "Things",
       "meaning": "Look",
@@ -691,7 +731,8 @@
       "group": "Things",
       "meaning": "Right sidebar",
       "sf": [
-        "sidebar.trailing"
+        "sidebar.trailing",
+        "sidebar.right"
       ]
     },
     {
@@ -725,6 +766,22 @@
       "meaning": "Listen",
       "sf": [
         "ear"
+      ]
+    },
+    {
+      "lucide": "keyboard",
+      "group": "Things",
+      "meaning": "Keyboard, type",
+      "sf": [
+        "keyboard"
+      ]
+    },
+    {
+      "lucide": "keyboard-off",
+      "group": "Actions",
+      "meaning": "Hide the keyboard",
+      "sf": [
+        "keyboard.chevron.compact.down"
       ]
     },
     {
@@ -880,7 +937,8 @@
         "arrow.uturn.backward",
         "arrow.uturn.left",
         "arrowshape.turn.up.left",
-        "arrow.uturn.backward.circle"
+        "arrow.uturn.backward.circle",
+        "arrow.uturn.up"
       ]
     },
     {
@@ -915,6 +973,14 @@
       "meaning": "Search",
       "sf": [
         "magnifyingglass"
+      ]
+    },
+    {
+      "lucide": "text-search",
+      "group": "Actions",
+      "meaning": "Find in the text",
+      "sf": [
+        "text.magnifyingglass"
       ]
     },
     {
@@ -972,6 +1038,22 @@
       "meaning": "Open outside the app",
       "sf": [
         "arrow.up.right.square"
+      ]
+    },
+    {
+      "lucide": "app-window",
+      "group": "Actions",
+      "meaning": "Open in a new window",
+      "sf": [
+        "macwindow.badge.plus"
+      ]
+    },
+    {
+      "lucide": "rectangle-vertical",
+      "group": "Actions",
+      "meaning": "Open alone, full screen",
+      "sf": [
+        "rectangle.portrait"
       ]
     },
     {
@@ -1058,7 +1140,8 @@
       "sf": [
         "chevron.right",
         "chevron.compact.right",
-        "forward"
+        "forward",
+        "arrow.up.forward.app"
       ]
     },
     {

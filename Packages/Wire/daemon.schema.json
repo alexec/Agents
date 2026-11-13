@@ -14996,6 +14996,54 @@
         "simulator"
       ]
     },
+    "LocalSecret": {
+      "type": "object",
+      "description": "A secret this machine keeps for itself (#5122): an agent saved it (ask_secret, capture_secret, generate_secret) or a connector's form set it. Every session's agent on this machine can name it. No value.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "setAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "lastOp": {
+          "$ref": "#/definitions/SecretLastOp"
+        },
+        "backedUp": {
+          "type": "boolean",
+          "description": "Always false: a secret this machine keeps for itself is on this machine only."
+        },
+        "needsApproval": {
+          "type": "boolean",
+          "description": "Ask before use (#4014): a person approves each use (#4015). Left out is off."
+        },
+        "description": {
+          "type": "string",
+          "description": "A secret's description (#4167): one or two sentences on what it is and what it is for, such as which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a value. Left out when it has none."
+        }
+      },
+      "required": [
+        "name",
+        "setAt"
+      ],
+      "additionalProperties": false
+    },
+    "LocalSecrets": {
+      "type": "object",
+      "description": "secrets/localList (#5122): every secret this machine keeps for itself, by name. No value.",
+      "properties": {
+        "secrets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LocalSecret"
+          }
+        }
+      },
+      "required": [
+        "secrets"
+      ],
+      "additionalProperties": false
+    },
     "Lock": {
       "type": "object",
       "description": "A person's machine lock (#3399, specs/3399-machine-lock): its chain of entries, the root first. lock/get, and machine/lock to a machine.",
@@ -18676,9 +18724,62 @@
       ],
       "additionalProperties": false
     },
+    "MessagesMarkAllReadRequest": {
+      "type": "object",
+      "description": "messages/markAllRead (#5137): mark every conversation of folder's messaging connectors read, or of every folder's when folder is absent.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MessagesMarked": {
+      "type": "object",
+      "description": "One connector that messages/markAllRead marked read (#5137): its name in mcp.json, a folder that reaches it, and how many messages it marked.",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "marked": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "server",
+        "folder",
+        "marked"
+      ],
+      "additionalProperties": false
+    },
+    "MessagesMarkedAllRead": {
+      "type": "object",
+      "description": "messages/markAllRead (#5137): the connectors that marked their conversations read, and those that could not, with why. A connector with no mark_conversation_read (its service gives no read state) is in neither.",
+      "properties": {
+        "marked": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessagesMarked"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessagesError"
+          }
+        }
+      },
+      "required": [
+        "marked"
+      ],
+      "additionalProperties": false
+    },
     "MessagesRead": {
       "type": "object",
-      "description": "messages/read (#4343): one page of a conversation's messages, newest first, as the connector's read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true: every text is outside content.",
+      "description": "messages/read (#4343): one page of a conversation's messages, newest first, as the connector's read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true: every text is outside content. markedRead (#5137): the connector's mark_conversation_read marked the conversation read on its service, so a client sets its unread count to 0; absent when the connector cannot mark read, on an older page, and on one thread's read.",
       "properties": {
         "server": {
           "type": "string"
@@ -18699,6 +18800,9 @@
           "type": "string"
         },
         "untrusted": {
+          "type": "boolean"
+        },
+        "markedRead": {
           "type": "boolean"
         }
       },
@@ -18880,6 +18984,32 @@
           "type": "boolean"
         }
       },
+      "additionalProperties": false
+    },
+    "MessagingMarkReadRequest": {
+      "type": "object",
+      "description": "mark_conversation_read's input (#5137, docs/reference/messaging-contract.md): conversation, a conversation's id from list_conversations, marks its messages read on the service; all: true marks every conversation that list_conversations lists with no input. One of the two.",
+      "properties": {
+        "conversation": {
+          "type": "string"
+        },
+        "all": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MessagingMarkedRead": {
+      "type": "object",
+      "description": "mark_conversation_read's structuredContent (#5137): how many messages it marked read.",
+      "properties": {
+        "marked": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "marked"
+      ],
       "additionalProperties": false
     },
     "MessagingMessage": {

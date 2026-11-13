@@ -117,7 +117,7 @@ struct PaneView: View {
                 Button {
                     state.pane = nil
                 } label: {
-                    Label("Close", systemImage: "xmark")
+                    Label("Close", icon: "xmark")
                         .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)

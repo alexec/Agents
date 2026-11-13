@@ -22,7 +22,7 @@ struct NewFolderMenu: View {
                 }
             }
         } label: {
-            Label("New Folder", systemImage: "plus")
+            Label("New Folder", icon: "plus")
         }
         .accessibilityHint("Adds a folder on a machine, or clones one from a Git URL")
         .sheet(item: $adding) { kind in
@@ -31,9 +31,9 @@ struct NewFolderMenu: View {
     }
 
     @ViewBuilder private func items(for machine: RemoteModel.HostSection) -> some View {
-        Button("Add Folder…", systemImage: "folder.badge.plus") { adding = .folder(machine.id, machine.title) }
+        Button("Add Folder…", icon: "folder.badge.plus") { adding = .folder(machine.id, machine.title) }
             .disabled(machine.offline)
-        Button("Clone Git URL…", systemImage: "arrow.down.circle") { adding = .clone(machine.id, machine.title) }
+        Button("Clone Git URL…", icon: "arrow.down.circle") { adding = .clone(machine.id, machine.title) }
             .disabled(machine.offline)
     }
 }
@@ -103,7 +103,7 @@ private struct AddFolderForm: View {
                             Task { await load(parent.path(percentEncoded: false)) }
                         } label: {
                             Label(parent.lastPathComponent.isEmpty ? "/" : parent.lastPathComponent,
-                                  systemImage: "chevron.left")
+                                  icon: "chevron.left")
                         }
                         .foregroundStyle(Paper.secondary)
                     }
@@ -112,11 +112,11 @@ private struct AddFolderForm: View {
                             Button {
                                 Task { await load(entry.url.path(percentEncoded: false)) }
                             } label: {
-                                Label(entry.name, systemImage: "folder")
+                                Label(entry.name, icon: "folder")
                             }
                             .foregroundStyle(.primary)
                         } else {
-                            Label(entry.name, systemImage: "doc")
+                            Label(entry.name, icon: "doc")
                                 .foregroundStyle(Paper.tertiary)
                         }
                     }

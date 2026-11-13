@@ -22,6 +22,7 @@ import { tellingWords, type AgentAct, type Store } from "../model/store";
 import { attach, pastedFiles, pastedWords, refusal, totalRefusal } from "../model/attachments";
 import { Telling } from "./Telling";
 import { commandQuery, completeCommand, completeMention, fileName, fileURL, matchingCommands, mentionQuery } from "../model/completions";
+import { Icon } from "./Icon";
 
 /** A send usually lands before anyone could read a word; words only for one still going after this. */
 const slowSend = 400;
@@ -262,7 +263,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName
               const why = refusal(attachment, capabilities, runtimeName, store.hasMac.value);
               return (
                 <li key={attachment.id}>
-                  <span>{attachment.block.type === "image" ? "🖼" : "📄"} {attachment.displayName}</span>
+                  <span><Icon name={attachment.block.type === "image" ? "image" : "file"} /> {attachment.displayName}</span>
                   <button class="remove" aria-label={`Remove ${attachment.displayName}`}
                     onClick={() => { attachments.value = attachments.value.filter((a) => a.id !== attachment.id); keep(); }}>×</button>
                   {why && <span class="failure small">{why}</span>}
@@ -379,12 +380,12 @@ export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName
             <button class={`send stop${acting === "agents/stop" ? " going" : ""}`} aria-label="Stop"
               title={acting === "agents/stop" ? tellingWords("Stopping", recipient) : stopHelp}
               disabled={disabled || (!!acting && acting !== "agents/stop")} onClick={stop}>
-              {acting === "agents/stop" ? <span class="spinner" aria-hidden="true" /> : "■"}
+              {acting === "agents/stop" ? <span class="spinner" aria-hidden="true" /> : <Icon name="circle-stop" />}
             </button>
           ) : (
             <button class={`send${sending.value ? " going" : ""}`} aria-label={sending.value ? tellingLabel(starting, recipient) : sendLabel(queues)}
               title={`${sendHelp(queues)} (Return)`} disabled={!canSend && !sending.value} onClick={() => void submit()}>
-              {sending.value ? <span class="spinner" aria-hidden="true" /> : queues ? "⤒" : "↑"}
+              {sending.value ? <span class="spinner" aria-hidden="true" /> : <Icon name={queues ? "arrow-up-to-line" : "arrow-up"} />}
             </button>
           )}
         </div>

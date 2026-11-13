@@ -1,10 +1,12 @@
 // A session whose account can no longer reach the model (#999): the organisation removed it, or its
 // policy refuses it now. A strip across the top of its chat says why, with Continue in New, as the
-// window's AccountMoveStrip.
+// window's AccountMoveStrip. A banner of the chat, as the missing-folder strip, in the warning's orange:
+// something is wrong, not a request (#5016, #5029).
 import type { Agent } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { go } from "../route";
 import { folderIsMissing } from "../model/missingFolder";
+import { MessageBanner } from "./MessageKinds";
 import { accountChoices, continueInNew } from "../model/runtimes";
 
 export function AccountMoveStrip({ store, host, agent }: { store: Store; host: string; agent: Agent | undefined }) {
@@ -18,9 +20,9 @@ export function AccountMoveStrip({ store, host, agent }: { store: Store; host: s
     if (id) go({ host, folder: agent.worktree?.folder || agent.cwd, session: id });
   };
   return (
-    <div class="missing-folder-strip" role="status">
+    <MessageBanner tone="warning" name="account-move-strip"
+      actions={<span class="ways-on"><button onClick={() => void move()}>{continueInNew}</button></span>}>
       <span class="what" title={reason}>{reason}</span>
-      <span class="ways-on"><button onClick={() => void move()}>{continueInNew}</button></span>
-    </div>
+    </MessageBanner>
   );
 }

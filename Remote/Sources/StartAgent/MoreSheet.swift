@@ -57,7 +57,7 @@ struct MoreSheet: View {
         Section {
             switch model.startChoicesState {
             case .loading:
-                Label("Asking \(runtimeName) what it offers…", systemImage: "hourglass")
+                Label("Asking \(runtimeName) what it offers…", icon: "hourglass")
                     .appText(.supporting)
                     .foregroundStyle(Paper.secondary)
             case .failed(let reason):
@@ -108,7 +108,7 @@ struct MoreSheet: View {
                         } label: {
                             VStack(alignment: .leading, spacing: 2) {
                                 if choice == mode {
-                                    Label(ClientPermissionWords.title(choice), systemImage: "checkmark")
+                                    Label(ClientPermissionWords.title(choice), icon: "checkmark")
                                 } else {
                                     Text(ClientPermissionWords.title(choice))
                                 }
@@ -218,7 +218,7 @@ struct MoreSheet: View {
                             model.choose(choice.value, for: option.id)
                         } label: {
                             if choice.value == chosen {
-                                Label(choice.name, systemImage: "checkmark")
+                                Label(choice.name, icon: "checkmark")
                             } else {
                                 Text(choice.name)
                             }

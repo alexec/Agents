@@ -3,6 +3,7 @@
 // a folder on the host, so one is typed as its path. Connectors are chosen in the window.
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
+import { Icon } from "./Icon";
 
 /** "Reach: this folder", or how many folders, as the window says it. */
 export function reachTitle(folders: readonly string[]): string {
@@ -47,7 +48,7 @@ export function Reach({ folders, change, disabled }: {
     <span class="menu-anchor reach" ref={anchor}>
       <button class="pill" aria-haspopup="dialog" aria-expanded={open.value} disabled={disabled}
         title="Folders this agent may reach" onClick={() => (open.value = !open.value)}>
-        {reachTitle(folders)} <span aria-hidden="true">▾</span>
+        {reachTitle(folders)} <Icon name="chevron-down" />
       </button>
       {open.value && (
         <div class="popover up reach-popover" role="dialog" aria-label="Reach">

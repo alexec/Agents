@@ -74,6 +74,7 @@ func (d *Daemon) register() {
 	d.registerBrowserSettings()
 	d.registerSessionSecrets()
 	d.registerSealedSecrets()
+	d.registerLocalSecrets()
 	d.registerSecretUse()
 	d.registerSecretTerminal()
 	d.registerDesktopControlPause()

@@ -14,6 +14,7 @@ import { machineNames, onlyMachine, onlyMachineLine } from "../model/secretInfo"
 import { Modal } from "./Modal";
 import { SecretInfoLine } from "./SecretInfoLine";
 import { ask } from "./MessageKinds";
+import { Icon } from "./Icon";
 import { type CardPart, auditAccount, cardParts, copiedSeconds, copyText, detailsLabel, type DetailField, identityFields, named,
   type Named, noSecretLine, notInSecrets, parseCard, recordFields, revealFailure, revealSecret, revealWords, shownSeconds,
   tokenExpiry } from "../model/reveal";
@@ -288,7 +289,7 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
       <h3 class="section-head" id="settings-accounts">{accountsTitle}</h3>
       {problem.value && <p class="hint">{problem.value}</p>}
       {only && all.value.some((a) => accountSecretName(a) !== null) &&
-        <p class="hint attention"><span aria-hidden="true">⚠ </span>{onlyMachineLine(only, names)}</p>}
+        <p class="hint attention"><Icon name="triangle-alert" />{" "}{onlyMachineLine(only, names)}</p>}
       {projects.length > 0 && (
         <label>
           Project{" "}
@@ -312,7 +313,7 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
               <SecretInfoLine parts={accountLine(a)} />
               {accountAsks(a) && <p class="hint">{askBeforeUseWords.asks}</p>}
               {soon && <p class="hint attention">{soon}</p>}
-              {warning && <p class="hint warning"><span aria-hidden="true">⚠ </span>{warning}</p>}
+              {warning && <p class="hint warning"><Icon name="triangle-alert" />{" "}{warning}</p>}
               <span class="row-actions">
                 <button type="button" disabled={down} onClick={() => { details.value = a; }}>{detailsLabel}</button>
                 <button type="button" disabled={down} onClick={() => { editing.value = a; }}>Edit…</button>
