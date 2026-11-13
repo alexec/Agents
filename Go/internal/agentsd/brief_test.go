@@ -341,6 +341,74 @@ func TestTheNewAppSkillIsReadyMade(t *testing.T) {
 	}
 }
 
+// #5052: the skill keeps a first build's task list as its plan, and the plan page (#5053,
+// #5054) finds each task by its words, so the skill's two tables hold these words, in this
+// order. A change here is a change to the plan pages too.
+func TestTheNewAppSkillKeepsTheFirstBuildTaskList(t *testing.T) {
+	skill, err := readyMadeSkillsFS.ReadFile("readymadeskills/start-a-new-app/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string][]string{
+		"iphone-app": {
+			"Set up the agent runtime",
+			"Connect GitHub",
+			"Make the repository from alexec/iphone-app-starter",
+			"Join the Apple Developer Program",
+			"Put the App Store Connect key in the repository's CI",
+			"Set up Sentry",
+			"Send the first build to TestFlight",
+			"Approve the first build",
+		},
+		"web-service": {
+			"Set up the agent runtime",
+			"Connect GitHub",
+			"Make the repository from alexec/web-service-starter",
+			"Set up Google Cloud (Cloud Run)",
+			"Set up Sentry",
+			"Deploy the first version",
+			"Approve the first deploy",
+		},
+	}
+	// Each table starts under the line that names its starter, as "(`iphone-app`):", and
+	// ends at its first line that is not a row.
+	lines := strings.Split(string(skill), "\n")
+	for starter, tasks := range want {
+		var got []string
+		start := -1
+		for i, l := range lines {
+			if strings.HasSuffix(l, "(`"+starter+"`):") {
+				start = i
+				break
+			}
+		}
+		if start < 0 {
+			t.Fatalf("no task list for %s", starter)
+		}
+		for _, l := range lines[start+1:] {
+			if l == "" && got == nil {
+				continue
+			}
+			if !strings.HasPrefix(l, "| ") {
+				break
+			}
+			cells := strings.Split(l, "|")
+			if len(cells) < 4 || strings.TrimSpace(cells[1]) == "#" || strings.HasPrefix(strings.TrimSpace(cells[1]), "-") {
+				continue
+			}
+			got = append(got, strings.TrimSpace(cells[2]))
+		}
+		if strings.Join(got, "\n") != strings.Join(tasks, "\n") {
+			t.Errorf("%s's task list is\n%s\nwant\n%s", starter, strings.Join(got, "\n"), strings.Join(tasks, "\n"))
+		}
+	}
+	for _, s := range []string{"`TodoWrite`", "`update_plan`", "`completed`", "`in_progress`", "`pending`", "Keep the first-build task list as your plan."} {
+		if !strings.Contains(strings.Join(strings.Fields(string(skill)), " "), s) {
+			t.Errorf("the skill does not say %q", s)
+		}
+	}
+}
+
 // The persona's prompt follows the brief: the folder's before the person's, its front
 // matter left out, none for a persona that is not there or an id that is a path (#760).
 func TestThePersonasPromptFollowsTheBrief(t *testing.T) {
