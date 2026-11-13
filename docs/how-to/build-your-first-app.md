@@ -68,8 +68,8 @@ Then the question page shows.
 ## 2. Check what will be built
 
 The plan page shows your idea as its title. Under it, one line says what the agent makes:
-*An iPhone app, from alexec/iphone-app-starter* or *A web service, from
-alexec/web-service-starter*.
+*An iPhone app, from agentloops-dev/iphone-app-starter* or *A web service, from
+agentloops-dev/web-service-starter*.
 
 - The words of the idea choose. Words such as *iPhone*, *iOS*, *iPad*, *App Store* or
   *TestFlight* choose an iPhone app. Words such as *web*, *website*, *page*, *service*,
@@ -91,7 +91,7 @@ The task list shows each task with its state: **To do**, **Doing**, **Done**, or
 | --- | --- |
 | 1. Set up the agent runtime | 1. Set up the agent runtime |
 | 2. Connect GitHub | 2. Connect GitHub |
-| 3. Make the repository from alexec/iphone-app-starter | 3. Make the repository from alexec/web-service-starter |
+| 3. Make the repository from agentloops-dev/iphone-app-starter | 3. Make the repository from agentloops-dev/web-service-starter |
 | 4. Join the Apple Developer Program | 4. Set up Google Cloud (Cloud Run) |
 | 5. Put the App Store Connect key in the repository's CI | 5. Set up Sentry |
 | 6. Set up Sentry | 6. Deploy the first version |

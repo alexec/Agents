@@ -87,7 +87,7 @@ type selfUpdateMarkFile struct {
 
 // releaseDownloads is where a release's files are, by tag. AGENTS_RELEASE_DOWNLOADS
 // replaces it, for a test or a mirror.
-const releaseDownloads = "https://github.com/alexec/Agents/releases/download"
+const releaseDownloads = "https://github.com/agentloops-dev/Agents/releases/download"
 
 // selfUpdater is one Mac host's updater; nil on a host that is not in an app.
 type selfUpdater struct {

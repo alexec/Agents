@@ -59,7 +59,7 @@ func TestMakeAppRepositoryPushesTheStarterAndAddsTheFolder(t *testing.T) {
 		t.Fatalf("%v %s", err, out)
 	}
 	gh.bare = "file://" + bare
-	starterTemplate(t, "alexec/web-service-starter", webTemplate)
+	starterTemplate(t, "agentloops-dev/web-service-starter", webTemplate)
 	a := seeded(t, d, gitFolder(t, "git@github.com:alexec/agents.git"), func(a *wire.Agent) { a.State, a.EndedReason = wire.AgentStateRunning, nil })
 	if !appToolServed("make_app_repository") {
 		t.Fatal("make_app_repository is not served")

@@ -21,7 +21,7 @@ import (
 // for every client.
 
 // problemRepo is where a problem report goes.
-const problemRepo = "https://github.com/alexec/Agents/issues/new"
+const problemRepo = "https://github.com/agentloops-dev/Agents/issues/new"
 
 const (
 	// problemLogLines is how many of daemon.log's last lines a report may add.

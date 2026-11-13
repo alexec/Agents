@@ -131,7 +131,7 @@ your report, not a reason to stop, and it is not started again until the next re
 Collect, in order:
 
 - **Dependabot alerts** (#1910, #3215): every open alert,
-  `gh api --paginate 'repos/alexec/Agents/dependabot/alerts?state=open'`. An alert is public
+  `gh api --paginate 'repos/agentloops-dev/Agents/dependabot/alerts?state=open'`. An alert is public
   already, so it gets an issue, not an advisory. Each **critical or high** alert gets a bug
   for the bug lane (#3212), unless an issue is open for it already (`gh issue list --search
   "<ghsa_id> in:body"`): title `Dependency (<severity>): <package> <advisory title>`, a body
@@ -171,7 +171,7 @@ the report.
 
 The paused security review (#3215) left draft advisories behind. The release makes no new
 ones. For each draft advisory
-(`gh api --paginate 'repos/alexec/Agents/security-advisories?state=draft'`):
+(`gh api --paginate 'repos/agentloops-dev/Agents/security-advisories?state=draft'`):
 
 1. Look for its fix on main (#1727): its description ends with `Fixed by <commit>` and that
    commit is on `origin/main`, or `findings.md` on `agents/reviews-security` says `fixed on
@@ -270,7 +270,7 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
 
    ```sh
    gh run view <id> --json jobs --jq '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped") | [.databaseId, .name, .conclusion, (.steps | length)] | @tsv'
-   gh api repos/alexec/Agents/check-runs/<job id>/annotations --jq '.[].message'
+   gh api repos/agentloops-dev/Agents/check-runs/<job id>/annotations --jq '.[].message'
    ```
 
    A job that is `cancelled` with no steps run, or whose annotation says that no runner
@@ -290,7 +290,7 @@ open for item 2 and for the notes' known issues (`git merge-base --is-ancestor <
    --is-ancestor <merge commit> <sha>`).
 3. Write the notes in Markdown, in plain short sentences:
    - `## Milestones finished`, first, when step 2 found any: a line per milestone, its
-     title and link, `- [Projects](https://github.com/alexec/Agents/milestone/N)`;
+     title and link, `- [Projects](https://github.com/agentloops-dev/Agents/milestone/N)`;
    - one heading per kind that has changes, in this order: `## New` (the plan's
      `[enhancement]`), `## Fixed` (`[bug]`) and `## Changed` (the rest, `[tooling]` too), with a line per
      change, from the pull requests the plan lists. A line names the pull request:
@@ -332,7 +332,7 @@ A tag that already exists for this version means another release ran: end with
    both `agentsd-linux-*.tar.gz` and `SHA256SUMS`. Macs update Agents Host from the `.zip`
    and `SHA256SUMS` by these names (#2178): a release without them updates no Mac.
    **The image** (#2140): the `image` job passed, and
-   `docker buildx imagetools inspect ghcr.io/alexec/agents-control:<version>` lists
+   `docker buildx imagetools inspect ghcr.io/agentloops-dev/agents-control:<version>` lists
    `linux/amd64` and `linux/arm64`. If the job failed, name
    the step and the first error: the `mac` job waits for it, so there is no GitHub release
    either.
@@ -417,7 +417,7 @@ that the notes name under `## Milestones finished` (#3760):
    is empty. A milestone never closes with open issues: nothing schedules an issue in a
    closed milestone. If one was added since the plan, leave the milestone open and say so
    in the report.
-2. Close it: `gh api -X PATCH repos/alexec/Agents/milestones/<number> -f state=closed`.
+2. Close it: `gh api -X PATCH repos/agentloops-dev/Agents/milestones/<number> -f state=closed`.
 
 Make no new milestone. The next milestone is the open one with the earliest due date. Its
 work did not wait for this release (#3465), so there is nothing to unpark. A lead may not read a message from you

@@ -60,7 +60,7 @@ The first two tasks are the app's, done before you start: write them as `complet
 | --- | --- | --- |
 | 1 | Set up the agent runtime | already done |
 | 2 | Connect GitHub | already done |
-| 3 | Make the repository from alexec/iphone-app-starter | steps 2 and 3 |
+| 3 | Make the repository from agentloops-dev/iphone-app-starter | steps 2 and 3 |
 | 4 | Join the Apple Developer Program | step 4.1 |
 | 5 | Put the App Store Connect key in the repository's CI | steps 4.2 to 4.7 |
 | 6 | Set up Sentry | step 6 |
@@ -73,7 +73,7 @@ The first two tasks are the app's, done before you start: write them as `complet
 | --- | --- | --- |
 | 1 | Set up the agent runtime | already done |
 | 2 | Connect GitHub | already done |
-| 3 | Make the repository from alexec/web-service-starter | steps 2 and 3 |
+| 3 | Make the repository from agentloops-dev/web-service-starter | steps 2 and 3 |
 | 4 | Set up Google Cloud (Cloud Run) | step 5 |
 | 5 | Set up Sentry | step 6 |
 | 6 | Deploy the first version | step 7.1 |
@@ -120,8 +120,8 @@ The person's GitHub login is the `login` of the GitHub server's `get_me`, or the
 ## 2. The repository
 
 Call `make_app_repository` with the name, the starter and its values. The starters are
-GitHub template repositories: `iphone-app` is `alexec/iphone-app-starter` and `web-service`
-is `alexec/web-service-starter`. When the person names another template repository, such as
+GitHub template repositories: `iphone-app` is `agentloops-dev/iphone-app-starter` and `web-service`
+is `agentloops-dev/web-service-starter`. When the person names another template repository, such as
 a fork of ours, give it as `owner/name`; its `.github/README.md` says its placeholders. For **Both**, call it twice, once for each starter. It makes a private
 repository, pushes the starter as its first commit, clones it on this machine and adds it
 as a folder. It skips what is there already, so after a failure, call it again once. When

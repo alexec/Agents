@@ -4,12 +4,12 @@
 # name @ is the zone itself, kept free for the promotional site (#3042); --names oauth points
 # oauth.agentloops.dev at the VM, for the hand-back page (#1343, deploy/gcp/site.sh).
 # --cname TARGET makes CNAME records to TARGET instead of A records: --names docs --cname
-# alexec.github.io serves the docs site from GitHub Pages at docs.agentloops.dev (#1549).
+# agentloops-dev.github.io serves the docs site from GitHub Pages at docs.agentloops.dev (#1549).
 # A record that is already right is left alone, and one with another address is changed, so
 # running it again is safe.
 #
 #   deploy/cloudflare/dns.sh [--dry-run] [--zone agentloops.dev] [--names "control views"] IP
-#   deploy/cloudflare/dns.sh [--dry-run] [--zone agentloops.dev] --names docs --cname alexec.github.io
+#   deploy/cloudflare/dns.sh [--dry-run] [--zone agentloops.dev] --names docs --cname agentloops-dev.github.io
 #
 # The API token comes from the Keychain item agents-cloudflare-token, and is never printed or
 # put on a command line. Make it at Cloudflare (My Profile ▸ API Tokens ▸ Create Token, the
@@ -41,7 +41,7 @@ while (($#)); do
 	--dry-run) dry_run=1; shift ;;
 	--zone) zone=${2:?--zone needs a domain}; shift 2 ;;
 	--names) names=${2:?--names needs the names, such as "control views"}; shift 2 ;;
-	--cname) cname=${2:?--cname needs the target, such as alexec.github.io}; shift 2 ;;
+	--cname) cname=${2:?--cname needs the target, such as agentloops-dev.github.io}; shift 2 ;;
 	--proxied) proxied=true; shift ;;
 	-*) die "$1 is not an option" ;;
 	*) ip=$1; shift ;;
