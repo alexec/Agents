@@ -57,7 +57,9 @@ struct MessagesListTests {
         let list = DaemonAPI.MessagesConversations(
             conversations: [.init(server: "slack", folder: "/p",
                                   conversation: .init(source: "slack", id: "C1", title: "#general", kind: .channel, unread: 2,
-                                                      lastActivity: "2026-11-10T08:00:00Z", link: "https://x.slack.com/archives/C1"),
+                                                      lastActivity: "2026-11-10T08:00:00Z",
+                                                      sender: .init(channel: "slack", identity: "T1/U1", name: "Sam"),
+                                                      link: "https://x.slack.com/archives/C1"),
                                   replyAs: "the Slack bot @agents")],
             cursor: "abc", errors: [.init(server: "mail", folder: "/p", message: "No answer.")])
         let read = DaemonAPI.MessagesRead(

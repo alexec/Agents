@@ -7953,6 +7953,11 @@ export interface MessagingConversation {
   kind: MessagingConversationKind;
   unread?: number;
   lastActivity?: string;
+  /**
+   * Who sent the newest message, so the list can say who a conversation is from. Absent when the
+   * service's list does not say (a Slack channel, a Google Chat space).
+   */
+  sender?: ChannelSender;
   /** The conversation on the service's own site or app. Absent when it has none. */
   link?: URLString;
 }
@@ -16406,7 +16411,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MessagesReadRequest: { required: ["server", "folder", "conversation"], optional: ["cursor", "thread", "limit"] },
   MessagesReplied: { required: ["server", "folder", "conversation", "message"], optional: [] },
   MessagesReplyRequest: { required: ["server", "folder", "conversation", "text"], optional: ["thread"] },
-  MessagingConversation: { required: ["source", "id", "title", "kind"], optional: ["unread", "lastActivity", "link"] },
+  MessagingConversation: { required: ["source", "id", "title", "kind"], optional: ["unread", "lastActivity", "sender", "link"] },
   MessagingConversations: { required: ["conversations"], optional: ["cursor", "replyAs"] },
   MessagingListRequest: { required: [], optional: ["cursor", "limit", "unread"] },
   MessagingMessage: { required: ["id", "conversation", "sender", "time", "text"], optional: ["thread", "link"] },

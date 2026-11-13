@@ -47,18 +47,21 @@ public extension DaemonAPI {
         public var unread: Int?
         /// The newest message's time, RFC 3339 as the connector wrote it (not a `WireDate`).
         public var lastActivity: String?
+        /// Who sent the newest message; nil when the service's list does not say (a Slack channel).
+        public var sender: ChannelSender?
         public var link: String?
 
         public var lastActivityDate: Date? { lastActivity.flatMap(MessagesList.date) }
 
         public init(source: String, id: String, title: String, kind: Kind, unread: Int? = nil,
-                    lastActivity: String? = nil, link: String? = nil) {
+                    lastActivity: String? = nil, sender: ChannelSender? = nil, link: String? = nil) {
             self.source = source
             self.id = id
             self.title = title
             self.kind = kind
             self.unread = unread
             self.lastActivity = lastActivity
+            self.sender = sender
             self.link = link
         }
     }

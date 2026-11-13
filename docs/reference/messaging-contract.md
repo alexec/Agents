@@ -77,6 +77,7 @@ newest `lastActivity` first. `replyAs` is optional: who `reply` sends as, in wor
 | `kind` | yes | `channel` (many people read it), `direct` (a chat with one person or a small group) or `thread` (a mail thread) |
 | `unread` | no | The service's own count of unread messages. Absent when the service does not say |
 | `lastActivity` | no | The newest message's time, RFC 3339 |
+| `sender` | no | Who sent the newest message: a `ChannelSender`, below. The list says who a conversation is from with it. Absent when the service's list does not say |
 | `link` | no | The conversation on the service's own site or app |
 
 ### read_messages
