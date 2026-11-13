@@ -33,7 +33,7 @@ var readyMadeRepo = "agentloops-dev/dotagents"
 // must be. A copy of another commit is refused, so a moved tag installs nothing.
 var (
 	readyMadeTag    = "v0.1.0"
-	readyMadeCommit = ""
+	readyMadeCommit = "32b6fdf090eeefc2acc60838ea33d99f7591c5a3"
 )
 
 // readyMadeGitBase is where the repository is cloned from: GitHub, or a folder of bare
