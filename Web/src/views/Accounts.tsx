@@ -198,7 +198,7 @@ function AccountDetails({ store, account, rows, close, edit }: {
         ))}
         {value !== null && !card && <p class="detail-value"><code class="no-select">{value}</code></p>}
         {value !== null && <p class="hint">{revealWords.shown}</p>}
-        {problems.value[key] && <p class="hint failure" role="alert">{problems.value[key]}</p>}
+        {problems.value[key] && <p class="hint failure" role="status">{problems.value[key]}</p>}
       </>
     );
   };
