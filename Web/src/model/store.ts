@@ -473,6 +473,8 @@ export class Work {
   /** The person's Mac's backups (#1810), for Settings ▸ Backups: null until it has said, or from a
    * host too old to keep backups, which leaves the section out. */
   readonly backups = signal<BackupState | null>(null);
+  /** When `backups` was last read or told (#5146), for its "Last update" line. */
+  readonly backupsAt = signal<number | undefined>(undefined);
   /** Desktop control's own off-by-default switch (#3004, US2), for Settings: null until it has
    * said, or from a host too old to know the method, which leaves the section out. */
   readonly desktopControl = signal<DesktopControlSettings | null>(null);
@@ -595,6 +597,8 @@ export class Work {
   readonly people = signal<PeopleList | null>(null);
   /** Why `people` could not be loaded: the failure itself, for each view to word. */
   readonly peopleFailure = signal<unknown>(null);
+  /** When `people` was last read (#5146), for Settings ▸ People's "Last update" line. */
+  readonly peopleAt = signal<number | undefined>(undefined);
   /** Each org provider's name by its id (#1002, FR-028), for People's "Managed by Okta": read once, when a person or group has one. */
   readonly orgProviderNames = signal<Record<string, string>>({});
   protected orgNamesRead = false;
@@ -856,7 +860,7 @@ export class Work {
         this.capacity.value = { ...this.capacity.value, [host]: params as CapacityState };
         return true;
       case "backups/changed":
-        if (this.isMac(host)) this.backups.value = params as BackupState;
+        if (this.isMac(host)) { this.backups.value = params as BackupState; this.backupsAt.value = Date.now(); }
         return true;
       case "worktrees/sized": {
         const held = { ...(this.worktreeSizes.value[host] ?? {}) };
@@ -2024,6 +2028,7 @@ export class Store extends Work {
   async loadPeople(): Promise<void> {
     try {
       this.people.value = await this.link.call("people/list", {});
+      this.peopleAt.value = Date.now();
       this.peopleFailure.value = null;
     } catch (error) {
       this.peopleFailure.value = error;
@@ -2921,7 +2926,7 @@ export class Store extends Work {
   /** Settings ▸ Backups (#1810), asked when Settings is shown. */
   loadBackups(): void {
     void this.hostBackups(this.macHostID.value).then((state) => {
-      if (state) this.backups.value = state;
+      if (state) { this.backups.value = state; this.backupsAt.value = Date.now(); }
     });
   }
 
@@ -4730,7 +4735,7 @@ export class Store extends Work {
    * The person's bus log (#4732): every machine's events, newest first, for the rows no host here
    * has. Null until read, and on a control plane too old for it. `filter` is what it was read for.
    */
-  readonly busLog = signal<{ events: BusEvent[]; next?: string; filter: EnvelopeFilter } | null>(null);
+  readonly busLog = signal<{ events: BusEvent[]; next?: string; filter: EnvelopeFilter; at: number } | null>(null);
 
   /** The newest page of the bus log, narrowed by the envelope's fields; an older page with `older`. */
   async loadBusLog(filter: EnvelopeFilter, older = false): Promise<void> {
@@ -4743,7 +4748,9 @@ export class Store extends Work {
     if (older && (!now || JSON.stringify(now.filter) !== JSON.stringify(filter))) return;
     const events = older && now ? [...now.events, ...page.events.filter((e: BusEvent) => !now.events.some((n) => n.id === e.id))] : page.events;
     const kept = events.slice(0, eventsPagedMost);
-    this.busLog.value = { events: kept, filter, ...(page.hasMore && page.next !== undefined && kept.length < eventsPagedMost && { next: page.next }) };
+    // `at`: when the newest page was read (#5146), for the page's "Last update" line; an older page leaves it.
+    const at = older && now ? now.at : Date.now();
+    this.busLog.value = { events: kept, filter, at, ...(page.hasMore && page.next !== undefined && kept.length < eventsPagedMost && { next: page.next }) };
   }
 
   /** Events ▸ Waiting now's ✕ (#541): the wait ends and nothing starts the agent again for it. */

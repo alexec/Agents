@@ -3,20 +3,24 @@
 // a filter that also asks the host with the words, and Load more at the foot. Each row opens its chat,
 // with its menu (Unarchive among them).
 import { useEffect, useRef, useState } from "preact/hooks";
-import { days, footer, hasMore, nextLimit, pageSize, sessionsWords, archivedState } from "../model/archivedPage";
+import { days, footer, hasMore, nextLimit, pageSize, sessionsWords, archivedState, readAt } from "../model/archivedPage";
 import { parseQuery, queryMatches } from "../model/labels";
 import type { Store } from "../model/store";
 import { route } from "../route";
 import { ArchivedFooter, ArchivedFrame } from "./ArchivedParts";
 import { SidebarSession } from "./Sidebar";
 
-export function ArchivedSessionsPage({ store, host, folder, folderName, down }: {
+export function ArchivedSessionsPage({ store, host, folder, folderName, down, liveUntil }: {
   store: Store; host: string; folder: string; folderName: string; down: boolean;
+  /** When the rows were last live with their host while it, or the link, is down (#5143). */
+  liveUntil: number | undefined;
 }) {
   const online = store.hostIsOnline(host);
   // Whether the host answered the ask for the archive: undefined while it is on its way, so an empty
   // list is not "none" before it is known (#664).
   const [answered, setAnswered] = useState<boolean | undefined>(undefined);
+  // When the host last answered an ask of this page (#5143), for the stale strip's time.
+  const [answeredAt, setAnsweredAt] = useState<number | undefined>(undefined);
   // The same for the filter's words.
   const [searched, setSearched] = useState<boolean | undefined>(undefined);
   const [filter, setFilter] = useState("");
@@ -28,7 +32,7 @@ export function ArchivedSessionsPage({ store, host, folder, folderName, down }: 
   useEffect(() => {
     if (!online) return;
     let live = true;
-    void store.loadArchived(host, folder, limit.current).then((said) => { if (live) setAnswered(said); });
+    void store.loadArchived(host, folder, limit.current).then((said) => { if (!live) return; setAnswered(said); if (said) setAnsweredAt(Date.now()); });
     store.holdWorkflows(host, folder);
     return () => {
       live = false;
@@ -45,7 +49,7 @@ export function ArchivedSessionsPage({ store, host, folder, folderName, down }: 
     setSearched(undefined);
     let live = true;
     const timer = setTimeout(() => {
-      void store.searchArchived(host, folder, words).then((said) => { if (live) setSearched(said); });
+      void store.searchArchived(host, folder, words).then((said) => { if (!live) return; setSearched(said); if (said) setAnsweredAt(Date.now()); });
     }, 250);
     return () => { live = false; clearTimeout(timer); };
   }, [host, folder, words, online]);
@@ -67,7 +71,7 @@ export function ArchivedSessionsPage({ store, host, folder, folderName, down }: 
   };
   return (
     <ArchivedFrame kind="sessions" title={sessionsWords.title} folderName={folderName} filterLabel={sessionsWords.filter}
-      filter={filter} onFilter={setFilter} state={state} noMatch={sessionsWords.noMatch}
+      filter={filter} onFilter={setFilter} state={state} readAt={readAt(liveUntil, answeredAt)} noMatch={sessionsWords.noMatch}
       empty={{ mark: "▣", title: sessionsWords.emptyTitle, line: sessionsWords.emptyLine }}>
       {days(shown).map((day) => (
         <div class="archived-day" key={day.id}>

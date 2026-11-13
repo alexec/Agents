@@ -2,7 +2,8 @@
 // A summary first (#3743): its CPU, load and capacity (#4582), memory and worst disk on one line. Then the detail, most of it closed until the
 // person opens it: the disk that matters with the others folded, a row per folder's worktrees (#3627), the runtimes
 // installed there (#3629), resources only when one is declared or held, and its processes (#3453). Read with
-// machine/usage when it opens and every few seconds while it is open and the tab is seen.
+// machine/usage when it opens and every few seconds while it is open and the tab is seen. A read that fails says when
+// the last one worked (#5146): the page reads every 3 s, so it shows no line while they work.
 import { useEffect, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import { hostAnswers, hostHas } from "../model/capabilities";
@@ -15,6 +16,7 @@ import { go } from "../route";
 import { MachineProcesses } from "./settings/Processes";
 import { chooseSettingsMachine } from "./settings/SettingsMachine";
 import { WorktreesList } from "./Worktrees";
+import { LastUpdate } from "./LastUpdate";
 import { Resources } from "./Resources";
 import { signInRuntime } from "./RuntimeSignInDialog";
 import { isInstalled, machineRuntimeLine, offersMachineSignIn, offersUpdate, signInOnTheMac } from "../model/runtimes";
@@ -32,13 +34,14 @@ export function MachinePage({ store, host }: { store: Store; host: string }) {
   const name = machine?.name ?? "This machine";
   const [usage, setUsage] = useState<MachineUsageState | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  const [readAt, setReadAt] = useState<number | null>(null);
   useEffect(() => {
     if (!asks) return;
     let gone = false;
     const read = () => {
       if (document.visibilityState !== "visible") return;
       store.link.call("machine/usage", {}, host).then(
-        (s) => { if (!gone) { setUsage(s); setFailure(null); } },
+        (s) => { if (!gone) { setUsage(s); setFailure(null); setReadAt(Date.now()); } },
         () => { if (!gone) setFailure(`${name} can’t be asked how it is doing now.`); });
     };
     read();
@@ -93,7 +96,7 @@ export function MachinePage({ store, host }: { store: Store; host: string }) {
                     </span>
                   </div>
                   {queued && <p class="hint">{queued}</p>}
-                  {failure && <p class="hint">{failure}</p>}
+                  {failure && <p class="hint">{failure}{readAt !== null && <> <LastUpdate at={readAt} /></>}</p>}
                 </>
               )}
             </section>

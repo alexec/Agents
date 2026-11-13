@@ -335,6 +335,9 @@ public extension DaemonAPI {
                 // A release's Lineage panel on the web page (#4423).
                 Row(Method.lineageFigures, params: LineageNodeRequest.self, result: LineageFigures.self,
                     kind: .hostRequest),
+                // Build trends on the web page (#5177): Web + Mac link, so no Swift types.
+                Row(Method.buildsHistory, params: JSONValue.self, result: JSONValue.self, kind: .hostRequest),
+                Row(Method.buildsRun, params: JSONValue.self, result: JSONValue.self, kind: .hostRequest),
                 Row(Method.simulatorsList, params: Empty.self, result: SimulatorList.self, kind: .hostRequest),
                 Row(Method.simulatorsBoot, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.simulatorsShutdown, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),

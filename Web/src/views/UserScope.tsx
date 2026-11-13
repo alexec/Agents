@@ -20,6 +20,7 @@ import { Modal } from "./Modal";
 import { SecretDescriptionField } from "./SecretDescription";
 import { ask } from "./MessageKinds";
 import { Icon } from "./Icon";
+import { HeadWithUpdate } from "./LastUpdate";
 
 function sentence(error: unknown): string {
   if (error instanceof CallFailed && error.code === methodNotFound) return "This control plane does not keep settings for you yet. Update it.";
@@ -344,9 +345,12 @@ function SecretItem({ row, replace, remove, down, names, oneMachine, show }: { r
 function useUserScope(store: Store, down: boolean) {
   const names = useSignal<UserSecretNames | null>(null);
   const problem = useSignal<string | null>(null);
+  /** When the names were read (#5146), for the "Last update" line. */
+  const readAt = useSignal<number | undefined>(undefined);
   const load = async () => {
     try {
       names.value = await store.link.call("user/secretNames", {});
+      readAt.value = Date.now();
       problem.value = null;
     } catch (error) {
       problem.value = sentence(error);
@@ -354,11 +358,11 @@ function useUserScope(store: Store, down: boolean) {
   };
   const changes = store.userScopeChanges.value;
   useEffect(() => { if (!down) void load(); }, [changes, down]);
-  return { names, problem, load };
+  return { names, problem, load, readAt };
 }
 
 export function SecretsSection({ store, down }: { store: Store; down: boolean }) {
-  const { names, problem, load } = useUserScope(store, down);
+  const { names, problem, load, readAt } = useUserScope(store, down);
   const adding = useSignal(false);
   const addingCard = useSignal(false);
   const replacing = useSignal<UserSecretRow | null>(null);
@@ -378,7 +382,7 @@ export function SecretsSection({ store, down }: { store: Store; down: boolean })
   const only = onlyMachine(rows);
   return (
     <section aria-labelledby="settings-secrets">
-      <h3 class="section-head" id="settings-secrets">{secretsTitle}</h3>
+      <HeadWithUpdate id="settings-secrets" title={secretsTitle} at={readAt.value} />
       {problem.value && <p class="hint">{problem.value}</p>}
       {left && (
         <div class="banner attention" role="status">

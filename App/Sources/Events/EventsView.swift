@@ -230,7 +230,14 @@ struct EventsView: View {
     /// list leaves both room.
     private var filters: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) { menus }
+            HStack(spacing: 8) {
+                menus
+                // Other machines' events are read every 30 s (#5146): how old the last read is.
+                if scope == nil, let read = model.work.busReadAt {
+                    Spacer(minLength: 8)
+                    LastUpdateText(read: read)
+                }
+            }
             HStack(spacing: 8) { chips }
         }
     }

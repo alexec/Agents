@@ -2488,6 +2488,14 @@ final class RemoteModel {
         host == .mac ? isStale : !reachableHosts.contains(host)
     }
 
+    /// When what the phone holds of `host` was last live (#5143), while it is stale: the
+    /// last read from the Mac or the control plane while that link is down, else the time
+    /// the server went. Nil while it answers.
+    func hostReadAt(_ host: MachineRef) -> Date? {
+        if isStale { return lastReadAt }
+        return host == .mac ? nil : hostDownSince[host]
+    }
+
     func isStale(_ agent: Agent) -> Bool { isStale(on: agent.host) }
 
     /// Who something sent to `host` goes to, as the in-flight mark (`Telling`) names it:

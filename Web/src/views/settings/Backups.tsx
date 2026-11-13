@@ -8,11 +8,14 @@ import { fromWireDate } from "../../protocol/dates";
 import { Capability } from "../../protocol/capabilities.generated";
 import type { BackupEvery, BackupRestoreResult, BackupSettings, BackupState, BackupTarget } from "../../protocol/generated";
 import { ask } from "../MessageKinds";
+import { HeadWithUpdate } from "../LastUpdate";
 
 /** Backups (#1810): how often, how many kept, where, Back Up Now, and Restore for each backup there. The
  * Mac's folder is its disk, so it is chosen on the Mac. A server's page draws the same (#1815). */
-function BackupsView({ state, onMac, title, id, configure, make, restore }: {
+function BackupsView({ state, readAt, onMac, title, id, configure, make, restore }: {
   state: BackupState;
+  /** When `state` was read (#5146): the page reads it when it opens, so it says how old it is. */
+  readAt: number | undefined;
   /** The Mac's backups, not a server's (#3425): only the Mac's folder is chosen on the Mac. */
   onMac: boolean;
   title: string;
@@ -31,7 +34,7 @@ function BackupsView({ state, onMac, title, id, configure, make, restore }: {
   const error = said ?? state.lastError;
   return (
     <section aria-labelledby={id}>
-      <h3 class="section-head" id={id}>{title}</h3>
+      <HeadWithUpdate id={id} title={title} at={readAt} />
       <label class="setting">
         <span>Back up</span>
         <select value={state.settings.every}
@@ -84,7 +87,7 @@ export function BackupsSection({ store }: { store: Store }) {
   const state = store.backups.value;
   if (!state) return null;
   return (
-    <BackupsView state={state} onMac title="Backups" id="settings-backups"
+    <BackupsView state={state} readAt={store.backupsAt.value} onMac title="Backups" id="settings-backups"
       configure={(settings) => void store.configureBackups(settings)} make={() => void store.makeBackup()}
       restore={(id) => store.restoreBackup(id)} />
   );
@@ -94,18 +97,19 @@ export function BackupsSection({ store }: { store: Store }) {
  * each change, and read again every few seconds while a backup is made: only the Mac's backups/changed is kept. */
 function ServerBackups({ store, host, name }: { store: Store; host: string; name: string }) {
   const [state, setState] = useState<BackupState | null>(null);
+  const [readAt, setReadAt] = useState<number | undefined>(undefined);
   const [asked, setAsked] = useState(false);
-  const read = () => void store.hostBackups(host).then((s) => { setState(s); setAsked(true); });
+  const read = () => void store.hostBackups(host).then((s) => { setState(s); setAsked(true); if (s) setReadAt(Date.now()); });
   useEffect(read, [store, host]);
   useEffect(() => {
     if (!state?.making) return undefined;
     const timer = setInterval(read, 3_000);
     return () => clearInterval(timer);
   }, [state?.making]);
-  const keep = (next: BackupState | null) => { if (next) setState(next); };
+  const keep = (next: BackupState | null) => { if (next) { setState(next); setReadAt(Date.now()); } };
   if (!state) return asked ? <p class="hint">{name} can’t be asked about its backups now.</p> : null;
   return (
-    <BackupsView state={state} onMac={false} title={`Backups of ${name}`} id={`settings-backups-${host}`}
+    <BackupsView state={state} readAt={readAt} onMac={false} title={`Backups of ${name}`} id={`settings-backups-${host}`}
       configure={(settings) => void store.configureBackups(settings, host).then(keep)}
       make={() => void store.makeBackup(host).then(keep)}
       restore={(id) => store.restoreBackup(id, host)} />

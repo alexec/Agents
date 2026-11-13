@@ -15,6 +15,8 @@ struct HostBackupsView: View {
 
     @State private var state: DaemonAPI.BackupState?
     @State private var failure: String?
+    /// When `state` was read (#5146).
+    @State private var readAt: Date?
 
     init(client: DaemonClient, hostName: String) {
         self.client = client
@@ -24,7 +26,8 @@ struct HostBackupsView: View {
     var body: some View {
         Form {
             if let state {
-                BackupsSection(state: state, configure: configure, make: make, restore: restore, title: "Backups of \(hostName)")
+                BackupsSection(state: state, configure: configure, make: make, restore: restore, title: "Backups of \(hostName)",
+                               readAt: readAt)
             } else if let failure {
                 Text(failure).foregroundStyle(.secondary)
             } else {
@@ -44,6 +47,7 @@ struct HostBackupsView: View {
     private func read() async {
         do {
             state = try await client.call(DaemonAPI.Method.backupsState, DaemonAPI.Empty(), returning: DaemonAPI.BackupState.self)
+            readAt = Date()
             failure = nil
         } catch let error as JSONRPCError {
             failure = error.message
@@ -54,11 +58,13 @@ struct HostBackupsView: View {
 
     private func configure(_ settings: DaemonAPI.BackupSettings) async throws {
         state = try await client.call(DaemonAPI.Method.backupsConfigure, settings, returning: DaemonAPI.BackupState.self)
+        readAt = Date()
     }
 
     private func make() async throws {
         state = try await client.call(DaemonAPI.Method.backupsMake, DaemonAPI.BackupMakeRequest(),
                                       returning: DaemonAPI.BackupState.self)
+        readAt = Date()
     }
 
     private func restore(_ backup: DaemonAPI.Backup) async throws -> DaemonAPI.BackupRestoreResult {
