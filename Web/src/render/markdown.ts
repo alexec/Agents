@@ -8,9 +8,12 @@
 // from bytes `forge/image` returns (#4011). A link opens in a new tab,
 // and only http, https and mailto links are links at all. A file: link, or a bare absolute path, is a link only
 // where the page says how a file opens (a chat opens it in Files, #548), and then it never navigates.
+// On a page, a relative link (`other.md`, `../docs/a.md`) is read against the page's own file and
+// opens that file where the page says (#5068), as on the Mac and the Remote (#5067).
 // An agents://agent/<id> link selects that session (#3353), as on the Mac and the Remote.
 import MarkdownIt, { type Token } from "markdown-it";
 import { pageImagePath } from "../model/pageImage";
+import { pageLinkTarget } from "../model/pageLink";
 import { agentLinkID, openAgentLink } from "../model/agentLink";
 import { LocalPicture } from "./LocalPicture";
 import { ForgePicture } from "./ForgePicture";
@@ -43,6 +46,27 @@ parser.validateLink = (url) => validateLink(url) || fileLinkPath(url) !== null;
 
 /** Opens a file on the agent's host by its full path: the chat's Files pane. */
 export type OpenFile = (location: { path: string }) => void;
+
+/**
+ * A page's links to files (#5068): `document` is the page's own file, which a relative link is read
+ * against, and `open` shows the file a link names. A file `takes` refuses stays words.
+ */
+export interface PageLinks {
+  document: string;
+  open: (path: string) => void;
+  takes?: ((path: string) => boolean) | undefined;
+}
+
+/** The file a link on a page names, by an absolute path or one relative to the page, or null. */
+function pageFile(href: string, links: PageLinks): string | null {
+  const path = fileLinkPath(href);
+  if (path) return path;
+  const target = pageLinkTarget(href, links.document);
+  return target?.kind === "file" ? target.path : null;
+}
+
+/** A button on a passage that is clicked or typed on does not also start editing the passage. */
+const own = (e: Event) => e.stopPropagation();
 
 /** The full path a file: link, or a bare absolute path, names on its host, or null for any other link. */
 export function fileLinkPath(href: string): string | null {
@@ -80,7 +104,7 @@ interface Frame {
 }
 
 /** Builds nodes from a flat token list with nesting, as markdown-it hands them over. */
-function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFile, forgeImages?: ForgeImages): ComponentChildren[] {
+function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFile, forgeImages?: ForgeImages, links?: PageLinks): ComponentChildren[] {
   const root: Frame = { tag: "", props: {}, children: [] };
   const stack: Frame[] = [root];
   const top = () => stack[stack.length - 1]!;
@@ -95,6 +119,8 @@ function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFil
         const href = String(token.attrGet("href") ?? "");
         const path = openFile ? fileLinkPath(href) : null;
         const agent = agentLinkID(href);
+        const linked = !path && links ? pageFile(href, links) : null;
+        const file = linked && (links?.takes?.(linked) ?? true) ? linked : null;
         if (isSafeLink(href)) {
           Object.assign(props, { href, target: "_blank", rel: "noopener noreferrer" });
         } else if (agent) {
@@ -103,6 +129,10 @@ function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFil
         } else if (path && openFile) {
           tag = "button";
           Object.assign(props, { type: "button", class: "link reading", title: path, onClick: () => openFile({ path }) });
+        } else if (file && links) {
+          tag = "button";
+          Object.assign(props, { type: "button", class: "link reading", title: file, onKeyDown: own,
+            onClick: (e: Event) => { own(e); links.open(file); } });
         } else {
           tag = "span";
         }
@@ -144,7 +174,7 @@ function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFil
         }
         // A cell of more than a few words may wrap, but not under 12em, as the Mac's TableColumns (#3943).
         if ((top().tag === "td" || top().tag === "th") && token.content.length > 16) top().props["class"] = "long";
-        top().children.push(...build(token.children ?? [], images, openFile, forgeImages));
+        top().children.push(...build(token.children ?? [], images, openFile, forgeImages, links));
         break;
       }
       case "text":
@@ -201,10 +231,10 @@ function build(tokens: readonly Token[], images?: PageImages, openFile?: OpenFil
 /**
  * Markdown as Preact nodes. `images` draws pictures from beside a document, and `forgeImages` a
  * forge page's; without them, none are fetched. `openFile` makes a file: link a way into that
- * file; without it, the link is its words.
+ * file, and `links` a page's relative links too; without them, the link is its words.
  */
-export function renderMarkdown(source: string, images?: PageImages, openFile?: OpenFile, forgeImages?: ForgeImages): ComponentChildren[] {
-  return build(parser.parse(source, {}), images, openFile, forgeImages);
+export function renderMarkdown(source: string, images?: PageImages, openFile?: OpenFile, forgeImages?: ForgeImages, links?: PageLinks): ComponentChildren[] {
+  return build(parser.parse(source, {}), images, openFile, forgeImages, links);
 }
 
 const fenceOpen = /^ {0,3}(`{3,}|~{3,})/;
@@ -270,15 +300,15 @@ export function markdownBlocks(source: string): string[] {
 }
 
 /** One finished block, parsed once. */
-const MarkdownBlock = memo(function MarkdownBlock({ text, images, openFile, forgeImages }: {
-  text: string; images?: PageImages | undefined; openFile?: OpenFile | undefined; forgeImages?: ForgeImages | undefined;
+const MarkdownBlock = memo(function MarkdownBlock({ text, images, openFile, forgeImages, links }: {
+  text: string; images?: PageImages | undefined; openFile?: OpenFile | undefined; forgeImages?: ForgeImages | undefined; links?: PageLinks | undefined;
 }): ComponentChildren {
-  return h(Fragment, null, ...renderMarkdown(text, images, openFile, forgeImages));
+  return h(Fragment, null, ...renderMarkdown(text, images, openFile, forgeImages, links));
 });
 
 /** A message's text, drawn; only a block whose text changed is parsed again (#170, #214). */
-export const Markdown = memo(function Markdown({ text, images, openFile, forgeImages }: {
-  text: string; images?: PageImages | undefined; openFile?: OpenFile | undefined; forgeImages?: ForgeImages | undefined;
+export const Markdown = memo(function Markdown({ text, images, openFile, forgeImages, links }: {
+  text: string; images?: PageImages | undefined; openFile?: OpenFile | undefined; forgeImages?: ForgeImages | undefined; links?: PageLinks | undefined;
 }): ComponentChildren {
-  return h("div", { class: "markdown" }, ...markdownBlocks(text).map((block, index) => h(MarkdownBlock, { key: index, text: block, images, openFile, forgeImages })));
+  return h("div", { class: "markdown" }, ...markdownBlocks(text).map((block, index) => h(MarkdownBlock, { key: index, text: block, images, openFile, forgeImages, links })));
 });

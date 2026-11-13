@@ -19,7 +19,9 @@ import {
 } from "../model/docs";
 import { projectName } from "../model/projects";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
-import { LiveDocument, type PageSource } from "./LiveDocument";
+import { LiveDocument, type OpenPageFile, type PageSource } from "./LiveDocument";
+import { isPageFile, pathInFolder } from "../model/pageLink";
+import { pathOf } from "./files/paneState";
 import { offerStart } from "./NewAgent";
 import { go, routeHash } from "../route";
 
@@ -298,6 +300,11 @@ export function DocPage({ store, docRef }: { store: Store; docRef: string }) {
   };
   const link = location.origin + location.pathname + location.search + routeHash({ nav: "docs", section: "docs", item: docRef });
   const filesPlace = doc && got.value ? folderPlace(store, got.value.host, doc) : undefined;
+  // A page in the doc's folder that a link names opens as the folder's page, as Open in Files does (#5068).
+  const opens: OpenPageFile | undefined = filesPlace && {
+    takes: (file) => { const page = pathInFolder(file, pathOf(filesPlace.folder)); return page !== null && isPageFile(page); },
+    open: (file) => { const page = pathInFolder(file, pathOf(filesPlace.folder)); if (page) go({ ...filesPlace, page }); },
+  };
   // The project it is in (#3408), as an issue's or a PR's page says it.
   const project = doc && got.value ? projectOfIn(store)(got.value.host, doc.folder) : undefined;
 
@@ -330,7 +337,7 @@ export function DocPage({ store, docRef }: { store: Store; docRef: string }) {
       )}
       {got.value && source && (
         <section class="work-body docs-text" aria-label="Text">
-          <LiveDocument store={store} host={got.value.host} agentID="" path={doc?.path ?? doc?.title ?? docRef} line={line} source={source} />
+          <LiveDocument store={store} host={got.value.host} agentID="" path={doc?.path ?? doc?.title ?? docRef} line={line} source={source} opens={opens} />
         </section>
       )}
     </article>
