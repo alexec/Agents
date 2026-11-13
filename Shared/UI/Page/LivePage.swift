@@ -29,6 +29,8 @@ import SwiftUI
 /// — the paper is the space and the type.
 struct LivePage: View {
     @Environment(\.pageActions) private var actions
+    /// The window's own way to open a link, for what the page does not show itself.
+    @Environment(\.openURL) private var windowOpenURL
 
     let text: String
     /// Where the document is, so an image beside it can be found.
@@ -113,6 +115,9 @@ struct LivePage: View {
                 .background { zoomKeys }
                 #endif
                 .textSelection(.enabled)
+                // A relative link names a file beside this one: read against the page, not
+                // handed to the system as it is, which macOS refused with error -50.
+                .environment(\.openURL, OpenURLAction { follow($0) })
                 .onAppear { load(text) }
                 .onChange(of: text) { _, new in
                     perform(page.follow(new), proxy: proxy)
@@ -151,6 +156,20 @@ struct LivePage: View {
                 }
             }
         }
+    }
+
+    // MARK: Links
+
+    private func follow(_ link: URL) -> OpenURLAction.Result {
+        switch MarkdownLink.target(of: link, onPage: url) {
+        case .samePage:
+            break
+        case .file(let file):
+            if actions.openFile?(file) != true { windowOpenURL(file) }
+        case .other(let other):
+            windowOpenURL(other)
+        }
+        return .handled
     }
 
     // MARK: Zoom

@@ -346,6 +346,7 @@ private struct DocPage: View {
                         .appText(.fine).foregroundStyle(.secondary).padding(.horizontal, 16).padding(.vertical, 6)
                 }
                 LivePage(text: reading.reading.text, url: pageURL(reading.reading.doc), line: line)
+                    .environment(\.pageActions, pageActions(reading.reading.doc, on: reading.host))
             } else {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -440,6 +441,19 @@ private struct DocPage: View {
     private func filesPlace(_ doc: DaemonAPI.Doc) -> (path: String, folder: String, host: MachineRef)? {
         guard let host = reading?.host, let folder = doc.folder, let path = doc.path else { return nil }
         return (path, folder, host)
+    }
+
+    /// Read only; a page in the doc's folder that a link names opens as the folder's page,
+    /// as Open in Files does. Anything else is the host's to open.
+    private func pageActions(_ doc: DaemonAPI.Doc, on host: MachineRef) -> PageActions {
+        var actions = PageActions()
+        guard let folder = doc.folder else { return actions }
+        actions.openFile = { [model] file in
+            guard let relative = PinRules.relative(file.path(percentEncoded: false), in: URL(filePath: folder)),
+                  PinRules.kind(relative) != nil else { return false }
+            return model.showDocFile(relative, folder: folder, on: host)
+        }
+        return actions
     }
 
     /// The document's own place, so a picture beside a folder doc can be found.

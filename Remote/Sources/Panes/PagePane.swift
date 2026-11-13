@@ -170,6 +170,11 @@ struct PagePane: View {
             await model.writeArtifact(agentID: agentID, path: path, text: document, base: base)
         }
         actions.typing = { model.isTyping = $0 }
+        // A file a link names opens where it belongs: a Markdown file on this Page, the rest in Files.
+        actions.openFile = { [state] file in
+            state.open(file: file, line: nil)
+            return true
+        }
         return actions
     }
 

@@ -42,6 +42,10 @@ struct PageActions {
     /// Told when a passage opens for typing and when it closes, so an agent asking to be
     /// looked at waits rather than taking the screen (034 FR-005).
     var typing: @MainActor (Bool) -> Void = { _ in }
+    /// Show a file a link on the page names, by its full path on the page's host, in the
+    /// app: true when it did. Nil, or false, and the link goes to the window's own
+    /// `openURL`, which hands the file to its host to open.
+    var openFile: (@MainActor (URL) -> Bool)? = nil
     /// What the language server for a source file's language finds in it, as the editor
     /// holds it (#844). It throws when the request fails, and the editor says why (#1687).
     /// Nil where nothing can ask, and then the editor lists nothing.

@@ -260,6 +260,16 @@ struct FilesPane: View {
         return probe.kind.isText && !probe.isTruncated
     }
 
+    /// The Mac's side of a Markdown page: a file a link names opens here, in the pane.
+    private var pageActions: PageActions {
+        var actions = MacPageActions.make(model: model, agentID: agent.id)
+        actions.openFile = { file in
+            open(file: file)
+            return true
+        }
+        return actions
+    }
+
     /// Where a link the person clicked on a page goes. Never into the file view itself.
     private func follow(_ link: HTMLPageScope.LinkDecision) {
         switch link {
@@ -429,7 +439,7 @@ struct FilesPane: View {
                          folderEvent: folderEvents)
                     // The page is shared with the phone (034); where it saves and how it
                     // reads a picture are the Mac's.
-                    .environment(\.pageActions, MacPageActions.make(model: model, agentID: agent.id))
+                    .environment(\.pageActions, pageActions)
                 if let probe, probe.isTruncated {
                     Divider()
                     Text("Showing the first \(ByteCountFormatter.string(fromByteCount: Int64(probe.prefix.count), countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: Int64(probe.size), countStyle: .file)).")
