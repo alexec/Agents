@@ -83,11 +83,19 @@ struct PinnedPage: View {
 
     private var actions: PageActions {
         let pictures = pictures ?? PhonePagePictures(model: model, folder: folder)
-        return PageActions(
+        var actions = PageActions(
             save: { [model, folder, path] _, document in await model.writePage(path, in: folder, text: document) },
             image: { url in await pictures.image(url) },
             stamp: { url in await pictures.stamp(url) },
             canEdit: model.isConnected)
+        // A page in the folder that a link names opens in this one's place, as on the Mac.
+        actions.openFile = { [model, folder] file in
+            guard let relative = PinRules.relative(file.path(percentEncoded: false), in: folder),
+                  PinRules.kind(relative) != nil else { return false }
+            model.openPin = relative
+            return true
+        }
+        return actions
     }
 
     private func load() async {
