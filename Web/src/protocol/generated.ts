@@ -3783,11 +3783,17 @@ export interface ElicitationAnswer {
 /**
  * An agent's hand_to_person (#3529): one step the person does on the page in the machine's browser
  * (solve a CAPTCHA, sign in). The form's one choice is Done or Can't do it; a client that can show
- * the machine's browser offers Open the page.
+ * the machine's browser offers Open the page, unless the step is in another window (window).
  */
 export interface ElicitationHandOff {
   step: string;
   reason?: string;
+  /**
+   * Where the person does the step when it is not in the machine's browser (#5095): one of the
+   * agents' own Chrome windows, as "the agents' Chrome (DevTools port 9233), at the tab “Create
+   * account”". A client then offers no Open the page and says this window instead.
+   */
+  window?: string;
 }
 
 export interface ElicitationNotification {
@@ -16049,7 +16055,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   EffectiveRule: { required: ["rule", "value", "words", "layers"], optional: ["decides", "cap", "capLine"] },
   EffectiveSandbox: { required: ["state", "requested"], optional: ["reason"] },
   ElicitationAnswer: { required: ["question", "answer"], optional: [] },
-  ElicitationHandOff: { required: ["step"], optional: ["reason"] },
+  ElicitationHandOff: { required: ["step"], optional: ["reason", "window"] },
   ElicitationNotification: { required: ["agentID", "requestID"], optional: ["request"] },
   ElicitationRequest: { required: ["id", "agentID", "mode", "scope", "askedAt"], optional: ["elicitationID", "message", "secret", "handOff"] },
   ElicitationSchema: { required: ["properties"], optional: ["title", "description"] },

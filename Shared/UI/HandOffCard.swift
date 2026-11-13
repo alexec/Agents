@@ -22,6 +22,12 @@ struct HandOffCard: View {
     @State private var note = ""
     @FocusState private var noteFocused: Bool
 
+    /// Said in place of Open the page for a step in one of the agents' own Chrome windows
+    /// (#5095): "Do it in the agents' Chrome (DevTools port 9233), … on your Mac."
+    static func inWindow(_ window: String, on host: String) -> String {
+        "Do it in \(window) on \(host)."
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label {

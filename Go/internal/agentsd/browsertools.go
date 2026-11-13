@@ -227,6 +227,15 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	if a == nil {
 		return failed(leaseNoCall)
 	}
+	if _, inChrome := handOffPort(args); name == handToPersonName && inChrome {
+		// The step is in one of the agents' own Chrome windows (#5095), not the app's
+		// browser: no lease and no Playwright, only the card.
+		if d.isBot() {
+			return failed(noOneAnswersWords)
+		}
+		said, isError := d.handToPerson(ctx, agent, args)
+		return []any{map[string]any{"type": "text", "text": said}}, isError, said
+	}
 	if !d.browserAvailable() {
 		return failed("The browser can't be installed on " + thisMachine() + ".")
 	}
@@ -291,7 +300,7 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	defer d.browserDrove(agent)
 	if name == handToPersonName {
 		// The person drives: no Playwright is needed for it.
-		said, isError := d.handToPerson(agent, args)
+		said, isError := d.handToPerson(ctx, agent, args)
 		return []any{map[string]any{"type": "text", "text": said}}, isError, said
 	}
 	ctx, cancel := context.WithTimeout(ctx, browserCallLongest)
