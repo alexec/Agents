@@ -16,6 +16,8 @@ public enum AgentWrite: Sendable, Hashable {
     case mute(Bool)
     /// A queued prompt sent into the running turn, by its id.
     case sendNow(UUID)
+    /// A queued session started at once (#5156): drawn as starting.
+    case startNow
     /// Move to a worktree or back to the folder (053), or with nil take back the move that
     /// waits (#4814). Drawn as the move that waits: the host makes it at once between
     /// turns, and its record then says where the agent is.
@@ -31,6 +33,7 @@ public enum AgentWrite: Sendable, Hashable {
         case .labels: return "change the labels"
         case .mute(let muted): return muted ? "mute" : "unmute"
         case .sendNow: return "send now"
+        case .startNow: return "start it now"
         case .move(let target): return target == nil ? "cancel the move" : "move"
         }
     }
@@ -87,6 +90,9 @@ public enum AgentWrite: Sendable, Hashable {
             agent.isMuted = muted
         case .sendNow(let promptID):
             agent.queuedPrompts.removeAll { $0.id == promptID }
+        case .startNow:
+            guard agent.state == .queued else { break }
+            agent.state = .starting
         case .move(let target):
             agent.pendingMove = target.map { PendingMove(target: $0, askedBy: .person, askedAt: now) }
         }
@@ -111,6 +117,7 @@ public enum AgentWrite: Sendable, Hashable {
                 && remove.allSatisfy { !held.contains(SessionLabelPolicy.key($0)) }
         case .mute(let muted): return agent.isMuted == muted
         case .sendNow(let promptID): return !agent.queuedPrompts.contains { $0.id == promptID }
+        case .startNow: return agent.state != .queued
         case .move(let target):
             // Waiting for the turn to end, or taken back. A move made at once is settled by
             // the host's answer instead (`settleWrite(_:on:failed:done:)`).

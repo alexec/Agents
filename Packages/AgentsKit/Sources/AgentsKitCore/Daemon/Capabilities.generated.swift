@@ -11,6 +11,7 @@ public enum Capability {
     public static let agentsFind1 = "agents.find/1"
     public static let agentsMoveWorktree1 = "agents.move-worktree/1"
     public static let agentsSaid1 = "agents.said/1"
+    public static let agentsStartNow1 = "agents.start-now/1"
     public static let agents1 = "agents/1"
     public static let approvals1 = "approvals/1"
     public static let artifact1 = "artifact/1"
@@ -268,6 +269,7 @@ public enum Capability {
         "agents/setSandbox": "agents/1",
         "agents/setUnread": "agents/1",
         "agents/start": "agents/1",
+        "agents/startNow": "agents.start-now/1",
         "agents/stop": "agents/1",
         "agents/stopBackground": "agents/1",
         "agents/summaryFacts": "summary.machines/1",

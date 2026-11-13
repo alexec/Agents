@@ -515,6 +515,12 @@ struct RemoteChatView: View {
         return { [model] command in Task { await model.tellAgent(about: command, in: agent.id) } }
     }
 
+    /// Start now on a queued session (#5156), where its host has it; nil draws no button.
+    private var startNow: (@MainActor (UUID) async -> Void)? {
+        guard model.agent(agent?.id, has: Capability.agentsStartNow1) else { return nil }
+        return { [model] agentID in await model.startNow(agentID) }
+    }
+
     private var actions: ChatActions {
         let agentID = agent?.id
         // This Mac's page at its Resources (#116, #4027), as the Mac opens its machine page
@@ -548,6 +554,7 @@ struct RemoteChatView: View {
             tellAgent: tellAgent,
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in model.canSteer(runtimeID) },
+            startNow: startNow,
             acting: { [model] agentID in model.acting(agentID) },
             // Show in Changes under an edit (#242), at that file in the new pane (#245).
             showEdit: { [model] diff, _ in

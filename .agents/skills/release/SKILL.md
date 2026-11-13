@@ -351,8 +351,8 @@ A tag that already exists for this version means another release ran: end with
       `https://github.com/orgs/<owner>/packages/container/agents-control/settings` ▸ Danger
       Zone ▸ Change visibility ▸ Public, type `agents-control`, then "I understand the
       consequences". There is no API for it: the Packages API only reads `visibility`. If
-      GitHub asks for sudo, pass it with the agents' passkey `GITHUB_ALEXEC_PASSKEY`, as
-      the sign-up skill's "GitHub sudo on `alexec`" says (#4955, #5096).
+      GitHub asks for sudo, use the agents' passkey (#4955, #4085); until that lands,
+      `hand_to_person` for the sudo step only.
    3. Run `ghcr-public.sh` again: it must exit 0 before item 5.
 
    **Not now**, or no answer: skip item 5 (the VM cannot pull the new image), and say in

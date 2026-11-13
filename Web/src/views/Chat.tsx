@@ -51,7 +51,7 @@ import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { ViewDiff } from "./chat/ViewDiff";
 import { offerStart } from "./NewAgent";
 import { BackToList } from "./BackToList";
-import { comingBackDescription, footStatusWords, startingLabel } from "../model/status";
+import { canStartNow, comingBackDescription, footStatusWords, startingLabel, startNowHelp } from "../model/status";
 import { ArchiveCard } from "./ArchiveCard";
 import { DesktopControlPauseCard } from "./DesktopControlPauseCard";
 import { SecretUseCard } from "./SecretUseCard";
@@ -862,8 +862,10 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
   const acting = store.onItsWay.value[agent.id];
   return (
     <>
-      {(agent.queuedPrompts ?? []).map((queued) => {
-        const going = typeof acting === "object" && acting.sendNow === queued.id;
+      {(agent.queuedPrompts ?? []).map((queued, index) => {
+        // A queued session's first words carry its Start now, as Send now (#5156): it starts the session at once.
+        const starts = index === 0 && canStartNow(agent) && store.has(host, Capability.agentsStartNow1);
+        const going = starts ? acting === "agents/startNow" : typeof acting === "object" && acting.sendNow === queued.id;
         if (editing.value?.id === queued.id) {
           // Edit open (#1552): the words in the bubble's place, Cancel and Save under them; Save keeps its place.
           return (
@@ -892,9 +894,10 @@ function Queued({ store, host, agent, disabled, draftKey }: { store: Store; host
             {queued.attachments.length > 0 && <p class="small">📎 {queued.attachments.map((a) => a.displayName).join(", ")}</p>}
           </div>
           <div class="queued-actions">
-            {canSendNow && (going ? <Telling recipient={store.recipient(host)} doing="Sending" /> : (
-              <button class="link" disabled={disabled || !!acting} title="Send this into the turn that is running, without waiting for it to end"
-                onClick={() => void store.sendNow(host, agent.id, queued.id)}>↑ Send now</button>
+            {(canSendNow || starts) && (going ? <Telling recipient={store.recipient(host)} doing={starts ? "Starting" : "Sending"} /> : (
+              <button class="link" disabled={disabled || !!acting}
+                title={starts ? startNowHelp : "Send this into the turn that is running, without waiting for it to end"}
+                onClick={() => void (starts ? store.startNow(host, agent.id) : store.sendNow(host, agent.id, queued.id))}>↑ Send now</button>
             ))}
             {/* The person's own words only: another agent's are theirs (#560). On a host too old to change them (#1748), greyed and saying why (#1866). */}
             {(queued.from ?? "person") === "person" && (

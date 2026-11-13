@@ -47,6 +47,7 @@ var CallAgentsSetOption = Method[SetOptionRequest, []ConfigOption]{"agents/setOp
 var CallAgentsSetSandbox = Method[SetSandboxRequest, Agent]{"agents/setSandbox"}
 var CallAgentsSetUnread = Method[SetUnreadRequest, Empty]{"agents/setUnread"}
 var CallAgentsStart = Method[StartRequest, UUID]{"agents/start"}
+var CallAgentsStartNow = Method[AgentRequest, Empty]{"agents/startNow"}
 var CallAgentsStop = Method[AgentStopRequest, Empty]{"agents/stop"}
 var CallAgentsStopBackground = Method[StopBackgroundRequest, JSONValue]{"agents/stopBackground"}
 var CallAgentsSummaryFacts = Method[SummaryFactsRequest, SummaryFacts]{"agents/summaryFacts"}

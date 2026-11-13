@@ -15026,6 +15026,7 @@ export interface Methods {
   "agents/setSandbox": { params: SetSandboxRequest; result: Agent };
   "agents/setUnread": { params: SetUnreadRequest; result: Empty };
   "agents/start": { params: StartRequest; result: UUID };
+  "agents/startNow": { params: AgentRequest; result: Empty };
   "agents/stop": { params: AgentStopRequest; result: Empty };
   "agents/stopBackground": { params: StopBackgroundRequest; result: JSONValue };
   "agents/touchedPaths": { params: AgentRequest; result: string[] };
@@ -15469,6 +15470,7 @@ export const MethodTarget = {
   "agents/setSandbox": "host",
   "agents/setUnread": "host",
   "agents/start": "host",
+  "agents/startNow": "host",
   "agents/stop": "host",
   "agents/stopBackground": "host",
   "agents/touchedPaths": "host",

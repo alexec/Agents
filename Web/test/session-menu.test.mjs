@@ -33,6 +33,16 @@ test("a session that asks to be archived offers Archive and Keep Session; there 
   assert.deepEqual(labels("asks to archive when the turn ends, running"), ["Stop", "Rename…", "Branch", "Archive"]);
 });
 
+test("a queued session an agent started offers Send Now (Start now) first, on a host that has it (#5156)", () => {
+  const queued = { ...agents["running"], state: "queued", startedByAgent: "11111111-1111-1111-1111-111111111111" };
+  const offered = (canStart, agent = queued) => sessionActions(agent, undefined, [], false, false, canStart).map((a) => a.label);
+  assert.deepEqual(offered(true).slice(0, 2), ["Send Now", "Stop"]);
+  assert.equal(offered(false).includes("Send Now"), false);
+  // The person's own queued start is not past a limit, so it has none.
+  const { startedByAgent: _, ...persons } = queued;
+  assert.equal(offered(true, persons).includes("Send Now"), false);
+});
+
 test("archived offers Unarchive and Delete, and no Branch (#398)", () => {
   assert.deepEqual(labels("archived"), ["Unarchive", "Delete…"]);
 });

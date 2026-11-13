@@ -6402,6 +6402,20 @@ final class AppModel {
         }
     }
 
+    /// Start now (#5156): a queued session started at once, past the running limit, by the
+    /// person's click. The host refuses it when the folder's total is full, and says why.
+    func startNow(_ agentID: UUID) async {
+        await act(.startNow, on: agentID) {
+            try await self.client(forAgent: agentID).call(DaemonAPI.Method.agentsStartNow,
+                                       DaemonAPI.AgentRequest(agentID: agentID))
+        }
+    }
+
+    /// Whether Start now is offered on this session: queued by an agent, on a host that has it.
+    func canStartNow(_ agent: Agent) -> Bool {
+        HelperLimit.canStartNow(agent) && self.agent(agent.id, has: Capability.agentsStartNow1)
+    }
+
     /// Something asked of a whole agent, sent once (#87). Held in `work.acting` until the
     /// host has answered, so whichever control sent it shows it on its way, and the menu,
     /// the row, the swipe and the key all refuse a second until it is back. False when it

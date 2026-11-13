@@ -10,6 +10,7 @@ const CapAgentsExport1 = "agents.export/1"
 const CapAgentsFind1 = "agents.find/1"
 const CapAgentsMoveWorktree1 = "agents.move-worktree/1"
 const CapAgentsSaid1 = "agents.said/1"
+const CapAgentsStartNow1 = "agents.start-now/1"
 const CapAgents1 = "agents/1"
 const CapApprovals1 = "approvals/1"
 const CapArtifact1 = "artifact/1"
@@ -267,6 +268,7 @@ var HostCapabilities = pairs([][2]string{
 	{"agents/setSandbox", "agents/1"},
 	{"agents/setUnread", "agents/1"},
 	{"agents/start", "agents/1"},
+	{"agents/startNow", "agents.start-now/1"},
 	{"agents/stop", "agents/1"},
 	{"agents/stopBackground", "agents/1"},
 	{"agents/summaryFacts", "summary.machines/1"},

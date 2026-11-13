@@ -114,6 +114,15 @@ export function ordinal(n: number): string {
   return `${n}${suffix}`;
 }
 
+/** HelperLimit.startNowLabel and its help (#5156): a queued session started at once, past the running limit. */
+export const startNowLabel = "Send Now";
+export const startNowHelp = "Start this session now, ahead of the queue and past the running limit";
+
+/** HelperLimit.canStartNow: a session an agent started that waits in the queue. The host still refuses it past the total. */
+export function canStartNow(agent: Pick<Agent, "state" | "startedByAgent">): boolean {
+  return agent.state === "queued" && agent.startedByAgent !== undefined;
+}
+
 /** HelperLimit.queuedLabel: "Queued", or with its place in the queue (#362). */
 export function queuedLabel(position: number | null): string {
   return position === null ? "Queued" : `Queued, ${ordinal(position)}`;

@@ -178,6 +178,9 @@ public enum DaemonAPI {
         public static let filesWatch = "files/watch"
         public static let filesUnwatch = "files/unwatch"
         public static let agentsStop = "agents/stop"
+        /// A queued session started at once by the person, past the running limit and
+        /// never past the total (#5156). Takes an `AgentRequest`. No agent's role may call it.
+        public static let agentsStartNow = "agents/startNow"
         public static let agentsArchive = "agents/archive"
         public static let agentsUnarchive = "agents/unarchive"
         /// Delete one archived agent: its conversation, record and clean worktree (#398).

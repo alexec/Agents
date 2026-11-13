@@ -268,6 +268,13 @@ struct AgentMenuItems: View {
     let agent: Agent
 
     var body: some View {
+        // Ahead of the queue and past the running limit, by the person's own tap (#5156).
+        if model.canStartNow(agent) {
+            Button(HelperLimit.startNowLabel, systemImage: "arrow.up") {
+                Task { await model.startNow(agent.id) }
+            }
+            .disabled(isActing)
+        }
         if model.canStop(agent) {
             Button("Stop", icon: "stop.circle") {
                 Task { await model.stop(agent.id) }

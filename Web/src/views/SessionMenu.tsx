@@ -23,8 +23,9 @@ import { moveToMachine } from "./MoveToMachineDialog";
 import { ask } from "./MessageKinds";
 import { MenuKey } from "./ContextMenu";
 import { listKeyGlyph } from "../model/listKeys";
+import { canStartNow, startNowHelp, startNowLabel } from "../model/status";
 
-export type Action = "carryOn" | "agents/stop" | "stopAll" | "agents/archive" | "agents/unarchive"
+export type Action = "carryOn" | "agents/startNow" | "agents/stop" | "stopAll" | "agents/archive" | "agents/unarchive"
   | "markRead" | "markUnread" | "mute" | "unmute" | "rename" | "pin" | "unpin" | "fork" | "moveToMachine" | "delete" | "keep";
 
 /**
@@ -32,12 +33,15 @@ export type Action = "carryOn" | "agents/stop" | "stopAll" | "agents/archive" | 
  * whether it is pinned, Pin or Unpin too (#180); given the sessions it started, Stop All
  * while one of them can stop (#835); given a host that can move it, Move to Machine… (#3790).
  */
-export function sessionActions(agent: Agent, pinned?: boolean, started: readonly Agent[] = [], canMute = false, canMove = false)
+export function sessionActions(agent: Agent, pinned?: boolean, started: readonly Agent[] = [], canMute = false, canMove = false,
+  canStart = false)
   : { action: Action; label: string; help: string; shortcut?: string }[] {
   const found: { action: Action; label: string; help: string; shortcut?: string }[] = [];
   const holds = agent.state === "starting" || agent.state === "running" || agent.state === "waitingOnUser";
   // First, as the window's row menu has it (AgentRow's contextMenu); the strip in the chat has it too.
   if (openBlock(agent)) found.push({ action: "carryOn", label: carryOnLabel, help: carryOnHelp(agent) });
+  // Ahead of the queue and past the running limit, by the person's own click (#5156), as AgentRow's menu.
+  if (canStart && canStartNow(agent)) found.push({ action: "agents/startNow", label: startNowLabel, help: startNowHelp });
   if (holds || (agent.state === "finished" && isOpenBlock(agent.report))) {
     found.push({ action: "agents/stop", label: "Stop", help: "Stop this session's turn" });
   } else if (agent.state === "queued") {
@@ -237,7 +241,7 @@ export function SessionMenu({ store, host, agent, disabled, find, findsOnHost = 
               }}>{thoughtsItem(showsThoughts.value).label}</button>
           )}
           {sessionActions(agent, store.sessionPinsIn(host, folderPath(agent)).includes(agent.id), startedBy(store, host, agent),
-            store.has(host, Capability.mute1), canMoveOn(store, host)).map(({ action, label, help, shortcut }) => (
+            store.has(host, Capability.mute1), canMoveOn(store, host), store.has(host, Capability.agentsStartNow1)).map(({ action, label, help, shortcut }) => (
             <button key={action} role="menuitem" title={help}
               onClick={() => {
                 open.value = false;
@@ -278,6 +282,7 @@ export function runSessionAction(store: Store, host: string, agent: Agent, actio
   else if (action === "stopAll") void stopAll(store, host, agent);
   else if (action === "delete") void ask(`${deleteTitle(agent.title)}\n\n${deleteMessageFor(agent)}`).then((yes) => { if (yes) void remove(store, host, agent); });
   else if (action === "agents/unarchive") void store.unarchive(host, agent.id);
+  else if (action === "agents/startNow") void store.startNow(host, agent.id);
   else void store.perform(host, agent.id, action);
 }
 

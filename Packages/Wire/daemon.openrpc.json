@@ -1318,6 +1318,32 @@
       }
     },
     {
+      "name": "agents/startNow",
+      "x-capability": "agents.start-now/1",
+      "description": "A person starts a queued session at once (#5156): past the folder's running limit, never past its total. Not an agent's: the agent role cannot call it, and no app tool does.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
       "name": "agents/stop",
       "x-capability": "agents/1",
       "tags": [
