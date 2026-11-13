@@ -115,8 +115,12 @@ agentloops@fastmail.com where the site lets you, or ask Alex with `ask_question`
   `<PROVIDER>_PASSWORD`: it is saved in Settings ▸ Secrets and typed in unseen. Fill a confirm
   field, and later sign-ins, with `fill_secret` and the same name. Give the site's rules as
   `rules` when it states them in words. On a change-password page, set `replace: true`; the
-  old value stays as `<NAME>_PREVIOUS`. Older accounts (0.7) keep theirs in the Keychain item
-  `agents-signup:<domain>`.
+  old value stays as `<NAME>_PREVIOUS`. Older accounts (0.7) kept theirs in the Keychain item
+  `agents-signup:<domain>`: agentsd copies each one into Settings ▸ Secrets at start (#5043), as
+  `<PROVIDER>_PASSWORD` (the domain's first label; `AWS_PASSWORD`, `GOOGLE_WORKSPACE_PASSWORD`,
+  `OKTA_INTEGRATOR_PASSWORD`), with Ask before use on, unless that name is set already. Sign in
+  with `fill_secret` and that name; never read the Keychain item yourself. A site that has not
+  seen the browser may still send a new-device code to agentstest@ until #4303 moves the account.
 - **Tokens, keys and app passwords a page shows once:** save it with `capture_secret` (#4028)
   on the element that shows it, named `<PROVIDER>_TOKEN` (or `_PASSWORD`), with its prefix as
   `pattern` (`glpat-[A-Za-z0-9_-]{20,}`, `dop_v1_[a-f0-9]{64}`). It is saved in Settings ▸
