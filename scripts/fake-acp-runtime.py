@@ -26,6 +26,11 @@ every turn, from `<its folder>/<its name>.behaviour`:
   goal    the turn sends the goal in `<its folder>/<its name>.goal` (JSON: a snapshot, or
           null to clear it) on a session_info_update, as Codex's and Claude's adapters do
           for an AIR client, then answers: for seeing the goal card (#2742).
+  plan [<name> <json arguments>]
+          the turn sends the plan in `<its folder>/<its name>.plan` (JSON: the entries, each
+          with content, priority and status) as Claude's to-do list, then, with a tool named,
+          calls it as `tool` does: for seeing the first build's plan page tick its tasks, and
+          a task wait on a card (#5054).
   ok      (or no file) it answers, saying what it was handed.
 
 So a walk can make a runtime run out, and later come back, by rewriting one file.
@@ -164,6 +169,25 @@ def prompt(request_id, params):
         update({"sessionUpdate": "tool_call_update", "toolCallId": "tool-1", "status": "completed",
                 "content": [{"type": "content", "content": {"type": "text", "text": text}}]})
         time.sleep(hold)
+        say(session_id, text)
+        reply(request_id, {"stopReason": "end_turn"})
+        return
+    if how and how[0] == "plan":
+        with open(os.path.join(HERE, f"{NAME}.plan")) as f:
+            entries = json.load(f)
+
+        def update(body):
+            send({"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": session_id, "update": body}})
+
+        update({"sessionUpdate": "plan", "entries": entries})
+        text = "The plan is up."
+        if len(how) > 1:
+            _, name, arguments = behaviour().split(maxsplit=2)
+            update({"sessionUpdate": "tool_call", "toolCallId": "tool-1", "title": f"mcp__agents__{name}",
+                    "kind": "other", "status": "in_progress", "rawInput": json.loads(arguments)})
+            text = call_tool(session_id, name, json.loads(arguments))
+            update({"sessionUpdate": "tool_call_update", "toolCallId": "tool-1", "status": "completed",
+                    "content": [{"type": "content", "content": {"type": "text", "text": text}}]})
         say(session_id, text)
         reply(request_id, {"stopReason": "end_turn"})
         return

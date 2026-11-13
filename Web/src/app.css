@@ -2942,3 +2942,34 @@ dialog.message-alert { width: min(420px, calc(100vw - 32px)); }
 .first-build-idea.still { transition: none; }
 @media (prefers-reduced-motion: reduce) { .first-build-idea { transition: none; } }
 .first-build-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; }
+
+/* The plan page (#5054): after Submit, the whole page, as the Mac window's (#5053). The plan on top,
+   the first-build session's chat under it. */
+.first-build-plan { height: 100vh; display: flex; flex-direction: column; position: relative; box-sizing: border-box; }
+.first-build-open { position: absolute; top: 16px; right: 16px; z-index: 1; }
+.first-build-plan-head { width: min(640px, 100%); margin: 0 auto; padding: 16px 40px; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 14px; flex: none; max-height: 60vh; overflow-y: auto; }
+.first-build-plan-head h1 { font-size: var(--type-title); font-weight: 600; margin: 0; padding-right: 110px; }
+.first-build-starter { display: flex; align-items: center; gap: 8px; margin: -8px 0 0; }
+.first-build-starter > .quiet, .first-build-choose > .quiet { font-size: var(--type-reading); }
+.first-build-choose { display: flex; flex-direction: column; gap: 10px; }
+.first-build-choose .row-actions { display: flex; gap: 8px; margin: 0; }
+.first-build-tasks { list-style: none; margin: 0; padding: 14px; display: flex; flex-direction: column; gap: 8px;
+  background: var(--paper-raised); border: 1px solid var(--paper-edge); border-radius: var(--radius-card); }
+.first-build-task { display: flex; gap: 10px; align-items: flex-start; }
+.first-build-task-icon { flex: none; width: 16px; height: 16px; margin-top: 3px; border-radius: 50%; box-sizing: border-box;
+  display: grid; place-items: center; font-size: 10px; font-weight: 700; line-height: 1; }
+.first-build-task.to-do .first-build-task-icon { border: 1.5px solid var(--paper-tertiary); }
+.first-build-task.done .first-build-task-icon { background: var(--accent); color: var(--paper-on-fill); }
+.first-build-task.waits-for-you .first-build-task-icon { background: var(--tint-attention); color: var(--paper-on-fill); }
+.first-build-task-icon .spinner { width: 12px; height: 12px; }
+.first-build-task-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.first-build-task-body p { margin: 0; font-size: var(--type-reading); display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.first-build-task.done .first-build-task-words { color: var(--paper-secondary); }
+.first-build-waits { font-size: var(--type-supporting); font-weight: 500; color: var(--tint-attention); }
+.first-build-runtime { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.first-build-runtime p { flex-basis: 100%; }
+.first-build-start { margin: 0; display: flex; align-items: center; gap: 8px; font-size: var(--type-supporting); }
+.first-build-start.problem { color: var(--tint-attention); justify-content: space-between; }
+.first-build-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; border-top: 1px solid var(--paper-rule); }
+.first-build-chat-empty { margin: auto; }

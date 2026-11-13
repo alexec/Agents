@@ -5,6 +5,8 @@ import { Columns } from "./views/Columns";
 import { OtherControlPlane, Pairing, Suspended, Unsupported } from "./views/Pairing";
 import { TakeOverPage } from "./views/TakeOverPage";
 import { QuestionPage, showsFirstBuild } from "./views/FirstBuild";
+import { PlanPage } from "./views/FirstBuildPlan";
+import { firstBuild } from "./model/firstBuild";
 import { route } from "./route";
 
 export function App({ session, store }: { session: Session; store: Store }) {
@@ -36,8 +38,11 @@ export function App({ session, store }: { session: Session; store: Store }) {
         return <TakeOverPage key={`${r.host}|${r.session}|${r.takeOver}`} store={store} host={r.host} session={r.session}
           source={r.takeOver} down={state.kind === "down"} />;
       }
-      // A newcomer's first open (#5051): the question page on the whole page, no columns.
-      if (showsFirstBuild(store)) return <QuestionPage />;
+      // A newcomer's first open (#5051): the question page on the whole page, no columns; after
+      // Submit, the plan page with the first-build session's chat, until Open Agents (#5054).
+      if (showsFirstBuild(store)) {
+        return firstBuild.sent.value ? <PlanPage store={store} down={state.kind === "down"} /> : <QuestionPage />;
+      }
       return <Columns session={session} store={store} />;
     }
   }

@@ -3,6 +3,7 @@
 // and what this browser keeps: whether the page shows, and the idea once it was sent. Kept in
 // localStorage, as the achievements' cards are; the Mac window keeps the same in its defaults.
 import { signal } from "@preact/signals";
+import type { Agent, PlanEntry } from "../protocol/generated";
 
 export type Starter = "iphone-app" | "web-service";
 
@@ -56,19 +57,156 @@ export function weigh(kept: Kept | null, facts: FirstBuildFacts, sent: boolean):
   return isSetUp(facts) && !sent ? "gone" : "showing";
 }
 
+// MARK: The plan page (#5054, spec sections 3 to 6), as FirstBuild in AgentsKitCore (#5053).
+
+/** What the words of an idea say about its starter (sections 3 and 4). */
+export type StarterPick = Starter | "unknown" | "neither";
+
+const iphoneWords = new Set(["iphone", "ios", "ipad", "testflight"]);
+const webWords = new Set(["web", "website", "site", "page", "service", "server", "api", "email"]);
+const neitherWords = new Set(["mac", "macos", "android", "game", "windows", "desktop"]);
+
+/**
+ * The starter an idea picks: an idea from the list keeps its own; typed words pick by the first
+ * word that names a kind (`app store` names the iPhone app). A bare "app" picks nothing.
+ * `FirstBuild.starter(for:)`, held to Fixtures/web/first-build/starters.json.
+ */
+export function firstBuildStarter(idea: string): StarterPick {
+  const trimmed = idea.trim();
+  const listed = firstBuildIdeas.find((i) => i.words.toLowerCase() === trimmed.toLowerCase());
+  if (listed) return listed.starter;
+  const words = trimmed.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w !== "");
+  for (let index = 0; index < words.length; index++) {
+    const word = words[index]!;
+    if (iphoneWords.has(word)) return "iphone-app";
+    if (word === "app" && words[index + 1] === "store") return "iphone-app";
+    if (webWords.has(word)) return "web-service";
+    if (neitherWords.has(word)) return "neither";
+  }
+  return "unknown";
+}
+
+/** The line above the choice for an idea neither starter makes (section 4). */
+export const neitherLine =
+  "Agents can start with an iPhone app or a web service. Choose one, and the agent builds your idea on it as far as it goes.";
+
+export const starters: readonly Starter[] = ["iphone-app", "web-service"];
+
+/** Who does a task: the page, before the agent can start, or the agent. */
+export type Doer = "app" | "agent";
+
+/** One task of a starter's list, in the skill's exact words (section 6). */
+export interface PlanTask { words: string; doer: Doer }
+
+/** The page's two tasks, first on both lists. */
+export const runtimeTask = "Set up the agent runtime";
+export const githubTask = "Connect GitHub";
+
+/** A starter's task list, in order; the skill writes the same words as its plan (#5052). Held to first-build/tasks.json. */
+export function firstBuildTasks(starter: Starter): PlanTask[] {
+  const app: PlanTask[] = [{ words: runtimeTask, doer: "app" }, { words: githubTask, doer: "app" }];
+  const agent = (words: string): PlanTask => ({ words, doer: "agent" });
+  return starter === "iphone-app"
+    ? [...app, agent("Make the repository from alexec/iphone-app-starter"), agent("Join the Apple Developer Program"),
+      agent("Put the App Store Connect key in the repository's CI"), agent("Set up Sentry"),
+      agent("Send the first build to TestFlight"), agent("Approve the first build")]
+    : [...app, agent("Make the repository from alexec/web-service-starter"), agent("Set up Google Cloud (Cloud Run)"),
+      agent("Set up Sentry"), agent("Deploy the first version"), agent("Approve the first deploy")];
+}
+
+/** The line under the title: what will be built, and from which template. */
+export function starterLine(starter: Starter): string {
+  return starter === "iphone-app" ? "An iPhone app, from alexec/iphone-app-starter" : "A web service, from alexec/web-service-starter";
+}
+
+/** The choice's own words. */
+export function kindName(starter: Starter): string {
+  return starter === "iphone-app" ? "iPhone app" : "Web service";
+}
+
+export type TaskState = "to-do" | "doing" | "done" | "waits-for-you";
+
+/** What the plan page knows (section 6): its two tasks from real state, the agent's from its plan. */
+export interface PlanFacts {
+  runtimeReady: boolean;
+  githubConnected: boolean;
+  /** The first-build session's plan in force, once it has sent one. */
+  plan?: readonly PlanEntry[] | undefined;
+  /** The session waits on the person (a card, a question). */
+  waitsForPerson: boolean;
+}
+
+function normalised(words: string): string {
+  return words.trim().replace(/^\.+|\.+$/g, "").trim().toLowerCase().replaceAll("\u2019", "'");
+}
+
+/**
+ * Each task with its state: the agent's are to do until its plan comes, and one the plan does
+ * not name stays to do. The task in progress waits for you while the session waits on the person.
+ */
+export function taskStates(starter: Starter, facts: PlanFacts): TaskState[] {
+  return firstBuildTasks(starter).map((task) => {
+    if (task.words === runtimeTask) return facts.runtimeReady ? "done" : "to-do";
+    if (task.words === githubTask) return facts.githubConnected ? "done" : "to-do";
+    const entry = facts.plan?.find((e) => normalised(e.content) === normalised(task.words));
+    if (entry?.status === "completed") return "done";
+    if (entry?.status === "in_progress") return facts.waitsForPerson ? "waits-for-you" : "doing";
+    return "to-do";
+  });
+}
+
+/** The page's tasks are done, so the agent can start. */
+export function canStart(facts: PlanFacts): boolean {
+  return facts.runtimeReady && facts.githubConnected;
+}
+
+/** The label firstBuild/start gives the session, by which the page finds it. */
+export const firstBuildLabel = "first-build";
+
+/** The session is archived: the plan page goes (section 5). */
+export function isArchived(agent: Pick<Agent, "state" | "archivedAt">): boolean {
+  return agent.state === "archived" || agent.archivedAt != null;
+}
+
+/** The first-build session: labelled first-build, and not archived. */
+export function isFirstBuild(agent: Pick<Agent, "state" | "archivedAt" | "labels">): boolean {
+  return !isArchived(agent) && (agent.labels ?? []).some((l) => l.value === firstBuildLabel);
+}
+
 const keptKey = "agents.firstBuild.page";
 const ideaKey = "agents.firstBuild.idea";
+const starterKey = "agents.firstBuild.starter";
+const sessionKey = "agents.firstBuild.session";
 
-/** This browser's half: whether the page shows, and the idea it sent. */
+/** The first-build session this browser started or found: the machine it runs on, and its id. */
+export interface FirstBuildSession { host: string; id: string }
+
+/**
+ * This browser's half: whether the page shows, the idea it sent, the starter it shows and the
+ * session it started. The session itself is the record (section 5); this keeps only where the
+ * page is, and the idea until the agent has it.
+ */
 export class FirstBuildStore {
   readonly kept = signal<Kept | null>(null);
+  /** The idea sent: the plan page shows while it is set. */
   readonly sent = signal<string | null>(null);
+  /** The starter the plan page shows: picked from the words, or chosen there. */
+  readonly starter = signal<Starter | null>(null);
+  readonly session = signal<FirstBuildSession | null>(null);
+  /** The words Back takes to the question page's box (section 4); not kept. */
+  readonly draft = signal("");
 
   constructor(private readonly storage: Storage | undefined) {
     const kept = storage?.getItem(keptKey);
     if (kept === "showing" || kept === "gone") this.kept.value = kept;
     const sent = storage?.getItem(ideaKey);
     if (sent) this.sent.value = sent;
+    const starter = storage?.getItem(starterKey);
+    if (starter === "iphone-app" || starter === "web-service") this.starter.value = starter;
+    try {
+      const session = JSON.parse(storage?.getItem(sessionKey) ?? "null") as FirstBuildSession | null;
+      if (session && typeof session.host === "string" && typeof session.id === "string") this.session.value = session;
+    } catch { /* none kept */ }
   }
 
   /** What the page knows now; a change is kept at once. */
@@ -79,17 +217,47 @@ export class FirstBuildStore {
     if (kept) this.write(keptKey, kept);
   }
 
-  /** Submit: the words, kept for the plan page (#5054). */
+  /** Submit: the words, kept for the plan page, with the starter they pick (section 3). */
   send(idea: string): void {
     const words = idea.trim();
     if (!words) return;
     this.sent.value = words;
     this.write(ideaKey, words);
+    const pick = firstBuildStarter(words);
+    this.choose(pick === "unknown" || pick === "neither" ? null : pick);
   }
 
-  private write(key: string, value: string): void {
+  /** The plan page's Change, or its choice for words that named no starter. */
+  choose(starter: Starter | null): void {
+    this.starter.value = starter;
+    this.write(starterKey, starter);
+  }
+
+  /** The session firstBuild/start answered with, or the one there already. */
+  started(session: FirstBuildSession): void {
+    this.session.value = session;
+    this.write(sessionKey, JSON.stringify(session));
+  }
+
+  /** Back, for an idea neither starter fits (section 4): the question page, the words still in the box. */
+  back(): void {
+    this.draft.value = this.sent.peek() ?? "";
+    this.sent.value = null;
+    this.write(ideaKey, null);
+    this.choose(null);
+  }
+
+  /** Open Agents, or the session archived (section 5): the usual page, and the plan page does not come back. */
+  leave(): void {
+    this.kept.value = "gone";
+    this.write(keptKey, "gone");
+    for (const key of [ideaKey, starterKey, sessionKey]) this.write(key, null);
+  }
+
+  private write(key: string, value: string | null): void {
     try {
-      this.storage?.setItem(key, value);
+      if (value === null) this.storage?.removeItem(key);
+      else this.storage?.setItem(key, value);
     } catch {
       // Storage full or off: this look still holds it.
     }

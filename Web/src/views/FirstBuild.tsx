@@ -33,7 +33,8 @@ function reducedMotion(): boolean {
 
 export function QuestionPage() {
   const sent = firstBuild.sent.value;
-  const [words, setWords] = useState(sent ?? "");
+  // Back from the plan page: the words are still in the box (section 4).
+  const [words, setWords] = useState(sent ?? firstBuild.draft.peek());
   const [focused, setFocused] = useState(false);
   const [shown, setShown] = useState(0);
   const [still] = useState(reducedMotion);
