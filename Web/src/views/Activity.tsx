@@ -39,6 +39,7 @@ import { OrgBudget, OrgPolicyLine, PassThroughList } from "./OrgPolicyLine";
 import { PageTitle } from "./TopBar";
 import { pageCrumbs, sectionOfActivity } from "../model/crumbs";
 import { ask } from "./MessageKinds";
+import { LastUpdate } from "./LastUpdate";
 import { busRow, envelopeChoices, envelopeMatches, joinBus, producerMachine, type EnvelopeFilter, type EventItem } from "../model/eventBus";
 
 function navigate(destination: { host: string; folder: string; session?: string; workflow?: string }): void {
@@ -579,6 +580,8 @@ function EventsList({ store, hostName }: { store: Store; hostName: (host: string
         {envelopeMenu("provider", "All providers", (event) => event.provider)}
         {envelopeMenu("type", "All types", (event) => event.type ?? event.name)}
         {envelopeMenu("topic", "All topics", (event) => event.topic)}
+        {/* Other machines' events are read every 30 s (#5146): how old the last read is. */}
+        {where.value === "all" && store.busLog.value && <LastUpdate at={store.busLog.value.at} />}
       </div>
       {events.length === 0 && <p class="hint">{where.value === "all" && filterKey === "{}" ? "Nothing yet." : "Nothing has happened there yet."}</p>}
       {[...days.entries()].map(([key, day]) => <section key={key}>

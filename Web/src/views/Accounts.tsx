@@ -3,6 +3,7 @@
 // secret, only the name of one in Settings ▸ You ▸ Secrets.
 import { useEffect, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
+import { HeadWithUpdate } from "./LastUpdate";
 import type { Store } from "../model/store";
 import type { JSONValue, OutsideAccount, OutsideAccounts, UserSecretRow } from "../protocol/generated";
 import { CallFailed } from "../wire/link";
@@ -235,12 +236,15 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
   const adding = useSignal(false);
   const editing = useSignal<OutsideAccount | null>(null);
   const details = useSignal<OutsideAccount | null>(null);
+  /** When the accounts were read (#5146), for the "Last update" line. */
+  const readAt = useSignal<number | undefined>(undefined);
   const load = async () => {
     try {
       const settings = await store.link.call("user/settings", {});
       all.value = (settings.accounts as OutsideAccounts | undefined)?.accounts ?? [];
       // The Secrets rows give each account's last 4 and whether its secret is backed up (#4160).
       secrets.value = await store.link.call("user/secretNames", {}).then((r) => r.secrets, () => []);
+      readAt.value = Date.now();
       problem.value = null;
     } catch (error) {
       problem.value = sentence(error);
@@ -286,7 +290,7 @@ export function AccountsSection({ store, down }: { store: Store; down: boolean }
   const only = onlyMachine(rows);
   return (
     <section aria-labelledby="settings-accounts">
-      <h3 class="section-head" id="settings-accounts">{accountsTitle}</h3>
+      <HeadWithUpdate id="settings-accounts" title={accountsTitle} at={readAt.value} />
       {problem.value && <p class="hint">{problem.value}</p>}
       {only && all.value.some((a) => accountSecretName(a) !== null) &&
         <p class="hint attention"><Icon name="triangle-alert" />{" "}{onlyMachineLine(only, names)}</p>}

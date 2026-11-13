@@ -1,3 +1,4 @@
+import Foundation
 import AgentsKitCore
 import Observation
 
@@ -27,8 +28,12 @@ final class WorkListState {
     /// The selected row on the Mac (lists.md section 2): ↑ and ↓ move it, Return opens it.
     var selected: String?
     /// The rows on screen came from this device's copy (#4930): the machines are asked again,
-    /// and the list says so until they answer.
-    var fromDevice = false
+    /// and the list says so until they answer, with when the copy was read (#5142).
+    var fromDeviceRead: Date?
+    var fromDevice: Bool { fromDeviceRead != nil }
+    /// Every machine failed over this device's copy: when the rows kept on screen were read,
+    /// for the "Last update" line in the failure strip (#5142).
+    var keptRead: Date?
     /// A read runs: the rows read before stay until the new ones come (#4930), and Refresh spins.
     var reading = false
     /// What the rows were read for; the list reads them again only when that changes.
@@ -71,14 +76,15 @@ final class WorkListState {
     @discardableResult
     func drawKept(model: any WorkModel) async -> Bool {
         let wanted = copyAsk
-        guard shownFor != wanted, let kept = await model.keptWork(Kept.self, .list, wanted),
+        guard shownFor != wanted, case let (kept, at)? = await model.keptWorkRead(Kept.self, .list, wanted),
               copyAsk == wanted, shownFor != wanted, kept.hosts.count == kept.lists.count else { return false }
         lists = Array(zip(kept.hosts, kept.lists)).map { (host: $0.0, list: $0.1) }
         lineage = kept.lineage
         lineageCursor = kept.lineageCursor
         if kind == .issue { boards = kept.boards }
         shownFor = wanted
-        fromDevice = true
+        fromDeviceRead = at
+        keptRead = nil
         return true
     }
 
@@ -197,12 +203,13 @@ final class WorkListState {
         // Every machine failed over this device's copy: its rows stay, dimmed under what the forges said, with no
         // next page (#4392, #4930), as the web page keeps them.
         let failed = got.allSatisfy { $0.list.items.isEmpty && !($0.list.errors ?? []).isEmpty }
-        if failed, fromDevice, let kept = lists, kept.contains(where: { !$0.list.items.isEmpty }) {
+        if failed, let read = fromDeviceRead, let kept = lists, kept.contains(where: { !$0.list.items.isEmpty }) {
             let said = got.flatMap { $0.list.errors ?? [] }
             lists = kept.enumerated().map { i, entry in
                 (entry.host, DaemonAPI.ForgeList(items: entry.list.items, errors: i == 0 ? said : nil, total: entry.list.total))
             }
             answered(wanted)
+            keptRead = read
             return
         }
         lineage = known.nodes
@@ -219,7 +226,8 @@ final class WorkListState {
     /// The machines answered for what is asked: the rows are theirs now.
     private func answered(_ wanted: String) {
         shownFor = wanted
-        fromDevice = false
+        fromDeviceRead = nil
+        keptRead = nil
     }
 
     func loadMore(model: any WorkModel) async {

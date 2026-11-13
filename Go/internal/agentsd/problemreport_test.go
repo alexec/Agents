@@ -16,7 +16,7 @@ func problemFields(t *testing.T, link string) url.Values {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if u.Host != "github.com" || u.Path != "/alexec/Agents/issues/new" {
+	if u.Host != "github.com" || u.Path != "/agentloops-dev/Agents/issues/new" {
 		t.Fatalf("link goes to %s%s", u.Host, u.Path)
 	}
 	return u.Query()

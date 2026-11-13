@@ -122,7 +122,7 @@ extension FirstBuild {
         switch starter {
         case .iphoneApp:
             return app + [
-                PlanTask("Make the repository from alexec/iphone-app-starter", .agent),
+                PlanTask("Make the repository from agentloops-dev/iphone-app-starter", .agent),
                 PlanTask("Join the Apple Developer Program", .agent),
                 PlanTask("Put the App Store Connect key in the repository's CI", .agent),
                 PlanTask("Set up Sentry", .agent),
@@ -131,7 +131,7 @@ extension FirstBuild {
             ]
         case .webService:
             return app + [
-                PlanTask("Make the repository from alexec/web-service-starter", .agent),
+                PlanTask("Make the repository from agentloops-dev/web-service-starter", .agent),
                 PlanTask("Set up Google Cloud (Cloud Run)", .agent),
                 PlanTask("Set up Sentry", .agent),
                 PlanTask("Deploy the first version", .agent),
@@ -143,8 +143,8 @@ extension FirstBuild {
     /// The line under the title: what will be built, and from which template.
     public static func starterLine(_ starter: Starter) -> String {
         switch starter {
-        case .iphoneApp: "An iPhone app, from alexec/iphone-app-starter"
-        case .webService: "A web service, from alexec/web-service-starter"
+        case .iphoneApp: "An iPhone app, from agentloops-dev/iphone-app-starter"
+        case .webService: "A web service, from agentloops-dev/web-service-starter"
         }
     }
 
