@@ -1,0 +1,358 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="900" viewBox="0 0 1240 900" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+<defs><filter id="shadow" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.18"/></filter><pattern id="queue" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#E3E6EA"/><rect width="2.4" height="6" fill="#9AA1AB"/></pattern></defs>
+<rect width="1240" height="900" fill="#E7EAEE"/>
+<text x="24.0" y="34.0" font-size="15" fill="#1C1D20" font-weight="600">1 · The trend: Reports ▸ Planning ▸ Builds, the last 30 days, all jobs, main</text>
+<text x="24.0" y="54.0" font-size="12" fill="#5B616B" >Real data: alexec/Agents, 1,173 green ci runs on main (first attempts) and its release tags, from the GitHub API on 2026-11-13. Run time is blue; waiting for a runner is hatched; waiting its turn is light grey.</text>
+<g filter="url(#shadow)"><rect x="24" y="92" width="1192" height="740" rx="8" fill="#F7F8F9"/></g>
+<rect x="24.0" y="92.0" width="1192.0" height="44.0" rx="8" fill="#FFFFFF"/>
+<path d="M24.0 136.0L1216.0 136.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="48.0" y="120.0" font-size="13" fill="#5B616B" >Overview</text>
+<text x="131.6" y="120.0" font-size="13" fill="#5B616B" >Agents</text>
+<text x="200.8" y="120.0" font-size="13" fill="#5B616B" >Work</text>
+<text x="255.6" y="120.0" font-size="13" fill="#5B616B" >Docs</text>
+<text x="310.4" y="120.0" font-size="13" fill="#5B616B" >Messages</text>
+<text x="394.0" y="120.0" font-size="13" fill="#5B616B" >Machines</text>
+<text x="477.6" y="120.0" font-size="13" fill="#5B616B" >Workflows</text>
+<text x="568.4" y="120.0" font-size="13" fill="#1C1D20" font-weight="600">Reports</text>
+<rect x="566.4" y="133.0" width="54.4" height="2.0" rx="0" fill="#0A6CDB"/>
+<text x="644.8" y="120.0" font-size="13" fill="#5B616B" >Requests</text>
+<text x="728.4" y="120.0" font-size="13" fill="#5B616B" >People</text>
+<text x="797.6" y="120.0" font-size="13" fill="#5B616B" >Status</text>
+<text x="866.8" y="120.0" font-size="13" fill="#5B616B" >Settings</text>
+<text x="48.0" y="174.0" font-size="11" fill="#5B616B" font-weight="600">Reports</text>
+<text x="48.0" y="198.0" font-size="13" fill="#1C1D20" >Spend</text>
+<text x="48.0" y="222.0" font-size="13" fill="#1C1D20" >Outcomes</text>
+<text x="48.0" y="246.0" font-size="13" fill="#1C1D20" >Time</text>
+<text x="48.0" y="270.0" font-size="13" fill="#1C1D20" >Runtimes</text>
+<text x="48.0" y="294.0" font-size="13" fill="#1C1D20" >Adoption</text>
+<text x="48.0" y="318.0" font-size="13" fill="#1C1D20" >Workflows</text>
+<text x="48.0" y="342.0" font-size="13" fill="#1C1D20" >Planning</text>
+<rect x="40.0" y="350.0" width="176.0" height="26.0" rx="6" fill="#EEF0F3"/>
+<text x="60.0" y="366.0" font-size="13" fill="#1C1D20" font-weight="600">Builds</text>
+<text x="48.0" y="396.0" font-size="11" fill="#5B616B" font-weight="600">Yours</text>
+<text x="48.0" y="420.0" font-size="13" fill="#1C1D20" >Multiplier</text>
+<text x="48.0" y="444.0" font-size="13" fill="#1C1D20" >Usage</text>
+<text x="48.0" y="474.0" font-size="11" fill="#5B616B" font-weight="600">Saved</text>
+<text x="48.0" y="498.0" font-size="13" fill="#1C1D20" >Saved Views</text>
+<path d="M234.0 136.0L234.0 832.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="264.0" y="166.0" font-size="12" fill="#0A6CDB" >Planning ›</text>
+<text x="264.0" y="192.0" font-size="22" fill="#1C1D20" font-weight="700">Builds</text>
+<text x="264.0" y="226.0" font-size="12" fill="#5B616B" >Repository</text>
+<rect x="338.0" y="210.0" width="130.0" height="24.0" rx="6" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+<text x="348.0" y="227.0" font-size="13" fill="#1C1D20" >alexec/Agents</text>
+<text x="454.0" y="226.0" font-size="13" fill="#5B616B" >⌄</text>
+<text x="486.0" y="226.0" font-size="12" fill="#5B616B" >Range</text>
+<rect x="527.0" y="210.0" width="130.0" height="24.0" rx="6" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+<text x="537.0" y="227.0" font-size="13" fill="#1C1D20" >The last 30 days</text>
+<text x="643.0" y="226.0" font-size="13" fill="#5B616B" >⌄</text>
+<text x="675.0" y="226.0" font-size="12" fill="#5B616B" >Workflow</text>
+<rect x="735.8" y="210.0" width="70.0" height="24.0" rx="6" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+<text x="745.8" y="227.0" font-size="13" fill="#1C1D20" >ci</text>
+<text x="791.8" y="226.0" font-size="13" fill="#5B616B" >⌄</text>
+<text x="823.8" y="226.0" font-size="12" fill="#5B616B" >Job</text>
+<rect x="851.6" y="210.0" width="90.0" height="24.0" rx="6" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+<text x="861.6" y="227.0" font-size="13" fill="#1C1D20" >All jobs</text>
+<text x="927.6" y="226.0" font-size="13" fill="#5B616B" >⌄</text>
+<text x="959.6" y="226.0" font-size="12" fill="#5B616B" >Branch</text>
+<rect x="1007.2" y="210.0" width="76.0" height="24.0" rx="6" fill="#FFFFFF" stroke="#C7CCD3" stroke-width="1"/>
+<text x="1017.2" y="227.0" font-size="13" fill="#1C1D20" >main</text>
+<text x="1069.2" y="226.0" font-size="13" fill="#5B616B" >⌄</text>
+<circle cx="1097.2" cy="222.0" r="9" fill="#B35900"/>
+<text x="1097.2" y="226.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">1</text>
+<rect x="264.0" y="250.0" width="223.0" height="92.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="278.0" y="272.0" font-size="11" fill="#5B616B" font-weight="600">TIME TO GREEN · MEDIAN</text>
+<text x="278.0" y="302.0" font-size="24" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">14.2 min</text>
+<text x="278.0" y="324.0" font-size="12" fill="#5B616B" >P90 25.4 min · 373 runs, last 7 days</text>
+<text x="473.0" y="302.0" font-size="12" fill="#B42318" font-weight="600" text-anchor="end">+9 %</text>
+<rect x="499.0" y="250.0" width="223.0" height="92.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="513.0" y="272.0" font-size="11" fill="#5B616B" font-weight="600">RUN TIME · MEDIAN</text>
+<text x="513.0" y="302.0" font-size="24" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">12.0 min</text>
+<text x="513.0" y="324.0" font-size="12" fill="#5B616B" >Jobs running. Points to a commit.</text>
+<text x="708.0" y="302.0" font-size="12" fill="#B42318" font-weight="600" text-anchor="end">+8 %</text>
+<rect x="734.0" y="250.0" width="223.0" height="92.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="748.0" y="272.0" font-size="11" fill="#5B616B" font-weight="600">QUEUE TIME · MEDIAN</text>
+<text x="748.0" y="302.0" font-size="24" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">79 s</text>
+<text x="748.0" y="324.0" font-size="12" fill="#5B616B" >53 s its turn, 26 s a runner. Load.</text>
+<text x="943.0" y="302.0" font-size="12" fill="#B42318" font-weight="600" text-anchor="end">+72 s</text>
+<rect x="969.0" y="250.0" width="223.0" height="92.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="983.0" y="272.0" font-size="11" fill="#5B616B" font-weight="600">GREEN RUNS ON MAIN</text>
+<text x="983.0" y="302.0" font-size="24" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">373</text>
+<text x="983.0" y="324.0" font-size="12" fill="#5B616B" >Last 7 days · 5 re-runs in 90 days</text>
+<circle cx="479.0" cy="260.0" r="9" fill="#B35900"/>
+<text x="479.0" y="264.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">2</text>
+<circle cx="949.0" cy="260.0" r="9" fill="#B35900"/>
+<text x="949.0" y="264.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">3</text>
+<text x="264.0" y="376.0" font-size="13" fill="#1C1D20" font-weight="600">Time to green on main, by day</text>
+<rect x="752.0" y="358.0" width="144.0" height="26.0" rx="7" fill="#EEF0F3"/>
+<rect x="754.0" y="360.0" width="70.0" height="22.0" rx="6" fill="#FFFFFF" stroke="#CCD1D7" stroke-width="1"/>
+<text x="789.0" y="375.0" font-size="12" fill="#1C1D20" font-weight="600" text-anchor="middle">Median</text>
+<text x="859.0" y="375.0" font-size="12" fill="#5B616B" text-anchor="middle">P90</text>
+<path d="M264.0 508.0L902.0 508.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="908.0" y="512.0" font-size="11" fill="#8A9099" >15 min</text>
+<path d="M264.0 396.0L902.0 396.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="908.0" y="400.0" font-size="11" fill="#8A9099" >30 min</text>
+<path d="M264.0 620.0L902.0 620.0" stroke="#C7CCD3" stroke-width="1"/>
+<rect x="267.8" y="445.8" width="13.6" height="174.2" rx="1.5" fill="#0A6CDB"/>
+<rect x="267.8" y="444.9" width="13.6" height="0.9" rx="0" fill="url(#queue)"/>
+<rect x="267.8" y="439.8" width="13.6" height="5.1" rx="0" fill="#D3D7DD"/>
+<rect x="289.1" y="461.6" width="13.6" height="158.4" rx="1.5" fill="#0A6CDB"/>
+<rect x="289.1" y="460.0" width="13.6" height="1.6" rx="0" fill="url(#queue)"/>
+<rect x="289.1" y="458.1" width="13.6" height="1.9" rx="0" fill="#D3D7DD"/>
+<rect x="310.4" y="571.2" width="13.6" height="48.8" rx="1.5" fill="#0A6CDB"/>
+<rect x="310.4" y="570.3" width="13.6" height="0.9" rx="0" fill="url(#queue)"/>
+<rect x="310.4" y="567.6" width="13.6" height="2.7" rx="0" fill="#D3D7DD"/>
+<rect x="331.6" y="558.6" width="13.6" height="61.4" rx="1.5" fill="#0A6CDB"/>
+<rect x="331.6" y="557.9" width="13.6" height="0.7" rx="0" fill="url(#queue)"/>
+<rect x="331.6" y="556.4" width="13.6" height="1.5" rx="0" fill="#D3D7DD"/>
+<rect x="352.9" y="517.1" width="13.6" height="102.9" rx="1.5" fill="#0A6CDB"/>
+<rect x="352.9" y="515.8" width="13.6" height="1.2" rx="0" fill="url(#queue)"/>
+<rect x="352.9" y="515.7" width="13.6" height="0.1" rx="0" fill="#D3D7DD"/>
+<text x="359.7" y="635.0" font-size="11" fill="#8A9099" text-anchor="middle">18 Oct</text>
+<rect x="374.2" y="557.0" width="13.6" height="63.0" rx="1.5" fill="#0A6CDB"/>
+<rect x="374.2" y="556.4" width="13.6" height="0.6" rx="0" fill="url(#queue)"/>
+<rect x="374.2" y="552.8" width="13.6" height="3.6" rx="0" fill="#D3D7DD"/>
+<rect x="395.4" y="555.2" width="13.6" height="64.8" rx="1.5" fill="#0A6CDB"/>
+<rect x="395.4" y="554.1" width="13.6" height="1.1" rx="0" fill="url(#queue)"/>
+<rect x="395.4" y="549.0" width="13.6" height="5.1" rx="0" fill="#D3D7DD"/>
+<rect x="416.7" y="550.7" width="13.6" height="69.3" rx="1.5" fill="#0A6CDB"/>
+<rect x="416.7" y="549.9" width="13.6" height="0.7" rx="0" fill="url(#queue)"/>
+<rect x="416.7" y="545.5" width="13.6" height="4.5" rx="0" fill="#D3D7DD"/>
+<rect x="438.0" y="518.0" width="13.6" height="102.0" rx="1.5" fill="#0A6CDB"/>
+<rect x="438.0" y="513.2" width="13.6" height="4.7" rx="0" fill="url(#queue)"/>
+<rect x="438.0" y="492.8" width="13.6" height="20.4" rx="0" fill="#D3D7DD"/>
+<rect x="459.2" y="548.3" width="13.6" height="71.7" rx="1.5" fill="#0A6CDB"/>
+<rect x="459.2" y="547.6" width="13.6" height="0.7" rx="0" fill="url(#queue)"/>
+<rect x="459.2" y="547.4" width="13.6" height="0.1" rx="0" fill="#D3D7DD"/>
+<text x="466.0" y="635.0" font-size="11" fill="#8A9099" text-anchor="middle">23 Oct</text>
+<rect x="480.5" y="550.3" width="13.6" height="69.7" rx="1.5" fill="#0A6CDB"/>
+<rect x="480.5" y="549.6" width="13.6" height="0.7" rx="0" fill="url(#queue)"/>
+<rect x="480.5" y="549.4" width="13.6" height="0.1" rx="0" fill="#D3D7DD"/>
+<rect x="501.8" y="587.4" width="13.6" height="32.6" rx="1.5" fill="#0A6CDB"/>
+<rect x="501.8" y="587.0" width="13.6" height="0.4" rx="0" fill="url(#queue)"/>
+<rect x="501.8" y="586.8" width="13.6" height="0.1" rx="0" fill="#D3D7DD"/>
+<rect x="523.0" y="546.3" width="13.6" height="73.7" rx="1.5" fill="#0A6CDB"/>
+<rect x="523.0" y="545.6" width="13.6" height="0.6" rx="0" fill="url(#queue)"/>
+<rect x="523.0" y="545.5" width="13.6" height="0.1" rx="0" fill="#D3D7DD"/>
+<rect x="544.3" y="559.6" width="13.6" height="60.4" rx="1.5" fill="#0A6CDB"/>
+<rect x="544.3" y="558.9" width="13.6" height="0.7" rx="0" fill="url(#queue)"/>
+<rect x="544.3" y="558.8" width="13.6" height="0.1" rx="0" fill="#D3D7DD"/>
+<rect x="565.6" y="528.5" width="13.6" height="91.5" rx="1.5" fill="#0A6CDB"/>
+<rect x="565.6" y="527.8" width="13.6" height="0.7" rx="0" fill="url(#queue)"/>
+<rect x="565.6" y="527.8" width="13.6" height="0.1" rx="0" fill="#D3D7DD"/>
+<text x="572.4" y="635.0" font-size="11" fill="#8A9099" text-anchor="middle">28 Oct</text>
+<rect x="586.8" y="531.1" width="13.6" height="88.9" rx="1.5" fill="#0A6CDB"/>
+<rect x="586.8" y="530.4" width="13.6" height="0.7" rx="0" fill="url(#queue)"/>
+<rect x="586.8" y="521.1" width="13.6" height="9.3" rx="0" fill="#D3D7DD"/>
+<rect x="608.1" y="545.5" width="13.6" height="74.5" rx="1.5" fill="#0A6CDB"/>
+<rect x="608.1" y="544.5" width="13.6" height="1.0" rx="0" fill="url(#queue)"/>
+<rect x="608.1" y="544.2" width="13.6" height="0.2" rx="0" fill="#D3D7DD"/>
+<rect x="629.4" y="547.3" width="13.6" height="72.7" rx="1.5" fill="#0A6CDB"/>
+<rect x="629.4" y="546.6" width="13.6" height="0.7" rx="0" fill="url(#queue)"/>
+<rect x="629.4" y="546.5" width="13.6" height="0.1" rx="0" fill="#D3D7DD"/>
+<rect x="650.6" y="533.0" width="13.6" height="87.0" rx="1.5" fill="#0A6CDB"/>
+<rect x="650.6" y="532.5" width="13.6" height="0.5" rx="0" fill="url(#queue)"/>
+<rect x="650.6" y="527.2" width="13.6" height="5.3" rx="0" fill="#D3D7DD"/>
+<rect x="671.9" y="524.6" width="13.6" height="95.4" rx="1.5" fill="#0A6CDB"/>
+<rect x="671.9" y="523.9" width="13.6" height="0.7" rx="0" fill="url(#queue)"/>
+<rect x="671.9" y="523.7" width="13.6" height="0.1" rx="0" fill="#D3D7DD"/>
+<text x="678.7" y="635.0" font-size="11" fill="#8A9099" text-anchor="middle">2 Nov</text>
+<rect x="693.2" y="535.1" width="13.6" height="84.9" rx="1.5" fill="#0A6CDB"/>
+<rect x="693.2" y="534.4" width="13.6" height="0.7" rx="0" fill="url(#queue)"/>
+<rect x="693.2" y="534.3" width="13.6" height="0.1" rx="0" fill="#D3D7DD"/>
+<rect x="714.4" y="538.2" width="13.6" height="81.8" rx="1.5" fill="#0A6CDB"/>
+<rect x="714.4" y="537.4" width="13.6" height="0.9" rx="0" fill="url(#queue)"/>
+<rect x="714.4" y="537.2" width="13.6" height="0.1" rx="0" fill="#D3D7DD"/>
+<rect x="735.7" y="518.2" width="13.6" height="101.8" rx="1.5" fill="#0A6CDB"/>
+<rect x="735.7" y="507.7" width="13.6" height="10.5" rx="0" fill="url(#queue)"/>
+<rect x="735.7" y="503.2" width="13.6" height="4.5" rx="0" fill="#D3D7DD"/>
+<rect x="757.0" y="571.5" width="13.6" height="48.5" rx="1.5" fill="#0A6CDB"/>
+<rect x="757.0" y="570.8" width="13.6" height="0.7" rx="0" fill="url(#queue)"/>
+<rect x="757.0" y="570.7" width="13.6" height="0.1" rx="0" fill="#D3D7DD"/>
+<rect x="778.2" y="538.4" width="13.6" height="81.6" rx="1.5" fill="#0A6CDB"/>
+<rect x="778.2" y="536.9" width="13.6" height="1.5" rx="0" fill="url(#queue)"/>
+<rect x="778.2" y="531.1" width="13.6" height="5.7" rx="0" fill="#D3D7DD"/>
+<text x="785.0" y="635.0" font-size="11" fill="#8A9099" text-anchor="middle">7 Nov</text>
+<rect x="799.5" y="540.6" width="13.6" height="79.4" rx="1.5" fill="#0A6CDB"/>
+<rect x="799.5" y="536.8" width="13.6" height="3.8" rx="0" fill="url(#queue)"/>
+<rect x="799.5" y="532.9" width="13.6" height="3.9" rx="0" fill="#D3D7DD"/>
+<rect x="820.8" y="526.9" width="13.6" height="93.1" rx="1.5" fill="#0A6CDB"/>
+<rect x="820.8" y="526.2" width="13.6" height="0.7" rx="0" fill="url(#queue)"/>
+<rect x="820.8" y="517.8" width="13.6" height="8.3" rx="0" fill="#D3D7DD"/>
+<rect x="842.0" y="518.6" width="13.6" height="101.4" rx="1.5" fill="#0A6CDB"/>
+<rect x="842.0" y="517.8" width="13.6" height="0.8" rx="0" fill="url(#queue)"/>
+<rect x="842.0" y="511.8" width="13.6" height="6.0" rx="0" fill="#D3D7DD"/>
+<rect x="863.3" y="520.5" width="13.6" height="99.5" rx="1.5" fill="#0A6CDB"/>
+<rect x="863.3" y="509.2" width="13.6" height="11.3" rx="0" fill="url(#queue)"/>
+<rect x="863.3" y="489.0" width="13.6" height="20.3" rx="0" fill="#D3D7DD"/>
+<rect x="884.6" y="494.8" width="13.6" height="125.2" rx="1.5" fill="#0A6CDB"/>
+<rect x="884.6" y="474.2" width="13.6" height="20.7" rx="0" fill="url(#queue)"/>
+<rect x="884.6" y="449.9" width="13.6" height="24.3" rx="0" fill="#D3D7DD"/>
+<text x="891.4" y="635.0" font-size="11" fill="#8A9099" text-anchor="middle">12 Nov</text>
+<path d="M274.6 419.8L295.9 405.3L317.2 453.7L338.4 471.3L359.7 492.8L381.0 492.8L402.2 490.0L423.5 478.0L444.8 424.1L466.0 497.7L487.3 479.4L508.6 548.0L529.8 474.3L551.1 499.8L572.4 516.8L593.6 460.3L614.9 474.7L636.2 460.0L657.4 444.2L678.7 441.5L700.0 503.3L721.2 462.6L742.5 422.7L763.8 482.4L785.0 440.9L806.3 447.4L827.6 419.1L848.8 453.9L870.1 396.0L891.4 396.0" fill="none" stroke="#5B616B" stroke-width="1" stroke-dasharray="2 3"/>
+<circle cx="274.6" cy="419.8" r="2" fill="#5B616B"/>
+<circle cx="295.9" cy="405.3" r="2" fill="#5B616B"/>
+<circle cx="317.2" cy="453.7" r="2" fill="#5B616B"/>
+<circle cx="338.4" cy="471.3" r="2" fill="#5B616B"/>
+<circle cx="359.7" cy="492.8" r="2" fill="#5B616B"/>
+<circle cx="381.0" cy="492.8" r="2" fill="#5B616B"/>
+<circle cx="402.2" cy="490.0" r="2" fill="#5B616B"/>
+<circle cx="423.5" cy="478.0" r="2" fill="#5B616B"/>
+<circle cx="444.8" cy="424.1" r="2" fill="#5B616B"/>
+<circle cx="466.0" cy="497.7" r="2" fill="#5B616B"/>
+<circle cx="487.3" cy="479.4" r="2" fill="#5B616B"/>
+<circle cx="508.6" cy="548.0" r="2" fill="#5B616B"/>
+<circle cx="529.8" cy="474.3" r="2" fill="#5B616B"/>
+<circle cx="551.1" cy="499.8" r="2" fill="#5B616B"/>
+<circle cx="572.4" cy="516.8" r="2" fill="#5B616B"/>
+<circle cx="593.6" cy="460.3" r="2" fill="#5B616B"/>
+<circle cx="614.9" cy="474.7" r="2" fill="#5B616B"/>
+<circle cx="636.2" cy="460.0" r="2" fill="#5B616B"/>
+<circle cx="657.4" cy="444.2" r="2" fill="#5B616B"/>
+<circle cx="678.7" cy="441.5" r="2" fill="#5B616B"/>
+<circle cx="700.0" cy="503.3" r="2" fill="#5B616B"/>
+<circle cx="721.2" cy="462.6" r="2" fill="#5B616B"/>
+<circle cx="742.5" cy="422.7" r="2" fill="#5B616B"/>
+<circle cx="763.8" cy="482.4" r="2" fill="#5B616B"/>
+<circle cx="785.0" cy="440.9" r="2" fill="#5B616B"/>
+<circle cx="806.3" cy="447.4" r="2" fill="#5B616B"/>
+<circle cx="827.6" cy="419.1" r="2" fill="#5B616B"/>
+<circle cx="848.8" cy="453.9" r="2" fill="#5B616B"/>
+<circle cx="870.1" cy="396.0" r="2" fill="#5B616B"/>
+<circle cx="891.4" cy="396.0" r="2" fill="#5B616B"/>
+<text x="887.4" y="388.0" font-size="10" fill="#5B616B" font-weight="600" text-anchor="end">P90</text>
+<circle cx="905.4" cy="386.0" r="9" fill="#B35900"/>
+<text x="905.4" y="390.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">4</text>
+<g opacity="1">
+<path d="M357.0 388.0L357.0 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<text x="360.0" y="396.0" font-size="9" fill="#7E57C2" font-weight="600">v0.4.0</text>
+<g opacity="1">
+<path d="M370.3 388.0L370.3 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="0.35">
+<path d="M378.3 388.0L378.3 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="1">
+<path d="M397.8 388.0L397.8 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="1">
+<path d="M408.4 388.0L408.4 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<text x="411.4" y="396.0" font-size="9" fill="#7E57C2" font-weight="600">v0.7.0</text>
+<g opacity="1">
+<path d="M413.8 388.0L413.8 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="1">
+<path d="M428.8 388.0L428.8 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="1">
+<path d="M434.1 388.0L434.1 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="1">
+<path d="M457.2 388.0L457.2 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<text x="460.2" y="396.0" font-size="9" fill="#7E57C2" font-weight="600">v0.11.0</text>
+<g opacity="0.35">
+<path d="M462.5 388.0L462.5 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="1">
+<path d="M552.9 388.0L552.9 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<text x="555.9" y="396.0" font-size="9" fill="#7E57C2" font-weight="600">v0.12.0</text>
+<g opacity="0.35">
+<path d="M552.9 388.0L552.9 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="0.35">
+<path d="M553.8 388.0L553.8 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="0.35">
+<path d="M567.0 388.0L567.0 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="1">
+<path d="M598.1 388.0L598.1 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="0.35">
+<path d="M599.8 388.0L599.8 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="1">
+<path d="M619.3 388.0L619.3 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<text x="622.3" y="396.0" font-size="9" fill="#7E57C2" font-weight="600">v0.14.0</text>
+<g opacity="0.35">
+<path d="M622.9 388.0L622.9 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="1">
+<path d="M650.3 388.0L650.3 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<g opacity="1">
+<path d="M718.6 388.0L718.6 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<text x="721.6" y="396.0" font-size="9" fill="#7E57C2" font-weight="600">v0.16.0</text>
+<g opacity="1">
+<path d="M784.1 388.0L784.1 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<text x="787.1" y="396.0" font-size="9" fill="#7E57C2" font-weight="600">v0.17.0</text>
+<g opacity="1">
+<path d="M803.6 388.0L803.6 620.0" stroke="#7E57C2" stroke-width="1" stroke-dasharray="3 3"/>
+</g>
+<circle cx="274.0" cy="392.0" r="9" fill="#B35900"/>
+<text x="274.0" y="396.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">5</text>
+<text x="264.0" y="658.0" font-size="11" fill="#5B616B" font-weight="600">Changes found, each job's own run time</text>
+<path d="M264.0 670.0L902.0 670.0" stroke="#DDE1E6" stroke-width="1"/>
+<path d="M299.7 666.0L309.7 666.0L304.7 675.0Z" fill="#1A7F37"/>
+<text x="312.7" y="674.0" font-size="10" fill="#1C1D20" >test -100%</text>
+<path d="M356.4 700.0L366.4 700.0L361.4 691.0Z" fill="#B42318"/>
+<text x="369.4" y="700.0" font-size="10" fill="#1C1D20" >go +33%</text>
+<path d="M390.1 674.0L400.1 674.0L395.1 665.0Z" fill="#B42318"/>
+<text x="403.1" y="674.0" font-size="10" fill="#1C1D20" >go-darwin +45%</text>
+<path d="M406.0 718.0L416.0 718.0L411.0 727.0Z" fill="#1A7F37"/>
+<text x="419.0" y="726.0" font-size="10" fill="#1C1D20" >select -96%</text>
+<path d="M521.2 674.0L531.2 674.0L526.2 665.0Z" fill="#B42318"/>
+<text x="534.2" y="674.0" font-size="10" fill="#1C1D20" >lint +34%</text>
+<path d="M621.3 674.0L631.3 674.0L626.3 665.0Z" fill="#B42318"/>
+<text x="634.3" y="674.0" font-size="10" fill="#1C1D20" >lint +31%</text>
+<path d="M645.3 700.0L655.3 700.0L650.3 691.0Z" fill="#B42318"/>
+<text x="658.3" y="700.0" font-size="10" fill="#1C1D20" >go-darwin +22%</text>
+<rect x="775.8" y="660.0" width="86.0" height="22.0" rx="6" fill="#FDECEA" stroke="#B42318" stroke-width="1"/>
+<path d="M780.8 674.0L790.8 674.0L785.8 665.0Z" fill="#B42318"/>
+<text x="793.8" y="674.0" font-size="10" fill="#1C1D20" font-weight="600">go-darwin +32%</text>
+<circle cx="504.0" cy="654.0" r="9" fill="#B35900"/>
+<text x="504.0" y="658.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">6</text>
+<text x="264.0" y="754.0" font-size="11" fill="#5B616B" >A dashed purple line is a release tag: a marker only. Deploys are out of this epic (Alex, 2026-11-13).</text>
+<rect x="956.0" y="360.0" width="236.0" height="262.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<rect x="970.0" y="378.0" width="14.0" height="14.0" rx="2" fill="#0A6CDB"/>
+<text x="992.0" y="390.0" font-size="13" fill="#1C1D20" font-weight="600">Run time</text>
+<text x="970.0" y="410.0" font-size="12" fill="#5B616B" >The jobs ran. A rise that stays</text>
+<text x="970.0" y="425.0" font-size="12" fill="#5B616B" >points to a commit: the culprit</text>
+<text x="970.0" y="440.0" font-size="12" fill="#5B616B" >finder looks here, on main.</text>
+<rect x="970.0" y="460.0" width="14.0" height="14.0" rx="2" fill="url(#queue)"/>
+<text x="992.0" y="472.0" font-size="13" fill="#1C1D20" font-weight="600">Waiting for a runner</text>
+<text x="970.0" y="492.0" font-size="12" fill="#5B616B" >A job waited for a machine:</text>
+<text x="970.0" y="507.0" font-size="12" fill="#5B616B" >xcode-27 and macos-latest are</text>
+<text x="970.0" y="522.0" font-size="12" fill="#5B616B" >few. Load, never a culprit.</text>
+<rect x="970.0" y="542.0" width="14.0" height="14.0" rx="2" fill="#D3D7DD"/>
+<text x="992.0" y="554.0" font-size="13" fill="#1C1D20" font-weight="600">Waiting its turn</text>
+<text x="970.0" y="574.0" font-size="12" fill="#5B616B" >The run before it on main was</text>
+<text x="970.0" y="589.0" font-size="12" fill="#5B616B" >still going. Load from merges,</text>
+<text x="970.0" y="604.0" font-size="12" fill="#5B616B" >never a culprit.</text>
+<circle cx="1180.0" cy="372.0" r="9" fill="#B35900"/>
+<text x="1180.0" y="376.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">7</text>
+<text x="956.0" y="646.0" font-size="13" fill="#1C1D20" font-weight="600">Changes in this range</text>
+<rect x="950.0" y="656.0" width="242.0" height="38.0" rx="6" fill="#FDECEA"/>
+<path d="M957.0 670.0L967.0 670.0L962.0 661.0Z" fill="#B42318"/>
+<text x="974.0" y="670.0" font-size="12" fill="#1C1D20" font-weight="600">go-darwin slower, 8 Nov</text>
+<text x="974.0" y="686.0" font-size="11" fill="#5B616B" >4.8 min → 6.4 min · 6 commits ›</text>
+<path d="M957.0 710.0L967.0 710.0L962.0 701.0Z" fill="#B42318"/>
+<text x="974.0" y="710.0" font-size="12" fill="#1C1D20" font-weight="600">go-darwin slower, 2 Nov</text>
+<text x="974.0" y="726.0" font-size="11" fill="#5B616B" >3.6 min → 4.4 min · 1 commit ›</text>
+<path d="M957.0 750.0L967.0 750.0L962.0 741.0Z" fill="#B42318"/>
+<text x="974.0" y="750.0" font-size="12" fill="#1C1D20" font-weight="600">lint slower, 1 Nov</text>
+<text x="974.0" y="766.0" font-size="11" fill="#5B616B" >1.6 min → 2.1 min · 1 commit ›</text>
+<path d="M957.0 790.0L967.0 790.0L962.0 781.0Z" fill="#B42318"/>
+<text x="974.0" y="790.0" font-size="12" fill="#1C1D20" font-weight="600">lint slower, 27 Oct</text>
+<text x="974.0" y="806.0" font-size="11" fill="#5B616B" >88 s → 2.0 min · 1 commit ›</text>
+<circle cx="1180.0" cy="642.0" r="9" fill="#B35900"/>
+<text x="1180.0" y="646.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">8</text>
+<text x="24.0" y="854.0" font-size="12" fill="#5B616B" font-weight="600">A change picked, in the lane or the list, opens board 2. The Job select draws one job's queue and run; with All jobs the bars are whole runs,</text>
+<text x="24.0" y="869.0" font-size="12" fill="#5B616B" font-weight="600">and the changes are still each job's own: a whole run's time mixes in which jobs ran (ci.yml's select job).</text>
+</svg>
