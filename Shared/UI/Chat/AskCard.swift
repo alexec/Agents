@@ -116,7 +116,7 @@ struct AskDecline: View {
     var body: some View {
         Button(title, action: action)
             .buttonStyle(.plain)
-            .foregroundStyle(Color.accentColor)
+            .foregroundStyle(.tint)
     }
 }
 
