@@ -32,10 +32,20 @@ Rules for every step:
 
 ## The task list
 
-Write the task list of the kind of app as your plan, with your runtime's own to-do list
-(Claude's `TodoWrite`, Codex's `update_plan`), as soon as you know the kind. Use these words
-exactly, in this order, and add no other task: a first build's plan page finds each task
-by its words. Write it again each time a task's state changes:
+Write the task list of the kind of app as your plan, with your runtime's own to-do list,
+as soon as you know the kind. Use these words exactly, in this order, and add no other
+task: a first build's plan page finds each task by its words.
+
+- **Claude:** its task tools, `TaskCreate` and `TaskUpdate` (a session through the app has
+  these, not `TodoWrite`; #5093). If they are not in your tools, load them with a tool
+  search for `select:TaskCreate,TaskUpdate`. Make each task with `TaskCreate`, in the
+  order below, with the task's words as its `subject` and as its `activeForm`: the plan
+  shows an `in_progress` task by its `activeForm`. Then change a task's state with
+  `TaskUpdate` (its `taskId` and `status`).
+- **Codex:** `update_plan`, with the whole list each time.
+- **Another runtime:** its own to-do or plan tool. When it has `TodoWrite`, use that.
+
+Change the plan each time a task's state changes:
 
 - a task is `completed` when its step is done, or was done before you came to it;
 - the task of the step that you do now is `in_progress`, also while a card waits for the

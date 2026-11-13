@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -402,7 +403,7 @@ func TestTheNewAppSkillKeepsTheFirstBuildTaskList(t *testing.T) {
 			t.Errorf("%s's task list is\n%s\nwant\n%s", starter, strings.Join(got, "\n"), strings.Join(tasks, "\n"))
 		}
 	}
-	for _, s := range []string{"`TodoWrite`", "`update_plan`", "`completed`", "`in_progress`", "`pending`", "Keep the first-build task list as your plan."} {
+	for _, s := range []string{"`TaskCreate`", "`TaskUpdate`", "`activeForm`", "`update_plan`", "`completed`", "`in_progress`", "`pending`", "Keep the first-build task list as your plan."} {
 		if !strings.Contains(strings.Join(strings.Fields(string(skill)), " "), s) {
 			t.Errorf("the skill does not say %q", s)
 		}
@@ -496,5 +497,16 @@ func TestVoiceModeTextGoesBeforeTheWords(t *testing.T) {
 	waitFor(t, "the second answer", func() bool { return strings.Count(agentMessages(d, id), "Before: ") == 2 })
 	if said := agentMessages(d, id); !strings.HasSuffix(said, "Before: ") {
 		t.Fatalf("said %q", said)
+	}
+}
+
+// Claude is started with its task tools on, which a model newer than claude-opus-4-7 does
+// not have otherwise, so it can send a plan (#5093). The person's own value is kept.
+func TestClaudeIsStartedWithItsTaskTools(t *testing.T) {
+	if got := withClaudeTodoTools([]string{"PATH=/bin", "CLAUDE_CODE_ENABLE_TODO_TOOLS="}); !slices.Equal(got, []string{"PATH=/bin", "CLAUDE_CODE_ENABLE_TODO_TOOLS=1"}) {
+		t.Fatalf("%q", got)
+	}
+	if got := withClaudeTodoTools([]string{"CLAUDE_CODE_ENABLE_TODO_TOOLS=0"}); !slices.Equal(got, []string{"CLAUDE_CODE_ENABLE_TODO_TOOLS=0"}) {
+		t.Fatalf("%q", got)
 	}
 }
