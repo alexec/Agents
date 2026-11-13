@@ -204,8 +204,14 @@ func (d *Daemon) stopScreenDrives() {
 // does the person's Take Over: the next turn may drive again.
 func (d *Daemon) endScreenDrive(agent wire.UUID) {
 	d.forgetDriveDenial(agent, wire.SecretUseScreen)
-	// The screen first: a call the pause's end lets go on finds it let go (#3295).
-	d.letGoOfScreen(agent)
+	// The screen first: a call the pause's end lets go on finds it let go (#3295). While the
+	// person has the agent's browser window in front (#5208), the lease stays until the
+	// hand-off's card comes down, as browser:agents does.
+	if d.windowHandedOff(agent) {
+		d.releaseScreenDrive(agent)
+	} else {
+		d.letGoOfScreen(agent)
+	}
 	d.endScreenPause(agent, "ended")
 	d.driveMu.Lock()
 	delete(d.takenOver, agent)

@@ -180,6 +180,8 @@ func (l *live) take(id wire.UUID) *pendingElicitation {
 }
 
 func (d *Daemon) formDown(agentID, requestID wire.UUID) {
+	// A hand-off in the real window (#5208): the window goes back, and the app before it.
+	d.hideHandOffWindow(requestID)
 	Broadcast(d, wire.NotifyAgentElicitation, wire.ElicitationNotification{AgentID: agentID, RequestID: requestID})
 	d.reconsider()
 }
