@@ -108,6 +108,10 @@ enum WalkCommands {
             return ["ok": true, "text": lines.joined(separator: "\n")]
         case "scroll":
             return try scroll(request)
+        case "selecttext":
+            return try selectText(request)
+        case "context":
+            return try editMenu(request)
         default:
             throw WalkError("unknown cmd \(verb)")
         }
@@ -211,6 +215,76 @@ enum WalkCommands {
             return nil
         }
         return windows().lazy.compactMap(search).first
+    }
+
+    // MARK: selecting words (#5181)
+
+    /// The text view that draws the words matched by `text`: the match, or a view around it.
+    private static func textView(_ request: [String: Any]) throws -> UITextView {
+        let found = try matches(request)
+        for match in found.reversed() {
+            var current: WalkAX? = match.element
+            while let element = current, !(element.object is UIWindow) {
+                if let view = element.object as? UITextView { return view }
+                current = element.parent
+            }
+        }
+        throw WalkError("no text view holds \(request["text"] ?? "")")
+    }
+
+    /// Words of a text view selected, as a long press and the handles would select them:
+    /// `from` and `length` in characters, the whole text when neither is given.
+    private static func selectText(_ request: [String: Any]) throws -> [String: Any] {
+        let view = try textView(request)
+        let whole = (view.text as NSString).length
+        let from = request["from"] as? Int ?? 0
+        let length = request["length"] as? Int ?? whole - from
+        guard from >= 0, length >= 0, from + length <= whole else {
+            throw WalkError("the text has \(whole) characters")
+        }
+        _ = view.becomeFirstResponder()
+        view.selectedRange = NSRange(location: from, length: length)
+        let words = (view.text as NSString).substring(with: view.selectedRange)
+        return ["ok": true, "did": "selected \(words.debugDescription)"]
+    }
+
+    /// A text view's edit menu for its selection, as a long press opens it: its items, or
+    /// `path`'s first item run. Copy and Select All stand in for the system's own items,
+    /// which only a finger's menu has. With no item, the menu is also opened, for a shot.
+    private static func editMenu(_ request: [String: Any]) throws -> [String: Any] {
+        let view = try textView(request)
+        let range = view.selectedRange
+        let system = UIMenu(options: .displayInline, children: [
+            UIAction(title: "Copy") { _ in view.copy(nil) },
+            UIAction(title: "Select All") { _ in view.selectAll(nil) },
+        ])
+        let suggested: [UIMenuElement] = [UIMenu(title: "", identifier: .standardEdit, options: .displayInline,
+                                                 children: system.children)]
+        let menu = view.delegate?.textView?(view, editMenuForTextIn: range, suggestedActions: suggested)
+            ?? UIMenu(children: suggested)
+        func leaves(_ element: UIMenuElement) -> [UIAction] {
+            if let action = element as? UIAction { return [action] }
+            return (element as? UIMenu)?.children.flatMap(leaves) ?? []
+        }
+        let items = leaves(menu)
+        if let wanted = (request["path"] as? [String])?.first {
+            guard let item = items.first(where: { $0.title == wanted }) else {
+                throw WalkError("no \(wanted) in \(items.map(\.title))")
+            }
+            guard !item.attributes.contains(.disabled) else { throw WalkError("\(wanted) is greyed") }
+            UIButton().sendAction(item)
+            return ["ok": true, "did": "chose \(wanted)"]
+        }
+        if let interaction = view.interactions.lazy.compactMap({ $0 as? UIEditMenuInteraction }).first,
+           let start = view.position(from: view.beginningOfDocument, offset: range.location),
+           let end = view.position(from: start, offset: range.length),
+           let selected = view.textRange(from: start, to: end) {
+            let box = view.firstRect(for: selected)
+            interaction.presentEditMenu(with: UIEditMenuConfiguration(identifier: nil,
+                                                                      sourcePoint: CGPoint(x: box.midX, y: box.minY)))
+        }
+        let titles = items.map { $0.attributes.contains(.disabled) ? "\($0.title) (greyed)" : $0.title }
+        return ["ok": true, "did": titles.joined(separator: " · ")]
     }
 
     // MARK: scrolling

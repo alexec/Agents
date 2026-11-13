@@ -259,7 +259,8 @@ enum Canned {
         guard agentID == waiting || agentID == working else { return entries }
         entries += [
             TranscriptEntry(at: ago(41), kind: .userMessage(
-                "Lay the remote out for a phone. Same three levels as the Mac, one at a time.")),
+                "Lay the remote out for a phone. Same three levels as the Mac, one at a time.\n\n"
+                    + "Keep the folder list first, and push the page from it.")),
             TranscriptEntry(at: ago(40), kind: .agentThought(
                 messageID: nil,
                 text: "The Mac ships two columns and a push, which is already the shape a phone wants.")),
@@ -293,7 +294,9 @@ enum Canned {
                 content: [.content(.text("Compiling AgentsKitCore\nBuild complete! (4.21s)"))]))),
             TranscriptEntry(at: ago(12), kind: .agentMessage(
                 messageID: nil,
-                text: "The list and the page are in. Next is the conversation, which is where the paging matters.")),
+                text: "The list and the page are in. Next is the conversation, which is where the paging matters.\n\n"
+                    + "What is left:\n\n- the conversation's paging\n- the prompt bar\n\n"
+                    + "> Same three levels as the Mac, one at a time.\n\nI keep to that.")),
             TranscriptEntry(at: ago(4), kind: .usageRecorded(
                 TurnUsage(totalTokens: 92_000, inputTokens: 81_000, outputTokens: 11_000,
                           cost: Cost(amount: 0.31, currency: "USD")))),

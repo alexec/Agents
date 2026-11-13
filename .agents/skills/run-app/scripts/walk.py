@@ -29,7 +29,9 @@
 
 ROOT `remote` walks the Remote in the walk simulator (#1182; `remote.sh up` first): the same
 verbs, less menu, size, fold, unfold and click; `key return|delete|escape|TEXT` types into
-the field being typed in. `press` on a `Menu`'s button (a toolbar's +) opens its menu, and
+the field being typed in. `selecttext TEXT [--from N --length N]` selects the words of the
+text view that holds TEXT, as a long press and the handles do, and `context TEXT [ITEM]` is
+that text view's edit menu: its items, or ITEM chosen (#5181). `press` on a `Menu`'s button (a toolbar's +) opens its menu, and
 `press ITEM` then runs that item of the open menu, as a finger's taps do (#4381).
 
 TEXT `=Send` is the whole label only; `#id` is an accessibility identifier. Add `--first` to
@@ -143,14 +145,14 @@ def main(argv):
     i = 0
     while i < len(rest):
         flag = rest[i]
-        if flag in ("--window", "--to", "--x", "--y", "--by", "--view", "--count", "--mods"):
+        if flag in ("--window", "--to", "--x", "--y", "--by", "--view", "--count", "--mods", "--from", "--length"):
             value = rest[i + 1]
             key = flag[2:]
             if key == "window" and value.isdigit():
                 value = int(value)
             elif key in ("x", "y", "by"):
                 value = float(value)
-            elif key == "count":
+            elif key in ("count", "from", "length"):
                 value = int(value)
             elif key == "mods":
                 key, value = "modifiers", value.split(",")
