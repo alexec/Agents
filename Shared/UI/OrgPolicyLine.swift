@@ -29,23 +29,6 @@ struct OrgPolicyLine: View {
     }
 }
 
-/// The line for a refused call (`policyRefused`, FR-010): the refusal's title and words, in the
-/// failure's colour where a call failed rather than a choice being shown.
-struct OrgPolicyRefusalLine: View {
-    let refusal: DaemonAPI.PolicyRefusal
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            if let title = refusal.title {
-                Label(title, icon: refusal.symbol).bold()
-            }
-            Text(refusal.words).fixedSize(horizontal: false, vertical: true)
-        }
-        .appText(.supporting)
-        .accessibilityElement(children: .combine)
-    }
-}
-
 /// A menu's line for a choice the policy refuses: its name, disabled, with **Set by your
 /// organisation** and the rule as the item's second line (a menu has no tips).
 struct OrgPolicyMenuItem: View {
@@ -123,19 +106,4 @@ extension EnvironmentValues {
     /// The organisation's mark while its policy requires the command sandbox (#998), for the
     /// sandbox failure card deep in the transcript: **Continue without sandbox** is not offered.
     @Entry var orgSandboxSetBy: DaemonAPI.PolicySetBy?
-}
-
-extension View {
-    /// Dims and disables a choice the policy refuses, with the rule as its tip (#998, FR-020).
-    /// Nothing changes without a mark.
-    @ViewBuilder
-    func setByOrganisation(_ mark: DaemonAPI.PolicySetBy?) -> some View {
-        if let mark {
-            disabled(true)
-                .opacity(0.5)
-                .help(OrgPolicyWords.line(mark))
-        } else {
-            self
-        }
-    }
 }

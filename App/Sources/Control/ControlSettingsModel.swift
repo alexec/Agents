@@ -287,22 +287,8 @@ final class ControlSettingsModel {
         return nil
     }
 
-    /// A host stops using a Mac's git access for one git server (#1122).
-    func revokeGit(_ host: MachineRef, from: MachineRef, server: String) async {
-        await perform(DaemonAPI.Method.hostsLendGit, DaemonAPI.LendGit(host: host, from: from, server: server, allowed: false))
-    }
-
     func unlink(_ host: MachineRef) async {
         await perform(DaemonAPI.Method.hostsUnlink, DaemonAPI.MachineRequest(host: host))
-    }
-
-    /// `stopWhenIdleMinutes` 0 turns idle stopping off.
-    func setWorkspaceOptions(_ host: MachineRef, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil,
-                             startForSchedules: Bool? = nil) async {
-        await perform(DaemonAPI.Method.hostsSetMachineOptions,
-                      DaemonAPI.MachineOptions(host: host, startWhenUsed: startWhenUsed,
-                                                     stopWhenIdleMinutes: stopWhenIdleMinutes,
-                                                     startForSchedules: startForSchedules))
     }
 
     func start(_ host: MachineRef) async {
@@ -382,12 +368,6 @@ final class ControlSettingsModel {
         await perform(DaemonAPI.Method.hostsDeleteMachine, DaemonAPI.MachineRequest(host: host))
     }
 
-    /// Whether the provider a host's workspace is at can delete it.
-    func canDeleteWorkspace(_ host: DaemonAPI.ControlMachine) -> Bool {
-        guard let workspace = host.workspace else { return false }
-        return providers.first { $0.id == workspace.provider }?.capabilities.contains("delete") == true
-    }
-
     /// Links a server added from a workspace once it joins under `name` (Add as Host…).
     /// `trust` is the host key's fingerprint the install trusted, which the link keeps (#3379).
     func linkWhenJoined(name: String, provider: ProviderID, workspace: String, trust: String? = nil) async {
@@ -410,11 +390,6 @@ final class ControlSettingsModel {
     func hostsThatMayBe(_ workspace: DaemonAPI.MachineInfo) -> [DaemonAPI.ControlMachine] {
         guard workspace.host == nil else { return [] }
         return hosts.filter { $0.workspace == nil && workspace.mayBe(hostNamed: $0.name) }
-    }
-
-    /// The workspaces no host is linked to yet, by provider, for Link to Machine….
-    var linkableWorkspaces: [(provider: DaemonAPI.ProviderSummary, workspaces: [DaemonAPI.MachineInfo])] {
-        providers.map { ($0, $0.workspaces) }.filter { !$0.1.isEmpty }
     }
 
     struct WorkspaceRefusal: Error {

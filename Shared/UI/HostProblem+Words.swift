@@ -45,15 +45,8 @@ extension HostProblem {
         }
     }
 
-    /// Whether trying the same thing again could work without the person changing
-    /// anything on the server or in their ssh setup first.
     static func megabytes(_ bytes: Int64) -> String {
         ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
-    }
-
-    var offersTryAgain: Bool {
-        if case .hostKeyChanged = self { return false }
-        return true
     }
 
     /// The window cannot reach the control plane at all (058, frame H). One strip for
