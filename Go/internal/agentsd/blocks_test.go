@@ -398,7 +398,8 @@ func TestATimeOnlyBlockIsDroppedOnLoad(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	old := seeded(t, d, t.TempDir(), func(a *wire.Agent) {
-		a.State = wire.AgentStateArchived
+		r := wire.AgentArchivedReasonByUser
+		a.State, a.ArchivedReason = wire.AgentStateArchived, &r
 		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: "Waiting for CI.", At: now(),
 			Block: &wire.Block{Waits: []wire.Wait{}, Deadline: new(wire.DateOf(time.Now().Add(-48 * time.Hour)))}}
 	})
