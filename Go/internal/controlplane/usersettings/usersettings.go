@@ -55,6 +55,10 @@ var (
 	// ErrInvalid is a part or a secret that is not what it must be. Its words never hold a
 	// secret's value.
 	ErrInvalid = errors.New("invalid")
+	// ErrNoSecret is Sealed for a name the person has no secret under.
+	ErrNoSecret = errors.New("no such secret")
+	// ErrNoCopy is Sealed for a secret that has no copy for the recipient yet (#3397).
+	ErrNoCopy = errors.New("no copy for this recipient yet")
 )
 
 var secretName = regexp.MustCompile(`^[A-Z_][A-Z0-9_]{0,63}$`)
@@ -686,6 +690,45 @@ func (b *Book) Work(ctx context.Context, user, client string, recipients []wire.
 		}
 	}
 	return items, lacks, nil
+}
+
+// Sealed is user/sealedSecret's part (#5114): one secret of user's as the person's client
+// sealed it to recipient, a client of theirs (c:<CLIENT UUID>). ErrNoSecret when there is
+// none under name, ErrNoCopy when it has no envelope for recipient. Nothing here opens it.
+func (b *Book) Sealed(ctx context.Context, user, name, recipient string) (wire.UserSealedSecret, error) {
+	if err := checkUser(user); err != nil {
+		return wire.UserSealedSecret{}, err
+	}
+	if !secretName.MatchString(name) {
+		return wire.UserSealedSecret{}, ErrNoSecret
+	}
+	o, err := b.store.Get(ctx, secretKey(user, name))
+	if err != nil {
+		return wire.UserSealedSecret{}, err
+	}
+	if o == nil {
+		return wire.UserSealedSecret{}, ErrNoSecret
+	}
+	var r secretRecord
+	if err := json.Unmarshal(o.Data, &r); err != nil {
+		return wire.UserSealedSecret{}, err
+	}
+	if r.Sealed == nil || r.Name != name {
+		return wire.UserSealedSecret{}, ErrNoSecret
+	}
+	mine, ok := r.Sealed[recipient]
+	if !ok {
+		return wire.UserSealedSecret{}, ErrNoCopy
+	}
+	out := wire.UserSealedSecret{Name: wire.UserSecretName(name), Version: r.Version, Sealed: mine}
+	if r.Kind != "" {
+		kind := wire.UserSecretKind(r.Kind)
+		out.Kind = &kind
+	}
+	if r.NeedsApproval {
+		out.NeedsApproval = new(true)
+	}
+	return out, nil
 }
 
 // Delivery is machine/userSettings for a machine of user's: the settings, and each secret as

@@ -70,6 +70,8 @@ func (m *Methods) userMethod(ctx context.Context, method string, params json.Raw
 		}
 		m.s.addSecretInfo(user, rows)
 		return wire.UserSecretNames{Secrets: rows}, nil
+	case "user/sealedSecret":
+		return m.sealedSecret(ctx, method, params, from)
 	case "user/secretRecipients":
 		return wire.SealRecipients{Recipients: m.s.userRecipients(user), User: &user}, nil
 	case "user/setSettings":
@@ -115,6 +117,97 @@ func (m *Methods) userMethod(ctx context.Context, method string, params json.Raw
 	}
 	return nil, fail(methodNotFound, "No method %s.", method)
 }
+
+// sealedSecret is user/sealedSecret (#5112, #5114): a person's own client gets its own
+// sealed copy of one of their secrets, to reveal or copy. Only a person's paired client with
+// a key: never a bot's, and never a machine's, whose calls do not come here. The audit
+// entry is written before the copy is given, and when it is not written nothing is given.
+// The control plane never has the value, and the entry never holds it.
+func (m *Methods) sealedSecret(ctx context.Context, method string, params json.RawMessage, from Caller) (any, error) {
+	request, err := require[wire.UserSealedSecretRequest](params, "UserSealedSecretRequest")
+	if err != nil {
+		return nil, err
+	}
+	user := m.callerPerson(from)
+	client := m.records.Client(strings.ToUpper(from.Client))
+	if client == nil || user == "" || m.s.PersonOf(client.ID) != user || !keyed(client.PublicKey) || m.s.isBot(user) {
+		return nil, fail(notPermitted, "Only a person's own app can show or copy their secrets.")
+	}
+	sealed, err := m.s.users.Sealed(ctx, user, string(request.Name), controllink.ClientRecipient(client.ID))
+	switch {
+	case errors.Is(err, usersettings.ErrNoSecret):
+		return nil, fail(noSuchSecret, "There is no secret %s.", request.Name)
+	case errors.Is(err, usersettings.ErrNoCopy):
+		return nil, fail(noClientCopy, "This app has no copy yet. It gets one when another app of yours is online.")
+	case err != nil:
+		return nil, userFailure(err)
+	}
+	action, err := sealedSecretAction(request, deref(sealed.Kind) == wire.UserSecretKindCard)
+	if err != nil {
+		return nil, err
+	}
+	target := string(request.Name)
+	if err := m.s.auditLog().Write(ctx, m.s.actorFor(client.ID), method, action, "", &target); err != nil {
+		return nil, fail(storeUnavailable, "The audit entry could not be written, so the secret was not given. Try again.")
+	}
+	return sealed, nil
+}
+
+// cardPartWords are a card's parts as an audit entry names them (#3531).
+var cardPartWords = map[wire.UserSealedSecretPart]string{
+	wire.UserSealedSecretPartNumber: "the card number",
+	wire.UserSealedSecretPartExpiry: "the expiry",
+	wire.UserSealedSecretPartCvc:    "the CVC",
+	wire.UserSealedSecretPartName:   "the name on card",
+	wire.UserSealedSecretPartZip:    "the billing ZIP",
+}
+
+// mostAccountText bounds an account's service and address in an audit entry.
+const mostAccountText = 200
+
+// sealedSecretAction is the audit entry's words for a reveal or a copy
+// (specs/5112-view-copy-secrets-accounts/wireframes.md, section 9): "Revealed secret NAME",
+// "Revealed card NAME", "Copied the CVC of card NAME", "… of account SERVICE (ADDRESS)".
+// Only a card has parts, and only a copy names one.
+func sealedSecretAction(request wire.UserSealedSecretRequest, card bool) (string, error) {
+	var verb string
+	switch request.Purpose {
+	case wire.UserSealedSecretPurposeReveal:
+		verb = "Revealed"
+	case wire.UserSealedSecretPurposeCopy:
+		verb = "Copied"
+	default:
+		return "", fail(invalidParams, "purpose is reveal or copy.")
+	}
+	action := verb + " secret " + string(request.Name)
+	if card {
+		action = verb + " card " + string(request.Name)
+	}
+	if request.Part != nil {
+		words, ok := cardPartWords[*request.Part]
+		switch {
+		case !card:
+			return "", fail(invalidParams, "%s is not a card, so it has no parts.", request.Name)
+		case !ok || request.Purpose != wire.UserSealedSecretPurposeCopy:
+			return "", fail(invalidParams, "A card's part is only for a copy: number, expiry, cvc, name or zip.")
+		}
+		action = verb + " " + words + " of card " + string(request.Name)
+	}
+	if a := request.Account; a != nil {
+		service, address := oneLine(a.Service), oneLine(deref(a.Address))
+		if service == "" || len([]rune(service)) > mostAccountText || len([]rune(address)) > mostAccountText {
+			return "", fail(invalidParams, "An account is its service and address, each at most %d characters.", mostAccountText)
+		}
+		action += " of account " + service
+		if address != "" {
+			action += " (" + address + ")"
+		}
+	}
+	return action, nil
+}
+
+// oneLine is s with each run of white space, new lines too, as one space.
+func oneLine(s string) string { return strings.Join(strings.Fields(s), " ") }
 
 // agentConfigFileRefused is user/setAgentConfigFile. The instructions, skills, personas,
 // MCP servers and plugins follow the person only from the person's own clients

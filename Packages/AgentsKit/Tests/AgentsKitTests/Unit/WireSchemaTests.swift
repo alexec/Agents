@@ -299,6 +299,8 @@ struct WireSchemaTests {
             "UserSecretSet": Self.through(DaemonAPI.UserSecretSet.self),
             "UserSecretRequest": Self.through(DaemonAPI.UserSecretRequest.self),
             "UserSecretNames": Self.through(DaemonAPI.UserSecretNames.self),
+            "UserSealedSecretRequest": Self.through(DaemonAPI.UserSealedSecretRequest.self),
+            "UserSealedSecret": Self.through(DaemonAPI.UserSealedSecret.self),
             "UserSettingsChanged": Self.through(DaemonAPI.UserSettingsChanged.self),
             "SecretsLeft": Self.through(DaemonAPI.SecretsLeft.self),
             // Client sealing (#3397).

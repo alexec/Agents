@@ -15081,6 +15081,55 @@ type UserRole string
 const UserRoleAdmin UserRole = "admin"
 const UserRoleMember UserRole = "member"
 
+// user/sealedSecret's answer (#5114): this client's own envelope of the secret, as the person's client sealed it (#3397). HPKE, info com.alexecollins.agents.usersecret.v1, associated data usersecret.v1|<person id>|c:<CLIENT UUID>|<name>|<version>, with |ask at the end when needsApproval is on. The control plane never has the value.
+type UserSealedSecret struct {
+	Name UserSecretName `json:"name"`
+
+	Version int64 `json:"version"`
+
+	Kind *UserSecretKind `json:"kind,omitzero"`
+
+	// Ask before use (#4014), bound into the associated data. Left out is off.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
+
+	Sealed SealedEnvelope `json:"sealed"`
+}
+
+// user/sealedSecret (#5114): the account a reveal or a copy was opened from, for the audit entry: its service and the address it signs in with. Never a value.
+type UserSealedSecretAccount struct {
+	Service string `json:"service"`
+
+	Address *string `json:"address,omitzero"`
+}
+
+// A card's part (#3531), for a copy of one part of a card: the card number, the expiry, the CVC, the name on card or the billing ZIP.
+type UserSealedSecretPart string
+
+const UserSealedSecretPartNumber UserSealedSecretPart = "number"
+const UserSealedSecretPartExpiry UserSealedSecretPart = "expiry"
+const UserSealedSecretPartCvc UserSealedSecretPart = "cvc"
+const UserSealedSecretPartName UserSealedSecretPart = "name"
+const UserSealedSecretPartZip UserSealedSecretPart = "zip"
+
+// Why a person's client asks for its copy of a secret (#5114): to show it, or to put it on the clipboard. Only for the audit entry's words.
+type UserSealedSecretPurpose string
+
+const UserSealedSecretPurposeReveal UserSealedSecretPurpose = "reveal"
+const UserSealedSecretPurposeCopy UserSealedSecretPurpose = "copy"
+
+// user/sealedSecret (#5112, #5114): a person's own client asks for its own sealed copy of one of the person's secrets, to reveal or copy it. The control plane writes the audit entry first, with the name and never the value.
+type UserSealedSecretRequest struct {
+	Name UserSecretName `json:"name"`
+
+	Purpose UserSealedSecretPurpose `json:"purpose"`
+
+	// A card's part, for a copy of that part; left out otherwise.
+	Part *UserSealedSecretPart `json:"part,omitzero"`
+
+	// The account the secret was opened from; left out when it was opened from Secrets.
+	Account *UserSealedSecretAccount `json:"account,omitzero"`
+}
+
 // user/setSecret (#1760, FR-025): a secret the control plane keeps sealed, and sends only to its person's own machines. The value is never sent back to a client.
 type UserSecret struct {
 	Name UserSecretName `json:"name"`

@@ -33,6 +33,8 @@ const (
 	changedElsewhere     = -32093
 	storeUnavailable     = -32094
 	notKeeper            = -32101
+	noSuchSecret         = -32107
+	noClientCopy         = -32108
 )
 
 // RPCError is JSONRPCError.

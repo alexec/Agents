@@ -93,7 +93,8 @@ control/status
     "tunnel/1",
     "user/1",
     "user/2",
-    "user/3"
+    "user/3",
+    "user/4"
   ],
   "required": {
     "host": [
@@ -317,7 +318,8 @@ control/status
     "tunnel/1",
     "user/1",
     "user/2",
-    "user/3"
+    "user/3",
+    "user/4"
   ],
   "required": {
     "host": [

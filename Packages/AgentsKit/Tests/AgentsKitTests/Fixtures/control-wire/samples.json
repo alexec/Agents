@@ -1218,6 +1218,25 @@
       }
     }
   },
+  "UserSealedSecretRequest": {
+    "name": "GITLAB_TOKEN",
+    "purpose": "copy",
+    "part": "cvc",
+    "account": {
+      "service": "gitlab.com",
+      "address": "agentloops@example.com"
+    }
+  },
+  "UserSealedSecret": {
+    "name": "SHOP_CARD",
+    "version": 2,
+    "kind": "card",
+    "needsApproval": true,
+    "sealed": {
+      "encapsulated": "BKzbiazQR4LGtRgQPSlIVEoCcE1zvM05lm29rjZefnVpuo68H773EO5R7jmXVga9BvIRe/w1Lo2D/Wckk23ZZh4=",
+      "ciphertext": "c2VhbGVk"
+    }
+  },
   "SealRecipients": {
     "recipients": [
       {

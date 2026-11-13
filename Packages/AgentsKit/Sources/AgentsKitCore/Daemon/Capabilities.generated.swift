@@ -210,6 +210,7 @@ public enum Capability {
     public static let user1 = "user/1"
     public static let user2 = "user/2"
     public static let user3 = "user/3"
+    public static let user4 = "user/4"
     public static let velocity1 = "velocity/1"
     public static let views1 = "views/1"
     public static let wake1 = "wake/1"
@@ -904,6 +905,7 @@ public enum Capability {
         "tunnel/open": "tunnel/1",
         "usage/rollup": "reports/1",
         "user/removeSecret": "user/2",
+        "user/sealedSecret": "user/4",
         "user/secretNames": "user/2",
         "user/secretRecipients": "user/2",
         "user/setAgentConfigFile": "user/1",

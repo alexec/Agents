@@ -202,6 +202,7 @@ var own = methodSet(
 	"signIn/requests",
 	"signIn/ticket",
 	"user/removeSecret",
+	"user/sealedSecret",
 	"user/secretNames",
 	"user/secretRecipients",
 	"user/setAgentConfigFile",
@@ -431,7 +432,7 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 	case "reports/usage", "reports/export", "reports/value", "reports/nodes":
 		return m.reportMethod(ctx, method, params, from)
 	case "user/settings", "user/setAgentConfigFile", "user/setSettings", "user/setSecret", "user/removeSecret", "user/secretNames",
-		"user/secretRecipients":
+		"user/secretRecipients", "user/sealedSecret":
 		return m.userMethod(ctx, method, params, from)
 	case "machines/joinRequests":
 		return m.s.joins.list(ctx, m.callerPerson(from))
