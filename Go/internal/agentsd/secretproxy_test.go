@@ -55,6 +55,11 @@ func TestAnHTTPServerGetsAFlaggedSecretThroughAgentsd(t *testing.T) {
 	}
 	d, _ := start(t, t.TempDir())
 	t.Cleanup(d.Shutdown)
+	// As main does before it accepts a connection (#5070, as #4857 did for the fill tests):
+	// your policy's first read makes the first-start move, which writes person-key and
+	// settings/policy-yours.json into the root. Read lazily, it ran on whichever goroutine
+	// asked first, under load as late as the root's TempDir removal ("directory not empty").
+	d.WarmYourPolicy()
 	if err := d.saveSecret("API_TOKEN", value, true); err != nil {
 		t.Fatal(err)
 	}
@@ -141,6 +146,8 @@ func TestADeniedServerDoesNotAskAgain(t *testing.T) {
 		[]byte(`{"mcpServers":{"notes":{"url":"https://notes.example.com/${API_TOKEN}"}}}`), 0o600)
 	d, _ := start(t, t.TempDir())
 	t.Cleanup(d.Shutdown)
+	// As above: the first-start move before the test, not during its cleanup (#5070).
+	d.WarmYourPolicy()
 	if err := d.saveSecret("API_TOKEN", "v4120", true); err != nil {
 		t.Fatal(err)
 	}
