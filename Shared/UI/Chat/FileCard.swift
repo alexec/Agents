@@ -14,10 +14,11 @@ struct FileCard: View {
         Group {
             if file.look == .chart || file.look == .diagram || file.look == .picture {
                 ObjectCard(icon: symbol, title: file.name, detail: detail,
-                           open: open, openHelp: "Open \(file.name) in Files") {
-                    FilePreview(file: file, mark: $mark)
-                        .frame(height: ObjectCard<EmptyView, EmptyView>.previewHeight)
-                }
+                           open: open, openHelp: "Open \(file.name) in Files",
+                           preview: {
+                               FilePreview(file: file, mark: $mark)
+                                   .frame(height: ObjectCard<EmptyView, EmptyView>.previewHeight)
+                           })
             } else {
                 ObjectCard(icon: symbol, title: file.name, detail: detail,
                            open: open, openHelp: "Open \(file.name) in Files",
@@ -26,7 +27,6 @@ struct FileCard: View {
         }
         .frame(maxWidth: ObjectCard<EmptyView, EmptyView>.width, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityAddTraits(actions.showFile == nil ? [] : .isButton)
     }
 
     /// A tap opens it in Files, where the chat can.
@@ -85,6 +85,7 @@ private struct FilePreview: View {
                 Text(words).appText(.fine).foregroundStyle(.secondary).padding(10)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .task(id: file) {
             shown = await load()
             if case .chart(let spec) = shown { mark = spec.mark }

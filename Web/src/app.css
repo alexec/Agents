@@ -1996,7 +1996,6 @@ button.object-card-open, .object-card-chevron { cursor: pointer; }
 .object-card-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .object-card-detail { font-size: 0.75rem; color: var(--paper-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .object-card-chevron { flex: none; display: inline-flex; padding: 4px; background: none; border: 0; color: var(--paper-tertiary); }
-.object-card-more .ask-more-menu { top: calc(100% + 4px); bottom: auto; }
 .object-card-notes { display: flex; flex-direction: column; gap: 4px; padding: 0 12px 10px; font-size: 0.75rem; color: var(--paper-secondary); }
 .object-card-notes p { margin: 0; }
 .object-card-notes .failure { color: var(--tint-failure); }

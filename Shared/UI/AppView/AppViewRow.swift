@@ -42,9 +42,7 @@ private struct AppViewInline: View {
             ObjectCard(icon: "square.grid.2x2", title: host.title, detail: detail,
                        open: canOpen ? { host.setFullscreen(true) } : nil,
                        openHelp: "Show this view in the chat's place",
-                       more: more, tapAnywhere: false) {
-                frame
-            }
+                       more: more, tapAnywhere: false, preview: { frame })
             AppViewAsks(host: host)
         }
         .onAppear { host.start() }

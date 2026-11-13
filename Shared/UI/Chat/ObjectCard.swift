@@ -10,12 +10,12 @@ struct ObjectCard<Preview: View, Notes: View>: View {
     let icon: String
     let title: String
     let detail: String
-    /// What a tap does; nil draws the card with no ›, and a tap does nothing.
+    /// What a tap on the row (and the preview) does; nil draws the card with no ›, and a tap does nothing.
     var open: (@MainActor () -> Void)?
     var openHelp: String?
     /// The actions that are not the tap: Undo These Changes, Pin to Folder, Full screen.
     var more: [StripButton] = []
-    /// False when the preview is live (an app view): only the › opens, as the view takes its own taps.
+    /// False when the preview is live (an app view): a click on the preview does not open, as the view takes its own.
     var tapAnywhere = true
     let preview: Preview
     /// Quiet lines under the row: an undo's outcome, a failure.
@@ -40,26 +40,19 @@ struct ObjectCard<Preview: View, Notes: View>: View {
     }
 
     var body: some View {
-        Group {
-            // The whole card is the button, so a click anywhere on it opens (the ⋯ inside keeps its own).
-            if let open, tapAnywhere {
-                Button(action: open) { card }
-                    .buttonStyle(.plain)
-                    .help(openHelp ?? "")
-            } else {
-                card
-            }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(title), \(detail)")
-    }
-
-    private var card: some View {
         VStack(alignment: .leading, spacing: 0) {
             if Preview.self != EmptyView.self {
-                preview
-                    .frame(maxWidth: .infinity)
-                    .background(Paper.well)
+                Group {
+                    // A click on the preview opens too, unless the preview is live and takes its own.
+                    if let open, tapAnywhere {
+                        Button(action: open) { previewBox }
+                            .buttonStyle(.plain)
+                            .help(openHelp ?? "")
+                            .accessibilityHidden(true)
+                    } else {
+                        previewBox
+                    }
+                }
                 Divider().overlay(Paper.rule)
             }
             VStack(alignment: .leading, spacing: 6) {
@@ -73,10 +66,19 @@ struct ObjectCard<Preview: View, Notes: View>: View {
         .background(Paper.raised)
         .clipShape(RoundedRectangle(cornerRadius: Paper.Radius.card))
         .overlay(RoundedRectangle(cornerRadius: Paper.Radius.card).strokeBorder(Paper.rule))
-        .contentShape(RoundedRectangle(cornerRadius: Paper.Radius.card))
+        .accessibilityElement(children: .contain)
     }
 
-    private var row: some View {
+    private var previewBox: some View {
+        preview
+            .frame(maxWidth: .infinity)
+            .background(Paper.well)
+            .contentShape(Rectangle())
+    }
+
+    /// The icon and the words: the button that opens, with ⋯ and › beside it rather than in it,
+    /// so each keeps its own click (a menu inside a button's label does not, on the Mac).
+    private var words: some View {
         HStack(spacing: 10) {
             Image(icon: icon)
                 .foregroundStyle(Paper.secondary)
@@ -87,6 +89,23 @@ struct ObjectCard<Preview: View, Notes: View>: View {
                 Text(detail).appText(.fine).foregroundStyle(Paper.secondary).lineLimit(1).truncationMode(.middle)
             }
             Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+    }
+
+    private var row: some View {
+        HStack(spacing: 6) {
+            if let open {
+                Button(action: open) { words }
+                    .buttonStyle(.plain)
+                    .help(openHelp ?? "")
+                    .accessibilityLabel("\(title), \(detail)")
+                    .accessibilityHint(openHelp ?? "")
+            } else {
+                words
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(title), \(detail)")
+            }
             if !more.isEmpty {
                 Menu {
                     ForEach(more.indices, id: \.self) { index in
@@ -98,32 +117,30 @@ struct ObjectCard<Preview: View, Notes: View>: View {
                         .foregroundStyle(Paper.secondary)
                         .frame(minWidth: 24, minHeight: 24)
                         .contentShape(Rectangle())
+                        .accessibilityLabel(StripWords.moreActions)
                 }
                 .menuStyle(.button)
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .accessibilityLabel(StripWords.moreActions)
+                .help(StripWords.moreActions)
             }
             if let open {
-                if tapAnywhere {
+                Button(action: open) {
                     Image(icon: "chevron.right").appText(.fine).foregroundStyle(Paper.tertiary)
-                        .accessibilityHidden(true)
-                } else {
-                    Button(action: open) {
-                        Image(icon: "chevron.right").appText(.fine).foregroundStyle(Paper.tertiary)
-                            .frame(minWidth: 24, minHeight: 24)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help(openHelp ?? "")
-                    .accessibilityLabel(openHelp ?? title)
+                        .frame(minWidth: 20, minHeight: 24)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .help(openHelp ?? "")
+                .accessibilityHidden(true)
             }
         }
     }
 }
 
+// Name the closure at each call (`preview:` or `notes:`): a bare trailing closure matches both
+// inits below, and Swift takes the one for notes.
 extension ObjectCard where Notes == EmptyView {
     init(icon: String, title: String, detail: String, open: (@MainActor () -> Void)? = nil, openHelp: String? = nil,
          more: [StripButton] = [], tapAnywhere: Bool = true, @ViewBuilder preview: () -> Preview) {

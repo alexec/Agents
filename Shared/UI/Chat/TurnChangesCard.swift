@@ -19,7 +19,7 @@ struct TurnChangesCard: View {
     var body: some View {
         ObjectCard(icon: TurnChangesWords.symbol, title: TurnChangesWords.title(changes),
                    detail: TurnChangesWords.names(changes), open: open, openHelp: TurnChangesWords.openHelp,
-                   more: more) {
+                   more: more, notes: {
             if changes.onlyReported == true {
                 Text(TurnChangesWords.onlyReported)
                     .appText(.fine).foregroundStyle(Paper.secondary)
@@ -41,7 +41,7 @@ struct TurnChangesCard: View {
                 Text(problem).appText(.fine).tinted(.failure)
                     .fixedSize(horizontal: false, vertical: true)
             }
-        }
+        })
         .frame(maxWidth: ObjectCard<EmptyView, EmptyView>.width, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
         .confirmationDialog(TurnChangesWords.confirmTitle, isPresented: Binding(
