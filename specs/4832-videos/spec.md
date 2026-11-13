@@ -396,6 +396,16 @@ anyway. Alex can overrule.
   is one step now. A public video still waits on open question 2 (the API audit) and on
   Alex's watch of this one.
 
+**A voice with tone and stress (#5062, #5079, 2026-11-12).** Alex, after U1 went public:
+"The audio could be more expressive if that's possible." Spike #5062 made U1's directed
+script in five voices, and Alex chose Qwen3-TTS CustomVoice 1.7B's built-in speaker
+**Aiden** in place of Kokoro's Heart: a speaker built into the model (no voice sample, no
+actor), Apache-2.0, through the same `mlx-audio`. `voice.py` tells it each phrase's tone, a
+slow rate as "a little slower", and the stressed words. It samples, so a phrase Whisper does
+not hear is said again (at most 3 times). Its weights are about 4 GB, fetched once by
+`make.sh`. U1 made again in Aiden's voice: Whisper 0% wrong, the sound test passed, the nine
+lines in under a minute. U1 stays public in Heart's voice until Alex says to replace it.
+
 ## Open questions
 
 1. **The channel:** answered (Alex, 2026-11-11, changed 2026-11-12): a new channel for the
