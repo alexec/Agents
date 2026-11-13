@@ -136,10 +136,14 @@ agentloops@fastmail.com where the site lets you, or ask Alex with `ask_question`
   pipe it from the page into `scripts/totp.sh --save <service>` (it writes
   `~/.agents/secrets/<service>-totp`, mode 600) without printing it. `scripts/totp.sh
   <service>` prints only the current code: read it into a script that types it, never into a
-  transcript. Where a site takes only a passkey, use a software passkey on Chrome's virtual
-  authenticator (WebAuthn over CDP), its key in `~/.agents/secrets/<service>-passkey.json`:
-  `scripts/okta-signin.mjs` makes one with `WebAuthn.addVirtualAuthenticator`, enrols it, and
-  saves it with `WebAuthn.getCredentials` for the next run (`okta-integrator-passkey.json`).
+  transcript. Where a site takes only a passkey, use a software passkey (#4085): call
+  `browser_passkey` with `secret` (one per account, e.g. `GITHUB_AGENT_PASSKEY`) and `site`
+  (`github.com`) **before** you open the sign-up or sign-in page, as it starts the browser
+  again with WebAuthn. With the secret not set yet, choose the site's "Add a passkey" or "Set
+  up a passkey": the passkey is saved as the secret, unseen. At the next sign-in, call it
+  again with the same secret and choose "Sign in with a passkey". Record the second factor as
+  "software passkey" in `manage_accounts`. The Okta walk's own Chrome still uses
+  `scripts/okta-signin.mjs`, which keeps its key in `~/.agents/secrets/okta-integrator-passkey.json`.
 - **Accounts:** `manage_accounts` with action `add` (#3967): service, a description (what it is
   for and who uses it, so another agent can tell it from the other accounts of the service, #4164), address, plan, monthly
   cost, card (its name in Settings ▸ You ▸ Secrets), secret (its name there, or where it is), the

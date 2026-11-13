@@ -25,6 +25,7 @@ type fake struct {
 	installs atomic.Int32
 	launches atomic.Int32
 	headed   atomic.Int32
+	webauthn atomic.Int32
 	stops    atomic.Int32
 	crash    chan struct{}
 	busy     atomic.Bool
@@ -55,14 +56,17 @@ func newFake(t *testing.T) *fake {
 		}
 		return "", errors.New("no PLAYWRIGHT_BROWSERS_PATH")
 	}
-	f.m.launch = func(exe, profile string, env []string, headed bool) (*process, error) {
+	f.m.launch = func(exe, profile string, env []string, how mode) (*process, error) {
 		n := f.launches.Add(1)
-		if headed {
+		if how.headed {
 			f.headed.Add(1)
+		}
+		if how.webauthn {
+			f.webauthn.Add(1)
 		}
 		f.crash = make(chan struct{})
 		return &process{endpoint: "ws://127.0.0.1:9222/devtools/browser/" + string(rune('a'+n-1)), pid: 1000 + int(n),
-			done: f.crash, stop: func() { f.stops.Add(1) }, headed: headed}, nil
+			done: f.crash, stop: func() { f.stops.Add(1) }, headed: how.headed, webauthn: how.webauthn}, nil
 	}
 	t.Cleanup(f.m.Shutdown)
 	return f
@@ -150,6 +154,49 @@ func TestHeadedStartsItAgainWithAWindow(t *testing.T) {
 	}
 }
 
+// A software passkey starts the browser again with WebAuthn (#4085), with no second start
+// while it has it; a window it has stays; the start after it stops has none again.
+func TestPasskeysStartsItAgainWithWebAuthn(t *testing.T) {
+	f := newFake(t)
+	if runtime.GOOS != "darwin" {
+		f.m.Env = func() []string { return []string{"PATH=/usr/bin:/bin", "DISPLAY=:0"} }
+	}
+	f.m.Headed()
+	mustStart(t, f.m)
+	if !f.m.Passkeys() || f.m.Running() || f.stops.Load() != 1 {
+		t.Fatal("the browser with no WebAuthn did not stop")
+	}
+	end, err := f.m.Endpoint(nil)
+	if err != nil || end != "ws://127.0.0.1:9222/devtools/browser/b" || f.webauthn.Load() != 1 || f.headed.Load() != 2 {
+		t.Fatal(end, err, f.webauthn.Load(), f.headed.Load())
+	}
+	if f.m.Passkeys() || f.m.Headed() || f.stops.Load() != 1 {
+		t.Fatal("a browser with WebAuthn started again")
+	}
+	f.m.Stop()
+	mustStart(t, f.m)
+	if f.launches.Load() != 3 || f.webauthn.Load() != 1 || f.headed.Load() != 2 {
+		t.Fatal("the start after a stop had WebAuthn", f.webauthn.Load(), f.headed.Load())
+	}
+}
+
+// A site that checks for bots keeps WebAuthn when it starts the browser again headed.
+func TestHeadedKeepsWebAuthn(t *testing.T) {
+	f := newFake(t)
+	if runtime.GOOS != "darwin" {
+		f.m.Env = func() []string { return []string{"PATH=/usr/bin:/bin", "DISPLAY=:0"} }
+	}
+	f.m.Passkeys()
+	mustStart(t, f.m)
+	if !f.m.Headed() {
+		t.Fatal("the headless browser did not stop")
+	}
+	mustStart(t, f.m)
+	if f.webauthn.Load() != 2 || f.headed.Load() != 1 {
+		t.Fatal(f.webauthn.Load(), f.headed.Load())
+	}
+}
+
 // With no display, there is no window: the browser stays as it is.
 func TestHeadedNeedsADisplay(t *testing.T) {
 	if runtime.GOOS == "darwin" {
@@ -167,11 +214,11 @@ func TestAFailedHeadedStartIsHeadless(t *testing.T) {
 	f := newFake(t)
 	f.m.Env = func() []string { return []string{"PATH=/usr/bin:/bin", "DISPLAY=:0"} }
 	launch := f.m.launch
-	f.m.launch = func(exe, profile string, env []string, headed bool) (*process, error) {
-		if headed {
+	f.m.launch = func(exe, profile string, env []string, how mode) (*process, error) {
+		if how.headed {
 			return nil, errors.New("no window")
 		}
-		return launch(exe, profile, env, headed)
+		return launch(exe, profile, env, how)
 	}
 	f.m.Headed()
 	if _, err := f.m.Endpoint(nil); err != nil || f.launches.Load() != 1 {
@@ -283,7 +330,7 @@ func TestARealChromium(t *testing.T) {
 		t.Skip("set AGENTS_TEST_CHROMIUM to a Chromium to start a real one")
 	}
 	profile := t.TempDir()
-	p, err := launchChromium(exe, profile, os.Environ(), false)
+	p, err := launchChromium(exe, profile, os.Environ(), mode{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,7 +374,7 @@ func TestARealHeadedChromium(t *testing.T) {
 	if exe == "" {
 		t.Skip("set AGENTS_TEST_CHROMIUM to a Chromium to start a real one")
 	}
-	p, err := launchChromium(exe, t.TempDir(), os.Environ(), true)
+	p, err := launchChromium(exe, t.TempDir(), os.Environ(), mode{headed: true})
 	if err != nil {
 		t.Fatal(err)
 	}

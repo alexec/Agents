@@ -17,8 +17,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -72,15 +72,17 @@ type Machine struct {
 	// lock: the clients that watch the page are told (#3528).
 	Changed func(running bool)
 
-	// launch starts Chromium, headed or not, and says how to reach it; a test gives its own.
-	launch func(exe, profile string, env []string, headed bool) (*process, error)
+	// launch starts Chromium as how says, and says how to reach it; a test gives its own.
+	launch func(exe, profile string, env []string, how mode) (*process, error)
 	// locate is the Chromium that the toolset installed; a test gives its own.
 	locate func(t Toolset, env []string) (string, error)
 
-	mu       sync.Mutex
-	running  *process
+	mu      sync.Mutex
+	running *process
 	// headed is whether the next start has a window (Headed): until the browser stops.
-	headed   bool
+	headed bool
+	// webauthn is whether the next start has WebAuthn (Passkeys): until the browser stops.
+	webauthn bool
 	toolset  Toolset
 	lastUsed time.Time
 	stopLoop chan struct{}
@@ -96,9 +98,15 @@ type process struct {
 	stop     func()
 	// headed is whether it has a window (off-screen), not headless.
 	headed bool
+	// webauthn is whether its pages have WebAuthn, for a software passkey (#4085).
+	webauthn bool
 	// store is its cookies, for Settings ▸ Browser (sites.go).
 	store cookieStore
 }
+
+// mode is how Chromium starts: with a window, off-screen (#4272), and with WebAuthn, for a
+// software passkey (#4085). The zero mode is headless with no WebAuthn, as it starts most.
+type mode struct{ headed, webauthn bool }
 
 // New is the machine's browser with its binaries under cache and its profile under root.
 func New(cache, root string, install func(func(string)) (Toolset, error), busy func() bool, env func() []string) *Machine {
@@ -164,13 +172,13 @@ func (m *Machine) Endpoint(progress func(string)) (string, error) {
 	m.endLeftover()
 	dropCaches(m.Profile)
 	progress("Starting the browser")
-	headed := m.headed && canHead(env)
-	p, err := m.launch(exe, m.Profile, env, headed)
-	if err != nil && headed {
+	how := mode{headed: m.headed && canHead(env), webauthn: m.webauthn}
+	p, err := m.launch(exe, m.Profile, env, how)
+	if err != nil && how.headed {
 		// A window it cannot open is no reason to have no browser: headless, as always.
 		log.Printf("browser: Chromium did not start with a window (%v); starting it headless", err)
-		m.headed = false
-		p, err = m.launch(exe, m.Profile, env, false)
+		m.headed, how.headed = false, false
+		p, err = m.launch(exe, m.Profile, env, how)
 	}
 	if err != nil {
 		return "", fmt.Errorf("the browser did not start: %w", err)
@@ -181,11 +189,14 @@ func (m *Machine) Endpoint(progress func(string)) (string, error) {
 	m.running = p
 	m.startLoop()
 	m.changed(true)
-	how := "headless"
+	started := "headless"
 	if p.headed {
-		how = "with a window off-screen"
+		started = "with a window off-screen"
 	}
-	log.Printf("browser: Chromium (pid %d) started %s, with the profile in %s", p.pid, how, m.Profile)
+	if p.webauthn {
+		started += ", with WebAuthn for a software passkey"
+	}
+	log.Printf("browser: Chromium (pid %d) started %s, with the profile in %s", p.pid, started, m.Profile)
 	return p.endpoint, nil
 }
 
@@ -202,11 +213,38 @@ func (m *Machine) Headed() bool {
 	}
 	restarted := false
 	if m.running != nil && !m.running.headed {
-		m.stopLocked()
+		m.restartLocked()
 		restarted = true
 	}
 	m.headed = true
 	return restarted
+}
+
+// Passkeys gives the browser's pages WebAuthn until it stops (#4085), for a software
+// passkey on a tab (Tabs.Passkey): it starts with none, as it has no passkeys of its own
+// (#4084). A Chromium that runs with none stops now, with its cookies kept, and the next
+// Endpoint starts it with WebAuthn, at a new address; its tabs close. It says whether it
+// stopped one. A window it has (Headed) it keeps.
+func (m *Machine) Passkeys() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.stopped {
+		return false
+	}
+	restarted := false
+	if m.running != nil && !m.running.webauthn {
+		m.restartLocked()
+		restarted = true
+	}
+	m.webauthn = true
+	return restarted
+}
+
+// restartLocked stops Chromium for a start in another mode, which keeps the mode it has.
+func (m *Machine) restartLocked() {
+	headed, webauthn := m.headed, m.webauthn
+	m.stopLocked()
+	m.headed, m.webauthn = headed, webauthn
 }
 
 // canHead is whether Chromium can open a window here: a Mac, or a display in env.
@@ -287,8 +325,9 @@ func (m *Machine) stopLocked() {
 	m.running.stop()
 	log.Printf("browser: Chromium (pid %d) stopped", m.running.pid)
 	m.running = nil
-	// The next start is headless again, unless a site asks for a window (Headed).
-	m.headed = false
+	// The next start is headless again, unless a site asks for a window (Headed), and has
+	// no WebAuthn, unless an agent asks for a software passkey (Passkeys).
+	m.headed, m.webauthn = false, false
 	// The pages are gone, and every value filled into them with the pages.
 	m.Filter.Forget()
 	os.Remove(m.pidFile())
@@ -394,18 +433,19 @@ func locateChromium(t Toolset, env []string) (string, error) {
 // launchChromium starts Chromium with chromedp: headless, the kept profile, its debugging
 // port on 127.0.0.1 and a port the system picks, so only this machine reaches it and the
 // address has the browser's random id in its path. Its user agent says Chrome, not
-// HeadlessChrome (#4060). It has no WebAuthn, as it cannot do passkeys (#4084). Headed
-// (#4272), it has a window off-screen instead, and its own user agent.
-func launchChromium(exe, profile string, env []string, headed bool) (*process, error) {
-	if headed {
-		p, _, err := startChromium(exe, profile, env, "", true)
+// HeadlessChrome (#4060). It has no WebAuthn, as it cannot do passkeys (#4084), unless
+// how asks for it, for a software passkey (#4085). Headed (#4272), it has a window
+// off-screen instead, and its own user agent.
+func launchChromium(exe, profile string, env []string, how mode) (*process, error) {
+	if how.headed {
+		p, _, err := startChromium(exe, profile, env, "", how)
 		return p, err
 	}
 	if ua, ok := userAgents.Load(exe); ok {
-		p, _, err := startChromium(exe, profile, env, ua.(string), false)
+		p, _, err := startChromium(exe, profile, env, ua.(string), how)
 		return p, err
 	}
-	p, ua, err := startChromium(exe, profile, env, "", false)
+	p, ua, err := startChromium(exe, profile, env, "", how)
 	if err != nil || !strings.Contains(ua, "HeadlessChrome/") {
 		return p, err
 	}
@@ -414,7 +454,7 @@ func launchChromium(exe, profile string, env []string, headed bool) (*process, e
 	userAgents.Store(exe, asChrome)
 	p.stop()
 	<-p.done
-	p, _, err = startChromium(exe, profile, env, asChrome, false)
+	p, _, err = startChromium(exe, profile, env, asChrome, how)
 	return p, err
 }
 
@@ -428,9 +468,9 @@ func headedUserAgent(ua string) string {
 	return strings.Replace(ua, "HeadlessChrome/", "Chrome/", 1)
 }
 
-// startChromium starts Chromium, with userAgent when it is not empty and a window when
-// headed, and says the user agent it has.
-func startChromium(exe, profile string, env []string, userAgent string, headed bool) (*process, string, error) {
+// startChromium starts Chromium, with userAgent when it is not empty, as how says, and says
+// the user agent it has.
+func startChromium(exe, profile string, env []string, userAgent string, how mode) (*process, string, error) {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.ExecPath(exe),
 		chromedp.UserDataDir(profile),
@@ -445,16 +485,20 @@ func startChromium(exe, profile string, env []string, userAgent string, headed b
 		// The profile's bound (#3727): the HTTP cache stays under this while it runs, and
 		// dropCaches empties every cache before the next start.
 		chromedp.Flag("disk-cache-size", strconv.Itoa(diskCacheBytes)),
-		// The agents' browser has no passkeys (#4084): headless, it has no window for the
-		// passkey dialog and no Touch ID. With WebAuthn off in Blink, PublicKeyCredential
-		// is not there, so a page does not wait on a dialog nobody sees; agents use a
-		// password and TOTP (#3908). Only the flag, no script in pages.
-		chromedp.Flag("disable-blink-features", "WebAuth"),
 	)
+	if !how.webauthn {
+		// The agents' browser has no passkeys of its own (#4084): headless, it has no
+		// window for the passkey dialog and no Touch ID. With WebAuthn off in Blink,
+		// PublicKeyCredential is not there, so a page does not wait on a dialog nobody
+		// sees; agents use a password and TOTP (#3908). Only the flag, no script in pages.
+		// A software passkey (#4085) starts it without the flag, and puts an authenticator
+		// on the agent's tab, which answers with no dialog (passkey.go).
+		opts = append(opts, chromedp.Flag("disable-blink-features", "WebAuth"))
+	}
 	if userAgent != "" {
 		opts = append(opts, chromedp.UserAgent(userAgent))
 	}
-	if headed {
+	if how.headed {
 		opts = append(opts, headedOptions...)
 	}
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(context.Background(), opts...)
@@ -478,7 +522,7 @@ func startChromium(exe, profile string, env []string, userAgent string, headed b
 		stop()
 		return nil, "", errors.New("chromedp has no browser process")
 	}
-	if headed {
+	if how.headed {
 		moveOffScreen(ctx)
 	}
 	version, err := chromedp.CallBrowser(ctx, cdpbrowser.GetVersion, cdp.Empty{})
@@ -491,7 +535,7 @@ func startChromium(exe, profile string, env []string, userAgent string, headed b
 		stop()
 		return nil, "", err
 	}
-	return &process{endpoint: endpoint, pid: b.Process().Pid, done: ctx.Done(), stop: stop, headed: headed, store: cdpStore{ctx}}, version.UserAgent, nil
+	return &process{endpoint: endpoint, pid: b.Process().Pid, done: ctx.Done(), stop: stop, headed: how.headed, webauthn: how.webauthn, store: cdpStore{ctx}}, version.UserAgent, nil
 }
 
 // moveOffScreen puts the first tab's window far off every screen. A Mac moves a window that
