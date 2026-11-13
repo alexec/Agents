@@ -1439,6 +1439,15 @@ final class AppModel {
         (controlPlaneAway && directHost != host) || hosts.isOffline(host)
     }
 
+    /// When what the window holds of `host` was last live (#5143), while it cannot be asked:
+    /// the last read from the control plane while that is away, else the time the host went.
+    /// Nil while the host answers.
+    func hostReadAt(_ host: MachineRef) -> Date? {
+        if controlPlaneAway && directHost != host { return controlPlaneAwayReadAt }
+        if case .offline(let since) = hosts.state(host) { return since }
+        return nil
+    }
+
     /// Why this Mac's host is quiet (#303), once the control plane has listed its hosts.
     /// Nil while the window is connected to it, while the control plane itself is away,
     /// and while the first list is still on its way (that is *Connecting…*).

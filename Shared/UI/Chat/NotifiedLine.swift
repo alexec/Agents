@@ -1,8 +1,8 @@
 import AgentsKitCore
 import SwiftUI
 
-/// What an agent told the person with `notify` (#2805), where it called it: a bell, the
-/// title in bold, the body under it, and the time with what became of the notification.
+/// What an agent told the person with `notify` (#2805), where it called it, as a Line (#5036):
+/// a bell, the title in bold, then the body, the time and what became of the notification.
 /// Not a bubble, since the agent did not say it in its reply; not a card, since it has
 /// nothing to answer. The web page's "notified" row draws the same.
 struct NotifiedLine: View {
@@ -17,21 +17,11 @@ struct NotifiedLine: View {
     @State private var revealed = false
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(icon: "bell")
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(notice.title).appText(.reading).bold()
-                if let body = notice.body {
-                    Text(body).appText(.reading)
-                }
-                Text("\(at.formatted(date: .omitted, time: .shortened)) \u{00B7} \(notice.outcomeText())")
-                    .appText(.fine).foregroundStyle(.secondary)
-            }
-            .textSelection(.enabled)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // A Line (#5036): the title, then the body, the time and what became of it.
+        RecordLine(icon: LineGlyph.notified, head: notice.title,
+                   detail: ([notice.body].compactMap { $0 }
+                            + [at.formatted(date: .omitted, time: .shortened), notice.outcomeText()])
+                       .joined(separator: " \u{00B7} "))
         .background {
             RoundedRectangle(cornerRadius: 6)
                 .fill(Color.accentColor.opacity(highlighted == id ? 0.18 : 0))

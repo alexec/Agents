@@ -1,4 +1,5 @@
 import AgentsKitCore
+import CodeText
 import SwiftUI
 #if os(macOS)
 import AppKit
@@ -23,20 +24,55 @@ extension EnvironmentValues {
 ///
 /// SwiftUI's selectable `Text` selects inside one `Text` only, so a drag stopped at the
 /// end of each paragraph. One text view for the run lets a person select a whole prompt
-/// or a part of a reply, and ⌘A selects the message. Code, tables and pictures are not in
-/// it: they keep their own views (`MarkdownBlock.segments`).
+/// or a part of a reply, and ⌘A selects the message. A message's code is in it too
+/// (#5182): its well is drawn behind its lines, its colours come from its language, its
+/// long lines wrap, and Run is a view placed under it. Tables and pictures are not in it:
+/// they keep their own views (`MarkdownBlock.segments`).
 ///
 /// TextKit 1, as `PassageEditor` is: the height comes from the layout manager, and the
-/// quote's bar is drawn from its line fragments.
-struct SelectableProse: NSViewRepresentable {
+/// quote's bar and the code's well are drawn from the layout.
+struct SelectableProse: View {
     let blocks: [MarkdownBlock]
     /// As wide as offered, or as wide as its words (the person's own message).
     let fillsWidth: Bool
     @Environment(\.textZoom) private var zoom
     @Environment(\.lineSpacing) private var lineSpacing
     @Environment(\.quietProse) private var quiet
-    @Environment(\.openURL) private var openURL
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(\.codeRuns) private var codeRuns
+    @Environment(\.chatActions) private var actions
+    @State private var measure = ProseMeasure()
+    @State private var colours = ProseCodeColours()
+
+    var body: some View {
+        let style = ProseStyle(zoom: zoom, lineSpacing: lineSpacing, quiet: quiet, dynamicType: dynamicType)
+        let sources = ProseCodeSource.of(blocks)
+        let commands = codeRuns && actions.runCommand != nil
+            ? sources.map { ShellCommand.runnable(tag: $0.language, text: $0.text) } : sources.map { _ in nil }
+        let code = ProseCode(spans: colours.spans(sources), commands: commands,
+                             barHeight: ProseCode.barHeight(style))
+        // Built here, once per change, so the text view and the bars' layout read one text.
+        let version = measure.set(ProseMeasure.Key(blocks: blocks, style: style, code: code)) {
+            ProseString.make(blocks, style: style, code: code)
+        }
+        ProseBarsLayout(measure: measure) {
+            ProseTextRepresentable(measure: measure, version: version,
+                                   fillsWidth: fillsWidth || !sources.isEmpty)
+            ForEach(Array(commands.compactMap(\.self).enumerated()), id: \.offset) { _, command in
+                RunCommandBar(command: command)
+            }
+        }
+        .onChange(of: sources, initial: true) { colours.sync(sources) }
+    }
+}
+
+/// The text view itself.
+private struct ProseTextRepresentable: NSViewRepresentable {
+    let measure: ProseMeasure
+    /// Bumped when `measure` holds a new text.
+    let version: Int
+    let fillsWidth: Bool
+    @Environment(\.openURL) private var openURL
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -67,64 +103,25 @@ struct SelectableProse: NSViewRepresentable {
     }
 
     private func update(_ view: ProseTextView, context: Context) {
-        let coordinator = context.coordinator
-        coordinator.openURL = openURL
-        let style = ProseStyle(zoom: zoom, lineSpacing: lineSpacing, quiet: quiet, dynamicType: dynamicType)
-        let key = Coordinator.Key(blocks: blocks, style: style)
-        guard coordinator.key != key else { return }
-        coordinator.key = key
-        let text = ProseString.make(blocks, style: style)
-        view.textStorage?.setAttributedString(text)
-        coordinator.measure(text)
+        context.coordinator.openURL = openURL
+        guard context.coordinator.version != version else { return }
+        context.coordinator.version = version
+        view.textStorage?.setAttributedString(measure.text)
+        view.topInset = measure.insets.top
         view.needsDisplay = true
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView view: ProseTextView,
                       context: Context) -> CGSize? {
         let width = proposal.width.flatMap { $0.isFinite ? $0 : nil } ?? 10_000
-        let used = context.coordinator.size(at: width)
+        let used = measure.size(at: width)
         return CGSize(width: fillsWidth ? width : min(width, used.width), height: used.height)
     }
 
-    /// Holds what the view was last given, and measures it apart from the view, so a
-    /// proposal SwiftUI only asks about does not change the width the view wraps at.
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
-        struct Key: Equatable {
-            let blocks: [MarkdownBlock]
-            let style: ProseStyle
-        }
-
-        var key: Key?
+        var version: Int?
         var openURL: OpenURLAction?
-        private let storage = NSTextStorage()
-        private let manager = NSLayoutManager()
-        private let container = NSTextContainer(size: .zero)
-        private var sizes: [CGFloat: CGSize] = [:]
-
-        override init() {
-            super.init()
-            container.lineFragmentPadding = 0
-            manager.addTextContainer(container)
-            storage.addLayoutManager(manager)
-        }
-
-        func measure(_ text: NSAttributedString) {
-            storage.setAttributedString(text)
-            sizes = [:]
-        }
-
-        func size(at width: CGFloat) -> CGSize {
-            if let known = sizes[width] { return known }
-            container.size = NSSize(width: width, height: .greatestFiniteMagnitude)
-            manager.ensureLayout(for: container)
-            let used = manager.usedRect(for: container)
-            // Rounded up, and a point more across, so the words wrap at the width they
-            // were measured at when the view is given it.
-            let size = CGSize(width: ceil(used.width) + 1, height: ceil(used.height))
-            sizes[width] = size
-            return size
-        }
 
         /// A link opens as the chat's other links do, through the window's openURL (058).
         func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
@@ -136,9 +133,116 @@ struct SelectableProse: NSViewRepresentable {
     }
 }
 
+/// The text, and a layout of it apart from the view, so a proposal SwiftUI only asks
+/// about does not change the width the view wraps at, and the Run bars can be placed by
+/// the code's lines at the width the view is given.
+@MainActor
+final class ProseMeasure {
+    struct Key: Equatable {
+        let blocks: [MarkdownBlock]
+        let style: ProseStyle
+        let code: ProseCode
+    }
+
+    private(set) var text = NSAttributedString()
+    private var key: Key?
+    private var version = 0
+    private let storage = NSTextStorage()
+    private let manager = NSLayoutManager()
+    private let container = NSTextContainer(size: .zero)
+    private var sizes: [CGFloat: CGSize] = [:]
+
+    init() {
+        container.lineFragmentPadding = 0
+        manager.addTextContainer(container)
+        storage.addLayoutManager(manager)
+    }
+
+    /// Takes the text for `key`, made only when the key changed, and says its version.
+    func set(_ key: Key, make: () -> NSAttributedString) -> Int {
+        guard self.key != key else { return version }
+        self.key = key
+        text = make()
+        storage.setAttributedString(text)
+        sizes = [:]
+        version += 1
+        return version
+    }
+
+    /// The room above the first line and below the last one, when the text starts or
+    /// ends with code: a paragraph's spacing is not laid before the first line nor after
+    /// the last, so the well's padding there is the view's.
+    var insets: (top: CGFloat, bottom: CGFloat) {
+        guard text.length > 0 else { return (0, 0) }
+        let first = text.attribute(.proseCode, at: 0, effectiveRange: nil) as? ProseCodeMark
+        let last = text.attribute(.proseCode, at: text.length - 1, effectiveRange: nil) as? ProseCodeMark
+        return (first?.top ?? 0, last?.bottom ?? 0)
+    }
+
+    func size(at width: CGFloat) -> CGSize {
+        if let known = sizes[width] { return known }
+        lay(at: width)
+        let used = manager.usedRect(for: container)
+        let insets = insets
+        // Rounded up, and a point more across, so the words wrap at the width they
+        // were measured at when the view is given it.
+        let size = CGSize(width: ceil(used.width) + 1, height: ceil(used.height + insets.top + insets.bottom))
+        sizes[width] = size
+        return size
+    }
+
+    /// Where each Run bar goes, from the top of the text, in the order of the code.
+    func bars(at width: CGFloat) -> [CGFloat] {
+        lay(at: width)
+        let top = insets.top
+        return ProseWells.find(storage, manager, container).compactMap { well in
+            well.mark.barHeight > 0 ? top + well.rect.maxY + ProseCodeMark.barGap : nil
+        }
+    }
+
+    private func lay(at width: CGFloat) {
+        if container.size.width != width {
+            container.size = NSSize(width: width, height: .greatestFiniteMagnitude)
+        }
+        manager.ensureLayout(for: container)
+    }
+}
+
+/// The text view first, then the Run bars, each under its code's well.
+private struct ProseBarsLayout: Layout {
+    let measure: ProseMeasure
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        subviews.first?.sizeThatFits(proposal) ?? .zero
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews,
+                       cache: inout ()) {
+        guard let text = subviews.first else { return }
+        text.place(at: bounds.origin, anchor: .topLeading,
+                   proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
+        let ys = MainActor.assumeIsolated { measure.bars(at: bounds.width) }
+        for (index, bar) in subviews.dropFirst().enumerated() {
+            guard index < ys.count else {
+                bar.place(at: bounds.origin, proposal: .zero)
+                continue
+            }
+            bar.place(at: CGPoint(x: bounds.minX, y: bounds.minY + ys[index]), anchor: .topLeading,
+                      proposal: .unspecified)
+        }
+    }
+}
+
 /// The read-only text view, which hands its right click to the message's own menu.
 final class ProseTextView: NSTextView {
     private var findingMenu = false
+
+    /// The well's padding above code that starts the text (`ProseMeasure.insets`).
+    var topInset: CGFloat = 0 {
+        didSet { if topInset != oldValue { needsDisplay = true } }
+    }
+
+    override var textContainerOrigin: NSPoint { NSPoint(x: 0, y: topInset) }
 
     /// The message's menu (Copy Message, Quote in Prompt, Branch from Here) is SwiftUI's,
     /// on the views around this one, so it is asked for there. Copy goes first while
@@ -191,12 +295,14 @@ final class ProseTextView: NSTextView {
         super.draw(dirtyRect)
     }
 
-    /// A quote's bar, at the left of its lines, as the `Text` blocks drew it.
+    /// A quote's bar, at the left of its lines, and a code block's well and language,
+    /// as the separate views drew them.
     override func drawBackground(in rect: NSRect) {
         super.drawBackground(in: rect)
-        guard let storage = textStorage, let manager = layoutManager, storage.length > 0 else { return }
-        NSColor.quaternaryLabelColor.setFill()
+        guard let storage = textStorage, let manager = layoutManager, let container = textContainer,
+              storage.length > 0 else { return }
         let origin = textContainerOrigin
+        NSColor.quaternaryLabelColor.setFill()
         storage.enumerateAttribute(.proseQuoteBars, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
             guard let bars = value as? [CGFloat], !bars.isEmpty else { return }
             let glyphs = manager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
@@ -209,7 +315,149 @@ final class ProseTextView: NSTextView {
                 NSRect(x: origin.x + x, y: origin.y + span.minY, width: 2, height: span.height).fill()
             }
         }
+        for well in ProseWells.find(storage, manager, container) {
+            let drawn = well.rect.offsetBy(dx: origin.x, dy: origin.y)
+            NSColor(Paper.well).setFill()
+            NSBezierPath(roundedRect: drawn, xRadius: 8, yRadius: 8).fill()
+            if let label = well.mark.label {
+                label.draw(at: NSPoint(x: drawn.minX, y: drawn.minY - ProseCodeMark.labelGap - label.size().height))
+            }
+        }
     }
+}
+
+/// Where a code block's well is in a laid-out text: from the top of its first line to
+/// the foot of its last, its padding around them, across the whole width.
+enum ProseWells {
+    struct Well {
+        let rect: NSRect
+        let mark: ProseCodeMark
+    }
+
+    static func find(_ storage: NSTextStorage, _ manager: NSLayoutManager,
+                     _ container: NSTextContainer) -> [Well] {
+        var wells: [Well] = []
+        guard storage.length > 0 else { return wells }
+        storage.enumerateAttribute(.proseCode, in: NSRange(location: 0, length: storage.length)) { value, range, _ in
+            guard let mark = value as? ProseCodeMark else { return }
+            let glyphs = manager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            var top = CGFloat.infinity
+            var bottom = -CGFloat.infinity
+            // A line's rect holds the spacing after its paragraph; its used rect does not.
+            manager.enumerateLineFragments(forGlyphRange: glyphs) { rect, used, _, _, _ in
+                top = min(top, rect.minY)
+                bottom = max(bottom, used.maxY)
+            }
+            guard top < bottom else { return }
+            let pad = ProseCodeMark.padding
+            wells.append(Well(rect: NSRect(x: 0, y: top - pad, width: container.size.width,
+                                           height: bottom - top + pad * 2),
+                              mark: mark))
+        }
+        return wells
+    }
+}
+
+/// One code block in the text, and what is drawn around it. A class, so two code blocks
+/// next to each other stay two.
+final class ProseCodeMark: NSObject {
+    static let padding: CGFloat = 10
+    static let labelGap: CGFloat = 4
+    static let barGap: CGFloat = 4
+
+    let label: NSAttributedString?
+    let labelHeight: CGFloat
+    let barHeight: CGFloat
+
+    init(label: NSAttributedString?, barHeight: CGFloat) {
+        self.label = label
+        labelHeight = label.map { ceil($0.size().height) } ?? 0
+        self.barHeight = barHeight
+    }
+
+    /// The room above the code's first line: its language, then the well's padding.
+    var top: CGFloat { Self.padding + (labelHeight > 0 ? labelHeight + Self.labelGap : 0) }
+    /// The room below its last line: the well's padding, then Run.
+    var bottom: CGFloat { Self.padding + (barHeight > 0 ? barHeight + Self.barGap : 0) }
+}
+
+extension NSAttributedString.Key {
+    /// A code block's lines, marked with its `ProseCodeMark`.
+    static let proseCode = NSAttributedString.Key("agents.proseCode")
+}
+
+/// A code block of the run, by its place among the run's code blocks.
+struct ProseCodeSource: Hashable {
+    let language: String?
+    let text: String
+
+    static func of(_ blocks: [MarkdownBlock]) -> [ProseCodeSource] {
+        blocks.compactMap { block in
+            guard block.isTextCode, case .code(let language, let text) = block else { return nil }
+            return ProseCodeSource(language: language, text: text)
+        }
+    }
+}
+
+/// What the text needs to draw the run's code: the colours found so far, and the
+/// command each block runs, in the order of the code blocks.
+struct ProseCode: Equatable {
+    /// Each code block's spans, line by line; nil while plain.
+    var spans: [[[CodeSpan]]?] = []
+    var commands: [String?] = []
+    var barHeight: CGFloat = 0
+
+    /// The room a Run bar takes: a line of the supporting step, and its button's edges.
+    static func barHeight(_ style: ProseStyle) -> CGFloat {
+        let font = TextStep.supporting.nsFont(zoom: style.zoom)
+        return ceil(font.ascender - font.descender + font.leading) + 6
+    }
+}
+
+/// The run's code blocks, coloured by their language as `CodeBlockText` colours one: a
+/// document each, whose colour arrives a window at a time.
+@MainActor @Observable
+final class ProseCodeColours {
+    private var documents: [CodeDocument?] = []
+    @ObservationIgnored private var sources: [ProseCodeSource] = []
+
+    func sync(_ new: [ProseCodeSource]) {
+        var next: [CodeDocument?] = []
+        for (index, source) in new.enumerated() {
+            guard let language = CodeLanguage.fence(tag: source.language) else {
+                next.append(nil)
+                continue
+            }
+            let document: CodeDocument
+            if index < sources.count, sources[index].language == source.language,
+               let known = documents[safe: index] ?? nil {
+                // A message still arriving: the block grows as it streams.
+                known.update(text: source.text)
+                document = known
+            } else {
+                document = CodeDocument(text: source.text, language: language)
+            }
+            // A block is short: ask for all of it.
+            for line in stride(from: 0, to: document.lines.count, by: Limits.window) {
+                document.appear(line: line)
+            }
+            next.append(document)
+        }
+        sources = new
+        documents = next
+    }
+
+    /// Each block's spans, line by line, read so a colour that arrives draws again.
+    func spans(_ wanted: [ProseCodeSource]) -> [[[CodeSpan]]?] {
+        wanted.indices.map { index in
+            guard let document = documents[safe: index] ?? nil, document.plainBecause == nil else { return nil }
+            return document.lines.indices.map { document.spans(line: $0) }
+        }
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? { indices.contains(index) ? self[index] : nil }
 }
 
 #endif
@@ -265,6 +513,12 @@ enum ProseString {
         var tab: CGFloat?
         var after: CGFloat = 0
         var bars: [CGFloat] = []
+        #if os(macOS)
+        /// A code line: the code block it is laid in, and the font of its line end, so
+        /// an empty line is as tall as the code's.
+        var code: ProseCodeMark?
+        var font: ProseFont?
+        #endif
     }
 
     private struct Context {
@@ -273,9 +527,33 @@ enum ProseString {
         var secondary = false
     }
 
+    #if os(macOS)
+    /// The blocks as one text. A message's own code blocks are in it on the Mac (#5182),
+    /// with `code` saying their colours and Run, in the order of the code blocks.
+    static func make(_ blocks: [MarkdownBlock], style: ProseStyle, code: ProseCode = ProseCode()) -> NSAttributedString {
+        var pieces: [Piece] = []
+        var codeIndex = 0
+        for block in blocks {
+            if block.isTextCode, case .code(let language, let text) = block {
+                codeLines(language: language, text: text, spans: code.spans[safe: codeIndex] ?? nil,
+                          barHeight: (code.commands[safe: codeIndex] ?? nil) == nil ? 0 : code.barHeight,
+                          style, into: &pieces)
+                codeIndex += 1
+            } else {
+                emit([block], Context(secondary: style.quiet), style, into: &pieces)
+            }
+        }
+        return join(pieces, style)
+    }
+    #else
     static func make(_ blocks: [MarkdownBlock], style: ProseStyle) -> NSAttributedString {
         var pieces: [Piece] = []
         emit(blocks, Context(secondary: style.quiet), style, into: &pieces)
+        return join(pieces, style)
+    }
+    #endif
+
+    private static func join(_ pieces: [Piece], _ style: ProseStyle) -> NSAttributedString {
         let result = NSMutableAttributedString()
         for (index, piece) in pieces.enumerated() {
             let paragraph = NSMutableParagraphStyle()
@@ -287,14 +565,79 @@ enum ProseString {
                 paragraph.tabStops = [NSTextTab(textAlignment: .left, location: tab)]
             }
             let text = piece.text
-            if index < pieces.count - 1 { text.append(NSAttributedString(string: "\n")) }
+            #if os(macOS)
+            if piece.code != nil {
+                paragraph.tailIndent = -ProseCodeMark.padding
+                paragraph.lineSpacing = 0
+            }
+            let end: [NSAttributedString.Key: Any] = piece.font.map { [.font: $0] } ?? [:]
+            #else
+            let end: [NSAttributedString.Key: Any] = [:]
+            #endif
+            if index < pieces.count - 1 { text.append(NSAttributedString(string: "\n", attributes: end)) }
             let whole = NSRange(location: 0, length: text.length)
             text.addAttribute(.paragraphStyle, value: paragraph, range: whole)
             if !piece.bars.isEmpty { text.addAttribute(.proseQuoteBars, value: piece.bars, range: whole) }
+            #if os(macOS)
+            if let code = piece.code { text.addAttribute(.proseCode, value: code, range: whole) }
+            #endif
             result.append(text)
         }
         return result
     }
+
+    #if os(macOS)
+    /// A code block as its lines, each a paragraph in the block's well, coloured by its
+    /// spans as `CodeBlockText` colours them: keywords semibold, comments italic.
+    private static func codeLines(language: String?, text: String, spans: [[CodeSpan]]?, barHeight: CGFloat,
+                                  _ style: ProseStyle, into pieces: inout [Piece]) {
+        let font = regular(.code, style)
+        let label = language.flatMap { $0.isEmpty ? nil : $0 }.map {
+            NSAttributedString(string: $0, attributes: [
+                .font: regular(.fine, style), .foregroundColor: NSColor.tertiaryLabelColor,
+            ])
+        }
+        let mark = ProseCodeMark(label: label, barHeight: barHeight)
+        // The well's top: after the block before it, as its spacing.
+        if !pieces.isEmpty { pieces[pieces.count - 1].after += mark.top }
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        for (index, line) in lines.enumerated() {
+            let drawn = NSMutableAttributedString(string: String(line), attributes: [
+                .font: font, .foregroundColor: ProseInk.primary,
+            ])
+            let length = drawn.length
+            for span in spans?[safe: index] ?? [] {
+                let lower = min(max(span.range.lowerBound, 0), length)
+                let upper = min(max(span.range.upperBound, 0), length)
+                guard lower < upper else { continue }
+                drawn.addAttributes(codeAttributes(span.role, font), range: NSRange(location: lower, length: upper - lower))
+            }
+            var piece = Piece(text: drawn, indent: ProseCodeMark.padding, firstIndent: ProseCodeMark.padding)
+            piece.code = mark
+            piece.font = font
+            pieces.append(piece)
+        }
+        pieces[pieces.count - 1].after = mark.bottom + blockSpacing
+    }
+
+    private static func codeAttributes(_ role: CodeRole, _ font: NSFont) -> [NSAttributedString.Key: Any] {
+        guard let ink = codeInks[role] else { return [:] }
+        var attributes: [NSAttributedString.Key: Any] = [.foregroundColor: ink]
+        switch role {
+        case .keyword: attributes[.font] = weighted(font, .semibold)
+        case .comment: attributes[.font] = italic(font)
+        default: break
+        }
+        return attributes
+    }
+
+    /// The code's inks, light and dark, the same as `CodeInk`'s.
+    private static let codeInks: [CodeRole: NSColor] = Dictionary(uniqueKeysWithValues:
+        CodeRole.allCases.compactMap { role in
+            guard let light = InkValues.light[role], let dark = InkValues.dark[role] else { return nil }
+            return (role, NSColor(Color(light: light, dark: dark)))
+        })
+    #endif
 
     private static func emit(_ blocks: [MarkdownBlock], _ context: Context, _ style: ProseStyle,
                              into pieces: inout [Piece]) {

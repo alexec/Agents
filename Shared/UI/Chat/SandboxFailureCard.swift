@@ -1,55 +1,57 @@
 import AgentsKitCore
 import SwiftUI
 
-/// A runtime's sandbox that could not be set up (064, look): what happened, on the record.
-/// While the agent waits on an answer (`Agent.pendingSandboxFailure`), the answers are an Ask
-/// at the end of the chat (`SandboxAsk`, #5031), not here; the note after it says what was chosen.
+/// A runtime's sandbox that could not be set up (064, look): what happened, on the record, as a
+/// failed Line (#5036): the title in red, what happened, and the error and what can be done a
+/// click away. While the agent waits on an answer (`Agent.pendingSandboxFailure`), the answers
+/// are an Ask at the end of the chat (`SandboxAsk`, #5031), not here; the note after it says
+/// what was chosen.
 struct SandboxFailureCard: View {
     let record: SandboxFailureRecord
     @Environment(\.chatActions) private var actions
     @Environment(\.orgSandboxSetBy) private var setBy
-    @State private var showsDetail = false
-    @State private var isSending = false
 
     private var name: String { RuntimeCatalog.runtime(id: record.runtimeID)?.name ?? record.runtimeID }
 
     /// Waiting for an answer: this is the open agent's waiting card.
     private var isWaiting: Bool { actions.keepStopped != nil && actions.waitingSandbox == record }
 
+    /// Whether there is anything to open: the error, that it cannot carry on, the organisation's rule.
+    private var hasMore: Bool { !record.detail.isEmpty || (!isWaiting && !record.recoveryOffered) || setBy != nil }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(SandboxWords.cardTitle(name))
-                .appText(.reading).fontWeight(.semibold)
-            Text(SandboxWords.cardBody(runtimeID: record.runtimeID, name: name, hang: record.hang))
-                .appText(.reading)
-            if !record.detail.isEmpty {
-                DisclosureGroup(isExpanded: $showsDetail) {
+        if hasMore {
+            line
+        } else {
+            RecordLine(icon: LineGlyph.failed, head: SandboxWords.cardTitle(name), detail: words, tone: .failure)
+        }
+    }
+
+    private var words: String {
+        SandboxWords.cardBody(runtimeID: record.runtimeID, name: name, hang: record.hang)
+    }
+
+    private var line: some View {
+        RecordLine(icon: LineGlyph.failed, head: SandboxWords.cardTitle(name), detail: words,
+                   tone: .failure, openHelp: ("Show error details", "Hide error details")) {
+            VStack(alignment: .leading, spacing: 6) {
+                if !record.detail.isEmpty {
                     Text(record.detail)
                         .appText(.code)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                } label: {
-                    Text("Show error details").appText(.reading).foregroundStyle(.secondary)
-                        .togglesFold($showsDetail)
                 }
+                if !isWaiting, !record.recoveryOffered {
+                    Text(SandboxWords.noRecovery)
+                        .appText(.reading)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                // Continue without sandbox is not offered: the organisation requires it (#998).
+                if let setBy { OrgPolicyLine(mark: setBy) }
             }
-            if !isWaiting, !record.recoveryOffered {
-                Text(record.recoveryOffered
-                     ? SandboxWords.cardOffer(runtimeID: record.runtimeID, name: name,
-                                              afterTools: record.completedToolCalls > 0)
-                     : SandboxWords.noRecovery)
-                    .appText(.reading)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            // Continue without sandbox is not offered: the organisation requires it (#998).
-            if let setBy { OrgPolicyLine(mark: setBy) }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(StateTint.warning.color?.opacity(0.03) ?? .clear, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder((StateTint.warning.color ?? .secondary).opacity(0.25)))
     }
 }
 

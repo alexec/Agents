@@ -72,6 +72,7 @@ import { autoHeader, cellOf } from "../model/levels";
 import { PageTitle, chatCrumbs } from "./TopBar";
 import { startLineWords } from "../model/capacity";
 import { Icon } from "./Icon";
+import { lineGlyph, RecordLine } from "./chat/RecordLine";
 
 /** One opened turn's entries, so an earlier page can be put in front and drawn again (#291). */
 interface HeldTurn {
@@ -697,10 +698,11 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         <ViewDiff layer={layer} openLink={(url) => { window.open(url, "_blank", "noopener,noreferrer"); }} />
         {failure && (
           // The history, or its earlier turns, did not load: said, with the way to ask again (#400).
-          <p class="load-failure" role="status">
-            <span>{failure.nothingLoaded ? "This chat's history did not load: " : "The earlier turns did not load: "}{failure.reason}</span>
-            <button class="link" onClick={() => { void store.reloadTranscript(); }}>Try Again</button>
-          </p>
+          <div class="load-failure" role="status">
+            <RecordLine icon={lineGlyph.loadFailure}
+              detail={`${failure.nothingLoaded ? "This chat's history did not load: " : "The earlier turns did not load: "}${failure.reason}`}
+              action={{ label: "Try Again", run: () => { void store.reloadTranscript(); } }} />
+          </div>
         )}
         {/* Only while more can come: by scrolling up, or by the chat paging back by itself (#3249). */}
         {store.hasMoreOfTheConversation && (fills.value || !live) && <p class="more" aria-label="Loading earlier"><span class="spinner" /></p>}
