@@ -42,8 +42,22 @@ final class AppModel {
     /// The question page shows after the window has paired, until Submit (#5050). Kept on
     /// this root, so a newcomer who quits before Submit sees it again. See `AppModel+FirstBuild`.
     var asksFirstBuild = FirstBuildStore.asking
-    /// The idea a newcomer submitted on the question page, for the plan page (#5053).
-    var firstBuildIdea: String?
+    /// The idea a newcomer submitted on the question page, for the plan page (#5053). Kept
+    /// on this root with the plan page's other state: see `FirstBuildStore`.
+    var firstBuildIdea: String? = FirstBuildStore.idea
+    /// The plan page shows: from Submit until **Open Agents**, or the first-build session is
+    /// archived (#5053, spec section 5).
+    var firstBuildPlanning = FirstBuildStore.planning
+    /// The starter the plan page shows: picked from the words, or chosen there.
+    var firstBuildStarter: FirstBuild.Starter? = FirstBuildStore.starter
+    /// The runtime the plan page's first task sets up: Claude unless the person picks another.
+    var firstBuildRuntimeID = "claude"
+    /// The `github` connector on this Mac is connected: the plan page's second task.
+    var firstBuildGitHubConnected = false
+    /// What went wrong starting the first-build agent, said on the plan page.
+    var firstBuildProblem: String?
+    /// `firstBuild/start` is on its way.
+    var firstBuildStarting = false
     /// The achievements this window has shown a card for (#984); nil before its first look
     /// on this root. See `AppModel+Achievements`.
     var achievementsSeen: Set<String>? = AchievementsSeenStore.seen

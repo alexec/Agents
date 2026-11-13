@@ -323,6 +323,10 @@ struct ContentView: View {
             } else if model.signIn.suspended {
                 // The organisation turned this person's access off: only that (#1002, FR-029).
                 SuspendedPage(device: "Mac")
+            } else if model.firstBuildPlanning {
+                // After Submit: the plan page, with the first-build session's chat, until
+                // Open Agents (#5053, spec 5048 section 5).
+                FirstBuildPlanView()
             } else {
                 // Two columns (#145): the one sidebar, then what is being read, with the
                 // inspector beside a chat.

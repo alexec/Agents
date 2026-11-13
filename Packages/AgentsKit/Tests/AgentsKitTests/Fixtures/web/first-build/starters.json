@@ -1,0 +1,72 @@
+[
+  {
+    "expected" : "iphone-app",
+    "input" : "An iPhone app that shows the weather where I am",
+    "name" : "An iPhone app that shows the weather where I am"
+  },
+  {
+    "expected" : "web-service",
+    "input" : "A web page that shows this week's weather for my town",
+    "name" : "A web page that shows this week's weather for my town"
+  },
+  {
+    "expected" : "iphone-app",
+    "input" : "An iPhone app that reminds me to water my plants",
+    "name" : "An iPhone app that reminds me to water my plants"
+  },
+  {
+    "expected" : "web-service",
+    "input" : "A website for my book club's reading list",
+    "name" : "A website for my book club's reading list"
+  },
+  {
+    "expected" : "iphone-app",
+    "input" : "An iPhone app that logs my runs",
+    "name" : "An iPhone app that logs my runs"
+  },
+  {
+    "expected" : "web-service",
+    "input" : "A web service that emails me a daily summary of my GitHub",
+    "name" : "A web service that emails me a daily summary of my GitHub"
+  },
+  {
+    "expected" : "iphone-app",
+    "input" : "an iOS thing for my cat",
+    "name" : "an iOS thing for my cat"
+  },
+  {
+    "expected" : "iphone-app",
+    "input" : "Something in the App Store",
+    "name" : "Something in the App Store"
+  },
+  {
+    "expected" : "web-service",
+    "input" : "an API for my recipes",
+    "name" : "an API for my recipes"
+  },
+  {
+    "expected" : "web-service",
+    "input" : "a site, then an iPhone app",
+    "name" : "a site, then an iPhone app"
+  },
+  {
+    "expected" : "unknown",
+    "input" : "an app for my dog",
+    "name" : "an app for my dog"
+  },
+  {
+    "expected" : "neither",
+    "input" : "a game about frogs",
+    "name" : "a game about frogs"
+  },
+  {
+    "expected" : "neither",
+    "input" : "a Mac app with a web page",
+    "name" : "a Mac app with a web page"
+  },
+  {
+    "expected" : "web-service",
+    "input" : "web pages",
+    "name" : "web pages"
+  }
+]
