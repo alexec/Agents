@@ -94,7 +94,10 @@ func serveWith(t *testing.T, p SocketPolicy) (*Daemon, string) {
 	}
 	t.Cleanup(func() { os.RemoveAll(dir) })
 	path := filepath.Join(dir, "d.sock")
-	go d.ServeSocket(ctx, path) // socketCall dials until it listens
+	go d.ServeSocket(ctx, path)
+	// Return only once it listens (#5071): a caller that dials once, as agents-secret
+	// does, failed at once under load when it dialled before the goroutine had run.
+	dialUnix(t, path).Close()
 	return d, path
 }
 
