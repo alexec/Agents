@@ -10859,6 +10859,10 @@
         "code": -32007,
         "message": "needsSignIn"
       },
+      "noClientCopy": {
+        "code": -32108,
+        "message": "noClientCopy"
+      },
       "noSuchAgent": {
         "code": -32005,
         "message": "noSuchAgent"
@@ -10870,6 +10874,10 @@
       "noSuchFolder": {
         "code": -32012,
         "message": "noSuchFolder"
+      },
+      "noSuchSecret": {
+        "code": -32107,
+        "message": "noSuchSecret"
       },
       "noSuchWorkflow": {
         "code": -32014,

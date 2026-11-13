@@ -33327,6 +33327,94 @@
         "member"
       ]
     },
+    "UserSealedSecret": {
+      "type": "object",
+      "description": "user/sealedSecret's answer (#5114): this client's own envelope of the secret, as the person's client sealed it (#3397). HPKE, info com.alexecollins.agents.usersecret.v1, associated data usersecret.v1|<person id>|c:<CLIENT UUID>|<name>|<version>, with |ask at the end when needsApproval is on. The control plane never has the value.",
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/UserSecretName"
+        },
+        "version": {
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/definitions/UserSecretKind"
+        },
+        "needsApproval": {
+          "type": "boolean",
+          "description": "Ask before use (#4014), bound into the associated data. Left out is off."
+        },
+        "sealed": {
+          "$ref": "#/definitions/SealedEnvelope"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "sealed"
+      ],
+      "additionalProperties": false
+    },
+    "UserSealedSecretAccount": {
+      "type": "object",
+      "description": "user/sealedSecret (#5114): the account a reveal or a copy was opened from, for the audit entry: its service and the address it signs in with. Never a value.",
+      "properties": {
+        "service": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "service"
+      ],
+      "additionalProperties": false
+    },
+    "UserSealedSecretPart": {
+      "type": "string",
+      "enum": [
+        "number",
+        "expiry",
+        "cvc",
+        "name",
+        "zip"
+      ],
+      "description": "A card's part (#3531), for a copy of one part of a card: the card number, the expiry, the CVC, the name on card or the billing ZIP."
+    },
+    "UserSealedSecretPurpose": {
+      "type": "string",
+      "enum": [
+        "reveal",
+        "copy"
+      ],
+      "description": "Why a person's client asks for its copy of a secret (#5114): to show it, or to put it on the clipboard. Only for the audit entry's words."
+    },
+    "UserSealedSecretRequest": {
+      "type": "object",
+      "description": "user/sealedSecret (#5112, #5114): a person's own client asks for its own sealed copy of one of the person's secrets, to reveal or copy it. The control plane writes the audit entry first, with the name and never the value.",
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/UserSecretName"
+        },
+        "purpose": {
+          "$ref": "#/definitions/UserSealedSecretPurpose"
+        },
+        "part": {
+          "$ref": "#/definitions/UserSealedSecretPart",
+          "description": "A card's part, for a copy of that part; left out otherwise."
+        },
+        "account": {
+          "$ref": "#/definitions/UserSealedSecretAccount",
+          "description": "The account the secret was opened from; left out when it was opened from Secrets."
+        }
+      },
+      "required": [
+        "name",
+        "purpose"
+      ],
+      "additionalProperties": false
+    },
     "UserSecret": {
       "type": "object",
       "description": "user/setSecret (#1760, FR-025): a secret the control plane keeps sealed, and sends only to its person's own machines. The value is never sent back to a client.",

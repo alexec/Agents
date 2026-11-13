@@ -323,7 +323,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"policy/askForMore": true, "policy/requests": true, "policy/refuseMore": true,
 		"orgRoutes/mine": true, "orgRoutes/list": true, "orgRoutes/set": true, "orgRoutes/replaceKey": true,
 		"orgRoutes/check": true, "orgRoutes/remove": true, "orgRoutes/recipients": true, "orgRoutes/sealed": true,
-		"sealing/work": true, "sealing/add": true, "user/secretRecipients": true,
+		"sealing/work": true, "sealing/add": true, "user/secretRecipients": true, "user/sealedSecret": true,
 		"lock/get": true, "lock/add": true, "lock/join": true, "lock/joinRequests": true, "lock/joinAnswer": true,
 		"lock/joinReveal": true, "lock/joinDeny": true, "lock/reset": true,
 		"scim/set": true, "scim/tokens/list": true, "scim/tokens/make": true, "scim/tokens/revoke": true,

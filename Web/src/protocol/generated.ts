@@ -56,9 +56,11 @@ export const Failure = {
   leaseRefused: -32035,
   managedByProvider: -32079,
   needsSignIn: -32007,
+  noClientCopy: -32108,
   noSuchAgent: -32005,
   noSuchFolder: -32012,
   noSuchHost: -32091,
+  noSuchSecret: -32107,
   noSuchWorkflow: -32014,
   noWait: -32051,
   notACloneURL: -32024,
@@ -13818,6 +13820,63 @@ export type UserRole =
   | "member";
 
 /**
+ * user/sealedSecret's answer (#5114): this client's own envelope of the secret, as the person's
+ * client sealed it (#3397). HPKE, info com.alexecollins.agents.usersecret.v1, associated data
+ * usersecret.v1|<person id>|c:<CLIENT UUID>|<name>|<version>, with |ask at the end when
+ * needsApproval is on. The control plane never has the value.
+ */
+export interface UserSealedSecret {
+  name: UserSecretName;
+  version: number;
+  kind?: UserSecretKind;
+  /** Ask before use (#4014), bound into the associated data. Left out is off. */
+  needsApproval?: boolean;
+  sealed: SealedEnvelope;
+}
+
+/**
+ * user/sealedSecret (#5114): the account a reveal or a copy was opened from, for the audit entry:
+ * its service and the address it signs in with. Never a value.
+ */
+export interface UserSealedSecretAccount {
+  service: string;
+  address?: string;
+}
+
+/**
+ * A card's part (#3531), for a copy of one part of a card: the card number, the expiry, the CVC,
+ * the name on card or the billing ZIP.
+ */
+export type UserSealedSecretPart =
+  | "number"
+  | "expiry"
+  | "cvc"
+  | "name"
+  | "zip";
+
+/**
+ * Why a person's client asks for its copy of a secret (#5114): to show it, or to put it on the
+ * clipboard. Only for the audit entry's words.
+ */
+export type UserSealedSecretPurpose =
+  | "reveal"
+  | "copy";
+
+/**
+ * user/sealedSecret (#5112, #5114): a person's own client asks for its own sealed copy of one of
+ * the person's secrets, to reveal or copy it. The control plane writes the audit entry first, with
+ * the name and never the value.
+ */
+export interface UserSealedSecretRequest {
+  name: UserSecretName;
+  purpose: UserSealedSecretPurpose;
+  /** A card's part, for a copy of that part; left out otherwise. */
+  part?: UserSealedSecretPart;
+  /** The account the secret was opened from; left out when it was opened from Secrets. */
+  account?: UserSealedSecretAccount;
+}
+
+/**
  * user/setSecret (#1760, FR-025): a secret the control plane keeps sealed, and sends only to its
  * person's own machines. The value is never sent back to a client.
  */
@@ -15228,6 +15287,7 @@ export interface Methods {
   "time/history": { params: Empty; result: TimeHistory };
   "usage/history": { params: Empty; result: UsageHistory };
   "user/removeSecret": { params: UserSecretRequest; result: Empty };
+  "user/sealedSecret": { params: UserSealedSecretRequest; result: UserSealedSecret };
   "user/secretNames": { params: Empty; result: UserSecretNames };
   "user/secretRecipients": { params: Empty; result: SealRecipients };
   "user/setSecret": { params: UserSecretSet; result: Empty };
@@ -15668,6 +15728,7 @@ export const MethodTarget = {
   "time/history": "host",
   "usage/history": "host",
   "user/removeSecret": "control",
+  "user/sealedSecret": "control",
   "user/secretNames": "control",
   "user/secretRecipients": "control",
   "user/setSecret": "control",
@@ -16903,6 +16964,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   UserAgentConfig: { required: [], optional: ["instructions", "personas", "skills"] },
   UserPartHere: { required: ["part", "value"], optional: ["leftOut"] },
   UserPartRequest: { required: ["part"], optional: [] },
+  UserSealedSecret: { required: ["name", "version", "sealed"], optional: ["kind", "needsApproval"] },
+  UserSealedSecretAccount: { required: ["service"], optional: ["address"] },
+  UserSealedSecretRequest: { required: ["name", "purpose"], optional: ["part", "account"] },
   UserSecret: { required: ["name", "value"], optional: [] },
   UserSecretAbout: { required: ["name"], optional: ["kind", "description", "needsApproval"] },
   UserSecretNames: { required: ["secrets"], optional: [] },

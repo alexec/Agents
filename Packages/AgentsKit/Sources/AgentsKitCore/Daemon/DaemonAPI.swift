@@ -3042,6 +3042,11 @@ public enum DaemonAPI {
         /// `firstBuild/start` while a first-build session that is not archived is there
         /// (#5056): the error's data has its `agentID`, so the client opens it.
         public static let firstBuildRunning = -32106
+        /// `user/sealedSecret` for a name the person has no secret under (#5114).
+        public static let noSuchSecret = -32107
+        /// `user/sealedSecret` from a client the control plane keeps no copy for yet (#5114):
+        /// it gets one when another of the person's clients is online (`sealing/work`).
+        public static let noClientCopy = -32108
     }
 
     // MARK: Workflows

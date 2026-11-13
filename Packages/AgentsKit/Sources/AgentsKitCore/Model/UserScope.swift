@@ -2,7 +2,8 @@ import Foundation
 
 /// The user scope (#1760, spec 736 US4): a person's settings and secrets, which the control
 /// plane keeps and sends to each machine of theirs when it joins and when they change. Only
-/// the person's own clients change them. A secret's value is never sent back to a client.
+/// the person's own clients change them. A secret's value is never sent back to a client in
+/// plain text: only a client's own sealed copy, to reveal or copy (`user/sealedSecret`, #5114).
 public extension DaemonAPI {
     /// A part of the user settings. Each keeps the shape its file has on a machine.
     enum UserSettingsPartName: String, Codable, Sendable, Hashable, CaseIterable {
@@ -209,6 +210,55 @@ public extension DaemonAPI {
         public init(name: String) { self.name = name }
     }
 
+    /// `user/sealedSecret` (#5112, #5114): this client's own sealed copy of one of the person's
+    /// secrets, to reveal or copy it. The control plane audits it with the name, never the value.
+    struct UserSealedSecretRequest: Codable, Sendable, Hashable {
+        public enum Purpose: String, Codable, Sendable, Hashable { case reveal, copy }
+        /// A card's part, for a copy of that one part (#3531).
+        public enum Part: String, Codable, Sendable, Hashable { case number, expiry, cvc, name, zip }
+        /// The account it was opened from, for the audit entry.
+        public struct Account: Codable, Sendable, Hashable {
+            public var service: String
+            public var address: String?
+
+            public init(service: String, address: String? = nil) {
+                self.service = service
+                self.address = address
+            }
+        }
+
+        public var name: String
+        public var purpose: Purpose
+        public var part: Part?
+        public var account: Account?
+
+        public init(name: String, purpose: Purpose, part: Part? = nil, account: Account? = nil) {
+            self.name = name
+            self.purpose = purpose
+            self.part = part
+            self.account = account
+        }
+    }
+
+    /// `user/sealedSecret`'s answer: this client's envelope (`c:<CLIENT UUID>`), associated
+    /// data `usersecret.v1|<person>|c:<CLIENT UUID>|<name>|<version>`, `|ask` when
+    /// `needsApproval`.
+    struct UserSealedSecret: Codable, Sendable, Hashable {
+        public var name: String
+        public var version: Int
+        public var kind: String?
+        public var needsApproval: Bool?
+        public var sealed: Envelope
+
+        public init(name: String, version: Int, sealed: Envelope, kind: String? = nil, needsApproval: Bool? = nil) {
+            self.name = name
+            self.version = version
+            self.sealed = sealed
+            self.kind = kind
+            self.needsApproval = needsApproval
+        }
+    }
+
     /// A machine removed with a secret on it (FR-026).
     struct SecretLeftOn: Codable, Sendable, Hashable {
         public var host: String
@@ -306,6 +356,8 @@ public extension DaemonAPI.Method {
     static let userSetSecret = "user/setSecret"
     /// `{}` → `SealRecipients`: the person's machines and clients, to seal a secret to (#3397).
     static let userSecretRecipients = "user/secretRecipients"
+    /// `UserSealedSecretRequest` → `UserSealedSecret`: this client's own copy, audited (#5114).
+    static let userSealedSecret = "user/sealedSecret"
     /// `UserSecretRequest` → `{}` (#1760).
     static let userRemoveSecret = "user/removeSecret"
     /// `{}` → `UserSecretNames` (#1760).

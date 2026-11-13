@@ -208,6 +208,7 @@ const CapUsage1 = "usage/1"
 const CapUser1 = "user/1"
 const CapUser2 = "user/2"
 const CapUser3 = "user/3"
+const CapUser4 = "user/4"
 const CapVelocity1 = "velocity/1"
 const CapViews1 = "views/1"
 const CapWake1 = "wake/1"
@@ -965,6 +966,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"tunnel/open", "tunnel/1"},
 	{"usage/rollup", "reports/1"},
 	{"user/removeSecret", "user/2"},
+	{"user/sealedSecret", "user/4"},
 	{"user/secretNames", "user/2"},
 	{"user/secretRecipients", "user/2"},
 	{"user/setAgentConfigFile", "user/1"},

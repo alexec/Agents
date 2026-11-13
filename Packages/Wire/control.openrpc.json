@@ -6344,6 +6344,32 @@
       }
     },
     {
+      "name": "user/sealedSecret",
+      "x-capability": "user/4",
+      "description": "A person's own client: its own sealed copy of one of the person's secrets, to reveal or copy (#5112, #5114). Only the person's paired clients with a key reach it; a bot's is refused notPermitted. The audit entry (Revealed secret NAME, Copied the CVC of card NAME, … of account SERVICE (ADDRESS)) is written first, with the name and never the value, and nothing is given back when it is not written. noSuchSecret when there is no such secret; noClientCopy when the control plane keeps no copy for this client yet. No agent, machine or MCP tool gets it.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/UserSealedSecretRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/UserSealedSecret"
+        }
+      }
+    },
+    {
       "name": "user/secretNames",
       "x-capability": "user/2",
       "tags": [
