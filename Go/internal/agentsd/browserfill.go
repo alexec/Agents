@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/alexec/agents/Go/internal/browser"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -25,7 +27,8 @@ import (
 //     while any value is filled, are refused, as a script can read the value in ways a
 //     filter cannot follow;
 //   - files: a call that asks Playwright to write its result to a file is refused while a
-//     value is filled, as the file would skip the filter.
+//     value is filled, as the file would skip the filter; a screenshot's file only on a
+//     page with a filled field (#5186), as pixels never went through the text filter.
 //
 // The promise is ask_secret's (#2885): an agent that tries hard can read secrets.env or
 // talk to Chromium itself; for a wall, use the sandbox.
@@ -308,22 +311,50 @@ func (d *Daemon) browserRefusal(ctx context.Context, drive *browserDrive, name s
 		return ""
 	}
 	if _, ok := args["filename"]; ok {
-		return "Leave out filename while a secret is filled into this browser: a file would skip the filter that keeps it out of what you read."
+		if name == "browser_take_screenshot" {
+			// A screenshot is pixels, which the filter does not read: a file of one is
+			// refused only on a page with a filled field, so one lane's fill does not hold
+			// every lane's PR screenshots until Chromium stops (#5186). A check that
+			// cannot tell refuses it.
+			if pageFilled(ctx, drive, args) != "agents-clear" {
+				return "Leave out filename on a page with a secret filled in: the file would skip the mask on the filled field. " +
+					"Take the screenshot with no filename, or navigate away from the page first."
+			}
+			return ""
+		}
+		return "Leave out filename while a secret is filled into this browser: a file would skip the filter that keeps it out of what you read. " +
+			"Leave out filename to get the result here, filtered. A file works again once the browser stops, after " +
+			strconv.Itoa(int(browser.IdleAfter.Minutes())) + " minutes with no agent using it."
 	}
 	switch name {
 	case "browser_run_code_unsafe":
 		return "browser_run_code_unsafe is refused while a secret is filled into this browser: code could read it. Use the other browser tools."
 	case "browser_evaluate":
-		check := map[string]json.RawMessage{"function": rawString(filledCheck)}
-		if t, ok := args["target"]; ok {
-			check["target"] = t
-			if e, ok := args["element"]; ok {
-				check["element"] = e
-			}
-		}
 		// A check that fails says nothing: the agent's own call meets the same page.
-		if res, err := drive.call(ctx, "browser_evaluate", check); err == nil && !res.IsError && evaluated(res, "agents-filled") {
+		if pageFilled(ctx, drive, args) == "agents-filled" {
 			return "browser_evaluate is refused on a page with a secret filled in: a script could read it. It works again once the page navigates."
+		}
+	}
+	return ""
+}
+
+// pageFilled is filledCheck's answer for the agent's page (the target's, when the call
+// names one): "agents-filled", "agents-clear", or "" when the check could not tell.
+func pageFilled(ctx context.Context, drive *browserDrive, args map[string]json.RawMessage) string {
+	check := map[string]json.RawMessage{"function": rawString(filledCheck)}
+	if t, ok := args["target"]; ok {
+		check["target"] = t
+		if e, ok := args["element"]; ok {
+			check["element"] = e
+		}
+	}
+	res, err := drive.call(ctx, "browser_evaluate", check)
+	if err != nil || res.IsError {
+		return ""
+	}
+	for _, word := range []string{"agents-filled", "agents-clear"} {
+		if evaluated(res, word) {
+			return word
 		}
 	}
 	return ""
