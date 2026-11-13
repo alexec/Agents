@@ -226,7 +226,9 @@ export function AgentBrowserPane({ store, host, session }: { store: Store; host:
           : state.status === "failed" ? <div class="agent-browser-note"><strong>{words.failedTitle}</strong><p>{state.detail ?? words.failed}</p></div>
           : <div class="agent-browser-note"><strong>{words.stoppedTitle}</strong><p>{words.stopped}</p></div>}
       </div>
-      {problem.value && <p class="faint small">{problem.value}</p>}
+      {/* Always on, one line high: a line that came and went changed the page's height, and
+          each new height laid the page out again, so the page flickered. */}
+      <p class="agent-browser-status faint small" role="status" title={problem.value ?? undefined}>{problem.value ?? "\u00a0"}</p>
     </div>
   );
 }
