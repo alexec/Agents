@@ -603,6 +603,8 @@ struct ChatTranscript: View {
     /// while the agent is at work or coming back, where the foot says so already (#1564).
     private var quietSince: Date? {
         guard !isComingBack, agent.state != .running, agent.state != .starting else { return nil }
+        // The quiet line takes the Now card's place, never sits under it (#5033).
+        guard !nowCard.isShown else { return nil }
         return lastEntryAt ?? agent.lastActivityAt
     }
 

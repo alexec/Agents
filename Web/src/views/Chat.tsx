@@ -540,12 +540,12 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   const start = startWords ? startLineWords(startWords) : null;
   const nowSummary = leases?.lines[0] ?? (background.length ? nowBackground(background.length) : null);
   const nowHead = !agent ? null
-    : comingBack ? <NowHead mark={<Icon name="rotate-cw" />} title={comingBackDescription} meta={nowSummary} />
+    : comingBack ? <NowHead mark={<Icon name="rotate-cw" />} title={comingBackDescription} closedMeta={nowSummary} />
     : working ? <NowHead mark={<WorkingMark tool={runningTool(agent)} />} title={agent.state === "starting" ? startingLabel : nowWorking}
-      detail={runningTool(agent)} meta={nowSummary} />
-    : start ? <NowHead mark={<Icon name="clock" />} title={start} meta={nowSummary} />
+      detail={runningTool(agent)} closedMeta={nowSummary} />
+    : start ? <NowHead mark={<Icon name="clock" />} title={start} closedMeta={nowSummary} />
     : leases && !background.length ? <NowHead mark={<Icon name="lock" />} title={leases.lines[0] ?? leases.full} />
-    : background.length ? <NowHead mark={<Icon name="layers" />} title={nowBackground(background.length)} meta={leases?.lines[0]} />
+    : background.length ? <NowHead mark={<Icon name="layers" />} title={nowBackground(background.length)} closedMeta={leases?.lines[0]} />
     : null;
   const nowDetail = agent && (leases || background.length) ? (
     <div class="now-rows">
@@ -720,7 +720,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         {/* Last before the prompt bar: what it does or waits on now (#5033). A wait only the person
             can settle is an Ask among the cards above (#3147, #5031). */}
         {agent && <NowFoot live={drives} parts={nowParts} head={nowHead} detail={nowDetail} />}
-        {agent && !store.isComingBack(host, agent.id) && agent.state !== "running" && agent.state !== "starting" && (
+        {/* The quiet line takes the Now card's place, never sits under it (#5033). */}
+        {agent && !comingBack && !working && !nowParts.length && !nowHead && !nowDetail && (
           <QuietLine since={lastEntryAt(store.entries.value, store.turns.value) ?? fromWireDate(agent.lastActivityAt)}
             startedAt={fromWireDate(agent.createdAt)} />
         )}

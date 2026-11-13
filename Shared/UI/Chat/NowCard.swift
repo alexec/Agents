@@ -39,6 +39,8 @@ struct NowHead<Mark: View>: View {
     let title: String
     var detail: String?
     var meta: String?
+    /// A meta that its detail says again, so it shows only while the card is closed.
+    var closedMeta: String?
     @ViewBuilder let mark: () -> Mark
 
     @Environment(\.nowOpen) private var open
@@ -77,7 +79,7 @@ struct NowHead<Mark: View>: View {
             .lineLimit(1)
             .truncationMode(.tail)
             Spacer(minLength: 8)
-            if let meta {
+            if let meta = meta ?? (isOpen == true ? nil : closedMeta) {
                 Text(meta)
                     .appText(.fine)
                     .foregroundStyle(.secondary)
@@ -213,19 +215,19 @@ struct NowCard: View {
     /// or only what it holds or runs in the background.
     @ViewBuilder private var head: some View {
         if isComingBack {
-            NowHead(title: AgentsModel.comingBackDescription, meta: summary) {
+            NowHead(title: AgentsModel.comingBackDescription, closedMeta: summary) {
                 Image(icon: AgentsModel.comingBackSymbol).foregroundStyle(.secondary)
             }
         } else if isWorking {
             let tool = RunningToolWords.tool(agent)
             NowHead(title: agent.state == .starting ? AgentState.startingLabel : NowWords.working,
-                    detail: tool, meta: summary) {
+                    detail: tool, closedMeta: summary) {
                 // The one working mark on the page, in step with the sidebar row (#2044, #2831).
                 WorkingRing(size: 16, doing: tool != nil)
             }
             .accessibilityLabel(tool.map(RunningToolWords.label) ?? NowWords.working)
         } else if let capacityStart {
-            NowHead(title: capacityStart, meta: summary) {
+            NowHead(title: capacityStart, closedMeta: summary) {
                 Image(icon: "clock").foregroundStyle(.secondary)
             }
         } else if let leases, running.isEmpty {
@@ -233,7 +235,7 @@ struct NowCard: View {
                 Image(icon: "lock").foregroundStyle(.secondary)
             }
         } else {
-            NowHead(title: NowWords.background(running.count), meta: leases?.lines.first) {
+            NowHead(title: NowWords.background(running.count), closedMeta: leases?.lines.first) {
                 Image(icon: "layers").foregroundStyle(.secondary)
             }
         }

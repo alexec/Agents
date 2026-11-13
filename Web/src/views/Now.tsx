@@ -22,15 +22,18 @@ export function useNowOpen(): boolean {
 }
 
 /** A Now card's head: mark, what in bold, a quiet detail, the meta, and the chevron when it has more. */
-export function NowHead({ mark, title, detail, meta }: {
+export function NowHead({ mark, title, detail, meta, closedMeta }: {
   mark: ComponentChildren; title: string; detail?: string | null | undefined; meta?: string | null | undefined;
+  /** A meta that the detail says again, so it shows only while the card is closed. */
+  closedMeta?: string | null | undefined;
 }) {
   const card = useContext(NowOpen);
+  const shownMeta = meta ?? (card?.open ? null : closedMeta);
   const row = (
     <>
       <span class="now-mark" aria-hidden="true">{mark}</span>
       <span class="now-what"><strong>{title}</strong>{detail && <span class="now-detail"> · {detail}</span>}</span>
-      {meta && <span class="now-meta">{meta}</span>}
+      {shownMeta && <span class="now-meta">{shownMeta}</span>}
       {card?.hasMore && <Icon name={card.open ? "chevron-down" : "chevron-right"} class="chevron" />}
     </>
   );
