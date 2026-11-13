@@ -92,12 +92,47 @@ func orgModeCeilingToPermissionLevel(ceiling string) wire.PermissionLevel {
 }
 
 // policyBook is what this copy knows of the policy: its version and requireFollowing, for
-// the router's gate, and what each machine here was last sent, by a hash.
+// the router's gate, and what each machine here was last sent, by a hash. sending is a
+// lock for each machine with a send in progress, so the sends to one machine are in
+// order (#5069).
 type policyBook struct {
 	mu               sync.Mutex
 	version          int64
 	requireFollowing bool
 	told             map[string][sha256.Size]byte
+	sending          map[string]*policySend
+}
+
+// policySend is one machine's send lock, and how many sends hold it or wait for it: the
+// entry goes when the count is 0, so the map holds only machines with a send now.
+type policySend struct {
+	mu    sync.Mutex
+	users int
+}
+
+// lockSend waits for host's earlier sends to finish. Call the function it returns to let
+// the next one go.
+func (b *policyBook) lockSend(host string) func() {
+	b.mu.Lock()
+	if b.sending == nil {
+		b.sending = map[string]*policySend{}
+	}
+	send := b.sending[host]
+	if send == nil {
+		send = &policySend{}
+		b.sending[host] = send
+	}
+	send.users++
+	b.mu.Unlock()
+	send.mu.Lock()
+	return func() {
+		send.mu.Unlock()
+		b.mu.Lock()
+		if send.users--; send.users == 0 {
+			delete(b.sending, host)
+		}
+		b.mu.Unlock()
+	}
 }
 
 // keptPolicy is the policy as the store has it: the document's bytes, exactly as signed,
@@ -704,10 +739,16 @@ func (s *Service) takesPolicy(host string) bool {
 // sendPolicy sends a machine the signed policy, or none, on its channel 0 (FR-006).
 // always sends even what it was sent last (a hello). A copy that reads a signature of
 // another version is in the middle of a change: it waits for it to finish.
+//
+// The sends to one machine go one at a time, each reading the store after the one before
+// it sent: two changes close together start two sends, and without the lock the older
+// version could reach the machine last, so it kept the kill switch on after it was
+// turned off (#5069).
 func (s *Service) sendPolicy(host string, always bool) {
 	if !s.takesPolicy(host) {
 		return
 	}
+	defer s.policies.lockSend(host)()
 	ctx, cancel := context.WithTimeout(context.Background(), userDeliveryTimeout)
 	defer cancel()
 	var line any
