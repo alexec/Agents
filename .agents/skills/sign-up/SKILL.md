@@ -160,6 +160,38 @@ agentloops@fastmail.com where the site lets you, or ask Alex with `ask_question`
 
 What the 0.7 sign-ups found (2026-10-19). Pages change; read the page before you trust these.
 
+### A GitHub organisation (free)
+
+From #4955 and #5064 (2026-11-12). An organisation is not a new sign-up: it is made from
+`alexec`'s own account, so it is the one exception to "never sign in to Alex's existing
+accounts", and only for this step.
+
+- **Alex's yes first, by a form**, with the name, and "not now" as an option. The name is
+  published at once, and GitHub holds back a deleted organisation's name, so a wrong name
+  cannot simply be made again.
+- **Is it there already?** `gh api orgs/<name>`: a 200 means it exists. Then check
+  `env -u GH_TOKEN /usr/local/bin/gh api user/memberships/orgs/<name>` (Alex's own `gh`):
+  `role` `admin` means Alex owns it, so record it ("Then") and stop. A 404 on both means
+  the name is free.
+- **No API.** `POST /admin/organizations` is only for GitHub Enterprise Server site admins.
+  Use the page https://github.com/account/organizations/new in the agents' browser
+  (`browser_*`), signed in as `alexec` (as #4291 did).
+- **The form:** the **Free** plan (Team only with Alex's form for the charge, #1064), the
+  name, the contact email `alex@alexecollins.com`, "This organization belongs to: **My
+  personal account**", and the terms (accept them for Alex). Untick any marketing box. Skip
+  "add members".
+- **CAPTCHA or sudo:** GitHub's docs list no sudo step for this page. If GitHub shows a
+  CAPTCHA, or asks for sudo (its email code goes to Alex's address), do only that step with
+  `hand_to_person`, then add it to #5064 (or the open automation issue for it under #3905).
+  The software passkey of #4085 is the sudo factor Alex chose (#4955).
+- **Check after:** `gh api orgs/<name>` gives 200 and `type` `Organization`; Alex's own `gh`
+  on `user/memberships/orgs/<name>` gives `role` `admin` and `state` `active`, and on
+  `orgs/<name> --jq .plan.name` gives `free`. A plan that is not `free` is a charge: tell
+  Alex at once with `notify` and in the issue.
+- **Then:** record it with `manage_accounts` (`add`; service `github`, the plan, the owner
+  `alexec`, the issue). Transfer no repo or App here: those are their own issues, each after
+  Alex's yes (#5063, #5065).
+
 ### gitlab.com (free)
 
 - Form: `#new_user_first_name`, `_last_name`, `_username`, `_email`, `_password`. The field
