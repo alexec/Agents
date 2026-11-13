@@ -597,6 +597,9 @@ func unrecognisedTrigger(name string, keys map[string]any) wire.WorkflowTrigger 
 }
 
 func triggerNamed(name string, keys map[string]yamlnode.Node) (wire.WorkflowTrigger, error) {
+	if name == onceTrigger {
+		return parseOnce(keys)
+	}
 	if name == "schedule" {
 		s, err := parseSchedule(keys)
 		if err != nil {
@@ -805,6 +808,9 @@ func triggerSupported(t wire.WorkflowTrigger) bool {
 		return true
 	}
 	if _, ok := serverTrigger(t); ok {
+		return true
+	}
+	if _, ok := alarmOf(t); ok {
 		return true
 	}
 	_, ok := triggerPattern(t)
