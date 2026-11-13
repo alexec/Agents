@@ -96,8 +96,8 @@ func (d *Daemon) registerBrowserWatch() {
 		if err != nil {
 			return wire.BrowserInputResult{}, err
 		}
-		editing, err := cast.Input(browserInput(r))
-		return wire.BrowserInputResult{Editing: editing}, err
+		said, err := cast.Input(browserInput(r))
+		return wire.BrowserInputResult{Editing: said.Editing, Copied: said.Copied}, err
 	})
 	On(d, wire.CallBrowserNavigate, func(ctx context.Context, c *Client, r wire.BrowserNavigateRequest) (wire.Empty, error) {
 		return wire.Empty{}, d.navigateBrowser(c, r)
@@ -126,6 +126,9 @@ func browserInput(r wire.BrowserInputRequest) browser.Input {
 		return *p
 	}
 	in.Type, in.Button, in.Key, in.Code, in.Text = str(r.Type), str(r.Button), str(r.Key), str(r.Code), str(r.Text)
+	if r.Command != nil {
+		in.Command = string(*r.Command)
+	}
 	in.X, in.Y, in.DeltaX, in.DeltaY = num(r.X), num(r.Y), num(r.DeltaX), num(r.DeltaY)
 	in.ClickCount, in.KeyCode, in.Modifiers = integer(r.ClickCount), integer(r.KeyCode), integer(r.Modifiers)
 	return in

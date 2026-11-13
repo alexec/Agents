@@ -1517,6 +1517,15 @@ type BrowserControlSettings struct {
 	Mode DriveApproval `json:"mode"`
 }
 
+// edit's command (#5119): selectAll, undo and redo act in the page as Chromium's editing commands; copy says the page's selection back in copied, and cut also deletes it.
+type BrowserEditCommand string
+
+const BrowserEditCommandSelectAll BrowserEditCommand = "selectAll"
+const BrowserEditCommandUndo BrowserEditCommand = "undo"
+const BrowserEditCommandRedo BrowserEditCommand = "redo"
+const BrowserEditCommandCopy BrowserEditCommand = "copy"
+const BrowserEditCommandCut BrowserEditCommand = "cut"
+
 // browser/frame: a JPEG of the machine's browser's page (#3528, spike #3527), from CDP Page.startScreencast, sent only to the clients that watch it. Never recorded.
 type BrowserFrame struct {
 	Image Data `json:"image"`
@@ -1537,8 +1546,9 @@ const BrowserInputKindMouse BrowserInputKind = "mouse"
 const BrowserInputKindWheel BrowserInputKind = "wheel"
 const BrowserInputKindKey BrowserInputKind = "key"
 const BrowserInputKindText BrowserInputKind = "text"
+const BrowserInputKindEdit BrowserInputKind = "edit"
 
-// browser/input: the person's input in the page (#3528). mouse and wheel are CDP Input.dispatchMouseEvent, key is Input.dispatchKeyEvent, text is Input.insertText (a paste). x and y are in the page's CSS pixels.
+// browser/input: the person's input in the page (#3528). mouse and wheel are CDP Input.dispatchMouseEvent, key is Input.dispatchKeyEvent, text is Input.insertText (a paste), edit is an editing command for a client's shortcut (#5119). x and y are in the page's CSS pixels.
 type BrowserInputRequest struct {
 	Kind BrowserInputKind `json:"kind"`
 
@@ -1571,11 +1581,16 @@ type BrowserInputRequest struct {
 
 	// Alt 1, Control 2, Meta 4, Shift 8, as CDP has them.
 	Modifiers *int64 `json:"modifiers,omitzero"`
+
+	Command *BrowserEditCommand `json:"command,omitzero"`
 }
 
-// browser/input's answer. editing is said after a mouseReleased only: whether the click left the page's focus in a field that takes text (an input, a textarea, a contenteditable), so a touch client opens or closes its keyboard. Left out for other input, and by a host before it was added.
+// browser/input's answer. copied is said after an edit's copy or cut. editing is said after a mouseReleased only: whether the click left the page's focus in a field that takes text (an input, a textarea, a contenteditable), so a touch client opens or closes its keyboard. Left out for other input, and by a host before it was added.
 type BrowserInputResult struct {
 	Editing *bool `json:"editing,omitzero"`
+
+	// After an edit's copy or cut: the page's selected text (the focused field's selection, else the page's), for the client's clipboard. Empty when nothing is selected or the field is a password.
+	Copied *string `json:"copied,omitzero"`
 }
 
 type BrowserNavigateAction string

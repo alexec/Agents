@@ -1369,6 +1369,17 @@ export interface BrowserControlSettings {
 }
 
 /**
+ * edit's command (#5119): selectAll, undo and redo act in the page as Chromium's editing commands;
+ * copy says the page's selection back in copied, and cut also deletes it.
+ */
+export type BrowserEditCommand =
+  | "selectAll"
+  | "undo"
+  | "redo"
+  | "copy"
+  | "cut";
+
+/**
  * browser/frame: a JPEG of the machine's browser's page (#3528, spike #3527), from CDP
  * Page.startScreencast, sent only to the clients that watch it. Never recorded.
  */
@@ -1386,12 +1397,13 @@ export type BrowserInputKind =
   | "mouse"
   | "wheel"
   | "key"
-  | "text";
+  | "text"
+  | "edit";
 
 /**
  * browser/input: the person's input in the page (#3528). mouse and wheel are CDP
- * Input.dispatchMouseEvent, key is Input.dispatchKeyEvent, text is Input.insertText (a paste). x
- * and y are in the page's CSS pixels.
+ * Input.dispatchMouseEvent, key is Input.dispatchKeyEvent, text is Input.insertText (a paste), edit
+ * is an editing command for a client's shortcut (#5119). x and y are in the page's CSS pixels.
  */
 export interface BrowserInputRequest {
   kind: BrowserInputKind;
@@ -1415,15 +1427,22 @@ export interface BrowserInputRequest {
   text?: string;
   /** Alt 1, Control 2, Meta 4, Shift 8, as CDP has them. */
   modifiers?: number;
+  command?: BrowserEditCommand;
 }
 
 /**
- * browser/input's answer. editing is said after a mouseReleased only: whether the click left the
- * page's focus in a field that takes text (an input, a textarea, a contenteditable), so a touch
- * client opens or closes its keyboard. Left out for other input, and by a host before it was added.
+ * browser/input's answer. copied is said after an edit's copy or cut. editing is said after a
+ * mouseReleased only: whether the click left the page's focus in a field that takes text (an input,
+ * a textarea, a contenteditable), so a touch client opens or closes its keyboard. Left out for
+ * other input, and by a host before it was added.
  */
 export interface BrowserInputResult {
   editing?: boolean;
+  /**
+   * After an edit's copy or cut: the page's selected text (the focused field's selection, else the
+   * page's), for the client's clipboard. Empty when nothing is selected or the field is a password.
+   */
+  copied?: string;
 }
 
 export type BrowserNavigateAction =
@@ -15888,8 +15907,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BrowserClearRequest: { required: [], optional: ["site"] },
   BrowserControlSettings: { required: ["mode"], optional: [] },
   BrowserFrame: { required: ["image", "ack", "width", "height"], optional: [] },
-  BrowserInputRequest: { required: ["kind"], optional: ["type", "x", "y", "button", "clickCount", "deltaX", "deltaY", "key", "code", "keyCode", "text", "modifiers"] },
-  BrowserInputResult: { required: [], optional: ["editing"] },
+  BrowserInputRequest: { required: ["kind"], optional: ["type", "x", "y", "button", "clickCount", "deltaX", "deltaY", "key", "code", "keyCode", "text", "modifiers", "command"] },
+  BrowserInputResult: { required: [], optional: ["editing", "copied"] },
   BrowserNavigateRequest: { required: ["action"], optional: ["url"] },
   BrowserPageState: { required: ["status"], optional: ["detail", "url", "title", "noTab", "holder", "holderTitle"] },
   BrowserSite: { required: ["site", "cookies"], optional: [] },

@@ -121,6 +121,10 @@ func TestTheWiresInputIsTheBrowsers(t *testing.T) {
 	if in != (browser.Input{Kind: "mouse", Type: "mousePressed", X: 12.5, Y: 40, Button: "left", ClickCount: 2, Modifiers: 8}) {
 		t.Fatalf("%+v", in)
 	}
+	command := wire.BrowserEditCommandCut
+	if in := browserInput(wire.BrowserInputRequest{Kind: wire.BrowserInputKindEdit, Command: &command}); in != (browser.Input{Kind: "edit", Command: "cut"}) {
+		t.Fatalf("%+v", in)
+	}
 }
 
 // A page that does not change sends no frame: one who joins sees the last one at once.

@@ -9,9 +9,13 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Store } from "../model/store";
 import type { BrowserInputRequest, BrowserNavigateAction, UUID } from "../protocol/generated";
+import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
-import { keyInput, modifiers, otherHolder, pagePoint, stopped, touchTyped, words } from "../model/machineBrowser";
+import { editCommand, keyInput, modifiers, otherHolder, pagePoint, stopped, touchTyped, words } from "../model/machineBrowser";
 import { openAgentLink } from "../model/agentLink";
+
+/** A Mac, iPhone or iPad: its shortcuts are ⌘, not Ctrl. */
+const mac = /Mac|iPhone|iPad/.test(navigator.platform) || /Mac OS X/.test(navigator.userAgent);
 
 /** A key event with no name the page can take: the field's input event says what it typed. */
 const unnamed = (e: KeyboardEvent) => e.isComposing || e.key === "Unidentified" || e.keyCode === 229;
@@ -29,6 +33,8 @@ export function AgentBrowserPane({ store, host, session }: { store: Store; host:
   const problem = useSignal<string | null>(null);
   /** The person's input, sent one call at a time, in order; a move behind a move is replaced. */
   const outbox = useRef<BrowserInputRequest[]>([]);
+  /** A copy or cut waiting for the host to say the page's selection, by its input (#5119). */
+  const copies = useRef(new Map<BrowserInputRequest, (text: string) => void>());
   const sending = useRef(false);
   /** The button held, so a move while it is down is a drag. */
   const held = useRef<string | null>(null);
@@ -97,6 +103,8 @@ export function AgentBrowserPane({ store, host, session }: { store: Store; host:
       try {
         const said = await store.link.call("browser/input", next, host);
         problem.value = null;
+        copies.current.get(next)?.(said?.copied ?? "");
+        copies.current.delete(next);
         // A tap outside a field closes the keyboard; an older host says nothing, which keeps it.
         const field = keys.current;
         if (next.kind === "mouse" && next.type === "mouseReleased" && said?.editing === false
@@ -105,6 +113,8 @@ export function AgentBrowserPane({ store, host, session }: { store: Store; host:
         }
       } catch (error) {
         // Input queued behind a failure is not sent later, out of context.
+        for (const input of [next, ...outbox.current]) copies.current.get(input)?.("");
+        copies.current.clear();
         outbox.current = [];
         problem.value = describe(error);
       }
@@ -120,6 +130,23 @@ export function AgentBrowserPane({ store, host, session }: { store: Store; host:
       outbox.current.push(input);
     }
     void drain();
+  };
+  /**
+   * ⌘C or ⌘X: the page's selection goes on this computer's clipboard (#5119). The clipboard is
+   * asked for inside the key press, as Safari needs, with the text to come; nothing selected
+   * leaves the clipboard as it was.
+   */
+  const copy = (input: BrowserInputRequest) => {
+    const text = new Promise<string>((resolve) => { copies.current.set(input, resolve); });
+    send(input);
+    if (!copies.current.has(input)) return;
+    const blob = text.then((t) => (t ? new Blob([t], { type: "text/plain" }) : Promise.reject(new Error("nothing selected"))));
+    try {
+      void navigator.clipboard.write([new ClipboardItem({ "text/plain": blob })]).catch(() => {});
+    } catch {
+      // A browser with no ClipboardItem: write the text when it comes, while the press still counts.
+      void text.then((t) => (t ? navigator.clipboard?.writeText(t) : undefined)).catch(() => {});
+    }
   };
   const navigate = async (action: BrowserNavigateAction, url?: string) => {
     try {
@@ -189,6 +216,15 @@ export function AgentBrowserPane({ store, host, session }: { store: Store; host:
         onKeyDown={(e) => {
           // ⌘V and Ctrl+V are a paste: the paste event sends this computer's clipboard.
           if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v") return;
+          // ⌘A, ⌘C, ⌘X, ⌘Z and ⇧⌘Z act in the page; a copy comes to this computer's clipboard (#5119).
+          const command = store.has(host, Capability.browser2) ? editCommand(e, mac) : null;
+          if (command) {
+            e.preventDefault();
+            const input: BrowserInputRequest = { kind: "edit", command };
+            if (command === "copy" || command === "cut") copy(input);
+            else send(input);
+            return;
+          }
           // Other ⌘ shortcuts stay the page's own (a new tab, a reload).
           if (e.metaKey) return;
           // A key the keyboard does not name (predictive text, a composition) comes as input.
@@ -197,7 +233,7 @@ export function AgentBrowserPane({ store, host, session }: { store: Store; host:
           send(keyInput(e, true));
         }}
         onKeyUp={(e) => {
-          if (e.metaKey || unnamed(e)) return;
+          if (e.metaKey || unnamed(e) || (store.has(host, Capability.browser2) && editCommand(e, mac))) return;
           send(keyInput(e, false));
         }}
         onPaste={(e) => {

@@ -23,6 +23,9 @@ public final class MachineBrowser {
     /// field that takes text, so a touch pane opens or closes its keyboard. Each click makes a
     /// new one, so a second tap in a field opens the keyboard again after the person hid it.
     public private(set) var editing: PageEditing?
+    /// Where a copy or cut from the page goes: the client's clipboard (#5119). Called with
+    /// the page's selected text, only when there is some.
+    @ObservationIgnored public var copied: (@MainActor (String) -> Void)?
 
     private let client: DaemonClient
     private let describe: @MainActor (any Error) -> String
@@ -119,6 +122,7 @@ public final class MachineBrowser {
                 if let field = said.editing {
                     editing = PageEditing(inField: field, click: (editing?.click ?? 0) + 1)
                 }
+                if let text = said.copied, !text.isEmpty { copied?(text) }
                 problem = nil
             } catch {
                 // Input queued behind a failure is not sent later, out of context.
@@ -177,6 +181,21 @@ public enum BrowserKeys {
         115: ("Home", "Home", 36), 119: ("End", "End", 35), 116: ("PageUp", "PageUp", 33),
         121: ("PageDown", "PageDown", 34), 49: (" ", "Space", 32),
     ]
+
+    /// The editing command a ⌘ shortcut is in the page (#5119): ⌘A, ⌘C, ⌘X, ⌘Z and ⇧⌘Z.
+    /// `bare` is the key's letter with no modifier. Nil for a shortcut that stays the app's.
+    public static func edit(bare: String, command: Bool, shift: Bool, option: Bool, control: Bool)
+        -> DaemonAPI.BrowserEditCommand? {
+        guard command, !option, !control else { return nil }
+        switch (bare.lowercased(), shift) {
+        case ("a", false): return .selectAll
+        case ("c", false): return .copy
+        case ("x", false): return .cut
+        case ("z", false): return .undo
+        case ("z", true): return .redo
+        default: return nil
+        }
+    }
 
     /// The modifier bits CDP takes: Alt 1, Control 2, Meta 4, Shift 8.
     public static func modifiers(option: Bool, control: Bool, command: Bool, shift: Bool) -> Int {
