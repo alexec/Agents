@@ -9,7 +9,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "preact/hooks";
 import { openTurnsHeld, rememberOpen, type Store } from "../model/store";
 import { backgroundAge, backgroundEnded, backgroundNoun, isRunning, subagentNoSteps, subagentStatus } from "../model/background";
-import { display, isPersonsAsk, isWorking, type ChatTurn, type Item } from "../model/turns";
+import { display, isPersonsAsk, isWorking, raisableStop, type ChatTurn, type Item } from "../model/turns";
 import { fromWireDate, toWireDate } from "../protocol/dates";
 import type { Agent, AppViewCall, BackgroundItem, ClientPermissionSettings, FileMentionDTO, FindMatch, FindResult, TranscriptEntry, TurnSummary, UUID } from "../protocol/generated";
 import { openTakeOver, replace, route } from "../route";
@@ -36,12 +36,14 @@ import { sentPrompts } from "../model/promptHistory";
 import { sessionPrompts } from "../model/sessionPrompts";
 import { PromptList } from "./chat/PromptList";
 import { asksToArchive, folderPath, personLine, personTriggerOf } from "../model/groups";
-import { CallActionsContext, ItemRow, TurnView, type CallActions } from "./chat/Rows";
+import { CallActionsContext, ItemRow, SandboxAsk, TurnView, type CallActions } from "./chat/Rows";
 import { Modal } from "./Modal";
 import { nameOf, pathOf, setPane } from "./files/paneState";
 import { FileSearch, isOpenFileKey } from "./files/FileSearch";
 import { focusedEntry, focusedIndex } from "../model/focus";
-import { ViewLayerContext } from "./chat/AppView";
+import { ViewAsk, ViewLayerContext } from "./chat/AppView";
+import { canRaise, PolicyStopAsk } from "./chat/PolicyStopCard";
+import { Ask, waitingForYou } from "./Ask";
 import { recipient, type Start, viewPin } from "./chat/appViewBridge";
 import { ViewLayer, type ViewActions } from "./chat/viewLayer";
 import { ViewDiff } from "./chat/ViewDiff";
@@ -471,6 +473,24 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
   // What waits on the person is in the conversation, not over it (#723), after all of it (#1995),
   // and the agent's wait on events under it.
   const asked = useWaitingCards({ store, host, session, down });
+  const waitCard = agent?.eventWait && agent.eventWait.ending === undefined ? <WaitCard agent={agent} title={(id) => store.agent(host, id)?.title}
+    disabled={down} continueNow={async () => {
+      // On a place in a line, Carry On leaves it: a prompt alone keeps the place (#3151).
+      const resource = lineResource(agent);
+      if (resource !== undefined) await store.cancelWait(host, agent.id);
+      await store.prompt(host, agent.id, resource === undefined ? eventCarryOnPrompt : lineCarryOnPrompt(resource), []);
+    }}
+    stop={() => store.cancelWait(host, agent.id)} /> : null;
+  const personWait = !!agent && lineResource(agent) === undefined && personLine(agent) !== null;
+  // The asks that were in the transcript (#5031, Alex 2026-11-12): the sandbox failure it waits on, a
+  // policy stop that can still be raised, and a view's Show or Send.
+  const answerSandbox = callActions.answerSandbox;
+  const sandboxWait = agent?.pendingSandboxFailure && answerSandbox
+    ? <SandboxAsk record={agent.pendingSandboxFailure} setBy={store.sandboxSetBy.value[host]} answer={answerSandbox} /> : null;
+  const stop = raisableStop(store.entries.value, agent);
+  const askForMore = callActions.askForMore;
+  const policyAsk = stop && askForMore && canRaise(stop.refusal, stop.id, askForMore)
+    ? <PolicyStopAsk refusal={stop.refusal} entryID={stop.id} send={askForMore} /> : null;
   const cards: WaitingCard[] = [
     // A change its agent made to the folder's own files, asked here (#531).
     ...store.guardedChanges(host, { session }).map(({ folder, change }) => ({
@@ -497,6 +517,10 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
       key: `screen:${agent.id}`,
       node: <DesktopControlPauseCard store={store} host={host} agent={agent} disabled={down} />,
     }] : []),
+    ...(sandboxWait ? [{ key: `sandbox:${agent!.id}`, node: sandboxWait }] : []),
+    ...(policyAsk ? [{ key: `policy:${stop!.id}`, node: policyAsk }] : []),
+    ...layer.asking().map((view) => ({ key: `view:${view.call.id}`, node: <ViewAsk view={view} /> })),
+    ...(waitCard && personWait ? [{ key: `wait:${agent!.id}`, node: waitCard }] : []),
     // An ask to be archived waits the same way (#827).
     ...(agent && asksToArchive(agent) ? [{
       key: `archive:${agent.id}`,
@@ -672,7 +696,8 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
         {agent && <LeaseLine store={store} host={host} agent={agent} />}
         {/* After all of it, where the reader is (#1995). */}
         {cards.length > 0 && (
-          <div class="waiting" aria-label="Waiting for you">
+          <div class="waiting" role="group" aria-label={waitingForYou}>
+            <p class="waiting-label" aria-hidden="true">{waitingForYou}</p>
             {cards.map((card) => <Fragment key={card.key}>{card.node}</Fragment>)}
           </div>
         )}
@@ -680,16 +705,9 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             under the chat's head with Carry on. */}
         {agent && openBlock(agent) && <BlockWaitCard store={store} host={host} agent={agent} disabled={down} />}
         {/* Under them, and not in "Waiting for you": the agent waits, not the person (#2084), except a
-            wait only the person can settle, which the card tints and says (#3147). Only while the
+            wait only the person can settle (#3147), which is an Ask among them (#5031). Only while the
             wait is open: an ended one stays on the record until the agent goes on (#2749). */}
-        {agent?.eventWait && agent.eventWait.ending === undefined && <WaitCard agent={agent} title={(id) => store.agent(host, id)?.title}
-          disabled={down} continueNow={async () => {
-            // On a place in a line, Carry On leaves it: a prompt alone keeps the place (#3151).
-            const resource = lineResource(agent);
-            if (resource !== undefined) await store.cancelWait(host, agent.id);
-            await store.prompt(host, agent.id, resource === undefined ? eventCarryOnPrompt : lineCarryOnPrompt(resource), []);
-          }}
-          stop={() => store.cancelWait(host, agent.id)} />}
+        {waitCard && !personWait && waitCard}
         {agent && !store.isComingBack(host, agent.id) && agent.state !== "running" && agent.state !== "starting" && (
           <QuietLine since={lastEntryAt(store.entries.value, store.turns.value) ?? fromWireDate(agent.lastActivityAt)}
             startedAt={fromWireDate(agent.createdAt)} />
@@ -935,39 +953,55 @@ function WaitCard({ agent, title, disabled, continueNow, stop }: { agent: Agent;
   const asks = isLine ? null : personLine(agent);
   const trigger = asks ? personTriggerOf(agent) : undefined;
   const url = trigger ? triggerURL(trigger) : undefined;
+  const carryOn = () => { busy.value = true; void continueNow().finally(() => (busy.value = false)); };
+  const endWait = () => { busy.value = true; void stop().finally(() => (busy.value = false)); };
+  const summary = (
+    <div class="wait-card-events">
+      {eventWaitSummaryLines(wait, title).map((line) => <p class="wait-card-event" key={line.id} title={line.events.join(", ")}>
+        <span class="wait-card-source">{line.source}</span><span class="wait-card-separator">·</span>
+        <span class="wait-card-kind">{line.words}</span>
+        {line.arguments.length > 0 && (line.url
+          ? <a class="wait-card-filters" href={line.url} target="_blank" rel="noopener noreferrer">({line.arguments.join(", ")})</a>
+          : <span class="wait-card-filters">({line.arguments.join(", ")})</span>)}
+      </p>)}
+    </div>
+  );
+  // A wait only the person can settle (#3147) is an Ask (#5031): what it asks of them, Open, Carry On, End Wait.
+  if (asks) {
+    return (
+      <Ask glyph="circle-help" title={asks} asker={eventWaitTime(elapsed, total)} label={asks} extra="wait-card for-person"
+        decline={<button class="link" disabled={disabled || busy.value} title={waitWords.endWaitHelp} onClick={endWait}>{waitWords.endWait}</button>}
+        buttons={<>
+          <button class={url ? undefined : "prominent"} disabled={disabled || busy.value} title={waitWords.carryOnHelp}
+            {...(url ? {} : { "data-default": "" })} onClick={carryOn}>{waitWords.carryOn}</button>
+          {url && <a class="button prominent" href={url} target="_blank" rel="noopener noreferrer" data-default=""
+            title={`Open ${url} in the browser.`}>Open</a>}
+        </>}>
+        {summary}
+      </Ask>
+    );
+  }
   return (
     <div class="cards">
-      <div class={`card wait-card${asks ? " for-person" : ""}`}>
+      <div class="card wait-card">
         {isLine ? <p class="strong">{line}</p> : <>
           <div class="wait-card-heading">
-            {asks
-              ? <span class="wait-card-title tinted"><span class="wait-card-mark" aria-hidden="true">!</span>{asks}</span>
-              : <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon kind={eventWaitKind(agent)} /></span>{eventWaitCardTitle(wait)}</span>}
+            <span class="wait-card-title"><span class="wait-card-broadcast waiting-beacon" aria-hidden="true"><Beacon kind={eventWaitKind(agent)} /></span>{eventWaitCardTitle(wait)}</span>
             <span class="wait-card-time">{eventWaitTime(elapsed, total)}</span>
           </div>
-          <div class="wait-card-events">
-            {eventWaitSummaryLines(wait, title).map((line) => <p class="wait-card-event" key={line.id} title={line.events.join(", ")}>
-              <span class="wait-card-source">{line.source}</span><span class="wait-card-separator">·</span>
-              <span class="wait-card-kind">{line.words}</span>
-              {line.arguments.length > 0 && (line.url
-                ? <a class="wait-card-filters" href={line.url} target="_blank" rel="noopener noreferrer">({line.arguments.join(", ")})</a>
-                : <span class="wait-card-filters">({line.arguments.join(", ")})</span>)}
-            </p>)}
-          </div>
+          {summary}
           {percent !== undefined && <div class="wait-card-progress" role="progressbar" aria-label="Event wait time"
             aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent}>
             <span style={{ width: `${percent}%` }} />
           </div>}
         </>}
         <p class="wait-answers">
-          {url && <a class="button prominent" href={url} target="_blank" rel="noopener noreferrer"
-            title={`Open ${url} in the browser.`}>Open</a>}
           <button disabled={disabled || busy.value}
             title={resource === undefined ? waitWords.carryOnHelp : `Leave the line for ${resource} and carry on now, without it.`}
-            onClick={() => { busy.value = true; void continueNow().finally(() => (busy.value = false)); }}>
+            onClick={carryOn}>
             {resource === undefined ? waitWords.carryOn : `Carry on without ${resource}`}</button>
           <button class="destructive" disabled={disabled || busy.value} title={waitWords.endWaitHelp}
-            onClick={() => { busy.value = true; void stop().finally(() => (busy.value = false)); }}>{waitWords.endWait}</button>
+            onClick={endWait}>{waitWords.endWait}</button>
         </p>
       </div>
     </div>

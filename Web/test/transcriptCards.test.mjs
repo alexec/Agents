@@ -15,6 +15,8 @@ test("no child of the transcript shrinks", () => {
 
 test("the wait card and the cards waiting for the person are in the transcript", () => {
   assert.match(chat, /class="scroll transcript"|class=\{`scroll transcript/);
-  assert.match(chat, /<div class="waiting" aria-label="Waiting for you">/);
+  assert.match(chat, /<div class="waiting" role="group" aria-label=\{waitingForYou\}>/);
+  // One label over the Asks, in the yellow of needs you (#5031).
+  assert.match(chat, /<p class="waiting-label" aria-hidden="true">\{waitingForYou\}<\/p>/);
   assert.match(chat, /<WaitCard /);
 });

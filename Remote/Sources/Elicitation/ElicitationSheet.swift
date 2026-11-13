@@ -26,18 +26,26 @@ struct ElicitationSheet: View {
     /// No, because… (#4039): the decline being explained, by its title, while the sheet asks why.
     @State private var because: String?
 
+    /// The Ask's head (#5031): the step to do, the secret's name, or the question.
+    private var headTitle: String {
+        if because == nil, let handOff = request.handOff { return handOff.step }
+        if because == nil, let secret = request.secret { return secret.name }
+        return request.title
+    }
+
+    private var glyph: String {
+        if request.handOff != nil { return "hand.raised" }
+        if request.secret != nil { return "key" }
+        if case .url = request.mode { return "globe" }
+        return "questionmark.circle"
+    }
+
     var body: some View {
+        // An Ask (#5031), at the chat's full width: who asks beside the title.
+        AskCard(icon: glyph, title: headTitle, asker: model.work.askerLine(request.agentID)) {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                // Who is asking, by title and runtime (#121).
-                if let asker = model.work.askerLine(request.agentID) {
-                    Text(asker).appText(.fine).foregroundStyle(Paper.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
                 if (request.secret == nil && request.handOff == nil) || because != nil {
-                    MarkdownText(markdown: request.title)
-                        .appText(.reading).fontWeight(.semibold)
-                        .fixedSize(horizontal: false, vertical: true)
                     // The question itself often lives here rather than in the schema: a
                     // one-question form arrives with an untitled field and the whole
                     // question in `message`.
@@ -87,9 +95,7 @@ struct ElicitationSheet: View {
                 answers
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .paperRaised(in: RoundedRectangle(cornerRadius: 18))
+        }
         // In the chat column, at the end of the conversation, as on the Mac
         // (033, #723).
         .chatColumn()
@@ -207,15 +213,19 @@ struct ElicitationSheet: View {
         model.isStale(on: model.work.agent(request.agentID)?.host ?? .mac)
     }
 
-    /// The decline, one tap, and No, because… beside it to say why first (#4039).
+    /// The decline, one tap, and No, because… beside it to say why first (#4039): the Ask's
+    /// foot, as links on the left (#5031). Large enough to tap.
     @ViewBuilder
     private func declineButton(_ title: String = "No thanks") -> some View {
-        Button { send(title, action: .decline) } label: { label(title, note: nil) }
-            .buttonStyle(.paper)
-            .controlSize(.large)
-        Button { because = title } label: { label(DeclineReasonField.opener, note: nil) }
-            .buttonStyle(.paper)
-            .controlSize(.large)
+        Divider().overlay(Paper.rule)
+        HStack(spacing: 6) {
+            AskDecline(title) { send(title, action: .decline) }
+            Text("·").foregroundStyle(.secondary)
+            AskDecline(DeclineReasonField.opener) { because = title }
+            Spacer(minLength: 0)
+        }
+        .appText(.reading)
+        .frame(minHeight: 44)
     }
 
     private func label(_ title: String, note: String?) -> some View {

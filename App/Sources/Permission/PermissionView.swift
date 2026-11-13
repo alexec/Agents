@@ -37,47 +37,59 @@ struct PermissionView: View {
     private static let questionCap: CGFloat = 260
 
     var body: some View {
-        GlassEffectContainer(spacing: 10) {
-            VStack(alignment: .leading, spacing: 10) {
-                question
+        // An Ask (#5031): the call as the title, who asks beside it, a reject on the left as a
+        // link, and the allowing answers on the right. More than two (a plan's five sentences)
+        // stack in the body instead, so each can be read whole.
+        AskCard(icon: request.toolCall.isPlanApproval ? "list.number" : "terminal",
+                title: request.toolCall.title,
+                asker: model.work.askerLine(request.agentID, subagent: request.subagent)) {
+            question
+            if stacks {
                 VStack(alignment: .leading, spacing: 6) {
-                    // The agent's own wording, on the agent's own options.
-                    // Return takes the first allowing answer; ⌘1…n pick by position
-                    // (View ▸ panes yield those keys while this card is up).
-                    ForEach(Array(request.options.enumerated()), id: \.element.id) { index, option in
-                        optionButton(option, index: index)
-                    }
-                }
-                .background {
-                    // Return for the first allowing option without stealing its ⌘n.
-                    if let option = request.options.first(where: \.kind.allows) {
-                        Button("") { answer(option) }
-                            .keyboardShortcut(.defaultAction)
-                            .opacity(0)
-                            .accessibilityHidden(true)
-                            .disabled(chosen != nil)
-                    }
+                    ForEach(allowing, id: \.option.id) { optionButton($0.option, index: $0.index) }
                 }
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .paperRaised(in: RoundedRectangle(cornerRadius: 16))
+        } decline: {
+            ForEach(Array(rejects.enumerated()), id: \.element.option.id) { position, item in
+                if position > 0 { Text("·").foregroundStyle(.secondary) }
+                AskDecline(item.option.name) { answer(item.option) }
+                    .modifier(NumberShortcut(index: item.index))
+                    .modifier(Held(chosen: chosen, option: item.option))
+            }
+        } buttons: {
+            if !stacks {
+                // The primary, the first allowing answer, last on the right.
+                ForEach(allowing.reversed(), id: \.option.id) { optionButton($0.option, index: $0.index) }
+            }
+        }
+        .background {
+            // Return for the first allowing option without stealing its ⌘n.
+            if let option = request.options.first(where: \.kind.allows) {
+                Button("") { answer(option) }
+                    .keyboardShortcut(.defaultAction)
+                    .opacity(0)
+                    .accessibilityHidden(true)
+                    .disabled(chosen != nil)
+            }
         }
         // At the end of the conversation, in its column (#723).
         .chatColumn()
     }
 
-    /// Title, kind and plan, or what the call will do — everything above the answers.
+    /// The options by their place, for ⌘1…9.
+    private var numbered: [(index: Int, option: PermissionOption)] {
+        request.options.enumerated().map { ($0.offset, $0.element) }
+    }
+    private var allowing: [(index: Int, option: PermissionOption)] { numbered.filter { $0.option.kind.allows } }
+    private var rejects: [(index: Int, option: PermissionOption)] { numbered.filter { !$0.option.kind.allows } }
+    /// Too many allowing answers for the foot's two buttons.
+    private var stacks: Bool { allowing.count > 2 }
+
+    /// Kind and plan, or what the call will do: everything between the head and the answers.
     /// Scrolls when tall so the buttons stay reachable.
     private var question: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                // Who is asking, by title and runtime (#121) — its subagent, when it is
-                // one (057). Still the agent's question to answer, so it is asked here.
-                if let asker = model.work.askerLine(request.agentID, subagent: request.subagent) {
-                    Text(asker).appText(.fine).foregroundStyle(Paper.secondary)
-                }
-                Text(request.toolCall.title).appText(.reading).fontWeight(.semibold)
                 if let kind = request.toolCall.kind, !request.toolCall.isPlanApproval {
                     Text(kind).appText(.fine).foregroundStyle(Paper.secondary)
                 }
@@ -136,7 +148,7 @@ struct PermissionView: View {
                 // Wraps in the width it is given. Not `fixedSize`: measured at no width, a
                 // fixed-height sentence is one letter a line, and the card pushed the whole
                 // window's layout a thousand points past its bottom edge.
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: stacks ? .infinity : nil, alignment: .leading)
             if chosen?.id == option.id {
                 Telling(host: model.answerRecipient(request.agentID))
             }
@@ -145,7 +157,7 @@ struct PermissionView: View {
 
     @ViewBuilder
     private func optionButton(_ option: PermissionOption, index: Int) -> some View {
-        if option.kind.allows {
+        if option.id == request.options.first(where: \.kind.allows)?.id {
             Button { answer(option) } label: { label(option) }
                 .buttonStyle(.paperProminent)
                 .modifier(NumberShortcut(index: index))

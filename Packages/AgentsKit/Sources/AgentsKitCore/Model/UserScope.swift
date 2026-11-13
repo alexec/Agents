@@ -390,9 +390,61 @@ public enum UserScopeWords {
     public static let thisMacOnly = "This Mac's"
     public static let addSecret = "Add a Secret…"
 
-    public static let secretsFoot = "A secret is sealed in this app to each of your own machines, and only agentsd opens it "
-        + "there; the control plane cannot. Write ${NAME} for it in an MCP server's env or headers. Nobody can read it back, "
-        + "you included: to change it, replace it."
+    public static let secretsFoot = "A secret is sealed in this app to each of your own machines and apps; the control plane "
+        + "cannot open it. Write ${NAME} for it in an MCP server's env or headers. You can reveal and copy it here, and each "
+        + "reveal and copy is in the audit log. Agents never get a value from here. To change it, replace it."
+
+    // Reveal and Copy (#5112, #5115; specs/5112-view-copy-secrets-accounts/wireframes.md).
+    public static let reveal = "Reveal"
+    public static let hide = "Hide"
+    public static let copy = "Copy"
+    public static let copyValue = "Copy Value"
+    /// How long a value shows, and how long until the clipboard is cleared of it.
+    public static let shownSeconds = 30
+    public static let clipboardSeconds = 90
+    /// How long Copy shows its check, and the copied line.
+    public static let copiedSeconds = 2
+
+    /// Under a shown value, with the seconds left.
+    public static func hidesIn(_ seconds: Int, card: Bool) -> String {
+        "Hides in \(max(seconds, 0)) s · " + (card ? "each reveal and copy is in the audit log" : "in the audit log")
+    }
+
+    /// Under a row just copied: the whole value, or one part of a card.
+    public static func copied(_ part: DaemonAPI.UserSealedSecretRequest.Part? = nil) -> String {
+        (part.map { "Copied \(partWords($0))." } ?? "Copied.") + " The clipboard clears in \(clipboardSeconds) s."
+    }
+
+    /// Ask before use, on a row a person can reveal: it holds only an agent's use (#4016).
+    public static let asksForAgents = "Asks before use: for agents. You reveal and copy at once."
+    public static let noCopyYet = "This app has no copy yet. It gets one when another app of yours is online."
+    public static let revealNeedsNewerPlane = "This control plane cannot show or copy a secret yet. Update it."
+    public static let didNotOpen = "This app's copy did not open. Replace the secret to seal it again."
+
+    /// A card's part, as its line names it.
+    public static func partLabel(_ part: DaemonAPI.UserSealedSecretRequest.Part) -> String {
+        switch part {
+        case .number: "Card number"
+        case .expiry: "Expiry"
+        case .cvc: "CVC"
+        case .name: "Name on card"
+        case .zip: "Billing ZIP"
+        }
+    }
+
+    /// A card's part in a sentence, as the audit entry names it.
+    public static func partWords(_ part: DaemonAPI.UserSealedSecretRequest.Part) -> String {
+        switch part {
+        case .number: "the card number"
+        case .expiry: "the expiry"
+        case .cvc: "the CVC"
+        case .name: "the name on card"
+        case .zip: "the billing ZIP"
+        }
+    }
+
+    /// A card's parts, in the order a reveal shows them.
+    public static let cardParts: [DaemonAPI.UserSealedSecretRequest.Part] = [.number, .expiry, .cvc, .name, .zip]
 
     /// Under a secret that one of the person's machines has no copy of yet (#3397).
     public static func waiting(_ row: DaemonAPI.UserSecretRow) -> String? {
@@ -513,6 +565,31 @@ public struct CardSecret: Codable, Sendable, Hashable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         return (try? encoder.encode(self)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    }
+
+    /// A card's value as it was sealed (#5115), or nil when it is not a card's.
+    public init?(value: String) {
+        guard let card = try? JSONDecoder().decode(CardSecret.self, from: Data(value.utf8)) else { return nil }
+        self = card
+    }
+
+    /// One part (#5115), for a reveal's line and its Copy.
+    public func part(_ part: DaemonAPI.UserSealedSecretRequest.Part) -> String {
+        switch part {
+        case .number: number
+        case .expiry: expiry
+        case .cvc: cvc
+        case .name: name
+        case .zip: zip
+        }
+    }
+
+    /// The card number in groups of four, as a reveal shows it.
+    public var spacedNumber: String {
+        stride(from: 0, to: number.count, by: 4).map { i in
+            let start = number.index(number.startIndex, offsetBy: i)
+            return String(number[start..<(number.index(start, offsetBy: 4, limitedBy: number.endIndex) ?? number.endIndex)])
+        }.joined(separator: " ")
     }
 
     static func tidyExpiry(_ typed: String) -> String {

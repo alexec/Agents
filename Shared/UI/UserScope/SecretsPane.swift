@@ -15,12 +15,16 @@ struct SecretsPane<Extra: View>: View {
     let state: UserScopeState
     /// Each of the person's machines' names, by id, for the not-backed-up warning.
     let machineNames: [String: String]
+    /// Reveal and Copy (#5115): the window's; nil on the Remote (tier Mac + web), which draws neither.
+    let show: SecretShowState?
     let extra: Extra
 
-    init(control: DaemonClient?, state: UserScopeState, machineNames: [String: String] = [:], @ViewBuilder extra: () -> Extra) {
+    init(control: DaemonClient?, state: UserScopeState, machineNames: [String: String] = [:], show: SecretShowState? = nil,
+         @ViewBuilder extra: () -> Extra) {
         self.control = control
         self.state = state
         self.machineNames = machineNames
+        self.show = show
         self.extra = extra()
     }
 
@@ -61,6 +65,12 @@ struct SecretsPane<Extra: View>: View {
         .paperForm()
         .task(id: control != nil) { await state.load(control) }
         .refreshable { await state.load(control) }
+        // A value shown hides when the pane closes, the window goes to the back, or its secret changes.
+        .onDisappear { show?.hide() }
+        .onChange(of: state.secrets) { _, names in show?.secretsChanged(names?.secrets ?? []) }
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in show?.hide() }
+        #endif
         .sheet(isPresented: $isAdding) {
             SecretSheet(name: nil, asks: true, description: nil) { name, value, ask, description in
                 await state.setSecret(name, value: value, askBeforeUse: ask, description: description, on: control)
@@ -111,9 +121,24 @@ struct SecretsPane<Extra: View>: View {
                             Text(UserScopeWords.cardKind).appText(.fine).foregroundStyle(.secondary)
                         }
                         Spacer()
-                        Text(SecretInfoWords.hint(row.hint)).appText(.code).foregroundStyle(.secondary)
-                            .accessibilityLabel(row.hint.map { "Ends in \($0)" } ?? "Value hidden")
+                        if show?.shown?.name != row.name {
+                            Text(SecretInfoWords.hint(row.hint)).appText(.code).foregroundStyle(.secondary)
+                                .accessibilityLabel(row.hint.map { "Ends in \($0)" } ?? "Value hidden")
+                        }
+                        if let show {
+                            SecretShowButtons(row: row, show: show, control: control)
+                        }
                         Menu {
+                            if let show {
+                                let off = control == nil || show.noCopy.contains(row.name)
+                                Button(show.shown?.name == row.name ? UserScopeWords.hide : UserScopeWords.reveal) {
+                                    Task { await show.toggle(row, on: control) }
+                                }
+                                .disabled(off)
+                                Button(UserScopeWords.copyValue) { Task { await show.copy(row, on: control) } }
+                                    .disabled(off)
+                                Divider()
+                            }
                             Button("Replace…") { replacing = row }
                             Button("Remove…", role: .destructive) { removing = row }
                         } label: {
@@ -122,11 +147,17 @@ struct SecretsPane<Extra: View>: View {
                         .fixedSize()
                         .accessibilityLabel("\(row.name) actions")
                     }
+                    if let show, let shown = show.shown, shown.name == row.name {
+                        SecretShownValue(row: row, shown: shown, show: show, control: control)
+                    }
                     Text(UserScopeWords.about(row.description)).appText(.fine).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     SecretInfoLine(parts: SecretInfoWords.line(row))
+                    if let show {
+                        SecretShowLines(row: row, show: show)
+                    }
                     if row.asksBeforeUse {
-                        Label(AskBeforeUseWords.asks, icon: "hand.raised")
+                        Label(show == nil ? AskBeforeUseWords.asks : UserScopeWords.asksForAgents, icon: "hand.raised")
                             .appText(.fine).foregroundStyle(.secondary)
                     }
                     if let waiting = UserScopeWords.waiting(row) {
@@ -155,8 +186,107 @@ struct SecretsPane<Extra: View>: View {
 }
 
 extension SecretsPane where Extra == EmptyView {
-    init(control: DaemonClient?, state: UserScopeState, machineNames: [String: String] = [:]) {
-        self.init(control: control, state: state, machineNames: machineNames) { EmptyView() }
+    init(control: DaemonClient?, state: UserScopeState, machineNames: [String: String] = [:], show: SecretShowState? = nil) {
+        self.init(control: control, state: state, machineNames: machineNames, show: show) { EmptyView() }
+    }
+}
+
+/// A row's Reveal (an eye; a spinner while its copy is fetched) and Copy (a check for 2 s once copied), #5115.
+private struct SecretShowButtons: View {
+    let row: DaemonAPI.UserSecretRow
+    let show: SecretShowState
+    let control: DaemonClient?
+
+    var body: some View {
+        let shown = show.shown?.name == row.name
+        let off = control == nil || show.noCopy.contains(row.name)
+        HStack(spacing: 4) {
+            if show.fetching == row.name {
+                ProgressView().controlSize(.small).frame(width: 16, height: 16)
+            } else {
+                Button { Task { await show.toggle(row, on: control) } } label: {
+                    Image(icon: shown ? "eye.slash" : "eye")
+                }
+                .buttonStyle(.borderless)
+                .help(shown ? UserScopeWords.hide : UserScopeWords.reveal)
+                .accessibilityLabel("\(shown ? UserScopeWords.hide : UserScopeWords.reveal) \(row.name)")
+                .disabled(off)
+            }
+            Button { Task { await show.copy(row, on: control) } } label: {
+                Image(icon: show.copied?.name == row.name && show.copied?.part == nil ? "checkmark" : "doc.on.doc")
+            }
+            .buttonStyle(.borderless)
+            .help(UserScopeWords.copy)
+            .accessibilityLabel("\(UserScopeWords.copy) \(row.name)")
+            .disabled(off)
+        }
+    }
+}
+
+/// The value shown, in a well, in the code font, that a person cannot select: Copy is the only
+/// way to copy it, so each copy is in the audit log. A card shows each part with its own Copy.
+private struct SecretShownValue: View {
+    let row: DaemonAPI.UserSecretRow
+    let shown: SecretShowState.Shown
+    let show: SecretShowState
+    let control: DaemonClient?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if let card = shown.card {
+                ForEach(UserScopeWords.cardParts, id: \.self) { part in
+                    HStack {
+                        Text(UserScopeWords.partLabel(part)).appText(.fine).foregroundStyle(.secondary)
+                            .frame(width: 96, alignment: .leading)
+                        Text(part == .number ? card.spacedNumber : card.part(part)).appText(.code)
+                        Spacer()
+                        Button { Task { await show.copy(row, part: part, on: control) } } label: {
+                            Image(icon: show.copied == .init(name: row.name, part: part) ? "checkmark" : "doc.on.doc")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(UserScopeWords.copy)
+                        .accessibilityLabel("\(UserScopeWords.copy) \(UserScopeWords.partLabel(part)) of \(row.name)")
+                    }
+                }
+            } else {
+                Text(shown.value).appText(.code)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel("\(row.name) value")
+                    .accessibilityValue(shown.value)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .paperWell(in: RoundedRectangle(cornerRadius: Paper.Radius.control))
+    }
+}
+
+/// Under a row: how long the value still shows, that it was copied, or why it cannot.
+private struct SecretShowLines: View {
+    let row: DaemonAPI.UserSecretRow
+    let show: SecretShowState
+
+    var body: some View {
+        if let shown = show.shown, shown.name == row.name {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Text(UserScopeWords.hidesIn(Int(shown.until.timeIntervalSince(context.date).rounded(.up)), card: shown.card != nil))
+                    .appText(.fine).foregroundStyle(.secondary)
+            }
+        }
+        if let copied = show.copied, copied.name == row.name {
+            Label(UserScopeWords.copied(copied.part), icon: "checkmark")
+                .appText(.fine).tinted(.vouched)
+        }
+        if show.noCopy.contains(row.name) {
+            Text(UserScopeWords.noCopyYet).appText(.fine).tinted(.attention)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        if let problem = show.problems[row.name] {
+            Text(problem).appText(.fine).tinted(.failure)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 }
 

@@ -461,6 +461,13 @@ export class ViewLayer {
 
   find(id: string): HostedView | undefined { return this.views.get(id); }
 
+  /** The views that ask the person now (Show, or Send), for the chat's "Waiting for you" (#5031). */
+  asking(): HostedView[] {
+    void this.made.value;
+    return [...this.views.values()].filter((view) =>
+      (view.phase.value === "asking" && view.ask.value !== null) || view.askedMessage.value !== null);
+  }
+
   attach(id: string, slot: HTMLElement): void {
     const view = this.views.get(id);
     if (!view) return;

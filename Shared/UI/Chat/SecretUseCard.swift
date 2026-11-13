@@ -19,47 +19,50 @@ struct SecretUseCard: View {
     private var title: String { request.title(asker: nil) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(title, icon: request.symbol)
-                .appText(.reading).fontWeight(.semibold)
-                .tinted(.attention)
+        // An Ask (#5031): Deny on the left, Approve last and prominent, the one beside it, and the
+        // rest in ⋯ (spec rule 2).
+        AskCard(icon: request.symbol, title: title) {
             Text(use.where)
                 .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            // A narrow column (the phone, a large text size) stacks them, so no word is cut.
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 10) {
-                    Spacer(minLength: 0)
-                    buttons
+        } decline: {
+            if use.actions.contains(.deny) {
+                AskDecline(NeedRequest.Action.deny.word) { send(.deny) }
+                    .disabled(busy || isDisabled)
+            }
+        } buttons: {
+            Group {
+                if !more.isEmpty {
+                    Menu {
+                        ForEach(more, id: \.self) { action in
+                            Button(action.word) { send(action) }
+                        }
+                    } label: {
+                        Image(icon: "ellipsis")
+                    }
+                    .menuStyle(.button)
+                    .buttonStyle(.paper)
+                    .fixedSize()
+                    .accessibilityLabel("More answers")
                 }
-                VStack(alignment: .trailing, spacing: 8) {
-                    buttons
+                if let second = approving.dropFirst().first {
+                    Button(second.word) { send(second) }
+                        .buttonStyle(.paper)
                 }
-                .frame(maxWidth: .infinity, alignment: .trailing)
+                if let primary = approving.first {
+                    Button(primary.word) { send(primary) }
+                        .buttonStyle(.paperProminent)
+                }
             }
             .disabled(busy || isDisabled)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Paper.raised, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Paper.lineAttention))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(title)
     }
 
-    /// Deny first, Approve last and prominent, as the archive card's Keep and Archive are.
-    @ViewBuilder private var buttons: some View {
-        ForEach(use.actions.reversed(), id: \.self) { action in
-            if action == .once {
-                Button(action.word) { send(action) }
-                    .buttonStyle(.paperProminent)
-            } else {
-                Button(action.word) { send(action) }
-                    .buttonStyle(.paper)
-            }
-        }
-    }
+    /// The answers that allow, the primary first.
+    private var approving: [NeedRequest.Action] { use.actions.filter { $0 != .deny } }
+    /// Past the foot's two buttons.
+    private var more: [NeedRequest.Action] { Array(approving.dropFirst(2)) }
 
     private func send(_ action: NeedRequest.Action) {
         busy = true

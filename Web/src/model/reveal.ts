@@ -5,25 +5,22 @@
 import type { OutsideAccount, UserSealedSecretAccount, UserSealedSecretPart, UserSealedSecretRequest, UserSecretRow }
   from "../protocol/generated";
 import { CallFailed, type Link } from "../wire/link";
-import { clientRecipient, open, userSecretAD, userSecretPurpose } from "../wire/sealing";
+import { openSealedSecret } from "../wire/sealing";
 import { describe, methodNotFound } from "./errors";
-import type { Card } from "./userScope";
+import { type Card, cardParts as userScopeCardParts, clipboardSeconds, copiedLine, copiedSeconds, copyRefused, didNotOpen, noCopyYet,
+  parseCard, partLabels, revealNeedsNewerPlane, shownSeconds, spacedNumber } from "./userScope";
 
-/** A value shown hides again after this (section 2). */
-export const shownSeconds = 30;
-/** A copied secret is written over after this, when the tab is still in front (section 3). */
-export const clipboardSeconds = 90;
-/** How long Copy says "Copied" (section 3). */
-export const copiedSeconds = 2;
+// The times and the words are Settings ▸ You ▸ Secrets' (#5115), so both pages say the same.
+export { clipboardSeconds, copiedSeconds, shownSeconds };
 
 export const revealWords = {
   shown: "Shown for 30 s. Your reveal is in the audit log.",
-  copied: "Copied. The clipboard clears in 90 s.",
+  copied: copiedLine(),
   copiedPlain: "Copied.",
-  noCopy: "This app has no copy yet. It gets one when another app of yours is online.",
-  didNotOpen: "This app's copy did not open. Replace the secret to seal it again.",
+  noCopy: noCopyYet,
+  didNotOpen,
   notCard: "This secret is not a card.",
-  noClipboard: "This browser did not let the page copy.",
+  noClipboard: copyRefused,
 };
 
 /** user/sealedSecret's code when the control plane keeps no copy for this page yet. */
@@ -36,7 +33,7 @@ export class RevealFailed extends Error {}
 export function revealFailure(error: unknown): string {
   if (error instanceof RevealFailed) return revealWords.didNotOpen;
   if (error instanceof CallFailed && error.code === noClientCopy) return revealWords.noCopy;
-  if (error instanceof CallFailed && error.code === methodNotFound) return "The control plane needs an update to do this.";
+  if (error instanceof CallFailed && error.code === methodNotFound) return revealNeedsNewerPlane;
   return describe(error);
 }
 
@@ -50,34 +47,22 @@ export async function revealSecret(link: Revealer, request: UserSealedSecretRequ
   const { user } = await link.call("user/secretRecipients", {});
   const sealed = await link.call("user/sealedSecret", request);
   try {
-    const ad = userSecretAD(user ?? "", clientRecipient(record.client), sealed.name, sealed.version, sealed.needsApproval === true);
-    return new TextDecoder().decode(await open(record, userSecretPurpose, ad, sealed.sealed));
+    return await openSealedSecret(record, user ?? "", sealed);
   } catch {
     throw new RevealFailed();
   }
 }
 
-/** The card a card secret's value holds, or null when it is not one. */
-export function parseCard(value: string): Card | null {
-  try {
-    const c = JSON.parse(value) as Partial<Card>;
-    return typeof c.number === "string" && typeof c.expiry === "string" ? c as Card : null;
-  } catch {
-    return null;
-  }
-}
+export { parseCard };
 
 export interface CardPart { part: UserSealedSecretPart; label: string; text: string; value: string }
 
 /** The five parts, in the order a payment form asks for them; the number shown in groups of four. */
 export function cardParts(c: Card): CardPart[] {
-  return [
-    { part: "number", label: "Card number", text: c.number.replace(/(.{4})(?=.)/g, "$1 "), value: c.number },
-    { part: "expiry", label: "Expiry", text: c.expiry, value: c.expiry },
-    { part: "cvc", label: "CVC", text: c.cvc, value: c.cvc },
-    { part: "name", label: "Name on card", text: c.name, value: c.name },
-    { part: "zip", label: "Billing ZIP", text: c.zip, value: c.zip },
-  ];
+  return userScopeCardParts.map((part) => {
+    const value = c[part];
+    return { part, label: partLabels[part], text: part === "number" ? spacedNumber(value) : value, value };
+  });
 }
 
 /**

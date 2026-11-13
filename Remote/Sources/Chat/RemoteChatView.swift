@@ -386,6 +386,32 @@ struct RemoteChatView: View {
                 })
             }
         }
+        // The sandbox failure it waits on, once in the transcript, is an Ask here, as on the
+        // Mac (#5031).
+        if let record = waitingSandbox, let keepStopped = sandboxAnswer(carryOn: false) {
+            cards.append(WaitingCard(id: "sandbox:" + agent.id.uuidString) {
+                SandboxAsk(record: record, setBy: model.sandboxSettings.setBy,
+                           keepStopped: keepStopped, continueWithout: sandboxAnswer(carryOn: true))
+                    .chatColumn()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            })
+        }
+        // A policy stop that can still be raised, once in the transcript, is an Ask here (#5031).
+        if let askForMore = actions.askForMore,
+           let stop = PolicyStopAsks.shared.raisable(model.work.entries, agent: agent) {
+            cards.append(WaitingCard(id: "policy:" + stop.id.uuidString) {
+                PolicyStopAsk(refusal: stop.refusal, entryID: stop.id, askForMore: askForMore,
+                              openPolicy: actions.openPolicy)
+                    .chatColumn()
+            })
+        }
+        // A view's Show or Send, once in its row, is an Ask here (#5031).
+        for host in views.asking {
+            cards.append(WaitingCard(id: "view:" + host.call.id.uuidString) {
+                AppViewAsk(host: host)
+                    .chatColumn()
+            })
+        }
         // An ask to be archived waits the same way, last when asked at once, as on the
         // Mac (#827).
         if agent.asksToArchive {
@@ -403,7 +429,7 @@ struct RemoteChatView: View {
         // iPad, a full-screen cover on an iPhone (#4141).
         let liveFrames = page.liveFrames.filter { $0.value.frame.agentID == agent.id }
         if agent.state == .running, !liveFrames.isEmpty {
-            cards.append(WaitingCard(id: "live:" + agent.id.uuidString) {
+            cards.append(WaitingCard(id: "live:" + agent.id.uuidString, asks: false) {
                 LiveTile(frames: liveFrames, open: { [openTakeOver] source in
                     openTakeOver(TakeOverKey(agentID: agent.id, source: source))
                 })
@@ -425,7 +451,7 @@ struct RemoteChatView: View {
         // A wait on sessions or on a time, the same card in the same place (#2750): it was
         // lines under the chat's head, with Carry on in the toolbar.
         if let (report, block) = model.work.openBlock(agent) {
-            cards.append(WaitingCard(id: "block:" + agent.id.uuidString) {
+            cards.append(WaitingCard(id: "block:" + agent.id.uuidString, asks: false) {
                 BlockWaitCard(block: block, since: report.at, lines: model.blockLines(agent),
                               stop: { await model.carryOn(agent.id) },
                               help: AgentsModel.carryOnHelp(for: agent),
@@ -436,7 +462,7 @@ struct RemoteChatView: View {
         }
         // The agent's wait on events, under the questions, as on the Mac (#1995).
         if agent.eventWait?.isOpen == true, let status = model.work.waitStatus(of: agent) {
-            cards.append(WaitingCard(id: "wait:" + agent.id.uuidString) {
+            cards.append(WaitingCard(id: "wait:" + agent.id.uuidString, asks: agent.eventWait?.lineResource == nil && agent.eventWait?.personLine != nil) {
                 WaitCard(status: status, eventWait: agent.eventWait,
                          lines: model.work.waitEventLines(of: agent),
                          continueNow: { await model.continueWaiting(of: agent.id, line: agent.eventWait?.lineResource) },

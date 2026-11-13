@@ -126,7 +126,7 @@ struct AccountDetailsSheet: View {
     @ViewBuilder
     private func secretRows(_ label: String, key: String, row: DaemonAPI.UserSecretRow) -> some View {
         let value = shown?.slot == key ? shown?.value : nil
-        let card = value.flatMap(CardSecret.parse)
+        let card = value.flatMap { CardSecret(value: $0) }
         LabeledContent(label) {
             HStack(spacing: 8) {
                 Text(row.name).appText(.code)
@@ -217,11 +217,11 @@ struct AccountDetailsSheet: View {
         do {
             var value = try await reveal(request(row, .copy, part: part))
             if let part {
-                guard let card = CardSecret.parse(value) else {
+                guard let card = CardSecret(value: value) else {
                     problems[slot] = SecretRevealWords.notCard
                     return
                 }
-                value = card.value(of: part)
+                value = card.part(part)
             }
             ConcealedClipboard.copy(value, secret: true)
             value = ""

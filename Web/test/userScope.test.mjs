@@ -48,3 +48,15 @@ test("user scope: a card is one value of its parts, as the window writes it (#35
   assert.equal(u.cardProblem({ ...ok, name: "" }), "Write the name on the card.");
   assert.match(u.cardRule, /has a spend limit, such as a Privacy.com card. A card locked to one merchant or category is safer/);
 });
+
+test("user scope: Reveal and Copy say how long a value shows and when the clipboard clears (#5115)", () => {
+  assert.equal(u.shownFor(24, false), "Shown for 30 s (24 s left). Your reveal is in the audit log.");
+  assert.equal(u.shownFor(-1, true), "Shown for 30 s (0 s left). Each reveal and copy is in the audit log.");
+  assert.equal(u.copiedLine(), "Copied. The clipboard clears in 90 s.");
+  assert.equal(u.copiedLine("cvc"), "Copied the CVC. The clipboard clears in 90 s.");
+  const card = u.tidyCard({ number: "4242 4242 4242 4242", expiry: "09/28", cvc: "123", name: "Ada Example", zip: "94110" });
+  assert.deepEqual(u.parseCard(u.cardValue(card)), card);
+  assert.equal(u.parseCard("ghp_x"), null);
+  assert.equal(u.spacedNumber("4242424242424242"), "4242 4242 4242 4242");
+  assert.equal(u.spacedNumber("378282246310005"), "3782 8224 6310 005");
+});

@@ -34,6 +34,9 @@ struct MarkdownText: View {
     /// A page's zoom (#1419), which headings take as the steps do.
     @Environment(\.textZoom) private var zoom
     @Environment(\.dynamicTypeSize) private var dynamicType
+    #if os(macOS)
+    @Environment(\.selectsAcrossBlocks) private var selectsAcross
+    #endif
     let markdown: String
     /// The document's own location, when there is one, so a relative image can be
     /// found. Nil in the conversation, where there is no document to be relative to —
@@ -79,9 +82,9 @@ struct MarkdownText: View {
         if parsed.isEmpty, let caret { return AnyView(caret.caret) }
         if let range {
             let shown = range.clamped(to: parsed.indices)
-            return blocks(Array(parsed[shown]), caret: shown.upperBound == parsed.count ? caret : nil)
+            return blocks(Array(parsed[shown]), caret: shown.upperBound == parsed.count ? caret : nil, top: true)
         }
-        return blocks(parsed, caret: caret)
+        return blocks(parsed, caret: caret, top: true)
     }
 
     /// Erased on purpose, and this is the only place it is.
@@ -91,23 +94,46 @@ struct MarkdownText: View {
     /// functions define their opaque types in terms of themselves and do not compile.
     /// One concrete type in the cycle breaks it. A document is tens of blocks, not
     /// thousands, so the cost is not worth a cleverer shape.
-    private func blocks(_ blocks: [MarkdownBlock], caret: CursorFlag? = nil) -> AnyView {
-        AnyView(stack(blocks, caret: caret))
+    /// `top` is the message's own blocks, not those inside a list item or a quote, which
+    /// keep a `Text` each: their marker or bar is set by the first line's baseline.
+    private func blocks(_ blocks: [MarkdownBlock], caret: CursorFlag? = nil, top: Bool = false) -> AnyView {
+        AnyView(stack(blocks, caret: caret, top: top))
     }
 
     @ViewBuilder
-    private func stack(_ blocks: [MarkdownBlock], caret: CursorFlag?) -> some View {
+    private func stack(_ blocks: [MarkdownBlock], caret: CursorFlag?, top: Bool) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Indexed, not keyed by content. Two identical paragraphs are two
-            // paragraphs, and a document with two horizontal rules used to hand
-            // `ForEach` the same id twice.
-            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
-                // The caret is at the end of the text, so it goes to the last block and
-                // down into whatever that block holds last.
-                view(for: block, caret: index == blocks.count - 1 ? caret : nil)
+            #if os(macOS)
+            if selectsAcross, top, caret == nil {
+                // The words between code, tables and pictures as one text, so a drag
+                // selects across paragraphs (#5155).
+                ForEach(MarkdownBlock.segments(blocks), id: \.self) { segment in
+                    switch segment {
+                    case .prose(let range):
+                        SelectableProse(blocks: Array(blocks[range]), fillsWidth: fillsWidth)
+                    case .block(let index):
+                        view(for: blocks[index], caret: nil)
+                    }
+                }
+            } else {
+                each(blocks, caret: caret)
             }
+            #else
+            each(blocks, caret: caret)
+            #endif
         }
         .frame(maxWidth: fillsWidth ? .infinity : nil, alignment: .leading)
+    }
+
+    private func each(_ blocks: [MarkdownBlock], caret: CursorFlag?) -> some View {
+        // Indexed, not keyed by content. Two identical paragraphs are two
+        // paragraphs, and a document with two horizontal rules used to hand
+        // `ForEach` the same id twice.
+        ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
+            // The caret is at the end of the text, so it goes to the last block and
+            // down into whatever that block holds last.
+            view(for: block, caret: index == blocks.count - 1 ? caret : nil)
+        }
     }
 
     /// A fenced or indented block of code, coloured by its tag.

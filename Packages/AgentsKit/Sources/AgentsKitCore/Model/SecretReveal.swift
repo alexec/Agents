@@ -9,19 +9,17 @@ import Foundation
 /// with its own key, shows or copies the value, and forgets it. The web page's
 /// `Web/src/model/reveal.ts` has the same words.
 public enum SecretRevealWords {
-    /// A value shown hides again after this (section 2).
-    public static let shownSeconds = 30
-    /// A copied secret leaves the clipboard after this, when it is still there (section 3).
-    public static let clipboardSeconds = 90
-    /// How long Copy says "Copied" (section 3).
-    public static let copiedSeconds = 2
+    // The times and the words are Settings ▸ You ▸ Secrets' (#5115), so both panes say the same.
+    public static let shownSeconds = UserScopeWords.shownSeconds
+    public static let clipboardSeconds = UserScopeWords.clipboardSeconds
+    public static let copiedSeconds = UserScopeWords.copiedSeconds
 
     public static let shown = "Shown for 30 s. Your reveal is in the audit log."
-    public static let copied = "Copied. The clipboard clears in 90 s."
+    public static let copied = UserScopeWords.copied()
     /// A copy of a plain field, which is not audited and not cleared.
     public static let copiedPlain = "Copied."
-    public static let noCopy = "This app has no copy yet. It gets one when another app of yours is online."
-    public static let didNotOpen = "This app's copy did not open. Replace the secret to seal it again."
+    public static let noCopy = UserScopeWords.noCopyYet
+    public static let didNotOpen = UserScopeWords.didNotOpen
     public static let notCard = "This secret is not a card."
 
     /// What went wrong, in one line for the row (section 6).
@@ -29,7 +27,7 @@ public enum SecretRevealWords {
         if let error = error as? JSONRPCError {
             switch error.code {
             case DaemonAPI.Failure.noClientCopy: return noCopy
-            case JSONRPCError.methodNotFound: return "The control plane needs an update to do this."
+            case JSONRPCError.methodNotFound: return UserScopeWords.revealNeedsNewerPlane
             default: return error.message
             }
         }
@@ -44,11 +42,6 @@ public enum SecretRevealWords {
 }
 
 public extension CardSecret {
-    /// The card a card secret's value holds, or nil when it is not one.
-    static func parse(_ value: String) -> CardSecret? {
-        try? JSONDecoder().decode(CardSecret.self, from: Data(value.utf8))
-    }
-
     /// One part of a card, as the reveal shows it (section 4).
     struct Shown: Hashable, Sendable, Identifiable {
         public var part: DaemonAPI.UserSealedSecretRequest.Part
@@ -62,36 +55,18 @@ public extension CardSecret {
 
     /// The five parts, in the order a payment form asks for them.
     var shown: [Shown] {
-        let groups = stride(from: 0, to: number.count, by: 4).map { i -> String in
-            let start = number.index(number.startIndex, offsetBy: i)
-            return String(number[start..<(number.index(start, offsetBy: 4, limitedBy: number.endIndex) ?? number.endIndex)])
+        UserScopeWords.cardParts.map { part in
+            let value = self.part(part)
+            let text = part == .number
+                ? stride(from: 0, to: value.count, by: 4).map { String(value.dropFirst($0).prefix(4)) }.joined(separator: " ")
+                : value
+            return Shown(part: part, label: UserScopeWords.partLabel(part), text: text, value: value)
         }
-        return [Shown(part: .number, label: "Card number", text: groups.joined(separator: " "), value: number),
-                Shown(part: .expiry, label: "Expiry", text: expiry, value: expiry),
-                Shown(part: .cvc, label: "CVC", text: cvc, value: cvc),
-                Shown(part: .name, label: "Name on card", text: name, value: name),
-                Shown(part: .zip, label: "Billing ZIP", text: zip, value: zip)]
-    }
-
-    /// The value of one part, for a copy.
-    func value(of part: DaemonAPI.UserSealedSecretRequest.Part) -> String {
-        shown.first { $0.part == part }?.value ?? ""
     }
 }
 
 #if canImport(CryptoKit)
 public extension ClientSealing {
-    /// `user/sealedSecret`'s copy, opened with this client's key: in memory only. `user` is the
-    /// person's id, as `user/secretRecipients` gives it.
-    static func open(_ sealed: DaemonAPI.UserSealedSecret, user: String, with key: DeviceKey, client: UUID) throws -> String {
-        let ad = userSecretAD(user: user, recipient: clientRecipient(client), name: sealed.name, version: sealed.version,
-                              ask: sealed.needsApproval == true)
-        guard let plain = try? key.open(sealed.sealed, info: userSecretPurpose, authenticating: ad),
-              let text = String(data: plain, encoding: .utf8)
-        else { throw SecretRevealWords.RevealFailure() }
-        return text
-    }
-
     /// Asks the control plane for this client's own copy of one secret (it writes the audit
     /// entry first), and opens it here.
     static func reveal(_ request: DaemonAPI.UserSealedSecretRequest, on control: DaemonClient, key: DeviceKey,
@@ -99,7 +74,12 @@ public extension ClientSealing {
         let to = try await control.call(DaemonAPI.Method.userSecretRecipients, DaemonAPI.Empty(),
                                         returning: DaemonAPI.SealRecipients.self)
         let sealed = try await control.call(DaemonAPI.Method.userSealedSecret, request, returning: DaemonAPI.UserSealedSecret.self)
-        return try open(sealed, user: to.user ?? "", with: key, client: client)
+        // A copy that does not open here (a changed key) has its own line.
+        do {
+            return try open(sealed, user: to.user ?? "", with: key, client: client)
+        } catch {
+            throw SecretRevealWords.RevealFailure()
+        }
     }
 }
 #endif

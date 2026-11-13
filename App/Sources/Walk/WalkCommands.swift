@@ -199,6 +199,13 @@ enum WalkCommands {
             let box = match.element.frame(in: match.window)
             guard box != .zero else { throw WalkError("\(match.element.line(in: match.window)) has no frame") }
             return ["ok": true, "did": try WalkEvents.click(match.window, at: CGPoint(x: box.midX, y: box.midY), count: count)]
+        case "drag":
+            guard let x = request["x"] as? Double, let y = request["y"] as? Double,
+                  let toX = request["toX"] as? Double, let toY = request["toY"] as? Double else {
+                throw WalkError("drag wants x, y, toX and toY")
+            }
+            return ["ok": true, "did": try WalkEvents.drag(try target(request), from: CGPoint(x: x, y: y),
+                                                           to: CGPoint(x: toX, y: toY))]
         case "key":
             guard let name = request["key"] as? String else { throw WalkError("key wants a key") }
             let window = try target(request)

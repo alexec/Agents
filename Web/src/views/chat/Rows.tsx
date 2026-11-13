@@ -29,6 +29,7 @@ import type { Shown } from "../../model/shownFile";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
 import { OrgPolicyLine } from "../OrgPolicyLine";
 import { PolicyStopCard } from "./PolicyStopCard";
+import { Ask } from "../Ask";
 import { TurnChangesCard } from "./TurnChangesCard";
 import { memo } from "../../render/memo";
 import { terminalOutput } from "../../model/onTheMac";
@@ -252,35 +253,46 @@ function ToolRun({ calls, background }: { calls: ToolCall[]; background: readonl
 }
 
 /**
- * SandboxFailureCard (064, #253): what happened, what Continue without sandbox would change, and
- * the two answers while the card waits. An answered or superseded card keeps saying what happened.
+ * SandboxFailureCard (064, #253): what happened, on the record. While the agent waits on an answer,
+ * the answers are an Ask at the end of the chat (SandboxAsk, #5031), not here.
  */
 function SandboxFailureCard({ record }: { record: SandboxFailureRecord }) {
   const actions = useContext(CallActionsContext);
-  const sending = useSignal(false);
   const waiting = actions?.answerSandbox !== undefined && actions.waitingSandbox !== undefined
     && JSON.stringify(actions.waitingSandbox) === JSON.stringify(record);
   const words = sandboxCard(record);
-  const answer = (carryOn: boolean) => {
-    sending.value = true;
-    void actions!.answerSandbox!(carryOn).finally(() => (sending.value = false));
-  };
   return (
-    <div class={`note switch sandbox-failure${waiting ? " waiting" : ""}`} role={waiting ? "alert" : undefined}>
+    <div class="note switch sandbox-failure">
       <p class="strong">{words.title}</p>
       <p>{words.body}</p>
       {record.detail && <details><summary class="quiet">Show error details</summary><pre>{record.detail}</pre></details>}
-      {(waiting || !record.recoveryOffered) && <p class="quiet">{words.offer}</p>}
+      {!waiting && !record.recoveryOffered && <p class="quiet">{words.offer}</p>}
       <OrgPolicyLine mark={actions?.sandboxSetBy} />
-      {waiting && (
-        <p class="answers">
-          <button disabled={sending.value} onClick={() => answer(false)}>{keepStopped}</button>
-          {record.recoveryOffered && !actions?.sandboxSetBy && (
-            <button class="prominent" disabled={sending.value} onClick={() => answer(true)}>{continueWithout}</button>
-          )}
-        </p>
-      )}
     </div>
+  );
+}
+
+/** The sandbox failure the agent waits on (#253), as an Ask (#5031): Keep stopped, or Continue without sandbox. */
+export function SandboxAsk({ record, setBy, answer }: {
+  record: SandboxFailureRecord; setBy: PolicySetBy | undefined; answer: (carryOn: boolean) => Promise<void>;
+}) {
+  const sending = useSignal(false);
+  const words = sandboxCard(record);
+  const send = (carryOn: boolean) => {
+    sending.value = true;
+    void answer(carryOn).finally(() => (sending.value = false));
+  };
+  const offered = record.recoveryOffered && !setBy;
+  return (
+    <Ask glyph="triangle-alert" title={words.title} label={words.title} alert extra="sandbox-ask"
+      decline={offered && <button class="link" disabled={sending.value} onClick={() => send(false)}>{keepStopped}</button>}
+      buttons={offered
+        ? <button class="prominent" disabled={sending.value} data-default="" onClick={() => send(true)}>{continueWithout}</button>
+        : <button class="prominent" disabled={sending.value} data-default="" onClick={() => send(false)}>{keepStopped}</button>}>
+      <p class="quiet small">{words.offer}</p>
+      {record.detail && <details><summary class="quiet small">Show error details</summary><pre>{record.detail}</pre></details>}
+      <OrgPolicyLine mark={setBy} />
+    </Ask>
   );
 }
 
@@ -436,7 +448,7 @@ function entryBody(entry: TranscriptEntry, from: (sender: MessageSender | undefi
       return <SandboxFailureCard record={fields(entry, "sandboxFailure")!._0} />;
     case "policyStopped":
       // A rule stopped this agent (#2957, FR-025): the rule, the layer that decides, and where to change it.
-      return <PolicyStopCard refusal={fields(entry, "policyStopped")!._0} />;
+      return <PolicyStopCard refusal={fields(entry, "policyStopped")!._0} entryID={entry.id} />;
     case "appView":
       return <AppView call={fields(entry, "appView")!._0} />;
     case "fileShown":

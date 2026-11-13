@@ -201,6 +201,8 @@ private struct ReplyBlocks: View {
     var body: some View {
         if case .entry(let entry) = item, let text = TurnRows.text(of: item) {
             MarkdownText(markdown: text, range: range)
+                // One selectable text for the words of these blocks (#5155).
+                .environment(\.selectsAcrossBlocks, true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .appText(.reading)
                 // A shell's code block in a reply can be run (#1533).
@@ -341,8 +343,11 @@ private struct EntryRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("From the app").appText(.reading).foregroundStyle(.tertiary)
                     BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                        // One selectable text for its words (#5155).
+                        .environment(\.selectsAcrossBlocks, true)
                         .appText(.reading)
                         .foregroundStyle(.secondary)
+                        .environment(\.quietProse, true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .copiesMessage(entry)
@@ -352,6 +357,8 @@ private struct EntryRow: View {
                 VStack(alignment: .trailing, spacing: 3) {
                     Text(actions.fromLine(entry.sender)).appText(.reading).foregroundStyle(.tertiary)
                     BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                        // One selectable text for its words (#5155).
+                        .environment(\.selectsAcrossBlocks, true)
                         .environment(\.textFillsWidth, false)
                         .appText(.reading)
                         .padding(12)
@@ -363,6 +370,8 @@ private struct EntryRow: View {
             } else {
                 // Theirs, so at the right, as wide as its words and no wider.
                 BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                    // One selectable text for its words (#5155).
+                    .environment(\.selectsAcrossBlocks, true)
                     .environment(\.textFillsWidth, false)
                     .appText(.reading)
                     .padding(12)
@@ -374,13 +383,14 @@ private struct EntryRow: View {
 
         case .agentMessage(_, let text, let blocks):
             BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                // One selectable text for its words (#5155).
+                .environment(\.selectsAcrossBlocks, true)
                 .appText(.reading)
                 // A shell's code block in a reply can be run (#1533).
                 .environment(\.codeRuns, true)
                 // A table or code wider than the text may reach into the margins (#3895).
                 .environment(\.widensBlocks, true)
                 .copiesMessage(entry)
-
         case .agentThought(_, let text):
             ThoughtLine(text: text)
 
@@ -466,7 +476,7 @@ private struct EntryRow: View {
             SandboxFailureCard(record: record)
 
         case .policyStopped(let refusal):
-            PolicyStopCard(refusal: refusal)
+            PolicyStopCard(refusal: refusal, entryID: entry.id)
 
         case .background(let item):
             BackgroundEntryLine(item: item)

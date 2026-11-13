@@ -48,8 +48,10 @@ private struct AppViewInline: View {
                     if let text = host.call.resultText {
                         Text(text).appText(.reading).textSelection(.enabled)
                     }
-                case .asking(let ask):
-                    AppViewShowAsk(host: host, ask: ask)
+                case .asking:
+                    // Its Show or Don't Show is an Ask under "Waiting for you" (#5031).
+                    Text(AppViewAsk.waitsWords).appText(.supporting).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
                 case .gone:
                     Text("This view was closed.").appText(.supporting).foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, minHeight: 40)
@@ -129,6 +131,40 @@ struct AppViewShowAsk: View {
             }
         }
         .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+    }
+}
+
+/// A view's ask (#191, #837), as an Ask under "Waiting for you" (#5031): Show or Don't Show,
+/// or Send or Don't Send. The web page's is `ViewAsk` in `AppView.tsx`.
+struct AppViewAsk: View {
+    let host: AppViewHost
+
+    /// What a view's row says while its ask waits at the end of the chat.
+    static let waitsWords = "Waiting for you, at the end of the chat."
+
+    var body: some View {
+        if case .asking(let ask) = host.phase {
+            AskCard(icon: "square.grid.2x2",
+                    title: ask.isNew ? "Show the view “\(host.title)”?" : "\(ask.server)'s view has changed. Show it again?",
+                    asker: ask.server) {
+                Text("It is drawn in a sandbox, and reaches only what it declared.")
+                    .appText(.supporting).foregroundStyle(.secondary)
+            } decline: {
+                AskDecline("Don't Show") { host.answerShow(false) }
+            } buttons: {
+                Button("Show") { host.answerShow(true) }.buttonStyle(.paperProminent)
+            }
+        } else if let message = host.askedMessage {
+            AskCard(icon: "square.grid.2x2",
+                    title: host.askedRecipient.map { "Send this to “\($0.name)” as your message?" } ?? "Send this as your message?",
+                    asker: host.title) {
+                Text(message).appText(.reading).textSelection(.enabled)
+            } decline: {
+                AskDecline("Don't Send") { host.answerMessage(send: false) }
+            } buttons: {
+                Button("Send") { host.answerMessage(send: true) }.buttonStyle(.paperProminent)
+            }
+        }
     }
 }
 
@@ -275,21 +311,9 @@ private struct AppViewAsks: View {
     let host: AppViewHost
 
     var body: some View {
-        if let message = host.askedMessage {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(host.askedRecipient.map { "The view asks to send this to “\($0.name)” as your message:" }
-                     ?? "The view asks to send this as your message:")
-                    .appText(.fine).foregroundStyle(.secondary)
-                Text(message).appText(.reading).textSelection(.enabled)
-                HStack(spacing: 8) {
-                    Button("Send") { host.answerMessage(send: true) }.buttonStyle(.paperProminent)
-                    Button("Don't Send") { host.answerMessage(send: false) }.buttonStyle(.paper)
-                }
-                .appText(.fine)
-            }
-            .padding(10)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .paperWell(in: RoundedRectangle(cornerRadius: Paper.Radius.card))
+        if host.askedMessage != nil {
+            // Its Send or Don't Send is an Ask under "Waiting for you" (#5031).
+            Text(AppViewAsk.waitsWords).appText(.fine).foregroundStyle(.secondary)
         }
         if let context = host.contextLine {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
