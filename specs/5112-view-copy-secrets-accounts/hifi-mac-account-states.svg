@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="410" viewBox="0 0 1220 410" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+<defs>
+<filter id="shadow" x="-5%" y="-5%" width="110%" height="110%"><feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#000" flood-opacity="0.16"/></filter>
+<symbol id="more" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="none" stroke="#1a52c0" stroke-width="1.2"/><circle cx="4.8" cy="8" r="1" fill="#1a52c0"/><circle cx="8" cy="8" r="1" fill="#1a52c0"/><circle cx="11.2" cy="8" r="1" fill="#1a52c0"/></symbol>
+<symbol id="eye" viewBox="0 0 16 16"><path d="M1.2 8 C3 4.6 5.4 3.2 8 3.2 S13 4.6 14.8 8 C13 11.4 10.6 12.8 8 12.8 S3 11.4 1.2 8 Z" fill="none" stroke="#1a52c0" stroke-width="1.2" stroke-linejoin="round"/><circle cx="8" cy="8" r="2.3" fill="none" stroke="#1a52c0" stroke-width="1.2"/></symbol>
+<symbol id="eyeoff" viewBox="0 0 16 16"><path d="M1.2 8 C3 4.6 5.4 3.2 8 3.2 S13 4.6 14.8 8 C13 11.4 10.6 12.8 8 12.8 S3 11.4 1.2 8 Z" fill="none" stroke="#1a52c0" stroke-width="1.2" stroke-linejoin="round"/><circle cx="8" cy="8" r="2.3" fill="none" stroke="#1a52c0" stroke-width="1.2"/><path d="M2.5 1.8 L13.5 14.2" stroke="#1a52c0" stroke-width="1.3" stroke-linecap="round"/></symbol>
+<symbol id="copy" viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9.5" rx="1.8" fill="none" stroke="#1a52c0" stroke-width="1.2"/><path d="M3.5 11 H3 a1.5 1.5 0 0 1 -1.5 -1.5 V3 A1.5 1.5 0 0 1 3 1.5 H9.5 A1.5 1.5 0 0 1 11 3 V3.5" fill="none" stroke="#1a52c0" stroke-width="1.2"/></symbol>
+<symbol id="check" viewBox="0 0 16 16"><path d="M2.8 8.6 L6.4 12 L13.2 4.2" fill="none" stroke="#25684f" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="eyedim" viewBox="0 0 16 16"><path d="M1.2 8 C3 4.6 5.4 3.2 8 3.2 S13 4.6 14.8 8 C13 11.4 10.6 12.8 8 12.8 S3 11.4 1.2 8 Z" fill="none" stroke="#b9b4aa" stroke-width="1.2" stroke-linejoin="round"/><circle cx="8" cy="8" r="2.3" fill="none" stroke="#b9b4aa" stroke-width="1.2"/></symbol>
+<symbol id="copydim" viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9.5" rx="1.8" fill="none" stroke="#b9b4aa" stroke-width="1.2"/><path d="M3.5 11 H3 a1.5 1.5 0 0 1 -1.5 -1.5 V3 A1.5 1.5 0 0 1 3 1.5 H9.5 A1.5 1.5 0 0 1 11 3 V3.5" fill="none" stroke="#b9b4aa" stroke-width="1.2"/></symbol>
+<symbol id="hand" viewBox="0 0 16 16"><path d="M5 14 C3 12 2.5 10 2.5 8.5 V6.5 a1 1 0 0 1 2 0 V8 V3 a1 1 0 0 1 2 0 V7 V2.2 a1 1 0 0 1 2 0 V7 V3 a1 1 0 0 1 2 0 V8.5 V6 a1 1 0 0 1 2 0 V10 C12.5 12.5 11 14 9 14 Z" fill="none" stroke="#625e57" stroke-width="1.1" stroke-linejoin="round"/></symbol>
+<symbol id="timer" viewBox="0 0 16 16"><circle cx="8" cy="9" r="5.8" fill="none" stroke="#625e57" stroke-width="1.2"/><path d="M8 9 V5.6 M6.4 1.8 H9.6" stroke="#625e57" stroke-width="1.2" stroke-linecap="round"/></symbol>
+</defs>
+<rect width="1220" height="410" fill="#d9d6cf"/>
+<g filter="url(#shadow)"><rect x="40" y="60" width="550" height="310" rx="12" fill="#ffffff" stroke="#d6d2c9"/></g>
+<text x="64" y="98" font-size="17" fill="#1a1918" font-weight="700">gitlab.com</text>
+<text x="64" y="130" font-size="12" fill="#4a4741">Service</text>
+<text x="190" y="130" font-size="13" fill="#1a1918">gitlab.com</text>
+<use href="#copy" x="542" y="118" width="16" height="16"/>
+<text x="64" y="160" font-size="12" fill="#4a4741">Address</text>
+<text x="190" y="160" font-size="13" fill="#1a1918">agentloops@example.com</text>
+<use href="#copy" x="542" y="148" width="16" height="16"/>
+<line x1="64" y1="178" x2="566" y2="178" stroke="#d6d2c9"/>
+<text x="64" y="200" font-size="12" fill="#4a4741">Secret</text>
+<rect x="188" y="184" width="300" height="22" rx="5" fill="#f6f5f2" stroke="#d6d2c9" />
+<text x="196" y="200" font-size="12" fill="#1a1918" font-family="'SF Mono', Menlo, monospace">glpat-4fQz8TnW2mXs0bLk9x9Qe</text>
+<use href="#eyeoff" x="516" y="188" width="16" height="16"/>
+<use href="#copy" x="542" y="188" width="16" height="16"/>
+<text x="64" y="230" font-size="12" fill="#4a4741"></text>
+<text x="190" y="230" font-size="13" fill="#625e57">Hides in 26 s · in the audit log</text>
+<text x="64" y="260" font-size="12" fill="#4a4741">Card</text>
+<text x="190" y="260" font-size="13" fill="#625e57">—</text>
+<line x1="40" y1="294" x2="590" y2="294" stroke="#d6d2c9"/>
+<text x="64" y="324" font-size="11" fill="#625e57">Revealed from the account: the audit names both.</text>
+<rect x="404" y="308" width="76" height="26" rx="6" fill="#ffffff" stroke="#7d786e" />
+<text x="442" y="325" font-size="13" fill="#1a1918" text-anchor="middle">Edit…</text>
+<rect x="490" y="308" width="76" height="26" rx="6" fill="#1a52c0" stroke="#1a52c0" />
+<text x="528" y="325" font-size="13" fill="#fff" text-anchor="middle">Done</text>
+<g filter="url(#shadow)"><rect x="630" y="60" width="550" height="310" rx="12" fill="#ffffff" stroke="#d6d2c9"/></g>
+<text x="654" y="98" font-size="17" fill="#1a1918" font-weight="700">aws.amazon.com</text>
+<text x="654" y="130" font-size="12" fill="#4a4741">Service</text>
+<text x="780" y="130" font-size="13" fill="#1a1918">aws.amazon.com</text>
+<use href="#copy" x="1132" y="118" width="16" height="16"/>
+<text x="654" y="160" font-size="12" fill="#4a4741">Address</text>
+<text x="780" y="160" font-size="13" fill="#1a1918">ada@example.com</text>
+<use href="#copy" x="1132" y="148" width="16" height="16"/>
+<line x1="654" y1="178" x2="1156" y2="178" stroke="#d6d2c9"/>
+<text x="654" y="200" font-size="12" fill="#4a4741">Secret</text>
+<text x="780" y="200" font-size="13" fill="#625e57">No secret. Add one in Secrets,</text>
+<text x="654" y="230" font-size="12" fill="#4a4741"></text>
+<text x="780" y="230" font-size="13" fill="#625e57">then name it in Edit….</text>
+<text x="654" y="260" font-size="12" fill="#4a4741">Card</text>
+<text x="780" y="260" font-size="13" fill="#1a1918" font-family="'SF Mono', Menlo, monospace">SHOP_CARD  ••••4242</text>
+<use href="#eye" x="1106" y="248" width="16" height="16"/>
+<use href="#copy" x="1132" y="248" width="16" height="16"/>
+<line x1="630" y1="294" x2="1180" y2="294" stroke="#d6d2c9"/>
+<text x="654" y="324" font-size="11" fill="#625e57">No secret: no Reveal or Copy on that line.</text>
+<rect x="994" y="308" width="76" height="26" rx="6" fill="#ffffff" stroke="#7d786e" />
+<text x="1032" y="325" font-size="13" fill="#1a1918" text-anchor="middle">Edit…</text>
+<rect x="1080" y="308" width="76" height="26" rx="6" fill="#1a52c0" stroke="#1a52c0" />
+<text x="1118" y="325" font-size="13" fill="#fff" text-anchor="middle">Done</text>
+</svg>
