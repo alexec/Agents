@@ -188,6 +188,7 @@ func (s *Service) BotMachineFor(person, host string) bool {
 
 // sendHostUser tells a machine its user, their kind and labels, and a bot's cap.
 func (s *Service) sendHostUser(host string) {
+	defer s.caps.telling.lock(host)()
 	h := s.records.Host(host)
 	if h == nil {
 		return
@@ -329,9 +330,15 @@ func sweepRuns(ctx context.Context, st store.Store, now time.Time, most int) (in
 // MARK: Spend caps
 
 // botCaps is which bots are at a cap, until the end of the UTC day, and to whom it was said.
+// checking is a lock for each bot whose spend is being weighed, so the checks of one bot go
+// in order and a check that read an older spend cannot clear a newer one's mark. telling is
+// a lock for each machine being sent machine/user, so the last one sent has the newest
+// cap (#5086).
 type botCaps struct {
-	mu     sync.Mutex
-	capped map[string]time.Time
+	mu       sync.Mutex
+	capped   map[string]time.Time
+	checking keyLocks
+	telling  keyLocks
 }
 
 func (c *botCaps) until(user string) (time.Time, bool) {
@@ -407,6 +414,7 @@ func (s *Service) spentToday(ctx context.Context, user string, now time.Time) fl
 // bots together). At one, its machines start no more work until the end of the day, and
 // the admins are told once (FR-033).
 func (s *Service) checkCaps(user string) {
+	defer s.caps.checking.lock(user)()
 	p := s.records.Person(user)
 	if p == nil || !p.IsBot() {
 		return
