@@ -973,21 +973,14 @@ private struct LoadFailureLine: View {
     @State private var retrying = false
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Label(sentence, icon: "exclamationmark.triangle")
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 0)
-            Button("Try Again") {
-                retrying = true
-                Task {
-                    await retry()
-                    retrying = false
-                }
-            }
-            .disabled(retrying)
-        }
-        .appText(.fine)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        RecordLine(icon: LineGlyph.loadFailure, detail: sentence,
+                   action: StripButton(title: "Try Again", disabled: retrying) {
+                       retrying = true
+                       Task {
+                           await retry()
+                           retrying = false
+                       }
+                   })
     }
 }
 
