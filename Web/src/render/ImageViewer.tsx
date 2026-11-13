@@ -1,23 +1,34 @@
 // A Work page's image, large, in the page (#4011), as the Mac's sheet (Shared/UI/Page/ImageViewer.swift):
 // the image fitted to the viewer, which is as large as the image inside the window; the wheel, a
 // pinch, a double-click or + and − to zoom, a drag to move about a zoomed image; Esc, Done or a
-// click outside to close. No new tab: the person stays here.
+// click outside to close. No new tab: the person stays here. It goes through the images of the
+// same message (#4954): the arrows, which show while the pointer is over the image (always on a
+// touch screen), ← and →, and a swipe sideways on a touch screen go to the previous and the next.
 import { useSignal } from "@preact/signals";
 import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import {
   clampMagnification, fitMagnification, magnificationAfterDoubleClick, magnificationAfterWheel,
-  stepMagnification, viewerSize, zoomMost,
+  sequenceCounter, sequenceStep, stepMagnification, swipeStep, viewerSize, zoomMost,
 } from "../model/pageImage";
+
+/** One image the viewer goes through. */
+export interface ViewerImage { src: string; alt: string; natural: { w: number; h: number } }
 
 /** Where the zoom started, kept under the pointer once the image is drawn at the new level. */
 interface Anchor { ix: number; iy: number; px: number; py: number }
 
-export function ImageViewer({ src, alt, natural, close }: {
-  src: string;
-  alt: string;
-  natural: { w: number; h: number };
+export function ImageViewer({ images, start, close }: {
+  images: ViewerImage[];
+  start: number;
   close: () => void;
 }) {
+  const at = useSignal(Math.min(Math.max(0, start), images.length - 1));
+  const { src, alt, natural } = images[at.value]!;
+  const naturalRef = useRef(natural);
+  naturalRef.current = natural;
+  const previous = sequenceStep(at.value, images.length, -1);
+  const following = sequenceStep(at.value, images.length, 1);
+  const counter = sequenceCounter(at.value, images.length);
   const dialog = useRef<HTMLDialogElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   /** Null while the image is fitted, so a resize of the window refits it. */
@@ -30,7 +41,21 @@ export function ImageViewer({ src, alt, natural, close }: {
   const fit = room.value.w > 0 ? fitMagnification(natural.w, natural.h, room.value.w, room.value.h) : 1;
   const shown = chosen.value === null ? fit : clampMagnification(chosen.value, fit);
   const fitted = chosen.value === null || Math.abs(shown - fit) < 0.0001;
-  const size = viewerSize(natural.w, natural.h, window_.value.w, window_.value.h);
+  // As large as the largest image, so the viewer keeps its size from one image to the next.
+  const size = viewerSize(Math.max(...images.map((i) => i.natural.w)), Math.max(...images.map((i) => i.natural.h)),
+    window_.value.w, window_.value.h);
+
+  /** Goes to the image at `next`, fitted. */
+  const show = (next: number | null) => {
+    if (next === null) return;
+    anchor.current = null;
+    chosen.value = null;
+    at.value = next;
+  };
+  const showRef = useRef(show);
+  showRef.current = show;
+  const atRef = useRef(at.value);
+  atRef.current = at.value;
 
   /** Zooms to `level`, keeping the point under (x, y) on the page where it is, or the middle. */
   const zoomTo = (level: number, x?: number, y?: number) => {
@@ -40,13 +65,14 @@ export function ImageViewer({ src, alt, natural, close }: {
       const px = x === undefined ? el.clientWidth / 2 : x - box.left;
       const py = y === undefined ? el.clientHeight / 2 : y - box.top;
       const was = shownNow();
-      const ox = Math.max(0, (el.clientWidth - natural.w * was) / 2), oy = Math.max(0, (el.clientHeight - natural.h * was) / 2);
+      const n = naturalRef.current;
+      const ox = Math.max(0, (el.clientWidth - n.w * was) / 2), oy = Math.max(0, (el.clientHeight - n.h * was) / 2);
       anchor.current = { ix: (el.scrollLeft + px - ox) / was, iy: (el.scrollTop + py - oy) / was, px, py };
     }
     const f = fitNow();
     chosen.value = Math.abs(level - f) < 0.0001 ? null : level;
   };
-  const fitNow = () => fitMagnification(natural.w, natural.h, room.peek().w, room.peek().h);
+  const fitNow = () => fitMagnification(naturalRef.current.w, naturalRef.current.h, room.peek().w, room.peek().h);
   const shownNow = () => { const f = fitNow(), c = chosen.peek(); return c === null ? f : clampMagnification(c, f); };
 
   useEffect(() => {
@@ -66,6 +92,12 @@ export function ImageViewer({ src, alt, natural, close }: {
     watcher.observe(el);
     return () => watcher.disconnect();
   }, []);
+
+  // An arrow that was clicked is gone at an end: focus stays in the viewer, so ← and → still work.
+  useEffect(() => {
+    const d = dialog.current;
+    if (d && !d.contains(document.activeElement)) d.focus();
+  }, [at.value]);
 
   // After a zoom, the point the zoom started from goes back under the pointer.
   useLayoutEffect(() => {
@@ -89,6 +121,8 @@ export function ImageViewer({ src, alt, natural, close }: {
     };
     const pointers = new Map<number, { x: number; y: number }>();
     let pinch: { distance: number; level: number } | null = null;
+    /** Where one finger went down on a fitted image: a swipe sideways from there steps (#4954). */
+    let swipe: { id: number; x: number; y: number } | null = null;
     const spread = () => {
       const [a, b] = [...pointers.values()];
       return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
@@ -98,6 +132,9 @@ export function ImageViewer({ src, alt, natural, close }: {
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       el.setPointerCapture(event.pointerId);
       if (pointers.size === 2) pinch = { distance: spread(), level: shownNow() };
+      const fittedNow = Math.abs(shownNow() - fitNow()) < 0.0001;
+      swipe = pointers.size === 1 && event.pointerType === "touch" && fittedNow
+        ? { id: event.pointerId, x: event.clientX, y: event.clientY } : null;
     };
     const move = (event: PointerEvent) => {
       const was = pointers.get(event.pointerId);
@@ -114,6 +151,11 @@ export function ImageViewer({ src, alt, natural, close }: {
       el.scrollTop -= event.clientY - was.y;
     };
     const up = (event: PointerEvent) => {
+      if (event.type === "pointerup" && swipe?.id === event.pointerId && pointers.size === 1) {
+        const by = swipeStep(event.clientX - swipe.x, event.clientY - swipe.y);
+        if (by) showRef.current(sequenceStep(atRef.current, images.length, by));
+      }
+      if (swipe?.id === event.pointerId || pointers.size > 1) swipe = null;
       pointers.delete(event.pointerId);
       if (pointers.size < 2) pinch = null;
     };
@@ -132,7 +174,7 @@ export function ImageViewer({ src, alt, natural, close }: {
   }, []);
 
   return (
-    <dialog class="image-viewer" ref={dialog} aria-label={label} onClose={close}
+    <dialog class="image-viewer" ref={dialog} aria-label={label} onClose={close} tabIndex={-1}
       style={{ width: `${size.w}px`, height: `${size.h}px` }}
       // A click on the backdrop is a click on the dialog itself: outside, so it closes.
       onClick={(event) => { if (event.target === dialog.current) close(); }}
@@ -140,16 +182,29 @@ export function ImageViewer({ src, alt, natural, close }: {
         if (event.metaKey || event.ctrlKey || event.altKey) return;
         if (event.key === "+" || event.key === "=") { event.preventDefault(); zoomTo(stepMagnification(shown, fit, 1)); }
         else if (event.key === "-") { event.preventDefault(); zoomTo(stepMagnification(shown, fit, -1)); }
+        else if (event.key === "ArrowLeft" && previous !== null) { event.preventDefault(); show(previous); }
+        else if (event.key === "ArrowRight" && following !== null) { event.preventDefault(); show(following); }
       }}>
-      <div class={`image-viewer-stage${fitted ? "" : " zoomed"}`} ref={stage}
-        onDblClick={(event) => zoomTo(magnificationAfterDoubleClick(shown, fit), event.clientX, event.clientY)}>
-        {room.value.w > 0 && (
-          <img src={src} alt={label} draggable={false}
-            style={{ width: `${Math.round(natural.w * shown)}px`, height: `${Math.round(natural.h * shown)}px` }} />
+      <div class="image-viewer-frame">
+        <div class={`image-viewer-stage${fitted ? "" : " zoomed"}`} ref={stage}
+          onDblClick={(event) => zoomTo(magnificationAfterDoubleClick(shown, fit), event.clientX, event.clientY)}>
+          {room.value.w > 0 && (
+            <img src={src} alt={label} draggable={false}
+              style={{ width: `${Math.round(natural.w * shown)}px`, height: `${Math.round(natural.h * shown)}px` }} />
+          )}
+        </div>
+        {images.length > 1 && previous !== null && (
+          <button type="button" class="image-viewer-arrow previous" aria-label="Previous Image" title="Previous Image (←)"
+            onClick={() => show(previous)}>‹</button>
+        )}
+        {images.length > 1 && following !== null && (
+          <button type="button" class="image-viewer-arrow next" aria-label="Next Image" title="Next Image (→)"
+            onClick={() => show(following)}>›</button>
         )}
       </div>
       <div class="image-viewer-bar">
         <span class="caption quiet small">{label}</span>
+        {counter && <span class="counter quiet small">{counter}</span>}
         <span class="spacer" />
         <button type="button" class="icon" aria-label="Zoom Out" title="Zoom Out (−)" disabled={shown <= fit + 0.001}
           onClick={() => zoomTo(stepMagnification(shown, fit, -1))}>−</button>

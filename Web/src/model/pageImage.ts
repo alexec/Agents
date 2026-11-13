@@ -151,3 +151,31 @@ export function magnificationAfterWheel(level: number, fit: number, deltaY: numb
   if (!Number.isFinite(deltaY)) return clampMagnification(level, fit);
   return clampMagnification(level * Math.exp(-deltaY * (pinch ? 0.01 : 0.002)), fit);
 }
+
+/**
+ * The least an image's longer side is, in CSS pixels, to open large and be in the viewer's sequence
+ * (#4954), as `ImageSequence.least` on the Mac and the Remote: a logo, a badge or an icon is smaller.
+ */
+export const sequenceLeast = 200;
+
+/** Whether an image of this size opens large and is in the viewer's sequence (#4954). */
+export function opensLarge(w: number, h: number): boolean {
+  return Math.max(w, h) >= sequenceLeast;
+}
+
+/** The image after (`by` 1) or before (`by` -1) the one at `index`, or null at an end (#4954). */
+export function sequenceStep(index: number, count: number, by: 1 | -1): number | null {
+  const next = index + by;
+  return index >= 0 && index < count && next >= 0 && next < count ? next : null;
+}
+
+/** "2 of 5", or null when there is only the one image (#4954). */
+export function sequenceCounter(index: number, count: number): string | null {
+  return count > 1 ? `${index + 1} of ${count}` : null;
+}
+
+/** Whether a one-finger drag on a fitted image is a swipe to the next (1) or the previous (-1) image. */
+export function swipeStep(dx: number, dy: number): 1 | -1 | null {
+  if (Math.abs(dx) < 80 || Math.abs(dx) <= Math.abs(dy)) return null;
+  return dx < 0 ? 1 : -1;
+}
