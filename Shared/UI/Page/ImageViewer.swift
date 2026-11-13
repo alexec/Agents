@@ -95,7 +95,7 @@ struct ImageViewer: View {
     private func arrow(_ target: Int?, icon: String, name: String, key: String) -> some View {
         Button { show(target) } label: {
             Image(icon: icon)
-                .font(.title3.weight(.semibold))
+                .appText(.reading).fontWeight(.semibold)
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
                 .background(Self.arrowFill, in: Circle())
