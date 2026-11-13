@@ -236,6 +236,9 @@ function storedTurnOf(summary: TurnSummary): ChatTurn {
  * The reducer: what each notification does to what is held. Kept apart from the link so the
  * fixtures can drive it, as `AgentsModel` is driven in Swift.
  */
+/** A usage figure whose read a page dates (#5144): Cost, the charts, Time, Velocity and the Multiplier. */
+export type UsageRead = "cost" | "usage" | "time" | "velocity" | "multiplier";
+
 export class Work {
   readonly hosts = signal<ControlMachine[]>([]);
   readonly folders = signal<ByHost<FolderSummary>>({});
@@ -506,6 +509,13 @@ export class Work {
   /** Each host's Multiplier (#3990), from multiplier/state and replaced whole by each multiplier/changed. With a
    * control plane the host counts all the person's machines (#3903), so the page asks only the Mac's. */
   readonly multiplier = signal<Record<string, Multiplier>>({});
+  /** When this page last read each host's usage (#5144), for the pages' "Last update" line. */
+  readonly usageReadAt = signal<Record<string, Partial<Record<UsageRead, number>>>>({});
+
+  /** Keeps the time of a read of one of a host's usage figures (#5144). */
+  protected usageRead(host: string, what: UsageRead): void {
+    this.usageReadAt.value = { ...this.usageReadAt.value, [host]: { ...this.usageReadAt.value[host], [what]: Date.now() } };
+  }
   /**
    * The control plane's machine, its home host, and how this Mac's host says its join stands
    * (#666), from `control/status`.
@@ -862,6 +872,7 @@ export class Work {
         return true;
       case "multiplier/changed":
         this.multiplier.value = { ...this.multiplier.value, [host]: params as Multiplier };
+        this.usageRead(host, "multiplier");
         return true;
       case "preferences/changed":
         if (this.isMac(host)) preferencesSaid(params as Record<string, JSONValue>);
@@ -2213,6 +2224,7 @@ export class Store extends Work {
       this.resuming.value = without(this.resuming.value);
       this.events.value = without(this.events.value);
       this.costs.value = without(this.costs.value);
+      this.usageReadAt.value = without(this.usageReadAt.value);
       this.disk.value = without(this.disk.value);
       this.storeNotes.value = without(this.storeNotes.value);
     });
@@ -2348,7 +2360,7 @@ export class Store extends Work {
       .catch(failed("achievements/state"));
     // A host from before #3903 doesn't know it: the Multiplier page shows — ×.
     void this.link.call("multiplier/state", {}, host)
-      .then((state) => { this.multiplier.value = { ...this.multiplier.value, [host]: state }; })
+      .then((state) => { this.multiplier.value = { ...this.multiplier.value, [host]: state }; this.usageRead(host, "multiplier"); })
       .catch(failed("multiplier/state"));
     const [permissions, elicitations] = await Promise.all([
       this.link.call("permissions/pending", {}, host).catch(failed("permissions/pending")),
@@ -4761,25 +4773,25 @@ export class Store extends Work {
 
   async loadCost(host: string): Promise<void> {
     const state = await this.link.call("cost/state", {}, host).catch(() => null);
-    if (state) this.costs.value = { ...this.costs.value, [host]: state };
+    if (state) { this.costs.value = { ...this.costs.value, [host]: state }; this.usageRead(host, "cost"); }
   }
 
   /** A host too old to know the method leaves the charts out. */
   async loadUsage(host: string): Promise<void> {
     const history = await this.link.call("usage/history", {}, host).catch(() => null);
-    if (history) this.usage.value = { ...this.usage.value, [host]: history };
+    if (history) { this.usage.value = { ...this.usage.value, [host]: history }; this.usageRead(host, "usage"); }
   }
 
   /** A host too old to know the method leaves the Time page loading. */
   async loadTime(host: string): Promise<void> {
     const history = await this.link.call("time/history", {}, host).catch(() => null);
-    if (history) this.time.value = { ...this.time.value, [host]: history };
+    if (history) { this.time.value = { ...this.time.value, [host]: history }; this.usageRead(host, "time"); }
   }
 
   /** A host too old to know the method leaves the Velocity page loading. */
   async loadVelocity(host: string): Promise<void> {
     const history = await this.link.call("velocity/history", {}, host).catch(() => null);
-    if (history) this.velocity.value = { ...this.velocity.value, [host]: history };
+    if (history) { this.velocity.value = { ...this.velocity.value, [host]: history }; this.usageRead(host, "velocity"); }
   }
 }
 

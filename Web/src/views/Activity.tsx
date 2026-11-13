@@ -34,6 +34,8 @@ import { velocityHere } from "../model/velocity";
 import { TimeCharts } from "./TimeCharts";
 import { VelocityCharts } from "./VelocityCharts";
 import { pageHost } from "./Multiplier";
+import { LastUpdate } from "./LastUpdate";
+import { oldestRead } from "../model/lastUpdate";
 import { Capability } from "../protocol/capabilities.generated";
 import { OrgBudget, OrgPolicyLine, PassThroughList } from "./OrgPolicyLine";
 import { PageTitle } from "./TopBar";
@@ -360,6 +362,11 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
       </header>
       <div class="scroll">
         <div class="activity-body">
+          {/* How old the usage figures are (#5144): the oldest read of the page's parts. */}
+          {(() => {
+            const at = usageReadAt(store, page, costPane.value);
+            return at !== undefined && <p class="page-fresh"><LastUpdate at={at} /></p>;
+          })()}
           {page === "events" && (
             <div class="tabs events-panes" role="tablist" aria-label="Show">
               {(["events", "audit"] as const).map((p) => (
@@ -434,6 +441,24 @@ export function ActivityPageView({ store, page }: { store: Store; page: Activity
       </div>
     </section>
   );
+}
+
+/**
+ * When the usage page last read what it shows (#5144), the oldest of its parts: Cost and Tokens
+ * each machine's day and the charts; Time every chart host's; Velocity the Mac's. Undefined for
+ * the other pages, and for Cost's Reports, which says its own.
+ */
+function usageReadAt(store: Store, page: ActivityPage, costPane: "cost" | "reports"): number | undefined {
+  const reads = store.usageReadAt.value;
+  if (page === "spending" && costPane === "reports") return undefined;
+  if (page === "spending" || page === "tokens") {
+    const parts = [oldestRead(reads, Object.keys(store.costs.value), ["cost"]), oldestRead(reads, chartHosts(store), ["usage"])]
+      .filter((at): at is number => at !== undefined);
+    return parts.length > 0 ? Math.min(...parts) : undefined;
+  }
+  if (page === "time") return oldestRead(reads, chartHosts(store), ["time"]);
+  if (page === "velocity") { const host = pageHost(store); return host ? oldestRead(reads, [host], ["velocity"]) : undefined; }
+  return undefined;
 }
 
 /**

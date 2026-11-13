@@ -589,7 +589,7 @@ struct RemoteMultiplierPage: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
-        MultiplierPage(multiplier: model.work.multiplier, achievements: model.work.achievements,
+        MultiplierPage(multiplier: model.work.multiplier, read: model.work.multiplierReadAt, achievements: model.work.achievements,
                        agentsWorking: model.agentsWorking, refresh: { await model.refreshMultiplier() })
             .navigationTitle("Multiplier")
             .toolbarTitleDisplayMode(.inline)
