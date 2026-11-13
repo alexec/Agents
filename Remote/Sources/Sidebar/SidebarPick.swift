@@ -22,10 +22,12 @@ private struct PaperPick: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            // The cell still says "selected" with an increased background prominence, which
-            // draws .primary and the tints white, for the accent fill this replaces. On the
-            // selection grey the words stay ink and the marks keep their colour.
+            // The cell still says "selected" for the accent fill this replaces: an increased
+            // background prominence draws the tints white, and the cell's own style draws
+            // plain text white. On the selection grey the words are ink and the marks keep
+            // their colour.
             .environment(\.backgroundProminence, .standard)
+            .foregroundStyle(pick == item ? AnyShapeStyle(Paper.ink) : AnyShapeStyle(.primary))
             .listRowBackground(Group {
                 if pick == item { PaperSelectionRow() } else { Color.clear }
             })
