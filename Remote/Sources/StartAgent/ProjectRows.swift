@@ -82,6 +82,6 @@ struct ProjectRows: View {
 
     @ViewBuilder
     private func choiceLabel(_ title: String, chosen: Bool) -> some View {
-        if chosen { Label(title, systemImage: "checkmark") } else { Text(title) }
+        if chosen { Label(title, icon: "checkmark") } else { Text(title) }
     }
 }

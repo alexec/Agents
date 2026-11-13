@@ -14,7 +14,7 @@ struct WebDistManifestTests {
     static let repo = webDistRepo
 
     /// The same inputs `Web/build.mjs` hashes. Keep the two in step.
-    static let fixedInputs = ["index.html", "sandbox.html", "build.mjs", "tsconfig.json", "package.json", "package-lock.json", ".node-version"]
+    static let fixedInputs = ["index.html", "sandbox.html", "build.mjs", "lucide.mjs", "tsconfig.json", "package.json", "package-lock.json", ".node-version"]
     static let inputFolders = ["src", "assets"]
 
     @Test func theBuiltWebRemoteMatchesItsSource() throws {

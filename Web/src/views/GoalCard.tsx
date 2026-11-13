@@ -5,6 +5,7 @@
 import { useSignal } from "@preact/signals";
 import type { Agent } from "../protocol/generated";
 import { goalBudgetFraction, goalIsStopped, goalProgress, goalStatusWord, goalSummary } from "../model/goal";
+import { Icon } from "./Icon";
 
 export function GoalCard({ agent }: { agent: Agent | undefined }) {
   const open = useSignal(false);
@@ -18,10 +19,10 @@ export function GoalCard({ agent }: { agent: Agent | undefined }) {
         <button class={`plan-summary${open.value ? " open" : ""}`} aria-expanded={open.value} aria-label={goalSummary(goal)}
           onClick={() => (open.value = !open.value)}>
           <span class="plan-line">
-            <span class="plan-icon" aria-hidden="true">{goal.status === "complete" ? "✓" : "◎"}</span>
+            <Icon name={goal.status === "complete" ? "circle-check" : "target"} class="plan-icon" />
             <span class="plan-step">{goal.objective}</span>
             <span class="plan-count">{goalStatusWord(goal)}</span>
-            <span class="chevron" aria-hidden="true">{open.value ? "▾" : "▸"}</span>
+            <Icon name={open.value ? "chevron-down" : "chevron-right"} class="chevron" />
           </span>
           {goal.reason !== undefined && (goalIsStopped(goal) || open.value) && <span class="goal-reason">{goal.reason}</span>}
           {open.value && progress && <span class="goal-progress">{progress}</span>}

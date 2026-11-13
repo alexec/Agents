@@ -165,7 +165,7 @@ struct FormPages: View {
                         ticks: Bool = false, choose: @escaping () -> Void) -> some View {
         let label = HStack(spacing: 8) {
             if ticks {
-                Image(systemName: chosen ? "checkmark.circle.fill" : "circle")
+                Image(icon: chosen ? "checkmark.circle.fill" : "circle")
                     .accessibilityHidden(true)
             }
             AnswerLabel(title: title, note: description)
@@ -217,7 +217,7 @@ struct FormPages: View {
                     Button {
                         step = page - 1
                     } label: {
-                        Image(systemName: "chevron.backward")
+                        Image(icon: "chevron.backward")
                             .frame(minHeight: 22)
                     }
                     .buttonStyle(.paper)

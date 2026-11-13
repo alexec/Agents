@@ -110,7 +110,7 @@ struct Waiting: View {
         } else if model.isStale {
             ContentUnavailableView {
                 // The control plane, by where it runs (#4916): the Mac, or its address.
-                Label(model.controlPlaneReach.title, systemImage: "wifi.slash")
+                Label(model.controlPlaneReach.title, icon: "wifi.slash")
             } description: {
                 Text(model.controlPlaneReach.detail)
             } actions: {

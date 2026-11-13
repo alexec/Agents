@@ -374,7 +374,7 @@ struct RemoteView: View {
                         Button {
                             showsFolderTerminal = true
                         } label: {
-                            Label("Folder Terminal", systemImage: "apple.terminal")
+                            Label("Folder Terminal", icon: "apple.terminal")
                         }
                         .keyboardShortcut("`", modifiers: .control)
                     }

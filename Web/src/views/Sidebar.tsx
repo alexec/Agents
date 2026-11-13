@@ -68,6 +68,7 @@ import { memo } from "../render/memo";
 import { ask } from "./MessageKinds";
 import { laterRequestOf, useListKeys } from "./ListKeys";
 import { laterTime, listKeyGlyph } from "../model/listKeys";
+import { Glyph, Icon, type IconName } from "./Icon";
 
 
 /** Folder Settings asked for another folder of the project, from Project Settings' Folders (#3280). */
@@ -291,8 +292,8 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         )}
         {/* Every person's running agents for an admin, and every project (#2141): pages in the chat's place. */}
         {!held && <section class="agents-pages" aria-label="More">
-          {adminOf(store) === true && <AgentsPageRow id="live" title="Live Now" icon={"◉"} />}
-          <AgentsPageRow id="projects" title="Projects" icon={"▦"} />
+          {adminOf(store) === true && <AgentsPageRow id="live" title="Live Now" icon="radio" />}
+          <AgentsPageRow id="projects" title="Projects" icon="layout-grid" />
         </section>}
       </div>
       {/* What the hosts and this browser are doing, pinned at the foot: status lines rather than
@@ -310,7 +311,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
         ))}
         {offline.filter((host) => !store.isMac(host.id)).map((host) => (
           <p class="foot-line" role="status" key={host.id}>
-            <span aria-hidden="true">⚡︎</span> {footLine(host)}
+            <Icon name="plug" /> {footLine(host)}
             {/* One on a stopped workspace offers Start, as its strip (#961). */}
             {host.workspace && offersStart(host.state, host.workspace) ? (
               <button type="button" class="foot-start" disabled={store.hostsBeingStarted.value.includes(host.id)}
@@ -322,7 +323,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
             may have gone from view, and that what they held is kept. A server's are named. */}
         {store.hosts.value.flatMap((host) => (store.storeNotes.value[host.id] ?? []).map((note) => (
           <p class="foot-line store-note" role="status" key={`${host.id}|${note}`}>
-            <span aria-hidden="true">⚠︎</span> {store.isMac(host.id) ? note : `${host.name}: ${note}`}
+            <Icon name="triangle-alert" /> {store.isMac(host.id) ? note : `${host.name}: ${note}`}
           </p>
         )))}
         <div class="identity">
@@ -366,7 +367,7 @@ function SummaryRow({ store }: { store: Store }) {
     <button class={`row activity-row summary-row${chosen ? " chosen" : ""}${newest?.unread ? " unread" : ""}`}
       aria-current={chosen} title="Your daily summary: what landed, what failed and what waits on you"
       onClick={() => go({ nav: "agents", section: "summary" })}>
-      <span class="activity-icon" aria-hidden="true">{"☀"}</span>
+      <Icon name="sun" class="activity-icon" />
       <span class="title">Summary{newest?.unread && <span class="dot" aria-label="Unread" />}</span>
       <span class="small quiet line">{newest?.title ?? nonePage}</span>
     </button>
@@ -374,11 +375,11 @@ function SummaryRow({ store }: { store: Store }) {
 }
 
 /** A row at the sidebar's foot that opens one of Agents' pages in the chat's place. */
-function AgentsPageRow({ id, title, icon }: { id: string; title: string; icon: string }) {
+function AgentsPageRow({ id, title, icon }: { id: string; title: string; icon: IconName }) {
   const chosen = route.value.nav === "agents" && route.value.section === id;
   return (
     <button class={`row activity-row${chosen ? " chosen" : ""}`} aria-current={chosen} onClick={() => go({ nav: "agents", section: id })}>
-      <span class="activity-icon" aria-hidden="true">{icon}</span>
+      <Icon name={icon} class="activity-icon" />
       <span class="title">{title}</span>
     </button>
   );
@@ -469,7 +470,7 @@ function NewSessionTopRow({ store, folders, linkDown }: { store: Store; folders:
       <div class={`row new-session${chosen ? " chosen" : ""}`}>
         <button class="pick" aria-current={chosen} disabled={linkDown || !target || !store.hostIsOnline(target.host)}
           onClick={() => target && go({ host: target.host, folder: target.folder, compose: true })}>
-          <span class="pin-mark" aria-hidden="true">✎</span>
+          <Icon name="square-pen" class="pin-mark" />
           <span class="title">New Session</span>
         </button>
       </div>
@@ -785,7 +786,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
       <div class={`row page-row${here && r.archive === page ? " chosen" : ""}`}>
         <button class="pick" aria-current={here && r.archive === page} aria-label={`${title}, ${count}`}
           title={count} onClick={() => go({ host: host.id, folder: folder, archive: page })}>
-          <span class="pin-mark" aria-hidden="true">{mark}</span>
+          <Glyph of={mark} class="pin-mark" />
           <span class="title">{title}</span>
         </button>
       </div>
@@ -885,7 +886,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
       ) : (
       <div class={`row folder${drop.targeted ? " drop-target" : ""}`} {...drop.props}>
         <button class="disclosure" aria-label={unfolded ? `Fold ${label}` : `Unfold ${label}`} aria-expanded={unfolded}
-          tabIndex={-1} disabled={searching} onClick={() => fold(!unfolded)}>{unfolded ? "⌄" : "›"}</button>
+          tabIndex={-1} disabled={searching} onClick={() => fold(!unfolded)}><Icon name={unfolded ? "chevron-down" : "chevron-right"} /></button>
         <button class="pick" aria-expanded={unfolded} data-fold="folder" title={folderPath(folder)}
           onClick={(e) => {
             // The row folds or unfolds, and nothing else (#375): a session starts from New Session
@@ -969,7 +970,7 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
             <div class={`row page-row${connectorsHere && r.mcp ? " chosen" : ""}`}>
               <button class="pick" aria-current={connectorsHere && !!r.mcp} aria-label={`Connectors, ${mcpTally || endedConnection ? connectorsWords : "none yet"}`}
                 title={connectorsWords} onClick={() => go({ host: connectorsHost, folder: connectorsFolder, mcp: true })}>
-                <span class={`pin-mark${mcpTally?.failing || endedConnection ? " warns" : ""}`} aria-hidden="true">▤</span>
+                <Icon name="plug" class={`pin-mark${mcpTally?.failing || endedConnection ? " warns" : ""}`} />
                 <span class="title">Connectors{mcpServers.length > 0 && <span class="count">{mcpServers.length}</span>}</span>
               </button>
             </div>
@@ -1110,7 +1111,7 @@ export const SidebarSession = memo(function SidebarSession({ store, host, folder
           aria-label={tree.isUnfolded ? `Hide ${tree.children} started sessions` : `Show ${tree.children} started sessions`}
           title={tree.isUnfolded ? "Hide the sessions it started" : `Show the ${tree.children} sessions it started`}
           onClick={() => folds.setSession(agent.id, !tree.isUnfolded)}>
-          {tree.children}<span class={`chevron${tree.isUnfolded ? " open" : ""}`} aria-hidden="true">›</span>
+          {tree.children}<Icon name="chevron-right" class={`chevron${tree.isUnfolded ? " open" : ""}`} />
         </button>
       )}
     </div>

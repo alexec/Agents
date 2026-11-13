@@ -29,7 +29,7 @@ struct WorkflowPage: View {
                 content(summary)
             } else {
                 ContentUnavailableView("This workflow is no longer there",
-                                       systemImage: "clock.badge.questionmark",
+                                       icon: "clock.badge.questionmark",
                                        description: Text("Its file has been removed or renamed."))
                     .padding(.top, 60)
             }
@@ -140,7 +140,7 @@ struct WorkflowPage: View {
 
     private func statusRow(_ line: WorkflowStatusLine) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: line.symbol)
+            Image(icon: line.symbol)
                 .appText(.reading)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 3) {
@@ -244,7 +244,7 @@ struct WorkflowPage: View {
                     model.openWorkflow = nil
                 }
             } label: {
-                Label("Archive", systemImage: "archivebox")
+                Label("Archive", icon: "archivebox")
             }
             .disabled(model.isStale)
         }

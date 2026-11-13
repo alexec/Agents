@@ -151,7 +151,7 @@ struct FilesPane: View {
                     state.openFile = nil
                     state.openLine = nil
                 } label: {
-                    Label("Back", systemImage: "chevron.left").labelStyle(.iconOnly)
+                    Label("Back", icon: "chevron.left").labelStyle(.iconOnly)
                 }
                 .accessibilityHint("Back to the folder")
             } else if isTree {
@@ -161,14 +161,14 @@ struct FilesPane: View {
                     Button {
                         state.folder = nil
                     } label: {
-                        Label("The agent's folder", systemImage: "house").labelStyle(.iconOnly)
+                        Label("The agent's folder", icon: "house").labelStyle(.iconOnly)
                     }
                 }
             } else if !isAtTop {
                 Button {
                     state.folder = folder.deletingLastPathComponent()
                 } label: {
-                    Label("Up", systemImage: "chevron.up").labelStyle(.iconOnly)
+                    Label("Up", icon: "chevron.up").labelStyle(.iconOnly)
                 }
                 .accessibilityHint("Up one folder")
             }
@@ -205,7 +205,7 @@ struct FilesPane: View {
                                  set: { allowed in
                                      if allowed { state.scriptsAllowed.insert(url.path) } else { state.scriptsAllowed.remove(url.path) }
                                  })) {
-                Label("Allow scripts", systemImage: "curlybraces")
+                Label("Allow scripts", icon: "curlybraces")
                     .labelStyle(.iconOnly)
             }
             .toggleStyle(.button)
@@ -419,7 +419,7 @@ struct FilesPane: View {
             }
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: entry.isDirectory ? "folder" : "doc")
+                Image(icon: entry.isDirectory ? "folder" : "doc")
                     .foregroundStyle(Paper.secondary)
                     .frame(width: 20)
                     .accessibilityHidden(true)
@@ -428,7 +428,7 @@ struct FilesPane: View {
                     .truncationMode(.middle)
                 Spacer(minLength: 8)
                 if let changed {
-                    Image(systemName: ChangeTint.symbol(changed.state))
+                    Image(icon: ChangeTint.symbol(changed.state))
                         .foregroundStyle(ChangeTint.color(changed.state))
                         .accessibilityLabel(ChangeWords.status(changed.state))
                     if let added = changed.added, let removed = changed.removed {
@@ -444,7 +444,7 @@ struct FilesPane: View {
                         .accessibilityLabel("Changed by the agent")
                 }
                 if entry.isDirectory {
-                    Image(systemName: "chevron.right").appText(.fine).foregroundStyle(Paper.tertiary)
+                    Image(icon: "chevron.right").appText(.fine).foregroundStyle(Paper.tertiary)
                 }
             }
             .contentShape(Rectangle())
@@ -754,7 +754,7 @@ private struct Said: View {
 
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: symbol)
+            Image(icon: symbol)
                 .appText(.title)
                 .foregroundStyle(Paper.tertiary)
                 .accessibilityHidden(true)

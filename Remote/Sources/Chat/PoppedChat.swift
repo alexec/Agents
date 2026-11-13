@@ -107,7 +107,7 @@ struct PoppedChatScene: View {
                     // Not looked for: its host did not answer, so it is not called deleted (#2743).
                     SessionNotLoadedPage(failure: failure) { await model.loadTranscript(of: chat) }
                 } else if id == nil {
-                    ContentUnavailableView("No session", systemImage: "bubble.left.and.bubble.right",
+                    ContentUnavailableView("No session", icon: "bubble.left.and.bubble.right",
                                            description: Text("Drag a session out of the sidebar to open it here."))
                 } else {
                     // On its way: said only after 300 ms, as a network wait (#4795).
@@ -148,7 +148,7 @@ struct OpenInNewWindowButton: View {
 
     var body: some View {
         if supportsMultipleWindows {
-            Button("Open in New Window", systemImage: "macwindow.badge.plus") {
+            Button("Open in New Window", icon: "macwindow.badge.plus") {
                 openWindow(id: PoppedChat.sceneID, value: agent.id)
             }
         }

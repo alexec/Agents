@@ -9,6 +9,7 @@ import { nothingToAdjust } from "../model/promptWords";
 import { line } from "../model/orgPolicy";
 import { optionLabel } from "./OrgPolicyLine";
 import { asksFirst, bypassConfirm, cellLine, customWords, fieldWords, followsSettings, levelMeaning, levelWords, levelsOf, ownWords } from "../model/levels";
+import { Icon } from "./Icon";
 
 type Mode = ClientPermissionSettings["cursor"];
 
@@ -49,7 +50,7 @@ export function LevelSelect({ field, levels, own, value, onChange, disabled }: {
     <details class="level-select model-effort" onToggle={(e) => {
       if (!(e.currentTarget as HTMLDetailsElement).open) setConfirming(undefined);
     }}>
-      <summary class="pill" aria-label={`${fieldWords[field]}: ${title}`} aria-disabled={disabled}>{title} <span aria-hidden="true">▾</span></summary>
+      <summary class="pill" aria-label={`${fieldWords[field]}: ${title}`} aria-disabled={disabled}>{title} <Icon name="chevron-down" /></summary>
       <div class="model-effort-menu" role="group" aria-label={fieldWords[field]}>
         {confirming ? (
           <div class="client-permission-confirm" role="alertdialog" aria-label={bypassConfirm.title}>
@@ -79,7 +80,7 @@ export function LevelSelect({ field, levels, own, value, onChange, disabled }: {
                 levels.choose(field, level);
                 close(e);
               }}>
-              <span class="client-permission-title"><span aria-hidden="true">{chosen === level ? "✓" : " "}</span>
+              <span class="client-permission-title"><span class="tick" aria-hidden="true">{chosen === level && <Icon name="check" />}</span>
                 {levelWords(field, level)}</span>
               <span class="quiet small">{line}</span>
             </button>
@@ -203,7 +204,7 @@ function ClientPermissionControl({ runtime, own, settings, onChange, disabled }:
       {/* The value alone, as every pill says (#2658); the menu's header names the field. */}
       <summary class="pill" title={`${fieldWords.permissionRequests}. ${scope}`}
         aria-label={`${runtime} permission requests: ${title(mode)}`} aria-disabled={disabled}>
-        {title(mode)} <span aria-hidden="true">▾</span>
+        {title(mode)} <Icon name="chevron-down" />
       </summary>
       <div class="client-permission-menu" role="group" aria-label={`${runtime} permission requests`}>
         {confirming ? (
@@ -230,7 +231,7 @@ function ClientPermissionControl({ runtime, own, settings, onChange, disabled }:
                 pick(choice);
                 close();
               }}>
-              <span class="client-permission-title"><span aria-hidden="true">{mode === choice ? "✓" : " "}</span>
+              <span class="client-permission-title"><span class="tick" aria-hidden="true">{mode === choice && <Icon name="check" />}</span>
                 {title(choice)}{own === undefined && choice === settings ? <span class="quiet"> {followsSettings}</span> : null}</span>
               <span class="quiet small">{description(choice)}</span>
             </button>

@@ -30,6 +30,16 @@ body {
   background: var(--paper-selection);
 }
 
+/* Paper v2's icons (#4996; src/views/Icon.tsx): Lucide at a 1.5 stroke, about the size of the text
+   around it (16 in a row of 13px text, 18 in a control) and in its colour, on the text's line. */
+svg.lucide {
+  display: inline-block;
+  flex: none;
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.25em;
+}
+
 button {
   font: inherit;
   color: inherit;
@@ -988,7 +998,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .client-permission-choice:hover, .client-permission-choice[aria-pressed=true] { background: var(--paper-selection); }
 .client-permission-choice:disabled { opacity: 0.55; cursor: default; }
 .client-permission-title { display: flex; gap: 7px; align-items: baseline; }
-.client-permission-title > span { width: 10px; }
+.client-permission-title > span { width: 1.15em; }
 .client-permission-menu > p { margin: 5px 8px 3px; }
 .client-permission-confirm { padding: 4px 8px; }
 .client-permission-confirm > p { margin: 0 0 6px; }

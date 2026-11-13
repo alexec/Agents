@@ -19,6 +19,7 @@ import { routeHash } from "../route";
 import { isMenuKey, openContextMenu } from "./ContextMenu";
 import { pathOf, setPane } from "./files/paneState";
 import { ago } from "./SessionRow";
+import { Icon, type IconName } from "./Icon";
 
 /**
  * The address of a tab landing straight on this file under Files (#3034): Open in New
@@ -115,7 +116,7 @@ export function Exchanged({ store, host, session }: { store: Store; host: string
                   onKeyDown={(event) => {
                     if (isMenuKey(event)) openContextMenu(event, menuItems);
                   }}>
-                  <span class="title">{mark(destination.kind)} {artifact.name}</span>
+                  <span class="title"><Icon name={mark(destination.kind)} /> {artifact.name}</span>
                   <span class="subtitle">
                     {ago(fromWireDate(artifact.arrivedAt))}
                     {artifact.mimeType ? ` · ${artifact.mimeType}` : ""}
@@ -177,11 +178,11 @@ function Empty() {
   );
 }
 
-function mark(kind: ReturnType<typeof destinationOf>["kind"]): string {
+function mark(kind: ReturnType<typeof destinationOf>["kind"]): IconName {
   switch (kind) {
-    case "web": return "🌐";
-    case "inPlace": return "📝";
-    case "nowhere": return "❓";
-    case "file": return "📄";
+    case "web": return "globe";
+    case "inPlace": return "file-text";
+    case "nowhere": return "file-question-mark";
+    case "file": return "file";
   }
 }

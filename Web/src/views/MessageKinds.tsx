@@ -8,10 +8,11 @@ import { useEffect, useLayoutEffect, useRef } from "preact/hooks";
 import type { Store } from "../model/store";
 import { undoLabel } from "../model/archiveWords";
 import { alertButton, alertParts, toastMillis, toneGlyph, toneRole, type Tone } from "../model/messageKinds";
+import { Glyph } from "./Icon";
 
 /** The tone's icon: the tint is on the icon only, and it is never colour alone. */
 export function ToneIcon({ tone }: { tone: Tone }) {
-  return <span class={`message-icon tone-${tone}`} aria-hidden="true">{toneGlyph[tone]}</span>;
+  return <span class={`message-icon tone-${tone}`} aria-hidden="true"><Glyph of={toneGlyph[tone]} /></span>;
 }
 
 /**
