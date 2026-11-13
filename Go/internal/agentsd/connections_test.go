@@ -47,13 +47,24 @@ func TestConnectingGitHubWithTheDeviceFlow(t *testing.T) {
 	defer d.Shutdown()
 	file := &connections.File{Path: filepath.Join(t.TempDir(), ".agents-secrets", connections.FileName)}
 	d.connStoreFor = func() (connections.Store, error) { return file, nil }
+	// The poll waits until the test has read the first answer (#4907): a Sleep that returns at
+	// once let a loaded runner connect before connections/sign-in answered, so it said connected.
+	polling := make(chan struct{})
 	d.newDeviceFlow = func(wire.ConnectionProvider) *connections.DeviceFlow {
 		return &connections.DeviceFlow{ClientID: connections.GitHubClientID, Base: gh.URL + "/", API: gh.URL + "/api/",
-			HTTP: gh.Client(), Sleep: func(ctx context.Context, _ time.Duration) error { return ctx.Err() }}
+			HTTP: gh.Client(), Sleep: func(ctx context.Context, _ time.Duration) error {
+				select {
+				case <-polling:
+					return nil
+				case <-ctx.Done():
+					return ctx.Err()
+				}
+			}}
 	}
 
 	var started wire.ConnectionSignIn
 	json.Unmarshal(c.call(t, 1, "connections/sign-in", map[string]any{"provider": "github"}), &started)
+	close(polling)
 	if started.Status != wire.ConnectionSignInStatusWaiting || started.UserCode == nil || *started.UserCode != "ABCD-1234" ||
 		started.Grant != wire.ConnectionSignInGrantDeviceCode ||
 		started.VerificationURL != "https://github.com/login/device" || started.InstallURL == nil ||

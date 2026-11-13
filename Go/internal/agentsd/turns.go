@@ -41,6 +41,10 @@ type live struct {
 	// stopEarly is a stop that came after kick and before the turn began (#3621): turn
 	// ends that turn stopped instead of clearing it.
 	stopEarly bool
+	// kicks counts kick calls, and kicksAtEnd is kicks when the last turn began to end: a
+	// kick between a turn's end and the run loop's return found it running, so the loop
+	// goes on for it rather than leave its message in the queue (#4907).
+	kicks, kicksAtEnd int
 	// prompting is whether the turn's words are with the runtime; a stop before then is
 	// kept in stopped, and the turn ends there instead of sending them.
 	prompting, stopped bool
@@ -467,6 +471,7 @@ func (d *Daemon) hasTurn(a *wire.Agent) bool {
 func (l *live) kick() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	l.kicks++
 	if !l.running {
 		l.stopEarly = false
 		l.running = l.d.goAfterTurn("agent "+string(l.id), l.run)
@@ -562,6 +567,13 @@ func (l *live) run() {
 		}
 		if !drain {
 			l.mu.Lock()
+			if l.kicks != l.kicksAtEnd {
+				// Something was queued as the turn ended: it is looked at again, held or sent,
+				// once for each such kick (a turn that returns before it ends sets no new mark).
+				l.kicksAtEnd = l.kicks
+				l.mu.Unlock()
+				continue
+			}
 			l.running = false
 			l.mu.Unlock()
 			return
@@ -962,6 +974,7 @@ func (d *Daemon) end(l *live, s wire.AgentState, why wire.EndedReason) {
 	l.mu.Lock()
 	last, reported, showedFile, held := l.lastMessage.String(), l.reported, l.showedFile, l.heldBlock
 	l.heldBlock = nil
+	l.kicksAtEnd = l.kicks
 	l.mu.Unlock()
 	d.noteDocLinks(l.id, last)
 	// The report says the last message as the transcript does: whole, so a token in it,
