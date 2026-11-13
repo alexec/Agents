@@ -1165,7 +1165,10 @@ private struct NewMachineRow: View {
                     .sidebarMark(Paper.accent)
                     .frame(width: 16)
                     .accessibilityHidden(true)
+                // Primary ink: a row with no tag in the sidebar's list draws grey, as if disabled.
                 Text("New Machine")
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
                 Spacer(minLength: 0)
             }
             .contentShape(Rectangle())
