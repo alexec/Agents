@@ -28,7 +28,7 @@ extension AppModel {
     }
 }
 
-/// The achievements this window has shown, in `WindowDefaults` as `GetStartedStore` is.
+/// The achievements this window has shown, in `WindowDefaults`, so a scratch copy keeps its own.
 enum AchievementsSeenStore {
     static var seen: Set<String>? {
         get { WindowDefaults.store.stringArray(forKey: "achievements.seen").map(Set.init) }

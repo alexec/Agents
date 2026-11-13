@@ -54,8 +54,8 @@ plane on this Mac is an option for a person who wants nothing remote.
    - pairs the window with the control plane.
 
    You copy and paste no code.
-2. When it is done, the window shows the session list, with a **Get started** card at the
-   top of the sidebar. Add a folder to start; see [Add a folder](add-a-folder.md).
+2. When it is done, the window shows the session list. Add a folder to start; see
+   [Add a folder](add-a-folder.md).
 
 If macOS asks you to allow Agents in **Login Items**, the window says so and shows
 **Open Login Items**. Click it, turn on **Agents** under **Allow in the Background**, and

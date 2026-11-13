@@ -33,12 +33,6 @@ final class AppModel {
     /// launch, and only for a runtime not already offered on this root.
     var isOfferingInstall = false
     var hasWeighedInstallOffer = false
-    /// The Get started card (#982): nil until weighed at this launch's first full lists,
-    /// then kept on this root. See `AppModel+GetStarted`.
-    var getStartedCard: GetStarted.Card? = GetStartedStore.kept
-    /// An agent has run a turn on this root, once seen: archived agents are not listed,
-    /// and the step stays ticked when the first one is archived.
-    var hasSeenAgentRun = GetStartedStore.ranAgent
     /// The question page shows after the window has paired, until Submit (#5050). Kept on
     /// this root, so a newcomer who quits before Submit sees it again. See `AppModel+FirstBuild`.
     var asksFirstBuild = FirstBuildStore.asking
@@ -3142,7 +3136,6 @@ final class AppModel {
             pruneFolderDefaults(of: .mac, listed: listed)
             hasLoadedFolders = true
             settleFolderSelection()
-            weighGetStarted()
             weighFirstBuild()
         } catch {
             // A list that failed is not worth an alert: the notification that follows
@@ -4877,7 +4870,6 @@ final class AppModel {
                 self.work.notePoint(snapshot.agentChanges, of: .mac)
             }
             self.hasLoadedAgents = true
-            self.weighGetStarted()
             self.weighFirstBuild()
             Perf.sinceLaunch("first-list")
             // Whatever the list already shows was spent before this window opened, so
@@ -5306,10 +5298,7 @@ final class AppModel {
                                                                                    Optional<String>.none,
                                                                                    returning: [RuntimeStatus].self))
         }
-        if listed {
-            weighGetStarted()
-            weighInstallOffer()
-        }
+        if listed { weighInstallOffer() }
     }
 
     /// Install a missing runtime on this Mac (048). Answers at once; the rest arrives on
@@ -5348,8 +5337,10 @@ final class AppModel {
     }
 
     func weighInstallOffer() {
-        // While the Get started card shows, its Install step is the offer (#982).
-        guard !hasWeighedInstallOffer, !runtimes.isEmpty, getStartedCard == .gone else { return }
+        // A newcomer's offer is the plan page's runtime task (#5057): the sheet waits until
+        // the question and plan pages have gone.
+        guard !hasWeighedInstallOffer, !runtimes.isEmpty, !needsFirstRun,
+              !asksFirstBuild, !firstBuildPlanning else { return }
         hasWeighedInstallOffer = true
         let offered = InstallOffer.offered
         if missingRuntimes.contains(where: { !offered.contains($0.id) }) { isOfferingInstall = true }

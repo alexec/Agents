@@ -97,7 +97,7 @@ prompt.
 
 The page loads new figures every minute while it is open. When you have earned every
 milestone, the **Milestones** list is under the Time charts. See
-[The Get started checklist](../reference/get-started-checklist.md).
+[Achievements](../reference/achievements.md).
 
 ## See how much of an allowance is used
 

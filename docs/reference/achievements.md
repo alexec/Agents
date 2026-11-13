@@ -1,52 +1,14 @@
 ---
 diataxis: reference
 devices: [mac, iphone, ipad, web]
-description: Every step of the Get started card and every achievement, when each is ticked, where each shows, and how to hide it.
+description: Every achievement, when each is ticked, where each shows, and how to hide it.
 ---
 
-# The Get started checklist
+# Achievements
 
-Agents has two checklists for a newcomer. The **Get started** card, on the Mac only,
-takes you from a fresh install to your first agent. The **Achievements** list, on every
-client, names the next main things to try. Both tick each item from what is really so,
-never from a box you tick yourself. Thus a tick always means the step is done.
-
-## The Get started card
-
-The card is at the top of the Mac sidebar. Its heading is **Get started**, with a count
-such as **2 of 5**. Each step has a tick or an open circle. A step that is not done shows
-one grey line that says what it is, and a button that does it.
-
-| Step | Ticked when | Button |
-| --- | --- | --- |
-| **Set up Agents on this Mac** | This window is paired with a control plane. Before that, the window shows only its first open, so on the card this step is always ticked. | None |
-| **Install an agent runtime** | A runtime on this Mac is installed and is not known to be signed out. A runtime is known to be signed out only after a call to it is refused. | **Install**: opens the **Install your agents** sheet. |
-| **Add a folder** | The window has a folder. | **Add Folder…** |
-| **Start your first agent** | An agent has run a turn to its end. | **New Agent**: opens the new session page of the folder you last started in, ready to type. It is dimmed until there is a folder. |
-| **Pair a phone or browser** | An iPhone, an iPad or a browser is paired. Another Mac window does not count. This step is optional. | **Pair a Device…** |
-
-While the card shows, the **Install your agents** sheet does not open by itself. The
-card's **Install** button is the way in.
-
-### When the card shows and goes
-
-- It shows on a new set-up, until every step is done.
-- It goes when all five steps are done. Then it does not come back.
-- Someone already set up at the first look never sees it. Set up means the four steps
-  that are not optional are done.
-- The Mac keeps the card's state for each set-up. A scratch copy of the app keeps its
-  own.
-
-### Hide it
-
-Click **×** at the top right of the card (**Dismiss Get started**). The card goes and
-does not come back. The **Install your agents** sheet then does not open by itself
-until the next launch.
-
-The iPhone, iPad and web page have no Get started card. Their checklist is the
-**Achievements** list.
-
-## Achievements
+The **Achievements** list, on every client, names the next main things to try in Agents.
+Each item is ticked from what is really so, never from a box you tick yourself. Thus a
+tick always means the step is done.
 
 An achievement is a first step in Agents. The host awards it the first time you do it, and
 keeps it with its date in `achievements.json`. Every client reads the same file, so they
@@ -62,7 +24,7 @@ all show the same list. The achievements you have not earned yet are the checkli
 | **First pull request landed with nobody watching** | Let an agent open a pull request that merges by itself. |
 | **Five agents working at once** | Have five agents in a turn at the same time. |
 
-### When an achievement is ticked
+## When an achievement is ticked
 
 The host ticks an achievement from the records it already keeps. On its first run it looks
 back, so steps you took before are ticked with their own date.
@@ -80,7 +42,7 @@ In this version, the host does not tick **First phone or browser paired**, **Fir
 question answered away from the Mac** or **First cloud host started**. They stay on the
 list with how to earn them.
 
-### Where the list shows
+## Where the list shows
 
 | Client | Where |
 | --- | --- |
@@ -103,7 +65,7 @@ On the web page, the **Achievements** row shows only while an achievement is sti
 group hides. When you have earned all seven, the row goes and the list moves under the
 charts on the **Time** page. See [See usage, cost and time](../how-to/see-usage-cost-and-time.md).
 
-### When you earn one
+## When you earn one
 
 | Client | What you see |
 | --- | --- |
@@ -116,7 +78,7 @@ charts on the **Time** page. See [See usage, cost and time](../how-to/see-usage-
 it. Agents never sends a notification for an achievement. On the first look from a device or
 a browser, the achievements earned before are not news, so they show no card.
 
-### Hide it
+## Hide it
 
 Click or tap **×** on a card (**Dismiss achievement**) to close it. The list itself has no
 switch to hide it. Its sidebar row goes by itself when you have earned every achievement.

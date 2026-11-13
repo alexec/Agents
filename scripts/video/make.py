@@ -451,10 +451,8 @@ class Video:
             time.sleep(0.6)
 
     def tidy(self):
-        """Puts away a milestone's note and, unless the scene keeps it (GET_STARTED = True),
-        the Get started card, if they are showing."""
-        labels = ("Dismiss milestone",) if getattr(self.scene, "GET_STARTED", False) else ("Dismiss Get started", "Dismiss milestone")
-        for label in labels:
+        """Puts away a milestone's note, if it is showing."""
+        for label in ("Dismiss milestone",):
             if self.walk.call("find", text=label).get("ok"):
                 self.press(label, wait=0)
 

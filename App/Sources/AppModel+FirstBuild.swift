@@ -135,8 +135,8 @@ extension AppModel {
     }
 }
 
-/// The question page and the plan page's state, in `WindowDefaults` as the Get started card's
-/// is, so a scratch copy does not answer the real app's. The session itself is the record:
+/// The question page and the plan page's state, in `WindowDefaults`, so a scratch copy does
+/// not answer the real app's. The session itself is the record:
 /// this keeps only where the window is, and the idea until the agent has it.
 enum FirstBuildStore {
     static var asking: Bool {

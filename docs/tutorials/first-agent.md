@@ -39,20 +39,12 @@ are in it.
    If macOS asks you to allow Agents in **Login Items**, click **Open Login Items**, turn
    Agents on, and come back. Agents continues by itself.
 
-You should see the Agents window, with a **Get started** card at the top of the sidebar.
-It is a checklist from here to your first agent, and each step ticks itself when it is
-done:
+You should see the Agents window.
 
-1. The first step, which pairs this window, is done already.
-2. **Install an agent runtime**: if it is not ticked, click **Install**. A sheet lists every
-   runtime the app knows and whether it is on this Mac. If Claude's row says **Not on this
-   Mac**, click **Install** on it and wait for it to finish. You need none of the others for
-   this tutorial. The same rows are in **Settings ▸ Agent Runtimes**.
-3. **Add a folder**: steps 2 and 3 of this tutorial.
-4. **Start your first agent**: step 4.
-5. **Pair a phone or browser**: optional, and not part of this tutorial.
-
-Click **×** on the card to put it away before you are done; it does not come back.
+If Claude is not on this Mac, open **Settings ▸ Agent Runtimes**. It lists every runtime
+the app knows and whether it is on this Mac. If Claude's row says **Not on this Mac**,
+click **Install** on it and wait for it to finish. You need none of the others for this
+tutorial.
 
 ## 2. Make a folder to work on
 
@@ -112,8 +104,7 @@ git init -q && git add -A && git commit -qm "First version"
 
 ## 3. Add it to Agents
 
-In the Agents window, click **Add Folder…** on the **Get started** card or in the empty
-folder list (once you have folders, it is **File ▸ Add Folder…**), and pick
+In the Agents window, click **Add Folder…** in the empty folder list (once you have folders, it is **File ▸ Add Folder…**), and pick
 `weather-app` in your `Demo` folder.
 
 You should see `weather-app` in the list on the left, and beside it an empty new session:

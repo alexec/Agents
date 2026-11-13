@@ -52,6 +52,7 @@ plugins:
   # A page that moves leaves its old path here, pointing at the new one: old.md: new.md
   - redirects:
       redirect_maps:
+        reference/get-started-checklist.md: reference/achievements.md
         how-to/add-an-mcp-server-by-hand.md: how-to/add-a-connector-by-hand.md
         how-to/add-an-mcp-server-from-the-registry.md: how-to/add-a-connector-from-the-registry.md
         how-to/share-one-copy-of-a-local-mcp-server.md: how-to/share-one-copy-of-a-local-connector.md
@@ -191,7 +192,7 @@ nav:
       - reference/integrations.md
       - reference/sign-in.md
       - reference/ssh-options.md
-      - reference/get-started-checklist.md
+      - reference/achievements.md
       - reference/charts-and-diagrams.md
       - reference/design-system.md
       - reference/remote-gestures.md
