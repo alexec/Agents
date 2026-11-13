@@ -525,20 +525,6 @@ button.link {
 .steps-control:hover { opacity: 1; }
 .steps { display: flex; flex-direction: column; gap: 8px; }
 .run { display: flex; flex-direction: column; gap: 3px; }
-.call-line {
-  display: block;
-  width: 100%;
-  text-align: left;
-  border: none;
-  background: none;
-  padding: 0;
-  margin: 0;
-  opacity: 0.65;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-button.call-line:hover { opacity: 1; }
 .chevron { display: inline-block; width: 12px; opacity: 0.6; }
 .call-detail { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 4px; }
 /* In a turn, code at the window's code step (13, mono) beside the reading text. */
@@ -555,11 +541,6 @@ button.link.reading:hover { text-decoration: underline; }
 .locations { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 0; }
 .locations > * { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .note { display: flex; flex-direction: column; gap: 3px; }
-.sandbox-failure p { margin: 0; }
-.sandbox-failure .answers { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
-/* Stopped by a policy (#2957, FR-025): the rule, the layer, the words, and where to change it. */
-.policy-stop p { margin: 0; }
-.policy-stop .answers { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 /* What a turn changed, and Undo These Changes (#3437). */
 /* An agent driving the Mac's screen (#3004, US4): the latest still, or "Mac is locked", and its last action. */
 .desktop-tile { display: flex; flex-direction: column; gap: 8px; }
@@ -597,8 +578,6 @@ a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underli
   border: 1px solid color-mix(in srgb, var(--tint-warning) 25%, transparent);
   background: color-mix(in srgb, var(--tint-warning) 7%, transparent);
 }
-.report .heading { font-weight: 500; margin: 0; opacity: 0.8; }
-.report .heading.tinted { opacity: 1; }
 .answers {
   background: var(--paper-well);
   border-radius: var(--radius-card);
@@ -617,7 +596,6 @@ a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underli
 .markdown .task-box { opacity: 0.45; }
 .markdown .task-box.done { opacity: 0.65; }
 .message-image { display: block; max-width: min(100%, 480px); max-height: 360px; border-radius: var(--radius-card); margin: 4px 0; }
-.thought > p { white-space: pre-wrap; margin: 6px 0 0; }
 /* A queued prompt: the .bubble's place and shape, dashed and dimmed, its buttons underneath (#95). */
 .queued {
   align-self: flex-end;
@@ -1615,6 +1593,15 @@ dialog.sheet {
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-sheet);
 }
+/* A panel that leaves the page working (#5203): the server runtime's sign-in, in the corner. */
+dialog.sheet.modeless {
+  position: fixed;
+  inset: auto 16px 16px auto;
+  margin: 0;
+  z-index: 20;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
 dialog.sheet::backdrop { background: color-mix(in srgb, var(--paper-scrim) 25%, transparent); }
 /* Project Settings and Folder Settings (#3280): tabs over a grid of a label and its value. */
 dialog.sheet:has(.settings-sheet) { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
@@ -1819,10 +1806,6 @@ button.now-row, button.now-head { cursor: pointer; }
 .now-rows { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--paper-rule); padding-top: 8px; }
 .now-rows .background { margin: 0; }
 .now-foot .working-ring { --well: 16px; opacity: 0.6; }
-/* The plan as it was sent, in the transcript: one line that opens to its steps (#5033). */
-.plan-line-head { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; padding: 0;
-  color: var(--paper-ink); opacity: .68; font: inherit; cursor: pointer; }
-.plan-line-entry .plan-block { margin-top: 6px; }
 .plan .in_progress .content { font-weight: 600; }
 .plan-block.withdrawn .plan .in_progress .content { font-weight: inherit; }
 /* With the working line: what the open agent holds and waits for in line (036, #2344). Untinted. */
@@ -1964,14 +1947,38 @@ button.now-row, button.now-head { cursor: pointer; }
 .time-swatch.person { background: var(--tint-attention); }
 .usage-axis { fill: currentColor; opacity: 0.6; font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
 
+/* The Line (#5036, specs/session-cards/spec.md, family 2): the record of what happened, with no box. A glyph, a bold
+   head, a quiet detail and one action link; a click on the words opens more in place. Red only on a failure's glyph
+   and its main words. Shared/UI/Chat/RecordLine.swift draws the same. */
+.record-line { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.record-line-row { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.record-line-glyph { flex: none; width: 16px; display: inline-flex; justify-content: center; color: var(--paper-secondary); }
+.record-line-glyph .lucide { transform: translateY(2px); }
+.record-line.failure .record-line-glyph { color: var(--tint-failure); }
+.record-line-open { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; flex: 0 1 auto; margin: 0; padding: 0;
+  border: none; background: none; font: inherit; color: inherit; text-align: left; }
+button.record-line-open { cursor: pointer; }
+.record-line-words { min-width: 0; }
+.record-line-words.one-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.record-line-lead { color: var(--paper-ink); }
+.record-line-head { font-weight: 600; color: var(--paper-ink); }
+.record-line.failure .record-line-head, .record-line-detail.failed { color: var(--tint-failure); }
+.record-line-detail { color: var(--paper-secondary); }
+button.record-line-open:hover .record-line-detail:not(.failed) { color: var(--paper-ink); }
+.record-line-chevron { flex: none; font-size: 0.6875rem; color: var(--paper-tertiary); transition: transform 0.15s ease-out; }
+.record-line-chevron.open { transform: rotate(90deg); }
+.record-line-action { flex: none; margin-left: auto; white-space: nowrap; }
+.record-line-more { padding-left: 24px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.record-line-more p { margin: 0; }
+.record-line-more pre { white-space: pre-wrap; margin: 0; }
+.thought .record-line-more > p { white-space: pre-wrap; }
+/* The quiet foot (34) is a Line with no glyph: under the words of the lines above it. */
+.quiet-line { padding-left: 24px; }
 /* What an agent told the person with notify (#2805): Shared/UI/Chat/NotifiedLine.swift. */
-.notice-line { display: flex; gap: 8px; align-items: baseline; border-radius: 6px; margin: -6px; padding: 6px;
+.notice-line { border-radius: 6px; margin: -6px; padding: 6px;
   transition: background-color 0.15s ease-out; }
 /* Gone to from its notification (#2860): lit a moment. */
 .notice-line.lit { background: color-mix(in srgb, var(--accent) 18%, transparent); }
-.notice-bell { opacity: 0.65; }
-.notice-title { margin: 0; font-weight: 600; }
-.notice-body { margin: 2px 0 0; }
 /* The Object card (#5035, specs/session-cards/spec.md, family 3): a thing the agent made, to open. A raised box:
    the preview on the well when there is one, then one row of icon, name and quiet line, ⋯ and ›. At most 360
    wide, but an app view is as wide as the chat. Shared/UI/Chat/ObjectCard.swift draws the same. */
@@ -3005,6 +3012,9 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 .message-icon.tone-neutral { color: var(--paper-secondary); }
 .message-icon.spinner { width: 8px; height: 8px; }
 .message-words { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+/* How old what is shown is (#5141): after a banner's words in its own colour; on its own, ink.secondary at the caption step. */
+.last-update { white-space: nowrap; }
+:not(.message-words) > .last-update { color: var(--paper-secondary); font-size: var(--type-fine); }
 .message-actions { flex: none; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* A banner: inset at the top of its pane, under the toolbar; it comes and goes with a short animation. */
 .message-banner { display: flex; align-items: center; gap: 8px; margin: 8px 12px; padding: 7px 12px; font-size: 0.8125rem;

@@ -3450,6 +3450,547 @@
       ],
       "additionalProperties": false
     },
+    "BuildsBetween": {
+      "type": "object",
+      "description": "A default-branch run of the workflow after a change's last fast run, up to its first slow one (#5177, board 2): whether its run started the job (a run whose paths did not select it did not), and how long the job ran, in seconds.",
+      "properties": {
+        "run": {
+          "$ref": "#/definitions/BuildsRunRef"
+        },
+        "ran": {
+          "type": "boolean"
+        },
+        "jobRun": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "run",
+        "ran"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsChange": {
+      "type": "object",
+      "description": "A change point in one job's run time on the default branch (#5177): the runs either side of the step, the medians of its run time and of its wait (for a runner and its turn) on each side, in seconds, and the score. slower says the run time went up. between is each run in between; points are the job's runs around the change. The finder does not blame: firstSlow is the first run to look at.",
+      "properties": {
+        "workflow": {
+          "type": "string"
+        },
+        "job": {
+          "type": "string"
+        },
+        "slower": {
+          "type": "boolean"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "lastFast": {
+          "$ref": "#/definitions/BuildsRunRef"
+        },
+        "firstSlow": {
+          "$ref": "#/definitions/BuildsRunRef"
+        },
+        "medianBefore": {
+          "type": "number"
+        },
+        "medianAfter": {
+          "type": "number"
+        },
+        "queueBefore": {
+          "type": "number"
+        },
+        "queueAfter": {
+          "type": "number"
+        },
+        "score": {
+          "type": "number"
+        },
+        "runner": {
+          "type": "string"
+        },
+        "between": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsBetween"
+          }
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsPoint"
+          }
+        }
+      },
+      "required": [
+        "workflow",
+        "job",
+        "slower",
+        "at",
+        "lastFast",
+        "firstSlow",
+        "medianBefore",
+        "medianAfter",
+        "queueBefore",
+        "queueAfter",
+        "score",
+        "between",
+        "points"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsDay": {
+      "type": "object",
+      "description": "One day of a build trend (#5177), the day (YYYY-MM-DD) in the request's time zone.",
+      "properties": {
+        "day": {
+          "type": "string"
+        },
+        "figures": {
+          "$ref": "#/definitions/BuildsFigures"
+        }
+      },
+      "required": [
+        "day",
+        "figures"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsFigures": {
+      "type": "object",
+      "description": "A set of CI runs' figures (#5177, spec 5166): runs is the first attempts, green those that passed, reruns the later attempts, counted apart and out of the time figures. Each time figure is of the runs that passed, in seconds: toGreen (made to the last job's end), run (the time a job ran), runner (waiting for a runner) and turn (waiting its turn: made to the first job made); run + runner + turn = toGreen. With a job picked, the job's own run and runner wait.",
+      "properties": {
+        "runs": {
+          "type": "integer"
+        },
+        "green": {
+          "type": "integer"
+        },
+        "reruns": {
+          "type": "integer"
+        },
+        "toGreen": {
+          "$ref": "#/definitions/BuildsStat"
+        },
+        "run": {
+          "$ref": "#/definitions/BuildsStat"
+        },
+        "runner": {
+          "$ref": "#/definitions/BuildsStat"
+        },
+        "turn": {
+          "$ref": "#/definitions/BuildsStat"
+        }
+      },
+      "required": [
+        "runs",
+        "green",
+        "reruns",
+        "toGreen",
+        "run",
+        "runner",
+        "turn"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsHistory": {
+      "type": "object",
+      "description": "builds/history's answer (#5177): the filters' choices in the range (workflows, jobs, branches), the range's figures and each day's, the change points found in the range (on the default branch, whatever the branch filter), and the job that waited longest for a runner. readAt is when this machine last read the forge's runs (Last update); filledFrom is the oldest day the backfill reached, absent before it starts. reader is none when Agents does not read CI timings from the repository's forge.",
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "defaultBranch": {
+          "type": "string"
+        },
+        "reader": {
+          "type": "string",
+          "enum": [
+            "github",
+            "none"
+          ]
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "jobs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "total": {
+          "$ref": "#/definitions/BuildsFigures"
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsDay"
+          }
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsChange"
+          }
+        },
+        "longestRunnerWait": {
+          "$ref": "#/definitions/BuildsRunnerWait"
+        },
+        "readAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "filledFrom": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "repo",
+        "reader",
+        "workflows",
+        "jobs",
+        "branches",
+        "total",
+        "days",
+        "changes"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsHistoryRequest": {
+      "type": "object",
+      "description": "builds/history (#5177): a repository (github:alexec/agents), runs made in [from, to), and the filters: a workflow's file name (ci.yml), a job, and the default branch (no branch and no pullRequests), the pull requests' runs, or one branch. timeZone (an IANA name) says the days; UTC when not said.",
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "from": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "to": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "workflow": {
+          "type": "string"
+        },
+        "job": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "pullRequests": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "repo",
+        "from",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsJob": {
+      "type": "object",
+      "description": "One job of a CI run attempt (#5177): made (waiting for a runner from then), started and ended, in seconds from the run's made time; runner is its first runner label. A forge with no steps has none.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "made": {
+          "type": "number"
+        },
+        "started": {
+          "type": "number"
+        },
+        "ended": {
+          "type": "number"
+        },
+        "conclusion": {
+          "type": "string"
+        },
+        "runner": {
+          "type": "string"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsStep"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "made",
+        "started",
+        "ended",
+        "steps"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsPoint": {
+      "type": "object",
+      "description": "One run of a job around a change (#5177, board 2): its ci-run ref, when it was made, the job's run time and its wait (for a runner and its turn), in seconds.",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "made": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "ran": {
+          "type": "number"
+        },
+        "queue": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "ref",
+        "made",
+        "ran",
+        "queue"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsRun": {
+      "type": "object",
+      "description": "One CI run attempt, with its jobs and their steps (#5177, board 3): times in seconds from made; started is the attempt's start, ended its last job's end, turn its wait for its turn.",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "attempt": {
+          "type": "integer"
+        },
+        "workflow": {
+          "type": "string"
+        },
+        "event": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "headSha": {
+          "type": "string"
+        },
+        "pr": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        },
+        "default": {
+          "type": "boolean"
+        },
+        "tag": {
+          "type": "boolean"
+        },
+        "made": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "started": {
+          "type": "number"
+        },
+        "ended": {
+          "type": "number"
+        },
+        "turn": {
+          "type": "number"
+        },
+        "conclusion": {
+          "type": "string"
+        },
+        "jobs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsJob"
+          }
+        }
+      },
+      "required": [
+        "ref",
+        "id",
+        "attempt",
+        "workflow",
+        "made",
+        "started",
+        "ended",
+        "turn",
+        "jobs"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsRunAnswer": {
+      "type": "object",
+      "description": "builds/run's answer (#5177): the run attempt, and the run to compare it with (the newest passed first attempt of its workflow before it on its branch, or on the default branch when its branch has none). attempts is how many attempts the store has of the run.",
+      "properties": {
+        "run": {
+          "$ref": "#/definitions/BuildsRun"
+        },
+        "before": {
+          "$ref": "#/definitions/BuildsRun"
+        },
+        "attempts": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run",
+        "attempts"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsRunRef": {
+      "type": "object",
+      "description": "A CI run attempt, named (#5177): its ci-run ref (github:run:alexec/agents#123), id, attempt and when it was made; its address, head commit, branch, pull request and conclusion when known.",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "attempt": {
+          "type": "integer"
+        },
+        "made": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "url": {
+          "type": "string"
+        },
+        "headSha": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "pr": {
+          "type": "integer"
+        },
+        "conclusion": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "id",
+        "attempt",
+        "made"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsRunRequest": {
+      "type": "object",
+      "description": "builds/run (#5177): a repository and a run's ci-run ref; its first attempt when attempt is not said.",
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "attempt": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "repo",
+        "ref"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsRunnerWait": {
+      "type": "object",
+      "description": "The job of a range's passed runs that waited longest for a runner (#5177, board 3 note 4): its run, its name, the wait and its run time, in seconds.",
+      "properties": {
+        "run": {
+          "$ref": "#/definitions/BuildsRunRef"
+        },
+        "job": {
+          "type": "string"
+        },
+        "wait": {
+          "type": "number"
+        },
+        "ran": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "run",
+        "job",
+        "wait",
+        "ran"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsStat": {
+      "type": "object",
+      "description": "A median and a 90th percentile of n values, in seconds (#5177); 0 and 0 when n is 0.",
+      "properties": {
+        "median": {
+          "type": "number"
+        },
+        "p90": {
+          "type": "number"
+        },
+        "n": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "median",
+        "p90",
+        "n"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsStep": {
+      "type": "object",
+      "description": "One step of a job (#5177), started and ended in seconds from the run's made time, as the forge says them.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "number": {
+          "type": "integer"
+        },
+        "started": {
+          "type": "number"
+        },
+        "ended": {
+          "type": "number"
+        },
+        "conclusion": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "number",
+        "started",
+        "ended"
+      ],
+      "additionalProperties": false
+    },
     "BusDelivery": {
       "type": "object",
       "description": "bus/deliver (#4729): one event on the bus that matched subscriptions of this machine, and which ones. Best effort: usually once, sometimes never, rarely twice.",

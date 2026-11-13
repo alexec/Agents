@@ -84,6 +84,16 @@ struct AgentsApp: App {
         }
         .defaultSize(width: 1_024, height: 768)
 
+        // A server runtime's sign-in (#4698) in a window of its own (#5203), so the person
+        // works on in the others while it waits on the browser. One per machine and runtime;
+        // not restored at launch, where it would start a sign-in nobody asked for.
+        WindowGroup(id: ServerSignInScene.id, for: ServerSignInKey.self) { $key in
+            ServerSignInWindow(key: key)
+                .environment(model)
+        }
+        .windowResizability(.contentSize)
+        .restorationBehavior(.disabled)
+
         // The app's first Settings scene, and what gives it ⌘, and the menu item.
         // A scene rather than a page beside Spending, which Spending itself is not:
         // that one is read-only by construction, and a limit is the one number in

@@ -796,8 +796,8 @@ private struct RemoteFailedWorkflowRow: View {
 /// Needs You and absent at none, so the heading stays put. No icon (Alex, #495): the
 /// sessions under it carry the marks.
 ///
-/// Needs You says when its count was last true while the Mac is out of reach (#1163), so
-/// an old count does not pass for a live one.
+/// Needs You says how old its count is while the Mac is out of reach (#1163, #5141): "Last
+/// update 5 min ago", so an old count does not pass for a live one.
 private struct SmartHeading: View {
     let row: SidebarSmartRow
     let count: Int
@@ -807,10 +807,12 @@ private struct SmartHeading: View {
         HStack(spacing: 6) {
             Text(row.title).lineLimit(1)
             if let updatedAt {
-                Text(Self.updated(updatedAt))
-                    .appText(.fine)
-                    .foregroundStyle(Paper.tertiary)
-                    .lineLimit(1)
+                LastUpdateTimeline(read: updatedAt) { now in
+                    Text(LastUpdate.line(since: updatedAt, now: now))
+                        .appText(.fine)
+                        .foregroundStyle(Paper.tertiary)
+                        .lineLimit(1)
+                }
             }
             Spacer(minLength: 4)
             if count > 0 {
@@ -821,15 +823,8 @@ private struct SmartHeading: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel([row.title, count > 0 ? "\(count)" : "none", updatedAt.map(Self.updated)]
+        .accessibilityLabel([row.title, count > 0 ? "\(count)" : "none", updatedAt.map { LastUpdate.spoken(since: $0) }]
             .compactMap { $0 }.joined(separator: ", "))
-    }
-
-    /// "Updated 14:02" today, "Updated Tue 14:02" before.
-    static func updated(_ date: Date) -> String {
-        Calendar.current.isDateInToday(date)
-            ? "Updated \(date.formatted(date: .omitted, time: .shortened))"
-            : "Updated \(date.formatted(.dateTime.weekday(.abbreviated).hour().minute()))"
     }
 }
 

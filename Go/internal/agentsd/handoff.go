@@ -15,6 +15,8 @@ import (
 // why, and one choice, Done or Can't do it, with a line for what stopped them. A client
 // that shows the machine's browser (the Mac and the web page) adds Open the page, which
 // opens the Agent Browser at the agent's tab; the Remote says to do it on one of those.
+// When the browser is Google Chrome, its real window comes to the front for the step
+// instead, and the card names it (handoffwindow.go, #5208).
 // While the card is open, the agent's other browser calls are refused, so the page does
 // not move under the person, and the agent keeps browser:agents past its turn's end, so
 // no other agent takes the page from them.
@@ -25,7 +27,7 @@ const handToPersonName = "hand_to_person"
 var handToPersonTool = json.RawMessage(`{"name":"hand_to_person","title":"Hand a step on the page to the person",` +
 	`"description":"Ask the person to do one step on the browser's current page that you cannot or must not do: solve a CAPTCHA, sign in, approve a sign-in on their phone, or click something only a person should. ` +
 	`Use it only when no tool or secret can do the step: fill a password with fill_secret, not this. ` +
-	`Every client shows a card with the step and Open the page; the person does it in the app's browser and answers Done or Can't do it. ` +
+	`Every client shows a card with the step; the person does it and answers Done or Can't do it. When the app's browser is Google Chrome on a Mac the person is at, its window comes to the front for the step and goes back on Done; otherwise the card has Open the page. ` +
 	`When the step is in one of the agents' own Chrome windows (a real Chrome over DevTools, as for a site that refuses the app's browser), give its cdp_port: the card names that window. ` +
 	`Never do a human check (a CAPTCHA, a press-and-hold, a slider) yourself with synthetic input: hand it over. ` +
 	`You get their answer; then call browser_snapshot to see where the page is now, and carry on from it. ` +
@@ -83,7 +85,15 @@ func (d *Daemon) handToPerson(ctx context.Context, agent wire.UUID, args map[str
 		}
 		handOff.Window = &window
 	}
-	req := wire.ElicitationRequest{ID: store.NewUUID(), AgentID: agent, Message: &step, HandOff: handOff,
+	id := store.NewUUID()
+	if handOff.Window == nil {
+		// The agents' browser is Google Chrome (#5207): the person gets its real window
+		// (#5208), which comes down again with the card (formDown).
+		if window, ok := d.showHandOffWindow(agent, id); ok {
+			handOff.Window = &window
+		}
+	}
+	req := wire.ElicitationRequest{ID: id, AgentID: agent, Message: &step, HandOff: handOff,
 		Mode:  wire.ElicitationRequestMode{Form: &wire.ElicitationRequestModeForm{Value: handOffSchema(reason)}},
 		Scope: wire.ElicitationRequestScopeSession, AskedAt: now()}
 	r, answered := l.holdAskedForm(req, nil, formHoldLimit)

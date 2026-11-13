@@ -89,6 +89,7 @@ type Daemon struct {
 	appToolsState
 	gitCredentialState
 	screenDriveState
+	handOffWindowState
 	browserDriveState
 	browserTabState
 	hostUserState
@@ -123,6 +124,8 @@ type Daemon struct {
 	timeBook
 	reportBook
 	lineageBook
+	// The build timings (#5177).
+	ciTimingsBook
 	// The events this machine publishes on the bus (#4729).
 	busBook
 	// Subscriptions on the bus, and the bursts debounce holds (#4730).

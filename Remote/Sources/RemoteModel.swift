@@ -33,9 +33,9 @@ final class RemoteModel {
     /// When what the phone holds was last live with the Mac (#1163): the moment touch was
     /// lost. Nil before the first connection since launch, when the phone holds nothing.
     private(set) var liveUntil: Date?
-    /// When the Needs you count was last true, for the "Updated" line beside it: nil while
-    /// live, when it is true now (#1163).
-    var needsYouUpdatedAt: Date? { isConnected ? nil : liveUntil }
+    /// When the Needs you count was last true, for the "Last update" line beside it: nil
+    /// while live, when it is true now (#1163, #5141).
+    var needsYouUpdatedAt: Date? { isConnected ? nil : lastReadAt }
     private(set) var lastHeardFrom: Date?
     private(set) var problem: String?
     /// Words for one chat's prompt bar, from elsewhere in the chat: an edit to a queued
@@ -2283,10 +2283,10 @@ final class RemoteModel {
     /// the screens say so and stop offering actions rather than pretending (FR-035).
     var isStale: Bool { !isConnected }
 
-    /// How long since the Mac last answered, in words.
-    var lastHeard: String? {
-        guard let lastHeardFrom else { return nil }
-        return lastHeardFrom.formatted(.relative(presentation: .named))
+    /// When what the phone shows was last read (#5141): the last word from the control plane,
+    /// or the moment a live link went, whichever is later; before either, this device's copy.
+    var lastReadAt: Date? {
+        [lastHeardFrom, liveUntil].compactMap { $0 }.max() ?? work.copyReadAt
     }
 
     /// The control plane's address itself refused the connection (suspended, over a
@@ -2486,6 +2486,14 @@ final class RemoteModel {
     /// staleness for its own, that host's link for another's (#208).
     func isStale(on host: MachineRef) -> Bool {
         host == .mac ? isStale : !reachableHosts.contains(host)
+    }
+
+    /// When what the phone holds of `host` was last live (#5143), while it is stale: the
+    /// last read from the Mac or the control plane while that link is down, else the time
+    /// the server went. Nil while it answers.
+    func hostReadAt(_ host: MachineRef) -> Date? {
+        if isStale { return lastReadAt }
+        return host == .mac ? nil : hostDownSince[host]
     }
 
     func isStale(_ agent: Agent) -> Bool { isStale(on: agent.host) }
@@ -5774,6 +5782,9 @@ final class RemoteModel {
     }
     /// The session a menu's Move to Machine… is moving (#4037), asked at the root as Rename… is.
     var movingToMachine: Agent?
+    /// The server runtime being signed in (#4035), asked at the root (#5203): the sheet stays
+    /// while the person goes to other pages, and the page under it works.
+    var signingIn: RuntimeSignInTarget?
     /// Moves to another machine under way, by session, and those that stopped with a problem
     /// until they are put away (#4641): a line on the session's card, as on the Mac's row.
     var moves: [UUID: DaemonAPI.MoveNotification] = [:]

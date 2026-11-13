@@ -16,9 +16,15 @@
 //   {"action":"type","app":"TextEdit","text":"hello"}
 //   {"action":"key","app":"TextEdit","keyName":"return"}
 //   {"action":"read","app":"TextEdit"}
+//   {"action":"front","pid":4242}
 //
 // The mouse and keyboard post to the whole session, so `type`, `key` and `click` by x,y
 // first bring `app` to the front and refuse when it does not get there (frontmost(app:)).
+//
+// "front" (#5208) brings the app with that pid to the front, by pid and not by name: the
+// agents' Google Chrome and the person's own have the same name. It answers with the pid
+// that was in front before, so the daemon can bring that app back when the person is done.
+// It is the person's step, not the agent's, so it does not watch for their touch.
 //
 // Each answered with {"ok":true, ...} or {"ok":false,"error":"..."}. It ends when its
 // standard input closes, which is when the agent's lease on "screen" is let go.
@@ -69,7 +75,7 @@ readFrames { frame in
     let app = json["app"] as? String ?? ""
     // The live tile's frame (US4) is not the agent's command: the person's touch between
     // two of those is said by the last command's arming, not again every few seconds.
-    if action != "frame" { touchWatch.arm() }
+    if action != "frame" && action != "front" { touchWatch.arm() }
     switch action {
     case "access":
         // Desktop control's Accessibility gate (#3004, US2, FR-005): triggers macOS's own
@@ -142,6 +148,18 @@ readFrames { frame in
             return
         }
         reply(["ok": true, "tree": axDump(pid: pid)])
+
+    case "front":
+        guard let pid = (json["pid"] as? NSNumber)?.int32Value, pid > 0 else {
+            reply(["ok": false, "error": "front needs a pid."])
+            return
+        }
+        let previous = frontmostPid()
+        if let refused = frontmost(pid: pid) {
+            reply(["ok": false, "error": refused, "previous": previous])
+            return
+        }
+        reply(["ok": true, "previous": previous])
 
     default:
         reply(["ok": false, "error": "unknown action \"\(action)\"."])

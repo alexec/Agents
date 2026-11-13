@@ -105,22 +105,31 @@ public actor LocalCopy {
     struct Record<Value: Codable & Sendable>: Codable, Sendable {
         var ref: WireRef
         var value: Value
+        /// When the client read `value` from its host (#5141), for the "Last update" line.
+        /// Nil in a file written before it: the file's own time is used then.
+        var at: Date?
     }
 
     // MARK: Machines
 
     /// Every machine held, in no order.
-    public func allMachines() -> [Machine] {
-        let files = (try? FileManager.default.contentsOfDirectory(at: machines, includingPropertiesForKeys: nil)) ?? []
-        return files.compactMap { url -> Machine? in
-            guard url.pathExtension == "json", var machine = read(Machine.self, at: url)?.value else { return nil }
+    public func allMachines() -> [Machine] { machinesRead().map(\.machine) }
+
+    /// Every machine held, in no order, with when it was read from its host (#5141).
+    public func machinesRead() -> [(machine: Machine, at: Date)] {
+        let files = (try? FileManager.default.contentsOfDirectory(at: machines, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        return files.compactMap { url -> (machine: Machine, at: Date)? in
+            guard url.pathExtension == "json", let record = read(Machine.self, at: url) else { return nil }
+            var machine = record.value
             // The host is the copy's to say, whatever a record's own coding keeps of it.
             machine.agents = machine.agents.map { var agent = $0; agent.host = machine.host; return agent }
-            return machine
+            let written = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            return (machine, record.at ?? written ?? .distantPast)
         }
     }
 
-    public func keep(_ machine: Machine) {
+    /// `at` is when the client read the machine from its host; now when not given.
+    public func keep(_ machine: Machine, readAt at: Date = Date()) {
         var machine = machine
         // The live ones whole, and the archived ones newest first, at most a page of them.
         let live = machine.agents.filter { $0.state != .archived }
@@ -129,7 +138,7 @@ public actor LocalCopy {
             .prefix(Self.archivedKept)
         machine.agents = live + archived
         let ref = Self.machineRef(machine.host)
-        write(Record(ref: ref, value: machine), to: machines.appendingPathComponent(Self.fileName(ref)))
+        write(Record(ref: ref, value: machine, at: at), to: machines.appendingPathComponent(Self.fileName(ref)))
     }
 
     // MARK: Transcripts
@@ -151,7 +160,7 @@ public actor LocalCopy {
             transcript.page.firstIndex += drop
         }
         let ref = Self.sessionRef(transcript.session)
-        write(Record(ref: ref, value: transcript), to: transcripts.appendingPathComponent(Self.fileName(ref)))
+        write(Record(ref: ref, value: transcript, at: Date()), to: transcripts.appendingPathComponent(Self.fileName(ref)))
         trim()
     }
 

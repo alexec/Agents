@@ -5,12 +5,15 @@ import type { ComponentChildren } from "preact";
 import { loadingMore as loadingMoreWords, staleStrip, type ArchivedState } from "../model/archivedPage";
 import { BackToList } from "./BackToList";
 import { EmptyState, PlaceholderRows } from "./WorkParts";
+import { LastUpdate } from "./LastUpdate";
 import { MessageBanner } from "./MessageKinds";
 import { Glyph } from "./Icon";
 
-export function ArchivedFrame({ kind, title, folderName, filterLabel, filter, onFilter, state, empty, noMatch, children }: {
+export function ArchivedFrame({ kind, title, folderName, filterLabel, filter, onFilter, state, readAt, empty, noMatch, children }: {
   kind: "sessions" | "workflows"; title: string; folderName: string; filterLabel: string;
   filter: string; onFilter: (words: string) => void; state: ArchivedState;
+  /** When the rows were last read (#5143), for the stale strip's "Last update" line. */
+  readAt: number | undefined;
   empty: { mark: string; title: string; line: string }; noMatch: string; children: ComponentChildren;
 }) {
   return (
@@ -31,7 +34,7 @@ export function ArchivedFrame({ kind, title, folderName, filterLabel, filter, on
             )
             : state.kind === "noMatch" ? <div class="archived-middle"><EmptyState kind={kind} title={noMatch} action={{ words: "Clear", run: () => onFilter("") }} /></div>
             : <>
-              {state.stale && <StaleStrip />}
+              {state.stale && <StaleStrip readAt={readAt} />}
               <div class={`archived-rows${state.stale ? " stale" : ""}`}>{children}</div>
             </>}
         </div>
@@ -40,9 +43,13 @@ export function ArchivedFrame({ kind, title, folderName, filterLabel, filter, on
   );
 }
 
-/** Its machine is not answering: over the rows last read, or alone with none. */
-function StaleStrip() {
-  return <MessageBanner tone="neutral" name="archived-stale">{staleStrip}</MessageBanner>;
+/** Its machine is not answering: over the rows last read, with how old they are (#5143), or alone with none. */
+function StaleStrip({ readAt }: { readAt?: number | undefined }) {
+  return (
+    <MessageBanner tone="neutral" name="archived-stale">
+      {staleStrip}{readAt !== undefined && <> <LastUpdate at={readAt} /></>}
+    </MessageBanner>
+  );
 }
 
 /** The foot of an Archived page: how many, and Load more while the host has more; a spinner and

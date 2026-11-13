@@ -127,24 +127,19 @@ struct BackgroundEntryLine: View {
     let item: BackgroundItem
 
     var body: some View {
-        HStack(spacing: 8) {
-            Text(line)
-                .appText(.reading)
-                .foregroundStyle((item.state == .failed ? StateTint.failure : .none).style(or: .secondary))
-            if item.kind == .subagent, let steps = actions.subagentSteps {
-                Button("Steps") { steps(item.id) }
-                    .linkStyle()
-                    .appText(.reading)
-                    .help("See what this subagent did")
-            }
-            if item.outputFilePath != nil, !item.isRunning, let output = actions.backgroundOutput {
-                Button("Output") { output(item) }
-                    .linkStyle()
-                    .appText(.reading)
-                    .help("Open what it printed")
-            }
+        // One action link (#5036): a subagent's Steps, or what a task printed.
+        RecordLine(icon: item.state == .failed ? LineGlyph.failed : LineGlyph.background, detail: line,
+                   tone: item.state == .failed ? .failure : .plain, action: link)
+    }
+
+    private var link: StripButton? {
+        if item.kind == .subagent, let steps = actions.subagentSteps {
+            return StripButton(title: "Steps", help: "See what this subagent did") { steps(item.id) }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        if item.outputFilePath != nil, !item.isRunning, let output = actions.backgroundOutput {
+            return StripButton(title: "Output", help: "Open what it printed") { output(item) }
+        }
+        return nil
     }
 
     private var line: String {

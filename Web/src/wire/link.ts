@@ -43,7 +43,9 @@ export type LinkState =
   // `refusalLine` when the address itself refused the connection outright (a suspended
   // hosted account, one over its plan's limit, 1003 CL-002, #2235): its words, read back
   // from `/readyz` since the handshake's own close carries none, in place of "can't reach".
-  | { kind: "down"; since: number; crowded?: boolean; refusalLine?: string }
+  // `heardAt` is when the page last heard the control plane (#5141), for the "Last update" line;
+  // absent when it never did since the page opened.
+  | { kind: "down"; since: number; heardAt?: number; crowded?: boolean; refusalLine?: string }
   | { kind: "unpaired" }
   | { kind: "forgotten" }
   | { kind: "wrongControlPlane" }
@@ -224,6 +226,8 @@ export class Link {
   private socket: SocketLike | null = null;
   private stopped = true;
   private attempt = 0;
+  /** When the control plane last said anything on this page's link (#5141), or null. */
+  private heardAt: number | null = null;
   /** When `unknown` was first heard since the last connection, or null. */
   private firstUnknown: number | null = null;
   private retry: ReturnType<typeof setTimeout> | null = null;
@@ -434,6 +438,7 @@ export class Link {
     let authed = false;
     socket.onmessage = (event) => {
       const line = String(event.data);
+      this.heardAt = Date.now();
       if (authed) this.heard(line);
       else lines.push(line);
     };
@@ -643,7 +648,8 @@ export class Link {
     if (this.state.kind !== "down" || (this.state.crowded ?? false) !== crowded || this.state.refusalLine !== refusalLine) {
       if (this.state.kind !== "down") log("link.down");
       const since = this.state.kind === "down" ? this.state.since : Date.now();
-      this.set({ kind: "down", since, ...(crowded ? { crowded } : {}), ...(refusalLine ? { refusalLine } : {}) });
+      const heardAt = this.heardAt ?? undefined;
+      this.set({ kind: "down", since, ...(heardAt !== undefined ? { heardAt } : {}), ...(crowded ? { crowded } : {}), ...(refusalLine ? { refusalLine } : {}) });
     }
     // Out of sight it waits: the tab's return calls retryNow (#170).
     if (this.stopped || this.options.hidden()) return;

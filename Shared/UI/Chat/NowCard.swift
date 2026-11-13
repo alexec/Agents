@@ -374,28 +374,11 @@ private struct PlanRow: View {
 /// that opens to the steps as they were then. The plan as it is now is in the top card.
 struct PlanLine: View {
     let plan: Plan
-    @State private var isExpanded = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Button {
-                withAnimation(ResponseMotion.response) { isExpanded.toggle() }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(icon: "checkmark.square")
-                        .accessibilityHidden(true)
-                    Text(NowWords.plan(plan))
-                    chevron(isExpanded)
-                }
-                .appText(.reading)
-                .foregroundStyle(.secondary)
-                .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(isExpanded ? "Hides the plan's steps" : "Shows the plan's steps")
-            if isExpanded {
-                PlanView(plan: plan)
-            }
+        RecordLine(icon: LineGlyph.plan, detail: NowWords.plan(plan),
+                   openHelp: ("Show the plan's steps", "Hide the plan's steps")) {
+            PlanView(plan: plan)
         }
     }
 }

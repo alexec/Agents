@@ -2198,6 +2198,56 @@
       }
     },
     {
+      "name": "builds/history",
+      "x-capability": "builds.trends/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BuildsHistoryRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BuildsHistory"
+        }
+      }
+    },
+    {
+      "name": "builds/run",
+      "x-capability": "builds.trends/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BuildsRunRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BuildsRunAnswer"
+        }
+      }
+    },
+    {
       "name": "capacity/changed",
       "x-capability": "capacity/1",
       "description": "The machine's capacity level moved (#4748): its rows say Near capacity or At capacity, as a low disk.",

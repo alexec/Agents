@@ -100,18 +100,9 @@ public struct AttentionSnapshot: Codable, Hashable, Sendable {
         now.timeIntervalSince(writtenAt) > Self.staleness
     }
 
-    /// How the widget's "Updated" line says when this was last true (#1163). Always one of
-    /// the two: the time of day while it is fresh, how long ago once it is stale. Never
+    /// When the number was read, for the widget's "Last update" line (#1163, #5141). Never
     /// later than `now`, as the Mac's clock may run a little ahead of the phone's.
-    public enum Updated: Hashable, Sendable {
-        case at(Date)
-        case ago(Date)
-    }
-
-    public func updated(at now: Date = Date()) -> Updated {
-        let when = min(writtenAt, now)
-        return isStale(at: now) ? .ago(when) : .at(when)
-    }
+    public func readAt(now: Date = Date()) -> Date { min(writtenAt, now) }
 
     /// This snapshot with one push laid over it (#1046): what the push says before the app
     /// has caught up, written by whichever of the app and the notification extension the

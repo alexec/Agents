@@ -38,19 +38,23 @@ struct StaleBanner: View {
             // one, and a try now rather than at the end of the long wait. Attention when
             // the account page is there to open, as the window's `ControlAwayStrip`.
             let account = ControlRefusal.link(in: refusal)
-            Strip(tone: account == nil ? .neutral : .warning, line: refusal,
-                  primary: StripButton(title: "Try Again") { model.tryAgainNow() },
-                  second: account.map { url in StripButton(title: "Open Account") { openURL(url) } })
-                .paneBannerInset()
+            let read = model.lastReadAt
+            LastUpdateTimeline(read: read ?? .distantPast) { now in
+                Strip(tone: account == nil ? .neutral : .warning, line: LastUpdate.banner(refusal, read: read, now: now),
+                      primary: StripButton(title: "Try Again") { model.tryAgainNow() },
+                      second: account.map { url in StripButton(title: "Open Account") { openURL(url) } })
+            }
+            .paneBannerInset()
         } else if model.isStale {
-            Strip(tone: .neutral, symbol: MessageTone.offlineSymbol, line: staleLine)
-                .paneBannerInset()
+            // The Mac, or the control plane where it runs elsewhere (#4916), and how old what
+            // is shown is (#5141), ticking.
+            let read = model.lastReadAt
+            LastUpdateTimeline(read: read ?? .distantPast) { now in
+                Strip(tone: .neutral, symbol: MessageTone.offlineSymbol,
+                      line: model.controlPlaneReach.banner(read: read, now: now))
+            }
+            .paneBannerInset()
         }
-    }
-
-    /// The Mac, or the control plane where it runs elsewhere (#4916).
-    private var staleLine: String {
-        model.controlPlaneReach.banner(lastHeard: model.lastHeard)
     }
 }
 

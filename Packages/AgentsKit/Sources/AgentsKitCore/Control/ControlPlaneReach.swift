@@ -51,11 +51,12 @@ public struct ControlPlaneReach: Sendable, Hashable {
             + "This screen fills in as soon as it answers."
     }
 
-    /// The banner on every screen: when it was last heard from, or that it has not been yet.
-    public func banner(lastHeard: String?) -> String {
+    /// The banner on every screen: that it can't be reached and how old what is shown is
+    /// (#5141), or that it has not been reached yet and nothing was read.
+    public func banner(read: Date?, now: Date = Date()) -> String {
         let name = onHomeMac ? "your Mac" : "the control plane"
-        guard let lastHeard else { return "Not connected to \(name) yet" }
-        return "Last heard from \(name) \(lastHeard)"
+        guard read != nil else { return "Not connected to \(name) yet" }
+        return LastUpdate.banner("Can't reach \(name).", read: read, now: now)
     }
 
     /// A save that did not go because nothing answers.

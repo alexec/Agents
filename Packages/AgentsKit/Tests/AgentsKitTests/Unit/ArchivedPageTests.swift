@@ -65,4 +65,21 @@ struct ArchivedPageTests {
         #expect(ArchivedPage.time(now.addingTimeInterval(-10), now: now, calendar: calendar) == "now")
         #expect(ArchivedPage.time(now.addingTimeInterval(-(19 * 3600 + 20 * 60)), now: now, calendar: calendar) == "18:40")
     }
+    /// The stale strip says how old the rows are (#5143), and nothing more when none were read.
+    @Test func theStaleStripSaysWhenTheRowsWereRead() {
+        #expect(ArchivedPage.staleLine(read: now.addingTimeInterval(-5 * 60), now: now)
+            == "Its machine isn’t answering. Showing what was last read. Last update 5 min ago")
+        #expect(ArchivedPage.staleLine(read: now.addingTimeInterval(-20), now: now)
+            == "Its machine isn’t answering. Showing what was last read. Last update just now")
+        #expect(ArchivedPage.staleLine(read: nil, now: now) == ArchivedPage.staleStrip)
+    }
+
+    /// The time is when the rows were last live; the page's own answer only when that is not known.
+    @Test func theReadIsWhenTheRowsWereLastLive() {
+        let went = now.addingTimeInterval(-60)
+        let answered = now.addingTimeInterval(-600)
+        #expect(ArchivedPage.readAt(liveUntil: went, answeredAt: answered) == went)
+        #expect(ArchivedPage.readAt(liveUntil: nil, answeredAt: answered) == answered)
+        #expect(ArchivedPage.readAt(liveUntil: nil, answeredAt: nil) == nil)
+    }
 }

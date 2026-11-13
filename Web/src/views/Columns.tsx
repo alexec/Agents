@@ -8,6 +8,7 @@
 import { useEffect } from "preact/hooks";
 import type { Store } from "../model/store";
 import { folderKey } from "../model/groups";
+import { pageReadAt } from "../model/lastUpdate";
 import { replace, route } from "../route";
 import { pathOf, setPane, textShownAs } from "./files/paneState";
 import type { Session } from "../session";
@@ -40,12 +41,16 @@ import { navPages } from "../model/nav";
 import { sectionOf } from "../route";
 import { OrgPolicyStrip } from "./OrgPolicyLine";
 import { Icon } from "./Icon";
+import { RuntimeSignInPanel } from "./RuntimeSignInDialog";
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
   // Connecting with this device's copy on show (#4790) is drawn as down: greyed, sending off.
   const kind = session.state.value.kind;
   const down = kind === "down" || kind === "connecting" || kind === "loading";
+  // When what a page shows of a host was last live while it, or the link, is down (#5143).
+  const liveUntil = (host: string): number | undefined =>
+    down ? pageReadAt(session.state.value, store.copyAt.value) : store.downSince.value[host];
   // What a narrow window shows: the list, or what the route opens in the chat's place.
   const section = sectionOf(r);
   const agentsPage = section === "agents" && !r.host ? navPages.agents.find((p) => p.id === r.section) : undefined;
@@ -87,7 +92,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
       <NavBar store={store} session={session} />
       {/* The page's banners, under its toolbar (docs/reference/design-system.md, "Messages"). */}
-      {down && <Banner session={session} />}
+      {down && <Banner session={session} store={store} />}
       <OrgPolicyStrip store={store} />
       {store.newMachineAsk.value && <NewMachineSheet key={JSON.stringify(store.newMachineAsk.value)} store={store} ask={store.newMachineAsk.value} />}
       {section === "overview" ? <div class="columns overview-columns console" aria-busy={down}><Overview store={store} down={down} /></div>
@@ -109,11 +114,11 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
             <PinnedPage store={store} host={r.host} folder={folder.folder.folder} path={r.page} down={down || !store.hostIsOnline(r.host)} />
           ) : r.host && r.folder && folder && r.archive === "workflows" ? (
             <ArchivedWorkflowsPage key={`${r.host}|${folder.folder.folder}`} store={store} host={r.host} folder={folder.folder.folder}
-              folderName={folder.name} down={down} />
+              folderName={folder.name} down={down} liveUntil={liveUntil(r.host)} />
           ) : r.host && r.folder && folder && r.archive ? (
             // Keyed by folder: another folder's page starts with its own page held, filter and state.
             <ArchivedSessionsPage key={`${r.host}|${folder.folder.folder}`} store={store} host={r.host} folder={folder.folder.folder}
-              folderName={folder.name} down={down} />
+              folderName={folder.name} down={down} liveUntil={liveUntil(r.host)} />
           ) : r.host && r.folder && folder && r.mcp ? (
             <MCPServersPage store={store} host={r.host} folder={folder.folder.folder}
               folderName={projectNameOf(folder.project) ?? folder.name} />
@@ -128,6 +133,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <ReportProblemDialog store={store} />
       <MoveToMachineDialog store={store} />
       <GitLendDialog store={store} />
+      <RuntimeSignInPanel store={store} />
       <ExportImportDialog store={store} />
       <ContextMenu />
       <AchievementCard store={store} />

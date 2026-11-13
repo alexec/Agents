@@ -704,6 +704,8 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 	switch e.Name {
 	case "checks.failed", "checks.passed", "run.completed":
 		d.lineageCIEvent(e)
+		// A run finished: the build timings read it soon (#5177).
+		d.kickCITimings()
 	case "health.issue_new", "health.issue_regressed":
 		d.lineageHealthEvent(e)
 		return

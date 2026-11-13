@@ -124,11 +124,8 @@ struct TurnView: View, Equatable {
                 }
                 if detail.showsSteps, stepCount != 0 {
                     if waiting, fetchFailed {
-                        HStack(spacing: 8) {
-                            Text("These steps did not load.").foregroundStyle(.secondary)
-                            Button("Try Again") { Task { await fetch() } }
-                        }
-                        .appText(.fine)
+                        RecordLine(icon: LineGlyph.loadFailure, detail: "These steps did not load.",
+                                   action: StripButton(title: "Try Again") { Task { await fetch() } })
                     } else if waiting {
                         ProgressView().controlSize(.small)
                     } else {
@@ -284,11 +281,7 @@ private struct LiveLine: View {
 
     var body: some View {
         if case .toolRun(_, let calls) = item, let call = calls.last {
-            Text(call.turnLine)
-                .appText(.reading)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            RecordLine(icon: LineGlyph.tool(call.kind), detail: call.turnLine, oneLine: true)
         } else {
             StepRow(item: item)
         }
@@ -308,18 +301,17 @@ private struct StepRow: View {
             switch item {
             case .toolRun(_, let calls) where !isUnrolled && calls.count > 1:
                 if let last = calls.last {
-                    ToolCallLine(call: last, lineText: last.turnLine, onClick: { isUnrolled = true }, brightensOnHover: true)
+                    ToolCallLine(call: last, lineText: last.turnLine, onClick: { isUnrolled = true })
                 }
             case .toolRun(_, let calls):
                 VStack(alignment: .leading, spacing: 4) {
                     ForEach(Array(calls.enumerated()), id: \.offset) { index, call in
-                        ToolCallLine(call: call, lineText: call.turnLine, isFocused: isFocused && index == 0,
-                                     brightensOnHover: true)
+                        ToolCallLine(call: call, lineText: call.turnLine, isFocused: isFocused && index == 0)
                     }
                 }
             case .entry(let entry):
                 if case .toolCall(let call) = entry.kind {
-                    ToolCallLine(call: call, lineText: call.turnLine, isFocused: isFocused, brightensOnHover: true)
+                    ToolCallLine(call: call, lineText: call.turnLine, isFocused: isFocused)
                 } else {
                     EntryRow(entry: entry)
                 }
@@ -396,7 +388,7 @@ private struct EntryRow: View {
 
         case .toolCall(let call), .toolCallUpdate(let call):
             // Reached only when something splits a run; a run is drawn by ToolRunRow.
-            Text(call.line).appText(.reading).foregroundStyle(.secondary)
+            RecordLine(icon: LineGlyph.tool(call.kind), detail: call.line, oneLine: true)
 
         case .planUpdated(let plan):
             // One line that opens to the steps (#5033): the plan as it is now is in the top card.
@@ -413,33 +405,34 @@ private struct EntryRow: View {
             ServedRequestLine(request: request)
 
         case .elicitationAsked(let request):
-            Text("Asked: \(request.title)").appText(.reading).foregroundStyle(.secondary)
+            RecordLine(icon: LineGlyph.asked, head: "Asked", detail: request.title)
 
         case .elicitationAnswered(_, let summary, let answers):
             if answers.isEmpty {
-                Text(summary).appText(.reading).foregroundStyle(.secondary)
+                RecordLine(icon: LineGlyph.answered, detail: summary)
             } else {
-                // What they said is theirs, so it sits in their bubble, each answer
-                // under the question it answers: the card that asked is gone.
-                VStack(alignment: .leading, spacing: 8) {
-                    ForEach(Array(answers.enumerated()), id: \.offset) { _, answer in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(answer.question).appText(.reading).foregroundStyle(.secondary)
-                            Text(answer.answer).appText(.reading).textSelection(.enabled)
+                // "You answered", which opens to each answer under the question it answers
+                // (#5036): the Ask that asked is gone.
+                RecordLine(icon: LineGlyph.answered, head: "You answered",
+                           detail: answers.count == 1 ? answers[0].question : "\(answers.count) questions",
+                           openHelp: ("Show the answers", "Hide the answers")) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(Array(answers.enumerated()), id: \.offset) { _, answer in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(answer.question).appText(.reading).foregroundStyle(.secondary)
+                                Text(answer.answer).appText(.reading).textSelection(.enabled)
+                            }
                         }
                     }
                 }
-                .padding(12)
-                .paperWell(in: RoundedRectangle(cornerRadius: 12))
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
         case .compaction(let status, let summary, _, let error):
-            VStack(alignment: .leading, spacing: 6) {
-                Text(CompactionLine.words(status: status, error: error))
-                    .appText(.reading)
-                    .foregroundStyle(.secondary)
-                if !summary.isEmpty {
+            if summary.isEmpty {
+                RecordLine(icon: LineGlyph.compaction, detail: CompactionLine.words(status: status, error: error))
+            } else {
+                RecordLine(icon: LineGlyph.compaction, detail: CompactionLine.words(status: status, error: error),
+                           openHelp: ("Show the summary", "Hide the summary")) {
                     BlocksView(blocks: summary).foregroundStyle(.secondary)
                 }
             }
@@ -448,14 +441,11 @@ private struct EntryRow: View {
             NoticeLine(notice: notice)
 
         case .permissionAsked(let request):
-            Text("Asked: \(request.toolCall.title)")
-                .appText(.reading)
-                .foregroundStyle(.secondary)
+            RecordLine(icon: LineGlyph.asked, head: "Asked", detail: request.toolCall.title)
 
         case .permissionAnswered(let optionID, let name):
-            Text("You chose \(name ?? optionID)")
-                .appText(.reading)
-                .foregroundStyle(.secondary)
+            // An answered Ask leaves one Line (#5036): "You chose ‹option›".
+            RecordLine(icon: LineGlyph.answered, lead: "You chose", head: name ?? optionID)
 
         case .optionChanged:
             // Dropped by `TranscriptEntry.display` before it gets here. Plumbing: the
@@ -471,7 +461,7 @@ private struct EntryRow: View {
             WorkReportLine(report: report)
 
         case .runtimeNote(let text):
-            Text(text).appText(.reading).foregroundStyle(.secondary)
+            RecordLine(icon: LineGlyph.note, detail: text)
 
         case .sandboxFailure(let record):
             SandboxFailureCard(record: record)
@@ -516,19 +506,8 @@ private struct NoticeLine: View {
     let notice: SessionNotice
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(notice.title)
-                .appText(.reading)
-                .fontWeight(notice.isError || notice.isWarning ? .medium : .regular)
-                .foregroundStyle((notice.isError ? StateTint.failure : .none).style(or: .secondary))
-            if let detail = notice.detail {
-                Text(detail)
-                    .appText(.reading)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        RecordLine(icon: LineGlyph.notice(notice), head: notice.title, detail: notice.detail,
+                   tone: notice.isError ? .failure : .plain)
     }
 }
 
@@ -537,33 +516,14 @@ private struct NoticeLine: View {
 /// at the Details level; a turn now draws every thought, so each has to be short.
 private struct ThoughtLine: View {
     let text: String
-    @State private var isExpanded = false
-    @State private var isHovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Button {
-                withAnimation(ResponseMotion.response) { isExpanded.toggle() }
-            } label: {
-                Text(TranscriptItem.thoughtLine(text))
-                    .appText(.reading)
-                    .foregroundStyle(isHovering ? .primary : .secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(.rect)
-                .onHover { isHovering = $0 }
-            }
-            .buttonStyle(.plain)
-            .help(isExpanded ? "Hide the thought" : "Show the whole thought")
-            .accessibilityHint(isExpanded ? "Hides the thought" : "Shows the whole thought")
-            if isExpanded {
-                Text(text)
-                    .appText(.reading)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+        RecordLine(icon: LineGlyph.thought, detail: TranscriptItem.thoughtLine(text), oneLine: true,
+                   openHelp: ("Show the whole thought", "Hide the thought")) {
+            Text(text)
+                .appText(.reading)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
         }
     }
 }
@@ -578,17 +538,9 @@ private struct WorkReportLine: View {
     let report: WorkReport
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(report.outcome.heading)
-                .appText(.reading).fontWeight(.medium)
-                .foregroundStyle((report.outcome.needsAPerson ? StateTint.attention : .none)
-                                    .style(or: .secondary))
-            Text(report.message)
-                .appText(.reading)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        // No attention tint (#5036): "Waiting on your answer" has its Ask under it, so the
+        // yellow is said there, once.
+        RecordLine(icon: LineGlyph.report(report.outcome), head: report.outcome.heading, detail: report.message)
     }
 }
 
@@ -832,58 +784,27 @@ private struct ToolCallLine: View {
     /// What a click does instead of opening the call, where the line is standing in
     /// for a whole folded run.
     var onClick: (() -> Void)? = nil
-    /// Brighter under the pointer, as a turn's step is (069): the step is a line of
-    /// text like the rest of the turn's margin, with no chevron in front of it (#112).
-    var brightensOnHover = false
-    @State private var isExpanded = false
-    @State private var isHovering = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            summary
-            if isExpanded { detail }
+        if let onClick {
+            RecordLine(icon: LineGlyph.tool(call.kind), detail: words, oneLine: true,
+                       onClick: onClick, clickHelp: "Show the whole run")
+        } else if hasDetail {
+            RecordLine(icon: LineGlyph.tool(call.kind), detail: words, oneLine: true,
+                       openHelp: ("Show the argument and the return", "Hide the argument and the return"),
+                       isFocused: isFocused) { detail }
+        } else {
+            RecordLine(icon: LineGlyph.tool(call.kind), detail: words, oneLine: true)
         }
-        .onChange(of: isFocused, initial: true) { _, now in if now, hasDetail { isExpanded = true } }
     }
 
     // MARK: The line itself
 
-    @ViewBuilder
-    private var summary: some View {
-        if let onClick {
-            Button(action: onClick) { line }
-                .buttonStyle(.plain)
-                .help("Show the whole run")
-                .accessibilityHint("Shows every call in this run")
-        } else if hasDetail {
-            Button {
-                withAnimation(ResponseMotion.response) { isExpanded.toggle() }
-            } label: {
-                line
-            }
-            .buttonStyle(.plain)
-            .help(isExpanded ? "Hide the argument and the return" : "Show the argument and the return")
-            .accessibilityHint(isExpanded ? "Hides the argument and the return" : "Shows the argument and the return")
-        } else {
-            line
-        }
-    }
-
-    /// The description alone. It is the whole affordance: no chevron in front of it,
-    /// so a run of calls is a run of sentences — one line each. A title with no
-    /// description behind it is usually a command line or a path, and a path that
-    /// wraps to three lines is three lines of a run that reads as one call per line;
-    /// the whole of it is a click away in the detail, where the raw input is.
-    private var line: some View {
-        Text((lineText ?? call.line) + runsOn)
-            .appText(.reading)
-            .foregroundStyle(isHovering ? .primary : .secondary)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(.rect)
-        .onHover { isHovering = brightensOnHover && $0 }
-    }
+    /// The description alone, after the kind's glyph (#5036): a run of calls is a run of
+    /// sentences, one line each. A title with no description behind it is usually a command
+    /// line or a path, and a path that wraps to three lines is three lines of a run that
+    /// reads as one call per line; the whole of it is a click away in the detail.
+    private var words: String { (lineText ?? call.line) + runsOn }
 
     /// " · running in the background", while what this call started still runs (057).
     /// The call itself came back at once; without this it reads as done.
@@ -971,8 +892,9 @@ private struct ToolCallLine: View {
     /// thirty calls with their outputs was a good deal of JSON formatted to answer
     /// a yes or no.
     private var hasDetail: Bool {
+        // Not `raw` alone (#5036): the detail does not draw it, so a chevron for it opened to nothing.
         !call.content.isEmpty || !call.locations.isEmpty
-            || call.rawInput != nil || call.rawOutput != nil || call.raw != nil
+            || call.rawInput != nil || call.rawOutput != nil
     }
 
     /// The argument or the return, under a word that says which. A runtime's own
@@ -1068,9 +990,11 @@ struct QuietLine: View {
     var body: some View {
         TimelineView(.everyMinute) { context in
             if let line = ActivityWords.quiet(since: since, startedAt: startedAt, now: context.date) {
+                // A Line with no glyph (#5036): under the words of the lines above it.
                 Text(line)
                     .appText(.fine)
                     .foregroundStyle(.tertiary)
+                    .padding(.leading, RecordLine<EmptyView>.glyphWidth + RecordLine<EmptyView>.gap)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, 14)
             }
@@ -1083,10 +1007,18 @@ private struct StateLine: View {
     let reason: EndedReason?
 
     var body: some View {
-        Text(text)
-            .appText(.reading)
-            // The one place in the transcript a colour earns itself: something went wrong.
-            .foregroundStyle((isFailure ? StateTint.failure : .none).style(or: .secondary))
+        // The one place in the transcript a colour earns itself: something went wrong.
+        RecordLine(icon: icon, head: text, tone: isFailure ? .failure : .plain)
+    }
+
+    private var icon: String {
+        if isFailure { return LineGlyph.failed }
+        switch state {
+        case .stopped: return LineGlyph.stopped
+        case .archived: return "archivebox"
+        case .finished: return "checkmark.circle"
+        default: return LineGlyph.note
+        }
     }
 
     private var isFailure: Bool {
