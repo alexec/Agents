@@ -838,7 +838,9 @@ def preflight(scene_ids):
             why.append(f"GROUP {getattr(scene, 'GROUP', '')!r} has no playlist (one of {', '.join(upload.PLAYLISTS)})")
         if youtube:
             why.append(youtube)
-            todo("Run `scripts/video/upload.py --sign-in` and approve with the Google account of the YouTube channel (#1856).",
+            todo("YouTube sign-in: an agent runs `scripts/video/upload.py --sign-in --no-browser` and approves in the "
+                 "agents' Chrome (scripts/video/README.md); Alex types the Google password only if that Chrome "
+                 "lost its Google sign-in (#4840).",
                  key="upload.py --sign-in")
         profile = getattr(scene, "CHROME_PROFILE", None)
         site = SIGN_IN.get(profile or "", {})
