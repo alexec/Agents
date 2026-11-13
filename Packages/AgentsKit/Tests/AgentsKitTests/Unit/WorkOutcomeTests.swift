@@ -125,7 +125,7 @@ struct WorkOutcomeTests {
         let block = Block(waits: [Wait(agentID: UUID(), nameAtReport: "helper",
                                        ending: WaitEnding(at: Date(timeIntervalSince1970: 5),
                                                           how: .finished(outcome: .done, message: "ok")))],
-                          checkAgainAt: Date(timeIntervalSince1970: 100))
+                          deadline: Date(timeIntervalSince1970: 100))
         let report = WorkReport(outcome: .waiting, message: "waiting", at: Date(timeIntervalSince1970: 1),
                                 block: block)
         let back = try JSONDecoder().decode(WorkReport.self, from: JSONEncoder().encode(report))

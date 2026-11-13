@@ -16,9 +16,9 @@ for (const { name, input, expected } of cases("block/lines.json")) {
     // The row's one line (#582), where it names someone, as AgentsModel.waitMark says it.
     const waitLine = names.length > 0
       ? rowLines.waitMark(agent, { names, lines: block.blockLines(agent, input.agents) }, null, () => undefined)?.line ?? "" : null;
-    const checksAgain = open !== null && block.checkAgainLine(open) !== null;
-    if (checksAgain) assert.match(lines.pop(), /^Checks again at \d{1,2}:\d{2}/);
-    assert.deepEqual({ isBlocked: open !== null, lines, checksAgain, waitLine, carryOnHelp: block.carryOnHelp(agent),
+    const hasDeadline = open !== null && block.deadlineLine(open) !== null;
+    if (hasDeadline) assert.match(lines.pop(), /^Carries on by \d{1,2}:\d{2}/);
+    assert.deepEqual({ isBlocked: open !== null, lines, hasDeadline, waitLine, carryOnHelp: block.carryOnHelp(agent),
       cardTitle: open === null ? null : block.cardTitle(open) }, expected);
   });
 }

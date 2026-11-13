@@ -71,7 +71,7 @@ to `ci-speed`; do not change `ci.yml` here.
      and failures;
    - **between turns, by what woke the session:** `event: checks.passed`,
      `event: lease.granted (build)` (the line for the lease), `wait timed out`,
-     `time reached` (`check_again timer` in older records), `person or agent message`, and the rest;
+     `time reached`, `person or agent message`, and the rest;
    - **the slowest calls, the commands run 3 or more times in one session,** and the
      longest-running sessions, with tokens and cost.
 

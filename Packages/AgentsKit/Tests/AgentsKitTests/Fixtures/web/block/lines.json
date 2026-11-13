@@ -3,7 +3,7 @@
     "expected" : {
       "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : true,
       "lines" : [
         "Carries on when all of these have finished",
@@ -123,7 +123,7 @@
     "expected" : {
       "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : true,
       "lines" : [
         "Carries on when all of these have finished",
@@ -244,7 +244,7 @@
     "expected" : {
       "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : true,
       "lines" : [
         "Carries on when any of these finishes",
@@ -365,7 +365,7 @@
     "expected" : {
       "cardTitle" : "Waiting for a session",
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : true,
+      "hasDeadline" : true,
       "isBlocked" : true,
       "lines" : [
         "Haiku one, renamed — still working"
@@ -440,7 +440,7 @@
           "report" : {
             "at" : 812500060,
             "block" : {
-              "checkAgainAt" : 812505400,
+              "deadline" : 812505400,
               "waits" : [
                 {
                   "agentID" : "00000000-0000-0000-0000-000000000060",
@@ -466,116 +466,13 @@
         }
       ]
     },
-    "name" : "one, with a time to check again"
-  },
-  {
-    "expected" : {
-      "cardTitle" : "Waiting until a set time",
-      "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : true,
-      "isBlocked" : true,
-      "lines" : [
-
-      ],
-      "waitLine" : null
-    },
-    "input" : {
-      "agentID" : "00000000-0000-0000-0000-000000000062",
-      "agents" : [
-        {
-          "advertisedOptions" : [
-
-          ],
-          "availableCommands" : [
-
-          ],
-          "createdAt" : 812500000,
-          "cwd" : "file:///fixture/folder/",
-          "id" : "00000000-0000-0000-0000-000000000060",
-          "lastActivityAt" : 812500000,
-          "runtimeID" : "claude",
-          "startOptions" : {
-            "extraArguments" : [
-
-            ],
-            "values" : {
-
-            }
-          },
-          "state" : "running",
-          "title" : "Haiku one, renamed"
-        },
-        {
-          "advertisedOptions" : [
-
-          ],
-          "availableCommands" : [
-
-          ],
-          "createdAt" : 812500000,
-          "cwd" : "file:///fixture/folder/",
-          "id" : "00000000-0000-0000-0000-000000000061",
-          "lastActivityAt" : 812500000,
-          "report" : {
-            "at" : 812500060,
-            "message" : "It went.",
-            "outcome" : "done"
-          },
-          "runtimeID" : "claude",
-          "startOptions" : {
-            "extraArguments" : [
-
-            ],
-            "values" : {
-
-            }
-          },
-          "state" : "finished",
-          "title" : "Haiku two"
-        },
-        {
-          "advertisedOptions" : [
-
-          ],
-          "availableCommands" : [
-
-          ],
-          "createdAt" : 812500000,
-          "cwd" : "file:///fixture/folder/",
-          "id" : "00000000-0000-0000-0000-000000000062",
-          "lastActivityAt" : 812500000,
-          "report" : {
-            "at" : 812500060,
-            "block" : {
-              "checkAgainAt" : 812505400,
-              "waits" : [
-
-              ]
-            },
-            "message" : "Waiting on the haikus.",
-            "outcome" : "waiting"
-          },
-          "runtimeID" : "claude",
-          "startOptions" : {
-            "extraArguments" : [
-
-            ],
-            "values" : {
-
-            }
-          },
-          "state" : "finished",
-          "title" : "Lead"
-        }
-      ]
-    },
-    "name" : "only a time"
+    "name" : "one, with a deadline"
   },
   {
     "expected" : {
       "cardTitle" : "Waiting for sessions",
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : true,
       "lines" : [
         "Carries on when any of these finishes",
@@ -768,7 +665,7 @@
     "expected" : {
       "cardTitle" : null,
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : false,
       "lines" : [
 
@@ -888,7 +785,7 @@
     "expected" : {
       "cardTitle" : null,
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : false,
       "lines" : [
 
@@ -985,7 +882,7 @@
     "expected" : {
       "cardTitle" : null,
       "carryOnHelp" : "Stop waiting and carry on now",
-      "checksAgain" : false,
+      "hasDeadline" : false,
       "isBlocked" : false,
       "lines" : [
 

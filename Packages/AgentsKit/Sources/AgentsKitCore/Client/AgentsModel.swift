@@ -2203,12 +2203,12 @@ public final class AgentsModel {
     }
 
     /// The lines under a blocked agent's message: whether it waits on any or all of
-    /// several (#152), one per agent it waits on, and when it will check again. The same on the Mac's row and the phone's card (FR-011).
+    /// several (#152), one per agent it waits on, and its deadline. The same on the Mac's row and the phone's card (FR-011).
     public func blockLines(_ agent: Agent) -> [String] {
         guard let (_, block) = openBlock(agent) else { return [] }
         return [block.wakeLine()].compactMap { $0 }
             + block.waits.map { Block.waitLine(name: waitName($0), ending: $0.ending) }
-            + [block.checkAgainLine()].compactMap { $0 }
+            + [block.deadlineLine()].compactMap { $0 }
     }
 
     /// A waiting agent's one row line (#582): the agents its block still waits on, what its wait

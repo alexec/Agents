@@ -102,8 +102,7 @@ RULES: list[tuple[str, str]] = [
 # Tools that start a wait. The call is only the first part of it: the daemon
 # holds it for up to 45 s, then the wait goes on with the turn ended. A wait is
 # not running time.
-# check_again went in #4843: older records still name it.
-WAITS = {"wait_for_event", "ask_question", "hand_to_person", "check_again"}
+WAITS = {"wait_for_event", "ask_question", "hand_to_person"}
 
 
 def is_wait(c: dict) -> bool:
@@ -174,8 +173,6 @@ def wake_reason(text: str) -> str:
         return "wait timed out"
     if first.startswith("The time you asked for has come"):
         return "time reached"
-    if first.startswith("The time you asked to check again"):
-        return "check_again timer"
     if first.startswith("The wait you reported has cleared"):
         return "other sessions ended"
     if first.startswith(("You have moved", "You moved")):

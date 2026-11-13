@@ -1216,7 +1216,8 @@ export type BackupTarget =
 
 export interface Block {
   waits: Wait[];
-  checkAgainAt?: WireDate;
+  /** When the wait ends if its sessions have not (#5152; was checkAgainAt). */
+  deadline?: WireDate;
   wakeOn?: BlockWakeOn;
   clearedAt?: WireDate;
   clearedBy?: BlockClearing;
@@ -15957,7 +15958,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BackupStoreList: { required: ["backups"], optional: [] },
   BackupStorePart: { required: ["name", "part", "data"], optional: [] },
   BackupStorePartRequest: { required: ["id", "part"], optional: [] },
-  Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
+  Block: { required: ["waits"], optional: ["deadline", "wakeOn", "clearedAt", "clearedBy"] },
   BotCaps: { required: ["user", "caps"], optional: ["group"] },
   BotMade: { required: ["user"], optional: [] },
   BotMake: { required: ["name", "group"], optional: ["caps"] },

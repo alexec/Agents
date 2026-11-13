@@ -16,7 +16,7 @@ import (
 // wait_for_event on agent.ended with agent (#3799) ends the turn waiting, with a block naming
 // them on the report;
 // as each ends its wait closes, and when they have (all, or any with wake_on any) or the
-// time to check again comes, the agent is started again with what they said.
+// wait's deadline comes, the agent is started again with what they said.
 
 const (
 	blockMinutesLow  = 1
@@ -206,8 +206,8 @@ func (d *Daemon) blockedNote(b *wire.Block) string {
 	for _, w := range b.Waits {
 		named = append(named, "“"+d.waitName(w)+"”")
 	}
-	// Every new block names agents or a time (until_minutes is required), so it is always
-	// under Waiting (#2045).
+	// Every new block names sessions and a deadline (until_minutes is required), so it is
+	// always under Waiting (#2045).
 	note := "Recorded. The person will see this conversation under \"Waiting\"."
 	switch {
 	case len(named) == 1:
@@ -217,18 +217,14 @@ func (d *Daemon) blockedNote(b *wire.Block) string {
 	case len(named) > 1:
 		note += " You will be resumed when " + strings.Join(named[:len(named)-1], ", ") + " and " + named[len(named)-1] + " have all finished"
 	}
-	if b.CheckAgainAt != nil {
-		minutes := max(1, int(math.Round(time.Until(b.CheckAgainAt.Time()).Minutes())))
-		if len(named) == 0 {
-			note += fmt.Sprintf(" You will be resumed in %d minutes.", minutes)
-		} else {
-			note += fmt.Sprintf(", or in %d minutes, whichever comes first.", minutes)
-		}
-	} else if len(named) > 0 {
-		note += "."
-	}
-	if len(named) == 0 && b.CheckAgainAt == nil {
+	switch {
+	case len(named) == 0:
 		note += " Nothing will resume you until the person carries you on."
+	case b.Deadline != nil:
+		minutes := max(1, int(math.Round(time.Until(b.Deadline.Time()).Minutes())))
+		note += fmt.Sprintf(", or in %d minutes, whichever comes first.", minutes)
+	default:
+		note += "."
 	}
 	return note
 }
@@ -332,7 +328,7 @@ func (d *Daemon) waitOn(caller wire.UUID, names []string, wakeOn string, minutes
 		return d.endedAtOnceWords(ended, block.Waits, onAny), nil
 	}
 	check := wire.DateOf(at.Time().Add(time.Duration(minutes) * time.Minute))
-	block.CheckAgainAt = &check
+	block.Deadline = &check
 	if wake != nil && *wake == wire.BlockWakeOnAny && len(block.Waits) > 0 {
 		block.WakeOn = wake
 	}
@@ -496,7 +492,7 @@ func (d *Daemon) resumePrompt(b *wire.Block, message string, why wire.BlockClear
 	case why == wire.BlockClearingWaits:
 		lines = append(lines, "The wait you reported has cleared: every agent you were waiting on has finished.")
 	default:
-		lines = append(lines, "The time you asked to check again has come.")
+		lines = append(lines, "The time you asked for has come.")
 	}
 	line := func(w wire.Wait) string {
 		s := "- “" + d.waitName(w) + "” (id " + string(w.AgentID) + "): "
@@ -557,7 +553,7 @@ func (d *Daemon) resumeIfCleared(id wire.UUID) {
 	}
 	b := *a.Report.Block
 	t := now()
-	due := b.CheckAgainAt != nil && !b.CheckAgainAt.Time().After(t.Time())
+	due := b.Deadline != nil && !b.Deadline.Time().After(t.Time())
 	if !waitsCleared(&b) && !due {
 		return
 	}
@@ -579,7 +575,7 @@ func (d *Daemon) resumeIfCleared(id wire.UUID) {
 		}
 		b := *a.Report.Block
 		cleared := waitsCleared(&b)
-		if !cleared && !(b.CheckAgainAt != nil && !b.CheckAgainAt.Time().After(t.Time())) {
+		if !cleared && !(b.Deadline != nil && !b.Deadline.Time().After(t.Time())) {
 			return
 		}
 		why := wire.BlockClearingTime
@@ -629,14 +625,17 @@ func (d *Daemon) couldNotCarryOn(id, promptID wire.UUID, why string) {
 }
 
 // dropBlock clears a block the person has carried on past.
-func (d *Daemon) dropBlock(id wire.UUID) {
+func (d *Daemon) dropBlock(id wire.UUID) { d.clearBlockDropped(id, true) }
+
+// clearBlockDropped is dropBlock; with moveOn false, the session keeps its place in its list.
+func (d *Daemon) clearBlockDropped(id wire.UUID, moveOn bool) {
 	a := d.Store.Agent(id)
 	if a == nil || !isOpenBlock(a.Report) {
 		return
 	}
 	t := now()
 	dropped := wire.BlockClearingDropped
-	d.change(id, func(a *wire.Agent) {
+	d.changeAgent(id, moveOn, func(a *wire.Agent) {
 		r := *a.Report
 		b := wire.Block{Waits: []wire.Wait{}}
 		if r.Block != nil {
@@ -648,7 +647,7 @@ func (d *Daemon) dropBlock(id wire.UUID) {
 	})
 }
 
-// armBlockTimer aims one timer at the earliest time a block checks again. A block that is
+// armBlockTimer aims one timer at the earliest deadline of a block. A block that is
 // due but cannot resume yet (its agent in a turn, not finished, or with prompts queued) is
 // passed over (#4687): aimed at its time, which has passed, the timer fired every 20 ms for
 // as long as the turn went on. The run resumes it as the turn ends (run's resumeIfCleared).
@@ -657,10 +656,10 @@ func (d *Daemon) armBlockTimer() {
 	var next *time.Time
 	at := nowFunc()
 	for _, a := range d.Store.LiveAgents() {
-		if !isOpenBlock(a.Report) || a.Report.Block == nil || a.Report.Block.CheckAgainAt == nil {
+		if !isOpenBlock(a.Report) || a.Report.Block == nil || a.Report.Block.Deadline == nil {
 			continue
 		}
-		t := a.Report.Block.CheckAgainAt.Time()
+		t := a.Report.Block.Deadline.Time()
 		if !t.After(at) && !d.mayResume(&a) {
 			continue
 		}
@@ -711,10 +710,17 @@ func (d *Daemon) resumeBlocks() {
 		if !isOpenBlock(a.Report) || a.Report.Block == nil {
 			continue
 		}
-		if a.Report.Block.CheckAgainAt == nil && len(a.Report.Block.Waits) > 0 {
+		// A block that waits on no session is a time-only one that check_again made before
+		// #4843. It is dropped, and nobody is resumed (#5152): some were weeks old, on
+		// archived sessions, and showed "Waiting until a set time" for ever.
+		if len(a.Report.Block.Waits) == 0 {
+			d.clearBlockDropped(a.ID, false)
+			continue
+		}
+		if a.Report.Block.Deadline == nil {
 			d.change(a.ID, func(a *wire.Agent) {
 				r, b := *a.Report, *a.Report.Block
-				b.CheckAgainAt = &latest
+				b.Deadline = &latest
 				r.Block = &b
 				a.Report = &r
 			})

@@ -66,20 +66,16 @@ struct BlockTests {
 
     /// Whichever comes first: the time, even with waits still open.
     @Test func theTimeResumesItWithWaitsStillOpen() {
-        let block = Block(waits: [Self.wait(ended: false)], checkAgainAt: Self.now)
+        let block = Block(waits: [Self.wait(ended: false)], deadline: Self.now)
         #expect(block.shouldResume(now: Self.now))
         #expect(!block.shouldResume(now: Self.now.addingTimeInterval(-1)))
     }
 
     /// Once cleared, never again — the whole of SC-002 on the model's side.
     @Test func aClearedBlockNeverResumes() {
-        let block = Block(waits: [Self.wait(ended: true)], checkAgainAt: Self.now,
+        let block = Block(waits: [Self.wait(ended: true)], deadline: Self.now,
                           clearedAt: Self.now, clearedBy: .waits)
         #expect(!block.shouldResume(now: .distantFuture))
-    }
-
-    @Test func theRangeIsAMinuteToADay() {
-        #expect(Block.checkAgainMinutes == 1...1440)
     }
 
     /// FR-013: each agent it waited on, how it ended, and what it said; and what the
@@ -97,12 +93,12 @@ struct BlockTests {
         #expect(text.contains("You said you were waiting on: the two helpers"))
     }
 
-    /// FR-014: the time came, and says so, with what is still open.
+    /// FR-014: the deadline came, and says so, with what is still open.
     @Test func theTimePromptSaysTheTimeCame() {
         let open = Wait(agentID: UUID(), nameAtReport: "CI watcher")
         let text = Block(waits: [open]).resumePrompt(message: "CI on fix-login", name: \.nameAtReport,
                                                      why: .time)
-        #expect(text.hasPrefix("The time you asked to check again has come."))
+        #expect(text.hasPrefix("The time you asked for has come."))
         #expect(text.contains("still working"))
         #expect(text.contains("CI on fix-login"))
     }

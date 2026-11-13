@@ -28,10 +28,10 @@ export function isOpenBlock(report: WorkReport | undefined): boolean {
   return report?.outcome === "waiting" && report.block?.clearedAt === undefined;
 }
 
-/** An open block the app clears by itself: it names agents, or a time (WorkReport.resumesByItself). */
+/** An open block the app clears by itself: it names agents, or a deadline (WorkReport.resumesByItself). */
 export function resumesByItself(report: WorkReport | undefined): boolean {
   if (!isOpenBlock(report) || !report?.block) return false;
-  return report.block.waits.length > 0 || report.block.checkAgainAt !== undefined;
+  return report.block.waits.length > 0 || report.block.deadline !== undefined;
 }
 
 const pausedEndings: readonly (EndedReason | undefined)[] = ["cancelled", "stoppedByAgent", "stoppedByAdmin"];
