@@ -8884,6 +8884,11 @@ export interface OutsideAccount {
   description?: string;
   /** The address it signs in with. */
   address?: string;
+  /**
+   * The user name it signs in with, when that is not the address (#5116). Plain text, never a
+   * secret. Absent when not set.
+   */
+  username?: string;
   /** Free, Pro… */
   plan?: string;
   /** What it costs a month, in US dollars. Absent when not known. */
@@ -16624,7 +16629,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OrgRoutesApplied: { required: ["routes"], optional: [] },
   OrgRoutesLeft: { required: ["host", "name", "user", "routes"], optional: [] },
   OrgRoutesMine: { required: ["routes"], optional: [] },
-  OutsideAccount: { required: ["service"], optional: ["description", "address", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "edited", "lastOp", "tokenExpires", "notes", "projects", "askBeforeUse"] },
+  OutsideAccount: { required: ["service"], optional: ["description", "address", "username", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "edited", "lastOp", "tokenExpires", "notes", "projects", "askBeforeUse"] },
   OutsideAccounts: { required: ["accounts"], optional: [] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
   PassThroughName: { required: ["name"], optional: ["runtime", "setBy"] },

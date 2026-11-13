@@ -68,7 +68,7 @@ func checkAccounts(value json.RawMessage) error {
 
 func accountTexts(a wire.OutsideAccount) []string {
 	texts := []string{a.Service}
-	for _, p := range []*string{a.Description, a.Address, a.Plan, a.Card, a.Secret, a.TwoFactor, a.Issue, a.Made, a.TokenExpires, a.Notes} {
+	for _, p := range []*string{a.Description, a.Address, a.Username, a.Plan, a.Card, a.Secret, a.TwoFactor, a.Issue, a.Made, a.TokenExpires, a.Notes} {
 		if p != nil {
 			texts = append(texts, *p)
 		}

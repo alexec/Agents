@@ -103,6 +103,8 @@ public extension DaemonAPI {
         /// accounts of the same service. nil on an account made before it.
         public var description: String?
         public var address: String?
+        /// The user name it signs in with, when that is not the address (#5116). Plain text.
+        public var username: String?
         public var plan: String?
         public var monthlyCostUsd: Double?
         public var card: String?
@@ -126,8 +128,9 @@ public extension DaemonAPI {
         public init(service: String, description: String? = nil, address: String? = nil, plan: String? = nil, monthlyCostUsd: Double? = nil,
                     card: String? = nil, secret: String? = nil, twoFactor: String? = nil, issue: String? = nil,
                     made: String? = nil, tokenExpires: String? = nil, notes: String? = nil, projects: [String]? = nil,
-                    askBeforeUse: Bool? = nil, edited: Date? = nil, lastOp: AccountLastOp? = nil) {
+                    askBeforeUse: Bool? = nil, edited: Date? = nil, lastOp: AccountLastOp? = nil, username: String? = nil) {
             self.service = service
+            self.username = username
             self.edited = edited
             self.lastOp = lastOp
             self.description = description

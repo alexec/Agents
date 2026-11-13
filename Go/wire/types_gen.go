@@ -9509,6 +9509,9 @@ type OutsideAccount struct {
 	// The address it signs in with.
 	Address *string `json:"address,omitzero"`
 
+	// The user name it signs in with, when that is not the address (#5116). Plain text, never a secret. Absent when not set.
+	Username *string `json:"username,omitzero"`
+
 	// Free, Pro…
 	Plan *string `json:"plan,omitzero"`
 

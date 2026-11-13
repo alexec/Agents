@@ -179,7 +179,7 @@ func accountFields(from, to wire.OutsideAccount) []string {
 		}
 	}
 	var out []string
-	for _, name := range []string{"service", "address", "description", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "tokenExpires", "notes", "projects"} {
+	for _, name := range []string{"service", "address", "username", "description", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "tokenExpires", "notes", "projects"} {
 		if a, b := show(old[name]), show(now[name]); a != b {
 			out = append(out, name+": "+a+" → "+b)
 		}
