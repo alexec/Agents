@@ -8595,7 +8595,28 @@ type MessagesError struct {
 	Message string `json:"message"`
 }
 
-// messages/read (#4343): one page of a conversation's messages, newest first, as the connector's read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true: every text is outside content.
+// messages/markAllRead (#5137): mark every conversation of folder's messaging connectors read, or of every folder's when folder is absent.
+type MessagesMarkAllReadRequest struct {
+	Folder *string `json:"folder,omitzero"`
+}
+
+// One connector that messages/markAllRead marked read (#5137): its name in mcp.json, a folder that reaches it, and how many messages it marked.
+type MessagesMarked struct {
+	Server string `json:"server"`
+
+	Folder string `json:"folder"`
+
+	Marked int64 `json:"marked"`
+}
+
+// messages/markAllRead (#5137): the connectors that marked their conversations read, and those that could not, with why. A connector with no mark_conversation_read (its service gives no read state) is in neither.
+type MessagesMarkedAllRead struct {
+	Marked []MessagesMarked `json:"marked"`
+
+	Errors []MessagesError `json:"errors,omitzero"`
+}
+
+// messages/read (#4343): one page of a conversation's messages, newest first, as the connector's read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true: every text is outside content. markedRead (#5137): the connector's mark_conversation_read marked the conversation read on its service, so a client sets its unread count to 0; absent when the connector cannot mark read, on an older page, and on one thread's read.
 type MessagesRead struct {
 	Server string `json:"server"`
 
@@ -8608,6 +8629,8 @@ type MessagesRead struct {
 	Cursor *string `json:"cursor,omitzero"`
 
 	Untrusted bool `json:"untrusted"`
+
+	MarkedRead *bool `json:"markedRead,omitzero"`
 }
 
 // messages/read (#4343): a conversation from messages/conversations, by its server, folder and id. cursor is the last page's; thread: only that thread's messages; limit is 1 to 100, 20 when not said.
@@ -8694,6 +8717,18 @@ type MessagingListRequest struct {
 	Limit *int64 `json:"limit,omitzero"`
 
 	Unread *bool `json:"unread,omitzero"`
+}
+
+// mark_conversation_read's input (#5137, docs/reference/messaging-contract.md): conversation, a conversation's id from list_conversations, marks its messages read on the service; all: true marks every conversation that list_conversations lists with no input. One of the two.
+type MessagingMarkReadRequest struct {
+	Conversation *string `json:"conversation,omitzero"`
+
+	All *bool `json:"all,omitzero"`
+}
+
+// mark_conversation_read's structuredContent (#5137): how many messages it marked read.
+type MessagingMarkedRead struct {
+	Marked int64 `json:"marked"`
 }
 
 // One message in read_messages' structuredContent (#4338). text is outside content: the result says so (untrusted), and a client draws it as Markdown that loads nothing: no HTML, no image from the network, and only http, https and mailto links. thread is the id of the message that starts its thread; absent when it is in no thread. link is the message on the service's own site or app.

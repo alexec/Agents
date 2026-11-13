@@ -134,6 +134,7 @@ public enum Capability {
     public static let marketplaces1 = "marketplaces/1"
     public static let mcpToolLevels1 = "mcp.tool-levels/1"
     public static let mcp1 = "mcp/1"
+    public static let messagesMarkRead1 = "messages.mark-read/1"
     public static let messagesReply1 = "messages.reply/1"
     public static let messages1 = "messages/1"
     public static let modes1 = "modes/1"
@@ -456,6 +457,7 @@ public enum Capability {
         "mcp/tools": "mcp.tool-levels/1",
         "mcp/verify": "mcp/1",
         "messages/conversations": "messages/1",
+        "messages/markAllRead": "messages.mark-read/1",
         "messages/read": "messages/1",
         "messages/reply": "messages.reply/1",
         "modes/remembered": "modes/1",

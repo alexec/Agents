@@ -87,15 +87,15 @@ func TestTheFrontOffersTheEventAndTools(t *testing.T) {
 	for _, tl := range tools {
 		names = append(names, tl.(map[string]any)["name"].(string))
 	}
-	want := []string{"list_conversations", "list_folders", "list_messages", "mark_read", "move_message", "read_message", "read_messages",
-		"search_messages", "show_mail"}
+	want := []string{"list_conversations", "list_folders", "list_messages", "mark_conversation_read", "mark_read", "move_message",
+		"read_message", "read_messages", "search_messages", "show_mail"}
 	if !reflect.DeepEqual(names, want) {
 		t.Fatalf("tools: %v", names)
 	}
 	for _, tl := range tools {
 		meta, _ := tl.(map[string]any)["_meta"].(map[string]any)
 		name := tl.(map[string]any)["name"].(string)
-		if follows := meta[ContractMeta] == float64(ContractVersion); follows != (name == "list_conversations" || name == "read_messages") {
+		if follows := meta[ContractMeta] == float64(ContractVersion); follows != (name == "list_conversations" || name == "read_messages" || name == "mark_conversation_read") {
 			t.Fatalf("%s's _meta: %v", name, meta)
 		}
 	}

@@ -13,8 +13,9 @@ import (
 // The messaging contract (#4337, #4340, docs/reference/messaging-contract.md): a mail
 // conversation is a thread (threads.go). list_conversations is a folder's threads, the
 // newest first, and read_messages is one thread's mail with its text, the newest first, by
-// cursor. Each tool says, in its _meta, that it follows the contract, so the Messages page
-// can read Mail. list_messages, read_message and show_mail stay as they were.
+// cursor. mark_conversation_read (#5137) marks a thread's mail read, or the whole folder's.
+// Each tool says, in its _meta, that it follows the contract, so the Messages page can read
+// Mail. list_messages, read_message, mark_read and show_mail stay as they were.
 
 // ContractMeta is the key that says a tool follows the messaging contract, and its version.
 const ContractMeta = "agents/messaging"
@@ -39,7 +40,13 @@ type threadArgs struct {
 	Limit        int    `json:"limit,omitempty" jsonschema:"at most this many: 20 when left out, 100 at most"`
 }
 
-// addMessagingTools puts list_conversations and read_messages on server.
+type markReadArgs struct {
+	Conversation string `json:"conversation,omitempty" jsonschema:"the conversation's id, as list_conversations gives it: its mail is marked read"`
+	All          bool   `json:"all,omitempty" jsonschema:"true: every conversation of the folder is marked read"`
+	Folder       string `json:"folder,omitempty" jsonschema:"with all, the folder whose mail to mark read; INBOX when left out"`
+}
+
+// addMessagingTools puts list_conversations, read_messages and mark_conversation_read on server.
 func addMessagingTools(server *mcp.Server, m *Mailbox) {
 	readOnly := &mcp.ToolAnnotations{ReadOnlyHint: true}
 	contract := mcp.Meta{ContractMeta: ContractVersion}
@@ -98,6 +105,31 @@ func addMessagingTools(server *mcp.Server, m *Mailbox) {
 			}
 			summary := fmt.Sprintf("conversation: %s\nmessages: %d\ncursor: %s\n%s", conversation, len(msgs), next, text.String())
 			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: summary}}, StructuredContent: out}, nil
+		})
+
+	notDestructive := false
+	tool(server, &mcp.Tool{Name: "mark_conversation_read", Title: "Mark a conversation read",
+		Description: "Marks a mail thread's unread mail read, by its conversation id from list_conversations; " +
+			"with all true, every unread mail of the folder (INBOX when left out). Gives how many it marked.",
+		Annotations: &mcp.ToolAnnotations{DestructiveHint: &notDestructive, IdempotentHint: true}, Meta: contract},
+		func(ctx context.Context, in markReadArgs) (*mcp.CallToolResult, error) {
+			conversation := strings.TrimSpace(in.Conversation)
+			var marked int
+			var err error
+			switch {
+			case in.All && conversation == "":
+				marked, err = m.MarkFolderRead(ctx, folderOr(in.Folder))
+			case !in.All && conversation != "":
+				marked, err = m.MarkThreadRead(ctx, conversation)
+			default:
+				return nil, fmt.Errorf("give conversation, a conversation's id from list_conversations, or all true; not both")
+			}
+			if err != nil {
+				return nil, err
+			}
+			out := wire.MessagingMarkedRead{Marked: int64(marked)}
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: fmt.Sprintf("marked read: %d", marked)}},
+				StructuredContent: out}, nil
 		})
 }
 

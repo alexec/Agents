@@ -478,3 +478,66 @@ func (m *Mailbox) texts(c *imapclient.Client, list []Summary) ([]Message, error)
 	}
 	return out, nil
 }
+
+// MarkThreadRead marks the unread mail of the thread id read in its folder (#5137), and says
+// how many it marked. The person's own answers in Sent are read already.
+func (m *Mailbox) MarkThreadRead(ctx context.Context, id string) (int, error) {
+	t, err := parseThreadID(id)
+	if err != nil {
+		return 0, err
+	}
+	marked := 0
+	err = m.with(ctx, func(c *imapclient.Client) error {
+		marked, m.folders = 0, nil
+		list, err := m.threadIn(c, t, t.Folder)
+		if err != nil {
+			return err
+		}
+		var uids []imap.UID
+		for _, s := range list {
+			if s.Unread {
+				uids = append(uids, s.uid)
+			}
+		}
+		if len(uids) == 0 {
+			return nil
+		}
+		if err := markSeen(c, imap.UIDSetNum(uids...)); err != nil {
+			return err
+		}
+		marked = len(uids)
+		return nil
+	})
+	return marked, err
+}
+
+// MarkFolderRead marks every unread mail of folder read (#5137): every conversation that
+// list_conversations lists there. It says how many it marked.
+func (m *Mailbox) MarkFolderRead(ctx context.Context, folder string) (int, error) {
+	marked := 0
+	err := m.with(ctx, func(c *imapclient.Client) error {
+		marked, m.folders = 0, nil
+		if err := m.open(c, folder); err != nil {
+			return err
+		}
+		found, err := c.UIDSearch(&imap.SearchCriteria{NotFlag: []imap.Flag{imap.FlagSeen}}, nil).Wait()
+		if err != nil {
+			return err
+		}
+		uids := found.AllUIDs()
+		if len(uids) == 0 {
+			return nil
+		}
+		if err := markSeen(c, imap.UIDSetNum(uids...)); err != nil {
+			return err
+		}
+		marked = len(uids)
+		return nil
+	})
+	return marked, err
+}
+
+// markSeen sets \Seen on uids of the selected folder.
+func markSeen(c *imapclient.Client, uids imap.UIDSet) error {
+	return c.Store(uids, &imap.StoreFlags{Op: imap.StoreFlagsAdd, Silent: true, Flags: []imap.Flag{imap.FlagSeen}}, nil).Close()
+}

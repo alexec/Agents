@@ -18724,9 +18724,62 @@
       ],
       "additionalProperties": false
     },
+    "MessagesMarkAllReadRequest": {
+      "type": "object",
+      "description": "messages/markAllRead (#5137): mark every conversation of folder's messaging connectors read, or of every folder's when folder is absent.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MessagesMarked": {
+      "type": "object",
+      "description": "One connector that messages/markAllRead marked read (#5137): its name in mcp.json, a folder that reaches it, and how many messages it marked.",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "marked": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "server",
+        "folder",
+        "marked"
+      ],
+      "additionalProperties": false
+    },
+    "MessagesMarkedAllRead": {
+      "type": "object",
+      "description": "messages/markAllRead (#5137): the connectors that marked their conversations read, and those that could not, with why. A connector with no mark_conversation_read (its service gives no read state) is in neither.",
+      "properties": {
+        "marked": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessagesMarked"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessagesError"
+          }
+        }
+      },
+      "required": [
+        "marked"
+      ],
+      "additionalProperties": false
+    },
     "MessagesRead": {
       "type": "object",
-      "description": "messages/read (#4343): one page of a conversation's messages, newest first, as the connector's read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true: every text is outside content.",
+      "description": "messages/read (#4343): one page of a conversation's messages, newest first, as the connector's read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true: every text is outside content. markedRead (#5137): the connector's mark_conversation_read marked the conversation read on its service, so a client sets its unread count to 0; absent when the connector cannot mark read, on an older page, and on one thread's read.",
       "properties": {
         "server": {
           "type": "string"
@@ -18747,6 +18800,9 @@
           "type": "string"
         },
         "untrusted": {
+          "type": "boolean"
+        },
+        "markedRead": {
           "type": "boolean"
         }
       },
@@ -18928,6 +18984,32 @@
           "type": "boolean"
         }
       },
+      "additionalProperties": false
+    },
+    "MessagingMarkReadRequest": {
+      "type": "object",
+      "description": "mark_conversation_read's input (#5137, docs/reference/messaging-contract.md): conversation, a conversation's id from list_conversations, marks its messages read on the service; all: true marks every conversation that list_conversations lists with no input. One of the two.",
+      "properties": {
+        "conversation": {
+          "type": "string"
+        },
+        "all": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MessagingMarkedRead": {
+      "type": "object",
+      "description": "mark_conversation_read's structuredContent (#5137): how many messages it marked read.",
+      "properties": {
+        "marked": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "marked"
+      ],
       "additionalProperties": false
     },
     "MessagingMessage": {

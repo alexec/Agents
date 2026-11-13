@@ -13,6 +13,11 @@ final class MessagesListState {
     var open: MessagesList.Row?
     var asked = 0
     var loadingMore = false
+    /// Goes up each time a conversation or all of them were marked read (#5137), so the sidebar row reads its count
+    /// again at once.
+    var marked = 0
+    var markingAll = false
+    var markProblems: [String] = []
 
     var ask: [String] { [String(asked), String(unreadOnly)] }
     var rows: [MessagesList.Row] { MessagesList.merged(lists ?? [], source: source) }
@@ -27,6 +32,43 @@ final class MessagesListState {
         }
         // A newer Refresh wins.
         if asked == self.asked, unread == unreadOnly { lists = read }
+    }
+
+    /// A read marked the conversation `key` read (#5137): its count goes to 0 here, and the sidebar's is read again.
+    func markedRead(_ key: String) {
+        if let lists { self.lists = MessagesList.markedRead(lists, key: key) }
+        marked += 1
+    }
+
+    /// Mark All as Read (#5137): every machine that can marks every conversation of its connectors read; then the
+    /// list is read again, as the services now say.
+    func markAllRead(model: AppModel) async {
+        guard !markingAll else { return }
+        markingAll = true
+        markProblems = []
+        defer { markingAll = false }
+        let machines = model.messagesMarkMachines
+        var answers: [(name: String, marked: DaemonAPI.MessagesMarkedAllRead?, problem: String?)] = []
+        await withTaskGroup(of: (String, DaemonAPI.MessagesMarkedAllRead?, String?).self) { group in
+            for machine in machines {
+                group.addTask {
+                    do {
+                        return (machine.name, try await model.messages(DaemonAPI.Method.messagesMarkAllRead,
+                                                                       DaemonAPI.MessagesMarkAllReadRequest(),
+                                                                       returning: DaemonAPI.MessagesMarkedAllRead.self,
+                                                                       on: machine.id), nil)
+                    } catch {
+                        return (machine.name, nil, error.localizedDescription)
+                    }
+                }
+            }
+            for await (name, got, problem) in group { answers.append((name: name, marked: got, problem: problem)) }
+        }
+        markProblems = MessagesList.markProblems(answers.sorted { a, b in
+            (machines.firstIndex { $0.name == a.name } ?? 0) < (machines.firstIndex { $0.name == b.name } ?? 0)
+        })
+        marked += 1
+        asked += 1
     }
 
     /// The next page of each machine that has one, after its own.
@@ -88,10 +130,14 @@ final class MessagesListState {
 struct MessagesView: View {
     @Bindable var list: MessagesListState
 
+    private var next: MessagesList.Row? {
+        list.open.flatMap { MessagesList.next(after: $0.id, in: list.rows) }
+    }
+
     var body: some View {
         Group {
             if let row = list.open {
-                ConversationPage(row: row).id(row.id)
+                ConversationPage(row: row) { list.markedRead(row.id) }.id(row.id)
             } else {
                 MessagesListPane(list: list)
             }
@@ -102,6 +148,12 @@ struct MessagesView: View {
                 Button { list.open = nil } label: { Image(toolbarIcon: "chevron.left") }
                     .disabled(list.open == nil)
                     .help("Back to Messages")
+                // Next (#5137): the next conversation in the list as it is filtered and sorted now.
+                Button { list.open = next } label: { Image(toolbarIcon: "chevron.down") }
+                    .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+                    .disabled(next == nil)
+                    .help(MessagesList.nextHelp)
+                    .accessibilityLabel(MessagesList.nextConversation)
             }
         }
     }
@@ -130,6 +182,14 @@ private struct MessagesListPane: View {
             Toggle("Unread", isOn: $list.unreadOnly)
                 .toggleStyle(.checkbox)
             Spacer()
+            if !model.messagesMarkMachines.isEmpty {
+                Button(list.markingAll ? MessagesList.markingAllRead : MessagesList.markAllRead) {
+                    Task { await list.markAllRead(model: model) }
+                }
+                .linkStyle()
+                .disabled(list.markingAll || !MessagesList.hasUnread(list.lists ?? []))
+                .help(MessagesList.markAllHelp)
+            }
             Button("Refresh") { list.asked += 1 }
                 .linkStyle()
         }
@@ -145,7 +205,7 @@ private struct MessagesListPane: View {
             } else {
                 let rows = list.rows
                 List {
-                    ForEach(MessagesList.problems(lists), id: \.self) { line in
+                    ForEach(MessagesList.problems(lists) + list.markProblems, id: \.self) { line in
                         Label(line, icon: "exclamationmark.triangle").foregroundStyle(.secondary)
                     }
                     if rows.isEmpty {
@@ -236,6 +296,8 @@ private struct ConversationPage: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openURL) private var openURL
     let row: MessagesList.Row
+    /// The read marked the conversation read on its service (#5137).
+    var markedRead: () -> Void = {}
 
     @State private var messages: [DaemonAPI.MessagingMessage]?
     @State private var cursor: String?
@@ -351,6 +413,7 @@ private struct ConversationPage: View {
                 returning: DaemonAPI.MessagesRead.self, on: row.host)
             messages = (more ? messages ?? [] : []) + got.messages
             cursor = got.cursor
+            if got.markedRead == true { markedRead() }
         } catch {
             problem = error.localizedDescription
         }
@@ -416,7 +479,7 @@ struct MessagesRow: View {
             }
             .accessibilityValue(line ?? "")
         }
-        .task(id: machines.map(\.id.rawValue)) {
+        .task(id: machines.map(\.id.rawValue) + [String(model.messagesList.marked)]) {
             while !Task.isCancelled {
                 await read(machines)
                 try? await Task.sleep(for: Self.every)

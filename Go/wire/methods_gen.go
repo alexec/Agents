@@ -236,6 +236,7 @@ var CallMCPSignOut = Method[MCPSignOutRequest, MCPSignOutAnswer]{"mcp/sign-out"}
 var CallMCPTools = Method[MCPToolsRequest, MCPToolsAnswer]{"mcp/tools"}
 var CallMCPVerify = Method[MCPVerifyRequest, MCPVerifyAnswer]{"mcp/verify"}
 var CallMessagesConversations = Method[MessagesConversationsRequest, MessagesConversations]{"messages/conversations"}
+var CallMessagesMarkAllRead = Method[MessagesMarkAllReadRequest, MessagesMarkedAllRead]{"messages/markAllRead"}
 var CallMessagesRead = Method[MessagesReadRequest, MessagesRead]{"messages/read"}
 var CallMessagesReply = Method[MessagesReplyRequest, MessagesReplied]{"messages/reply"}
 var CallModesRemembered = Method[Empty, map[string]JSONValue]{"modes/remembered"}
