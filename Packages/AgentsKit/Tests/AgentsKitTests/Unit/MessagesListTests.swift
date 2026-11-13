@@ -89,4 +89,38 @@ struct MessagesListTests {
         #expect(MessagesList.replyText(" \n ") == nil)
         #expect(MessagesList.sentAs("the Slack bot @agents") == "Sent as the Slack bot @agents, not as an agent.")
     }
+    /// The sidebar Messages row's grey line (#4934): the unread count, and what the newest message woke.
+    @Test func theRowsLineSaysTheUnreadAndWhatTheLastMessageWoke() {
+        let now = Date(timeIntervalSince1970: 10_000)
+        func event(_ position: EventPosition, _ name: String, at: TimeInterval, _ consequences: [Consequence] = []) -> Event {
+            Event(position: position, name: name, at: Date(timeIntervalSince1970: at), scope: .mac, sentence: "",
+                  consequences: consequences)
+        }
+        let agent = UUID()
+        let folder = URL(fileURLWithPath: "/p")
+        let woke = event(1, "message.received", at: 9_760, [.fired(workflowID: "triage", folder: folder, agentID: nil),
+                                                             .woke(agentID: agent, title: "Fix login bug")])
+        let last = MessagesList.lastConsequence([woke, event(2, "agent.started", at: 9_990)])
+        #expect(last == .init(at: Date(timeIntervalSince1970: 9_760), words: "woke Fix login bug"))
+        #expect(MessagesList.statusLine(unread: 12, last: last, now: now) == "12 unread · woke Fix login bug 4 min ago")
+        // A workflow's start when it woke no session; nothing, the case to look into, said as such.
+        let fired = event(3, "message.received", at: 9_000, [.fired(workflowID: "triage", folder: folder, agentID: agent)])
+        #expect(MessagesList.lastConsequence([fired])?.words == "started triage")
+        let nothing = event(4, "message.received", at: 9_880, [.refused(workflowID: "triage", folder: folder, reason: .disabled)])
+        #expect(MessagesList.statusLine(unread: 0, last: MessagesList.lastConsequence([woke, nothing]), now: now)
+                == "nothing woke 2 min ago")
+        // No count and no message: no line.
+        #expect(MessagesList.statusLine(unread: nil, last: nil, now: now) == nil)
+        #expect(MessagesList.lastConsequence([event(5, "agent.started", at: 1)]) == nil)
+        #expect(MessagesList.statusLine(unread: 3, last: nil, now: now) == "3 unread")
+        // Each conversation once, across machines; a connector with no count adds nothing.
+        let lists: [MessagesList.HostConversations] = [
+            .init(host: Self.mac, name: "This Mac", conversations: [Self.item("slack", "C1", at: 1, unread: 2),
+                                                                     Self.item("email", "t1", at: 2)]),
+            .init(host: Self.box, name: "Box", conversations: [Self.item("slack", "C1", at: 1, unread: 2),
+                                                               Self.item("slack", "C2", at: 3, unread: 5)]),
+        ]
+        #expect(MessagesList.unreadTotal(lists) == 7)
+        #expect(MessagesList.unreadTotal([.init(host: Self.mac, name: "This Mac", conversations: [Self.item("email", "t", at: 1)])]) == nil)
+    }
 }

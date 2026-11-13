@@ -1,8 +1,10 @@
 // The Messages page (#4344), as the window's (AgentsKitCore's MessagesList): every machine's conversations
 // from messages/conversations in one list, each conversation once, the newest first, and its words; the
 // reply field's too (#4345).
-import type { ChannelSender, MessagesConversation, MessagesError, MessagingConversation } from "../protocol/generated";
+import type { ChannelSender, Event, MessagesConversation, MessagesError, MessagingConversation } from "../protocol/generated";
+import { fromWireDate } from "../protocol/dates";
 import { channelName } from "./channelLinks";
+import { shortAgo } from "./statusSecrets";
 
 /** One machine's answer, or why it gave none. */
 export interface HostConversations {
@@ -98,4 +100,37 @@ export function sourceGlyph(source: string): string {
     case "whatsapp": return "✆";
     default: return "💬";
   }
+}
+
+// The grey line at the head of Messages (#4934), as the window's sidebar row (MessagesList.statusLine).
+
+/** The event a messaging connector raises for a message (Slack, Google Chat, WhatsApp). */
+export const receivedEvent = "message.received";
+
+/** The newest message.received and what came of it: "woke Fix login bug", "started triage", or "nothing woke". */
+export interface LastConsequence { at: number; words: string }
+
+/** The newest message.received in `events` (every machine's, in any order) and what it did: the session it woke, else
+ * the workflow it started, else "nothing woke", the case a person looks into. Undefined when there is none. */
+export function lastConsequence(events: readonly Event[]): LastConsequence | undefined {
+  const latest = (e: Event) => fromWireDate(e.lastAt ?? e.at).getTime();
+  const newest = events.filter((e) => e.name === receivedEvent).reduce<Event | undefined>((a, e) => (!a || latest(e) > latest(a) ? e : a), undefined);
+  if (!newest) return undefined;
+  const woke = newest.consequences.find((c) => "woke" in c);
+  const fired = newest.consequences.find((c) => "fired" in c);
+  const words = woke && "woke" in woke ? `woke ${woke.woke.title}`
+    : fired && "fired" in fired ? `started ${fired.fired.workflowID}` : "nothing woke";
+  return { at: latest(newest), words };
+}
+
+/** The unread messages of every machine's conversations, each conversation once; undefined when none gives a count. */
+export function unreadTotal(lists: HostConversations[]): number | undefined {
+  const counts = mergeConversations(lists).flatMap((r) => r.item.conversation.unread ?? []);
+  return counts.length ? counts.reduce((a, b) => a + b, 0) : undefined;
+}
+
+/** "12 unread · woke Fix login bug 4 min ago". A count of 0 or none is left out; undefined when there is nothing to say. */
+export function messagesStatusLine(unread: number | undefined, last: LastConsequence | undefined, now = Date.now()): string | undefined {
+  const parts = [unread ? `${unread} unread` : null, last ? `${last.words} ${shortAgo(last.at, now)}` : null].filter((p): p is string => !!p);
+  return parts.length ? parts.join(" · ") : undefined;
 }
