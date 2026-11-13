@@ -50,13 +50,25 @@ struct MarkdownText: View {
     /// the machine's `forge/image`, never by the app. Nil everywhere else, where a remote
     /// image stays its alternative text, so documents and the chat do not change.
     var remoteImage: RemoteImageLoader?
+    /// The images this text opens large, which the viewer goes through (#4954).
+    @State private var gallery = ImageGallery()
 
     var body: some View {
-        if caret != nil {
-            content.textRenderer(CaretFlagRenderer())
-        } else {
-            content
+        Group {
+            if caret != nil {
+                content.textRenderer(CaretFlagRenderer())
+            } else {
+                content
+            }
         }
+        .environment(\.imageSequence, sequence)
+    }
+
+    /// A forge page's images, in their order, for the viewer; nil where no image opens large.
+    private var sequence: ImageSequenceScope? {
+        guard remoteImage != nil else { return nil }
+        let order = ImageSequence.sources(in: MarkdownBlock.parsed(markdown)).compactMap(ForgeMarkdown.imageURL(of:))
+        return ImageSequenceScope(gallery: gallery, order: order)
     }
 
     private var content: AnyView {
@@ -229,7 +241,8 @@ struct MarkdownText: View {
     /// read is the app's: the Mac's disk, or the phone asking the Mac.
     ///
     /// A forge's page is the one exception (#4010): its `remoteImage` asks the machine that
-    /// read the page for an https image, and a click opens it in the image viewer.
+    /// read the page for an https image, and a click opens it in the image viewer. An image that
+    /// is a link is never here: it is the link's words, whose click follows the link (#4954).
     @ViewBuilder
     private func image(source: String, alt: String) -> some View {
         if let base, let url = ImageStamps.url(of: source, base: base) {
@@ -556,9 +569,11 @@ private struct Sideways<Content: View>: View {
 ///
 /// A forge page's picture (`remote`, #4010) is asked for once, shows its alternative text
 /// while it loads and when it cannot be read, is never drawn larger than it is, and opens
-/// in the image viewer when clicked.
+/// in the image viewer when clicked, with the page's other images to go through (#4954). A
+/// small one (a logo, a badge) does not open.
 private struct PagePicture: View {
     @Environment(\.pageActions) private var actions
+    @Environment(\.imageSequence) private var sequence
     let url: URL
     let source: String
     let alt: String
@@ -570,8 +585,8 @@ private struct PagePicture: View {
 
     var body: some View {
         Group {
-            if let loaded, remote != nil {
-                Button { viewed = ViewedImage(image: loaded, alt: alt) } label: {
+            if let loaded, remote != nil, opensLarge(loaded) {
+                Button { open(loaded) } label: {
                     drawn(loaded).frame(maxWidth: loaded.size.width)
                 }
                 .buttonStyle(.plain)
@@ -581,6 +596,9 @@ private struct PagePicture: View {
                 .pointerStyle(.link)
                 #endif
                 .imageViewer($viewed)
+            } else if let loaded, remote != nil {
+                drawn(loaded).frame(maxWidth: loaded.size.width)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             } else if let loaded {
                 drawn(loaded).frame(maxWidth: .infinity, alignment: .leading)
             } else if tried || remote != nil {
@@ -594,6 +612,9 @@ private struct PagePicture: View {
             if let remote {
                 loaded = await remote(url)
                 tried = true
+                if let loaded, opensLarge(loaded) {
+                    sequence?.gallery.add(url, ViewedImage.Item(image: loaded, alt: alt))
+                }
                 return
             }
             // Asked more than once: on a phone a picture is drawn by WebKit, and a
@@ -607,6 +628,16 @@ private struct PagePicture: View {
             }
             tried = true
         }
+    }
+
+    private func opensLarge(_ image: PlatformImage) -> Bool {
+        ImageSequence.opensLarge(width: image.size.width, height: image.size.height)
+    }
+
+    /// The viewer, at this image, with the page's other images read so far.
+    private func open(_ image: PlatformImage) {
+        viewed = sequence?.gallery.viewed(at: url, order: sequence?.order ?? [url])
+            ?? ViewedImage(images: [ViewedImage.Item(image: image, alt: alt)], start: 0)
     }
 
     private func drawn(_ image: PlatformImage) -> some View {
