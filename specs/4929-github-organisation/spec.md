@@ -94,8 +94,10 @@ or installs one, so an agent does it in the agents' browser (`browser_*`), signe
 1. **Alex's yes, by a form** (`ask_question`), each time. "Not now" is the first option. A
    transfer is hard to undo: only an owner of `agentloops-dev` can transfer it back.
 2. **Tell the #4925 lead** (`message_session`) to start no new lane, as for step 4. Between
-   the App's transfer and the repo's, the bot may not reach `alexec/Agents`: a private App
-   installs only on the account that owns it. So steps 3 and 4 go one right after the other.
+   the App's transfer and the repo's, the bot cannot reach `alexec/Agents`: GitHub
+   uninstalls the App from the old owner when the transfer completes ("this app will be
+   automatically uninstalled from your account"). So steps 3 and 4 go one right after the
+   other.
 3. **Write down the state now**, to compare after:
    - `curl -s https://api.github.com/apps/alexec-agents` answers 404 (a private App).
    - Alex's own `gh` (`/usr/local/bin/gh`, `GH_TOKEN` unset):
@@ -111,14 +113,21 @@ or installs one, so an agent does it in the agents' browser (`browser_*`), signe
    skill's "GitHub sudo on `alexec`" (#5096): open the page first, then `browser_passkey`
    with `GITHUB_ALEXEC_PASSKEY`, load the page again, Use your passkey ▸ Use passkey
    (#5196). The secret is Ask before use, so the call waits for Alex's approval in the app.
+   When the account is still in sudo mode from an earlier step, GitHub does not ask.
 3. Under **Danger zone**, **Transfer ownership**. Type the App's name, `alexec-agents`, and
-   the new owner, `agentloops-dev`, then **Transfer this GitHub App**.
-4. `browser_navigate` to `https://github.com/apps/alexec-agents/installations/new`. Choose
-   `agentloops-dev`, **Only select repositories**: the repos that moved (`Agents` first;
+   the new owner, `agentloops-dev` (choose the **Organization** in the list, not the user
+   `agentloops-dev-agent`), then **Transfer this GitHub App**.
+4. GitHub opens the organisation's side, `organizations/agentloops-dev/settings/apps/transfers/<id>`,
+   because `alexec` is its owner. Check the permissions it lists, then **Complete transfer**.
+5. `browser_navigate` to `https://github.com/apps/alexec-agents/installations/new`.
+   **Continue** as `alexec`, then the page installs on `agentloops-dev`. Choose **Only select repositories**: the repos that moved (`Agents` first;
    the others when they move). **Install**. Before `Agents` moves, the organisation has no
    repo to choose: then choose **All repositories**, and set it to the moved repos after
    step 4 of the order.
-5. `browser_passkey` with `off`.
+6. `browser_passkey` with `off`, if it was on.
+
+**Done on 2026-11-13** (#5065), after Alex's yes by a form: installation 180039971 on
+`alexec` went; installation 181675598 on `agentloops-dev`, All repositories.
 
 **Checks after:**
 
@@ -129,8 +138,8 @@ or installs one, so an agent does it in the agents' browser (`browser_*`), signe
 - The agents' bot row lists `agentloops-dev`. The App's id and
   private key do not change, so `~/.agents` needs no change: the daemon makes an
   installation token for each repo's owner (`connections/githubbot.go`, `BotTokens.For`).
-  Write down whether the installation on `alexec` stayed. If it went, the bot cannot post on
-  `alexec/*` until each repo moves: say so in #4929.
+  `github.com/settings/installations` no longer lists it on `alexec`, so the bot cannot
+  post on `alexec/*` until each repo moves.
 - After the repo moves: the bot pushes a scratch branch on `agentloops-dev/Agents` and
   deletes it, and `gh pr view <n> --json author` on the next lane's PR says
   `app/alexec-agents`.
