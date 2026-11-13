@@ -389,7 +389,8 @@ struct RuntimesRow: View {
                 Text(low).appText(.fine).foregroundStyle(.secondary).lineLimit(1)
             }
         }
-        .help(tally.map { [$0.lowDetail, "\($0.working) of \($0.total) runtimes working. Your runtimes and accounts, and where each machine has them"]
+        // The detail ends in a full stop of its own (#5000): the join adds one.
+        .help(tally.map { [$0.lowDetail.map { $0.hasSuffix(".") ? String($0.dropLast()) : $0 }, "\($0.working) of \($0.total) runtimes working. Your runtimes and accounts, and where each machine has them"]
                     .compactMap { $0 }.joined(separator: ". ") }
               ?? "Your runtimes and accounts, and where each machine has them")
         .accessibilityValue(tally.map { [$0.noneWorking ? "None of \($0.total) working" : "\($0.working) of \($0.total) working", $0.lowDetail]
