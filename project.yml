@@ -105,6 +105,11 @@ targets:
       # tracking.
       - path: Remote/PrivacyInfo.xcprivacy
         buildPhase: resources
+      # Paper v2's faces (#4992), as on the Mac: the bundle's fonts folder, which
+      # PaperFonts registers at launch.
+      - path: design/fonts
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: AgentsKit
         product: AgentsKitCore
@@ -277,6 +282,11 @@ targets:
       - path: Shared/UI/Paper.swift
       - path: Shared/UI/StateTint.swift
       - path: Shared/UI/TypeScale.swift
+      # The type scale's faces (#4992), so the widget reads as the app does.
+      - path: Shared/UI/PaperFonts.swift
+      - path: design/fonts
+        type: folder
+        buildPhase: resources
       # Listed, not owned. See the note on the AgentsHost target's entitlements.
       - path: RemoteWidget/RemoteWidget.entitlements
         buildPhase: none

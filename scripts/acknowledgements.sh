@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Writes the licence notices for the code colouring (041) into both apps' resources:
 # tree-sitter, swift-tree-sitter, and every vendored grammar, each in its own words; and
-# on the Mac, the notice for Paper v2's faces (#4975).
+# the notice for Paper v2's faces (#4975, #4992).
 # MIT and BSD both ask for their notice to travel with the software.
 #
 #   scripts/acknowledgements.sh      (after scripts/vendor-grammars.sh)
@@ -12,7 +12,7 @@ checkouts=$root/Packages/CodeText/.build/checkouts
 
 out=$(mktemp)
 fonts=$(mktemp)
-# Paper v2's faces (#4975), on the Mac only until the Remote draws in them (#4992).
+# Paper v2's faces (#4975), on the Mac and the Remote (#4992).
 {
   print "## Atkinson Hyperlegible Next and Atkinson Hyperlegible Mono\n"
   print "The app's text and code faces, from the Braille Institute, used under the SIL Open"
@@ -59,9 +59,10 @@ fonts=$(mktemp)
 } > $root/App/Resources/Acknowledgements.md
 {
   print "# Acknowledgements\n"
-  print "Code in this app is coloured with tree-sitter and the grammars below, used under"
-  print "their licences, which follow in full.\n"
-  cat $out
+  print "The app's text is set in Atkinson Hyperlegible Next and Mono, and its code is coloured"
+  print "with tree-sitter and the grammars below, each used under its licence, which follows in"
+  print "full.\n"
+  cat $fonts $out
 } > $root/Remote/Resources/Acknowledgements.md
 rm $out $fonts
 print "wrote $(grep -c '^## ' $root/App/Resources/Acknowledgements.md) notices"

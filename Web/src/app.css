@@ -1,4 +1,5 @@
-/* The web remote's styles: the Paper palette, then the page. */
+/* The web remote's styles: Paper's faces and palette, then the page. */
+@import "./theme/fonts.css";
 @import "./theme/paper.css";
 @import "./sidebar.css";
 @import "./theme/console.css";

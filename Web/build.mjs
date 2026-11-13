@@ -61,7 +61,8 @@ await esbuild.build({
   jsx: "automatic",
   jsxImportSource: "preact",
 });
-await esbuild.build({ ...common, entryPoints: ["src/app.css"], outfile: "dist/app.css" });
+// The faces' url()s point at assets/, which is copied as it is below, not bundled (#4992).
+await esbuild.build({ ...common, entryPoints: ["src/app.css"], outfile: "dist/app.css", external: ["/assets/*"] });
 // The page's service worker (#1486), at the top so its scope is the whole page: Web Push.
 await esbuild.build({ ...common, entryPoints: ["src/sw.ts"], outfile: "dist/sw.js", format: "iife" });
 // The sandbox proxy a view is drawn through (#187), served at another origin than the page.
