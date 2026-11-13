@@ -35,6 +35,20 @@ public enum ArchivedPage {
 
     /// The strip over what was last read, and alone when nothing was.
     public static let staleStrip = "Its machine isn’t answering. Showing what was last read."
+
+    /// The strip over the rows, with how old they are after its words (#5143): "Its
+    /// machine isn’t answering. Showing what was last read. Last update 5 min ago". `read`
+    /// is when the rows were last live: the time the host or the link went, or the page's
+    /// last answer when neither is known. The words alone when nothing was read.
+    public static func staleLine(read: Date?, now: Date = Date()) -> String {
+        LastUpdate.banner(staleStrip, read: read, now: now)
+    }
+
+    /// The time for `staleLine`: when the rows were last live with their host (the time it,
+    /// or the link to it, went), else when the page's own ask was last answered.
+    public static func readAt(liveUntil: Date?, answeredAt: Date?) -> Date? {
+        liveUntil ?? answeredAt
+    }
     public static let loading = "Loading…"
     public static let loadingMore = "Loading more…"
     public static let filterPrompt = "Filter"
