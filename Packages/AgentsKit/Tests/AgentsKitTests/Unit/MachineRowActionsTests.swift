@@ -35,9 +35,10 @@ struct MachineRowActionsTests {
         #expect(MachineRowActions.of(row("online", canStop: false), isThisMac: false) == MachineRowActions(delete: true))
     }
 
-    private func provider(_ id: String, _ workspaces: [DaemonAPI.MachineInfo]) -> DaemonAPI.ProviderSummary {
+    private func provider(_ id: String, _ workspaces: [DaemonAPI.MachineInfo],
+                          capabilities: [String] = ["create", "delete"]) -> DaemonAPI.ProviderSummary {
         DaemonAPI.ProviderSummary(id: ProviderID(rawValue: id), name: id.capitalized, kind: "command",
-                                  capabilities: ["create"], workspaces: workspaces)
+                                  capabilities: capabilities, workspaces: workspaces)
     }
 
     /// A machine New Machine made has a row until it joins (#4610): Making… while the control
@@ -85,6 +86,29 @@ struct MachineRowActionsTests {
         #expect(gamma.joinHint == nil)
         #expect(gamma.line.hasPrefix("Not joined. Codespaces gives no ssh destination"))
         #expect(!alpha.failed())
+        #expect(alpha.deleteMessage == "Codespaces deletes alpha and its disk. It never joined Agents, so it has no backup: "
+            + "work on it that is not pushed is lost.")
+    }
+
+    /// Delete is on a row the control plane gave up on and on one that never joined, never
+    /// on one New Machine still makes, nor while a join runs.
+    @Test func deleteIsOnEveryRowThatIsNotBeingMade() throws {
+        let making = DaemonAPI.MachineInfo(id: "ws-1", name: "machine-1", state: "starting", joining: true)
+        let gaveUp = DaemonAPI.MachineInfo(id: "ws-2", name: "machine-2", state: "running", notJoined: "It didn’t join.")
+        let alpha = DaemonAPI.MachineInfo(id: "cs-1", name: "alpha", state: "running", ssh: "cs.cs-1.main")
+        let gamma = DaemonAPI.MachineInfo(id: "cs-3", name: "gamma", state: "running")
+        let rows = MachineMaking.rows([provider("codespaces", [making, gaveUp, alpha, gamma])], hostNames: [])
+        func row(_ name: String) throws -> MachineMaking { try #require(rows.first { $0.name == name }) }
+        #expect(try !row("machine-1").canDelete())
+        #expect(try row("machine-2").canDelete())
+        #expect(try row("alpha").canDelete())
+        #expect(try row("gamma").canDelete())
+        #expect(try !row("alpha").canDelete(.joining(step: nil)))
+        #expect(try row("alpha").canDelete(.failed("no")))
+        #expect(try row("alpha").canDelete(.needsTrust("SHA256:abc")))
+        // A provider that can't delete offers no Delete.
+        let cannot = MachineMaking.rows([provider("cws", [alpha], capabilities: [])], hostNames: [])
+        #expect(cannot.map { $0.canDelete() } == [false])
     }
 
     /// A click's join says how it goes, and why it failed, on the row (#4978).

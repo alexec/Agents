@@ -102,7 +102,7 @@ public enum MachineIcon: Equatable, Sendable {
 /// web page's. Amber and *Making…* while the control plane waits for one New Machine made;
 /// red with the reason and Delete once the control plane gave up. Grey and *Not joined* for
 /// one Agents did not make, such as a codespace made on github.com, or a stopped one: a click
-/// joins it (`MachineJoin`). The web page's machineRow has the same rows.
+/// or a swipe to the right joins it (`MachineJoin`), and Delete deletes it. The web page's machineRow has the same rows.
 public struct MachineMaking: Equatable, Sendable, Identifiable {
     public var provider: ProviderID
     public var providerName: String
@@ -118,11 +118,14 @@ public struct MachineMaking: Equatable, Sendable, Identifiable {
     /// provider says nothing, and then it can't join with a click.
     public var ssh: String?
     public var tunnel: Bool
+    /// Whether its provider can delete a machine (`delete` in its capabilities).
+    public var deletable: Bool
 
     public var id: String { "\(provider.rawValue)/\(workspace)" }
 
     public init(provider: ProviderID, providerName: String, workspace: String, name: String, notJoined: String? = nil,
-                joinable: Bool = false, state: String = "running", ssh: String? = nil, tunnel: Bool = false) {
+                joinable: Bool = false, state: String = "running", ssh: String? = nil, tunnel: Bool = false,
+                deletable: Bool = true) {
         self.provider = provider
         self.providerName = providerName
         self.workspace = workspace
@@ -132,6 +135,7 @@ public struct MachineMaking: Equatable, Sendable, Identifiable {
         self.state = state
         self.ssh = ssh
         self.tunnel = tunnel
+        self.deletable = deletable
     }
 
     /// The rows: each provider's workspaces that no machine is linked to and no machine of the
@@ -146,7 +150,8 @@ public struct MachineMaking: Equatable, Sendable, Identifiable {
                 let making = workspace.joining == true || workspace.notJoined != nil
                 rows.append(MachineMaking(provider: provider.id, providerName: provider.name, workspace: workspace.id,
                                           name: workspace.name, notJoined: workspace.notJoined, joinable: !making,
-                                          state: workspace.state, ssh: workspace.ssh, tunnel: workspace.tunnel ?? false))
+                                          state: workspace.state, ssh: workspace.ssh, tunnel: workspace.tunnel ?? false,
+                                          deletable: provider.capabilities.contains("delete")))
             }
         }
         func rank(_ row: MachineMaking) -> Int { row.joinable ? 2 : row.notJoined == nil ? 0 : 1 }
@@ -201,9 +206,19 @@ public struct MachineMaking: Equatable, Sendable, Identifiable {
         return false
     }
 
-    /// Delete's question on a row the control plane gave up on.
+    /// Whether its menu and a swipe to the left offer Delete: once the control plane gave up on
+    /// it, and on one that never joined, but not while New Machine makes it or a join runs, nor
+    /// when its provider can't delete.
+    public func canDelete(_ join: MachineJoin? = nil) -> Bool {
+        deletable && (joinable || notJoined != nil) && join?.isJoining != true
+    }
+
+    /// Delete's question. Agents installed nothing on a machine it gave up on; one that never
+    /// joined, such as a codespace made on github.com, can hold the person's own work.
     public var deleteMessage: String {
-        "\(providerName) deletes \(name). Nothing was installed on it, so there is nothing to back up."
+        joinable
+            ? "\(providerName) deletes \(name) and its disk. It never joined Agents, so it has no backup: work on it that is not pushed is lost."
+            : "\(providerName) deletes \(name). Nothing was installed on it, so there is nothing to back up."
     }
 }
 

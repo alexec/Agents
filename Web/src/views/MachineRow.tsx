@@ -1,13 +1,14 @@
 // A machine's row in the Machines section (#3974), as the window's MachineRow (#3973): the icon (its
 // kind in its shape, its state in its colour, #4113), the name and the grey line; its menu on a right-click, from ··· on hover or a finger held on it; and on
-// a touch screen a swipe to the right starts or stops it, to the left deletes or removes it, both asked first.
+// a touch screen a swipe to the right starts or stops it, to the left deletes or removes it, both asked first. A machine
+// that never joined swipes to the right to join and to the left to delete.
 import { useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { ComponentChildren } from "preact";
 import type { Store } from "../model/store";
 import { deleteQuestion, machineActions, machineDot, machineIcon, machineKind, machineSwipes, removeQuestion, swipeDistance,
-  type MachineIconTone, type MachineJoin, type MachineKind, type MachineMaking, joinHint, makingFailed, makingLine,
-  makingTone } from "../model/machineRow";
+  type MachineIconTone, type MachineJoin, type MachineKind, type MachineMaking, joinHint, makingCanDelete, makingFailed,
+  makingLine, makingTone } from "../model/machineRow";
 import { machineSheets } from "../model/machineSheets";
 import { placedSessions } from "../model/overview";
 import { holdForMenu, isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
@@ -23,7 +24,41 @@ function openSettings(host: string, section: string) {
   setTimeout(() => document.getElementById(section)?.scrollIntoView({ block: "start" }), 0);
 }
 
-const swipeWords = { start: "Start", stop: "Stop", delete: "Delete", remove: "Remove" } as const;
+const swipeWords = { start: "Start", stop: "Stop", delete: "Delete", remove: "Remove", join: "Join" } as const;
+type SwipeKind = keyof typeof swipeWords;
+
+/** A finger across a row, not down the list: the row follows it, and past swipeDistance lifting it acts. A mouse never
+ * swipes. `swiped` says the click that ends a swipe is not a click. */
+function useSwipe() {
+  const dx = useSignal(0);
+  const from = useRef<{ x: number; y: number; across: boolean } | null>(null);
+  const swiped = useRef(false);
+  const handlers = <K extends SwipeKind>(leading: K | null, trailing: K | null, act: (kind: K) => void) => ({
+    onPointerDown: (e: PointerEvent) => {
+      if (e.pointerType === "mouse" || !e.isPrimary || (!leading && !trailing)) return;
+      from.current = { x: e.clientX, y: e.clientY, across: false };
+    },
+    onPointerMove: (e: PointerEvent) => {
+      const f = from.current;
+      if (!f) return;
+      const x = e.clientX - f.x;
+      if (!f.across && Math.abs(x) > 8 && Math.abs(x) > Math.abs(e.clientY - f.y)) f.across = true;
+      if (!f.across) return;
+      dx.value = Math.max(trailing ? -swipeDistance * 1.5 : 0, Math.min(leading ? swipeDistance * 1.5 : 0, x));
+    },
+    onPointerUp: () => {
+      const moved = dx.value;
+      swiped.current = from.current?.across ?? false;
+      from.current = null;
+      dx.value = 0;
+      if (moved >= swipeDistance && leading) act(leading);
+      else if (moved <= -swipeDistance && trailing) act(trailing);
+    },
+    onPointerCancel: () => { from.current = null; dx.value = 0; },
+    shown: dx.value > 0 ? leading : dx.value < 0 ? trailing : null,
+  });
+  return { dx, swiped, handlers };
+}
 
 /** A laptop, a cloud or a rack, as the window's SF Symbols, in its state's colour; amber pulses while it changes. */
 function MachineIcon({ kind, tone }: { kind: MachineKind; tone: MachineIconTone }) {
@@ -47,9 +82,7 @@ export function MachineRow({ store, host, on, open, children }: {
   store: Store; host: string; on: boolean; open: () => void; children: ComponentChildren;
 }) {
   const row = store.hosts.value.find((h) => h.id === host);
-  const dx = useSignal(0);
-  const from = useRef<{ x: number; y: number; across: boolean } | null>(null);
-  const swiped = useRef(false);
+  const { dx, swiped, handlers } = useSwipe();
   // Update…, Choose Folders… or Link to Provider…, open from the menu (#4122).
   const sheet = useSignal<MachineSheet | null>(null);
   if (!row) return null;
@@ -101,32 +134,9 @@ export function MachineRow({ store, host, on, open, children }: {
     ...(actions.remove ? [{ label: `Remove ${row.name}…`, run: run.remove }] : []),
   ];
 
-  // A finger across the row, not down the list: the row follows it, and past swipeDistance lifting it acts.
-  const swipe = {
-    onPointerDown: (e: PointerEvent) => {
-      if (e.pointerType === "mouse" || !e.isPrimary || (!swipes.leading && !swipes.trailing)) return;
-      from.current = { x: e.clientX, y: e.clientY, across: false };
-    },
-    onPointerMove: (e: PointerEvent) => {
-      const f = from.current;
-      if (!f) return;
-      const x = e.clientX - f.x;
-      if (!f.across && Math.abs(x) > 8 && Math.abs(x) > Math.abs(e.clientY - f.y)) f.across = true;
-      if (!f.across) return;
-      dx.value = Math.max(swipes.trailing ? -swipeDistance * 1.5 : 0, Math.min(swipes.leading ? swipeDistance * 1.5 : 0, x));
-    },
-    onPointerUp: () => {
-      const moved = dx.value;
-      swiped.current = from.current?.across ?? false;
-      from.current = null;
-      dx.value = 0;
-      if (moved >= swipeDistance && swipes.leading) run[swipes.leading]();
-      else if (moved <= -swipeDistance && swipes.trailing) run[swipes.trailing]();
-    },
-    onPointerCancel: () => { from.current = null; dx.value = 0; },
-  };
+  const swipe = handlers(swipes.leading, swipes.trailing, (kind) => void run[kind]());
   const hold = holdForMenu(items);
-  const shown = dx.value > 0 ? swipes.leading : dx.value < 0 ? swipes.trailing : null;
+  const shown = swipe.shown;
 
   // The sheet is beside the row, not in it, so its pointer events are not the row's swipes and holds.
   return (
@@ -157,34 +167,47 @@ export function MachineRow({ store, host, on, open, children }: {
 
 /** A machine New Machine is making (#3974): an amber, pulsing cloud and `Making…` until it joins; red with the reason,
  * and Delete in its menu, once the control plane gave up waiting for it (#4610). A machine of the person's that never
- * joined (#4978) is grey and `Not joined`: a click joins it, and the line says each step and why it failed. */
+ * joined (#4978) is grey and `Not joined`: a click or a swipe to the right joins it, the line says each step and why it
+ * failed, and Delete in its menu or a swipe to the left deletes it, asked first. */
 export function MakingRow({ row, join, onDelete, onJoin }: {
   row: MachineMaking; join?: MachineJoin | undefined; onDelete: () => void; onJoin: () => void;
 }) {
+  const { dx, swiped, handlers } = useSwipe();
   const name = row.name || "New machine";
-  const gaveUp = !row.joinable && row.notJoined !== null;
+  const canDelete = makingCanDelete(row, join);
   const failed = makingFailed(row, join);
   const line = makingLine(row, join);
   const hint = join && "joining" in join ? null : joinHint(row);
   const items = (): MenuItem[] => [
     ...(hint ? [{ label: failed ? `Join ${name} Again` : `Join ${name}`, run: onJoin }] : []),
-    ...(gaveUp ? [{ label: `Delete ${name}…`, run: onDelete }] : []),
+    ...(canDelete ? [{ label: `Delete ${name}…`, run: onDelete }] : []),
   ];
-  const menu = gaveUp || hint !== null;
+  const menu = canDelete || hint !== null;
   const busy = !row.joinable || (join && "joining" in join);
+  const swipe = handlers(hint ? "join" : null, canDelete ? "delete" : null, (kind) => (kind === "join" ? onJoin : onDelete)());
+  const hold = holdForMenu(items);
   return (
-    <div class={`machine-row making${failed ? " not-joined" : ""}${row.joinable ? " joinable" : ""}`}
+    <div class={`machine-row making${failed ? " not-joined" : ""}${row.joinable ? " joinable" : ""}${dx.value ? " swiping" : ""}`}
       role={busy ? "status" : undefined}
-      onContextMenu={menu ? (e) => openContextMenu(e, items()) : undefined}>
-      {hint
-        ? <button type="button" class="sub-app-row machine-join" title={`${name}: ${line}. Click: ${hint}.`}
-          aria-label={`${name}, ${line}. ${hint}`} onClick={onJoin}>
-          <span class="machine-name"><MachineIcon kind="cloud" tone={makingTone(row, join)} />{name}</span>
-        </button>
-        : <span class="sub-app-row"><span class="machine-name"><MachineIcon kind="cloud" tone={makingTone(row, join)} />{name}</span></span>}
-      {menu && <button type="button" class="machine-more" aria-label={`More for ${name}`}
-        onClick={(e) => openContextMenu(e, items())}>···</button>}
-      <p class={`machine-need small ${failed ? "failure" : "quiet"}`}>{line}</p>
+      onContextMenu={menu ? (e) => openContextMenu(e, items()) : undefined}
+      onPointerDown={(e) => { swipe.onPointerDown(e); if (menu) hold.onPointerDown(e); }}
+      onPointerMove={(e) => { swipe.onPointerMove(e); hold.onPointerMove(e); }}
+      onPointerUp={() => { swipe.onPointerUp(); hold.onPointerUp(); }}
+      onPointerCancel={() => { swipe.onPointerCancel(); hold.onPointerCancel(); }}>
+      {swipe.shown && <span class={`machine-swipe ${swipe.shown} ${dx.value > 0 ? "leading" : "trailing"}`}
+        aria-hidden="true">{swipeWords[swipe.shown]}</span>}
+      <div class="machine-row-body" style={dx.value ? { transform: `translateX(${dx.value}px)` } : undefined}>
+        {hint
+          ? <button type="button" class="sub-app-row machine-join" title={`${name}: ${line}. Click: ${hint}.`}
+            aria-label={`${name}, ${line}. ${hint}`}
+            onClick={() => { if (swiped.current) { swiped.current = false; return; } onJoin(); }}>
+            <span class="machine-name"><MachineIcon kind="cloud" tone={makingTone(row, join)} />{name}</span>
+          </button>
+          : <span class="sub-app-row"><span class="machine-name"><MachineIcon kind="cloud" tone={makingTone(row, join)} />{name}</span></span>}
+        {menu && <button type="button" class="machine-more" aria-label={`More for ${name}`}
+          onClick={(e) => openContextMenu(e, items())}>···</button>}
+        <p class={`machine-need small ${failed ? "failure" : "quiet"}`}>{line}</p>
+      </div>
     </div>
   );
 }

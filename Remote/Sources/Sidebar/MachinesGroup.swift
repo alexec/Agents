@@ -164,7 +164,8 @@ struct RemoteMachineRow: View {
 /// the control plane waits for it; red with the reason once it gave up, when the long press
 /// and a swipe left offer Delete, asked first. Nil while providers/create has not answered:
 /// a row at once, named once the provider names it. A machine of the person's that never
-/// joined (#4978) is grey and *Not joined*: a tap joins it, and the line says how it goes.
+/// joined (#4978) is grey and *Not joined*: a tap or a swipe right joins it, the line says how
+/// it goes, and Delete deletes it.
 struct RemoteMakingMachineRow: View {
     @Environment(RemoteModel.self) private var model
     let making: MachineMaking?
@@ -175,7 +176,7 @@ struct RemoteMakingMachineRow: View {
         let name = making?.name ?? "New machine"
         let line = making?.line(joined) ?? "Making…"
         let failed = making?.failed(joined) ?? false
-        let gaveUp = making?.joinable == false && making?.notJoined != nil
+        let canDelete = making?.canDelete(joined) ?? false
         let hint = joined?.isJoining == true ? nil : making?.joinHint
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             MachineIconView(symbol: "cloud", icon: making?.icon(joined) ?? .busy)
@@ -200,9 +201,18 @@ struct RemoteMakingMachineRow: View {
         .accessibilityHint(hint ?? "")
         .accessibilityAddTraits(hint != nil ? .isButton : [])
         .accessibilityAction { join(trust: nil) }
+        .accessibilityActions {
+            if canDelete { Button("Delete") { deleting = true } }
+        }
+        // A swipe to the right joins it, as a tap does.
+        .swipeActions(edge: .leading) {
+            if hint != nil {
+                Button(failed ? "Join Again" : "Join", systemImage: "arrow.right.circle") { join(trust: nil) }.tint(Paper.accent)
+            }
+        }
         // A full swipe never deletes: Delete asks first.
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-            if gaveUp {
+            if canDelete {
                 Button("Delete", systemImage: "trash") { deleting = true }.tint(StateTint.failure.color)
             }
         }
@@ -210,7 +220,7 @@ struct RemoteMakingMachineRow: View {
             if hint != nil {
                 Button(failed ? "Join \(name) Again" : "Join \(name)", systemImage: "arrow.right.circle") { join(trust: nil) }
             }
-            if gaveUp {
+            if canDelete {
                 Button("Delete \(name)…", systemImage: "trash", role: .destructive) { deleting = true }
             }
         }
