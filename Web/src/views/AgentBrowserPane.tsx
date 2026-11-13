@@ -9,6 +9,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { Store } from "../model/store";
 import type { BrowserInputRequest, BrowserNavigateAction, UUID } from "../protocol/generated";
+import { Capability } from "../protocol/capabilities.generated";
 import { describe } from "../model/errors";
 import { editCommand, keyInput, modifiers, otherHolder, pagePoint, stopped, touchTyped, words } from "../model/machineBrowser";
 import { openAgentLink } from "../model/agentLink";
@@ -216,7 +217,7 @@ export function AgentBrowserPane({ store, host, session }: { store: Store; host:
           // ⌘V and Ctrl+V are a paste: the paste event sends this computer's clipboard.
           if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "v") return;
           // ⌘A, ⌘C, ⌘X, ⌘Z and ⇧⌘Z act in the page; a copy comes to this computer's clipboard (#5119).
-          const command = editCommand(e, mac);
+          const command = store.has(host, Capability.browser2) ? editCommand(e, mac) : null;
           if (command) {
             e.preventDefault();
             const input: BrowserInputRequest = { kind: "edit", command };
@@ -232,7 +233,7 @@ export function AgentBrowserPane({ store, host, session }: { store: Store; host:
           send(keyInput(e, true));
         }}
         onKeyUp={(e) => {
-          if (e.metaKey || unnamed(e) || editCommand(e, mac)) return;
+          if (e.metaKey || unnamed(e) || (store.has(host, Capability.browser2) && editCommand(e, mac))) return;
           send(keyInput(e, false));
         }}
         onPaste={(e) => {

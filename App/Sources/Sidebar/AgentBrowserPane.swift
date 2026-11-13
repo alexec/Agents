@@ -145,7 +145,8 @@ struct AgentBrowserPane: View {
                             .aspectRatio(contentMode: .fit)
                             .accessibilityLabel("The page in the machine's browser")
                     }
-                    BrowserInput(pageSize: CGSize(width: frame.width, height: frame.height)) { browser.send($0) }
+                    BrowserInput(pageSize: CGSize(width: frame.width, height: frame.height),
+                                 edits: model.host(agent.host, has: Capability.browser2)) { browser.send($0) }
                 }
             } else {
                 Waiting(words: "Loading the page")
@@ -210,24 +211,29 @@ private struct Note: View {
 /// Over the page, drawn to fit: the person's mouse, scroll and keys, sent to it.
 private struct BrowserInput: NSViewRepresentable {
     let pageSize: CGSize
+    /// The host takes editing commands (browser/2, #5119).
+    let edits: Bool
     let send: (DaemonAPI.BrowserInputRequest) -> Void
 
     func makeNSView(context: Context) -> InputView {
         let view = InputView()
         view.send = send
         view.pageSize = pageSize
+        view.edits = edits
         return view
     }
 
     func updateNSView(_ view: InputView, context: Context) {
         view.send = send
         view.pageSize = pageSize
+        view.edits = edits
     }
 }
 
 private final class InputView: NSView {
     var send: (DaemonAPI.BrowserInputRequest) -> Void = { _ in }
     var pageSize: CGSize = .zero
+    var edits = false
     /// The button held, so a move while it is down is a drag.
     private var held: String?
 
@@ -304,8 +310,8 @@ private final class InputView: NSView {
     }
 
     /// ⌘V pastes this Mac's clipboard into the page. ⌘A, ⌘C, ⌘X, ⌘Z and ⇧⌘Z act in the page
-    /// (#5119): a copy or cut comes back to this Mac's clipboard. Every other ⌘ shortcut
-    /// stays the app's.
+    /// (#5119), when the host takes them: a copy or cut comes back to this Mac's clipboard.
+    /// Every other ⌘ shortcut stays the app's.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard window?.firstResponder === self else { return super.performKeyEquivalent(with: event) }
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -316,7 +322,7 @@ private final class InputView: NSView {
             }
             return true
         }
-        guard let command = BrowserKeys.edit(bare: bare, command: flags.contains(.command), shift: flags.contains(.shift),
+        guard edits, let command = BrowserKeys.edit(bare: bare, command: flags.contains(.command), shift: flags.contains(.shift),
                                              option: flags.contains(.option), control: flags.contains(.control))
         else { return super.performKeyEquivalent(with: event) }
         send(DaemonAPI.BrowserInputRequest(kind: .edit, command: command))
