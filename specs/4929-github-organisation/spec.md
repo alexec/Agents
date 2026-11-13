@@ -61,9 +61,13 @@ Two kinds, so the PR is safe to merge at any time:
 2. **This PR lands** (owner-agnostic scripts and CI), and follow-up 1 (the ref alias) lands.
 3. **Alex transfers the agents' GitHub App** to the organisation and installs it on the
    organisation.
-4. **Alex transfers `alexec/Agents`** to `agentloops-dev` (Settings ▸ General ▸ Danger
-   Zone ▸ Transfer). No lane runs at that time: the lead pauses new lanes and waits for
-   open PRs to land or park.
+4. **Alex says yes, by a form; an agent transfers `alexec/Agents`** to `agentloops-dev`
+   with `scripts/github-transfer.sh alexec/Agents agentloops-dev` (#5063): Alex's own `gh`,
+   `POST /repos/{owner}/{repo}/transfer`, then a wait until the new name answers. Run it
+   with `--dry-run` first: that does only the checks (the `repo` scope, admin on the repo,
+   `alexec` an admin of the organisation, no repo of that name there). No lane runs at that
+   time: the lead pauses new lanes and waits for open PRs to land or park. The other repos
+   (step 8) go the same way, each after its own yes.
 5. **An agent checks** (one lane): `origin` updated, a PR auto-merges, the ruleset and the
    environments are there, the bot posts as `alexec-agents[bot]`, a release dry run passes.
 6. **The links PR lands** (follow-up 2): www, mkdocs, docs, skills, `deploy/` GHCR name,
