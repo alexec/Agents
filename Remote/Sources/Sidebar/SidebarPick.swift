@@ -21,8 +21,13 @@ private struct PaperPick: ViewModifier {
     @Environment(\.sidebarPick) private var pick
 
     func body(content: Content) -> some View {
-        content.listRowBackground(Group {
-            if pick == item { PaperSelectionRow() } else { Color.clear }
-        })
+        content
+            // The cell still says "selected" with an increased background prominence, which
+            // draws .primary and the tints white, for the accent fill this replaces. On the
+            // selection grey the words stay ink and the marks keep their colour.
+            .environment(\.backgroundProminence, .standard)
+            .listRowBackground(Group {
+                if pick == item { PaperSelectionRow() } else { Color.clear }
+            })
     }
 }
