@@ -24,7 +24,7 @@ import { Markdown } from "../render/markdown";
 import { inputType, momentFromInput, momentToInput, placeholder } from "../model/formInputs";
 import { descriptionField, getIt, keeping, secretField } from "../model/secretAsk";
 import { descriptionHint, descriptionLabel, descriptionPrompt } from "../model/userScope";
-import { handOffAnswer } from "../model/handOff";
+import { handOffAnswer, handOffWindowWords } from "../model/handOff";
 import { openTakeOver, route } from "../route";
 import { keepingForSession, sessionOnlyField, sessionSecretWords } from "../model/sessionSecrets";
 import { askBeforeUseHint, askBeforeUseWords, needsApprovalField } from "../model/askBeforeUse";
@@ -389,7 +389,7 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
       send={(reason) => go(key, "decline", {}, reason)} />;
   } else if (request.handOff) {
     // A step on the page in the machine's browser (#3529): Open the page shows it in a tab of its own (#4141).
-    body = <HandOffField handOff={request.handOff} inert={inert} open={openBrowser}
+    body = <HandOffField handOff={request.handOff} inert={inert} open={openBrowser} recipient={hold.recipient}
       done={button("done")} cannot={button("cannot", "prominent")}
       send={(isDone, note) => go(isDone ? "done" : "cannot", "accept", handOffAnswer(isDone, note))} />;
   } else if (request.secret) {
@@ -540,8 +540,8 @@ function DeclineReason({ inert, sent, back, send }: {
  * An agent's hand_to_person (#3529): the step, why, Open the page, Done, and Can't do it with a
  * line for what stopped the person. As the window's and the Remote's HandOffCard.
  */
-function HandOffField({ handOff, inert, open, done, cannot, send }: {
-  handOff: ElicitationHandOff; inert: boolean; open: (() => void) | undefined; done: AnswerButton; cannot: AnswerButton;
+function HandOffField({ handOff, inert, open, recipient, done, cannot, send }: {
+  handOff: ElicitationHandOff; inert: boolean; open: (() => void) | undefined; recipient: string; done: AnswerButton; cannot: AnswerButton;
   send: (done: boolean, note: string) => void;
 }) {
   const saying = useSignal(false);
@@ -550,6 +550,8 @@ function HandOffField({ handOff, inert, open, done, cannot, send }: {
     <>
       <p class="strong secret"><span aria-hidden="true">✋ </span>{handOff.step}</p>
       {handOff.reason && <p class="secret">{handOff.reason}</p>}
+      {/* A step in one of the agents' own Chrome windows (#5095): no page here, so say where. */}
+      {handOff.window && <p class="small quiet">{handOffWindowWords(handOff.window, recipient)}</p>}
       {saying.value && (
         <label class="field">
           <input type="text" autofocus disabled={inert} placeholder="What stopped you (optional)" aria-label="What stopped you (optional)"
@@ -563,7 +565,7 @@ function HandOffField({ handOff, inert, open, done, cannot, send }: {
         </label>
       )}
       <div class="form-row">
-        {!saying.value && open && <button class="prominent" disabled={inert} data-default="" onClick={open}>Open the page</button>}
+        {!saying.value && open && !handOff.window && <button class="prominent" disabled={inert} data-default="" onClick={open}>Open the page</button>}
         <span class="spacer" />
         {saying.value ? (
           <>

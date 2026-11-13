@@ -52,7 +52,9 @@ struct ElicitationView: View {
                     // A step on the page in the machine's browser (#3529): Open the page
                     // takes it over in a window of its own (#4141); in that window, the page
                     // is already open.
-                    HandOffCard(handOff: handOff, open: inTakeOver ? nil : openAgentBrowser, elsewhere: nil,
+                    // A step in one of the agents' own Chrome windows (#5095) has no page here.
+                    HandOffCard(handOff: handOff, open: inTakeOver || handOff.window != nil ? nil : openAgentBrowser,
+                                elsewhere: handOff.window.map { HandOffCard.inWindow($0, on: model.answerRecipient(request.agentID)) },
                                 host: model.answerRecipient(request.agentID), sending: sending != nil) { done, note in
                         send(done ? "done" : "cannot", .accept, content: ElicitationRequest.handOffAnswer(done: done, note: note))
                     }

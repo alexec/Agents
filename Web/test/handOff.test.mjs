@@ -11,3 +11,8 @@ test("hand-off: the choice the host names, and a note only when one is typed", (
   assert.deepEqual(h.handOffAnswer(false, "  "), { outcome: "cannot" });
   assert.deepEqual(h.handOffAnswer(false, " It wants a phone number. "), { outcome: "cannot", outcome_note: "It wants a phone number." });
 });
+
+test("hand-off: a step in the agents' own Chrome says that window, as the Mac does (#5095)", () => {
+  assert.equal(h.handOffWindowWords("the agents' Chrome (DevTools port 9233)", "your Mac"),
+    "Do it in the agents' Chrome (DevTools port 9233) on your Mac.");
+});

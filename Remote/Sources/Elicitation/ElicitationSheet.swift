@@ -60,8 +60,10 @@ struct ElicitationSheet: View {
                 // A step on the page in the machine's browser (#3529): Open the page takes the
                 // agent browser over (#3800, #4038, #4141), as on the Mac and the web; a host too
                 // old to have one says so. In the take-over, the page is open already.
-                HandOffCard(handOff: handOff, open: inTakeOver || !model.agent(request.agentID, has: Capability.browser1) ? nil : openAgentBrowser,
-                            elsewhere: inTakeOver ? nil : "This machine’s Agents is too old to show its browser here. Update it, then open the page.",
+                // A step in one of the agents' own Chrome windows (#5095) has no page here.
+                HandOffCard(handOff: handOff, open: inTakeOver || handOff.window != nil || !model.agent(request.agentID, has: Capability.browser1) ? nil : openAgentBrowser,
+                            elsewhere: handOff.window.map { HandOffCard.inWindow($0, on: model.answerRecipient(request.agentID)) }
+                                ?? (inTakeOver ? nil : "This machine’s Agents is too old to show its browser here. Update it, then open the page."),
                             host: model.answerRecipient(request.agentID), sending: chosen != nil) { done, note in
                     send(done ? "Done" : "Can't do it", action: .accept, content: ElicitationRequest.handOffAnswer(done: done, note: note))
                 }
