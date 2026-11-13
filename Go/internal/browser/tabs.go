@@ -34,6 +34,8 @@ type Tabs struct {
 	// browser's own user agent, as a page read it.
 	emulated map[target.ID]*emulated
 	hints    uaHints
+	// passkeys is each tab with a software authenticator (passkey.go, #4085).
+	passkeys map[target.ID]*passkeyTab
 }
 
 // FollowTabs connects to the browser at endpoint. created hears each new page tab, with
@@ -89,6 +91,7 @@ func FollowTabs(endpoint string, created func(tab, opener target.ID), destroyed 
 				return
 			}
 			t.forget(ev.TargetID, nil)
+			t.forgetPasskey(ev.TargetID, nil)
 			destroyed(ev.TargetID)
 		}
 	}()
@@ -139,7 +142,8 @@ func (t *Tabs) Open(address string) (target.ID, error) {
 	return made.TargetID, nil
 }
 
-// Close stops following the tabs, and leaves them open, with no device profile.
+// Close stops following the tabs, and leaves them open, with no device profile and no
+// software passkey.
 func (t *Tabs) Close() { t.cancel() }
 
 // tabLine is one line of @playwright/mcp's browser_tabs list: "- 0: (current) [title](url)".
