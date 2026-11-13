@@ -59,6 +59,7 @@ struct RemoteApp: App {
                 // the prompt bar.
                 .modifier(RemoteToasts())
                 .modifier(MoveToMachineAsk())
+                .modifier(RuntimeSignInAsk())
                 .modifier(ProjectSettingsAsk())
                 .environment(model)
                 // A new model on a new link once the phone pairs with a control plane.
@@ -538,6 +539,22 @@ private struct MoveToMachineAsk: ViewModifier {
         content.sheet(item: Binding(get: { model.movingToMachine }, set: { model.movingToMachine = $0 })) { agent in
             RemoteMoveToMachineSheet(agent: agent)
                 .environment(model)
+        }
+    }
+}
+
+/// A server runtime's Sign In… (#4035), at the root and not on the machine's page (#5203): a
+/// sign-in waits on the browser for minutes, so the sheet stays while the person goes to other
+/// pages, and at its medium height the page under it takes taps.
+private struct RuntimeSignInAsk: ViewModifier {
+    @Environment(RemoteModel.self) private var model
+
+    func body(content: Content) -> some View {
+        content.sheet(item: Binding(get: { model.signingIn }, set: { model.signingIn = $0 })) { target in
+            RuntimeSignInSheet(host: target.host, runtime: target.runtime)
+                .environment(model)
+                .presentationDetents([.medium, .large])
+                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
     }
 }

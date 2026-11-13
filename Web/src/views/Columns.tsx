@@ -40,6 +40,7 @@ import { navPages } from "../model/nav";
 import { sectionOf } from "../route";
 import { OrgPolicyStrip } from "./OrgPolicyLine";
 import { Icon } from "./Icon";
+import { RuntimeSignInPanel } from "./RuntimeSignInDialog";
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
@@ -128,6 +129,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <ReportProblemDialog store={store} />
       <MoveToMachineDialog store={store} />
       <GitLendDialog store={store} />
+      <RuntimeSignInPanel store={store} />
       <ExportImportDialog store={store} />
       <ContextMenu />
       <AchievementCard store={store} />

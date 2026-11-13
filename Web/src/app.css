@@ -1615,6 +1615,15 @@ dialog.sheet {
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-sheet);
 }
+/* A panel that leaves the page working (#5203): the server runtime's sign-in, in the corner. */
+dialog.sheet.modeless {
+  position: fixed;
+  inset: auto 16px 16px auto;
+  margin: 0;
+  z-index: 20;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
 dialog.sheet::backdrop { background: color-mix(in srgb, var(--paper-scrim) 25%, transparent); }
 /* Project Settings and Folder Settings (#3280): tabs over a grid of a label and its value. */
 dialog.sheet:has(.settings-sheet) { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }

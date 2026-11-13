@@ -5774,6 +5774,9 @@ final class RemoteModel {
     }
     /// The session a menu's Move to Machine… is moving (#4037), asked at the root as Rename… is.
     var movingToMachine: Agent?
+    /// The server runtime being signed in (#4035), asked at the root (#5203): the sheet stays
+    /// while the person goes to other pages, and the page under it works.
+    var signingIn: RuntimeSignInTarget?
     /// Moves to another machine under way, by session, and those that stopped with a problem
     /// until they are put away (#4641): a line on the session's card, as on the Mac's row.
     var moves: [UUID: DaemonAPI.MoveNotification] = [:]

@@ -1612,11 +1612,17 @@ export function tellingWords(doing: string | null, recipient: string): string {
 /** Said when an edit came too late (#1552), as QueuedPrompt.sentBeforeEdit says it. */
 export const sentBeforeEdit = "That prompt was sent before your change. Your words are in the prompt bar.";
 
+/** A runtime on a machine, to sign in (#5203). */
+export interface RuntimeSignInTarget { host: string; runtimeID: string; runtimeName: string; machine: string }
+
 export class Store extends Work {
   /** The control plane's workspace providers (#1808), for Settings ▸ Control plane. */
   readonly providers: Providers;
   /** This browser in its person's machine lock, and the devices that ask to join it (#3490). */
   readonly machineLock: MachineLock;
+  /** The server runtime being signed in (#3349), drawn at the page's root and not modal (#5203):
+   * a sign-in waits on another tab for minutes, and the person works on meanwhile. */
+  readonly runtimeSignIn = signal<RuntimeSignInTarget | null>(null);
 
   /** A machine Add as Machine… installed is linked to its workspace once it joins (#3365). */
   override takeHosts(hosts: ControlMachine[], now = Date.now()): void {

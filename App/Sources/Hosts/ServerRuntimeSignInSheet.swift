@@ -6,6 +6,10 @@ import SwiftUI
 /// and the Remote's RuntimeSignInSheet (#4035): the machine has no browser, so the runtime's own
 /// sign-in runs there and gives a link to open here. Claude's page then gives a code to paste
 /// back; Codex gives a code to type on its page. An API key is the other way in.
+///
+/// In a window of its own, not a sheet (#5203): a sign-in waits on the person's browser for
+/// minutes, and a sheet held the whole main window until it was done. The window stays open
+/// while the person works in the others.
 struct ServerRuntimeSignInSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -51,8 +55,11 @@ struct ServerRuntimeSignInSheet: View {
             .padding(16)
         }
         .frame(width: 460)
-        .interactiveDismissDisabled(busy)
+        .fixedSize(horizontal: false, vertical: true)
+        .navigationTitle(RuntimeSignInWords.title(runtime.name, machine: model.hosts.label(host)))
         .task { await start() }
+        // Closed by its close button, Cancel or ⌘W: a sign-in left waiting is stopped.
+        .onDisappear { cancelStep() }
     }
 
     @ViewBuilder
@@ -133,7 +140,6 @@ struct ServerRuntimeSignInSheet: View {
     }
 
     private func leave() {
-        cancelStep()
         dismiss()
     }
 
@@ -156,6 +162,7 @@ struct ServerRuntimeSignInSheet: View {
                 try await model.runtimeSignInFinish(.init(signInID: step.signInID, code: step.wantsCode ? code.trimmed : nil),
                                                     on: host)
             }
+            step = nil
             dismiss()
         } catch {
             problem = Self.words(error)
@@ -172,6 +179,32 @@ struct ServerRuntimeSignInSheet: View {
 
     private static func words(_ error: any Error) -> String {
         (error as? JSONRPCError)?.message ?? error.localizedDescription
+    }
+}
+
+/// What a server runtime's sign-in window is opened by (#5203): one window per machine and
+/// runtime, so a second Sign In… brings the open one forward.
+struct ServerSignInKey: Hashable, Codable {
+    var host: MachineRef
+    var runtime: Runtime
+}
+
+/// The scene id (`AgentsApp`).
+enum ServerSignInScene {
+    static let id = "server-sign-in"
+}
+
+/// The window's view: the sign-in, and its own close (the window's close button is Cancel).
+struct ServerSignInWindow: View {
+    let key: ServerSignInKey?
+
+    var body: some View {
+        Group {
+            if let key {
+                ServerRuntimeSignInSheet(host: key.host, runtime: key.runtime)
+            }
+        }
+        .paperGround()
     }
 }
 
