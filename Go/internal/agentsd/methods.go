@@ -33,6 +33,7 @@ func (d *Daemon) register() {
 	d.registerProblemReport()
 	d.registerBackups()
 	d.registerLockHello()
+	d.registerFirstBuild()
 	d.registerLockReset()
 	d.registerReceive()
 	d.registerSend()

@@ -10104,6 +10104,37 @@
       ],
       "additionalProperties": false
     },
+    "FirstBuildStartRequest": {
+      "type": "object",
+      "description": "firstBuild/start (#5056, spec 5048 section 7): the newcomer's idea, as typed, the starter the plan page shows, and the runtime its first task set up. The host makes the folder ~/.agents/first-build when it is not there, writes the first prompt itself, so every client sends the same, and labels the session first-build. It answers with the session's id. While a first-build session that is not archived is there, it refuses with firstBuildRunning, with that session's id as the data.",
+      "properties": {
+        "idea": {
+          "type": "string",
+          "description": "The person's words, as typed. Not empty."
+        },
+        "starter": {
+          "$ref": "#/definitions/FirstBuildStarter"
+        },
+        "runtimeID": {
+          "type": "string",
+          "description": "The runtime that the plan page's first task set up, as agents/start takes it."
+        }
+      },
+      "required": [
+        "idea",
+        "starter",
+        "runtimeID"
+      ],
+      "additionalProperties": false
+    },
+    "FirstBuildStarter": {
+      "type": "string",
+      "description": "The starter that a first build begins from (#5048): iphone-app is alexec/iphone-app-starter, web-service is alexec/web-service-starter, as make_app_repository names them.",
+      "enum": [
+        "iphone-app",
+        "web-service"
+      ]
+    },
     "FleetBoard": {
       "type": "object",
       "description": "console/fleet's answer (#1804): every machine on the control plane, for an admin.",

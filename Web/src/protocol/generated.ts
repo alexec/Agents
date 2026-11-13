@@ -44,6 +44,7 @@ export const Failure = {
   fileChanged: -32081,
   fileGone: -32032,
   fileNotReadable: -32033,
+  firstBuildRunning: -32106,
   folderGone: -32004,
   folderHasLiveAgents: -32013,
   folderInTheWay: -32025,
@@ -4268,6 +4269,30 @@ export interface FindResult {
   matches: FindMatch[];
   more: boolean;
 }
+
+/**
+ * firstBuild/start (#5056, spec 5048 section 7): the newcomer's idea, as typed, the starter the
+ * plan page shows, and the runtime its first task set up. The host makes the folder
+ * ~/.agents/first-build when it is not there, writes the first prompt itself, so every client sends
+ * the same, and labels the session first-build. It answers with the session's id. While a
+ * first-build session that is not archived is there, it refuses with firstBuildRunning, with that
+ * session's id as the data.
+ */
+export interface FirstBuildStartRequest {
+  /** The person's words, as typed. Not empty. */
+  idea: string;
+  starter: FirstBuildStarter;
+  /** The runtime that the plan page's first task set up, as agents/start takes it. */
+  runtimeID: string;
+}
+
+/**
+ * The starter that a first build begins from (#5048): iphone-app is alexec/iphone-app-starter,
+ * web-service is alexec/web-service-starter, as make_app_repository names them.
+ */
+export type FirstBuildStarter =
+  | "iphone-app"
+  | "web-service";
 
 /** console/fleet's answer (#1804): every machine on the control plane, for an admin. */
 export interface FleetBoard {
@@ -14946,6 +14971,7 @@ export interface Methods {
   "files/read": { params: FilesReadRequest; result: FileReading };
   "files/unwatch": { params: FilesWatchRequest; result: Empty };
   "files/watch": { params: FilesWatchRequest; result: Empty };
+  "firstBuild/start": { params: FirstBuildStartRequest; result: UUID };
   "folders/add": { params: AddFolderRequest; result: FolderSummary };
   "folders/archive": { params: FolderRequest; result: FolderSummary };
   "folders/clone": { params: CloneRequest; result: FolderSummary };
@@ -15385,6 +15411,7 @@ export const MethodTarget = {
   "files/read": "host",
   "files/unwatch": "host",
   "files/watch": "host",
+  "firstBuild/start": "host",
   "folders/add": "host",
   "folders/archive": "host",
   "folders/clone": "host",
@@ -16091,6 +16118,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   FindMatch: { required: ["index", "entryID", "line"], optional: [] },
   FindRequest: { required: ["agentID", "text"], optional: ["limit"] },
   FindResult: { required: ["matches", "more"], optional: [] },
+  FirstBuildStartRequest: { required: ["idea", "starter", "runtimeID"], optional: [] },
   FleetBoard: { required: ["machines"], optional: [] },
   FleetMachine: { required: ["host", "ownerName", "bot"], optional: ["running", "heardAt"] },
   Folder: { required: ["folder", "addedAt"], optional: ["archivedAt", "helperLimits", "diskSpace", "pinned", "prCostComment", "workingHours"] },
