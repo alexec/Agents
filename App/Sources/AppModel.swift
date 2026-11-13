@@ -1,4 +1,5 @@
 import AgentsKitCore
+import AppKit
 import Foundation
 import Observation
 import os
@@ -6800,6 +6801,11 @@ final class AppModel {
         if let existing = machineBrowsers[host] { return existing }
         let fresh = MachineBrowser(client: client(for: host),
                                    describe: { [weak self] error in self?.describeForShell(error) ?? "\(error)" })
+        // ⌘C and ⌘X in the page put its selection on this Mac's clipboard (#5119).
+        fresh.copied = { text in
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
         machineBrowsers[host] = fresh
         return fresh
     }

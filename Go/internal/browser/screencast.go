@@ -39,7 +39,7 @@ type Page struct {
 
 // Input is the person's click, scroll, key or paste, in the page's CSS pixels.
 type Input struct {
-	Kind       string // mouse, wheel, key or text
+	Kind       string // mouse, wheel, key, text or edit
 	Type       string // mouse: mousePressed, mouseReleased, mouseMoved; key: keyDown, keyUp, char
 	X, Y       float64
 	Button     string
@@ -50,6 +50,16 @@ type Input struct {
 	KeyCode    int64
 	Text       string
 	Modifiers  int64
+	Command    string // edit: selectAll, undo, redo, copy or cut
+}
+
+// InputResult is what the page says back after an input. Editing is said after a click
+// is released: whether the page's focus is now in a field that takes text, so a touch
+// client opens its keyboard. Copied is said after an edit's copy or cut: the selected
+// text, for the client's clipboard. Each is nil otherwise, or when the page cannot say.
+type InputResult struct {
+	Editing *bool
+	Copied  *string
 }
 
 // The size a cast lays the page out at, in CSS pixels.
@@ -408,13 +418,12 @@ func (c *Cast) SetDevice(device *Device) error {
 	return c.start(ctx, w, h, device, free)
 }
 
-// Input sends the person's input to the page. After a click is released it says whether
-// the page's focus is now in a field that takes text, so a touch client opens its keyboard;
-// for other input, or when the page cannot say, editing is nil.
-func (c *Cast) Input(in Input) (editing *bool, err error) {
+// Input sends the person's input to the page.
+func (c *Cast) Input(in Input) (InputResult, error) {
+	var said InputResult
 	ctx, err := c.tabContext()
 	if err != nil {
-		return nil, err
+		return said, err
 	}
 	call, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -423,18 +432,104 @@ func (c *Cast) Input(in Input) (editing *bool, err error) {
 		_, err = chromedp.Call(call, input.DispatchMouseEvent, mouseParams(in))
 		if err == nil && in.Kind == "mouse" && in.Type == string(input.DispatchMouseEventTypeMouseReleased) {
 			if e, err := chromedp.Run(call, chromedp.Evaluate[bool](focusEditable)); err == nil {
-				editing = &e
+				said.Editing = &e
 			}
 		}
 	case "key":
 		_, err = chromedp.Call(call, input.DispatchKeyEvent, keyParams(in))
 	case "text":
 		_, err = chromedp.Call(call, input.InsertText, input.InsertTextParams{Text: in.Text})
+	case "edit":
+		said.Copied, err = edit(call, in)
 	default:
 		err = errors.New("unknown input: " + in.Kind)
 	}
-	return editing, err
+	return said, err
 }
+
+// editKeys are the shortcuts a Mac client sends as edits (#5119), as the page's key
+// events name them. The page sees the key with Meta held; Chromium on Linux does nothing
+// for Meta, so the editing command goes with the key.
+var editKeys = map[string]struct {
+	key, code string
+	keyCode   int64
+	shift     bool
+	command   string
+}{
+	"selectAll": {"a", "KeyA", 65, false, "selectAll"},
+	"undo":      {"z", "KeyZ", 90, false, "undo"},
+	"redo":      {"z", "KeyZ", 90, true, "redo"},
+	"copy":      {"c", "KeyC", 67, false, ""},
+	"cut":       {"x", "KeyX", 88, false, "delete"},
+}
+
+// edit runs an edit's command in the page. For copy and cut it says the selected text
+// first; cut then deletes it, in a field only, as a local browser does.
+func edit(ctx context.Context, in Input) (*string, error) {
+	k, ok := editKeys[in.Command]
+	if !ok {
+		return nil, errors.New("unknown edit: " + in.Command)
+	}
+	var copied *string
+	command := k.command
+	if in.Command == "copy" || in.Command == "cut" {
+		sel, err := chromedp.Run(ctx, chromedp.Evaluate[selection](selectedText))
+		if err != nil {
+			return nil, err
+		}
+		copied = &sel.Text
+		if sel.Text == "" || !sel.Editable {
+			command = ""
+		}
+	}
+	modifiers := int64(4)
+	if k.shift {
+		modifiers |= 8
+	}
+	down := input.DispatchKeyEventParams{Type: input.DispatchKeyEventTypeRawKeyDown, Key: k.key, Code: k.code,
+		WindowsVirtualKeyCode: k.keyCode, NativeVirtualKeyCode: k.keyCode, Modifiers: modifiers}
+	if command != "" {
+		down.Commands = []string{command}
+	}
+	up := down
+	up.Type, up.Commands = input.DispatchKeyEventTypeKeyUp, nil
+	if _, err := chromedp.Call(ctx, input.DispatchKeyEvent, down); err != nil {
+		return nil, err
+	}
+	if _, err := chromedp.Call(ctx, input.DispatchKeyEvent, up); err != nil {
+		return nil, err
+	}
+	return copied, nil
+}
+
+// selection is the page's selected text, and whether it is in a field that takes text.
+type selection struct {
+	Text     string `json:"text"`
+	Editable bool   `json:"editable"`
+}
+
+// selectedText is the focused field's selection, else the page's, also inside a
+// same-origin frame or a shadow root. A password field's selection is never said.
+const selectedText = `(() => {
+	let e = document.activeElement, w = window;
+	for (;;) {
+		if (e && e.shadowRoot && e.shadowRoot.activeElement) { e = e.shadowRoot.activeElement; continue; }
+		let inner = null;
+		try { inner = e && e.contentDocument && e.contentDocument.activeElement; } catch (_) {}
+		if (inner) { w = e.contentWindow; e = inner; continue; }
+		break;
+	}
+	if (e && (e.tagName === "INPUT" || e.tagName === "TEXTAREA")) {
+		if ((e.type || "").toLowerCase() === "password") return { text: "", editable: false };
+		let start = null, end = null;
+		try { start = e.selectionStart; end = e.selectionEnd; } catch (_) {}
+		if (typeof start === "number" && typeof end === "number") {
+			return { text: e.value.slice(start, end), editable: !e.disabled && !e.readOnly };
+		}
+	}
+	const text = String(w.getSelection() || "");
+	return { text, editable: !!(e && e.isContentEditable) };
+})()`
 
 // focusEditable is true when the focused element takes text: a text input, a textarea or
 // contenteditable, also inside a same-origin frame or a shadow root.

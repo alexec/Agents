@@ -66,6 +66,26 @@ struct MachineBrowserTests {
         try check(DaemonAPI.BrowserFrame(image: Data([0xFF, 0xD8]), ack: 1, width: 800, height: 600), "BrowserFrame")
         try check(DaemonAPI.BrowserInputResult(editing: true), "BrowserInputResult")
         try check(DaemonAPI.BrowserInputResult(), "BrowserInputResult")
+        try check(DaemonAPI.BrowserInputRequest(kind: .edit, command: .cut), "BrowserInputRequest")
+        try check(DaemonAPI.BrowserInputResult(copied: "selected"), "BrowserInputResult")
+    }
+
+    /// #5119: the usual editing shortcuts act in the page; the others stay the app's.
+    @Test func editingShortcutsGoToThePage() {
+        func edit(_ bare: String, shift: Bool = false, option: Bool = false, control: Bool = false,
+                  command: Bool = true) -> DaemonAPI.BrowserEditCommand? {
+            BrowserKeys.edit(bare: bare, command: command, shift: shift, option: option, control: control)
+        }
+        #expect(edit("a") == .selectAll)
+        #expect(edit("c") == .copy)
+        #expect(edit("x") == .cut)
+        #expect(edit("z") == .undo)
+        #expect(edit("z", shift: true) == .redo)
+        #expect(edit("Z", shift: true) == .redo)
+        for other in ["w", "q", ",", "v", "n"] { #expect(edit(other) == nil, "⌘\(other)") }
+        #expect(edit("c", option: true) == nil)
+        #expect(edit("a", control: true) == nil)
+        #expect(edit("a", command: false) == nil)
     }
 
     /// A tap in a field of the page opens the keyboard: the host says so after the click.

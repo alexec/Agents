@@ -81,7 +81,13 @@ public extension DaemonAPI {
     }
 
     enum BrowserInputKind: String, Codable, Sendable, Hashable {
-        case mouse, wheel, key, text
+        case mouse, wheel, key, text, edit
+    }
+
+    /// edit's command (#5119): selectAll, undo and redo act in the page; copy says the
+    /// page's selection back, and cut also deletes it.
+    enum BrowserEditCommand: String, Codable, Sendable, Hashable {
+        case selectAll, undo, redo, copy, cut
     }
 
     /// browser/input: a click, a scroll, a key or a paste, in the page's CSS pixels.
@@ -101,10 +107,11 @@ public extension DaemonAPI {
         public var text: String?
         /// Alt 1, Control 2, Meta 4, Shift 8.
         public var modifiers: Int?
+        public var command: BrowserEditCommand?
         public init(kind: BrowserInputKind, type: String? = nil, x: Double? = nil, y: Double? = nil,
                     button: String? = nil, clickCount: Int? = nil, deltaX: Double? = nil, deltaY: Double? = nil,
                     key: String? = nil, code: String? = nil, keyCode: Int? = nil, text: String? = nil,
-                    modifiers: Int? = nil) {
+                    modifiers: Int? = nil, command: BrowserEditCommand? = nil) {
             self.kind = kind
             self.type = type
             self.x = x
@@ -118,14 +125,20 @@ public extension DaemonAPI {
             self.keyCode = keyCode
             self.text = text
             self.modifiers = modifiers
+            self.command = command
         }
     }
 
     /// browser/input's answer: after a click is released, whether the page's focus is now in
-    /// a field that takes text. Nil for other input, and from a host before it said so.
+    /// a field that takes text; after an edit's copy or cut, the page's selected text. Nil
+    /// for other input, and from a host before it said so.
     struct BrowserInputResult: Codable, Sendable, Hashable {
         public var editing: Bool?
-        public init(editing: Bool? = nil) { self.editing = editing }
+        public var copied: String?
+        public init(editing: Bool? = nil, copied: String? = nil) {
+            self.editing = editing
+            self.copied = copied
+        }
     }
 
     enum BrowserNavigateAction: String, Codable, Sendable, Hashable {

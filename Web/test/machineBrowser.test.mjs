@@ -65,3 +65,24 @@ test("the pane says which other session holds the browser, and nothing for its o
   assert.deepEqual(m.otherHolder({ status: "running", holder: other }, own), { id: other, title: "Another session" });
   assert.equal(m.words.noTabTitle, "This session's agent has not used the browser");
 });
+
+test("the editing shortcuts act in the page, and the others stay the browser's (#5119)", () => {
+  const key = (letter, mods = {}) => ({ key: letter, code: `Key${letter.toUpperCase()}`, altKey: false, ctrlKey: false,
+    metaKey: false, shiftKey: false, ...mods });
+  const cmd = { metaKey: true };
+  assert.equal(m.editCommand(key("a", cmd), true), "selectAll");
+  assert.equal(m.editCommand(key("c", cmd), true), "copy");
+  assert.equal(m.editCommand(key("x", cmd), true), "cut");
+  assert.equal(m.editCommand(key("z", cmd), true), "undo");
+  assert.equal(m.editCommand(key("Z", { ...cmd, shiftKey: true }), true), "redo");
+  for (const other of ["w", "q", "v", "t", "r"]) assert.equal(m.editCommand(key(other, cmd), true), null, other);
+  assert.equal(m.editCommand(key("c", { ...cmd, altKey: true }), true), null);
+  assert.equal(m.editCommand(key("a", { ctrlKey: true }), true), null);
+  assert.equal(m.editCommand(key("a"), true), null);
+  // Elsewhere Ctrl is the shortcut's key, and Ctrl+Y redoes.
+  assert.equal(m.editCommand(key("c", { ctrlKey: true }), false), "copy");
+  assert.equal(m.editCommand(key("y", { ctrlKey: true }), false), "redo");
+  assert.equal(m.editCommand(key("c", cmd), false), null);
+  // A layout with no Latin letters finds the shortcut by the key's place.
+  assert.equal(m.editCommand({ ...key("c", cmd), key: "с" }, true), "copy");
+});

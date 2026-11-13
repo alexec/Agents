@@ -303,14 +303,23 @@ private final class InputView: NSView {
                                modifiers: modifiers(event)))
     }
 
-    /// ⌘V pastes this Mac's clipboard into the page. Every other ⌘ shortcut stays the app's.
+    /// ⌘V pastes this Mac's clipboard into the page. ⌘A, ⌘C, ⌘X, ⌘Z and ⇧⌘Z act in the page
+    /// (#5119): a copy or cut comes back to this Mac's clipboard. Every other ⌘ shortcut
+    /// stays the app's.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        guard window?.firstResponder === self,
-              event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
-              event.charactersIgnoringModifiers == "v" else { return super.performKeyEquivalent(with: event) }
-        if let text = NSPasteboard.general.string(forType: .string), !text.isEmpty {
-            send(DaemonAPI.BrowserInputRequest(kind: .text, text: text))
+        guard window?.firstResponder === self else { return super.performKeyEquivalent(with: event) }
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let bare = event.charactersIgnoringModifiers ?? ""
+        if flags == .command, bare == "v" {
+            if let text = NSPasteboard.general.string(forType: .string), !text.isEmpty {
+                send(DaemonAPI.BrowserInputRequest(kind: .text, text: text))
+            }
+            return true
         }
+        guard let command = BrowserKeys.edit(bare: bare, command: flags.contains(.command), shift: flags.contains(.shift),
+                                             option: flags.contains(.option), control: flags.contains(.control))
+        else { return super.performKeyEquivalent(with: event) }
+        send(DaemonAPI.BrowserInputRequest(kind: .edit, command: command))
         return true
     }
 }

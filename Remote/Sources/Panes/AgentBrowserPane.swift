@@ -337,9 +337,31 @@ final class TouchInputView: UIView, UIKeyInput {
     ]
 
     /// Paste from the edit menu, or ⌘V on an iPad's keyboard, sends the pasteboard's text.
+    /// Copy, Cut and Select All (⌘C, ⌘X, ⌘A) act in the page, and a copy comes back to
+    /// this device's pasteboard (#5119).
     override func canPerformAction(_ action: Selector, withSender sender: Any?) -> Bool {
-        action == #selector(paste(_:)) ? UIPasteboard.general.hasStrings : super.canPerformAction(action, withSender: sender)
+        switch action {
+        case #selector(paste(_:)): UIPasteboard.general.hasStrings
+        case #selector(copy(_:)), #selector(cut(_:)), #selector(selectAll(_:)), #selector(undoInPage),
+             #selector(redoInPage): true
+        default: super.canPerformAction(action, withSender: sender)
+        }
     }
+
+    override func copy(_ sender: Any?) { send(DaemonAPI.BrowserInputRequest(kind: .edit, command: .copy)) }
+    override func cut(_ sender: Any?) { send(DaemonAPI.BrowserInputRequest(kind: .edit, command: .cut)) }
+    override func selectAll(_ sender: Any?) { send(DaemonAPI.BrowserInputRequest(kind: .edit, command: .selectAll)) }
+
+    /// ⌘Z and ⇧⌘Z on an iPad's keyboard undo and redo in the page's field.
+    override var keyCommands: [UIKeyCommand]? {
+        let undo = UIKeyCommand(input: "z", modifierFlags: .command, action: #selector(undoInPage))
+        let redo = UIKeyCommand(input: "z", modifierFlags: [.command, .shift], action: #selector(redoInPage))
+        for command in [undo, redo] { command.wantsPriorityOverSystemBehavior = true }
+        return [undo, redo]
+    }
+
+    @objc private func undoInPage() { send(DaemonAPI.BrowserInputRequest(kind: .edit, command: .undo)) }
+    @objc private func redoInPage() { send(DaemonAPI.BrowserInputRequest(kind: .edit, command: .redo)) }
 
     override func paste(_ sender: Any?) {
         if let text = UIPasteboard.general.string, !text.isEmpty {

@@ -1,7 +1,7 @@
 // The browser on the session's machine, which agents drive (#3528, spike #3527): what the Agent
 // Browser says, where a click lands in the page, and what a key says to it. The window's
 // AgentBrowserPane.swift and MachineBrowser.swift say the same.
-import type { BrowserInputRequest, BrowserPageState } from "../protocol/generated";
+import type { BrowserEditCommand, BrowserInputRequest, BrowserPageState } from "../protocol/generated";
 
 export const words = {
   stoppedTitle: "The browser isn't running",
@@ -39,6 +39,23 @@ export function pagePoint(point: { x: number; y: number }, view: { width: number
 /** The modifier bits CDP takes: Alt 1, Control 2, Meta 4, Shift 8. */
 export function modifiers(e: { altKey: boolean; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }): number {
   return (e.altKey ? 1 : 0) | (e.ctrlKey ? 2 : 0) | (e.metaKey ? 4 : 0) | (e.shiftKey ? 8 : 0);
+}
+
+/**
+ * The editing command a shortcut is in the page (#5119; the window's BrowserKeys.edit): ⌘A, ⌘C, ⌘X,
+ * ⌘Z and ⇧⌘Z on a Mac, Ctrl with the same keys (and Ctrl+Y for redo) elsewhere. Null for a
+ * shortcut that stays the browser's own.
+ */
+export function editCommand(e: { key: string; code: string; altKey: boolean; ctrlKey: boolean; metaKey: boolean;
+  shiftKey: boolean }, mac: boolean): BrowserEditCommand | null {
+  const held = mac ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
+  if (!held || e.altKey) return null;
+  // The layout's letter, as a Mac's own shortcuts take it; the key's place for a layout with no Latin letters.
+  const letter = /^[a-z]$/i.test(e.key) ? e.key.toLowerCase() : /^Key([A-Z])$/.exec(e.code)?.[1]?.toLowerCase() ?? "";
+  if (letter === "z") return e.shiftKey ? "redo" : "undo";
+  if (e.shiftKey) return null;
+  if (letter === "y" && !mac) return "redo";
+  return ({ a: "selectAll", c: "copy", x: "cut" } as Record<string, BrowserEditCommand>)[letter] ?? null;
 }
 
 /** A key going down or up, as the page's own key events name it. Text only with a key that types. */

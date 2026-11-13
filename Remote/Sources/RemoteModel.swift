@@ -5148,6 +5148,8 @@ final class RemoteModel {
         if let existing = machineBrowsers[host] { return existing }
         guard let client = try? client(for: DaemonAPI.AgentRequest(agentID: agentID)) else { return nil }
         let fresh = MachineBrowser(client: client, describe: Self.describeBrowserFailure)
+        // Copy and Cut in the page put its selection on this device's pasteboard (#5119).
+        fresh.copied = { UIPasteboard.general.string = $0 }
         machineBrowsers[host] = fresh
         return fresh
     }

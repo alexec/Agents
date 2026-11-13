@@ -158,10 +158,11 @@ func TestACastOfARealChromium(t *testing.T) {
 		{Kind: "key", Type: "keyUp", Key: "Backspace", Code: "Backspace", KeyCode: 8},
 		{Kind: "text", Text: " there"},
 	} {
-		editing, err := cast.Input(in)
+		said, err := cast.Input(in)
 		if err != nil {
 			t.Fatal(in, err)
 		}
+		editing := said.Editing
 		// A click released in the field leaves the focus in it: a phone opens its keyboard.
 		if released := in.Type == "mouseReleased"; released != (editing != nil) || released && !*editing {
 			t.Fatalf("%v: editing %v", in, editing)
@@ -171,12 +172,48 @@ func TestACastOfARealChromium(t *testing.T) {
 	if err != nil || value != "h there" {
 		t.Fatalf("%q %v", value, err)
 	}
-	// A click beside the field takes the focus out of it: the keyboard goes.
-	for _, kind := range []string{"mousePressed", "mouseReleased"} {
-		editing, err := cast.Input(Input{Kind: "mouse", Type: kind, X: 400, Y: 300, Button: "left"})
+	// ⌘A, ⌘C, ⌘X and ⌘Z act on the field, and a copy comes back for the Mac's clipboard (#5119).
+	field := func() string {
+		v, err := chromedp.Run(ctx, chromedp.Evaluate[string](`document.getElementById("f").value`))
 		if err != nil {
 			t.Fatal(err)
 		}
+		return v
+	}
+	for _, step := range []struct {
+		command, copied, value string
+	}{
+		{"selectAll", "", "h there"},
+		{"copy", "h there", "h there"},
+		{"cut", "h there", ""},
+		{"undo", "", "h there"},
+		{"redo", "", ""},
+	} {
+		said, err := cast.Input(Input{Kind: "edit", Command: step.command})
+		if err != nil {
+			t.Fatal(step.command, err)
+		}
+		if copies := step.command == "copy" || step.command == "cut"; copies != (said.Copied != nil) ||
+			copies && *said.Copied != step.copied {
+			t.Fatalf("%s: copied %v", step.command, said.Copied)
+		}
+		if v := field(); v != step.value {
+			t.Fatalf("%s: the field says %q, not %q", step.command, v, step.value)
+		}
+	}
+	if _, err := cast.Input(Input{Kind: "edit", Command: "paste"}); err == nil {
+		t.Fatal("an unknown edit was taken")
+	}
+	if _, err := cast.Input(Input{Kind: "text", Text: "h there"}); err != nil {
+		t.Fatal(err)
+	}
+	// A click beside the field takes the focus out of it: the keyboard goes.
+	for _, kind := range []string{"mousePressed", "mouseReleased"} {
+		said, err := cast.Input(Input{Kind: "mouse", Type: kind, X: 400, Y: 300, Button: "left"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		editing := said.Editing
 		if kind == "mouseReleased" && (editing == nil || *editing) {
 			t.Fatalf("editing %v after a click outside the field", editing)
 		}
