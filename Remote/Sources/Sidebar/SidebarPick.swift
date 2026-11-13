@@ -1,3 +1,4 @@
+import AgentsKitCore
 import SwiftUI
 
 extension EnvironmentValues {
