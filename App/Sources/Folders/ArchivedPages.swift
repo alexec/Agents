@@ -16,6 +16,9 @@ struct ArchivedSessionsPage: View {
     /// Whether the host answered the ask for this folder's archive: nil while it is on
     /// its way, so an empty list is not "none" before it is known (#664).
     @State private var answered: Bool?
+    /// When the host last answered an ask of this page (#5143), for the stale strip's time
+    /// when the model does not know when the host went.
+    @State private var answeredAt: Date?
     /// Whether the host answered the ask for the filter's words, nil while it is on its way.
     @State private var searched: Bool?
     @State private var filter = ""
@@ -41,7 +44,10 @@ struct ArchivedSessionsPage: View {
             case .noMatch:
                 ArchivedNoMatch(title: ArchivedPage.Sessions.noMatch) { filter = "" }
             case .rows(let stale):
-                if stale { ArchivedStaleStrip() }
+                if stale {
+                    ArchivedStaleStrip(read: ArchivedPage.readAt(liveUntil: model.hostReadAt(folder.host),
+                                                                 answeredAt: answeredAt))
+                }
                 list(shown, held: held.count).opacity(stale ? 0.55 : 1)
             }
         }
@@ -53,6 +59,7 @@ struct ArchivedSessionsPage: View {
         .task(id: folder) {
             answered = nil
             answered = await model.loadArchived(in: folder)
+            if answered == true { answeredAt = Date() }
         }
         // The host too, for the words, so one older than the page held is found (#4448).
         .task(id: words) {
@@ -61,6 +68,7 @@ struct ArchivedSessionsPage: View {
             try? await Task.sleep(for: .milliseconds(250))
             guard !Task.isCancelled else { return }
             searched = await model.searchArchived(in: folder, words: words)
+            if searched == true { answeredAt = Date() }
         }
         .onDisappear { model.letGoOfArchived(in: folder) }
     }
@@ -130,7 +138,7 @@ struct ArchivedWorkflowsPage: View {
             case .noMatch:
                 ArchivedNoMatch(title: ArchivedPage.Workflows.noMatch) { filter = "" }
             case .rows(let stale):
-                if stale { ArchivedStaleStrip() }
+                if stale { ArchivedStaleStrip(read: model.hostReadAt(folder.host)) }
                 List(selection: windowOpen.map { open in
                     Binding(get: { windowPick }, set: { if let item = $0 { open(item) } })
                 } ?? $model.sidebarItem) {
@@ -185,10 +193,16 @@ private struct ArchivedFooter: View {
 
 /// Its machine is not answering: over the rows last read, or alone with none.
 private struct ArchivedStaleStrip: View {
+    /// When the rows were last read (#5143): the line after the words, ticking. Nil when
+    /// nothing was read: the words alone.
+    var read: Date?
+
     var body: some View {
-        PaneBanner(tone: .neutral, symbol: MessageTone.offlineSymbol, ArchivedPage.staleStrip)
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
+        LastUpdateTimeline(read: read ?? .distantPast) { now in
+            PaneBanner(tone: .neutral, symbol: MessageTone.offlineSymbol, ArchivedPage.staleLine(read: read, now: now))
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
     }
 }
 

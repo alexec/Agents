@@ -52,3 +52,9 @@ test("a row's time: ago today, the clock time before", () => {
   assert.equal(page.archivedTime(new Date(2026, 10, 9, 18, 40), now), "18:40");
   assert.equal(page.archivedTime(new Date(2026, 10, 7, 9, 5), now), "09:05");
 });
+
+test("the stale strip's time: when the rows were last live, else the page's last answer (#5143)", () => {
+  assert.equal(page.readAt(2000, 1000), 2000);
+  assert.equal(page.readAt(undefined, 1000), 1000);
+  assert.equal(page.readAt(undefined, undefined), undefined);
+});
