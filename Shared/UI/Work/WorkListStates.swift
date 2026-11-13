@@ -70,10 +70,18 @@ struct WorkEmptyState: View {
 }
 
 /// What the forges said when a read failed: a strip above the list (not in place of it), a
-/// failure banner (#4737), the forge's words, one line each, and Try again.
+/// failure banner (#4737), the forge's words, one line each, and Try again. With `read`, what
+/// is shown is an earlier read: "Last update 5 min ago" after the words (#5142).
 struct WorkErrorStrip: View {
     let lines: [String]
+    var read: Date?
     var retry: (() -> Void)?
+
+    init(lines: [String], read: Date? = nil, retry: (() -> Void)? = nil) {
+        self.lines = lines
+        self.read = read
+        self.retry = retry
+    }
 
     var body: some View {
         // A failure banner (#4737): a read that failed. Not the `forge.waiting` wash, which is
@@ -81,6 +89,7 @@ struct WorkErrorStrip: View {
         if !lines.isEmpty {
             PaneBanner(tone: .failure, announcement: lines.joined(separator: " ")) {
                 ForEach(lines, id: \.self) { Text($0).lineLimit(1).truncationMode(.tail).help($0) }
+                if let read { LastUpdateText(read: read) }
             } actions: {
                 if let retry {
                     Button(WorkLook.tryAgain, action: retry)
@@ -91,16 +100,21 @@ struct WorkErrorStrip: View {
 }
 
 /// A Work page drawn from this device's copy (#4930) while its machine is asked again: a
-/// neutral strip above it, with a spinner, that goes when the machine answers.
+/// neutral strip above it, with a spinner, that goes when the machine answers. It says when
+/// the copy was read (#5142): "From this device. Reading it again. Last update 5 min ago".
 struct WorkFromDeviceStrip: View {
-    var on: Bool
+    /// When the copy on screen was read from its host; no strip when nil.
+    var read: Date?
 
     var body: some View {
-        if on {
-            PaneBanner(tone: .neutral, busy: true, announcement: WorkLook.fromDevice) {
-                PaneBannerWords(line: WorkLook.fromDevice, detail: nil)
-            } actions: {
-                EmptyView()
+        if let read {
+            LastUpdateTimeline(read: read) { now in
+                let line = LastUpdate.banner(WorkLook.fromDevice, read: read, now: now)
+                PaneBanner(tone: .neutral, busy: true, announcement: line) {
+                    PaneBannerWords(line: line, detail: nil)
+                } actions: {
+                    EmptyView()
+                }
             }
         }
     }

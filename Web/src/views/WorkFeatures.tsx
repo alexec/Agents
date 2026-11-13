@@ -9,7 +9,7 @@
 // an epic shows at most two children.
 import { effect, signal } from "@preact/signals";
 import { useEffect } from "preact/hooks";
-import { keepWork, keptWork } from "../model/localCopy";
+import { keepWork, keptWorkRead } from "../model/localCopy";
 import type { Agent, ForgeFeature, ForgeItem, ForgePlan } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { describe } from "../model/errors";
@@ -51,6 +51,8 @@ const board = signal("");
 let read: string | undefined;
 /** The features on screen came from this device's copy (#4930), until the machines answer. */
 const fromDevice = signal(false);
+/** When the copy on screen was read from the machines (#5142), for the strip's "Last update" line. */
+const copyAt = signal<number | undefined>(undefined);
 /** The board the features on screen were read for: the copy is drawn only for another. */
 let shownFor: string | undefined;
 /** The machines answered for `shownFor`: what is on screen is theirs, and is kept as it fills in. */
@@ -89,8 +91,10 @@ async function loadFeatures(store: Store) {
   reading.value = true;
   // The features on screen stay until the machines answer (#4930); a board not shown yet draws this device's copy.
   if (shownFor !== on) {
-    const kept = await keptWork<KeptFeatures>("features", on);
-    if (kept && asked.value === mine && board.value === on && shownFor !== on) {
+    const got = await keptWorkRead<KeptFeatures>("features", on);
+    const kept = got?.value;
+    if (got && kept && asked.value === mine && board.value === on && shownFor !== on) {
+      copyAt.value = got.at;
       features.value = kept.features;
       approvals.value = kept.approvals;
       errors.value = [];
@@ -196,7 +200,7 @@ export function WorkFeatures({ store }: { store: Store }) {
           </div>
         ) : (
           <>
-            <FromDeviceStrip on={fromDevice.value} />
+            <FromDeviceStrip at={fromDevice.value ? copyAt.value : undefined} />
             <ErrorStrip lines={errors.value} retry={refresh} />
             <div class={errors.value.length > 0 ? "stale" : undefined}><FeatureGroups store={store} list={list} /></div>
           </>

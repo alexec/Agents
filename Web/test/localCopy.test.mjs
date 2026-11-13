@@ -148,6 +148,14 @@ test("work: an answer is read back for what was asked only", async () => {
   assert.equal(workRef("item", "github:alexec/Agents#1"), "agents:work:item#github:alexec/Agents#1");
 });
 
+test("work: an answer comes back with when it was read, for its Last update line (#5142)", async () => {
+  const copy = new LocalCopy(new MemoryCopyStore());
+  copy.writing = true;
+  await copy.keepWork("plan", "github:alexec/Agents#5139", { children: [] }, 1_800_000_000_000);
+  assert.deepEqual(await copy.workRead("plan", "github:alexec/Agents#5139"), { value: { children: [] }, at: 1_800_000_000_000 });
+  assert.equal(await copy.workRead("plan", "github:alexec/Agents#1"), undefined);
+});
+
 test("work: nothing is kept signed out", async () => {
   const store = new MemoryCopyStore();
   const copy = new LocalCopy(store);

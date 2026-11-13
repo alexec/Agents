@@ -80,6 +80,13 @@ extension WorkModel {
         return await copy.work(Value.self, group, asked)
     }
 
+    /// The last answer this device kept, with when it was read from its host (#5142): the
+    /// "Last update" line of a page drawn from the copy.
+    func keptWorkRead<Value: Codable & Sendable>(_: Value.Type, _ group: LocalCopy.WorkGroup, _ asked: String) async -> (value: Value, at: Date)? {
+        guard let copy = workCopy else { return nil }
+        return await copy.workRead(Value.self, group, asked)
+    }
+
     /// A host's answer, kept for the next open (#4930). Only a host's answers are kept, never what came from the copy.
     func keepWork<Value: Codable & Sendable>(_ value: Value, _ group: LocalCopy.WorkGroup, _ asked: String) {
         guard let copy = workCopy else { return }
