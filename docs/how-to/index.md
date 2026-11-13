@@ -12,6 +12,8 @@ something particular done.
 
 - [Set up Agents on this Mac](set-up-on-this-mac.md): install Agents, which runs your
   agents and the control plane here and pairs its window by itself.
+- [Build your first app](build-your-first-app.md): type an idea the first time you open
+  Agents, and an agent takes you to the first deploy of an iPhone app or a web service.
 - [Connect a window or phone](connect-a-window-or-phone.md): pair another Mac, an iPhone,
   an iPad or a browser, connect this Mac to another control plane, and forget a client.
 - [Use Agents in a browser](use-agents-in-a-browser.md): open Agents in Safari or Chrome on

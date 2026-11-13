@@ -9,7 +9,8 @@ description: Install Agents on this Mac. It runs your agents and the control pla
 Your agents run on a host, and every window and phone reaches them through a control plane
 you own (see [The control plane](../explanation/control-plane.md)). On a Mac, one app,
 **Agents**, has all three: the window, this Mac's host (`agentsd`) and a control plane.
-The first time you open it, it sets them up with no question.
+The first time you open it, it sets them up by itself, while it asks for your idea for an
+app.
 
 The way in is [agentloops.dev](https://agentloops.dev), in a browser: sign up there first,
 and your account's control plane is in the cloud. This Mac then joins it as a machine for
@@ -44,7 +45,7 @@ plane on this Mac is an option for a person who wants nothing remote.
 
 1. Open Agents.
 
-   The window says **Setting up Agents on this Mac…**, then **Connecting this window…**.
+   The window shows **Let's build your idea.** with one box, and sets Agents up behind it.
    In these steps, Agents:
 
    - makes the control plane's key;
@@ -53,9 +54,12 @@ plane on this Mac is an option for a person who wants nothing remote.
    - joins this Mac's host to the control plane;
    - pairs the window with the control plane.
 
-   You copy and paste no code.
-2. When it is done, the window shows the session list. Add a folder to start; see
-   [Add a folder](add-a-folder.md).
+   You copy and paste no code, and you can type at once. A line shows under the box only
+   when a step is slow or fails.
+2. Type an idea for an app and press **Submit**. The plan page shows the tasks to your first
+   deploy, and an agent does them with you; see
+   [Build your first app](build-your-first-app.md). **Open Agents**, at the top right of the
+   plan page, shows the session list.
 
 If macOS asks you to allow Agents in **Login Items**, the window says so and shows
 **Open Login Items**. Click it, turn on **Agents** under **Allow in the Background**, and

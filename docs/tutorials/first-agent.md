@@ -32,12 +32,16 @@ are in it.
 1. Download Agents, a free download from us.
    Open `Agents-<version>.dmg`, and drag Agents into `~/Applications`.
    [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md) says more about this step.
-2. Open Agents. It asks no question. It says **Setting up Agents on this Mac…**, starts
-   this Mac's host and its control plane, and pairs the window. They keep running when you
+2. Open Agents. It shows **Let's build your idea.** with one box. Behind it, Agents
+   starts this Mac's host and its control plane, and pairs the window. They keep running when you
    close the window or quit Agents.
 
    If macOS asks you to allow Agents in **Login Items**, click **Open Login Items**, turn
    Agents on, and come back. Agents continues by itself.
+
+3. This tutorial does not build an app, so type a few words, such as *A web page for my
+   tests*, and press **Submit**. On the plan page, choose **Open Agents**, at the top right.
+   To build an app instead, see [Build your first app](../how-to/build-your-first-app.md).
 
 You should see the Agents window.
 

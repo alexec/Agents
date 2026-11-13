@@ -278,7 +278,9 @@ private repository in your GitHub account, or in an organisation you name, with 
 your other clones and adds it as a folder, so it shows in the session list on every client.
 When a step fails, ask again: each step that is done already is skipped.
 
-The agent follows the ready-made skill `start-a-new-app` (#3712), in voice mode or typed,
+The first open of Agents does this for a newcomer: see
+[Build your first app](build-your-first-app.md). Later, the agent follows the ready-made
+skill `start-a-new-app` (#3712), in voice mode or typed,
 from the first question to the first deploy. It asks the kind of app (an iPhone app, a web
 service, or both) and its name, makes the repository and the deploy gates with you as their
 reviewer, then does Apple, Google Cloud and Sentry as the app needs them. Each step that

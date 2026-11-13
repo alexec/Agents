@@ -40,13 +40,17 @@ file in another app are offered only for folders on this Mac.
 
 ## The first open
 
-When you open Agents for the first time, it asks no question and needs no code. It makes
+When you open Agents for the first time, it needs no code. It makes
 the control key, and registers two launch agents with macOS: a control plane on this Mac,
 and this Mac's host, `agentsd`. It starts them, and joins this Mac's host to that control
 plane. Then the window pairs itself with the control plane, so you copy and paste nothing.
 
-Then the window opens on the empty session list. If a step fails, the window shows one
-line with **Try Again** and **Show Details** in place of the list. When macOS asks you to approve the login
+All of this runs behind the question page, **Let's build your idea.** (#5048): you type an
+idea for an app while Agents sets itself up, and an agent then takes you from it to the
+first deploy. See [Build your first app](../how-to/build-your-first-app.md). A person who
+is set up already never sees the question page: the window opens on the session list. If a
+step fails, the question page shows one line under its box with **Try Again** and **Show
+Details**, and keeps your words. When macOS asks you to approve the login
 items, the line says so and has **Open Login Items**. See
 [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md).
 
