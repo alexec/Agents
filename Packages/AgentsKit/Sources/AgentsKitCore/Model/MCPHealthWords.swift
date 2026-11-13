@@ -30,19 +30,24 @@ public enum MCPHealthWords {
         if server.hosted {
             return server.live.map(HostedMCPWords.line) ?? "Hosted \u{00B7} starts on the first call"
         }
-        let checked = server.checkedAt.map { " \u{00B7} checked \(LeaseWords.clock($0))" } ?? ""
         switch server.check {
         case .unchecked: return "Not checked yet"
         case .checking: return "Checking\u{2026}"
         case .answered:
             let tools = server.tools.map { $0 == 1 ? " \u{00B7} 1 tool" : " \u{00B7} \($0) tools" } ?? ""
-            return "Answered" + tools + checked
-        case .failed: return "Didn't answer" + checked
+            return "Answered" + tools
+        case .failed: return "Didn't answer"
         case .waiting: return "Waiting for approval in this folder's settings, so it is not started"
         case .missingSecret: return "Needs a secret that isn't set here, so it is not started"
         case .signIn: return "Wants a sign-in first, in Settings"
         case .oldTransport: return "Uses the old sse transport, which isn't checked"
         }
+    }
+
+    /// When the oldest of these servers was last checked: the page's "Last update" (#5145), in
+    /// place of a clock time on each row. Nil when none was checked yet.
+    public static func readAt(_ servers: [Server]) -> Date? {
+        servers.compactMap(\.checkedAt).min()
     }
 
     /// Why it last failed, when it has: shown under the line.

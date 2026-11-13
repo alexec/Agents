@@ -7,7 +7,7 @@ import { useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import type { MCPLevels } from "../protocol/generated";
 import {
-  connectorLevels, fileProblem, healthKind, healthLastError, healthLine, healthTone, levelsSentence,
+  connectorLevels, fileProblem, healthKind, healthLastError, healthLine, healthReadAt, healthTone, levelsSentence,
   notRemoved, notRemovedOffline, personalServers, folderEmpty, folderIntro, folderServers, removesCommitted, removesWords,
 } from "../model/hostedMCP";
 import { BackToList } from "./BackToList";
@@ -17,6 +17,7 @@ import { go } from "../route";
 import { Capability } from "../protocol/capabilities.generated";
 import { hostNeedsUpdate } from "../model/capabilities";
 import { ask } from "./MessageKinds";
+import { LastUpdate } from "./LastUpdate";
 
 /** One host's servers from one file: the person's (no folder) or a folder's. */
 export function MCPServersList({ store, host, folder }: { store: Store; host: string; folder?: string }) {
@@ -35,6 +36,8 @@ export function MCPServersList({ store, host, folder }: { store: Store; host: st
     setToolsOpen(next);
   };
   const checkable = servers.some((s) => !s.hosted);
+  // The oldest check, in place of a time on each row (#5145).
+  const readAt = healthReadAt(servers);
   // Every connector (#2154), one written by hand in mcp.json too; asked first, as the window's sheet.
   // A server's is named (#2266); the Mac's is not.
   const machine = store.isMac(host) ? undefined : store.hosts.value.find((h) => h.id === host)?.name ?? host;
@@ -51,6 +54,7 @@ export function MCPServersList({ store, host, folder }: { store: Store; host: st
   };
   return (
     <div class="resources mcp-servers">
+      {readAt !== undefined && <p><LastUpdate at={readAt} /></p>}
       {problem && <p class="small failure">{problem}</p>}
       {removeProblem && <p class="small failure">{removeProblem}</p>}
       {servers.length > 0 && (

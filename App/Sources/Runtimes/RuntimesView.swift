@@ -38,7 +38,11 @@ struct RuntimesView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Runtimes").appText(.reading)
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Runtimes").appText(.reading)
+                    Spacer(minLength: 16)
+                    if let readAt { LastUpdateText(read: readAt) }
+                }
                 // One sentence (#3744); what a spent allowance means is its help tag.
                 Text("What you can start on, and how much is left.")
                     .appText(.supporting)
@@ -167,6 +171,13 @@ struct RuntimesView: View {
     }
 
     private var now: Date { model.runtimeAllowances?.at ?? Date() }
+
+    /// The oldest read on the page (#5145): each machine's last runtimes/list, an offline one's
+    /// kept from before it went, and the allowances'.
+    private var readAt: Date? {
+        (machines.flatMap { model.runtimes(on: $0) }.map(\.checkedAt)
+            + [model.runtimeAllowances?.at].compactMap { $0 }).min()
+    }
 
     /// What a runtime's machines say of it, in their order.
     private func summary(_ runtimeID: String) -> RuntimeMachinesSummary<MachineRef> {
