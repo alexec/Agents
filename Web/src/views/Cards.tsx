@@ -17,7 +17,8 @@ import { CallFailed } from "../wire/link";
 import { describe } from "../model/errors";
 import { Failure } from "../protocol/generated";
 import { isSafeLink } from "../render/markdown";
-import { Blocks, EditDiff, elicitationTitle } from "./chat/Rows";
+import { Blocks, EditDiff } from "./chat/Rows";
+import { askHead } from "../model/askHead";
 import { askerFor } from "../model/asker";
 import { planOf } from "../model/plan";
 import { Markdown } from "../render/markdown";
@@ -367,7 +368,8 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
   const step = useSignal(0);
   // No, because… (#4039): the decline being explained, by its key, while the card asks why.
   const because = useSignal<string | null>(null);
-  const title = elicitationTitle(request);
+  // The one question of a confirm card is its title (#5028).
+  const { title, message } = askHead(request);
   const go = (key: string, action: Action, content: Record<string, JSONValue> = {}, reason?: string) =>
     !inert && answer(key, action, content, reason?.trim() || undefined);
   /** One of the card's answers, by its key: its class beside `base`, held state and pending mark. */
@@ -490,7 +492,7 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
     <section ref={card} class={cardClass(hold)} aria-label="Question">
       {asker && <p class="quiet small asker">{asker}</p>}
       {((!request.secret && !request.handOff) || because.value !== null) && <div class="strong"><Markdown text={title} /></div>}
-      {!request.secret && !request.handOff && because.value === null && request.message && request.message !== title && <Markdown text={request.message} />}
+      {!request.secret && !request.handOff && because.value === null && message && <Markdown text={message} />}
       {body}
       <AnsweredNote answered={hold.answered} />
     </section>
