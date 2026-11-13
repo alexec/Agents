@@ -8,18 +8,17 @@ import SwiftUI
 /// ones This Mac can install, closed under Not installed: this page is where This Mac installs one
 /// after start-up. A server installs its runtimes when it is set up, and refuses a new install
 /// from a client. **Sign In…** on This Mac opens the runtime's sign-in sheet; on a server's Claude
-/// or Codex, the machine's own sign-in, a link to open here (#4698, as the web's #3349 and the
+/// or Codex, the machine's own sign-in, a link to open here, in a window of its own (#5203; #4698, as the web's #3349 and the
 /// Remote's #4035). The machine's grey line for a sign-in opens its page here, and Sign In….
 /// Accounts and allowances are the person's, not the machine's: they stay in Status.
 /// The web page draws the same in Web/src/views/MachinePage.tsx.
 struct MachineRuntimesSection: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     let host: MachineRef
 
     /// The runtime whose sign-in sheet is open.
     @State private var signingIn: String?
-    /// The server runtime whose sign-in sheet is open (#4698).
-    @State private var signingInServer: Runtime?
 
     private var runtimes: [RuntimeStatus] { model.runtimes(on: host).filter(\.isInstalled) }
     /// What This Mac can install, closed until the person opens it.
@@ -50,7 +49,7 @@ struct MachineRuntimesSection: View {
             // The row's grey line said a runtime here needs a sign-in: Sign In… opens (#4698).
             if case .signIn = model.need(of: host),
                let first = model.runtimes(on: host).first(where: { model.offersServerSignIn($0, on: host) }) {
-                signingInServer = first.runtime
+                signInOnServer(first.runtime)
             }
         }
         .sheet(isPresented: Binding(get: { signingIn != nil }, set: { if !$0 { signingIn = nil } })) {
@@ -59,10 +58,12 @@ struct MachineRuntimesSection: View {
                     .paperSheet()
             }
         }
-        .sheet(item: $signingInServer) { runtime in
-            ServerRuntimeSignInSheet(host: host, runtime: runtime)
-                .paperSheet()
-        }
+    }
+
+    /// A server's sign-in opens in a window of its own, not a sheet (#5203): it waits on the
+    /// browser, and the person works on in this window meanwhile.
+    private func signInOnServer(_ runtime: Runtime) {
+        openWindow(id: ServerSignInScene.id, value: ServerSignInKey(host: host, runtime: runtime))
     }
 
     private func row(_ status: RuntimeStatus) -> some View {
@@ -91,7 +92,7 @@ struct MachineRuntimesSection: View {
             }
         } else {
             if model.offersServerSignIn(status, on: host) {
-                Button("Sign In…") { signingInServer = status.runtime }
+                Button("Sign In…") { signInOnServer(status.runtime) }
                     .controlSize(.small)
             }
             if status.outdated, status.runtime.install != nil, !status.availability.isInstalling {

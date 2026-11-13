@@ -16,9 +16,8 @@ import { MachineProcesses } from "./settings/Processes";
 import { chooseSettingsMachine } from "./settings/SettingsMachine";
 import { WorktreesList } from "./Worktrees";
 import { Resources } from "./Resources";
-import { RuntimeSignInDialog } from "./RuntimeSignInDialog";
+import { signInRuntime } from "./RuntimeSignInDialog";
 import { isInstalled, machineRuntimeLine, offersMachineSignIn, offersUpdate, signInOnTheMac } from "../model/runtimes";
-import type { RuntimeStatus } from "../protocol/generated";
 import { forCleanup, pageLine, tally, worktreesIntro } from "../model/worktrees";
 
 const disksHelp = "Each disk its agents write to. Low and almost full are the lines set in Folder Settings ▸ Disk Space.";
@@ -144,7 +143,6 @@ function MachineWorktrees({ store, host }: { store: Store; host: string }) {
  * and the daemon takes a new install only from the Mac, so there is no Install here.
  * Accounts and allowances are the person’s: Status ▸ Runtimes. */
 function MachineRuntimes({ store, host, name }: { store: Store; host: string; name: string }) {
-  const [signingIn, setSigningIn] = useState<RuntimeStatus | null>(null);
   const runtimes = store.runtimes.value[host]?.filter(isInstalled);
   const signs = store.has(host, Capability.runtimesSignIn1);
   return (
@@ -158,7 +156,7 @@ function MachineRuntimes({ store, host, name }: { store: Store; host: string; na
               {((offersMachineSignIn(status) && signs) || offersUpdate(status)) && (
                 <span class="row-actions">
                   {offersMachineSignIn(status) && signs && (
-                    <button type="button" onClick={() => setSigningIn(status)}>Sign In…</button>
+                    <button type="button" onClick={() => signInRuntime(store, { host, runtimeID: status.runtime.id, runtimeName: status.runtime.name, machine: name })}>Sign In…</button>
                   )}
                   {offersUpdate(status) && (
                     <button type="button" onClick={() => void store.updateRuntime(host, status.runtime.id)}>Update</button>
@@ -172,10 +170,6 @@ function MachineRuntimes({ store, host, name }: { store: Store; host: string; na
       )}
       <p><button type="button" class="link small" onClick={() => go({ nav: "status", section: "runtimes" })}>
         Every runtime, your accounts and allowances, in Status</button></p>
-      {signingIn && (
-        <RuntimeSignInDialog store={store} host={host} runtimeID={signingIn.runtime.id} runtimeName={signingIn.runtime.name}
-          machine={name} close={() => setSigningIn(null)} />
-      )}
     </section>
   );
 }

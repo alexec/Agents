@@ -13,8 +13,6 @@ struct RemoteMachinePage: View {
 
     @State private var usage: DaemonAPI.MachineUsageState?
     @State private var failure: String?
-    /// The runtime whose Sign In… is open.
-    @State private var signingIn: Runtime?
 
     private var name: String { model.machineName(host) }
     private var offline: Bool { model.machineOffline(host) }
@@ -81,11 +79,8 @@ struct RemoteMachinePage: View {
             await model.refreshMachineRuntimes(host)
             // A tap on a row that says a runtime needs sign-in comes here: Sign In… opens (#4035).
             if case .signIn = model.need(of: host), let first = model.runtimes(on: host).first(where: offersSignIn) {
-                signingIn = first.runtime
+                model.signingIn = RuntimeSignInTarget(host: host, runtime: first.runtime)
             }
-        }
-        .sheet(item: $signingIn) { runtime in
-            RuntimeSignInSheet(host: host, runtime: runtime)
         }
         .task(id: host) {
             usage = nil
@@ -115,7 +110,7 @@ struct RemoteMachinePage: View {
             if offersSignIn(status) || update {
                 HStack(spacing: 8) {
                     if offersSignIn(status) {
-                        Button("Sign In…") { signingIn = status.runtime }
+                        Button("Sign In…") { model.signingIn = RuntimeSignInTarget(host: host, runtime: status.runtime) }
                     }
                     if update {
                         Button("Update") { Task { await model.updateRuntime(status.id, on: host) } }

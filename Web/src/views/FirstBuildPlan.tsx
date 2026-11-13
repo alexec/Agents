@@ -24,7 +24,7 @@ import {
 import { go } from "../route";
 import { Chat } from "./Chat";
 import { ConnectDialog } from "./ConnectorSetup";
-import { RuntimeSignInDialog } from "./RuntimeSignInDialog";
+import { RuntimeSignInPanel, signInRuntime } from "./RuntimeSignInDialog";
 
 /** The machine the session runs on: the one it was started on, else this Mac's host, else the first that answers. */
 export function firstBuildHost(store: Store): string | undefined {
@@ -73,7 +73,6 @@ export function PlanPage({ store, down }: { store: Store; down: boolean }) {
   const [github, setGitHub] = useState(false);
   const [starting, setStarting] = useState(false);
   const [problem, setProblem] = useState<string>();
-  const [signingIn, setSigningIn] = useState<RuntimeStatus>();
   const [connecting, setConnecting] = useState(false);
   const plan = agent ? planInForce(agent) : null;
   const facts: PlanFacts = {
@@ -156,7 +155,8 @@ export function PlanPage({ store, down }: { store: Store; down: boolean }) {
   const control = (task: PlanTask) => {
     if (task.words === runtimeTask && !facts.runtimeReady) {
       return host && <RuntimeControl store={store} host={host} runtimes={runtimes} runtime={runtime}
-        choose={setRuntimeID} signIn={setSigningIn} />;
+        choose={setRuntimeID} signIn={(status) => signInRuntime(store, { host, runtimeID: status.runtime.id, runtimeName: status.runtime.name,
+          machine: store.hosts.value.find((h) => h.id === host)?.name ?? host })} />;
     }
     if (task.words === githubTask && !facts.githubConnected) {
       return <button type="button" onClick={() => setConnecting(true)}>Connect GitHub…</button>;
@@ -198,11 +198,7 @@ export function PlanPage({ store, down }: { store: Store; down: boolean }) {
         {host && agent ? <Chat store={store} host={host} session={agent.id} down={down} />
           : <p class="quiet small first-build-chat-empty">The agent's chat shows here when it starts.</p>}
       </div>
-      {signingIn && host && (
-        <RuntimeSignInDialog store={store} host={host} runtimeID={signingIn.runtime.id} runtimeName={signingIn.runtime.name}
-          machine={store.hosts.value.find((h) => h.id === host)?.name ?? host}
-          close={() => { setSigningIn(undefined); void store.reloadRuntimeList(host); }} />
-      )}
+      <RuntimeSignInPanel store={store} closed={(h) => void store.reloadRuntimeList(h)} />
       {connecting && host && (
         <ConnectDialog store={store} host={host} provider="github"
           connected={() => setGitHub(true)} close={() => setConnecting(false)} />
