@@ -37,9 +37,12 @@ type cookieStore interface {
 	clearAll(ctx context.Context) error
 }
 
-// Installed is whether Chromium has been downloaded on this machine: Playwright's
-// browsers folder has something in it.
+// Installed is whether this machine has a browser to start: Google Chrome (#5207), or a
+// Chromium downloaded into Playwright's browsers folder.
 func (m *Machine) Installed() bool {
+	if m.chromeExe() != "" {
+		return true
+	}
 	entries, err := os.ReadDir(m.Binaries)
 	return err == nil && len(entries) > 0
 }

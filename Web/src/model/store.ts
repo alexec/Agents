@@ -268,6 +268,12 @@ export class Work {
   readonly transcriptSource = signal<"none" | "device" | "host">("none");
   /** The hosts drawn from this device's copy (#4790) whose own answer has not come yet. */
   readonly fromDevice = signal<ReadonlySet<string>>(new Set());
+  /** When the oldest machine drawn from this device's copy was read (#5141), for the "Last update" line. */
+  readonly copyAt = computed(() => {
+    const reads = [...this.fromDevice.value].map((host) => this.copyReads.get(host)).filter((at): at is number => at !== undefined);
+    return reads.length > 0 ? Math.min(...reads) : undefined;
+  });
+  private readonly copyReads = new Map<string, number>();
   /** The page as the chat draws it, folded once as each entry lands. */
   readonly items = signal<Item[]>([]);
   /**
@@ -1383,6 +1389,7 @@ export class Work {
         // The host's first catch-up asks only for what changed since the copy (#4794).
         if (m.point) this.listPoints.set(m.host.id, m.point);
       }
+      for (const m of machines) this.copyReads.set(m.host.id, m.at);
       this.fromDevice.value = new Set(machines.map((m) => m.host.id));
     });
   }
@@ -1594,13 +1601,13 @@ export class Work {
 }
 
 /** Something a person asked of a whole agent, on its way to its host (#87; AgentAct.swift). */
-export type AgentAct = "agents/stop" | "agents/archive" | "agents/unarchive"
+export type AgentAct = "agents/stop" | "agents/archive" | "agents/unarchive" | "agents/startNow"
   | { sendNow: string };
 
 /** What the pending mark says it is doing, before "telling your Mac" (AgentAct.doing). */
 export function actDoing(act: AgentAct): string {
   if (typeof act !== "string") return "Sending";
-  return { "agents/stop": "Stopping", "agents/archive": "Archiving", "agents/unarchive": "Unarchiving" }[act];
+  return { "agents/stop": "Stopping", "agents/archive": "Archiving", "agents/unarchive": "Unarchiving", "agents/startNow": "Starting" }[act];
 }
 
 /** Telling.words: "Archiving — telling your Mac", or "telling your Mac" beside a button that says what. */
@@ -1612,11 +1619,17 @@ export function tellingWords(doing: string | null, recipient: string): string {
 /** Said when an edit came too late (#1552), as QueuedPrompt.sentBeforeEdit says it. */
 export const sentBeforeEdit = "That prompt was sent before your change. Your words are in the prompt bar.";
 
+/** A runtime on a machine, to sign in (#5203). */
+export interface RuntimeSignInTarget { host: string; runtimeID: string; runtimeName: string; machine: string }
+
 export class Store extends Work {
   /** The control plane's workspace providers (#1808), for Settings ▸ Control plane. */
   readonly providers: Providers;
   /** This browser in its person's machine lock, and the devices that ask to join it (#3490). */
   readonly machineLock: MachineLock;
+  /** The server runtime being signed in (#3349), drawn at the page's root and not modal (#5203):
+   * a sign-in waits on another tab for minutes, and the person works on meanwhile. */
+  readonly runtimeSignIn = signal<RuntimeSignInTarget | null>(null);
 
   /** A machine Add as Machine… installed is linked to its workspace once it joins (#3365). */
   override takeHosts(hosts: ControlMachine[], now = Date.now()): void {
@@ -3911,6 +3924,13 @@ export class Store extends Work {
   async continueWhenBack(host: string, agentID: string, on: boolean): Promise<void> {
     const agent = await this.act(on ? "agents/continueWhenBack" : "agents/cancelContinue", { agentID: agentID as UUID }, host);
     if (agent) this.apply("agent/changed", agent, host);
+  }
+
+  /** Start now (#5156): a queued session at once, past the running limit; the host refuses it past the total, and says why. */
+  async startNow(host: string, agentID: string): Promise<void> {
+    const write: AgentWrite = { kind: "startNow" };
+    await this.acting(agentID, "agents/startNow", () => this.optimistic(host, agentID, write, async () =>
+      await this.act("agents/startNow", { agentID: agentID as UUID }, host, write) !== null));
   }
 
   async sendNow(host: string, agentID: string, promptID: string): Promise<void> {

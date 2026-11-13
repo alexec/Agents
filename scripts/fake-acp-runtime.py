@@ -35,6 +35,9 @@ every turn, from `<its folder>/<its name>.behaviour`:
           it answers as `ok` does, and the turn reports that many tokens (half in, half
           out) on its prompt response: for reaching a token limit, as the limit strip
           needs (#5034).
+  edit <path> [<path> ...]
+          the turn adds a line to each file, by its path in the session's folder (made when
+          it is not there), then answers: for seeing a turn's Changed files card (#5035).
   ok      (or no file) it answers, saying what it was handed.
 
 So a walk can make a runtime run out, and later come back, by rewriting one file.
@@ -84,6 +87,8 @@ SPENT = {"jetbrains": {"air": {"version": 1, "sessionFailure": {
 
 # The app's own MCP server, as session/new hands it over: its address and headers.
 servers = {}
+# Each session's folder, as session/new hands it over.
+folders = {}
 
 
 def call_tool(session_id, name, arguments):
@@ -176,6 +181,16 @@ def prompt(request_id, params):
         say(session_id, text)
         reply(request_id, {"stopReason": "end_turn"})
         return
+    if how and how[0] == "edit":
+        folder = folders.get(session_id, os.getcwd())
+        for rel in how[1:]:
+            path = os.path.join(folder, rel)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            with open(path, "a") as f:
+                f.write(f"A line from {NAME}.\n")
+        say(session_id, f"Edited {len(how) - 1} files.")
+        reply(request_id, {"stopReason": "end_turn"})
+        return
     if how and how[0] == "plan":
         with open(os.path.join(HERE, f"{NAME}.plan")) as f:
             entries = json.load(f)
@@ -260,6 +275,7 @@ def main():
             for server in params.get("mcpServers", []):
                 if server.get("name") == "agents" and server.get("url"):
                     servers[session_id] = server
+            folders[session_id] = params.get("cwd") or os.getcwd()
             reply(request_id, {"sessionId": session_id, "configOptions": options()})
         elif method == "session/set_config_option":
             chosen[params.get("configId", "")] = params.get("value")

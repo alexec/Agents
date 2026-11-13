@@ -1,16 +1,20 @@
-// What a turn changed, at its end (#3437): the files, and Undo These Changes, which puts them back as they were before
-// the turn. A file that changed again after the turn is asked about first. The window's is
+// What a turn changed, at its end (#3437), as an Object card (#5035): the files by name, a click that opens them in
+// Changes, and Undo These Changes in its ⋯, which puts them back as they were before the turn. A file that changed
+// again after the turn is asked about first. The window's is
 // Shared/UI/Chat/TurnChangesCard.swift.
 import { useContext } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { TurnChanges, TurnUndo } from "../../protocol/generated";
-import { cannotUndoWords, changedTitle, confirmMessage, confirmTitle, moreWords, onlyReported, stateMark, stateWord, undoHelp,
+import { cannotUndoWords, changedCount, changedTitle, confirmMessage, confirmTitle, fileNames, onlyReported, openHelp, undoHelp,
   undoing, undoneWords, undoRefusal, undoTitle } from "../../model/turnChanges";
+import { ObjectCard } from "./ObjectCard";
 import { CallActionsContext } from "./Rows";
 import { ask } from "../MessageKinds";
 
 export function TurnChangesCard({ changes }: { changes: TurnChanges }) {
-  const undoTurn = useContext(CallActionsContext)?.undoTurn;
+  const actions = useContext(CallActionsContext);
+  const undoTurn = actions?.undoTurn;
+  const showChanges = actions?.showChanges;
   // Undone here, before the turnUndone entry comes back.
   const undone = useSignal<TurnUndo | null>(null);
   const working = useSignal(false);
@@ -32,26 +36,20 @@ export function TurnChangesCard({ changes }: { changes: TurnChanges }) {
       working.value = false;
     }
   };
+  // A click opens Changes (#5035): at the file when it is one, else at its list.
+  const one = changedCount(changes) === 1 ? changes.files[0]?.path ?? null : null;
+  const open = showChanges && changes.files.length > 0 ? () => showChanges(one) : undefined;
+  const notes = [
+    changes.onlyReported && <p key="r">{onlyReported}</p>,
+    changes.cannotUndo && changes.cannotUndo.length > 0 && <p key="c">⚠︎ {cannotUndoWords(changes.cannotUndo)}</p>,
+    working.value && <p key="w">{undoing}</p>,
+    done && <p key="d">↩︎ {undoneWords(done)}</p>,
+    problem.value && <p key="p" class="failure" role="alert">{problem.value}</p>,
+  ].filter(Boolean);
   return (
-    <div class="note turn-changes">
-      <p class="strong">{changedTitle(changes)}</p>
-      <ul class="turn-files small">
-        {changes.files.map((file) => (
-          <li key={file.path} title={file.path}>
-            <span class="quiet" aria-label={stateWord(file.state)}>{stateMark(file.state)}</span> {file.relativePath ?? file.path}
-          </li>
-        ))}
-        {(changes.more ?? 0) > 0 && <li class="quiet">{moreWords(changes.more!)}</li>}
-      </ul>
-      {changes.onlyReported && <p class="quiet small">{onlyReported}</p>}
-      {changes.cannotUndo && changes.cannotUndo.length > 0 && <p class="quiet small">⚠︎ {cannotUndoWords(changes.cannotUndo)}</p>}
-      {done && <p class="quiet small">↩︎ {undoneWords(done)}</p>}
-      {problem.value && <p class="failure small" role="alert">{problem.value}</p>}
-      {!done && changes.files.length > 0 && undoTurn && (
-        <p class="undo">
-          <button title={undoHelp} disabled={working.value} onClick={() => void run(undoTurn)}>{working.value ? undoing : undoTitle}</button>
-        </p>
-      )}
-    </div>
+    <ObjectCard icon="square-pen" title={changedTitle(changes)} detail={fileNames(changes)} open={open} openTitle={openHelp}
+      more={!done && changes.files.length > 0 && undoTurn
+        ? [{ label: undoTitle, title: undoHelp, disabled: working.value, run: () => void run(undoTurn) }] : []}
+      notes={notes.length > 0 ? <div class="object-card-notes">{notes}</div> : undefined} />
   );
 }

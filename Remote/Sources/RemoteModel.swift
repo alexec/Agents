@@ -33,9 +33,9 @@ final class RemoteModel {
     /// When what the phone holds was last live with the Mac (#1163): the moment touch was
     /// lost. Nil before the first connection since launch, when the phone holds nothing.
     private(set) var liveUntil: Date?
-    /// When the Needs you count was last true, for the "Updated" line beside it: nil while
-    /// live, when it is true now (#1163).
-    var needsYouUpdatedAt: Date? { isConnected ? nil : liveUntil }
+    /// When the Needs you count was last true, for the "Last update" line beside it: nil
+    /// while live, when it is true now (#1163, #5141).
+    var needsYouUpdatedAt: Date? { isConnected ? nil : lastReadAt }
     private(set) var lastHeardFrom: Date?
     private(set) var problem: String?
     /// Words for one chat's prompt bar, from elsewhere in the chat: an edit to a queued
@@ -2245,22 +2245,11 @@ final class RemoteModel {
     ///
     /// Where it opens is the Mac's answer (034 FR-004): a Markdown file on the Page, any
     /// other file in Files at the line. A Mac without the panes gets today's sheet.
-    /// While the person is typing it is left where it is, and the chat offers it.
+    /// While the person is typing it is not opened: it is taken off all the same, and its
+    /// Object card in the chat opens it when the person chooses (034 FR-005, #5035).
     func openFileTheAgentWants() {
-        guard !isTyping, let selection, let file = work.takeFileToShow(for: selection) else { return }
-        open(file, for: selection)
-    }
-
-    /// The strip's Open, which the person chose, typing or not.
-    func openOfferedFile() {
         guard let selection, let file = work.takeFileToShow(for: selection) else { return }
-        open(file, for: selection)
-    }
-
-    /// The strip's ✕: not now. Taken off, as an opened one would be.
-    func dismissOfferedFile() {
-        guard let selection else { return }
-        _ = work.takeFileToShow(for: selection)
+        if !isTyping { open(file, for: selection) }
     }
 
     /// A file shown in the chat, opened again from its card (#836).
@@ -2294,10 +2283,10 @@ final class RemoteModel {
     /// the screens say so and stop offering actions rather than pretending (FR-035).
     var isStale: Bool { !isConnected }
 
-    /// How long since the Mac last answered, in words.
-    var lastHeard: String? {
-        guard let lastHeardFrom else { return nil }
-        return lastHeardFrom.formatted(.relative(presentation: .named))
+    /// When what the phone shows was last read (#5141): the last word from the control plane,
+    /// or the moment a live link went, whichever is later; before either, this device's copy.
+    var lastReadAt: Date? {
+        [lastHeardFrom, liveUntil].compactMap { $0 }.max() ?? work.copyReadAt
     }
 
     /// The control plane's address itself refused the connection (suspended, over a
@@ -5586,6 +5575,17 @@ final class RemoteModel {
                   DaemonAPI.UnqueueRequest(agentID: agentID, promptID: prompt.id))
     }
 
+    /// Start now (#5156): a queued session started at once, past the running limit, by the
+    /// person's tap. The Mac refuses it when the folder's total is full, and says why.
+    func startNow(_ agentID: UUID) async {
+        await act(.startNow, on: agentID, DaemonAPI.Method.agentsStartNow, DaemonAPI.AgentRequest(agentID: agentID))
+    }
+
+    /// Whether Start now is offered on this session: queued by an agent, on a host that has it.
+    func canStartNow(_ agent: Agent) -> Bool {
+        HelperLimit.canStartNow(agent) && self.agent(agent.id, has: Capability.agentsStartNow1)
+    }
+
     /// What a command an agent ran has printed, as far as this phone heard it.
     func terminalOutput(_ terminalID: String) -> String { work.terminalOutput[terminalID] ?? "" }
 
@@ -5774,6 +5774,9 @@ final class RemoteModel {
     }
     /// The session a menu's Move to Machine… is moving (#4037), asked at the root as Rename… is.
     var movingToMachine: Agent?
+    /// The server runtime being signed in (#4035), asked at the root (#5203): the sheet stays
+    /// while the person goes to other pages, and the page under it works.
+    var signingIn: RuntimeSignInTarget?
     /// Moves to another machine under way, by session, and those that stopped with a problem
     /// until they are put away (#4641): a line on the session's card, as on the Mac's row.
     var moves: [UUID: DaemonAPI.MoveNotification] = [:]
@@ -6034,7 +6037,9 @@ final class RemoteModel {
             // that host is away (#208).
             try await sendOnce(method, request)
             return true
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.folderGone {
+        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.folderGone
+                    || error.code == DaemonAPI.Failure.notAllowed {
+            // The Mac's own reason: a folder gone, or Start now past the total (#5156).
             problem = error.message
             return false
         } catch {

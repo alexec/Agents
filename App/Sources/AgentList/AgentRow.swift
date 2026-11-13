@@ -343,6 +343,12 @@ struct AgentRow: View {
             if model.isBlocked(agent) {
                 Button(AgentsModel.carryOnLabel) { Task { await model.carryOn(agent.id) } }
             }
+            // Ahead of the queue and past the running limit, by the person's own click (#5156).
+            if model.canStartNow(agent) {
+                Button(HelperLimit.startNowLabel) { Task { await model.startNow(agent.id) } }
+                    .help(HelperLimit.startNowHelp)
+                    .disabled(isActing)
+            }
             if model.canStop(agent) {
                 Button("Stop") { Task { await model.stop(agent.id) } }
                     .disabled(isActing)

@@ -1,9 +1,10 @@
 import AgentsKitCore
 import SwiftUI
 
-/// What a turn changed, at its end (#3437): the files, and Undo These Changes, which puts
-/// them back as they were before the turn. A file that changed again after the turn is
-/// asked about first. The page draws the same card in TurnChangesCard.tsx.
+/// What a turn changed, at its end (#3437), as an Object card (#5035): the files by name, a
+/// tap that opens them in Changes, and Undo These Changes in its ⋯, which puts them back as
+/// they were before the turn. A file that changed again after the turn is asked about
+/// first. The page draws the same card in TurnChangesCard.tsx.
 struct TurnChangesCard: View {
     let changes: TurnChanges
     @Environment(\.chatActions) private var actions
@@ -16,56 +17,33 @@ struct TurnChangesCard: View {
     private var done: TurnUndo? { changes.undone ?? undone }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(TurnChangesWords.title(changes), icon: TurnChangesWords.symbol)
-                .appText(.reading).fontWeight(.semibold)
-            VStack(alignment: .leading, spacing: 3) {
-                ForEach(changes.files) { file in
-                    Label {
-                        Text(file.shown).appText(.fine).lineLimit(1).truncationMode(.middle)
-                    } icon: {
-                        Image(icon: TurnChangesWords.stateSymbol(file.state)).foregroundStyle(.secondary)
-                    }
-                    .accessibilityLabel("\(TurnChangesWords.stateWord(file.state)) \(file.shown)")
-                }
-                if let more = changes.more, more > 0 {
-                    Text(TurnChangesWords.more(more)).appText(.fine).foregroundStyle(.secondary)
-                }
-            }
+        ObjectCard(icon: TurnChangesWords.symbol, title: TurnChangesWords.title(changes),
+                   detail: TurnChangesWords.names(changes), open: open, openHelp: TurnChangesWords.openHelp,
+                   more: more, notes: {
             if changes.onlyReported == true {
                 Text(TurnChangesWords.onlyReported)
-                    .appText(.fine).foregroundStyle(.secondary)
+                    .appText(.fine).foregroundStyle(Paper.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let cannot = changes.cannotUndo, !cannot.isEmpty {
                 Label(TurnChangesWords.cannotUndo(cannot), icon: "exclamationmark.triangle")
-                    .appText(.fine).foregroundStyle(.secondary)
+                    .appText(.fine).foregroundStyle(Paper.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+            if working {
+                Text(TurnChangesWords.undoing).appText(.fine).foregroundStyle(Paper.secondary)
             }
             if let done {
                 Label(TurnChangesWords.undone(done), icon: "arrow.uturn.backward")
-                    .appText(.fine).foregroundStyle(.secondary)
+                    .appText(.fine).foregroundStyle(Paper.secondary)
             }
             if let problem {
                 Text(problem).appText(.fine).tinted(.failure)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if done == nil, !changes.files.isEmpty, let undo = actions.undoTurn {
-                HStack {
-                    Spacer()
-                    Button(working ? TurnChangesWords.undoing : TurnChangesWords.undo) {
-                        Task { await run(undo, confirmed: false) }
-                    }
-                    .buttonStyle(.paper)
-                    .help(TurnChangesWords.undoHelp)
-                    .disabled(working)
-                }
-            }
-        }
-        .padding(14)
+        })
+        .frame(maxWidth: ObjectCard<EmptyView, EmptyView>.width, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .paperWell(in: RoundedRectangle(cornerRadius: 10))
-        .accessibilityElement(children: .contain)
         .confirmationDialog(TurnChangesWords.confirmTitle, isPresented: Binding(
             get: { !asking.isEmpty }, set: { if !$0 { asking = [] } }), titleVisibility: .visible) {
             Button(TurnChangesWords.confirmUndo, role: .destructive) {
@@ -76,6 +54,21 @@ struct TurnChangesCard: View {
         } message: {
             Text(TurnChangesWords.confirmMessage(asking))
         }
+    }
+
+    /// A tap opens Changes (#5035): at the file when it is one, else at the list.
+    private var open: (@MainActor () -> Void)? {
+        guard let show = actions.showChanges, !changes.files.isEmpty else { return nil }
+        let one = changes.count == 1 ? changes.files.first?.path : nil
+        return { show(one) }
+    }
+
+    /// The ⋯: Undo These Changes, with the same question as before when a file changed since.
+    private var more: [StripButton] {
+        guard done == nil, !changes.files.isEmpty, let undo = actions.undoTurn else { return [] }
+        return [StripButton(title: TurnChangesWords.undo, help: TurnChangesWords.undoHelp, disabled: working) {
+            Task { await run(undo, confirmed: false) }
+        }]
     }
 
     private func run(_ undo: @MainActor (UUID, Bool) async throws -> DaemonAPI.UndoTurnResult, confirmed: Bool) async {

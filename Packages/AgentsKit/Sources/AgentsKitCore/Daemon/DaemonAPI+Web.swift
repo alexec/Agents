@@ -335,6 +335,9 @@ public extension DaemonAPI {
                 // A release's Lineage panel on the web page (#4423).
                 Row(Method.lineageFigures, params: LineageNodeRequest.self, result: LineageFigures.self,
                     kind: .hostRequest),
+                // Build trends on the web page (#5177): Web + Mac link, so no Swift types.
+                Row(Method.buildsHistory, params: JSONValue.self, result: JSONValue.self, kind: .hostRequest),
+                Row(Method.buildsRun, params: JSONValue.self, result: JSONValue.self, kind: .hostRequest),
                 Row(Method.simulatorsList, params: Empty.self, result: SimulatorList.self, kind: .hostRequest),
                 Row(Method.simulatorsBoot, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.simulatorsShutdown, params: SimulatorRequest.self, result: Empty.self, kind: .hostRequest),
@@ -372,6 +375,8 @@ public extension DaemonAPI {
                 Row(Method.agentsBranchFrom, params: BranchFromRequest.self, result: UUID.self, kind: .hostRequest),
                 Row(Method.agentsPrewarm, params: PrewarmRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsUnarchive, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
+                // Start now (#5156): a queued session, at once, by the person's click.
+                Row(Method.agentsStartNow, params: AgentRequest.self, result: Empty.self, kind: .hostRequest),
                 Row(Method.agentsSetLabels, params: SetLabelsRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetCeiling, params: SetCeilingRequest.self, result: Agent.self, kind: .hostRequest),
                 Row(Method.agentsSetSandbox, params: SetSandboxRequest.self, result: Agent.self, kind: .hostRequest),

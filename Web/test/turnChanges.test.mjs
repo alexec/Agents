@@ -18,6 +18,9 @@ test("the card stands at the end of its turn, at every level", () => {
   const [turn] = turns.turns(items);
   assert.ok(turns.turnParts(turn.items, false).outcome.some((i) => i.id === "c"));
   assert.equal(words.changedTitle(changes), "Changed 5 files");
+  // The Object card's quiet line names the files, as on the Mac (#5035).
+  assert.equal(words.fileNames(changes), "a.txt, n.txt and 3 more");
+  assert.equal(words.fileNames({ ...changes, more: 0 }), "a.txt and n.txt");
 });
 
 // The undo is said on the card, and is no line of its own.

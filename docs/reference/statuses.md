@@ -121,7 +121,7 @@ plane.
 | Line | What it means | What works |
 | --- | --- | --- |
 | No line | Connected to the control plane at its address. | Everything. |
-| Last heard from your Mac … | The device cannot reach the control plane: the Mac it runs on is asleep, or Agents is not running on it. What is shown is dimmed and offers nothing. | Nothing, until it answers. |
+| Can't reach your Mac. Last update … | The device cannot reach the control plane: the Mac it runs on is asleep, or Agents is not running on it. What is shown is dimmed and offers nothing. | Nothing, until it answers. |
 | Not connected to your Mac yet | The app has not reached the control plane since it opened. If it has not paired, the page says **Connect to your agents**, with a button to scan the code the Mac shows in **Settings ▸ Control plane ▸ Clients ▸ Pair a Device…**. | Nothing, until it answers. |
 
 ## See also

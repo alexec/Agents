@@ -100,6 +100,18 @@ public enum HelperLimit {
         return "Queued, \(ordinal(position))"
     }
 
+    /// Start now (#5156): the person starts a queued session at once, past the running
+    /// limit. Called Send now, as a queued prompt's is (Alex, PR #5172): in the row menus,
+    /// and under the session's queued words in its chat.
+    public static let startNowLabel = "Send Now"
+    public static let startNowHelp = "Start this session now, ahead of the queue and past the running limit"
+
+    /// Whether Start now is offered: a session an agent started that waits in the queue.
+    /// The host still refuses it when the folder's total is full, and says why.
+    public static func canStartNow(_ agent: Agent) -> Bool {
+        agent.state == .queued && agent.startedByAgent != nil
+    }
+
     public static func ordinal(_ n: Int) -> String {
         let tens = n % 100
         let suffix = (11...13).contains(tens) ? "th"

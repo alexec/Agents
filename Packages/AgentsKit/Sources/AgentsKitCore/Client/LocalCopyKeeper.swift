@@ -27,9 +27,9 @@ public final class LocalCopyKeeper {
 
     /// Every machine kept, drawn at once: each one whose host has not listed it yet.
     public func drawMachines() async {
-        let machines = await copy.allMachines()
+        let machines = await copy.machinesRead()
         guard let work else { return }
-        for machine in machines { work.takeCopy(machine) }
+        for (machine, at) in machines { work.takeCopy(machine, readAt: at) }
     }
 
     /// The chat being opened, drawn from the copy while its host's page is on its way.
@@ -71,6 +71,7 @@ public final class LocalCopyKeeper {
     private func listed(_ host: MachineRef) {
         pending[host]?.cancel()
         let wait = writeAfter
+        let readAt = Date()
         pending[host] = Task { [weak self] in
             try? await Task.sleep(for: wait)
             guard !Task.isCancelled, let self, let work = self.work else { return }
@@ -78,7 +79,7 @@ public final class LocalCopyKeeper {
             let machine = LocalCopy.Machine(host: host, folders: work.folders.filter { $0.host == host },
                                             agents: work.agents.filter { $0.host == host },
                                             point: work.listPoint(of: host))
-            await self.copy.keep(machine)
+            await self.copy.keep(machine, readAt: readAt)
         }
     }
 }

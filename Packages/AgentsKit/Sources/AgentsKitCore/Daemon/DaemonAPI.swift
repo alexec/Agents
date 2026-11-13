@@ -145,6 +145,11 @@ public enum DaemonAPI {
         public static let lineageEstimate = "lineage/estimate"
         /// When an epic lands, its estimate to complete, the spend, the burn and service levels (#4526).
         public static let lineageForecast = "lineage/forecast"
+        /// Build trends (#5177, spec 5166): a repository's CI timings, figures and change points,
+        /// and one run with its jobs and steps. The web page reads them; the Mac has only a link
+        /// (tier web+link), so Swift has no types for them.
+        public static let buildsHistory = "builds/history"
+        public static let buildsRun = "builds/run"
         public static let simulatorsList = "simulators/list"
         public static let simulatorsBoot = "simulators/boot"
         public static let simulatorsShutdown = "simulators/shutdown"
@@ -178,6 +183,9 @@ public enum DaemonAPI {
         public static let filesWatch = "files/watch"
         public static let filesUnwatch = "files/unwatch"
         public static let agentsStop = "agents/stop"
+        /// A queued session started at once by the person, past the running limit and
+        /// never past the total (#5156). Takes an `AgentRequest`. No agent's role may call it.
+        public static let agentsStartNow = "agents/startNow"
         public static let agentsArchive = "agents/archive"
         public static let agentsUnarchive = "agents/unarchive"
         /// Delete one archived agent: its conversation, record and clean worktree (#398).

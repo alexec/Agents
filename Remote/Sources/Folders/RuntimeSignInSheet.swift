@@ -6,6 +6,9 @@ import UIKit
 /// (#3349): the machine has no browser, so the runtime's own sign-in runs there and gives a
 /// link to open here. Claude's page then gives a code to paste back; Codex gives a code to
 /// type on its page. An API key is the other way in.
+///
+/// Not modal (#5203): it is shown at the root (`RuntimeSignInAsk`), stays while the person
+/// goes to other pages, and at its medium height leaves the page under it working.
 struct RuntimeSignInSheet: View {
     @Environment(RemoteModel.self) private var model
     @Environment(\.dismiss) private var dismiss
@@ -98,6 +101,8 @@ struct RuntimeSignInSheet: View {
         }
         .interactiveDismissDisabled(busy)
         .task { await start() }
+        // Closed by Cancel or a swipe down: a sign-in left waiting is stopped.
+        .onDisappear { cancelStep() }
     }
 
     private func start() async {
@@ -118,7 +123,6 @@ struct RuntimeSignInSheet: View {
     }
 
     private func leave() {
-        cancelStep()
         dismiss()
     }
 
@@ -141,6 +145,7 @@ struct RuntimeSignInSheet: View {
                 try await model.runtimeSignInFinish(.init(signInID: step.signInID, code: step.wantsCode ? code.trimmed : nil),
                                                     on: host)
             }
+            step = nil
             dismiss()
         } catch {
             problem = Self.words(error)
@@ -157,6 +162,13 @@ struct RuntimeSignInSheet: View {
     private static func words(_ error: any Error) -> String {
         (error as? JSONRPCError)?.message ?? error.localizedDescription
     }
+}
+
+/// What the root's sign-in sheet is for (#5203): a runtime on a machine.
+struct RuntimeSignInTarget: Identifiable, Hashable {
+    var host: MachineRef
+    var runtime: Runtime
+    var id: String { "\(host.rawValue)/\(runtime.id)" }
 }
 
 private extension String {

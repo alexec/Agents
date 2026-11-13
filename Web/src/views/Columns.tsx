@@ -40,6 +40,7 @@ import { navPages } from "../model/nav";
 import { sectionOf } from "../route";
 import { OrgPolicyStrip } from "./OrgPolicyLine";
 import { Icon } from "./Icon";
+import { RuntimeSignInPanel } from "./RuntimeSignInDialog";
 
 export function Columns({ session, store }: { session: Session; store: Store }) {
   const r = route.value;
@@ -87,7 +88,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
     <div class={`app depth-${depth}${r.files && r.session ? " files-open" : ""}${down ? " down" : ""}`}>
       <NavBar store={store} session={session} />
       {/* The page's banners, under its toolbar (docs/reference/design-system.md, "Messages"). */}
-      {down && <Banner session={session} />}
+      {down && <Banner session={session} store={store} />}
       <OrgPolicyStrip store={store} />
       {store.newMachineAsk.value && <NewMachineSheet key={JSON.stringify(store.newMachineAsk.value)} store={store} ask={store.newMachineAsk.value} />}
       {section === "overview" ? <div class="columns overview-columns console" aria-busy={down}><Overview store={store} down={down} /></div>
@@ -128,6 +129,7 @@ export function Columns({ session, store }: { session: Session; store: Store }) 
       <ReportProblemDialog store={store} />
       <MoveToMachineDialog store={store} />
       <GitLendDialog store={store} />
+      <RuntimeSignInPanel store={store} />
       <ExportImportDialog store={store} />
       <ContextMenu />
       <AchievementCard store={store} />

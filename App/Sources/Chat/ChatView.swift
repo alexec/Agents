@@ -186,6 +186,12 @@ struct ChatView: View {
         return { [model] command in Task { await model.tellAgent(about: command, in: agent.id) } }
     }
 
+    /// Start now on a queued session (#5156), where its host has it; nil draws no button.
+    private var startNow: (@MainActor (UUID) async -> Void)? {
+        guard model.agent(agent?.id, has: Capability.agentsStartNow1) else { return nil }
+        return { [model] agentID in await model.startNow(agentID) }
+    }
+
     /// What the shared chat rows mean on a Mac (033).
     private var chatActions: ChatActions {
         ChatActions(
@@ -202,6 +208,7 @@ struct ChatView: View {
             tellAgent: tellAgent,
             sendNow: { [model] prompt, agentID in await model.sendNow(prompt, to: agentID) },
             canSendNow: { [model] runtimeID in runtimeID.flatMap { model.accounts[$0]?.canSteer } ?? false },
+            startNow: startNow,
             acting: { [model] agentID in model.acting(agentID) },
             recipient: { [model] agentID in model.answerRecipient(agentID) },
             // The sidebar's Changes pane, open at that edit (035 FR-014).
@@ -211,6 +218,18 @@ struct ChatView: View {
                 if !hasInspector { return model.open(URL(filePath: diff.path), on: agent.host) }
                 states.state(for: agent.id).changesSelection = ChangesSelection(
                     path: ReportedChanges.key(diff.path), toolCallID: toolCallID)
+                frame.pane = .changes
+                if !frame.isOpen { frame.open() }
+            },
+            // A turn's Changed files card (#5035): the Changes pane, at the file or its list.
+            showChanges: { [model, frame, states, agent, hasInspector] path in
+                guard let agent else { return }
+                // A window of its own has no Changes pane: one file opens in the editor (#826).
+                if !hasInspector {
+                    if let path { model.open(URL(filePath: path), on: agent.host) }
+                    return
+                }
+                states.state(for: agent.id).changesSelection = path.map { ChangesSelection(path: ReportedChanges.key($0)) }
                 frame.pane = .changes
                 if !frame.isOpen { frame.open() }
             },

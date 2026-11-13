@@ -175,6 +175,8 @@ export interface CallActions {
   fromLine?: ((sender: MessageSender | undefined) => string) | undefined;
   /** Ask for More on a Stopped by a policy card at the organisation's budget (ChatActions.askForMore, #3262). */
   askForMore?: (() => Promise<BudgetRequest>) | undefined;
+  /** Open the Changes pane at a file, or at its list for null: a turn's Changed files card (ChatActions.showChanges, #5035). */
+  showChanges?: ((path: string | null) => void) | undefined;
   /** Undo These Changes on a turn's card (ChatActions.undoTurn, #3437). Not on an archived session, nor a host too old. */
   undoTurn?: ((turn: string, confirmed: boolean) => Promise<UndoTurnResult>) | undefined;
 }

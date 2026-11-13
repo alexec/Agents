@@ -1,0 +1,114 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="680" viewBox="0 0 1240 680" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+<defs><filter id="shadow" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.18"/></filter><pattern id="queue" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="#E3E6EA"/><rect width="2.4" height="6" fill="#9AA1AB"/></pattern></defs>
+<rect width="1240" height="680" fill="#E7EAEE"/>
+<text x="24.0" y="34.0" font-size="15" fill="#1C1D20" font-weight="600">5 · The Mac link: Build trends on the Pipeline line of a pull request's or release's Work page (Web + Mac link, #4937)</text>
+<text x="24.0" y="54.0" font-size="12" fill="#5B616B" >The PR page around the line is scratch; the line is the Pipeline line of #3588. The link draws nothing on the Mac but itself.</text>
+<g filter="url(#shadow)"><rect x="24" y="80" width="700" height="520" rx="10" fill="#F7F8F9"/></g>
+<circle cx="44.0" cy="100.0" r="6" fill="#FF5F57"/>
+<circle cx="64.0" cy="100.0" r="6" fill="#FEBC2E"/>
+<circle cx="84.0" cy="100.0" r="6" fill="#28C840"/>
+<text x="134.0" y="105.0" font-size="13" fill="#5B616B" >Work ▸ Pull requests</text>
+<text x="52.0" y="150.0" font-size="17" fill="#1C1D20" font-weight="700">An agent's gh and git fall back to the person's own login when</text>
+<text x="52.0" y="172.0" font-size="17" fill="#1C1D20" font-weight="700">GitHub refuses the App (#4154)</text>
+<rect x="52.0" y="188.0" width="58.0" height="20.0" rx="10" fill="#E9E1F7"/>
+<text x="81.0" y="202.0" font-size="11" fill="#5B3FA0" font-weight="600" text-anchor="middle">Merged</text>
+<text x="120.0" y="202.0" font-size="12" fill="#5B616B" >alexec/Agents · agents/4077 → main · $3.12</text>
+<path d="M52.0 224.0L696.0 224.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="52.0" y="240.0" font-size="13" fill="#0A6CDB" >Fixes #4077</text>
+<text x="138.1" y="240.0" font-size="13" fill="#8A9099" >·</text>
+<text x="153.2" y="240.0" font-size="13" fill="#0A6CDB" >CI run</text>
+<text x="203.8" y="240.0" font-size="13" fill="#8A9099" >·</text>
+<rect x="211.8" y="224.0" width="130.0" height="24.0" rx="6" fill="#E6F0FC"/>
+<text x="217.8" y="240.0" font-size="13" fill="#0A6CDB" font-weight="600">Build trends ↗</text>
+<circle cx="351.8" cy="236.0" r="9" fill="#B35900"/>
+<text x="351.8" y="240.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">1</text>
+<rect x="197.8" y="254.0" width="290.0" height="44.0" rx="6" fill="#2B2D31"/>
+<text x="209.8" y="272.0" font-size="11" fill="#FFF" >Build trends on the web page,</text>
+<text x="209.8" y="287.0" font-size="11" fill="#FFF" >at this pull request's last run on main</text>
+<path d="M52.0 320.0L696.0 320.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="52.0" y="350.0" font-size="13" fill="#8A9099" font-style="italic">The body, the files and the comments, as today.</text>
+<text x="52.0" y="540.0" font-size="12" fill="#5B616B" >With no web page this Mac can open (no control plane, or no page</text>
+<text x="52.0" y="556.0" font-size="12" fill="#5B616B" >served), the line has no Build trends and the Mac has no trends.</text>
+<circle cx="694.0" cy="548.0" r="9" fill="#B35900"/>
+<text x="694.0" y="552.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">2</text>
+<g filter="url(#shadow)"><rect x="760" y="80" width="456" height="520" rx="10" fill="#F7F8F9"/></g>
+<rect x="760.0" y="80.0" width="456.0" height="40.0" rx="10" fill="#FFFFFF"/>
+<rect x="774.0" y="89.0" width="428.0" height="22.0" rx="11" fill="#EEF0F3"/>
+<text x="786.0" y="104.0" font-size="10" fill="#5B616B" >…/#/reports/value/builds?repo=github:alexec/agents&amp;range=month&amp;run=…</text>
+<circle cx="1202.0" cy="100.0" r="9" fill="#B35900"/>
+<text x="1202.0" y="104.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">3</text>
+<text x="780.0" y="152.0" font-size="12" fill="#0A6CDB" >Planning ›</text>
+<text x="780.0" y="176.0" font-size="18" fill="#1C1D20" font-weight="700">Builds</text>
+<text x="780.0" y="200.0" font-size="11" fill="#5B616B" >Repository alexec/Agents · The last 30 days · ci · main</text>
+<rect x="782.8" y="256.7" width="8.3" height="93.3" rx="1" fill="#0A6CDB"/>
+<rect x="782.8" y="253.5" width="8.3" height="3.2" rx="0" fill="#D3D7DD"/>
+<rect x="796.6" y="265.1" width="8.3" height="84.9" rx="1" fill="#0A6CDB"/>
+<rect x="796.6" y="263.3" width="8.3" height="1.9" rx="0" fill="#D3D7DD"/>
+<rect x="810.5" y="323.9" width="8.3" height="26.1" rx="1" fill="#0A6CDB"/>
+<rect x="810.5" y="321.9" width="8.3" height="1.9" rx="0" fill="#D3D7DD"/>
+<rect x="824.4" y="317.1" width="8.3" height="32.9" rx="1" fill="#0A6CDB"/>
+<rect x="824.4" y="315.9" width="8.3" height="1.2" rx="0" fill="#D3D7DD"/>
+<rect x="838.2" y="294.9" width="8.3" height="55.1" rx="1" fill="#0A6CDB"/>
+<rect x="838.2" y="294.1" width="8.3" height="0.7" rx="0" fill="#D3D7DD"/>
+<rect x="852.1" y="316.3" width="8.3" height="33.7" rx="1" fill="#0A6CDB"/>
+<rect x="852.1" y="314.0" width="8.3" height="2.3" rx="0" fill="#D3D7DD"/>
+<rect x="866.0" y="315.3" width="8.3" height="34.7" rx="1" fill="#0A6CDB"/>
+<rect x="866.0" y="312.0" width="8.3" height="3.3" rx="0" fill="#D3D7DD"/>
+<rect x="879.8" y="312.9" width="8.3" height="37.1" rx="1" fill="#0A6CDB"/>
+<rect x="879.8" y="310.1" width="8.3" height="2.8" rx="0" fill="#D3D7DD"/>
+<rect x="893.7" y="295.3" width="8.3" height="54.7" rx="1" fill="#0A6CDB"/>
+<rect x="893.7" y="281.9" width="8.3" height="13.5" rx="0" fill="#D3D7DD"/>
+<rect x="907.6" y="311.6" width="8.3" height="38.4" rx="1" fill="#0A6CDB"/>
+<rect x="907.6" y="311.1" width="8.3" height="0.5" rx="0" fill="#D3D7DD"/>
+<rect x="921.4" y="312.7" width="8.3" height="37.3" rx="1" fill="#0A6CDB"/>
+<rect x="921.4" y="312.2" width="8.3" height="0.5" rx="0" fill="#D3D7DD"/>
+<rect x="935.3" y="332.5" width="8.3" height="17.5" rx="1" fill="#0A6CDB"/>
+<rect x="935.3" y="332.2" width="8.3" height="0.3" rx="0" fill="#D3D7DD"/>
+<rect x="949.2" y="310.5" width="8.3" height="39.5" rx="1" fill="#0A6CDB"/>
+<rect x="949.2" y="310.1" width="8.3" height="0.4" rx="0" fill="#D3D7DD"/>
+<rect x="963.0" y="317.7" width="8.3" height="32.3" rx="1" fill="#0A6CDB"/>
+<rect x="963.0" y="317.2" width="8.3" height="0.5" rx="0" fill="#D3D7DD"/>
+<rect x="976.9" y="301.0" width="8.3" height="49.0" rx="1" fill="#0A6CDB"/>
+<rect x="976.9" y="300.6" width="8.3" height="0.4" rx="0" fill="#D3D7DD"/>
+<rect x="990.8" y="302.4" width="8.3" height="47.6" rx="1" fill="#0A6CDB"/>
+<rect x="990.8" y="297.0" width="8.3" height="5.4" rx="0" fill="#D3D7DD"/>
+<rect x="1004.6" y="310.1" width="8.3" height="39.9" rx="1" fill="#0A6CDB"/>
+<rect x="1004.6" y="309.4" width="8.3" height="0.7" rx="0" fill="#D3D7DD"/>
+<rect x="1018.5" y="311.1" width="8.3" height="38.9" rx="1" fill="#0A6CDB"/>
+<rect x="1018.5" y="310.6" width="8.3" height="0.5" rx="0" fill="#D3D7DD"/>
+<rect x="1032.4" y="303.4" width="8.3" height="46.6" rx="1" fill="#0A6CDB"/>
+<rect x="1032.4" y="300.3" width="8.3" height="3.1" rx="0" fill="#D3D7DD"/>
+<rect x="1046.2" y="298.9" width="8.3" height="51.1" rx="1" fill="#0A6CDB"/>
+<rect x="1046.2" y="298.4" width="8.3" height="0.5" rx="0" fill="#D3D7DD"/>
+<rect x="1060.1" y="304.5" width="8.3" height="45.5" rx="1" fill="#0A6CDB"/>
+<rect x="1060.1" y="304.1" width="8.3" height="0.4" rx="0" fill="#D3D7DD"/>
+<rect x="1074.0" y="306.2" width="8.3" height="43.8" rx="1" fill="#0A6CDB"/>
+<rect x="1074.0" y="305.7" width="8.3" height="0.5" rx="0" fill="#D3D7DD"/>
+<rect x="1087.8" y="295.5" width="8.3" height="54.5" rx="1" fill="#0A6CDB"/>
+<rect x="1087.8" y="287.4" width="8.3" height="8.0" rx="0" fill="#D3D7DD"/>
+<rect x="1101.7" y="324.0" width="8.3" height="26.0" rx="1" fill="#0A6CDB"/>
+<rect x="1101.7" y="323.6" width="8.3" height="0.5" rx="0" fill="#D3D7DD"/>
+<rect x="1115.6" y="306.3" width="8.3" height="43.7" rx="1" fill="#0A6CDB"/>
+<rect x="1115.6" y="302.4" width="8.3" height="3.9" rx="0" fill="#D3D7DD"/>
+<rect x="1129.4" y="307.5" width="8.3" height="42.5" rx="1" fill="#0A6CDB"/>
+<rect x="1129.4" y="303.3" width="8.3" height="4.1" rx="0" fill="#D3D7DD"/>
+<rect x="1143.3" y="300.1" width="8.3" height="49.9" rx="1" fill="#0A6CDB"/>
+<rect x="1143.3" y="295.3" width="8.3" height="4.9" rx="0" fill="#D3D7DD"/>
+<rect x="1157.2" y="295.7" width="8.3" height="54.3" rx="1" fill="#0A6CDB"/>
+<rect x="1157.2" y="292.0" width="8.3" height="3.7" rx="0" fill="#D3D7DD"/>
+<rect x="1171.0" y="296.7" width="8.3" height="53.3" rx="1" fill="#0A6CDB"/>
+<rect x="1171.0" y="279.8" width="8.3" height="16.9" rx="0" fill="#D3D7DD"/>
+<rect x="1184.9" y="282.9" width="8.3" height="67.1" rx="1" fill="#0A6CDB"/>
+<rect x="1184.9" y="258.9" width="8.3" height="24.1" rx="0" fill="#D3D7DD"/>
+<path d="M1133.6 224.0L1133.6 350.0" stroke="#1C1D20" stroke-width="1.5"/>
+<text x="1129.6" y="222.0" font-size="10" fill="#1C1D20" font-weight="600" text-anchor="end">this PR's run, 8 Nov</text>
+<text x="780.0" y="390.0" font-size="12" fill="#5B616B" >The page opens at the trend, with the run marked; a click on the</text>
+<text x="780.0" y="406.0" font-size="12" fill="#5B616B" >mark opens its drill-down (board 3). A release's line opens the</text>
+<text x="780.0" y="422.0" font-size="12" fill="#5B616B" >range around its tag, the tag marked.</text>
+<text x="780.0" y="454.0" font-size="12" fill="#5B616B" >Signed in as Open in Browser does: on this Mac's control plane</text>
+<text x="780.0" y="470.0" font-size="12" fill="#5B616B" >it pairs the browser the first time; elsewhere, the page's own</text>
+<text x="780.0" y="486.0" font-size="12" fill="#5B616B" >sign-in keeps the address. The link carries no code or token.</text>
+<circle cx="1202.0" cy="402.0" r="9" fill="#B35900"/>
+<text x="1202.0" y="406.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle">4</text>
+<text x="24.0" y="626.0" font-size="12" fill="#5B616B" font-weight="600">The Remote has nothing (tier Web + Mac link). The web's own PR page (Work ▸ a PR) gets the same Build trends link, as a link inside the page.</text>
+</svg>

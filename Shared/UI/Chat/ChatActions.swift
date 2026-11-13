@@ -40,6 +40,9 @@ struct ChatActions {
     /// there at all: what it advertised, by runtime id.
     var sendNow: @MainActor (QueuedPrompt, UUID) async -> Void = { _, _ in }
     var canSendNow: @MainActor (String?) -> Bool = { _ in false }
+    /// Start now on a queued session (#5156), past the running limit. Nil, where the host is
+    /// too old (`agents.start-now/1`), draws no button.
+    var startNow: (@MainActor (UUID) async -> Void)? = nil
     /// What is on its way to an agent, by its id (#87): Send now shows it going and holds,
     /// and who it is going to, as the pending mark names it.
     var acting: @MainActor (UUID) -> AgentAct? = { _ in nil }
@@ -48,6 +51,9 @@ struct ChatActions {
     /// pane, at that file and that tool call. Nil where there is no such pane, and then
     /// the edit offers nothing.
     var showEdit: (@MainActor (ToolCallContent.Diff, String?) -> Void)? = nil
+    /// Open the Changes pane at a file, by its path, or at its list for nil: a turn's Changed
+    /// files card (#5035). Nil where there is no such pane, and then the card does not open.
+    var showChanges: (@MainActor (String?) -> Void)? = nil
     /// Open a subagent's own steps, by its id (057): the Mac's Background pane, the
     /// phone's sheet. Nil offers nothing.
     var subagentSteps: (@MainActor (String) -> Void)? = nil

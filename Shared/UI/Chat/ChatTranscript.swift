@@ -450,7 +450,10 @@ struct ChatTranscript: View {
                     SendingPromptRow(prompt: sending)
                 }
                 ForEach(agent.queuedPrompts) { queued in
-                    QueuedPromptRow(prompt: queued, agentID: agent.id, canSendNow: canSendNow)
+                    // A queued session's first words carry its Start now, as Send now (#5156).
+                    QueuedPromptRow(prompt: queued, agentID: agent.id, canSendNow: canSendNow,
+                                    startNow: queued.id == agent.queuedPrompts.first?.id && HelperLimit.canStartNow(agent)
+                                        ? actions.startNow : nil)
                 }
                 // Kept by the control plane for a stopped workspace (#691 US3).
                 ForEach(actions.kept(agent.id)) { kept in

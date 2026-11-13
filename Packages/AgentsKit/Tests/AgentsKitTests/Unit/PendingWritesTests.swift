@@ -34,6 +34,24 @@ struct PendingWritesTests {
         #expect(model.agent(held.id)?.state == .archived)
     }
 
+    /// Start now (#5156) draws a queued session as starting, and a refusal (its folder's
+    /// total is full) puts it back in the queue.
+    @Test func startNowDrawsStartingAndARefusalPutsItBack() {
+        let model = AgentsModel()
+        var queued = agent(state: .queued)
+        queued.startedByAgent = UUID()
+        model.upsert(queued)
+        #expect(HelperLimit.canStartNow(queued))
+        let write = model.beginWrite(.startNow, on: queued.id)
+        #expect(model.agent(queued.id)?.state == .starting)
+        model.settleWrite(write, on: queued.id, failed: true)
+        #expect(model.agent(queued.id)?.state == .queued)
+        #expect(AgentWrite.startNow.failure("It was not started.") == "Could not start it now — it was not started.")
+        var persons = queued
+        persons.startedByAgent = nil
+        #expect(!HelperLimit.canStartNow(persons))
+    }
+
     @Test func aFailedCallPutsTheRecordBack() {
         let model = AgentsModel()
         let held = agent(state: .finished, title: "Old")

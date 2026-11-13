@@ -561,11 +561,6 @@ button.link.reading:hover { text-decoration: underline; }
 .policy-stop p { margin: 0; }
 .policy-stop .answers { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 /* What a turn changed, and Undo These Changes (#3437). */
-.turn-changes { background: var(--paper-well); border-radius: var(--radius-card); padding: 12px 14px; }
-.turn-changes p { margin: 0; }
-.turn-changes .turn-files { list-style: none; margin: 2px 0; padding: 0; }
-.turn-changes .turn-files li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.turn-changes .undo { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
 /* An agent driving the Mac's screen (#3004, US4): the latest still, or "Mac is locked", and its last action. */
 .desktop-tile { display: flex; flex-direction: column; gap: 8px; }
 .desktop-tile p { margin: 0; }
@@ -1620,6 +1615,15 @@ dialog.sheet {
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-sheet);
 }
+/* A panel that leaves the page working (#5203): the server runtime's sign-in, in the corner. */
+dialog.sheet.modeless {
+  position: fixed;
+  inset: auto 16px 16px auto;
+  margin: 0;
+  z-index: 20;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
 dialog.sheet::backdrop { background: color-mix(in srgb, var(--paper-scrim) 25%, transparent); }
 /* Project Settings and Folder Settings (#3280): tabs over a grid of a label and its value. */
 dialog.sheet:has(.settings-sheet) { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
@@ -1765,8 +1769,8 @@ dialog.sheet:has(.settings-sheet) { width: min(760px, calc(100vw - 32px)); max-h
 .view-box.full iframe { flex: 1; height: auto; }
 .view-box.full .view-bar strong { flex: 1; }
 .app-view { display: flex; flex-direction: column; gap: 6px; }
-.app-view .view-caption { display: flex; gap: 8px; align-items: center; margin: 0; font-size: 0.75rem; }
-.app-view .view-caption .view-actions { margin-left: auto; display: flex; gap: 12px; align-items: center; }
+.app-view .object-card-preview { display: block; min-height: 0; }
+.app-view .view-frame > p { margin: 0; padding: 12px; }
 .app-view .view-slot { width: 100%; }
 .app-view .view-result { margin: 0; max-width: 100%; overflow-wrap: anywhere; white-space: pre-wrap; }
 button.plain { background: none; border: none; padding: 0; color: inherit; opacity: 0.65; font: inherit; }
@@ -1969,13 +1973,6 @@ button.now-row, button.now-head { cursor: pointer; }
 .time-swatch.person { background: var(--tint-attention); }
 .usage-axis { fill: currentColor; opacity: 0.6; font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
 
-/* A file an agent showed (#836), on its card where it was shown: Layout A of
-   specs/836-file-card/layout.svg. At most 340 wide; a chart or a picture shows a preview, at most
-   150 tall, above the name; anything else is one line. The whole card is the button. */
-.file-card { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 340px; box-sizing: border-box;
-  padding: 12px; margin: 2px 0; text-align: left; font: inherit; color: inherit;
-  background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
-button.file-card { cursor: pointer; }
 /* What an agent told the person with notify (#2805): Shared/UI/Chat/NotifiedLine.swift. */
 .notice-line { display: flex; gap: 8px; align-items: baseline; border-radius: 6px; margin: -6px; padding: 6px;
   transition: background-color 0.15s ease-out; }
@@ -1984,18 +1981,33 @@ button.file-card { cursor: pointer; }
 .notice-bell { opacity: 0.65; }
 .notice-title { margin: 0; font-weight: 600; }
 .notice-body { margin: 2px 0 0; }
-button.file-card:hover { border-color: color-mix(in srgb, var(--paper-ink) 25%, transparent); }
-.file-card-preview { display: flex; align-items: center; justify-content: center; height: 150px; overflow: hidden;
-  border-radius: 6px; background: var(--paper-well); }
-.file-card-preview img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }
-.file-card-preview > .quiet { padding: 10px; text-align: center; }
-.file-card-preview .chart.compact { width: 100%; height: 100%; padding: 10px; box-sizing: border-box; }
-.file-card-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.file-card-symbol { flex: none; width: 18px; text-align: center; opacity: 0.7; }
-.file-card-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-.file-card-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.file-card-detail { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.file-card-chevron { flex: none; opacity: 0.4; font-size: 1rem; }
+/* The Object card (#5035, specs/session-cards/spec.md, family 3): a thing the agent made, to open. A raised box:
+   the preview on the well when there is one, then one row of icon, name and quiet line, ⋯ and ›. At most 360
+   wide, but an app view is as wide as the chat. Shared/UI/Chat/ObjectCard.swift draws the same. */
+.object-card { display: flex; flex-direction: column; width: 100%; max-width: 360px; box-sizing: border-box; margin: 2px 0;
+  background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
+.object-card.wide { max-width: none; }
+.object-card.opens:hover { border-color: var(--paper-edge); }
+.object-card-preview { display: flex; align-items: center; justify-content: center; min-height: 40px; overflow: hidden;
+  background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
+  border-radius: calc(var(--radius-card) - 1px) calc(var(--radius-card) - 1px) 0 0; }
+.object-card.opens .object-card-preview[aria-hidden] { cursor: pointer; }
+.object-card:not(.wide) .object-card-preview { height: 150px; }
+.object-card-preview img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; padding: 6px; box-sizing: border-box; }
+.object-card-preview > .quiet { padding: 10px; text-align: center; }
+.object-card-preview .chart.compact { width: 100%; height: 100%; padding: 10px; box-sizing: border-box; }
+.object-card-row { display: flex; align-items: center; gap: 6px; padding: 8px 10px 8px 12px; min-width: 0; }
+.object-card-open { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; padding: 0; margin: 0;
+  text-align: left; font: inherit; color: inherit; background: none; border: 0; }
+button.object-card-open, .object-card-chevron { cursor: pointer; }
+.object-card-icon { flex: none; width: 18px; color: var(--paper-secondary); }
+.object-card-words { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.object-card-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.object-card-detail { font-size: 0.75rem; color: var(--paper-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.object-card-chevron { flex: none; display: inline-flex; padding: 4px; background: none; border: 0; color: var(--paper-tertiary); }
+.object-card-notes { display: flex; flex-direction: column; gap: 4px; padding: 0 12px 10px; font-size: 0.75rem; color: var(--paper-secondary); }
+.object-card-notes p { margin: 0; }
+.object-card-notes .failure { color: var(--tint-failure); }
 
 /* A chart from a file (#836), in the Files pane and small on the card: one colour per series,
    the theme's own tints, in turn. */
@@ -3002,6 +3014,9 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 .message-icon.tone-neutral { color: var(--paper-secondary); }
 .message-icon.spinner { width: 8px; height: 8px; }
 .message-words { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+/* How old what is shown is (#5141): after a banner's words in its own colour; on its own, ink.secondary at the caption step. */
+.last-update { white-space: nowrap; }
+:not(.message-words) > .last-update { color: var(--paper-secondary); font-size: var(--type-fine); }
 .message-actions { flex: none; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* A banner: inset at the top of its pane, under the toolbar; it comes and goes with a short animation. */
 .message-banner { display: flex; align-items: center; gap: 8px; margin: 8px 12px; padding: 7px 12px; font-size: 0.8125rem;
