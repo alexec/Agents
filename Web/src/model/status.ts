@@ -115,7 +115,7 @@ export function ordinal(n: number): string {
 }
 
 /** HelperLimit.startNowLabel and its help (#5156): a queued session started at once, past the running limit. */
-export const startNowLabel = "Start Now";
+export const startNowLabel = "Send Now";
 export const startNowHelp = "Start this session now, ahead of the queue and past the running limit";
 
 /** HelperLimit.canStartNow: a session an agent started that waits in the queue. The host still refuses it past the total. */

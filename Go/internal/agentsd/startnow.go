@@ -50,7 +50,7 @@ func (d *Daemon) holdStartNow(a wire.Agent, folder string) (*wire.Agent, error) 
 	if have := len(d.helpersIn(folder)) + reserved; int64(have) >= notArchived {
 		// Said after the client's "Could not start it now — ".
 		return nil, &Error{Code: wire.FailureNotAllowed, Message: fmt.Sprintf(
-			"%s has %d of %d sessions not archived, and Start now never goes past that. "+
+			"%s has %d of %d sessions not archived, and Send now never starts a session past that. "+
 				"Archive one of the sessions agents started, or raise the limit in Project Settings.", scopeTitle(folder), have, notArchived)}
 	}
 	if d.startingFromQueue == nil {

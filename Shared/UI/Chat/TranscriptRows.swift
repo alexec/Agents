@@ -593,6 +593,9 @@ struct QueuedPromptRow: View {
     let agentID: UUID
     /// A turn is running and its runtime takes words mid-turn (`_session/steering`).
     var canSendNow = false
+    /// The words a queued session starts with (#5156): Send now starts the session at once,
+    /// past the running limit, as it sends a queued prompt at once. Nil for any other prompt.
+    var startNow: (@MainActor (UUID) async -> Void)? = nil
     /// The words being changed, while Edit is open (#1552); nil otherwise.
     @State private var draft: String?
     @FocusState private var editorFocused: Bool
@@ -654,10 +657,16 @@ struct QueuedPromptRow: View {
         Task { await actions.editQueued(prompt, words, agentID) }
     }
 
+    /// Send now: into the running turn, or, for a queued session's words, the session started.
+    private func send() async {
+        if let startNow { await startNow(agentID) } else { await actions.sendNow(prompt, agentID) }
+    }
+
     private var waiting: some View {
         // Held while anything is on its way to this agent; this one, said (#87).
         let acting = actions.acting(agentID)
-        let going = acting == .sendNow(prompt.id)
+        let going = startNow != nil ? acting == .startNow : acting == .sendNow(prompt.id)
+        let offersSendNow = canSendNow || startNow != nil
         // The person's bubble (TranscriptRow's .userMessage), dashed and dimmed: at the
         // right, as wide as its words, with what can be done to it underneath, so the
         // buttons never push it off the edge (#95).
@@ -683,8 +692,8 @@ struct QueuedPromptRow: View {
                     ? "Queued, \(actions.fromLine(prompt.sender)): \(prompt.text)"
                     : "Queued: \(prompt.text)")
                 .accessibilityAction(named: "Send now") {
-                    guard canSendNow, acting == nil else { return }
-                    Task { await actions.sendNow(prompt, agentID) }
+                    guard offersSendNow, acting == nil else { return }
+                    Task { await send() }
                 }
                 .accessibilityAction(named: "Remove") {
                     guard !going else { return }
@@ -697,9 +706,9 @@ struct QueuedPromptRow: View {
 
             // A step down from the words, so the row under the bubble stays quiet.
             HStack(spacing: 12) {
-                if canSendNow {
+                if offersSendNow {
                     Button {
-                        Task { await actions.sendNow(prompt, agentID) }
+                        Task { await send() }
                     } label: {
                         Group {
                             if going {
@@ -718,7 +727,8 @@ struct QueuedPromptRow: View {
                     // The one going stays bright, as on the answer cards (#86); the
                     // model refuses a second press of it.
                     .disabled(acting != nil && !going)
-                    .help("Send this into the turn that is running, without waiting for it to end")
+                    .help(startNow != nil ? HelperLimit.startNowHelp
+                          : "Send this into the turn that is running, without waiting for it to end")
                 }
 
                 // The person's own words only: another agent's are theirs (#560). On a host
@@ -1071,39 +1081,6 @@ struct QuietLine: View {
                     .padding(.bottom, 14)
             }
         }
-    }
-}
-
-/// Start now under a queued session (#5156): it starts at once, past the running limit, as
-/// Send now sends a queued prompt at once. While it goes, it says so and holds.
-struct StartNowLine: View {
-    let agentID: UUID
-    let startNow: @MainActor (UUID) async -> Void
-    @Environment(\.chatActions) private var actions
-
-    var body: some View {
-        let acting = actions.acting(agentID)
-        let going = acting == .startNow
-        Button {
-            Task { await startNow(agentID) }
-        } label: {
-            Group {
-                if going {
-                    Telling(host: actions.recipient(agentID), doing: acting?.doing)
-                } else {
-                    Label(HelperLimit.startNowLabel, icon: "play")
-                        .appText(.supporting)
-                }
-            }
-            #if os(iOS)
-            .frame(minHeight: 44)
-            .contentShape(.rect)
-            #endif
-        }
-        .buttonStyle(.borderless)
-        .disabled(acting != nil)
-        .help(HelperLimit.startNowHelp)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

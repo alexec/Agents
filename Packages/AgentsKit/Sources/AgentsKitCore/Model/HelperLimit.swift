@@ -101,8 +101,9 @@ public enum HelperLimit {
     }
 
     /// Start now (#5156): the person starts a queued session at once, past the running
-    /// limit, in all three clients' row menus and chats.
-    public static let startNowLabel = "Start Now"
+    /// limit. Called Send now, as a queued prompt's is (Alex, PR #5172): in the row menus,
+    /// and under the session's queued words in its chat.
+    public static let startNowLabel = "Send Now"
     public static let startNowHelp = "Start this session now, ahead of the queue and past the running limit"
 
     /// Whether Start now is offered: a session an agent started that waits in the queue.
