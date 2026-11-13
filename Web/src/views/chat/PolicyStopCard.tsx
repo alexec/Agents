@@ -10,6 +10,7 @@ import { askedWords, askForMoreHelp, askForMoreTitle, askRefusal, canAskForMore,
 import { failedWords } from "../../model/console";
 import { go, usageAsked } from "../../route";
 import { Ask } from "../Ask";
+import { RecordLine } from "./RecordLine";
 
 function open(action: StopAction): void {
   switch (action.kind) {
@@ -34,9 +35,9 @@ function open(action: StopAction): void {
 const askedFor = signal<Record<string, BudgetRequest>>({});
 
 /**
- * A policy stop on the record: the rule, the layer, the words and where to change it. Ask for More
- * is an Ask at the end of the chat while it can be raised (PolicyStopAsk); this line then says where
- * the request stands.
+ * A policy stop on the record, as a Line (#5036): Stopped by a policy, the rule, and one link to where
+ * to change it; it opens to the layer and the words. Ask for More is an Ask at the end of the chat while
+ * it can be raised (PolicyStopAsk); this line then says where the request stands.
  */
 export function PolicyStopCard({ refusal, entryID }: { refusal: PolicyRefusal; entryID: string }) {
   const rule = stopRuleTitle(refusal.rule);
@@ -44,14 +45,13 @@ export function PolicyStopCard({ refusal, entryID }: { refusal: PolicyRefusal; e
   const action = stopAction(refusal);
   const asked = askedFor.value[entryID];
   return (
-    <div class="note policy-stop">
-      <p class="strong">{stoppedTitle}</p>
-      {rule && <p>{rule}</p>}
-      {layer && <p class="quiet">{layer}</p>}
-      <p>{refusal.words}</p>
-      {asked && <p class="quiet small">{askedWords(asked)}</p>}
-      <p class="answers"><button class="link" onClick={() => open(action)}>{action.label}</button></p>
-    </div>
+    <RecordLine icon="hand" head={stoppedTitle} detail={asked ? askedWords(asked) : rule ?? undefined} extra="policy-stop"
+      action={{ label: action.label, run: () => open(action) }} openTitles={["Show why", "Hide why"]}
+      more={<>
+        {asked && rule && <p>{rule}</p>}
+        {layer && <p class="quiet small">{layer}</p>}
+        <p class="quiet">{refusal.words}</p>
+      </>} />
   );
 }
 
