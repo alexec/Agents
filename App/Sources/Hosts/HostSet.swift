@@ -24,11 +24,15 @@ final class HostSet {
 
     /// Hosts the control plane reaches for this window: their names, and whether each is
     /// online.
-    var controlled: [MachineRef: (label: String, online: Bool)] = [:]
+    var controlled: [MachineRef: (label: String, online: Bool)] = [:] {
+        didSet { offlineSince = Self.keptOfflineSince(offlineSince, controlled: controlled, now: Date()) }
+    }
     /// Each server's row as the control plane last listed it: its state's word, and the
     /// workspace it runs on when it is linked to one (#691).
     var controlRows: [MachineRef: DaemonAPI.ControlMachine] = [:]
-    var offlineSince: [MachineRef: Date] { [:] }
+    /// Since when each offline server was last heard (#5148): kept from the list where it
+    /// first showed offline, not the time of each new list, so the strip does not say "now".
+    private(set) var offlineSince: [MachineRef: Date] = [:]
 
     init(locations: StoreLocations) {}
 
@@ -61,7 +65,24 @@ final class HostSet {
     func state(_ id: MachineRef) -> ServerConnection.State {
         guard id != .mac else { return macDownSince.map { .offline(since: $0) } ?? .connected }
         guard let controlled = controlled[id] else { return .idle }
-        return controlled.online ? .connected : .offline(since: Date())
+        return controlled.online ? .connected : .offline(since: offlineSince[id] ?? Date())
+    }
+
+    /// The control plane last heard `id` at `heardAt` (#962): when that is before the time
+    /// this window saw it offline, the strip says that time (#5148).
+    func noteLastHeard(_ id: MachineRef, at heardAt: Date?) {
+        guard let heardAt, controlled[id]?.online == false else { return }
+        offlineSince[id] = min(offlineSince[id] ?? heardAt, heardAt)
+    }
+
+    /// Each offline server keeps the time it already had; one that went offline gets `now`;
+    /// one online or gone has none.
+    static func keptOfflineSince(_ kept: [MachineRef: Date],
+                                 controlled: [MachineRef: (label: String, online: Bool)],
+                                 now: Date) -> [MachineRef: Date] {
+        var next: [MachineRef: Date] = [:]
+        for (id, host) in controlled where !host.online { next[id] = kept[id] ?? now }
+        return next
     }
 
     /// Since when this Mac's host has not answered the window, or nil while it does

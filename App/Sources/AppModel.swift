@@ -4492,6 +4492,7 @@ final class AppModel {
         for host in others where !host.answers && !work.holdsFolders(of: host.id) {
             if let heard = try? await control.call(DaemonAPI.Method.hostsLastHeard, DaemonAPI.MachineRequest(host: host.id),
                                                    returning: DaemonAPI.MachineLastHeard.self) {
+                hosts.noteLastHeard(host.id, at: heard.heardAt)
                 work.takeLastHeard(heard)
             }
         }
