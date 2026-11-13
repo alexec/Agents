@@ -6613,6 +6613,32 @@ export type LiveSource =
   | "simulator";
 
 /**
+ * A secret this machine keeps for itself (#5122): an agent saved it (ask_secret, capture_secret,
+ * generate_secret) or a connector's form set it. Every session's agent on this machine can name it.
+ * No value.
+ */
+export interface LocalSecret {
+  name: string;
+  setAt: WireDate;
+  lastOp?: SecretLastOp;
+  /** Always false: a secret this machine keeps for itself is on this machine only. */
+  backedUp?: boolean;
+  /** Ask before use (#4014): a person approves each use (#4015). Left out is off. */
+  needsApproval?: boolean;
+  /**
+   * A secret's description (#4167): one or two sentences on what it is and what it is for, such as
+   * which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a
+   * value. Left out when it has none.
+   */
+  description?: string;
+}
+
+/** secrets/localList (#5122): every secret this machine keeps for itself, by name. No value. */
+export interface LocalSecrets {
+  secrets: LocalSecret[];
+}
+
+/**
  * A person's machine lock (#3399, specs/3399-machine-lock): its chain of entries, the root first.
  * lock/get, and machine/lock to a machine.
  */
@@ -15276,6 +15302,7 @@ export interface Methods {
   "scim/tokens/revoke": { params: SCIMTokenRequest; result: Empty };
   "sealing/add": { params: SealingAdd; result: Empty };
   "sealing/work": { params: Empty; result: SealingWork };
+  "secrets/localList": { params: Empty; result: LocalSecrets };
   "secrets/sessionList": { params: Empty; result: SessionSecrets };
   "secrets/sessionRemove": { params: SessionSecretRemoveRequest; result: SessionSecrets };
   "secrets/sessionSet": { params: SessionSecretSetRequest; result: SessionSecrets };
@@ -15717,6 +15744,7 @@ export const MethodTarget = {
   "scim/tokens/revoke": "control",
   "sealing/add": "control",
   "sealing/work": "control",
+  "secrets/localList": "host",
   "secrets/sessionList": "host",
   "secrets/sessionRemove": "host",
   "secrets/sessionSet": "host",
@@ -16366,6 +16394,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LiveAgent: { required: ["host", "hostName", "owner", "ownerName", "bot", "agent", "runtime", "state"], optional: ["waitsOnOthers", "workflow", "since", "costToDate", "heardAt"] },
   LiveBoard: { required: ["agents"], optional: [] },
   LiveFrame: { required: ["source", "agentID", "capturedAt"], optional: ["image", "locked", "narration", "title", "width", "height"] },
+  LocalSecret: { required: ["name", "setAt"], optional: ["lastOp", "backedUp", "needsApproval", "description"] },
+  LocalSecrets: { required: ["secrets"], optional: [] },
   Lock: { required: ["person", "entries"], optional: [] },
   LockAdd: { required: ["entries"], optional: [] },
   LockBody: { required: ["v", "kind", "person", "signer", "at", "key"], optional: ["previous", "sealingKey", "id", "name", "clientKind", "expires", "sealed"] },

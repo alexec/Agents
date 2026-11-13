@@ -330,6 +330,7 @@ var CallSandboxSet = Method[SandboxSettings, SandboxSettings]{"sandbox/set"}
 var CallSandboxState = Method[Empty, SandboxSettings]{"sandbox/state"}
 var CallSecretsAddGrant = Method[SecretGrantChange, SecretGrants]{"secrets/addGrant"}
 var CallSecretsGrants = Method[Empty, SecretGrants]{"secrets/grants"}
+var CallSecretsLocalList = Method[Empty, LocalSecrets]{"secrets/localList"}
 var CallSecretsRemoveGrant = Method[SecretGrantChange, SecretGrants]{"secrets/removeGrant"}
 var CallSecretsSessionList = Method[Empty, SessionSecrets]{"secrets/sessionList"}
 var CallSecretsSessionRemove = Method[SessionSecretRemoveRequest, SessionSecrets]{"secrets/sessionRemove"}

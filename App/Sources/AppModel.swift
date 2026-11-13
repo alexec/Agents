@@ -2420,6 +2420,24 @@ final class AppModel {
         }
     }
 
+    /// Settings ▸ You ▸ Secrets ▸ On This Machine (#5122): the secrets this Mac's host keeps for
+    /// itself, which agents saved. Nil from a daemon too old to know the method.
+    func localSecrets() async -> LocalSecrets? {
+        try? await macClient.call(DaemonAPI.Method.secretsLocalList, DaemonAPI.Empty(), returning: LocalSecrets.self)
+    }
+
+    /// Turn Ask before use on or off for a secret this Mac keeps for itself (#5122): the list after, or why not.
+    func setLocalSecretAsksBeforeUse(_ secret: LocalSecret, _ on: Bool) async -> Result<LocalSecrets?, Error> {
+        do {
+            _ = try await macClient.call(DaemonAPI.Method.secretsSetNeedsApproval,
+                                         SecretNeedsApprovalRequest(name: secret.name, needsApproval: on),
+                                         returning: DaemonAPI.Empty.self)
+            return .success(await localSecrets())
+        } catch {
+            return .failure(error)
+        }
+    }
+
     /// Take a session's secret out now (#3548): its agent is told it expired.
     func removeSessionSecret(_ secret: SessionSecret) async -> SessionSecrets? {
         var after: SessionSecrets?
@@ -7673,4 +7691,4 @@ extension AppModel: WorkModel {
 }
 
 /// Settings ▸ You ▸ Secrets ▸ For One Session (#3548), through this Mac's host.
-extension AppModel: SessionSecretsSource {}
+extension AppModel: LocalSecretsSource {}

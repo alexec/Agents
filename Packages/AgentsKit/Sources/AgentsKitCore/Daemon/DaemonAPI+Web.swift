@@ -74,6 +74,8 @@ public extension DaemonAPI {
                 Row(Method.secretsSessionSet, params: SessionSecretSetRequest.self, result: SessionSecrets.self, kind: .hostRequest),
                 Row(Method.secretsSessionRemove, params: SessionSecretRemoveRequest.self, result: SessionSecrets.self, kind: .hostRequest),
                 Row(Method.secretsSetNeedsApproval, params: SecretNeedsApprovalRequest.self, result: Empty.self, kind: .hostRequest),
+                // Settings ▸ You ▸ Secrets ▸ On This Machine (#5122): what agents saved on the machine.
+                Row(Method.secretsLocalList, params: Empty.self, result: LocalSecrets.self, kind: .hostRequest),
                 Row(Method.desktopControlSet, params: DesktopControlSettings.self, result: DesktopControlSettings.self,
                     kind: .hostRequest),
                 // Pause on touch's two answers (#3004, US3).

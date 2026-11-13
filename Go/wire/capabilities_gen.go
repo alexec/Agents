@@ -87,6 +87,7 @@ const CapHandover1 = "handover/1"
 const CapHostBrowserSettings1 = "host.browser-settings/1"
 const CapHostDesktopControl1 = "host.desktop-control/1"
 const CapHostDriveApproval1 = "host.drive-approval/1"
+const CapHostLocalSecrets1 = "host.local-secrets/1"
 const CapHostLock1 = "host.lock/1"
 const CapHostLock2 = "host.lock/2"
 const CapHostLock3 = "host.lock/3"
@@ -548,6 +549,7 @@ var HostCapabilities = pairs([][2]string{
 	{"sandbox/state", "sandbox/1"},
 	{"secrets/addGrant", "host.secret-grants/1"},
 	{"secrets/grants", "host.secret-grants/1"},
+	{"secrets/localList", "host.local-secrets/1"},
 	{"secrets/removeGrant", "host.secret-grants/1"},
 	{"secrets/sessionList", "host.session-secrets/1"},
 	{"secrets/sessionRemove", "host.session-secrets/1"},

@@ -507,6 +507,9 @@ public enum DaemonAPI {
         public static let secretsSessionRemove = "secrets/sessionRemove"
         /// Ask before use on or off (#4014, #4016). The person's own clients only.
         public static let secretsSetNeedsApproval = "secrets/setNeedsApproval"
+        /// Settings ▸ You ▸ Secrets ▸ On This Machine (#5122): the secrets a machine keeps for itself,
+        /// which agents saved there. The person's own clients only.
+        public static let secretsLocalList = "secrets/localList"
         public static let desktopControlState = "desktopControl/state"
         public static let desktopControlSet = "desktopControl/set"
         public static let desktopControlResume = "desktopControl/resume"

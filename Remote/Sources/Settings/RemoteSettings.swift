@@ -81,7 +81,10 @@ private struct RemoteSecretsPage: View {
     var body: some View {
         // Read when the page opens: the control plane's client is not observed.
         SecretsPane(control: model.controlPlane, state: model.userScope,
-                    machineNames: SecretInfoWords.names(model.controlHosts)) { SessionSecretsSection(model: model) }
+                    machineNames: SecretInfoWords.names(model.controlHosts)) {
+                        SessionSecretsSection(model: model)
+                        LocalSecretsSection(model: model)
+                    }
             .navigationTitle(UserScopeWords.secretsTitle)
             .navigationBarTitleDisplayMode(.inline)
     }
