@@ -77,6 +77,10 @@ out.
 3. Where the runtime says so, a second line shows what is left of its plan: **28% left this
    week · resets Sun 20:39 · as of 14:02**. Grok is asked each time the page opens, at most
    every five minutes. Claude says it during a turn, usually once a limit is near.
+4. The sidebar's **Runtimes** row turns orange with a grey line before a runtime runs out:
+   **Claude: 8% left** when less than 10% is left, or **Claude: runs out Fri at this pace**
+   when its week is on course to run out before it resets. Use it more slowly, or move work
+   to another runtime.
 
 On the iPhone and iPad, **Runtimes** is at the foot of **Spending**, with a red dot while a
 runtime is out.

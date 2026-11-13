@@ -44,7 +44,7 @@ import { DataTable } from "./DataTable";
 import { PageTitle, PersonMenu, SearchBox } from "./TopBar";
 import { pageCrumbs } from "../model/crumbs";
 import { MultiplierPage } from "./Multiplier";
-import { lowWords, runtimeTally, setupRuntimes } from "../model/runtimes";
+import { lowDetail, lowWords, runtimeTally, setupRuntimes } from "../model/runtimes";
 import { eventsWaitingLine } from "../model/eventsWaiting";
 import type { Session } from "../session";
 import { ask } from "./MessageKinds";
@@ -130,11 +130,14 @@ export function NavBar({ store, session }: { store: Store; session: Session }) {
   );
 }
 
-/** Status ▸ Runtimes' grey line (#3956), as the window's Runtimes row: each runtime read on the machine the page reads it on. */
-function runtimesLowWords(store: Store): string | undefined {
+/** Status ▸ Runtimes' grey line (#3956), as the window's Runtimes row: each runtime read on the machine the page reads
+ * it on. `detail` is the title's and a screen reader's, with the reset when it is on course to run out (#5000). */
+function runtimesLowWords(store: Store): { words: string; detail: string } | undefined {
   const all = setupRuntimes(store.hosts.value, store.macHostID.value, store.runtimes.value);
   const home = new Map(all.map((r) => [r.status.runtime.id, r.home]));
-  return lowWords(runtimeTally(all.map((r) => r.status), (id) => store.runtimeAllowances.value[home.get(id) ?? ""]));
+  const tally = runtimeTally(all.map((r) => r.status), (id) => store.runtimeAllowances.value[home.get(id) ?? ""]);
+  const words = lowWords(tally);
+  return words ? { words, detail: lowDetail(tally) ?? words } : undefined;
 }
 
 const isRuntimesPage = (page: NavPage) => page.draw.kind === "activity" && page.draw.page === "runtimes";
@@ -143,10 +146,10 @@ const isRuntimesPage = (page: NavPage) => page.draw.kind === "activity" && page.
 function PageMark({ store, page }: { store: Store; page: NavPage }) {
   // Status ▸ Secrets and Accounts (#4161): the newest operation's age.
   if (page.draw.kind === "statusList") return <StatusListMark store={store} list={page.draw.list} />;
-  // Status ▸ Runtimes (#3956): an allowance below 10% left, in the warning tint, as the window's orange Runtimes icon.
+  // Status ▸ Runtimes (#3956): an allowance below 10% left or on course to run out (#5000), in the warning tint, as the window's orange Runtimes icon.
   if (isRuntimesPage(page)) {
-    const words = runtimesLowWords(store);
-    if (words) return <span class="small attention" title={words} aria-hidden="true">●</span>;
+    const low = runtimesLowWords(store);
+    if (low) return <span class="small attention" title={low.detail} aria-hidden="true">●</span>;
   }
   if (page.id === "requests" && requestCount(store) > 0) return <span class="sub-app-count">{requestCount(store)}</span>;
   if (page.id === "reportPolicy" && policyNotSaved(store)) return <span class="quiet small attention">Not saved</span>;
@@ -171,10 +174,10 @@ function MachineNeedLine({ store, host }: { store: Store; host: string }) {
   );
 }
 
-/** Under Status ▸ Runtimes (#3956), in grey: `Claude: 8% left`. Nothing when no allowance is low, or none work. */
+/** Under Status ▸ Runtimes (#3956), in grey: `Claude: 8% left`, or `Claude: runs out Fri at this pace` (#5000). Nothing when no allowance is low, or none work. */
 function RuntimesLowLine({ store }: { store: Store }) {
-  const words = runtimesLowWords(store);
-  return words ? <p class="page-need quiet small" role="status">{words}</p> : null;
+  const low = runtimesLowWords(store);
+  return low ? <p class="page-need quiet small" role="status" title={low.detail} aria-label={low.detail}>{low.words}</p> : null;
 }
 
 const isEventsPage = (page: NavPage) => page.draw.kind === "activity" && page.draw.page === "events";

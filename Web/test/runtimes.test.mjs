@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { load } from "./load.mjs";
 
 const r = await load("src/model/runtimes.ts");
+const sn = await load("src/model/switchNote.ts");
 const status = (id, name, available = true) => ({
   runtime: { id, name }, availability: available ? { available: { path: "/x", supportsResume: true } } : { missing: { lookedIn: [] } },
 });
@@ -211,11 +212,46 @@ const week = (used, days, window = "seven_day") => ({ window, used, spent: false
 
 test("runtimes: a week used faster than an even pace says so", () => {
   const current = week(0.72, 3);
+  // 72% used in 4 days runs out in about 1.6 days: on course to run out too (#5000).
+  const when = r.runsOutWords(r.allowancePace({ weeks: [current] }, paceNow).runsOutAt, paceNow);
   assert.equal(r.allowancePaceLine({ reading: current, weeks: [current] }, paceNow),
-    "3 days to go · used faster than an even pace (43% left)");
+    `3 days to go · used faster than an even pace (43% left) · runs out ${when} at this pace`);
   assert.equal(r.allowancePaceLine({ weeks: [week(0.2, 3)] }, paceNow),
     "80% left this week · 3 days to go · used slower than an even pace (43% left)");
   assert.equal(r.allowancePaceLine({ weeks: [week(0.53, 3.4)] }, paceNow), "47% left this week · 3 days to go · on an even pace");
+});
+
+// On course to run out before it resets (#5000), as AllowancePaceTests and RuntimeTallyTests.
+test("runtimes: a week on course to run out before it resets says when", () => {
+  const pace = r.allowancePace({ weeks: [week(0.45, 5)] }, paceNow);
+  assert.ok(Math.abs(pace.runsOutAt.getTime() - paceNow.getTime() - 0.55 * 2 / 0.45 * 86400e3) < 1000);
+  assert.equal(pace.onCourseToRunOut, true, "day 2 of 7, 45% used");
+  const when = r.runsOutWords(pace.runsOutAt, paceNow);
+  assert.equal(r.allowancePaceLine({ weeks: [week(0.45, 5)] }, paceNow),
+    `55% left this week · 5 days to go · used faster than an even pace (71% left) · runs out ${when} at this pace`);
+  assert.equal(r.allowancePace({ weeks: [week(0.25, 5)] }, paceNow).onCourseToRunOut, false, "a slower pace");
+  assert.equal(r.allowancePace({ weeks: [week(0.58, 3)] }, paceNow).onCourseToRunOut, false, "inside the 12-hour margin");
+  assert.equal(r.allowancePace({ weeks: [week(0.3, 6.5)] }, paceNow).onCourseToRunOut, false, "the first day");
+  assert.equal(r.allowancePace({ weeks: [week(0.08, 5.5)] }, paceNow).onCourseToRunOut, false, "under 10% used");
+  const soon = new Date(paceNow.getTime() + 5 * 3600e3);
+  assert.equal(r.runsOutWords(soon, paceNow), soon.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+});
+
+test("runtimes: the Runtimes row warns when a week is on course to run out (#5000)", () => {
+  const two = [status("claude", "Claude"), status("codex", "Codex")];
+  const allowancesWith = (current, reading = current) => () => ({ at: wire(paceNow),
+    rows: [{ credentialKey: "claude:sign-in", state: { reading, weeks: [current] } }] });
+  const tally = r.runtimeTally(two, allowancesWith(week(0.45, 5)));
+  const runsOutAt = new Date(paceNow.getTime() + 0.55 * 2 / 0.45 * 86400e3);
+  const reset = new Date(paceNow.getTime() + 5 * 86400e3);
+  assert.equal(r.lowWords(tally, paceNow), `Claude: runs out ${r.runsOutWords(runsOutAt, paceNow)} at this pace`);
+  assert.equal(r.lowDetail(tally, paceNow),
+    `Claude runs out ${r.runsOutWords(runsOutAt, paceNow)} at this pace; it resets ${sn.switchTime(reset, paceNow)}. 55% left.`);
+  const fiveHour = { window: "five_hour", used: 0.95, spent: false, nearlySpent: false, resetsAt: wire(paceNow) + 3600, at: wire(paceNow) };
+  const urgent = r.runtimeTally(two, allowancesWith(week(0.45, 5), fiveHour));
+  assert.equal(r.lowWords(urgent, paceNow), "Claude: 5% left", "less than 10% left wins");
+  assert.equal(r.lowDetail(urgent, paceNow), "Claude: 5% left");
+  assert.equal(r.lowWords(r.runtimeTally(two, allowancesWith(week(0.25, 5))), paceNow), undefined, "a slower pace");
 });
 
 test("runtimes: past weeks are their final shares, of one window", () => {

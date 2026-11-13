@@ -207,6 +207,42 @@ struct RuntimeTallyTests {
         #expect(!tally.isLow)
     }
 
+    private func allowances(week used: Double, resetsIn days: Double, reading: AllowanceReading? = nil) -> RuntimeAllowances {
+        var state = AllowanceState(credentialKey: "claude:sign-in", entryID: UUID(), since: now)
+        let week = AllowanceReading(window: "seven_day", used: used, resetsAt: now.addingTimeInterval(days * 86400), at: now)
+        state.reading = reading ?? week
+        state.weeks = [week]
+        return RuntimeAllowances(rows: [RuntimeAllowances.Row(credentialKey: "claude:sign-in", state: state)], at: now)
+    }
+
+    @Test func onCourseToRunOutIsLow() throws {
+        // Day 2 of 7, 45% used (#5000).
+        let tally = try #require(RuntimeTally(two, allowances: allowances(week: 0.45, resetsIn: 5)))
+        let runsOutAt = now.addingTimeInterval(0.55 * 2 / 0.45 * 86400)
+        let reset = now.addingTimeInterval(5 * 86400)
+        #expect(tally.isLow)
+        #expect(tally.lowWords == "Claude: runs out \(PoolWords.runsOut(runsOutAt, now: now)) at this pace")
+        #expect(tally.lowDetail == "Claude runs out \(PoolWords.runsOut(runsOutAt, now: now)) at this pace; it resets \(PoolWords.time(reset, now: now)). 55% left.")
+    }
+
+    @Test func onCourseFromTheWeekWhenTheReadingIsFiveHours() throws {
+        let fiveHour = AllowanceReading(window: "five_hour", used: 0.2, resetsAt: now.addingTimeInterval(3600), at: now)
+        let tally = try #require(RuntimeTally(two, allowances: allowances(week: 0.45, resetsIn: 5, reading: fiveHour)))
+        #expect(tally.lowWords?.hasSuffix("at this pace") == true)
+    }
+
+    @Test func lessThanATenthLeftWinsOverThePace() throws {
+        let fiveHour = AllowanceReading(window: "five_hour", used: 0.95, resetsAt: now.addingTimeInterval(3600), at: now)
+        let tally = try #require(RuntimeTally(two, allowances: allowances(week: 0.45, resetsIn: 5, reading: fiveHour)))
+        #expect(tally.lowWords == "Claude: 5% left")
+        #expect(tally.lowDetail == "Claude: 5% left")
+    }
+
+    @Test func aSlowerPaceIsNotLow() throws {
+        let tally = try #require(RuntimeTally(two, allowances: allowances(week: 0.25, resetsIn: 5)))
+        #expect(!tally.isLow)
+    }
+
     @Test func noneWorkingIsRedNotLow() throws {
         var out = status("claude", available)
         out.isOut = true
