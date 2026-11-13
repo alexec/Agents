@@ -89,7 +89,7 @@ A PR's run opens this page too: from its PR, or from a bar of Branch ▸ Pull re
 1. **Loading** is the Reports pages' own *Loading…*. An error is their hint line. There is no toast and no modal.
 2. **No runs in the range:** the tiles say –, and *No ci runs on main finished in the last 7 days. Try a longer range, or Branch ▸ Pull requests.*
 3. **No CI data from the forge:** *alexec/agents-walk has no GitHub Actions runs. Builds come from the forge's CI runs.*
-4. **A forge Agents does not read CI from**, for example Forgejo if the data spike finds no reader for it (the spike lists which forges have one): *Forgejo: Agents does not read its CI runs yet, so there is nothing to draw for codeberg.org/scratch/app.*
+4. **A forge Agents does not read CI timings from:** CI outside the forge (CircleCI, Buildkite, Jenkins), or a forge whose timing reader is not built yet (the spike found a `run.completed` reader on all five forges and a timing reader on none; #5177 builds GitHub's). The board's example: *Forgejo: Agents does not read its CI runs yet, so there is nothing to draw for codeberg.org/scratch/app.*
 5. **The way in from Planning:** the Delivery row's *CI time to green* card (#4555) gets a link, *Build trends ›*, to this page, with the repository and the range of the card. Reports' left list also gets *Builds* under Planning (board 1). With no CI data in any repository of the scope, the card says so and the link still opens the page, where card 3 says why.
 
 ### Board 5: the Mac link
@@ -145,6 +145,64 @@ Lineage is a secondary copy of the forge and the other systems, which links them
 - **Lineage keeps only the `ci-run` node and its links** (its PR, its commit, the release that holds it), so the report walks from a run to its PRs and from a change to its commits.
 - The spike (#5176) says whether the forge's run, job and step data is enough, and sets the store's bounds (how many days, how many runs, its size).
 
+## The data spike (#5176)
+
+Measured on 2026-11-13 from alexec/Agents (the cache of `fetch.py`, 5,831 `ci` runs and 3,364 runs' jobs) and from the forge servers in `Go/internal/*mcp`.
+
+### Is the forge's data enough? Yes, on GitHub
+
+GitHub Actions gives all the fields this report uses:
+
+| Level | Endpoint | Fields used |
+|---|---|---|
+| Run | `actions/runs` (the list `run.completed` reads already) | `id`, `run_attempt`, `created_at` (made; a re-run keeps it), `run_started_at` (the attempt's start), `updated_at`, `conclusion`, `head_branch`, `head_sha`, `event`, `path` (the workflow) |
+| Job | `actions/runs/{id}/jobs?filter=all` | `run_attempt`, `created_at`, `started_at`, `completed_at`, `conclusion`, `labels` (the runner label), `runner_name` |
+| Step | inside each job of the same answer | `name`, `number`, `started_at`, `completed_at`, `conclusion` |
+
+- **Waiting its turn** = run made → its first job made (attempt 1). **Waiting for a runner** = job made → job started. **Run** = job started → job ended. A step has no "made" time, and it does not need one.
+- **Re-runs (the spec's finding 3) are told apart by `filter=all`.** The jobs API with `filter=latest` (what `RunDetails` reads today) gives only the latest attempt. `filter=all` gives every attempt's jobs, each with its own `run_attempt`. Probe: run 36315623551 has its `test` job twice, attempt 1 at 11:24 and attempt 2 at 13:01. So one call per run gives attempt 1's timings for the time figures, and the later attempts to count apart. `actions/runs/{id}/attempts/{n}` gives each attempt's own `run_started_at`.
+- One run's jobs and steps are one call (≤ 100 jobs a run; `ci.yml` has about 7).
+
+The other forges (from their APIs and our servers; none of them walked for this):
+
+| Forge | `run.completed` today | Jobs | Steps | Runner wait | Its turn | Attempts |
+|---|---|---|---|---|---|---|
+| GitHub Actions | yes | yes | yes | yes | yes | yes (`filter=all`) |
+| GitLab pipelines | yes (`gitlabmcp/deploys.go`) | yes (`pipelines/{id}/jobs`) | **no** (only log sections) | yes (`queued_duration`) | in part (a `resource_group` wait only) | yes (`include_retried=true`, `retried`) |
+| Azure Pipelines | yes (`azuredevopsmcp/azuredevops.go`) | yes (timeline `Job` records) | yes (timeline `Task` records) | yes (build `queueTime`, job `startTime`) | in part | yes (record `attempt`, `previousAttempts`) |
+| Bitbucket Pipelines | yes (`bitbucketmcp/deploys.go`) | yes (pipeline steps) | **no** (commands only in the log) | in part (pipeline made → first step) | no | not checked |
+| Forgejo / Gitea Actions | yes (`forgejomcp/runs.go`) | Forgejo 16, Gitea 1.25 (`actions/runs/{id}/jobs`) | Forgejo 17 | not checked | no | not checked |
+
+So **all five forge servers have a CI reader** (`run.completed`), and **none reads timings yet**. Board 4's "Agents does not read its CI runs" is for CI outside the forge (CircleCI, Buildkite, Jenkins) and for a forge whose timing reader is not built yet. A forge with no steps draws board 3 with jobs only.
+
+### The store and its bounds
+
+- **One store per repository, plain files** (as lineage): `<data>/ci-timings/<forge>/<owner>/<repo>/<YYYY-MM-DD>.jsonl`, one file per UTC day the run was made, one line per run attempt. Times are seconds from the run's made time; the run line has its `ci-run` ref.
+- **Size** (measured): 2.8 KB a run with its jobs and steps, 0.55 KB without the steps; 6.9 jobs and 57 steps a run. alexec/Agents makes about 160 `ci` runs a day (30 days to 12 November; 399 on 12 November), about 70 of them on `main`.
+- **Bounds:**
+  - **90 days**, as lineage's `KeepEnded`: a day file past it is deleted whole.
+  - **Steps for 90 days on the default branch and on tags; 14 days on other branches.** A PR's drill-down compares with the run before it, which is days old, not months. At 14 days, a day file is written once again without the steps of its PR runs.
+  - **At most 20,000 runs a repository** (as lineage's `MostLinks`). Past it, the oldest PR runs go first, then the oldest default-branch runs.
+  - For alexec/Agents: 6,300 `main` runs × 2.8 KB + 8,100 PR runs × 0.55 KB + 14 days of PR steps ≈ **25 MB**, which is high: this repository makes more runs than most.
+- **What is dropped first:** a PR run's steps (at 14 days), then a PR run (at the run bound), then any run past 90 days.
+
+### How it fills, and its API cost
+
+- **Live:** on each `run.completed` (its event id has the attempt already), the daemon reads `jobs?filter=all`: **one call a run**, the run itself being in the event. alexec/Agents: about 160 calls a day, against GitHub's 5,000 an hour for a token.
+- **Backfill,** when a repository is first watched: the run list in 3-day windows (the list gives at most 1,000 runs for one query), newest first, then one jobs call a run. **Default-branch and tag runs for 90 days, PR runs for 14 days.** For alexec/Agents: about 100 list calls + 6,300 + 1,300 jobs calls ≈ 7,700 calls. **Paced at 10 % of the token's hourly limit** (500 an hour on GitHub), so that the forge's other events never wait: about 15 hours, the page filling from today backwards. The spec's own fetch (3,400 calls) took jobs for only each 4th PR run.
+- A run that the backfill and the live read both see is the same line (same `ci-run` ref and attempt).
+
+### Where
+
+<!-- Alex's answer goes here. -->
+
+### Decisions
+
+- **Decided:** the forge's data is enough on GitHub; the jobs read uses `filter=all`, and attempt 1 gives the time figures, because `filter=latest` hides the re-run that made finding 3's false queue. Alex can overrule.
+- **Decided:** 90 days, at most 20,000 runs a repository, steps for 14 days on branches other than the default branch, one JSONL file per repository and day, because it bounds this busy repository at about 25 MB and keeps every board's data (board 3 for `main` over the whole range). Alex can overrule.
+- **Decided:** fill from `run.completed` (one call a run) and a backfill paced at 10 % of the token's hourly limit, default branch first, because the live cost is small and the backfill must not delay the forge's events. Alex can overrule.
+- **Decided:** #5177 builds the GitHub reader; GitLab, Azure DevOps, Bitbucket and Forgejo each get a task of their own, the lead's to file, because the fields differ by forge (no steps on GitLab and Bitbucket) and GitHub is where the data was measured. Alex can overrule.
+
 ## A slowdown makes an event
 
 When the change finder finds a step up in a job's run time on the default branch, the daemon sends an event, **`ci.slowed`** (in the style of `checks.passed`), with:
@@ -186,7 +244,7 @@ The stories add a new page, controls and a link, so each PR waits for Alex with 
 ## Open questions
 
 1. ~~Where is the Mac link?~~ **Answered (Alex, 2026-11-13):** the Pipeline line of a PR's or release's Work page, after *CI run* (board 5). The other choices were the Work ▸ Releases toolbar and the Cost page.
-2. ~~Forge API or extend the `ci-run` nodes?~~ **Decided (Alex, 2026-11-13):** a timing store of its own, keyed by the `ci-run` ref (see "Where the timings live"). Still open for the spike (#5176): is the forge's run, job and step data enough, the store's bounds, and whether it runs on the Mac's daemon or the control plane. The fetch for this spec made about 3,400 API calls for 90 days of this repository.
+2. ~~Forge API or extend the `ci-run` nodes?~~ **Decided (Alex, 2026-11-13):** a timing store of its own, keyed by the `ci-run` ref (see "Where the timings live"). The spike (#5176) answered the data, the bounds and the fill (see "The data spike"); where it lives is Alex's answer there.
 3. ~~What is a deploy?~~ **Out of this epic** (Alex, 2026-11-13): the later Release × Environment epic.
 4. **The detector's floor** (30 s and 20 %, a score of 8) and its library. Otava is Python. The timing task looks for a Go library first (AGENTS.md, "Libraries before our own code").
 5. ~~Should a change found on `main` tell someone?~~ **Yes (Alex, 2026-11-13):** the daemon sends `ci.slowed` (see "A slowdown makes an event"). Open: the event's final name and fields, in #5200.
