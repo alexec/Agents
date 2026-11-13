@@ -328,7 +328,7 @@ func TestTheNewAppSkillIsReadyMade(t *testing.T) {
 	if !found {
 		t.Fatalf("%s is not a ready-made skill: %v", id, readyMadeSkillIDs())
 	}
-	skill, err := readyMadeSkillsFS.ReadFile("readymadeskills/" + id + "/SKILL.md")
+	skill, err := os.ReadFile(filepath.Join(readyMadeFixtureDir, "skills", id, "SKILL.md"))
 	if err != nil || !strings.HasPrefix(string(skill), "---\nname: "+id+"\n") {
 		t.Fatalf("its SKILL.md does not start with its name: %v", err)
 	}
@@ -346,7 +346,7 @@ func TestTheNewAppSkillIsReadyMade(t *testing.T) {
 // #5054) finds each task by its words, so the skill's two tables hold these words, in this
 // order. A change here is a change to the plan pages too.
 func TestTheNewAppSkillKeepsTheFirstBuildTaskList(t *testing.T) {
-	skill, err := readyMadeSkillsFS.ReadFile("readymadeskills/start-a-new-app/SKILL.md")
+	skill, err := os.ReadFile(filepath.Join(readyMadeFixtureDir, "skills", "start-a-new-app", "SKILL.md"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -126,6 +126,22 @@ for its findings at once, so their fixes start while the others still run. One t
 failed, or is still running at T0 + 1 day (stop it with `stop_session`), is a note in
 your report, not a reason to stop, and it is not started again until the next release.
 
+### The ready-made workflows' pin (#5091)
+
+The ready-made workflows and skills are in agentloops-dev/dotagents, and each release pins one
+tag of it (`readyMadeTag` and `readyMadeCommit` in `Go/internal/agentsd/dotagents.go`). When
+`dotagents` main has commits since the pinned tag (`gh api repos/agentloops-dev/dotagents/compare/<tag>...main --jq .ahead_by`):
+
+1. Tag its main with the next tag (`v0.<n+1>.0`): `gh api repos/agentloops-dev/dotagents/git/refs -f ref=refs/tags/<tag> -f sha=<main's sha>`. Never move a tag that is there.
+2. On a branch `agents/dotagents-<tag>`, run `scripts/dotagents.sh pin <tag>`, then
+   `scripts/go-changed.sh` under the "build" lease: agentsd's tests check that each skill
+   names only tools this release serves. Open its PR with auto-merge on; the gate (step 5)
+   waits for it as for a fix. A failing test is a fix in `dotagents` and a new tag, not a
+   change to the test.
+
+With no new commit, `scripts/dotagents.sh check` still runs once: it fails when the tag
+moved, or the copy for the tests is not the pinned tag.
+
 ## 3. Have the high ones fixed, and file the medium ones
 
 Collect, in order:

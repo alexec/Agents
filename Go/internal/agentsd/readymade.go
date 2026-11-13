@@ -2,7 +2,6 @@ package agentsd
 
 import (
 	"crypto/sha256"
-	"embed"
 	"encoding/hex"
 	"encoding/json"
 	"log"
@@ -17,53 +16,10 @@ import (
 	"github.com/alexec/agents/Go/wire"
 )
 
-// Ready-made workflows (#1342, #1633) are copied to the person's workflow folder once.
-// After that, the files belong to the person, except that a copy the person did not edit
-// takes a newer ready-made version (#4048).
-
-//go:embed readymade
-var readyMadeFS embed.FS
-
-// readyMadeIDs is every ready-made workflow, by id.
-func readyMadeIDs() []string {
-	entries, _ := readyMadeFS.ReadDir("readymade")
-	var ids []string
-	for _, e := range entries {
-		if e.IsDir() {
-			ids = append(ids, e.Name())
-		}
-	}
-	return ids
-}
-
-func isReadyMade(id string) bool {
-	_, err := readyMadeFS.ReadFile("readymade/" + id + "/workflow.md")
-	return err == nil
-}
-
-// Ready-made skills with no workflow (#3307) are copied to the person's skills once, as a
-// ready-made workflow's skill is: map-a-docs-server, which any agent follows when asked.
-//
-//go:embed readymadeskills
-var readyMadeSkillsFS embed.FS
-
-// readyMadeSkillIDs is every ready-made skill with no workflow, by id.
-func readyMadeSkillIDs() []string {
-	entries, _ := readyMadeSkillsFS.ReadDir("readymadeskills")
-	var ids []string
-	for _, e := range entries {
-		if e.IsDir() {
-			ids = append(ids, e.Name())
-		}
-	}
-	return ids
-}
-
-func readyMadeText(id string) (workflow, skill string) {
-	w, _ := readyMadeFS.ReadFile("readymade/" + id + "/workflow.md")
-	s, _ := readyMadeFS.ReadFile("readymade/" + id + "/SKILL.md")
-	return string(w), string(s)
-}
+// Ready-made workflows (#1342, #1633) are copied to the person's workflow folder once, from
+// the copy of agentloops-dev/dotagents that dotagents.go fetched (#5091). After that, the files
+// belong to the person, except that a copy the person did not edit takes a newer ready-made
+// version (#4048), which waits for the person's approval as any changed workflow does.
 
 // pushesToForge is whether a folder's git config names a GitHub or GitLab remote: github.com,
 // or a host with gitlab in its name. It reads the config, never runs git: the scan that asks
@@ -110,11 +66,7 @@ func removedReadyMadePath(home string) string {
 }
 
 func markReadyMadeRemoved(home, id string) error {
-	known := false
-	for _, builtIn := range readyMadeIDs() {
-		known = known || builtIn == id
-	}
-	if !known {
+	if !loadReadyMade(home).has(id) {
 		return nil
 	}
 	path := removedReadyMadePath(home)
@@ -155,18 +107,18 @@ func (d *Daemon) ensureReadyMadeUserWorkflowsLocked() {
 	for _, id := range removed {
 		wasRemoved[id] = true
 	}
-	for _, id := range readyMadeSkillIDs() {
+	set := d.readyMadeLocked(home)
+	for _, id := range set.skillIDs() {
 		skillPath := filepath.Join(home, ".agents", "skills", id, "SKILL.md")
 		if !ownFolders(home, filepath.Join(".agents", "skills", id)) {
 			continue
 		}
 		if _, err := os.Lstat(skillPath); os.IsNotExist(err) && os.MkdirAll(filepath.Dir(skillPath), 0o755) == nil {
-			skill, _ := readyMadeSkillsFS.ReadFile("readymadeskills/" + id + "/SKILL.md")
-			_ = store.WriteAtomically(skillPath, skill, 0o644)
+			_ = store.WriteAtomically(skillPath, []byte(set.Skills[id]), 0o644)
 		}
 	}
 	made := madeReadyMade(home)
-	for _, id := range readyMadeIDs() {
+	for _, id := range set.ids() {
 		if wasRemoved[id] {
 			continue
 		}
@@ -174,7 +126,7 @@ func (d *Daemon) ensureReadyMadeUserWorkflowsLocked() {
 		if ownFolders(home, filepath.Join(".agents", "skills", id)) {
 			if _, err := os.Lstat(skillPath); os.IsNotExist(err) {
 				if os.MkdirAll(filepath.Dir(skillPath), 0o755) == nil {
-					_, skill := readyMadeText(id)
+					_, skill := set.text(id)
 					_ = store.WriteAtomically(skillPath, []byte(skill), 0o644)
 				}
 			}
@@ -183,7 +135,7 @@ func (d *Daemon) ensureReadyMadeUserWorkflowsLocked() {
 		if !ok {
 			continue
 		}
-		workflow, _ := readyMadeText(id)
+		workflow, _ := set.text(id)
 		if _, err := os.Lstat(path); err == nil {
 			d.updateReadyMadeLocked(home, id, path, workflow, made[id])
 			continue
@@ -219,21 +171,13 @@ func readyMadeDigest(text string) (string, bool) {
 	return hex.EncodeToString(sum[:]), true
 }
 
-// earlierReadyMade is each ready-made workflow's earlier versions, by readyMadeDigest, and
-// whether going from that version to today's widens what the workflow can do. A change to a
-// ready-made workflow.md adds the version it replaces here, so that a copy made before the
-// daemon kept digests is updated too. #3922's plan → ask keeps the folders read-only.
+// earlierReadyMade is each ready-made workflow's earlier versions, by readyMadeDigest: the
+// versions made before the daemon kept the digest of the copy it made, so that such a copy is
+// known to be unedited and is updated too. It is compiled in, never read from the repository,
+// and it says only that a copy is unedited: an update never keeps the copy's approval (#5091).
 var earlierReadyMade = map[string]map[string]bool{
-	"daily-summary": {"d39b71bc9d4ab7c2f5fa24dca8b72919dc7d0992f79e0ea964ebe93249262d42": false},
-	"daily-checks":  {"0dff5345182c13cbf18da06086d57e03371baa9db9565b69f8d51ff3a4a3512e": false},
-}
-
-// readyMadeChange is what each ready-made workflow's version today changes, in a sentence: what
-// an edited copy's page says the newer version does (#4071). A change to a ready-made
-// workflow.md says it here, as it adds the version it replaces to earlierReadyMade.
-var readyMadeChange = map[string]string{
-	"daily-summary": "It runs in ask mode rather than plan mode, so a run no longer waits for your approval before it saves (#3922).",
-	"daily-checks":  "It runs in ask mode rather than plan mode, so a run no longer waits for your approval before it saves (#3922).",
+	"daily-summary": {"d39b71bc9d4ab7c2f5fa24dca8b72919dc7d0992f79e0ea964ebe93249262d42": true},
+	"daily-checks":  {"0dff5345182c13cbf18da06086d57e03371baa9db9565b69f8d51ff3a4a3512e": true},
 }
 
 // updatedReadyMadePath keeps when the daemon last wrote a newer version over each unedited
@@ -258,7 +202,7 @@ func markReadyMadeUpdated(home, id string, at time.Time) {
 // the newer version changes, until they take it or keep their copy (#4075). Neither for a copy made before the daemon kept digests, whose
 // version it does not know.
 func readyMadeNotice(home, id, text string, now time.Time) (updatedAt *wire.Date, newer *string) {
-	workflow, _ := readyMadeText(id)
+	workflow, _ := loadReadyMade(home).text(id)
 	want, ok := readyMadeDigest(workflow)
 	if workflow == "" || !ok {
 		return nil, nil
@@ -278,10 +222,7 @@ func readyMadeNotice(home, id, text string, now time.Time) (updatedAt *wire.Date
 		return nil, nil
 	}
 	if made := madeReadyMade(home)[id]; made != "" && made != want && keptReadyMade(home)[id] != want {
-		change := readyMadeChange[id]
-		if change == "" {
-			change = "Its ready-made version changed since this copy was made."
-		}
+		change := "Its ready-made version changed since this copy was made."
 		return nil, &change
 	}
 	return nil, nil
@@ -364,7 +305,8 @@ func (d *Daemon) readyMadeCopyLocked(r wire.WorkflowRequest) (home, path, text, 
 	if f == nil {
 		return "", "", "", "", noSuchWorkflow(r.WorkflowID)
 	}
-	if f.scope != "user" || home == "" || !isReadyMade(r.WorkflowID) {
+	set := loadReadyMade(home)
+	if f.scope != "user" || home == "" || !set.has(r.WorkflowID) {
 		return "", "", "", "", &Error{Code: wire.FailureNotChanged, Message: f.wf.Name + " is not a copy of a ready-made workflow."}
 	}
 	if _, newer := readyMadeNotice(home, r.WorkflowID, f.text, time.Now()); newer == nil {
@@ -374,7 +316,7 @@ func (d *Daemon) readyMadeCopyLocked(r wire.WorkflowRequest) (home, path, text, 
 	if !ok {
 		return "", "", "", "", notInFolder(r.WorkflowID)
 	}
-	text, _ = readyMadeText(r.WorkflowID)
+	text, _ = set.text(r.WorkflowID)
 	want, _ = readyMadeDigest(text)
 	return home, path, text, want, nil
 }
@@ -431,14 +373,14 @@ func (d *Daemon) keepReadyMade(r wire.WorkflowRequest) (wire.WorkflowSummary, er
 
 // updateReadyMadeLocked writes today's ready-made version over a copy the person did not
 // edit: one the same as the copy the daemon made, or as an earlier version. The copy keeps
-// its state keys. Its approval goes with it when the step does not widen what it can do;
-// otherwise the new version waits for the person as any changed workflow does.
+// its state keys, but not its approval: the new version came from the repository, so it waits
+// for the person as any changed workflow does (#5091).
 func (d *Daemon) updateReadyMadeLocked(home, id, path, workflow, madeDigest string) {
 	want, ok := readyMadeDigest(workflow)
 	if !ok {
 		return
 	}
-	old, oldFileDigest, why := readWorkflowFile(path)
+	old, _, why := readWorkflowFile(path)
 	if why != "" {
 		return
 	}
@@ -446,45 +388,17 @@ func (d *Daemon) updateReadyMadeLocked(home, id, path, workflow, madeDigest stri
 	if !ok || have == want {
 		return
 	}
-	widens, earlier := earlierReadyMade[id][have]
-	if !earlier && have != madeDigest {
+	if !earlierReadyMade[id][have] && have != madeDigest {
 		return // the person's own edit
-	}
-	if !earlier {
-		widens = true // made by the daemon, but no one said what the step does
 	}
 	text, err := withStateKeys(old, workflow, id, home)
 	if err != nil {
 		return
 	}
-	oldSkills, _ := readWorkflowSkills(home, old)
-	oldDigest := workflowDigest(oldFileDigest, old, oldSkills)
 	if err := store.WriteAtomically(path, []byte(text), 0o644); err != nil {
 		return
 	}
 	markReadyMadeMade(home, id, want)
 	markReadyMadeUpdated(home, id, time.Now())
-	log.Printf("workflows: updated the unedited ready-made %s to today's version", id)
-	st := d.stateLocked(home, id, false)
-	if widens || d.workflowRecsBad || st == nil {
-		return
-	}
-	newText, newFileDigest, why := readWorkflowFile(path)
-	skills, skillsWhy := readWorkflowSkills(home, newText)
-	if why != "" || skillsWhy != "" {
-		return
-	}
-	f := &workflowFile{text: newText, skills: skills, digest: workflowDigest(newFileDigest, newText, skills)}
-	moved := false
-	if st.ApprovedDigest != nil && *st.ApprovedDigest == oldDigest {
-		d.keepCopyLocked(st, f)
-		moved = true
-	}
-	if st.HeardDigest != nil && *st.HeardDigest == oldDigest {
-		st.HeardDigest = &f.digest
-		moved = true
-	}
-	if moved {
-		d.saveRecordsLocked(false)
-	}
+	log.Printf("workflows: updated the unedited ready-made %s to the fetched version; it waits for approval", id)
 }
