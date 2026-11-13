@@ -466,6 +466,13 @@ struct MessagesRow: View {
     /// How often the line is read again.
     static let every: Duration = .seconds(60)
 
+    /// What starts the reads again: the machines, a mark as read (#5137), and whether the sessions have been listed.
+    private struct Key: Equatable {
+        let machines: [String]
+        let marked: Int
+        let listed: Bool
+    }
+
     var body: some View {
         let machines = model.messagesMachines
         // The time ago moves on between reads.
@@ -479,7 +486,11 @@ struct MessagesRow: View {
             }
             .accessibilityValue(line ?? "")
         }
-        .task(id: machines.map(\.id.rawValue) + [String(model.messagesList.marked)]) {
+        // Not before the sessions' first list (#5173): the line is no reason to keep the list waiting
+        // at launch, and the night's run holds the Mac to 2 calls before it (#4891).
+        .task(id: Key(machines: machines.map(\.id.rawValue), marked: model.messagesList.marked,
+                      listed: model.hasLoadedAgents || !model.hasMacHost)) {
+            guard model.hasLoadedAgents || !model.hasMacHost else { return }
             while !Task.isCancelled {
                 await read(machines)
                 try? await Task.sleep(for: Self.every)
