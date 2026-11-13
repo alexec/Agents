@@ -411,7 +411,17 @@ if (( BUILD )); then
     run build-host scripts/build-cache.sh xcodebuild -scheme AgentsHost -configuration $CONFIG -destination 'platform=macOS' -derivedDataPath build/DD-host $XFLAGS build
   fi
   if (( DEVICES )); then
-    run build-ios scripts/build-cache.sh xcodebuild -scheme Remote -configuration $CONFIG -destination 'generic/platform=iOS' -derivedDataPath build/DD-ios -allowProvisioningUpdates $XFLAGS build
+    # Xcode makes the Remote's profiles (the app, RemoteShare and their App Group) with an
+    # account. With no Apple ID in Xcode's Accounts, it falls back to the wildcard profile and
+    # fails on the App Group; the App Store Connect key, as for scripts/release-secrets.sh,
+    # lets it make them without one.
+    ASC=()
+    if [[ -r ~/.private_keys/asc.env ]]; then
+      ASC_ENV=$(set -a; source ~/.private_keys/asc.env; print -r -- "$ASC_KEY_ID $ASC_ISSUER_ID")
+      P8=( ~/.private_keys/AuthKey_${ASC_ENV%% *}.p8(N) )
+      (( ${#P8} )) && ASC=(-authenticationKeyPath $P8[1] -authenticationKeyID ${ASC_ENV%% *} -authenticationKeyIssuerID ${ASC_ENV##* })
+    fi
+    run build-ios scripts/build-cache.sh xcodebuild -scheme Remote -configuration $CONFIG -destination 'generic/platform=iOS' -derivedDataPath build/DD-ios -allowProvisioningUpdates $ASC $XFLAGS build
   fi
 fi
 
