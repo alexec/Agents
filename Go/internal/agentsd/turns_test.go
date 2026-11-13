@@ -19,6 +19,7 @@ import (
 
 	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
 	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/alexec/agents/Go/internal/browser"
 	"github.com/alexec/agents/Go/wire"
 )
 
@@ -46,6 +47,9 @@ func TestMain(m *testing.M) {
 	releaseLayerHere = false
 	// The machine's memory pressure does not move a test's warm pool (#4514).
 	pressureNow = func() string { return "" }
+	// The browser is Chrome for Testing, which a test fakes: never the machine's own Google
+	// Chrome, which GitHub's Linux runners have, with Xvfb (#5227).
+	browser.FindChrome = func() string { return "" }
 	// Nor does the load of the machine a test runs on raise machine.busy (#4578).
 	capacitySampler = func(context.Context) capacitySample { return capacitySample{} }
 	// No test asks the person's gh about merged pull requests unless it says so.

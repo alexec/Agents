@@ -135,9 +135,14 @@ func New(cache, root string, install func(func(string)) (Toolset, error), busy f
 		Env:      env,
 		launch:   launchChromium,
 		locate:   locateChromium,
-		chrome:   findChrome,
+		chrome:   FindChrome,
 	}
 }
+
+// FindChrome is how New finds Google Chrome stable on this machine (findChrome). A test of
+// another package that must not start the machine's own Chrome sets it to return "" before
+// it makes a Machine: GitHub's Linux runners have Chrome and Xvfb (#5227).
+var FindChrome = findChrome
 
 // Endpoint is the browser's CDP address (ws://127.0.0.1:<port>/devtools/browser/<id>),
 // after it installs and starts it when it must. Each call counts as use, so the browser
