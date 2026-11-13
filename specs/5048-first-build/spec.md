@@ -1,8 +1,8 @@
 ---
-description: The first open of Agents asks one question, "What do you want to build?", then shows a plan page with the task list for an iPhone app or a web service, and an agent with the start-a-new-app skill takes the person from the idea to the first approved deploy (#5048).
+description: The first open of Agents asks for one idea, under "Let's build your idea.", then shows a plan page with the task list for an iPhone app or a web service, and an agent with the start-a-new-app skill takes the person from the idea to the first approved deploy (#5048).
 ---
 
-# What do you want to build? (#5048)
+# Let's build your idea. (#5048)
 
 Epic #5048, feature `feature:first-build`, milestone `1.0 Public release`. Spike #5049
 wrote this spec. Docs only: the epic's children build it.
@@ -12,8 +12,8 @@ wrote this spec. Docs only: the epic's children build it.
 A person opens Agents for the first time. What do they see, and how do they get from that
 first look to their first app, deployed, with nothing set up before?
 
-Alex's idea (2026-11-12): one question, **What do you want to build?** The person types an
-idea and presses Submit. An agent walks them through the accounts, the agent runtime, the
+Alex's idea (2026-11-12): one question, under the hero text **Let's build your idea.**
+(Alex, 2026-11-12, #5050). The person types an idea and presses Submit. An agent walks them through the accounts, the agent runtime, the
 repository and the deploy.
 
 ## Today
@@ -57,7 +57,7 @@ The whole window (or the whole web page): no sidebar, no toolbar, no checklist.
 
 - The Huddle (the blob icon), as `FirstOpenView` draws it, with `promptFocused` on while the
   box has focus, so the Blobs look at it.
-- Under it, the hero text **What do you want to build?** in the largest type step.
+- Under it, the hero text **Let's build your idea.** in the largest type step.
 - One prompt box, several lines high, with **Submit** (Return submits, Shift-Return makes a
   new line). Submit is off while the box is empty.
 - The box's placeholder rotates through the ideas below, one every 4 seconds, with a cross
