@@ -15,9 +15,12 @@ package browser
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -540,27 +543,74 @@ func findChrome() string {
 }
 
 // launchChrome starts Google Chrome stable (#5207): headed, on the kept profile, its
-// debugging port on 127.0.0.1 and a port the system picks, and none of chromedp's test
+// debugging port on 127.0.0.1 and a free port agentsd picks, and none of chromedp's test
 // defaults (no mock keychain, no basic password store, sync and extensions as Chrome has
 // them), so a site sees the Chrome it is. Its user agent is its own. WebAuthn is off unless
 // how asks for it (#4085), as for Chrome for Testing. Its window goes just below the screen
 // before the first page opens.
+//
+// The port is not 0: Google Chrome with --remote-debugging-port=0 sets navigator.webdriver
+// on every page, where a port of its own leaves it false, as a person's Chrome has it
+// (measured on Chrome 157, #5207). A port another program takes between the pick and the
+// start is tried again on a new one.
 func launchChrome(exe, profile string, env []string, how mode) (*process, error) {
-	opts := []chromedp.ExecAllocatorOption{
-		chromedp.ExecPath(exe),
-		chromedp.UserDataDir(profile),
-		chromedp.NoInheritEnv,
-		chromedp.Env(env...),
-		remote.WebSocket,
-		chromedp.Flag("remote-debugging-address", "127.0.0.1"),
-		chromedp.Flag("remote-debugging-port", "0"),
-		chromedp.Flag("disk-cache-size", strconv.Itoa(diskCacheBytes)),
-		chromedp.NoFirstRun,
-		chromedp.NoDefaultBrowserCheck,
-		chromedp.WindowSize(windowWidth, windowHeight),
+	var err error
+	for range 3 {
+		var port int
+		if port, err = freePort(); err != nil {
+			return nil, err
+		}
+		opts := []chromedp.ExecAllocatorOption{
+			chromedp.ExecPath(exe),
+			chromedp.UserDataDir(profile),
+			chromedp.NoInheritEnv,
+			chromedp.Env(env...),
+			remote.WebSocket,
+			chromedp.Flag("remote-debugging-address", "127.0.0.1"),
+			chromedp.Flag("remote-debugging-port", strconv.Itoa(port)),
+			chromedp.Flag("disk-cache-size", strconv.Itoa(diskCacheBytes)),
+			chromedp.NoFirstRun,
+			chromedp.NoDefaultBrowserCheck,
+			chromedp.WindowSize(windowWidth, windowHeight),
+		}
+		var p *process
+		at := func() (string, error) { return listening(port) }
+		if p, _, err = run(opts, how, func(ctx context.Context) { moveBelowScreen(ctx) }, at); err == nil {
+			return p, nil
+		}
 	}
-	p, _, err := run(opts, profile, how, func(ctx context.Context) { moveBelowScreen(ctx) })
-	return p, err
+	return nil, err
+}
+
+// listening is the CDP address of the browser whose debugging port is port, as it says at
+// /json/version: Chrome writes no DevToolsActivePort for a port it did not pick.
+func listening(port int) (string, error) {
+	c := http.Client{Timeout: 5 * time.Second}
+	res, err := c.Get("http://127.0.0.1:" + strconv.Itoa(port) + "/json/version")
+	if err != nil {
+		return "", err
+	}
+	defer res.Body.Close()
+	var v struct {
+		WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&v); err != nil {
+		return "", err
+	}
+	if !strings.HasPrefix(v.WebSocketDebuggerURL, "ws://127.0.0.1:"+strconv.Itoa(port)+"/devtools/browser/") {
+		return "", fmt.Errorf("the browser on port %d says no address of its own: %q", port, v.WebSocketDebuggerURL)
+	}
+	return v.WebSocketDebuggerURL, nil
+}
+
+// freePort is a TCP port on 127.0.0.1 that nothing listens on now.
+func freePort() (int, error) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
 // userAgents is each Chromium's user agent as a headed Chrome, by its executable.
@@ -597,16 +647,16 @@ func startChromium(exe, profile string, env []string, userAgent string, how mode
 	if how.headed {
 		opts = append(opts, headedOptions...)
 	}
-	return run(opts, profile, how, func(ctx context.Context) {
+	return run(opts, how, func(ctx context.Context) {
 		if how.headed {
 			moveOffScreen(ctx)
 		}
-	})
+	}, func() (string, error) { return activePort(profile) })
 }
 
 // run starts a browser with opts, and, after its first tab opens, places its window. It says
 // the user agent it has. With WebAuthn off (how), Blink has none.
-func run(opts []chromedp.ExecAllocatorOption, profile string, how mode, place func(context.Context)) (*process, string, error) {
+func run(opts []chromedp.ExecAllocatorOption, how mode, place func(context.Context), at func() (string, error)) (*process, string, error) {
 	if !how.webauthn {
 		// The agents' browser has no passkeys of its own (#4084): headless, it has no
 		// window for the passkey dialog and no Touch ID. With WebAuthn off in Blink,
@@ -643,7 +693,7 @@ func run(opts []chromedp.ExecAllocatorOption, profile string, how mode, place fu
 		stop()
 		return nil, "", err
 	}
-	endpoint, err := activePort(profile)
+	endpoint, err := at()
 	if err != nil {
 		stop()
 		return nil, "", err
@@ -670,10 +720,12 @@ func moveOffScreen(ctx context.Context) {
 const offScreen = -32000
 
 // moveBelowScreen puts Google Chrome's window just below the screen (#5207). macOS keeps
-// 40 points of a window on a screen across, so far to the left or top comes back onto it
-// (spike #5127: -32000, -32000 became -1240, 33); down, it lets the window go past the
-// bottom of the lowest display, and keeps it just below. So the window goes all but one
-// point to the left, and down as far as macOS lets it.
+// part of a window on a screen: 40 points across when it is moved further left (spike
+// #5127: -32000, -32000 became -1240, 33), but only one at x = -(width-1); and down, it
+// stops at the bottom of the lowest display or a little above it (a 2560×1440 display
+// kept 129 points, -1279, 32000 became -1279, 1311). So the window goes all but one point
+// to the left, and down as far as macOS lets it: at most a line one point wide shows, at
+// the screen's left edge.
 func moveBelowScreen(ctx context.Context) {
 	w, err := chromedp.Call(ctx, cdpbrowser.GetWindowForTarget, cdpbrowser.GetWindowForTargetParams{})
 	if err == nil {

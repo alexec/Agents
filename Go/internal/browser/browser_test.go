@@ -15,6 +15,7 @@ import (
 
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 )
 
@@ -490,26 +491,29 @@ func TestARealGoogleChrome(t *testing.T) {
 		<-p.done
 	}()
 	ctx := p.store.(cdpStore).ctx
-	if url := os.Getenv("AGENTS_TEST_BOT_CHECK"); url != "" {
-		if _, err := chromedp.Run(ctx, chromedp.Navigate(url)); err != nil {
-			t.Fatal(err)
-		}
+	// userAgentData is only in a secure context, which about:blank is not.
+	if _, err := chromedp.Run(ctx, chromedp.Navigate("https://example.com/")); err != nil {
+		t.Fatal(err)
 	}
 	says, err := chromedp.Run(ctx, chromedp.Evaluate[[]any](`[navigator.userAgentData.brands.map(b => b.brand).join(","), navigator.webdriver, navigator.userAgent, typeof PublicKeyCredential]`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("it says %v", says)
+	if cmd, err := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(p.pid)).Output(); err == nil {
+		t.Logf("it runs as %s", cmd)
+	}
 	if !strings.Contains(says[0].(string), "Google Chrome") || says[1] != false || strings.Contains(says[2].(string), "Headless") || says[3] != "undefined" {
 		t.Fatalf("not the Chrome it is, or WebAuthn on: %v", says)
 	}
-	where, err := chromedp.Run(ctx, chromedp.Evaluate[[]float64](`[window.screenX, window.screenY, window.outerWidth, screen.availTop + screen.height]`))
+	// At most one point across shows, at the screen's left edge, or none below it.
+	where, err := chromedp.Run(ctx, chromedp.Evaluate[[]float64](`[window.screenX, window.screenY, window.outerWidth, screen.availLeft, screen.height]`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("the window is at %v", where)
-	if len(where) != 4 || where[0] > -(windowWidth-41) || where[1] < where[3] {
-		t.Fatalf("the window is not below the screen: %v", where)
+	if len(where) != 5 || where[0]+where[2]-where[3] > 1 && where[1] < where[4] {
+		t.Fatalf("the window is on the screen: %v", where)
 	}
 	out, err := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(p.pid)).Output()
 	if err != nil {
@@ -520,10 +524,37 @@ func TestARealGoogleChrome(t *testing.T) {
 			t.Errorf("it has the test flag %s: %s", flag, out)
 		}
 	}
-	if os.Getenv("AGENTS_TEST_BOT_CHECK") != "" {
+	// The chat tile's screencast (#4138) paints from below the screen while the page changes.
+	frames := chromedp.Events(ctx, page.ScreencastFrame)
+	var painted atomic.Int32
+	go func() {
+		for ev, err := range frames {
+			if err != nil {
+				return
+			}
+			painted.Add(1)
+			_, _ = chromedp.Call(ctx, page.ScreencastFrameAck, page.ScreencastFrameAckParams{SessionID: ev.SessionID})
+		}
+	}()
+	if _, err := chromedp.Call(ctx, page.StartScreencast, page.StartScreencastParams{Format: page.StartScreencastFormatJpeg, EveryNthFrame: 1}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := chromedp.Run(ctx, chromedp.Evaluate[any](`setInterval(() => document.body.style.background = '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0'), 50)`)); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(3 * time.Second)
+	t.Logf("the screencast painted %d frames in 3 s", painted.Load())
+	if painted.Load() < 10 {
+		t.Fatalf("the screencast painted %d frames in 3 s", painted.Load())
+	}
+	if url := os.Getenv("AGENTS_TEST_BOT_CHECK"); url != "" {
+		// One page that checks, opened once: what it says after the check.
+		if _, err := chromedp.Run(ctx, chromedp.Navigate(url)); err != nil {
+			t.Fatal(err)
+		}
 		time.Sleep(15 * time.Second)
-		page, err := chromedp.Run(ctx, chromedp.Evaluate[[]any](`[document.title, location.href, document.body.innerText.slice(0, 300)]`))
-		t.Logf("%v (err %v)", page, err)
+		said, err := chromedp.Run(ctx, chromedp.Evaluate[[]any](`[document.title, location.href, document.body.innerText.slice(0, 300)]`))
+		t.Logf("%v (err %v)", said, err)
 	}
 }
 
