@@ -20,8 +20,6 @@ public enum ControlPush {
         var needID: NeedID
         var alert: Bool
         var headline: Headline?
-        /// Time Sensitive (#4268); the push's own `aps` says it to iOS.
-        var timely: Bool?
     }
 
     /// Whether this is the control plane's push, opened or not.

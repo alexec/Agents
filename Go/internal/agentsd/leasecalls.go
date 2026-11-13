@@ -164,10 +164,6 @@ func (d *Daemon) resolveResource(given string) (wire.ResourceName, wire.Resource
 	if name == capacityResource {
 		return name, "named", capacityDisplay(), true
 	}
-	if isPersonLease(name) {
-		p, display := d.personLease()
-		return p, "named", display, true
-	}
 	if udid := simulatorLease(name); udid != "" {
 		// One lease for each simulator, whether the agent names it with simulator: or not.
 		return wire.ResourceName(simulatorLeasePrefix + strings.ToLower(udid)), "simulator", "Simulator " + udid, true
@@ -484,7 +480,7 @@ func (d *Daemon) listResources(agent wire.UUID, _ map[string]json.RawMessage) (s
 			lines = append(lines, "- "+label+": "+d.capacityStateWords(s, agent))
 			continue
 		}
-		if s.Kind == "named" && !isPersonLease(s.Name) {
+		if s.Kind == "named" {
 			label = s.DisplayName + " (named by an agent)"
 		}
 		gone := ""
