@@ -194,13 +194,19 @@ So **all five forge servers have a CI reader** (`run.completed`), and **none rea
 
 ### Where
 
-<!-- Alex's answer goes here. -->
+**Alex chose (2026-11-13, #5176): the machine reads and keeps the store, and sends a copy to the control plane, as lineage's merged copy does.**
+
+- **The machine's daemon** reads the runs, jobs and steps, because only the machine has the forge's token (principle 6). Its store is the system of record.
+- **The control plane keeps a copy**, sent a few seconds after a change, as `lineage/sync` sends links (#4275): refs, times, attempts, conclusions, runner labels, and the names of workflows, jobs and steps. It keeps no commit or PR titles and no logs (principle 7). The copy has the store's bounds, and the hourly sweep applies them to a machine that stopped sending.
+- **The web page reads the copy,** so every board works while the Mac sleeps (principle 1). Two machines that watch one repository send the same runs; a read takes one line for each `ci-run` ref and attempt.
+- Board 2's commit list shows each commit's short hash and PR number from lineage's links. A title comes only from a client that can read the forge.
 
 ### Decisions
 
 - **Decided:** the forge's data is enough on GitHub; the jobs read uses `filter=all`, and attempt 1 gives the time figures, because `filter=latest` hides the re-run that made finding 3's false queue. Alex can overrule.
 - **Decided:** 90 days, at most 20,000 runs a repository, steps for 14 days on branches other than the default branch, one JSONL file per repository and day, because it bounds this busy repository at about 25 MB and keeps every board's data (board 3 for `main` over the whole range). Alex can overrule.
 - **Decided:** fill from `run.completed` (one call a run) and a backfill paced at 10 % of the token's hourly limit, default branch first, because the live cost is small and the backfill must not delay the forge's events. Alex can overrule.
+- **Alex chose:** the machine's daemon reads and keeps the store; the control plane keeps a bounded copy with names but no titles, and the web page reads it (2026-11-13).
 - **Decided:** #5177 builds the GitHub reader; GitLab, Azure DevOps, Bitbucket and Forgejo each get a task of their own, the lead's to file, because the fields differ by forge (no steps on GitLab and Bitbucket) and GitHub is where the data was measured. Alex can overrule.
 
 ## A slowdown makes an event
@@ -244,7 +250,7 @@ The stories add a new page, controls and a link, so each PR waits for Alex with 
 ## Open questions
 
 1. ~~Where is the Mac link?~~ **Answered (Alex, 2026-11-13):** the Pipeline line of a PR's or release's Work page, after *CI run* (board 5). The other choices were the Work ▸ Releases toolbar and the Cost page.
-2. ~~Forge API or extend the `ci-run` nodes?~~ **Decided (Alex, 2026-11-13):** a timing store of its own, keyed by the `ci-run` ref (see "Where the timings live"). The spike (#5176) answered the data, the bounds and the fill (see "The data spike"); where it lives is Alex's answer there.
+2. ~~Forge API or extend the `ci-run` nodes?~~ **Decided (Alex, 2026-11-13):** a timing store of its own, keyed by the `ci-run` ref (see "Where the timings live"). The spike (#5176) answered the data, the bounds and the fill (see "The data spike"); Alex chose where it lives: the machine, with a copy on the control plane.
 3. ~~What is a deploy?~~ **Out of this epic** (Alex, 2026-11-13): the later Release × Environment epic.
 4. **The detector's floor** (30 s and 20 %, a score of 8) and its library. Otava is Python. The timing task looks for a Go library first (AGENTS.md, "Libraries before our own code").
 5. ~~Should a change found on `main` tell someone?~~ **Yes (Alex, 2026-11-13):** the daemon sends `ci.slowed` (see "A slowdown makes an event"). Open: the event's final name and fields, in #5200.
