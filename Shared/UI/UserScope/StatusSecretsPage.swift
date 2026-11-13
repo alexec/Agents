@@ -118,7 +118,7 @@ struct StatusSecretsPage: View {
                 }
                 Text(StatusSecretsWords.summary(line)).appText(.supporting).foregroundStyle(.secondary)
                 if !line.backedUp {
-                    Text(StatusSecretsWords.notBackedUp).appText(.supporting).tinted(.attention)
+                    Text(StatusSecretsWords.notBackedUp).appText(.supporting).tinted(.warning)
                 }
             }
             .padding(.vertical, 4)

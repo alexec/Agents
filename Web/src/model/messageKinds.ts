@@ -3,11 +3,12 @@
 // No DOM here, so the tests read it.
 
 /** A message's tone: neutral is a status, attention is "a person is needed", failure is "it failed",
- *  success is an ending the app can vouch for. There is no warning tone. */
-export type Tone = "neutral" | "attention" | "failure" | "success";
+ *  warning is "something is wrong or nearly so" (the orange, never a request; #5016), success is an ending
+ *  the app can vouch for. */
+export type Tone = "neutral" | "attention" | "warning" | "failure" | "success";
 
 /** The icon beside the words: a tone is never colour alone. */
-export const toneGlyph: Record<Tone, string> = { neutral: "ⓘ", attention: "⚠︎", failure: "✕", success: "✓" };
+export const toneGlyph: Record<Tone, string> = { neutral: "ⓘ", attention: "⚠︎", warning: "⛔", failure: "✕", success: "✓" };
 
 /** The ARIA role a banner, a sheet note or a toast has: an alert for a failure, a status for the rest. */
 export function toneRole(tone: Tone): "alert" | "status" {

@@ -18,6 +18,7 @@ import { go } from "../route";
 import { BackToList } from "./BackToList";
 import { ApprovalMark } from "./Approval";
 import { FileDiff, type DiffLayout } from "./FileDiff";
+import { Icon } from "./Icon";
 
 /** At most this many lines come from the host (GuardedDiffLine.limit). */
 export const readingLimit = 400;
@@ -78,7 +79,7 @@ export function ReviewPage({ store, host, folder, folderName, id, down }: {
     return (
       <section class="chat empty review-page" aria-label="Review">
         <header class="column-head"><BackToList /><h1>Review</h1></header>
-        <span class="glyph" aria-hidden="true">✓</span>
+        <Icon name="check" class="glyph" />
         <h2>Nothing waits for an OK here</h2>
         <p>The change was answered, or it is no longer there.</p>
       </section>

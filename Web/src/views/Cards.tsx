@@ -17,7 +17,8 @@ import { CallFailed } from "../wire/link";
 import { describe } from "../model/errors";
 import { Failure } from "../protocol/generated";
 import { isSafeLink } from "../render/markdown";
-import { Blocks, EditDiff, elicitationTitle } from "./chat/Rows";
+import { Blocks, EditDiff } from "./chat/Rows";
+import { askHead } from "../model/askHead";
 import { askerFor } from "../model/asker";
 import { planOf } from "../model/plan";
 import { Markdown } from "../render/markdown";
@@ -28,6 +29,7 @@ import { handOffAnswer, handOffWindowWords } from "../model/handOff";
 import { openTakeOver, route } from "../route";
 import { keepingForSession, sessionOnlyField, sessionSecretWords } from "../model/sessionSecrets";
 import { askBeforeUseHint, askBeforeUseWords, needsApprovalField } from "../model/askBeforeUse";
+import { Ask } from "./Ask";
 
 type Held = (
   | { kind: "permission"; request: PermissionRequest }
@@ -150,16 +152,16 @@ export function useWaitingCards({ store, host, session, down = false, handOffsOn
   const runtimeName = (id: string) => (store.runtimes.value[host] ?? []).find((r) => r.runtime.id === id)?.runtime.name;
   const asker = (agentID: string, subagent?: string) =>
     askerFor(store.agents.value[host] ?? [], agentID, runtimeName, subagent);
-  return cards.map((card, index) => ({
+  return cards.map((card) => ({
     key: card.request.id,
     node: card.kind === "permission"
-      ? <PermissionCard key={card.request.id} active={index === 0} request={card.request} asker={asker(card.request.agentID, card.request.subagent)}
+      ? <PermissionCard key={card.request.id} request={card.request} asker={asker(card.request.agentID, card.request.subagent)}
           // Shown as the host shows it: the page beside the chat, read again (the window's Show plan).
           showPlan={(path) => (store.shownFile.value = { host, agentID: card.request.agentID, path, at: Date.now() })}
           hold={{ answered: card.answered, chosen: card.chosen, recipient, down }}
           answer={(option) => send(card.request.id, option.optionID, (sendID) => store.link.call("permissions/answer",
             { permissionID: card.request.id, optionID: option.optionID, sendID }, host))} />
-      : <ElicitationCard key={card.request.id} active={index === 0} request={card.request} asker={asker(card.request.agentID)}
+      : <ElicitationCard key={card.request.id} request={card.request} asker={asker(card.request.agentID)}
           // The agent browser in a tab of its own, at the agent's tab (#3529, #4141).
           openBrowser={handOffsOnly ? undefined : () => {
             const agent = store.agent(host, session);
@@ -199,61 +201,41 @@ function holding(hold: Hold, key: string) {
   };
 }
 
-/** A card's own class: greyed whole only once it is settled somewhere else. */
-const cardClass = (hold: Hold) => `card${hold.answered === "elsewhere" || hold.answered === "withdrawn" ? " inert" : ""}`;
-
-/**
- * The keys for a card while it is the first: ⌥1…9 press its `data-answer` buttons in order, and
- * Return its `data-default` one, unless a field, a menu or a link has the keys.
- */
-function useCardKeys(card: { current: HTMLElement | null }, active: boolean) {
-  useEffect(() => {
-    if (!active) return;
-    const press = (e: KeyboardEvent) => {
-      const here = card.current;
-      if (!here || e.defaultPrevented || e.isComposing) return;
-      const digit = /^Digit([1-9])$/.exec(e.code);
-      if (digit && e.altKey && !e.metaKey && !e.ctrlKey) {
-        const answer = here.querySelectorAll<HTMLElement>("[data-answer]")[Number(digit[1]) - 1];
-        if (answer) {
-          e.preventDefault();
-          answer.click();
-        }
-        return;
-      }
-      if (e.key !== "Enter" || e.altKey || e.metaKey || e.ctrlKey || e.shiftKey) return;
-      const focused = document.activeElement;
-      if (focused instanceof HTMLElement && focused.closest("input, textarea, select, button, a, [contenteditable]")) return;
-      const answer = here.querySelector<HTMLElement>("[data-default]");
-      if (answer) {
-        e.preventDefault();
-        answer.click();
-      }
-    };
-    document.addEventListener("keydown", press);
-    return () => document.removeEventListener("keydown", press);
-  }, [active]);
-}
+/** Greyed whole only once it is settled somewhere else. */
+const inertOf = (hold: Hold) => hold.answered === "elsewhere" || hold.answered === "withdrawn";
 
 /** The hint a numbered answer carries, as the window's ⌘n. */
 const numbered = (n: number) => (n < 9 ? { "data-answer": "", title: `⌥${n + 1}` } : {});
 
 const allows = (option: PermissionOption) => option.kind === "allow_once" || option.kind === "allow_always";
 
-function PermissionCard({ request, asker, hold, answer, active, showPlan }: {
-  request: PermissionRequest; asker: string | null; hold: Hold; answer: (option: PermissionOption) => void; active: boolean;
+function PermissionCard({ request, asker, hold, answer, showPlan }: {
+  request: PermissionRequest; asker: string | null; hold: Hold; answer: (option: PermissionOption) => void;
   showPlan: (path: string) => void;
 }) {
-  const card = useRef<HTMLElement>(null);
-  useCardKeys(card, active);
   // A plan's kind is the runtime's word for it (switch_mode), so a plan says the plan instead.
   const plan = planOf(request.toolCall);
   const firstAllowing = request.options.find(allows);
+  const button = (option: PermissionOption, index: number, link = false) => {
+    const h = holding(hold, option.optionID);
+    return (
+      <button key={option.optionID} class={`${link ? "link" : allows(option) && option === firstAllowing ? "prominent" : ""} ${h.class}`.trim()}
+        aria-disabled={h.disabled} {...numbered(index)} {...(option === firstAllowing ? { "data-default": "" } : {})}
+        onClick={() => !h.disabled && answer(option)}>{option.name}{h.telling}</button>
+    );
+  };
+  // The runtime's options keep their labels; a reject goes on the left, as a link (the Ask's foot).
+  const numberedOptions = request.options.map((option, index) => ({ option, index }));
+  const rejects = numberedOptions.filter(({ option }) => !allows(option));
+  // The primary answer last, on the right.
+  const allowing = numberedOptions.filter(({ option }) => allows(option)).sort((a, b) =>
+    Number(a.option === firstAllowing) - Number(b.option === firstAllowing));
   return (
-    <section ref={card} class={cardClass(hold)} aria-label="Permission request">
+    <Ask glyph={plan ? "list-ordered" : "square-terminal"} title={request.toolCall.title} asker={asker}
+      label="Permission request" inert={inertOf(hold)}
+      decline={rejects.map(({ option, index }, i) => <>{i > 0 && " · "}{button(option, index, true)}</>)}
+      buttons={allowing.map(({ option, index }) => button(option, index))}>
       <div class="question">
-        {asker && <p class="quiet small asker">{asker}</p>}
-        <p class="strong">{request.toolCall.title}</p>
         {request.toolCall.kind && !plan && <p class="quiet small">{request.toolCall.kind}</p>}
         {plan?.file && (
           <p class="plan-shown quiet small">The plan is open beside this conversation.{" "}
@@ -267,18 +249,8 @@ function PermissionCard({ request, asker, hold, answer, active, showPlan }: {
           : piece.type === "content" ? <Blocks key={index} blocks={[piece.content]} text="" />
           : null)}
       </div>
-      <div class="options">
-        {request.options.map((option, index) => {
-          const h = holding(hold, option.optionID);
-          return (
-            <button key={option.optionID} class={`${allows(option) ? "prominent" : ""} ${h.class}`.trim()} aria-disabled={h.disabled}
-              {...numbered(index)} {...(option === firstAllowing ? { "data-default": "" } : {})}
-              onClick={() => !h.disabled && answer(option)}>{option.name}{h.telling}</button>
-          );
-        })}
-      </div>
       <AnsweredNote answered={hold.answered} />
-    </section>
+    </Ask>
   );
 }
 
@@ -350,15 +322,12 @@ function defaultsOf(request: ElicitationRequest): Record<string, JSONValue> {
   return defaults;
 }
 
-function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: {
+function ElicitationCard({ request, asker, hold, answer, openBrowser }: {
   request: ElicitationRequest; asker: string | null; hold: Hold;
   answer: (key: string, action: Action, content: Record<string, JSONValue>, reason?: string) => void;
-  active: boolean;
   /** Open the page; none where the page is open already (#4141). */
   openBrowser: (() => void) | undefined;
 }) {
-  const card = useRef<HTMLElement>(null);
-  useCardKeys(card, active);
   const inert = hold.answered !== null || hold.down;
   // Each card is its own request (keyed by its id above), so its defaults are where it starts.
   // Filled in an effect instead, they landed after the first paint, and a choice made before
@@ -367,7 +336,8 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
   const step = useSignal(0);
   // No, because… (#4039): the decline being explained, by its key, while the card asks why.
   const because = useSignal<string | null>(null);
-  const title = elicitationTitle(request);
+  // The one question of a confirm card is its title (#5028).
+  const { title, message } = askHead(request);
   const go = (key: string, action: Action, content: Record<string, JSONValue> = {}, reason?: string) =>
     !inert && answer(key, action, content, reason?.trim() || undefined);
   /** One of the card's answers, by its key: its class beside `base`, held state and pending mark. */
@@ -378,7 +348,7 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
   const done = button("done"), gaveUp = button("gave-up"), none = button("none"), decline = button("decline");
   /** No, because…, beside the decline it explains. */
   const sayWhy = (key: string, attrs: Record<string, string> = {}) => (
-    <button aria-disabled={inert} {...attrs} onClick={() => !inert && (because.value = key)}>{declineReasonOpener}</button>
+    <button class="link" aria-disabled={inert} {...attrs} onClick={() => !inert && (because.value = key)}>{declineReasonOpener}</button>
   );
 
   let body;
@@ -407,11 +377,14 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
   } else if ("url" in request.mode) {
     const url = request.mode.url._0;
     body = (
-      <div class="options row-options">
-        {isSafeLink(url) && <a class="button prominent" href={url} target="_blank" rel="noopener noreferrer" data-default="">Open</a>}
+      <div class="ask-foot">
+        <span class="ask-decline">
+          <button class={`link ${gaveUp.class ?? ""}`.trim()} aria-disabled={gaveUp.disabled} {...numbered(1)} onClick={() => go("gave-up", "decline")}>Gave up{gaveUp.telling}</button>
+          {" · "}{sayWhy("gave-up", numbered(2))}
+        </span>
+        <span class="spacer" />
         <button class={done.class} aria-disabled={done.disabled} {...numbered(0)} onClick={() => go("done", "accept")}>Done{done.telling}</button>
-        <button class={gaveUp.class} aria-disabled={gaveUp.disabled} {...numbered(1)} onClick={() => go("gave-up", "decline")}>Gave up{gaveUp.telling}</button>
-        {sayWhy("gave-up", numbered(2))}
+        {isSafeLink(url) && <a class="button prominent" href={url} target="_blank" rel="noopener noreferrer" data-default="">Open</a>}
       </div>
     );
   } else {
@@ -434,15 +407,18 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
               );
             })}
           </div>
-          <div class="options">
+          <div class="ask-foot">
+            <span class="ask-decline">
+              <button class={`link ${decline.class ?? ""}`.trim()} aria-disabled={decline.disabled}
+                {...numbered(single.choices.length + (single.property.isRequired ? 0 : 1))}
+                onClick={() => go("decline", "decline")}>No thanks{decline.telling}</button>
+              {" · "}{sayWhy("decline", numbered(single.choices.length + (single.property.isRequired ? 1 : 2)))}
+            </span>
+            <span class="spacer" />
             {!single.property.isRequired && (
               <button class={none.class} aria-disabled={none.disabled} {...numbered(single.choices.length)}
                 onClick={() => go("none", "accept", { [single.property.name]: "" })}>No answer{none.telling}</button>
             )}
-            <button class={decline.class} aria-disabled={decline.disabled}
-              {...numbered(single.choices.length + (single.property.isRequired ? 0 : 1))}
-              onClick={() => go("decline", "decline")}>No thanks{decline.telling}</button>
-            {sayWhy("decline", numbered(single.choices.length + (single.property.isRequired ? 1 : 2)))}
           </div>
         </>
       );
@@ -462,17 +438,19 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
                 chose={() => { if (page < last) step.value = page + 1; }} />
             ))}
           </div>
-          <div class="form-row">
+          <div class="form-row ask-foot">
+            <span class="ask-decline">
+              <button class={`link ${decline.class ?? ""}`.trim()} aria-disabled={decline.disabled} onClick={() => go("decline", "decline")}>No thanks{decline.telling}</button>
+              {" · "}{sayWhy("decline")}
+            </span>
+            <span class="spacer" />
             {last > 0 && (
               <>
                 <button aria-label="Previous question" disabled={page === 0} onClick={() => (step.value = page - 1)}>‹</button>
                 <span class="quiet small">{page + 1}/{pages.length}</span>
               </>
             )}
-            <span class="spacer" />
             {page === last && problems[0] && <span class="quiet small">{problems[0]}</span>}
-            <button class={decline.class} aria-disabled={decline.disabled} onClick={() => go("decline", "decline")}>No thanks{decline.telling}</button>
-            {sayWhy("decline")}
             {page < last && <button onClick={() => (step.value = page + 1)}>Next</button>}
             {page === last && (() => {
               const submit = button("submit", "prominent");
@@ -486,19 +464,28 @@ function ElicitationCard({ request, asker, hold, answer, active, openBrowser }: 
       );
     }
   }
+  const glyph = request.handOff ? "hand" : request.secret ? "lock" : "url" in request.mode ? "globe" : "circle-help";
+  // The head says what is asked: the step to do, the secret's name, or the question (#5028).
+  const head = because.value === null && request.handOff ? request.handOff.step
+    : because.value === null && request.secret ? <code>{request.secret.name}</code>
+    : <Markdown text={title} />;
   return (
-    <section ref={card} class={cardClass(hold)} aria-label="Question">
-      {asker && <p class="quiet small asker">{asker}</p>}
-      {((!request.secret && !request.handOff) || because.value !== null) && <div class="strong"><Markdown text={title} /></div>}
-      {!request.secret && !request.handOff && because.value === null && request.message && request.message !== title && <Markdown text={request.message} />}
+    <Ask glyph={glyph} title={head} asker={asker} label="Question" inert={inertOf(hold)}>
+      {!request.secret && !request.handOff && because.value === null && message && <Markdown text={message} />}
       {body}
       <AnsweredNote answered={hold.answered} />
-    </section>
+    </Ask>
   );
 }
 
 /** One of a card's answers, as ElicitationCard's `button` gives it. */
 interface AnswerButton { class: string | undefined; disabled: boolean; telling: ComponentChildren }
+
+/** The secret card's one disclosure: the settings under it, by name. */
+function secretMoreWords(secret: ElicitationSecret): string {
+  const parts = [descriptionLabel, ...(secret.canBeSessionOnly ? ["session only"] : []), ...(secret.canAskBeforeUse ? ["ask before use"] : [])];
+  return parts.join(", ");
+}
 
 /** The control that opens DeclineReason, as the window's and the Remote's DeclineReasonField.opener. */
 const declineReasonOpener = "No, because…";
@@ -527,7 +514,7 @@ function DeclineReason({ inert, sent, back, send }: {
             }
           }} />
       </label>
-      <div class="form-row">
+      <div class="form-row ask-foot">
         <span class="spacer" />
         <button disabled={inert} onClick={back}>Back</button>
         <button class={sent.class} aria-disabled={sent.disabled} onClick={() => send(reason.value)}>Send{sent.telling}</button>
@@ -548,7 +535,6 @@ function HandOffField({ handOff, inert, open, recipient, done, cannot, send }: {
   const note = useSignal("");
   return (
     <>
-      <p class="strong secret"><span aria-hidden="true">✋ </span>{handOff.step}</p>
       {handOff.reason && <p class="secret">{handOff.reason}</p>}
       {/* A step in one of the agents' own Chrome windows (#5095): no page here, so say where. */}
       {handOff.window && <p class="small quiet">{handOffWindowWords(handOff.window, recipient)}</p>}
@@ -564,8 +550,8 @@ function HandOffField({ handOff, inert, open, recipient, done, cannot, send }: {
             }} />
         </label>
       )}
-      <div class="form-row">
-        {!saying.value && open && !handOff.window && <button class="prominent" disabled={inert} data-default="" onClick={open}>Open the page</button>}
+      <div class="form-row ask-foot">
+        {!saying.value && <span class="ask-decline"><button class="link" disabled={inert} onClick={() => (saying.value = true)}>Can't do it</button></span>}
         <span class="spacer" />
         {saying.value ? (
           <>
@@ -574,8 +560,8 @@ function HandOffField({ handOff, inert, open, recipient, done, cannot, send }: {
           </>
         ) : (
           <>
-            <button disabled={inert} onClick={() => (saying.value = true)}>Can't do it</button>
             <button class={done.class} aria-disabled={done.disabled} onClick={() => send(true, "")}>Done{done.telling}</button>
+            {open && !handOff.window && <button class="prominent" disabled={inert} data-default="" onClick={open}>Open the page</button>}
           </>
         )}
       </div>
@@ -606,7 +592,6 @@ function SecretField({ secret, reason, recipient, inert, save, decline, sayWhy, 
   const link = getIt(secret.url);
   return (
     <>
-      <p class="strong secret"><span aria-hidden="true">🔒 </span><code>{secret.name}</code></p>
       {reason && <p class="secret">{reason}</p>}
       {link && secret.url && <p class="secret"><a href={secret.url} target="_blank" rel="noopener noreferrer">{link}</a></p>}
       <label class="field">
@@ -621,6 +606,9 @@ function SecretField({ secret, reason, recipient, inert, save, decline, sayWhy, 
           }} />
         <span class="quiet small">{forSession ? keepingForSession(recipient) : keeping(secret, recipient)}</span>
       </label>
+      {/* The three extra settings fold under one line, so the card is half as tall (#5031). */}
+      <details class="secret-more">
+      <summary class="small">{secretMoreWords(secret)}</summary>
       <label class="field">
         <textarea aria-label={descriptionLabel} placeholder={descriptionPrompt} rows={2} disabled={inert} value={description.value}
           onInput={(e) => (description.value = (e.currentTarget as HTMLTextAreaElement).value)} />
@@ -643,10 +631,13 @@ function SecretField({ secret, reason, recipient, inert, save, decline, sayWhy, 
           <span class="quiet small">{askBeforeUseHint(askBeforeUse.value)}</span>
         </div>
       )}
-      <div class="form-row">
+      </details>
+      <div class="form-row ask-foot">
+        <span class="ask-decline">
+          <button class={`link ${decline.class ?? ""}`.trim()} aria-disabled={decline.disabled} onClick={() => send(null, false, null, "")}>No thanks{decline.telling}</button>
+          {" · "}{sayWhy}
+        </span>
         <span class="spacer" />
-        <button class={decline.class} aria-disabled={decline.disabled} onClick={() => send(null, false, null, "")}>No thanks{decline.telling}</button>
-        {sayWhy}
         <button class={save.class} disabled={!typed} aria-disabled={save.disabled} data-default=""
           onClick={() => send(typed, forSession, ask, description.value.trim())}>Save securely{save.telling}</button>
       </div>

@@ -86,17 +86,27 @@ enum Canned {
                   usage: Usage(used: 92_000, size: 200_000,
                                cost: Cost(amount: 1.84, currency: "USD")),
                   costToDate: ["USD": 1.84]),
-            Agent(id: working, runtimeID: "claude", cwd: agentsFolder,
-                  title: "Split the package in two", state: .running,
-                  createdAt: ago(18), lastActivityAt: ago(1),
-                  usage: Usage(used: 41_000, size: 200_000),
-                  costToDate: ["USD": 0.62],
-                  plans: [Plan(planID: "p1", entries: [
-                      PlanEntry(content: "Move the model across", status: .completed),
-                      PlanEntry(content: "Split the client in two", status: .completed),
-                      PlanEntry(content: "Build both platforms", status: .inProgress),
-                      PlanEntry(content: "Run the tests", status: .pending),
-                  ])]),
+            {
+                var agent = Agent(id: working, runtimeID: "claude", cwd: agentsFolder,
+                                  title: "Split the package in two", state: .running,
+                                  createdAt: ago(18), lastActivityAt: ago(1),
+                                  usage: Usage(used: 41_000, size: 200_000),
+                                  costToDate: ["USD": 0.62],
+                                  plans: [Plan(planID: "p1", entries: [
+                                      PlanEntry(content: "Move the model across", status: .completed),
+                                      PlanEntry(content: "Split the client in two", status: .completed),
+                                      PlanEntry(content: "Build both platforms", status: .inProgress),
+                                      PlanEntry(content: "Run the tests", status: .pending),
+                                  ])])
+                // The goal over the plan, one Now card at the top (#5033), and a subagent
+                // in the background, the Now card's detail at the foot.
+                agent.goal = Goal(objective: "Both platforms build from one package", status: .active,
+                                  tokensUsed: 41_000, tokenBudget: 200_000)
+                agent.background = [BackgroundItem(id: "sub-1", kind: .subagent, name: "reviewer",
+                                                   detail: "Review the split for missing imports",
+                                                   startedAt: ago(2))]
+                return agent
+            }(),
             Agent(id: crashed, runtimeID: "copilot", cwd: agentsFolder,
                   title: "Rename the suggestion service", state: .stopped,
                   createdAt: ago(190), lastActivityAt: ago(140),
@@ -259,7 +269,8 @@ enum Canned {
         guard agentID == waiting || agentID == working else { return entries }
         entries += [
             TranscriptEntry(at: ago(41), kind: .userMessage(
-                "Lay the remote out for a phone. Same three levels as the Mac, one at a time.")),
+                "Lay the remote out for a phone. Same three levels as the Mac, one at a time.\n\n"
+                    + "Keep the folder list first, and push the page from it.")),
             TranscriptEntry(at: ago(40), kind: .agentThought(
                 messageID: nil,
                 text: "The Mac ships two columns and a push, which is already the shape a phone wants.")),
@@ -293,7 +304,9 @@ enum Canned {
                 content: [.content(.text("Compiling AgentsKitCore\nBuild complete! (4.21s)"))]))),
             TranscriptEntry(at: ago(12), kind: .agentMessage(
                 messageID: nil,
-                text: "The list and the page are in. Next is the conversation, which is where the paging matters.")),
+                text: "The list and the page are in. Next is the conversation, which is where the paging matters.\n\n"
+                    + "What is left:\n\n- the conversation's paging\n- the prompt bar\n\n"
+                    + "> Same three levels as the Mac, one at a time.\n\nI keep to that.")),
             TranscriptEntry(at: ago(4), kind: .usageRecorded(
                 TurnUsage(totalTokens: 92_000, inputTokens: 81_000, outputTokens: 11_000,
                           cost: Cost(amount: 0.31, currency: "USD")))),

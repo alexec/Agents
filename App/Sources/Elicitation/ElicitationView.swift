@@ -27,23 +27,29 @@ struct ElicitationView: View {
     /// No, because… (#4039): the decline being explained, by its key, while the card asks why.
     @State private var because: String?
 
+    /// The Ask's head (#5031): the step to do, the secret's name, or the question.
+    private var headTitle: String {
+        if because == nil, let handOff = request.handOff { return handOff.step }
+        if because == nil, let secret = request.secret { return secret.name }
+        return request.title
+    }
+
+    private var glyph: String {
+        if request.handOff != nil { return "hand.raised" }
+        if request.secret != nil { return "key" }
+        if case .url = request.mode { return "globe" }
+        return "questionmark.circle"
+    }
+
     var body: some View {
-        GlassEffectContainer(spacing: 10) {
+        // Who is asking, by title and runtime (#121); Later at the head's end (#4234), on a
+        // card that is a request to the person.
+        let needRequest = model.work.requests.first { $0.id == request.id }
+        AskCard(icon: glyph, title: headTitle, asker: model.work.askerLine(request.agentID),
+                accessory: needRequest.map { AnyView(RequestCardLater(request: $0)) }) {
             VStack(alignment: .leading, spacing: 12) {
-                // Who is asking, by title and runtime (#121); Later at its end (#4234), on a
-                // card that is a request to the person.
-                let needRequest = model.work.requests.first { $0.id == request.id }
-                let asker = model.work.askerLine(request.agentID)
-                if asker != nil || needRequest != nil {
-                    HStack(spacing: 8) {
-                        if let asker { Text(asker).appText(.fine).foregroundStyle(Paper.secondary).lineLimit(1) }
-                        Spacer(minLength: 0)
-                        if let needRequest { RequestCardLater(request: needRequest) }
-                    }
-                }
                 if let because {
-                    // The question stays in view; the answers give way to the reason.
-                    MarkdownText(markdown: request.title).appText(.reading).fontWeight(.semibold)
+                    // The question stays in view, as the head; the answers give way to the reason.
                     DeclineReasonField(host: model.answerRecipient(request.agentID), sending: sending != nil,
                                        back: { self.because = nil }) { reason in
                         send(because, .decline, reason: reason)
@@ -70,7 +76,6 @@ struct ElicitationView: View {
                         }
                     }
                 } else {
-                    MarkdownText(markdown: request.title).appText(.reading).fontWeight(.semibold)
                     if let message = request.message, message != request.title {
                         MarkdownText(markdown: message).appText(.reading)
                     }
@@ -109,9 +114,6 @@ struct ElicitationView: View {
                 }
             }
             .allowsHitTesting(sending == nil)
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .paperRaised(in: RoundedRectangle(cornerRadius: 16))
         }
         // At the end of the conversation, in its column (#723).
         .chatColumn()
@@ -393,18 +395,23 @@ struct ElicitationView: View {
                         answer(single.property.name, with: .string(""))
                     }
                 }
-                // Not the same thing as answering with nothing, and the daemon
-                // already tells the two apart.
-                answerButton(title: "No thanks", description: nil, key: "decline", prominent: false,
-                             index: single.choices.count + (single.property.isRequired ? 0 : 1)) {
-                    send("decline", .decline)
-                }
-                // Saying why is a second step, so No thanks stays one click (#4039).
-                answerButton(title: DeclineReasonField.opener, description: nil, key: "because", prominent: false,
-                             index: single.choices.count + (single.property.isRequired ? 1 : 2)) {
-                    because = "decline"
-                }
             }
+            // The Ask's foot (#5031): the two ways to say no, as links on the left. Not the
+            // same thing as answering with nothing, and the daemon already tells the two
+            // apart; saying why is a second step, so No thanks stays one click (#4039).
+            Divider().overlay(Paper.rule)
+            HStack(spacing: 4) {
+                let first = single.choices.count + (single.property.isRequired ? 0 : 1)
+                AskDecline("No thanks") { send("decline", .decline) }
+                    .modifier(ElicitationNumberShortcut(index: first))
+                    .modifier(Held(sending: sending, key: "decline"))
+                if sending == "decline" { Telling(host: model.answerRecipient(request.agentID)) }
+                Text("·").foregroundStyle(.secondary)
+                AskDecline(DeclineReasonField.opener) { because = "decline" }
+                    .modifier(ElicitationNumberShortcut(index: first + 1))
+                    .modifier(Held(sending: sending))
+            }
+            .appText(.fine)
         }
     }
 
@@ -644,3 +651,4 @@ private struct ElicitationNumberShortcut: ViewModifier {
         }
     }
 }
+

@@ -14,6 +14,11 @@ struct AccountsPane: View {
     let state: UserScopeState
     /// Each of the person's machines' names, by id, for the not-backed-up warning.
     var machineNames: [String: String] = [:]
+    #if os(macOS)
+    /// Opens this window's own copy of a secret, for Details… (#5116); nil gives no Details….
+    var reveal: SecretReveal?
+    @State private var details: DaemonAPI.OutsideAccount?
+    #endif
 
     @State private var project = ""
     @State private var editing: DaemonAPI.OutsideAccount?
@@ -50,7 +55,7 @@ struct AccountsPane: View {
                 if let only, all.contains(where: { AccountsWords.secretName($0) != nil }) {
                     Section {
                         Label(SecretInfoWords.onlyMachineLine(only, names: machineNames), icon: "exclamationmark.triangle")
-                            .appText(.supporting).tinted(.attention)
+                            .appText(.supporting).tinted(.warning)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .paperListRow()
@@ -67,6 +72,14 @@ struct AccountsPane: View {
         .sheet(item: $editing) { account in
             AccountSheet(account: account) { await save(adding: $0, replacing: account) }.paperSheet()
         }
+        #if os(macOS)
+        .sheet(item: $details) { account in
+            if let reveal {
+                AccountDetailsSheet(account: account, rows: state.secrets?.secrets ?? [], reveal: reveal) { editing = account }
+                    .paperSheet()
+            }
+        }
+        #endif
         .confirmationDialog(removing.map { "Remove \($0.service)?" } ?? "",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
                             titleVisibility: .visible, presenting: removing) { account in
@@ -103,21 +116,48 @@ struct AccountsPane: View {
         await state.load(control)
     }
 
+    /// A row; on the Mac a press on its text opens its details (#5116). The text is the
+    /// `Button`, as a tap gesture on a row takes no real click; the menu sits beside it, an
+    /// element of its own.
     private func row(_ account: DaemonAPI.OutsideAccount, secrets: [DaemonAPI.UserSecretRow], oneMachine: Bool) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            #if os(macOS)
+            if reveal != nil {
+                Button { details = account } label: {
+                    rowText(account, secrets: secrets, oneMachine: oneMachine).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Shows its details")
+            } else {
+                rowText(account, secrets: secrets, oneMachine: oneMachine)
+            }
+            #else
+            rowText(account, secrets: secrets, oneMachine: oneMachine)
+            #endif
+            Menu {
+                #if os(macOS)
+                if reveal != nil {
+                    Button(AccountsWords.details) { details = account }
+                    Divider()
+                }
+                #endif
+                Button("Edit…") { editing = account }
+                Button("Remove…", role: .destructive) { removing = account }
+            } label: {
+                // A label, not only an icon, so VoiceOver and a walk find the menu (#5116).
+                Label("\(account.service) actions", icon: "ellipsis.circle").labelStyle(.iconOnly)
+            }
+            .fixedSize()
+        }
+    }
+
+    private func rowText(_ account: DaemonAPI.OutsideAccount, secrets: [DaemonAPI.UserSecretRow], oneMachine: Bool) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(account.service)
                 Spacer()
                 Text(AccountsWords.cost(account)).foregroundStyle(.secondary).monospacedDigit()
                 Text(AccountsWords.hint(account, rows: secrets)).appText(.code).foregroundStyle(.secondary)
-                Menu {
-                    Button("Edit…") { editing = account }
-                    Button("Remove…", role: .destructive) { removing = account }
-                } label: {
-                    Image(icon: "ellipsis.circle")
-                }
-                .fixedSize()
-                .accessibilityLabel("\(account.service) actions")
             }
             Text(AccountsWords.detail(account)).appText(.fine).foregroundStyle(.secondary)
             Text(AccountsWords.about(account)).appText(.fine).foregroundStyle(.secondary)
@@ -127,10 +167,10 @@ struct AccountsPane: View {
                 Label(AskBeforeUseWords.asks, icon: "hand.raised").appText(.fine).foregroundStyle(.secondary)
             }
             if let soon = AccountsWords.expiresSoon(account, now: Date()) {
-                Text(soon).appText(.fine).tinted(.attention)
+                Text(soon).appText(.fine).tinted(.warning)
             }
             if !oneMachine, let warning = AccountsWords.notBackedUp(account, rows: secrets, names: machineNames) {
-                Text("⚠ " + warning).appText(.fine).tinted(.attention)
+                Text("⚠ " + warning).appText(.fine).tinted(.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -203,6 +243,7 @@ private struct AccountSheet: View {
             Section {
                 field("Service", "service", "gitlab.com")
                 field("Address", "address", "name@example.com")
+                field("User name", "username", "When it is not the address")
                 field("Description", "description", "What it is for, and who uses it")
                 field("Plan", "plan", "Free")
                 field("Monthly cost (USD)", "cost", "0")

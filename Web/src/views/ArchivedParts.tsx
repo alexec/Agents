@@ -6,6 +6,7 @@ import { loadingMore as loadingMoreWords, staleStrip, type ArchivedState } from 
 import { BackToList } from "./BackToList";
 import { EmptyState, PlaceholderRows } from "./WorkParts";
 import { MessageBanner } from "./MessageKinds";
+import { Glyph } from "./Icon";
 
 export function ArchivedFrame({ kind, title, folderName, filterLabel, filter, onFilter, state, empty, noMatch, children }: {
   kind: "sessions" | "workflows"; title: string; folderName: string; filterLabel: string;
@@ -23,7 +24,7 @@ export function ArchivedFrame({ kind, title, folderName, filterLabel, filter, on
             : state.kind === "hostSilent" ? <div class="archived-middle"><StaleStrip /></div>
             : state.kind === "empty" ? (
               <div class="work-empty archived-middle">
-                <span class="archived-glyph" aria-hidden="true">{empty.mark}</span>
+                <Glyph of={empty.mark} class="archived-glyph" />
                 <p class="strong">{empty.title}</p>
                 <p class="quiet">{empty.line}</p>
               </div>

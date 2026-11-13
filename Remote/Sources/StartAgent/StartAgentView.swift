@@ -180,17 +180,17 @@ struct StartAgentView: View {
                     if !usable.isEmpty, personaAuto {
                         Text(Persona.autoLine(autoPick))
                             .appText(.supporting)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                     }
                     if let description = picked?.description {
                         Text(description)
                             .appText(.supporting)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                     }
                     ForEach(broken) { persona in
                         Text("\(persona.id).md: \(persona.problem ?? "")")
                             .appText(.supporting)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                     }
                 }
                 .multilineTextAlignment(.center)
@@ -362,7 +362,7 @@ struct StartAgentView: View {
                                 if model.isStarting {
                                     ProgressView()
                                 } else {
-                                    Image(systemName: "arrow.up")
+                                    Image(icon: "arrow.up")
                                         .appText(.reading).fontWeight(.semibold)
                                 }
                             }

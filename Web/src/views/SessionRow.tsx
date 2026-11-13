@@ -25,6 +25,7 @@ import { runningTool, runningToolLabel, sessionMark, type SessionMark } from "..
 import { isMuted, muteMark, mutedHelp, mutedWords } from "../model/mute";
 import { callLine } from "../model/turns";
 import { leadProgressSpoken } from "../model/leadProgress";
+import { Glyph, Icon } from "./Icon";
 
 const glyphs: Record<StatusShape, string> = { working: "", needsYou: "!", waiting: "", done: "✓", stopped: "■" };
 
@@ -37,7 +38,7 @@ export function StatusMark({ agent, comingBack = false }: { agent: Agent; coming
       {status.shape === "working" && <WorkingMark tool={runningTool(agent)} />}
       {status.shape === "waiting" && <WaitingMark kind={waitKind(agent)} />}
       {status.shape !== "working" && status.shape !== "waiting"
-        && <span class="glyph" aria-hidden="true">{glyphs[status.shape]}</span>}
+        && <Glyph of={glyphs[status.shape]} class="glyph" />}
     </span>
   );
 }
@@ -53,7 +54,7 @@ const markWords: Record<SessionMark, string> = { needsYou: "Needs you", working:
  */
 export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comingBack?: boolean }) {
   if (agent.state === "archived") {
-    return <span class="sidebar-mark archived" role="img" aria-label="Archived" title="Archived">▣</span>;
+    return <span class="sidebar-mark archived" role="img" aria-label="Archived" title="Archived"><Icon name="archive" /></span>;
   }
   const status = rowStatus(agent, comingBack);
   const mark = comingBack ? null : sessionMark(agent);
@@ -62,13 +63,13 @@ export function SidebarMark({ agent, comingBack = false }: { agent: Agent; comin
   const words = tool !== null ? runningToolLabel(tool) : mark === "needsYou" ? status.words : markWords[mark];
   return (
     <span class={`sidebar-mark ${mark}`} role="img" aria-label={words} title={words}>
-      {mark === "needsYou" && <span class="glyph" aria-hidden="true">✋&#xFE0E;</span>}
+      {mark === "needsYou" && <Icon name="hand" class="glyph" />}
       {(mark === "working" || mark === "tool") && <WorkingMark tool={tool} />}
-      {mark === "queued" && <span class="glyph" aria-hidden="true">≡</span>}
+      {mark === "queued" && <Icon name="list-ordered" class="glyph" />}
       {mark === "waiting" && <WaitingMark kind={waitKind(agent)} />}
-      {mark === "paused" && <span class="glyph" aria-hidden="true">⏸&#xFE0E;</span>}
-      {mark === "done" && <span class="glyph" aria-hidden="true">✓&#xFE0E;</span>}
-      {mark === "asksToArchive" && <span class="glyph" aria-hidden="true">🗃&#xFE0E;</span>}
+      {mark === "paused" && <Icon name="circle-pause" class="glyph" />}
+      {mark === "done" && <Icon name="check" class="glyph" />}
+      {mark === "asksToArchive" && <Icon name="archive" class="glyph" />}
     </span>
   );
 }

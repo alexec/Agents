@@ -41,7 +41,7 @@ struct SignInButtons: View {
                     Button { Task { await signInWithOrg(org.id) } } label: {
                         Label(SignInWords.orgButton(org.name), icon: "building.2").frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.paperProminent)
                     .controlSize(.large)
                     .disabled(busy != nil)
                 }
@@ -120,7 +120,7 @@ struct SignInButtons: View {
                     .disabled(busy != nil || !email.contains("@"))
             }
             if let emailProblem {
-                Text(emailProblem).appText(.supporting).tinted(.attention).fixedSize(horizontal: false, vertical: true)
+                Text(emailProblem).appText(.supporting).tinted(.warning).fixedSize(horizontal: false, vertical: true)
             }
         }
     }

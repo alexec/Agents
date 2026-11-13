@@ -68,7 +68,7 @@ private struct Provenance: View {
              ? "As the agent left it. One change, in this conversation."
              : "As the agent left it. \(count) changes, newest first.")
             .appText(.fine)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Paper.secondary)
     }
 }
 
@@ -106,7 +106,7 @@ private struct AfterTheEdit: View {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
                     Text("\(index + 1)")
                         .appText(.fine).monospacedDigit()
-                        .foregroundStyle(.tertiary)
+                        .foregroundStyle(Paper.tertiary)
                         .frame(width: 34, alignment: .trailing)
                         .accessibilityHidden(true)
                     Text(line.isEmpty ? " " : String(line))
@@ -118,7 +118,7 @@ private struct AfterTheEdit: View {
             if lines.count > Self.limit {
                 Text("\(lines.count - Self.limit) more lines, on your Mac")
                     .appText(.fine)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Paper.tertiary)
                     .padding(.top, 8)
             }
         }
@@ -140,7 +140,7 @@ private struct Unseen: View {
             Text("The iPad shows a file as the agent's own changes describe it. "
                  + "A file it only read is on your Mac.")
                 .appText(.fine)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

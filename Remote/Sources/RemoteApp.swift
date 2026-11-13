@@ -27,6 +27,8 @@ struct RemoteApp: App {
     @State private var model = RemoteModel(link: RemoteApp.link())
 
     init() {
+        // Paper v2's faces (#4992), before the first view draws.
+        PaperFonts.register()
         #if DEBUG && targetEnvironment(simulator)
         // The walk simulator's socket (#1182), for run-app's `walk.py remote`; only with -walk.
         WalkServer.startIfWalking()
@@ -372,7 +374,7 @@ struct RemoteView: View {
                         Button {
                             showsFolderTerminal = true
                         } label: {
-                            Label("Folder Terminal", systemImage: "apple.terminal")
+                            Label("Folder Terminal", icon: "apple.terminal")
                         }
                         .keyboardShortcut("`", modifiers: .control)
                     }

@@ -218,7 +218,7 @@ struct FolderListView: View {
             // person's connectors, secrets and outside accounts are in Settings ▸ You.
             Section(isExpanded: $showsStatus) {
                 RuntimesRow().activityIcon("cpu", warns: runtimesTally.map { $0.noneWorking || $0.isLow } ?? false,
-                                           tint: runtimesTally?.isLow == true ? .attention : .failure)
+                                           tint: runtimesTally?.isLow == true ? .warning : .failure)
                     .appText(.supporting).sidebarInk(.runtimes).tag(SidebarItem.runtimes)
                 EventsRow().activityIcon("list.bullet.rectangle")
                     .appText(.supporting).sidebarInk(.events).tag(SidebarItem.events)
@@ -1455,21 +1455,6 @@ private struct SidebarInk: ViewModifier {
         content.listRowBackground(Group {
             if picks.items.contains(item) { PaperSelectionRow() }
         })
-    }
-}
-
-/// The selection grey with the accent's bar, inset as the system's sidebar selection is.
-struct PaperSelectionRow: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: Paper.Radius.control)
-            .fill(Paper.selection)
-            .overlay(alignment: .leading) {
-                UnevenRoundedRectangle(topLeadingRadius: Paper.Radius.control,
-                                       bottomLeadingRadius: Paper.Radius.control)
-                    .fill(Paper.accent)
-                    .frame(width: 3)
-            }
-            .padding(.horizontal, 10)
     }
 }
 

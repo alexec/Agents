@@ -83,7 +83,7 @@ struct AgentGroupTests {
         var blocked = agent(.finished, report: .waiting, endedReason: .endTurn)
         #expect(blocked.group() == .finished)
         blocked.report = WorkReport(outcome: .waiting, message: "Waiting", at: Date(),
-                                    block: Block(checkAgainAt: Date().addingTimeInterval(600)))
+                                    block: Block(deadline: Date().addingTimeInterval(600)))
         #expect(blocked.group() == .waiting)
         blocked.isUnread = true
         #expect(blocked.group() == .waiting, "an unread wait still carries on by itself")

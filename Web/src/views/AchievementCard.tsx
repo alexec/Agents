@@ -4,6 +4,7 @@
 import { type AchievementID, achievementList, achievementsSeen } from "../model/achievements";
 import { go } from "../route";
 import type { Store } from "../model/store";
+import { Icon } from "./Icon";
 
 /** The one-time card for an achievement just earned on this Mac's host. No notification is sent. */
 export function AchievementCard({ store }: { store: Store }) {
@@ -16,7 +17,7 @@ export function AchievementCard({ store }: { store: Store }) {
   return (
     <aside class="card achievement-card" aria-label={`Achievement earned: ${achievement.title}`}>
       <div class="achievement-card-head">
-        <span class="achievement-mark" aria-hidden="true">✓</span>
+        <Icon name="check" class="achievement-mark" />
         <span>
           <span class="quiet small">Achievement</span>
           <span class="achievement-title">{achievement.title}</span>

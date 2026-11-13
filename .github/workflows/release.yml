@@ -10,7 +10,7 @@
 #                                          servers Agents ships (#700)
 #   SHA256SUMS
 #
-# and the control plane's image, ghcr.io/alexec/agents-control:<version> (#2140), signed.
+# and the control plane's image, ghcr.io/<owner>/agents-control:<version> (#2140, #4958), signed.
 #
 # Beside it, the testflight job (#914) uploads the Remote to TestFlight as an .ipa, version <tag>
 # and build <run number>, and waits until App Store Connect has processed it. The Mac is not in
@@ -88,10 +88,12 @@ jobs:
           retention-days: 3
 
   # The control plane's image (#2140): deploy/Containerfile for linux/amd64 and linux/arm64,
-  # pushed to ghcr.io/alexec/agents-control as <version>, and for a release X.Y.Z also as X.Y
+  # pushed to ghcr.io/<owner>/agents-control as <version>, and for a release X.Y.Z also as X.Y
   # and latest. It carries an SBOM and provenance (BuildKit's attestations), and a keyless
   # cosign signature made with this run's OIDC identity: docs/how-to/run-the-control-plane-in-the-cloud.md
   # says how to check it. GITHUB_TOKEN pushes it: no account or secret of our own.
+  # <owner> is the repo's owner (#4958): a package belongs to its owner, and a release can
+  # push only to its own owner's packages, so after a transfer the new owner gets the image.
   image:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -100,7 +102,7 @@ jobs:
       packages: write
       id-token: write
     env:
-      IMAGE: ghcr.io/alexec/agents-control
+      IMAGE: ghcr.io/${{ github.repository_owner }}/agents-control
     steps:
       - uses: actions/checkout@v6
         with:

@@ -240,9 +240,7 @@ public enum TimeMark: Sendable, Hashable {
         }
         // `release_resource` ends with `lease_resource`: a release is quick, and a tool.
         if name.hasSuffix(AppTool.releaseResource) { return .tools }
-        if name.hasSuffix(AppTool.waitForEvent)
-            // check_again went in #4843; an old transcript still names it.
-            || name.hasSuffix("check_again") || name.hasSuffix(AppTool.leaseResource) { return .others }
+        if name.hasSuffix(AppTool.waitForEvent) || name.hasSuffix(AppTool.leaseResource) { return .others }
         return .tools
     }
 

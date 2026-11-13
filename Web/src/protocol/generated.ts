@@ -1216,7 +1216,8 @@ export type BackupTarget =
 
 export interface Block {
   waits: Wait[];
-  checkAgainAt?: WireDate;
+  /** When the wait ends if its sessions have not (#5152; was checkAgainAt). */
+  deadline?: WireDate;
   wakeOn?: BlockWakeOn;
   clearedAt?: WireDate;
   clearedBy?: BlockClearing;
@@ -6612,6 +6613,32 @@ export type LiveSource =
   | "simulator";
 
 /**
+ * A secret this machine keeps for itself (#5122): an agent saved it (ask_secret, capture_secret,
+ * generate_secret) or a connector's form set it. Every session's agent on this machine can name it.
+ * No value.
+ */
+export interface LocalSecret {
+  name: string;
+  setAt: WireDate;
+  lastOp?: SecretLastOp;
+  /** Always false: a secret this machine keeps for itself is on this machine only. */
+  backedUp?: boolean;
+  /** Ask before use (#4014): a person approves each use (#4015). Left out is off. */
+  needsApproval?: boolean;
+  /**
+   * A secret's description (#4167): one or two sentences on what it is and what it is for, such as
+   * which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a
+   * value. Left out when it has none.
+   */
+  description?: string;
+}
+
+/** secrets/localList (#5122): every secret this machine keeps for itself, by name. No value. */
+export interface LocalSecrets {
+  secrets: LocalSecret[];
+}
+
+/**
  * A person's machine lock (#3399, specs/3399-machine-lock): its chain of entries, the root first.
  * lock/get, and machine/lock to a machine.
  */
@@ -7914,9 +7941,39 @@ export interface MessagesError {
 }
 
 /**
+ * messages/markAllRead (#5137): mark every conversation of folder's messaging connectors read, or
+ * of every folder's when folder is absent.
+ */
+export interface MessagesMarkAllReadRequest {
+  folder?: string;
+}
+
+/**
+ * One connector that messages/markAllRead marked read (#5137): its name in mcp.json, a folder that
+ * reaches it, and how many messages it marked.
+ */
+export interface MessagesMarked {
+  server: string;
+  folder: string;
+  marked: number;
+}
+
+/**
+ * messages/markAllRead (#5137): the connectors that marked their conversations read, and those that
+ * could not, with why. A connector with no mark_conversation_read (its service gives no read state)
+ * is in neither.
+ */
+export interface MessagesMarkedAllRead {
+  marked: MessagesMarked[];
+  errors?: MessagesError[];
+}
+
+/**
  * messages/read (#4343): one page of a conversation's messages, newest first, as the connector's
  * read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true:
- * every text is outside content.
+ * every text is outside content. markedRead (#5137): the connector's mark_conversation_read marked
+ * the conversation read on its service, so a client sets its unread count to 0; absent when the
+ * connector cannot mark read, on an older page, and on one thread's read.
  */
 export interface MessagesRead {
   server: string;
@@ -7925,6 +7982,7 @@ export interface MessagesRead {
   messages: MessagingMessage[];
   cursor?: string;
   untrusted: boolean;
+  markedRead?: boolean;
 }
 
 /**
@@ -8018,6 +8076,21 @@ export interface MessagingListRequest {
   cursor?: string;
   limit?: number;
   unread?: boolean;
+}
+
+/**
+ * mark_conversation_read's input (#5137, docs/reference/messaging-contract.md): conversation, a
+ * conversation's id from list_conversations, marks its messages read on the service; all: true
+ * marks every conversation that list_conversations lists with no input. One of the two.
+ */
+export interface MessagingMarkReadRequest {
+  conversation?: string;
+  all?: boolean;
+}
+
+/** mark_conversation_read's structuredContent (#5137): how many messages it marked read. */
+export interface MessagingMarkedRead {
+  marked: number;
 }
 
 /**
@@ -8811,6 +8884,11 @@ export interface OutsideAccount {
   description?: string;
   /** The address it signs in with. */
   address?: string;
+  /**
+   * The user name it signs in with, when that is not the address (#5116). Plain text, never a
+   * secret. Absent when not set.
+   */
+  username?: string;
   /** Free, Pro… */
   plan?: string;
   /** What it costs a month, in US dollars. Absent when not known. */
@@ -15156,6 +15234,7 @@ export interface Methods {
   "mcp/setToolLevel": { params: MCPSetToolLevelRequest; result: MCPToolsAnswer };
   "mcp/tools": { params: MCPToolsRequest; result: MCPToolsAnswer };
   "messages/conversations": { params: MessagesConversationsRequest; result: MessagesConversations };
+  "messages/markAllRead": { params: MessagesMarkAllReadRequest; result: MessagesMarkedAllRead };
   "messages/read": { params: MessagesReadRequest; result: MessagesRead };
   "messages/reply": { params: MessagesReplyRequest; result: MessagesReplied };
   "modes/remembered": { params: Empty; result: Record<string, JSONValue> };
@@ -15276,6 +15355,7 @@ export interface Methods {
   "scim/tokens/revoke": { params: SCIMTokenRequest; result: Empty };
   "sealing/add": { params: SealingAdd; result: Empty };
   "sealing/work": { params: Empty; result: SealingWork };
+  "secrets/localList": { params: Empty; result: LocalSecrets };
   "secrets/sessionList": { params: Empty; result: SessionSecrets };
   "secrets/sessionRemove": { params: SessionSecretRemoveRequest; result: SessionSecrets };
   "secrets/sessionSet": { params: SessionSecretSetRequest; result: SessionSecrets };
@@ -15598,6 +15678,7 @@ export const MethodTarget = {
   "mcp/setToolLevel": "host",
   "mcp/tools": "host",
   "messages/conversations": "host",
+  "messages/markAllRead": "host",
   "messages/read": "host",
   "messages/reply": "host",
   "modes/remembered": "host",
@@ -15718,6 +15799,7 @@ export const MethodTarget = {
   "scim/tokens/revoke": "control",
   "sealing/add": "control",
   "sealing/work": "control",
+  "secrets/localList": "host",
   "secrets/sessionList": "host",
   "secrets/sessionRemove": "host",
   "secrets/sessionSet": "host",
@@ -15959,7 +16041,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BackupStoreList: { required: ["backups"], optional: [] },
   BackupStorePart: { required: ["name", "part", "data"], optional: [] },
   BackupStorePartRequest: { required: ["id", "part"], optional: [] },
-  Block: { required: ["waits"], optional: ["checkAgainAt", "wakeOn", "clearedAt", "clearedBy"] },
+  Block: { required: ["waits"], optional: ["deadline", "wakeOn", "clearedAt", "clearedBy"] },
   BotCaps: { required: ["user", "caps"], optional: ["group"] },
   BotMade: { required: ["user"], optional: [] },
   BotMake: { required: ["name", "group"], optional: ["caps"] },
@@ -16367,6 +16449,8 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LiveAgent: { required: ["host", "hostName", "owner", "ownerName", "bot", "agent", "runtime", "state"], optional: ["waitsOnOthers", "workflow", "since", "costToDate", "heardAt"] },
   LiveBoard: { required: ["agents"], optional: [] },
   LiveFrame: { required: ["source", "agentID", "capturedAt"], optional: ["image", "locked", "narration", "title", "width", "height"] },
+  LocalSecret: { required: ["name", "setAt"], optional: ["lastOp", "backedUp", "needsApproval", "description"] },
+  LocalSecrets: { required: ["secrets"], optional: [] },
   Lock: { required: ["person", "entries"], optional: [] },
   LockAdd: { required: ["entries"], optional: [] },
   LockBody: { required: ["v", "kind", "person", "signer", "at", "key"], optional: ["previous", "sealingKey", "id", "name", "clientKind", "expires", "sealed"] },
@@ -16485,13 +16569,18 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MessagesConversations: { required: ["conversations"], optional: ["cursor", "errors"] },
   MessagesConversationsRequest: { required: [], optional: ["folder", "cursor", "limit", "unread"] },
   MessagesError: { required: ["server", "folder", "message"], optional: [] },
-  MessagesRead: { required: ["server", "folder", "conversation", "messages", "untrusted"], optional: ["cursor"] },
+  MessagesMarkAllReadRequest: { required: [], optional: ["folder"] },
+  MessagesMarked: { required: ["server", "folder", "marked"], optional: [] },
+  MessagesMarkedAllRead: { required: ["marked"], optional: ["errors"] },
+  MessagesRead: { required: ["server", "folder", "conversation", "messages", "untrusted"], optional: ["cursor", "markedRead"] },
   MessagesReadRequest: { required: ["server", "folder", "conversation"], optional: ["cursor", "thread", "limit"] },
   MessagesReplied: { required: ["server", "folder", "conversation", "message"], optional: [] },
   MessagesReplyRequest: { required: ["server", "folder", "conversation", "text"], optional: ["thread"] },
   MessagingConversation: { required: ["source", "id", "title", "kind"], optional: ["unread", "lastActivity", "sender", "link"] },
   MessagingConversations: { required: ["conversations"], optional: ["cursor", "replyAs"] },
   MessagingListRequest: { required: [], optional: ["cursor", "limit", "unread"] },
+  MessagingMarkReadRequest: { required: [], optional: ["conversation", "all"] },
+  MessagingMarkedRead: { required: ["marked"], optional: [] },
   MessagingMessage: { required: ["id", "conversation", "sender", "time", "text"], optional: ["thread", "link"] },
   MessagingMessages: { required: ["conversation", "messages", "untrusted"], optional: ["cursor"] },
   MessagingReadRequest: { required: ["conversation"], optional: ["cursor", "thread", "limit"] },
@@ -16542,7 +16631,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OrgRoutesApplied: { required: ["routes"], optional: [] },
   OrgRoutesLeft: { required: ["host", "name", "user", "routes"], optional: [] },
   OrgRoutesMine: { required: ["routes"], optional: [] },
-  OutsideAccount: { required: ["service"], optional: ["description", "address", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "edited", "lastOp", "tokenExpires", "notes", "projects", "askBeforeUse"] },
+  OutsideAccount: { required: ["service"], optional: ["description", "address", "username", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "edited", "lastOp", "tokenExpires", "notes", "projects", "askBeforeUse"] },
   OutsideAccounts: { required: ["accounts"], optional: [] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
   PassThroughName: { required: ["name"], optional: ["runtime", "setBy"] },

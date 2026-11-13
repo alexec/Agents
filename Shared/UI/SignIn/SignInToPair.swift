@@ -47,7 +47,7 @@ struct SignInToPair: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if suspended {
-                Text(SignInWords.suspendedLine).appText(.supporting).tinted(.attention)
+                Text(SignInWords.suspendedLine).appText(.supporting).tinted(.warning)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let asking {
@@ -75,11 +75,11 @@ struct SignInToPair: View {
                 }
             }
             if let problem {
-                Text(problem).appText(.supporting).tinted(.attention).fixedSize(horizontal: false, vertical: true)
+                Text(problem).appText(.supporting).tinted(.warning).fixedSize(horizontal: false, vertical: true)
             }
             if let required, asking == nil, attempt == nil {
                 Button(SignInWords.orgButton(required.name), action: start)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.paperProminent)
                     .disabled(Self.url(address) == nil)
             }
             if attempt != nil, asking != nil || waitingCode != nil {

@@ -11,6 +11,7 @@ import type { Store } from "../model/store";
 import { go } from "../route";
 import { readingCounts } from "./Review";
 import { policyChangeButtons } from "../model/policyLayers";
+import { Ask } from "./Ask";
 
 /** Every guarded change asked here: in `session`, or of the folder `folder` when there is none. */
 export function GuardedChangeCards({ store, host, where, down = false }: {
@@ -73,18 +74,16 @@ export function GuardedChangeCard({ store, host, folder, change, down }: {
   const held = !reading.value || busy.value || down;
   const counts = reading.value ? readingCounts(reading.value) : undefined;
   const words = change.policy ? policyChangeButtons(change.policy) : { allow: "Keep", undo: "Undo", review: "Review…" };
+  // An Ask (#5031): who changed what as the title, the counts as the asker's place, Review… on the left.
   return (
-    <div class="card guarded-change" role="alert" aria-label={`Keep the change to ${change.path}?`}>
-      <p class="strong">{guardedHeadline(change)}</p>
-      {change.policy && <p>{change.policy.words}</p>}
-      <p class="guarded-answers">
-        {counts ? <span class="quiet small counts" aria-label={`${counts.added} lines added, ${counts.removed} removed`}>
-          +{counts.added} −{counts.removed}</span> : <span class="quiet small">Reading the change…</span>}
-        <span class="spacer" />
-        <button onClick={() => go({ host, folder: folder, review: guardedApprovalID(change) })}>{words.review}</button>
+    <Ask glyph="file-text" title={guardedHeadline(change)} label={`Keep the change to ${change.path}?`} alert extra="guarded-change"
+      asker={counts ? `+${counts.added} −${counts.removed}` : "Reading the change…"}
+      decline={<button class="link" onClick={() => go({ host, folder: folder, review: guardedApprovalID(change) })}>{words.review}</button>}
+      buttons={<>
         <button disabled={held} onClick={() => answer(false)}>{words.undo}</button>
-        <button class="prominent" disabled={held} onClick={() => answer(true)}>{words.allow}</button>
-      </p>
-    </div>
+        <button class="prominent" disabled={held} data-default="" onClick={() => answer(true)}>{words.allow}</button>
+      </>}>
+      {change.policy && <p>{change.policy.words}</p>}
+    </Ask>
   );
 }

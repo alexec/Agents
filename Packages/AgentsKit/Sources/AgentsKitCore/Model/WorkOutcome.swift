@@ -188,10 +188,10 @@ public struct WorkReport: Codable, Hashable, Sendable {
     }
 
     /// An open block the app will clear by itself: it names agents to wait for, or a
-    /// time to check again. The rest — a block that named nothing and gave no time, which
+    /// deadline. The rest — a block that named nothing and gave no time, which
     /// only an old record has — is done (#1916).
     public var resumesByItself: Bool {
         guard isOpenBlock, let block else { return false }
-        return !block.waits.isEmpty || block.checkAgainAt != nil
+        return !block.waits.isEmpty || block.deadline != nil
     }
 }

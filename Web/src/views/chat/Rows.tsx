@@ -29,9 +29,12 @@ import type { Shown } from "../../model/shownFile";
 import { continueWithout, keepStopped, sandboxCard } from "../../model/sandboxWords";
 import { OrgPolicyLine } from "../OrgPolicyLine";
 import { PolicyStopCard } from "./PolicyStopCard";
+import { Ask } from "../Ask";
 import { TurnChangesCard } from "./TurnChangesCard";
 import { memo } from "../../render/memo";
 import { terminalOutput } from "../../model/onTheMac";
+import { Icon } from "../Icon";
+import { nowPlan } from "../../model/nowWords";
 
 /** The text of a message's blocks: text blocks as Markdown, anything else named. */
 export function Blocks({ blocks, text }: { blocks: ContentBlock[] | undefined; text: string }) {
@@ -98,9 +101,23 @@ function Exchanged({ title, value }: { title: string; value: JSONValue }) {
   return <div><p class="faint">{title}</p>{structured ? <pre class="code">{highlightCode(text, "yaml")}</pre> : <pre>{text}</pre>}</div>;
 }
 
+/** The plan as the agent sent it, in the transcript: one line, "Plan · 5 steps", that opens to the steps then. */
+function PlanLine({ plan }: { plan: Plan }) {
+  const open = useSignal(false);
+  return (
+    <div class="plan-line-entry">
+      <button class="plan-line-head" aria-expanded={open.value} onClick={() => (open.value = !open.value)}>
+        <Icon name="square-check" /> <span>{nowPlan(plan)}</span>
+        <Icon name={open.value ? "chevron-down" : "chevron-right"} class="chevron" />
+      </button>
+      {open.value && <PlanView plan={plan} />}
+    </div>
+  );
+}
+
 /** ChatBlocks' PlanView: a withdrawn plan is struck through, and says the agent dropped it (#252). */
 export function PlanView({ plan }: { plan: Plan }) {
-  const marks = { pending: "○", in_progress: "◐", completed: "●" } as const;
+  const marks = { pending: "circle", in_progress: "circle-dot", completed: "circle-check" } as const;
   const spoken = { pending: "To do", in_progress: "Doing now", completed: "Done" } as const;
   const withdrawn = plan.state === "withdrawn";
   return (
@@ -108,7 +125,7 @@ export function PlanView({ plan }: { plan: Plan }) {
       <ul class="plan" aria-label="Plan">
         {plan.entries.map((entry, index) => (
           <li key={index} class={entry.status} aria-label={`${withdrawn ? "Dropped" : spoken[entry.status]}: ${entry.content}`}>
-            <span class="mark" aria-hidden="true">{marks[entry.status]}</span> <span class="content">{entry.content}</span>
+            <Icon name={marks[entry.status]} class="mark" /> <span class="content">{entry.content}</span>
           </li>
         ))}
       </ul>
@@ -251,35 +268,46 @@ function ToolRun({ calls, background }: { calls: ToolCall[]; background: readonl
 }
 
 /**
- * SandboxFailureCard (064, #253): what happened, what Continue without sandbox would change, and
- * the two answers while the card waits. An answered or superseded card keeps saying what happened.
+ * SandboxFailureCard (064, #253): what happened, on the record. While the agent waits on an answer,
+ * the answers are an Ask at the end of the chat (SandboxAsk, #5031), not here.
  */
 function SandboxFailureCard({ record }: { record: SandboxFailureRecord }) {
   const actions = useContext(CallActionsContext);
-  const sending = useSignal(false);
   const waiting = actions?.answerSandbox !== undefined && actions.waitingSandbox !== undefined
     && JSON.stringify(actions.waitingSandbox) === JSON.stringify(record);
   const words = sandboxCard(record);
-  const answer = (carryOn: boolean) => {
-    sending.value = true;
-    void actions!.answerSandbox!(carryOn).finally(() => (sending.value = false));
-  };
   return (
-    <div class={`note switch sandbox-failure${waiting ? " waiting" : ""}`} role={waiting ? "alert" : undefined}>
+    <div class="note switch sandbox-failure">
       <p class="strong">{words.title}</p>
       <p>{words.body}</p>
       {record.detail && <details><summary class="quiet">Show error details</summary><pre>{record.detail}</pre></details>}
-      {(waiting || !record.recoveryOffered) && <p class="quiet">{words.offer}</p>}
+      {!waiting && !record.recoveryOffered && <p class="quiet">{words.offer}</p>}
       <OrgPolicyLine mark={actions?.sandboxSetBy} />
-      {waiting && (
-        <p class="answers">
-          <button disabled={sending.value} onClick={() => answer(false)}>{keepStopped}</button>
-          {record.recoveryOffered && !actions?.sandboxSetBy && (
-            <button class="prominent" disabled={sending.value} onClick={() => answer(true)}>{continueWithout}</button>
-          )}
-        </p>
-      )}
     </div>
+  );
+}
+
+/** The sandbox failure the agent waits on (#253), as an Ask (#5031): Keep stopped, or Continue without sandbox. */
+export function SandboxAsk({ record, setBy, answer }: {
+  record: SandboxFailureRecord; setBy: PolicySetBy | undefined; answer: (carryOn: boolean) => Promise<void>;
+}) {
+  const sending = useSignal(false);
+  const words = sandboxCard(record);
+  const send = (carryOn: boolean) => {
+    sending.value = true;
+    void answer(carryOn).finally(() => (sending.value = false));
+  };
+  const offered = record.recoveryOffered && !setBy;
+  return (
+    <Ask glyph="triangle-alert" title={words.title} label={words.title} alert extra="sandbox-ask"
+      decline={offered && <button class="link" disabled={sending.value} onClick={() => send(false)}>{keepStopped}</button>}
+      buttons={offered
+        ? <button class="prominent" disabled={sending.value} data-default="" onClick={() => send(true)}>{continueWithout}</button>
+        : <button class="prominent" disabled={sending.value} data-default="" onClick={() => send(false)}>{keepStopped}</button>}>
+      <p class="quiet small">{words.offer}</p>
+      {record.detail && <details><summary class="quiet small">Show error details</summary><pre>{record.detail}</pre></details>}
+      <OrgPolicyLine mark={setBy} />
+    </Ask>
   );
 }
 
@@ -374,7 +402,8 @@ function entryBody(entry: TranscriptEntry, from: (sender: MessageSender | undefi
     case "toolCallUpdate":
       return <p class="quiet">{callLine((fields(entry, "toolCall") ?? fields(entry, "toolCallUpdate"))!._0)}</p>;
     case "planUpdated":
-      return <PlanView plan={fields(entry, "planUpdated")!._0} />;
+      // One line that opens to the steps (#5033): the plan as it is now is in the top Now card.
+      return <PlanLine plan={fields(entry, "planUpdated")!._0} />;
     case "servedRequest": {
       const request = fields(entry, "servedRequest")!._0;
       const what = "readFile" in request.kind ? `Read ${request.kind.readFile.path.split("/").pop()}`
@@ -435,7 +464,7 @@ function entryBody(entry: TranscriptEntry, from: (sender: MessageSender | undefi
       return <SandboxFailureCard record={fields(entry, "sandboxFailure")!._0} />;
     case "policyStopped":
       // A rule stopped this agent (#2957, FR-025): the rule, the layer that decides, and where to change it.
-      return <PolicyStopCard refusal={fields(entry, "policyStopped")!._0} />;
+      return <PolicyStopCard refusal={fields(entry, "policyStopped")!._0} entryID={entry.id} />;
     case "appView":
       return <AppView call={fields(entry, "appView")!._0} />;
     case "fileShown":
@@ -447,7 +476,7 @@ function entryBody(entry: TranscriptEntry, from: (sender: MessageSender | undefi
       const notice = fields(entry, "notified")!._0;
       return (
         <div class="notice-line">
-          <span class="notice-bell" aria-hidden="true">🔔︎</span>
+          <Icon name="bell" class="notice-bell" />
           <div>
             <p class="notice-title">{notice.title}</p>
             {notice.body !== undefined && <p class="notice-body">{notice.body}</p>}

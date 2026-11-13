@@ -22,7 +22,7 @@ struct RemoteMoveToMachineSheet: View {
             Form {
                 if targets.isEmpty {
                     Section {
-                        Text(MoveToMachineWords.noTargets).foregroundStyle(.secondary)
+                        Text(MoveToMachineWords.noTargets).foregroundStyle(Paper.secondary)
                     }
                 } else {
                     Section {
@@ -97,7 +97,7 @@ struct MoveToMachineButton: View {
 
     var body: some View {
         if model.moveTargets(for: agent) != nil {
-            Button(MoveToMachineWords.menu, systemImage: MoveToMachineWords.symbol) { model.movingToMachine = agent }
+            Button(MoveToMachineWords.menu, icon: MoveToMachineWords.symbol) { model.movingToMachine = agent }
                 .disabled(model.acting(agent.id) != nil)
         }
     }

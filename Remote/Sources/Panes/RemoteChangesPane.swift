@@ -28,15 +28,15 @@ struct RemoteChangesPane: View {
                 .id(selectedPath)
             } else if let list {
                 if list.files.isEmpty, !list.reportsEdits, case .unavailable(let why) = list.git {
-                    ContentUnavailableView("Changes unavailable", systemImage: "arrow.triangle.2.circlepath",
+                    ContentUnavailableView("Changes unavailable", icon: "arrow.triangle.2.circlepath",
                                            description: Text(Self.unavailable(why)))
                 } else if list.files.isEmpty {
-                    ContentUnavailableView("No changes yet", systemImage: "checkmark.circle")
+                    ContentUnavailableView("No changes yet", icon: "checkmark.circle")
                 } else {
                     files(list)
                 }
             } else if let problem {
-                ContentUnavailableView("Changes could not be read", systemImage: "exclamationmark.triangle",
+                ContentUnavailableView("Changes could not be read", icon: "exclamationmark.triangle",
                                        description: Text(problem))
             } else {
                 ProgressView()
@@ -70,9 +70,9 @@ struct RemoteChangesPane: View {
         return List {
             VStack(alignment: .leading, spacing: 4) {
                 Text("\(list.files.count) \(list.files.count == 1 ? "file" : "files") · +\(added) −\(removed)")
-                    .appText(.fine).foregroundStyle(.secondary)
+                    .appText(.fine).foregroundStyle(Paper.secondary)
                 if let source = Self.source(list.git) {
-                    Text(source).appText(.fine).foregroundStyle(.tertiary)
+                    Text(source).appText(.fine).foregroundStyle(Paper.tertiary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -93,7 +93,7 @@ struct RemoteChangesPane: View {
             }
             if let more = list.more, more > 0 {
                 Text(more == 1 ? "and 1 more file" : "and \(more) more files")
-                    .appText(.fine).foregroundStyle(.secondary)
+                    .appText(.fine).foregroundStyle(Paper.secondary)
             }
         }
         .listStyle(.plain)

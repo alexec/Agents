@@ -22,6 +22,7 @@ import { tellingWords, type AgentAct, type Store } from "../model/store";
 import { attach, pastedFiles, pastedWords, refusal, totalRefusal } from "../model/attachments";
 import { Telling } from "./Telling";
 import { commandQuery, completeCommand, completeMention, fileName, fileURL, matchingCommands, mentionQuery } from "../model/completions";
+import { Icon } from "./Icon";
 
 /** A send usually lands before anyone could read a word; words only for one still going after this. */
 const slowSend = 400;
@@ -30,7 +31,7 @@ const slowSend = 400;
 const mentionPause = 150;
 
 export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName, onAttachments, disabled, send, recipient, starting = false, where, runtime, onTyping, children,
-  stop, acting, queues = false, suggestion, commands = [], findFiles, banner, sent = [] }: {
+  stop, acting, queues = false, suggestion, commands = [], findFiles, sent = [] }: {
   store: Store;
   /** Where the draft is kept: a session, or a new-agent form. */
   draftKey: string;
@@ -68,8 +69,6 @@ export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName
   commands?: readonly SlashCommand[] | undefined;
   /** Files under the agent's folders matching what follows an `@`, found by its host. */
   findFiles?: ((term: string) => Promise<FileMentionDTO[]>) | undefined;
-  /** A limit notice, above the field as in both Swift clients. */
-  banner?: ComponentChildren;
   /** The prompts the person sent in this session, oldest first: what Up gives back (#1551). */
   sent?: readonly string[];
 }) {
@@ -246,7 +245,6 @@ export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName
           {runtime && <div class="bar-runtime">{runtime}</div>}
         </div>
       )}
-      {banner}
       {sending.value && (starting || slow.value) && (
         <Telling recipient={recipient} doing={starting ? "Starting" : "Sending"} />
       )}
@@ -262,7 +260,7 @@ export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName
               const why = refusal(attachment, capabilities, runtimeName, store.hasMac.value);
               return (
                 <li key={attachment.id}>
-                  <span>{attachment.block.type === "image" ? "🖼" : "📄"} {attachment.displayName}</span>
+                  <span><Icon name={attachment.block.type === "image" ? "image" : "file"} /> {attachment.displayName}</span>
                   <button class="remove" aria-label={`Remove ${attachment.displayName}`}
                     onClick={() => { attachments.value = attachments.value.filter((a) => a.id !== attachment.id); keep(); }}>×</button>
                   {why && <span class="failure small">{why}</span>}
@@ -379,12 +377,12 @@ export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName
             <button class={`send stop${acting === "agents/stop" ? " going" : ""}`} aria-label="Stop"
               title={acting === "agents/stop" ? tellingWords("Stopping", recipient) : stopHelp}
               disabled={disabled || (!!acting && acting !== "agents/stop")} onClick={stop}>
-              {acting === "agents/stop" ? <span class="spinner" aria-hidden="true" /> : "■"}
+              {acting === "agents/stop" ? <span class="spinner" aria-hidden="true" /> : <Icon name="circle-stop" />}
             </button>
           ) : (
             <button class={`send${sending.value ? " going" : ""}`} aria-label={sending.value ? tellingLabel(starting, recipient) : sendLabel(queues)}
               title={`${sendHelp(queues)} (Return)`} disabled={!canSend && !sending.value} onClick={() => void submit()}>
-              {sending.value ? <span class="spinner" aria-hidden="true" /> : queues ? "⤒" : "↑"}
+              {sending.value ? <span class="spinner" aria-hidden="true" /> : <Icon name={queues ? "arrow-up-to-line" : "arrow-up"} />}
             </button>
           )}
         </div>

@@ -20,6 +20,7 @@ import { Exchanged } from "./Exchanged";
 import { SimulatorPane } from "./SimulatorPane";
 import { Capability } from "../protocol/capabilities.generated";
 import { hostNeedsUpdate } from "../model/capabilities";
+import { Icon } from "./Icon";
 
 const tabs: { tab: Tab; label: string }[] = [
   { tab: "files", label: "Files" }, { tab: "changes", label: "Changes" }, { tab: "page", label: "Page" },
@@ -116,7 +117,7 @@ function FolderList({ store, host, session, root, marks, changedAt }: {
               <button class={`row entry${last ? " chosen" : ""}`} aria-current={last}
                 onClick={() => setPane(session, entry.isDirectory ? { folder: path } : { file: path, fileLine: undefined, last: path })}>
                 <span class="title">
-                  {changed ? <StatusSquare file={changed} /> : <span aria-hidden="true">{entry.isDirectory ? "📁" : "📄"}</span>} {entry.name}
+                  {changed ? <StatusSquare file={changed} /> : <Icon name={entry.isDirectory ? "folder" : "file"} />} {entry.name}
                 </span>
                 {changed ? <Counts added={changed.added} removed={changed.removed} /> : total ? <Counts added={total.added} removed={total.removed} /> : null}
               </button>

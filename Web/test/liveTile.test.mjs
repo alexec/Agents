@@ -68,5 +68,7 @@ test("the store keeps each source's latest frame and the chat draws the tile whi
   const store = read("Web/src/model/store.ts");
   assert.match(store, /case "live\/frame": \{\s*const frame = params as LiveFrame;\s*this\.liveFrames\.value = \{ \.\.\.this\.liveFrames\.peek\(\), \[frame\.source\]:/);
   const chat = read("Web/src/views/Chat.tsx");
-  assert.match(chat, /agent && agent\.state === "running" \? \[\{\s*key: `live:\$\{agent\.id\}`,\s*node: <LiveTile/);
+  // A part of the Now card at the foot (#5033), not a card in Waiting for you.
+  assert.match(chat, /const drives = !!agent && agent\.state === "running" && freshFrames\(/);
+  assert.match(chat, /\.\.\.\(drives \? \[<LiveTile key="live"/);
 });

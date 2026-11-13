@@ -20,6 +20,7 @@ enum LucideIcons {
         "lucide.folder",
         "lucide.folder-open",
         "lucide.folder-search",
+        "lucide.folder-plus",
         "lucide.workflow",
         "lucide.circle-dot",
         "lucide.git-pull-request",
@@ -48,13 +49,16 @@ enum LucideIcons {
         "lucide.file-question-mark",
         "lucide.file-search",
         "lucide.copy",
+        "lucide.clipboard-paste",
         "lucide.square-terminal",
         "lucide.code",
         "lucide.braces",
         "lucide.globe",
         "lucide.compass",
         "lucide.image",
+        "lucide.camera",
         "lucide.link",
+        "lucide.scan-qr-code",
         "lucide.tag",
         "lucide.building-2",
         "lucide.landmark",
@@ -74,6 +78,7 @@ enum LucideIcons {
         "lucide.chart-column",
         "lucide.target",
         "lucide.lightbulb",
+        "lucide.brain",
         "lucide.paintbrush",
         "lucide.eye",
         "lucide.eye-off",
@@ -95,6 +100,8 @@ enum LucideIcons {
         "lucide.hand",
         "lucide.pointer",
         "lucide.ear",
+        "lucide.keyboard",
+        "lucide.keyboard-off",
         "lucide.droplet",
         "lucide.dot",
         "lucide.square-dot",
@@ -118,6 +125,7 @@ enum LucideIcons {
         "lucide.mic",
         "lucide.audio-waveform",
         "lucide.search",
+        "lucide.text-search",
         "lucide.zoom-in",
         "lucide.zoom-out",
         "lucide.ellipsis",
@@ -125,6 +133,8 @@ enum LucideIcons {
         "lucide.pin",
         "lucide.pin-off",
         "lucide.external-link",
+        "lucide.app-window",
+        "lucide.rectangle-vertical",
         "lucide.rotate-cw",
         "lucide.refresh-cw",
         "lucide.repeat",
@@ -197,6 +207,7 @@ enum LucideIcons {
         "folder.fill": "lucide.folder-open", // An open folder
         "questionmark.folder": "lucide.folder-search", // A folder that is not found
         "folder.badge.questionmark": "lucide.folder-search", // A folder that is not found
+        "folder.badge.plus": "lucide.folder-plus", // Add a folder
         "flowchart": "lucide.workflow", // Workflow
         "point.3.connected.trianglepath.dotted": "lucide.workflow", // Workflow
         "smallcircle.filled.circle": "lucide.circle-dot", // Issue; a chosen option
@@ -235,6 +246,7 @@ enum LucideIcons {
         "doc.text.magnifyingglass": "lucide.file-search", // Search in a file
         "doc.on.doc": "lucide.copy", // Copy
         "square.on.square": "lucide.copy", // Copy
+        "doc.on.clipboard": "lucide.clipboard-paste", // Paste
         "apple.terminal": "lucide.square-terminal", // Terminal, command
         "terminal": "lucide.square-terminal", // Terminal, command
         "chevron.left.forwardslash.chevron.right": "lucide.code", // Code
@@ -242,7 +254,9 @@ enum LucideIcons {
         "globe": "lucide.globe", // Web page
         "safari": "lucide.compass", // Browser
         "photo": "lucide.image", // Picture
+        "camera": "lucide.camera", // Camera
         "link": "lucide.link", // Link
+        "qrcode.viewfinder": "lucide.scan-qr-code", // Scan a code to pair
         "tag": "lucide.tag", // Label
         "building.2": "lucide.building-2", // Organisation
         "building.columns": "lucide.landmark", // Institution
@@ -265,6 +279,7 @@ enum LucideIcons {
         "target": "lucide.target", // Goal
         "scope": "lucide.target", // Goal
         "lightbulb": "lucide.lightbulb", // Idea, suggestion
+        "brain": "lucide.brain", // Thoughts, the agent's reasoning
         "paintbrush": "lucide.paintbrush", // Look
         "eye": "lucide.eye", // Show
         "eye.slash": "lucide.eye-off", // Hide
@@ -283,11 +298,14 @@ enum LucideIcons {
         "number": "lucide.hash", // Number
         "sidebar.left": "lucide.panel-left", // Left sidebar
         "sidebar.trailing": "lucide.panel-right", // Right sidebar
+        "sidebar.right": "lucide.panel-right", // Right sidebar
         "cursorarrow.rays": "lucide.mouse-pointer-click", // Click, control the screen
         "hand.raised": "lucide.hand", // Stop and ask; a hand raised
         "hand.raised.fill": "lucide.hand", // Stop and ask; a hand raised
         "hand.tap": "lucide.pointer", // Tap
         "ear": "lucide.ear", // Listen
+        "keyboard": "lucide.keyboard", // Keyboard, type
+        "keyboard.chevron.compact.down": "lucide.keyboard-off", // Hide the keyboard
         "drop": "lucide.droplet", // Drop
         "circle.fill": "lucide.dot", // A running mark
         "dot.square": "lucide.square-dot", // A changed file
@@ -311,12 +329,14 @@ enum LucideIcons {
         "arrow.uturn.left": "lucide.undo-2", // Undo, go back
         "arrowshape.turn.up.left": "lucide.undo-2", // Undo, go back
         "arrow.uturn.backward.circle": "lucide.undo-2", // Undo, go back
+        "arrow.uturn.up": "lucide.undo-2", // Undo, go back
         "paperclip": "lucide.paperclip", // Attach
         "microphone": "lucide.mic", // Voice
         "mic.fill": "lucide.mic", // Voice
         "waveform": "lucide.audio-waveform", // Voice mode
         "waveform.circle": "lucide.audio-waveform", // Voice mode
         "magnifyingglass": "lucide.search", // Search
+        "text.magnifyingglass": "lucide.text-search", // Find in the text
         "plus.magnifyingglass": "lucide.zoom-in", // Zoom in
         "minus.magnifyingglass": "lucide.zoom-out", // Zoom out
         "ellipsis": "lucide.ellipsis", // More
@@ -325,6 +345,8 @@ enum LucideIcons {
         "pin.fill": "lucide.pin", // Pin
         "pin.slash": "lucide.pin-off", // Unpin
         "arrow.up.right.square": "lucide.external-link", // Open outside the app
+        "macwindow.badge.plus": "lucide.app-window", // Open in a new window
+        "rectangle.portrait": "lucide.rectangle-vertical", // Open alone, full screen
         "arrow.clockwise": "lucide.rotate-cw", // Retry
         "arrow.clockwise.circle": "lucide.rotate-cw", // Retry
         "arrow.triangle.2.circlepath": "lucide.refresh-cw", // Again and again, sync
@@ -342,6 +364,7 @@ enum LucideIcons {
         "chevron.right": "lucide.chevron-right", // Open, go in
         "chevron.compact.right": "lucide.chevron-right", // Open, go in
         "forward": "lucide.chevron-right", // Open, go in
+        "arrow.up.forward.app": "lucide.chevron-right", // Open, go in
         "chevron.left": "lucide.chevron-left", // Back
         "chevron.backward": "lucide.chevron-left", // Back
         "chevron.down": "lucide.chevron-down", // Fold, menu

@@ -77,7 +77,7 @@ struct RemoteFolderScene: View {
             if let state, let summary {
                 RemoteFolderColumns(state: state, summary: summary, chat: chat, back: back)
             } else if key == nil || !model.folders.isEmpty {
-                ContentUnavailableView("This folder is not open", systemImage: "folder.badge.questionmark",
+                ContentUnavailableView("This folder is not open", icon: "folder.badge.questionmark",
                                        description: Text("It has been archived or removed."))
             } else {
                 ProgressView()
@@ -173,7 +173,7 @@ private struct RemoteFolderColumns: View {
             NothingPickedPage()
                 .paperGround()
         default:
-            ContentUnavailableView("Open it in All Folders", systemImage: "sidebar.left",
+            ContentUnavailableView("Open it in All Folders", icon: "sidebar.left",
                                    description: Text("This page opens in the sidebar of every folder."))
         }
     }
@@ -207,9 +207,9 @@ private struct RemoteFolderSidebar: View {
             if case .folder(let key) = pick { model.rememberNewSessionFolder(key) }
         })) {
             Section {
-                Label("New Session", systemImage: "square.and.pencil")
+                Label("New Session", icon: "square.and.pencil")
                     .appText(.supporting)
-                    .tag(SidebarItem.folder(summary.key))
+                    .paperTag(SidebarItem.folder(summary.key))
             }
             ForEach(SidebarSmartRow.allCases.filter(groups.contains), id: \.self) { row in
                 RemoteSmartFold(row: row, folders: [summary], folds: folds, query: "", groups: groups)
@@ -218,6 +218,7 @@ private struct RemoteFolderSidebar: View {
                               smartGroups: groups, inScene: true)
             ElsewhereRow(key: summary.key, back: back)
         }
+        .environment(\.sidebarPick, state.pick)
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
@@ -226,7 +227,7 @@ private struct RemoteFolderSidebar: View {
             if let back {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(action: back) {
-                        Label("All", systemImage: "chevron.left")
+                        Label("All", icon: "chevron.left")
                             .labelStyle(.titleAndIcon)
                     }
                     .accessibilityLabel("All folders")
@@ -272,11 +273,11 @@ struct OpenFolderButton: View {
 
     var body: some View {
         if supportsMultipleWindows {
-            Button("Open in New Window", systemImage: "macwindow.badge.plus") {
+            Button("Open in New Window", icon: "macwindow.badge.plus") {
                 openWindow(id: RemoteFolderState.sceneID, value: key)
             }
         } else {
-            Button("Open Folder Alone", systemImage: "rectangle.portrait") {
+            Button("Open Folder Alone", icon: "rectangle.portrait") {
                 model.phoneFolder = key
             }
         }

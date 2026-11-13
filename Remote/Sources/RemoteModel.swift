@@ -1451,6 +1451,22 @@ final class RemoteModel {
         }
     }
 
+    /// Settings ▸ You ▸ Secrets ▸ On This Machine (#5122): what agents saved on the Mac's host.
+    func localSecrets() async -> LocalSecrets? {
+        try? await client.call(DaemonAPI.Method.secretsLocalList, DaemonAPI.Empty(), returning: LocalSecrets.self)
+    }
+
+    func setLocalSecretAsksBeforeUse(_ secret: LocalSecret, _ on: Bool) async -> Result<LocalSecrets?, Error> {
+        do {
+            _ = try await client.call(DaemonAPI.Method.secretsSetNeedsApproval,
+                                      SecretNeedsApprovalRequest(name: secret.name, needsApproval: on),
+                                      returning: DaemonAPI.Empty.self)
+            return .success(await localSecrets())
+        } catch {
+            return .failure(error)
+        }
+    }
+
     /// Take a session's secret out now: its agent is told it expired.
     func removeSessionSecret(_ secret: SessionSecret) async -> SessionSecrets? {
         do {
@@ -6290,7 +6306,7 @@ extension RemoteModel {
 extension RemoteModel: WorkModel {}
 
 /// Settings ▸ You ▸ Secrets ▸ For One Session (#4032), through the Mac's host.
-extension RemoteModel: SessionSecretsSource {}
+extension RemoteModel: LocalSecretsSource {}
 
 /// Which of a folder's two archive pages (#4448): its archived sessions or its archived workflows.
 enum ArchiveKind: Hashable {

@@ -64,7 +64,7 @@ struct PeoplePane: View {
             if kind == .bot, list?.admin == true, !people.capped.isEmpty {
                 Section {
                     ForEach(people.capped, id: \.user) { reached in
-                        Text(BotWords.capReached(reached)).appText(.supporting).tinted(.attention)
+                        Text(BotWords.capReached(reached)).appText(.supporting).tinted(.warning)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }

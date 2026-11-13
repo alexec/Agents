@@ -157,12 +157,12 @@ struct ShellScreen: View {
     /// printed is still readable, and a new shell is one tap away (FR-022).
     private func ended(_ client: ShellClient) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: "exclamationmark.circle")
-                .foregroundStyle(.secondary)
+            Image(icon: "exclamationmark.circle")
+                .foregroundStyle(Paper.secondary)
                 .accessibilityHidden(true)
             Text(client.state.explanation ?? "The shell is no longer running.")
                 .appText(.supporting)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
             Spacer()
             Button("Start again") {
                 Task { await client.restart(rows: rows, cols: cols) }
@@ -332,7 +332,7 @@ private struct Note: View {
     var body: some View {
         Text(text)
             .appText(.fine)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Paper.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
@@ -347,13 +347,13 @@ private struct Trouble: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle")
+            Image(icon: "exclamationmark.triangle")
                 .appText(.title)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Paper.tertiary)
                 .accessibilityHidden(true)
             Text(message)
                 .appText(.supporting)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
                 .multilineTextAlignment(.center)
             Button("Try again") { Task { await retry() } }
                 .buttonStyle(.paper)

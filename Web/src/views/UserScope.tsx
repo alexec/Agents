@@ -1,14 +1,17 @@
 // Settings ▸ You ▸ Secrets (#1760, #3632), as the window's (Shared/UI/UserScope): the person's secrets
 // and cards, by name only, which go to every machine of theirs.
-import { useEffect } from "preact/hooks";
+import { useEffect, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
 import type { Store } from "../model/store";
-import type { UserSecretKind, UserSecretNames, UserSecretRow } from "../protocol/generated";
+import { Failure, type UserSecretKind, type UserSecretNames, type UserSecretRow } from "../protocol/generated";
+import { Capability } from "../protocol/capabilities.generated";
 import { CallFailed } from "../wire/link";
-import { sealSecret } from "../wire/sealing";
+import { openSealedSecret, sealSecret } from "../wire/sealing";
 import { describe, methodNotFound } from "../model/errors";
-import { about, addCard, addSecret, cardConfirm, cardKind, cardKindLabel, cardProblem, cardRule, cardValue, describedAs,
-  isSecretName, leftOn, nameHint, nextVersion, secretsFoot, secretsLeft, secretsTitle, tidyCard, waitingOn } from "../model/userScope";
+import { about, addCard, addSecret, asksForAgents, type Card, cardConfirm, cardKind, cardKindLabel, type CardPart, cardParts,
+  cardProblem, cardRule, cardValue, clipboardSeconds, copiedLine, copiedSeconds, copyRefused, describedAs, didNotOpen,
+  isSecretName, leftOn, nameHint, nextVersion, noCopyYet, parseCard, partLabels, revealNeedsNewerPlane, secretsFoot,
+  secretsLeft, secretsTitle, shownFor, shownSeconds, spacedNumber, tidyCard, waitingOn } from "../model/userScope";
 import { askBeforeUseWords } from "../model/askBeforeUse";
 import { hint, machineNames, notBackedUp, onlyMachine, onlyMachineLine, rowLine } from "../model/secretInfo";
 import { SecretInfoLine } from "./SecretInfoLine";
@@ -16,6 +19,7 @@ import { AskBeforeUseCheck } from "./AskBeforeUse";
 import { Modal } from "./Modal";
 import { SecretDescriptionField } from "./SecretDescription";
 import { ask } from "./MessageKinds";
+import { Icon } from "./Icon";
 
 function sentence(error: unknown): string {
   if (error instanceof CallFailed && error.code === methodNotFound) return "This control plane does not keep settings for you yet. Update it.";
@@ -149,23 +153,185 @@ function CardSheet({ store, replacing, close }: { store: Store; replacing: UserS
   );
 }
 
-function SecretItem({ row, replace, remove, down, names, oneMachine }: { row: UserSecretRow; replace: () => void;
-  remove: () => void; down: boolean; names: Record<string, string>; oneMachine: boolean }) {
+/** A value shown (#5115), and when it hides. */
+interface Shown { name: string; version: number; value: string; card: Card | null; until: number }
+/** What was just copied: the row, and a card's part. */
+interface Copied { name: string; part: CardPart | null }
+
+/**
+ * Reveal and Copy (#5112, #5115; specs/5112-view-copy-secrets-accounts/wireframes.md, sections 1 to 6), as the window's
+ * SecretShowState: the page asks the control plane for its own sealed copy (user/sealedSecret, which writes the audit
+ * entry first), opens it with its own key, and shows or copies the value. One value at a time, for 30 s, in memory
+ * only; it hides when the tab is hidden, the section closes, or the secret changes.
+ */
+function useSecretShow(store: Store, rows: UserSecretRow[]) {
+  const shown = useSignal<Shown | null>(null);
+  const copied = useSignal<Copied | null>(null);
+  const fetching = useSignal<string | null>(null);
+  const problems = useSignal<Record<string, string>>({});
+  const noCopy = useSignal<Set<string>>(new Set());
+  const now = useSignal(Date.now());
+  const person = useRef<string | null>(null);
+  const timers = useRef<{ hide?: number; copied?: number; tick?: number }>({});
+  const can = store.planeHas(Capability.user4);
+
+  const hide = () => {
+    window.clearTimeout(timers.current.hide);
+    window.clearInterval(timers.current.tick);
+    shown.value = null;
+  };
+  useEffect(() => {
+    const hidden = () => { if (document.visibilityState === "hidden") hide(); };
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      document.removeEventListener("visibilitychange", hidden);
+      hide();
+      window.clearTimeout(timers.current.copied);
+    };
+  }, []);
+  // A value shown hides when its secret changed or went; a replaced secret is sealed again, to this page too.
+  useEffect(() => {
+    const s = shown.value;
+    if (s && rows.find((r) => r.name === s.name)?.version !== s.version) hide();
+    const kept = [...noCopy.value].filter((name) => rows.some((r) => r.name === name));
+    if (kept.length !== noCopy.value.size) noCopy.value = new Set(kept);
+  }, [rows]);
+
+  const say = (name: string, problem: string | null) => {
+    const next = { ...problems.value };
+    if (problem) next[name] = problem; else delete next[name];
+    problems.value = next;
+  };
+  const sealedValue = async (row: UserSecretRow, purpose: "reveal" | "copy", part: CardPart | null): Promise<string | null> => {
+    const record = await store.link.keyRecord();
+    if (!record) {
+      say(row.name, noCopyYet);
+      return null;
+    }
+    fetching.value = row.name;
+    say(row.name, null);
+    try {
+      person.current ??= (await store.link.call("user/secretRecipients", {})).user ?? "";
+      const sealed = await store.link.call("user/sealedSecret", { name: row.name as never, purpose, ...(part ? { part } : {}) });
+      try {
+        return await openSealedSecret(record, person.current, sealed);
+      } catch {
+        say(row.name, didNotOpen);
+        return null;
+      }
+    } catch (error) {
+      if (error instanceof CallFailed && error.code === Failure.noClientCopy) noCopy.value = new Set([...noCopy.value, row.name]);
+      else say(row.name, error instanceof CallFailed && error.code === methodNotFound ? revealNeedsNewerPlane : sentence(error));
+      return null;
+    } finally {
+      fetching.value = null;
+    }
+  };
+
+  const toggle = async (row: UserSecretRow) => {
+    if (shown.value?.name === row.name) {
+      hide();
+      return;
+    }
+    hide();
+    const value = await sealedValue(row, "reveal", null);
+    if (value === null) return;
+    shown.value = { name: row.name, version: row.version ?? 0, value, card: row.kind === cardKind ? parseCard(value) : null,
+      until: Date.now() + shownSeconds * 1000 };
+    now.value = Date.now();
+    timers.current.tick = window.setInterval(() => { now.value = Date.now(); }, 1000);
+    timers.current.hide = window.setTimeout(hide, shownSeconds * 1000);
+  };
+
+  const copy = async (row: UserSecretRow, part: CardPart | null = null) => {
+    const card = row.kind === cardKind;
+    const which = part ?? (card ? "number" : null);
+    const value = await sealedValue(row, "copy", which);
+    if (value === null) return;
+    const parsed = card ? parseCard(value) : null;
+    if (card && !parsed) {
+      say(row.name, didNotOpen);
+      return;
+    }
+    const text = parsed && which ? parsed[which] : value;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      say(row.name, copyRefused);
+      return;
+    }
+    // A browser lets a page write the clipboard only while its tab is in front, so the clear is only then.
+    window.setTimeout(() => {
+      if (document.visibilityState === "visible" && document.hasFocus()) void navigator.clipboard.writeText("").catch(() => undefined);
+    }, clipboardSeconds * 1000);
+    copied.value = { name: row.name, part: shown.value?.name === row.name ? part : null };
+    window.clearTimeout(timers.current.copied);
+    timers.current.copied = window.setTimeout(() => { copied.value = null; }, copiedSeconds * 1000);
+  };
+
+  return { can, shown, copied, fetching, problems, noCopy, now, toggle, copy };
+}
+
+type SecretShow = ReturnType<typeof useSecretShow>;
+
+/** The value shown, in a well that a person cannot select: Copy is the only way to copy it, so each copy is audited. */
+function ShownValue({ row, shown, show }: { row: UserSecretRow; shown: Shown; show: SecretShow }) {
+  if (!shown.card) return <code class="secret-shown" aria-label={`${row.name} value`}>{shown.value}</code>;
+  const card = shown.card;
+  return (
+    <div class="secret-shown" aria-label={`${row.name} parts`}>
+      {cardParts.map((part) => {
+        const done = show.copied.value?.name === row.name && show.copied.value.part === part;
+        return (
+          <div class="card-part" key={part}>
+            <span class="part-label">{partLabels[part]}</span>
+            <span class="part-value">{part === "number" ? spacedNumber(card.number) : card[part]}</span>
+            <button type="button" aria-label={`Copy ${partLabels[part]} of ${row.name}`} onClick={() => void show.copy(row, part)}>
+              {done ? "Copied ✓" : "Copy"}
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SecretItem({ row, replace, remove, down, names, oneMachine, show }: { row: UserSecretRow; replace: () => void;
+  remove: () => void; down: boolean; names: Record<string, string>; oneMachine: boolean; show: SecretShow }) {
   const left = leftOn(row);
   const waiting = waitingOn(row);
   const warning = oneMachine ? null : notBackedUp(row, names);
+  const shown = show.shown.value?.name === row.name ? show.shown.value : null;
+  const copied = show.copied.value?.name === row.name ? show.copied.value : null;
+  const off = down || show.noCopy.value.has(row.name) || show.fetching.value === row.name;
+  const problem = show.problems.value[row.name];
   return (
     <li class="user-secret">
       <code>{row.name}</code>
       {row.kind === cardKind && <span class="hint">{cardKindLabel}</span>}
-      <code class="hint secret-hint" aria-label={row.hint ? `Ends in ${row.hint}` : "Value hidden"}>{hint(row.hint)}</code>
+      {!shown && <code class="hint secret-hint" aria-label={row.hint ? `Ends in ${row.hint}` : "Value hidden"}>{hint(row.hint)}</code>}
+      {shown && <ShownValue row={row} shown={shown} show={show} />}
       <p class="hint">{about(row.description)}</p>
       <SecretInfoLine parts={rowLine(row)} />
-      {row.needsApproval && <span class="hint"><span aria-hidden="true">✋ </span>{askBeforeUseWords.asks}</span>}
+      {shown && <p class="hint">{shownFor(Math.ceil((shown.until - show.now.value) / 1000), shown.card !== null)}</p>}
+      {copied && <p class="hint vouched" role="status"><span aria-hidden="true">✓ </span>{copiedLine(copied.part)}</p>}
+      {row.needsApproval && <span class="hint"><Icon name="hand" />{" "}{show.can ? asksForAgents : askBeforeUseWords.asks}</span>}
+      {show.noCopy.value.has(row.name) && <p class="hint attention">{noCopyYet}</p>}
+      {problem && <p class="failure" role="alert">{problem}</p>}
       {waiting && <p class="hint attention">{waiting}</p>}
       {left && <p class="hint attention">{left}</p>}
-      {warning && <p class="hint attention"><span aria-hidden="true">⚠ </span>{warning}</p>}
+      {warning && <p class="hint warning"><Icon name="triangle-alert" />{" "}{warning}</p>}
       <span class="row-actions">
+        {show.can && (
+          <>
+            <button type="button" disabled={off} aria-label={`${shown ? "Hide" : "Reveal"} ${row.name}`} onClick={() => void show.toggle(row)}>
+              {show.fetching.value === row.name ? "…" : shown ? "Hide" : "Reveal"}
+            </button>
+            <button type="button" disabled={off} aria-label={`Copy ${row.name}`} onClick={() => void show.copy(row)}>
+              {copied && copied.part === null ? "Copied ✓" : "Copy"}
+            </button>
+          </>
+        )}
         <button type="button" disabled={down} onClick={replace}>Replace…</button>
         <button type="button" class="destructive" disabled={down} onClick={remove}>Remove…</button>
       </span>
@@ -207,6 +373,7 @@ export function SecretsSection({ store, down }: { store: Store; down: boolean })
   };
   const left = store.secretsLeft.value;
   const rows = names.value?.secrets ?? [];
+  const show = useSecretShow(store, rows);
   const hostNames = machineNames(store.hosts.value);
   const only = onlyMachine(rows);
   return (
@@ -219,10 +386,10 @@ export function SecretsSection({ store, down }: { store: Store; down: boolean })
           <button type="button" onClick={() => { store.secretsLeft.value = null; }}>OK</button>
         </div>
       )}
-      {only && <p class="hint attention"><span aria-hidden="true">⚠ </span>{onlyMachineLine(only, hostNames)}</p>}
+      {only && <p class="hint attention"><Icon name="triangle-alert" />{" "}{onlyMachineLine(only, hostNames)}</p>}
       <ul class="user-secrets">
         {rows.map((row) => (
-          <SecretItem key={row.name} row={row} down={down} names={hostNames} oneMachine={only !== null}
+          <SecretItem key={row.name} row={row} down={down} names={hostNames} oneMachine={only !== null} show={show}
             replace={() => { replacing.value = row; }} remove={() => void remove(row.name)} />
         ))}
       </ul>

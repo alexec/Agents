@@ -29,7 +29,7 @@ struct WorkflowPage: View {
                 content(summary)
             } else {
                 ContentUnavailableView("This workflow is no longer there",
-                                       systemImage: "clock.badge.questionmark",
+                                       icon: "clock.badge.questionmark",
                                        description: Text("Its file has been removed or renamed."))
                     .padding(.top, 60)
             }
@@ -100,14 +100,14 @@ struct WorkflowPage: View {
             if summary.workflow.problem == nil {
                 Text(summary.workflow.summary)
                     .appText(.supporting)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             // Yours, in every folder (#2759): its rows under a folder do not say so.
             if let scope = summary.scopeSentence {
                 Text(scope)
                     .appText(.fine)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Paper.tertiary)
             }
         }
     }
@@ -140,7 +140,7 @@ struct WorkflowPage: View {
 
     private func statusRow(_ line: WorkflowStatusLine) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Image(systemName: line.symbol)
+            Image(icon: line.symbol)
                 .appText(.reading)
                 .frame(width: 18)
             VStack(alignment: .leading, spacing: 3) {
@@ -150,7 +150,7 @@ struct WorkflowPage: View {
                 if let detail = line.detail {
                     Text(detail)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let agentID = line.agentID {
@@ -216,14 +216,14 @@ struct WorkflowPage: View {
                     if model.canMute(summary) {
                         Text(MuteWords.workflowHelp(muted: summary.workflow.isMuted))
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     // They write the workflow's file (#125), the Mac page's words.
                     Text(summary.switchesSentence)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -244,7 +244,7 @@ struct WorkflowPage: View {
                     model.openWorkflow = nil
                 }
             } label: {
-                Label("Archive", systemImage: "archivebox")
+                Label("Archive", icon: "archivebox")
             }
             .disabled(model.isStale)
         }
@@ -301,7 +301,7 @@ struct WorkflowPage: View {
     private func note(_ text: String) -> some View {
         Text(text)
             .appText(.fine)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Paper.secondary)
             .fixedSize(horizontal: false, vertical: true)
     }
 }

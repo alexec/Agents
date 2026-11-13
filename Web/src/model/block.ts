@@ -42,16 +42,17 @@ export function wakeLine(block: Block): string | null {
   return block.wakeOn === "any" ? "Carries on when any of these finishes" : "Carries on when all of these have finished";
 }
 
-/** Block.checkAgainLine: when it will look again, in the reader's own time. */
-export function checkAgainLine(block: Block): string | null {
-  if (block.clearedAt !== undefined || block.checkAgainAt === undefined) return null;
-  const at = fromWireDate(block.checkAgainAt);
-  return `Checks again at ${at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+/** Block.deadlineLine: when it carries on at the latest, in the reader's own time. */
+export function deadlineLine(block: Block): string | null {
+  if (block.clearedAt !== undefined || block.deadline === undefined) return null;
+  const at = fromWireDate(block.deadline);
+  return `Carries on by ${at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })} at the latest`;
 }
 
 /** Block.cardTitle: the heading of its card at the foot of the chat (#2750). */
 export function cardTitle(block: Block): string {
-  return block.waits.length === 0 ? "Waiting until a set time" : block.waits.length === 1 ? "Waiting for a session" : "Waiting for sessions";
+  // A wait on a time alone is an event wait on time.reached (#4843, #5152).
+  return block.waits.length > 1 ? "Waiting for sessions" : "Waiting for a session";
 }
 
 /** AgentsModel.waitName: its title now, or the one it had when the block was made. */
@@ -60,13 +61,13 @@ export function waitName(wait: Wait, agents: readonly Agent[]): string {
   return title ? title : wait.nameAtReport;
 }
 
-/** AgentsModel.blockLines: any of or all of, one line an agent waited on, and when it checks again. */
+/** AgentsModel.blockLines: any of or all of, one line an agent waited on, and its deadline. */
 export function blockLines(agent: Agent, agents: readonly Agent[]): string[] {
   const block = openBlock(agent);
   if (!block) return [];
   const lines = block.waits.map((wait) => waitLine(waitName(wait, agents), wait.ending));
   const wake = wakeLine(block);
-  const check = checkAgainLine(block);
+  const check = deadlineLine(block);
   return [...(wake ? [wake] : []), ...lines, ...(check ? [check] : [])];
 }
 

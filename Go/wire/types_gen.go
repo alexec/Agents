@@ -1373,7 +1373,8 @@ func (v *BackupTarget) UnmarshalJSON(b []byte) error {
 type Block struct {
 	Waits []Wait `json:"waits"`
 
-	CheckAgainAt *Date `json:"checkAgainAt,omitzero"`
+	// When the wait ends if its sessions have not (#5152; was checkAgainAt).
+	Deadline *Date `json:"deadline,omitzero"`
 
 	WakeOn *BlockWakeOn `json:"wakeOn,omitzero"`
 
@@ -7036,6 +7037,29 @@ const LiveSourceScreen LiveSource = "screen"
 const LiveSourceBrowser LiveSource = "browser"
 const LiveSourceSimulator LiveSource = "simulator"
 
+// A secret this machine keeps for itself (#5122): an agent saved it (ask_secret, capture_secret, generate_secret) or a connector's form set it. Every session's agent on this machine can name it. No value.
+type LocalSecret struct {
+	Name string `json:"name"`
+
+	SetAt Date `json:"setAt"`
+
+	LastOp *SecretLastOp `json:"lastOp,omitzero"`
+
+	// Always false: a secret this machine keeps for itself is on this machine only.
+	BackedUp *bool `json:"backedUp,omitzero"`
+
+	// Ask before use (#4014): a person approves each use (#4015). Left out is off.
+	NeedsApproval *bool `json:"needsApproval,omitzero"`
+
+	// A secret's description (#4167): one or two sentences on what it is and what it is for, such as which account and scopes. Not secret, and not sealed: the control plane may keep it. Never a value. Left out when it has none.
+	Description *string `json:"description,omitzero"`
+}
+
+// secrets/localList (#5122): every secret this machine keeps for itself, by name. No value.
+type LocalSecrets struct {
+	Secrets []LocalSecret `json:"secrets"`
+}
+
 // A person's machine lock (#3399, specs/3399-machine-lock): its chain of entries, the root first. lock/get, and machine/lock to a machine.
 type Lock struct {
 	Person string `json:"person"`
@@ -8571,7 +8595,28 @@ type MessagesError struct {
 	Message string `json:"message"`
 }
 
-// messages/read (#4343): one page of a conversation's messages, newest first, as the connector's read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true: every text is outside content.
+// messages/markAllRead (#5137): mark every conversation of folder's messaging connectors read, or of every folder's when folder is absent.
+type MessagesMarkAllReadRequest struct {
+	Folder *string `json:"folder,omitzero"`
+}
+
+// One connector that messages/markAllRead marked read (#5137): its name in mcp.json, a folder that reaches it, and how many messages it marked.
+type MessagesMarked struct {
+	Server string `json:"server"`
+
+	Folder string `json:"folder"`
+
+	Marked int64 `json:"marked"`
+}
+
+// messages/markAllRead (#5137): the connectors that marked their conversations read, and those that could not, with why. A connector with no mark_conversation_read (its service gives no read state) is in neither.
+type MessagesMarkedAllRead struct {
+	Marked []MessagesMarked `json:"marked"`
+
+	Errors []MessagesError `json:"errors,omitzero"`
+}
+
+// messages/read (#4343): one page of a conversation's messages, newest first, as the connector's read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true: every text is outside content. markedRead (#5137): the connector's mark_conversation_read marked the conversation read on its service, so a client sets its unread count to 0; absent when the connector cannot mark read, on an older page, and on one thread's read.
 type MessagesRead struct {
 	Server string `json:"server"`
 
@@ -8584,6 +8629,8 @@ type MessagesRead struct {
 	Cursor *string `json:"cursor,omitzero"`
 
 	Untrusted bool `json:"untrusted"`
+
+	MarkedRead *bool `json:"markedRead,omitzero"`
 }
 
 // messages/read (#4343): a conversation from messages/conversations, by its server, folder and id. cursor is the last page's; thread: only that thread's messages; limit is 1 to 100, 20 when not said.
@@ -8670,6 +8717,18 @@ type MessagingListRequest struct {
 	Limit *int64 `json:"limit,omitzero"`
 
 	Unread *bool `json:"unread,omitzero"`
+}
+
+// mark_conversation_read's input (#5137, docs/reference/messaging-contract.md): conversation, a conversation's id from list_conversations, marks its messages read on the service; all: true marks every conversation that list_conversations lists with no input. One of the two.
+type MessagingMarkReadRequest struct {
+	Conversation *string `json:"conversation,omitzero"`
+
+	All *bool `json:"all,omitzero"`
+}
+
+// mark_conversation_read's structuredContent (#5137): how many messages it marked read.
+type MessagingMarkedRead struct {
+	Marked int64 `json:"marked"`
 }
 
 // One message in read_messages' structuredContent (#4338). text is outside content: the result says so (untrusted), and a client draws it as Markdown that loads nothing: no HTML, no image from the network, and only http, https and mailto links. thread is the id of the message that starts its thread; absent when it is in no thread. link is the message on the service's own site or app.
@@ -9449,6 +9508,9 @@ type OutsideAccount struct {
 
 	// The address it signs in with.
 	Address *string `json:"address,omitzero"`
+
+	// The user name it signs in with, when that is not the address (#5116). Plain text, never a secret. Absent when not set.
+	Username *string `json:"username,omitzero"`
 
 	// Free, Pro…
 	Plan *string `json:"plan,omitzero"`

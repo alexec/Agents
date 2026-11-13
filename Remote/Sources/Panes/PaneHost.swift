@@ -117,7 +117,7 @@ struct PaneView: View {
                 Button {
                     state.pane = nil
                 } label: {
-                    Label("Close", systemImage: "xmark")
+                    Label("Close", icon: "xmark")
                         .labelStyle(.iconOnly)
                 }
                 .buttonStyle(.borderless)
@@ -134,7 +134,7 @@ struct PaneView: View {
             VStack(spacing: 0) {
                 Text("Update Agents on your Mac to read files and use the terminal here.")
                     .appText(.fine)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
                     .padding(12)
                 ArtifactsList()
             }

@@ -157,11 +157,11 @@ struct ChoiceChips: View {
         return model.startRuntime?.runtime.name ?? "None set up on \(model.startHost == .mac ? "the Mac" : model.hostName(model.startHost))"
     }
 
-    /// The mark on the Runtime chip: red when Auto picks nothing (#2658), orange when the
+    /// The mark on the Runtime chip: red when Auto picks nothing (#2658), orange (a warning) when the
     /// runtime chosen is out (052, 065).
     private var runtimeDot: StateTint {
         if model.startAutoPicksNothing { return .failure }
-        if model.startRuntimeOut != nil { return .attention }
+        if model.startRuntimeOut != nil { return .warning }
         return .none
     }
 
@@ -437,7 +437,7 @@ struct ChoiceChips: View {
 
     @ViewBuilder
     private func choiceLabel(_ title: String, chosen: Bool) -> some View {
-        if chosen { Label(title, systemImage: "checkmark") } else { Text(title) }
+        if chosen { Label(title, icon: "checkmark") } else { Text(title) }
     }
 
     /// Its branch, git status, who is in it, and with `size` how much it holds (#790).
@@ -475,10 +475,10 @@ struct StartChip: View {
     var body: some View {
         HStack(spacing: 4) {
             if let systemImage {
-                Image(systemName: systemImage)
+                Image(icon: systemImage)
                     // Decorative: the chip's words say what it is (FR-015).
                     .glyph(size: 11, weight: .semibold)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             }
             if let title {
                 Text(title)
@@ -487,9 +487,9 @@ struct StartChip: View {
                     .frame(maxWidth: maxTitleWidth, alignment: .leading)
             }
             if locked {
-                Image(systemName: "lock.fill")
+                Image(icon: "lock.fill")
                     .glyph(size: 8, weight: .semibold)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             }
             if badge > 0 {
                 Text("\(badge)")
@@ -501,13 +501,13 @@ struct StartChip: View {
                     .background(Paper.accent, in: Capsule())
             }
             if chevron {
-                Image(systemName: "chevron.down")
+                Image(icon: "chevron.down")
                     .glyph(size: 8, weight: .semibold)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             }
         }
         .appText(.fine)
-        .foregroundStyle(plain ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+        .foregroundStyle(plain ? AnyShapeStyle(Paper.secondary) : AnyShapeStyle(.primary))
         .padding(.horizontal, 10)
         .frame(minHeight: 32)
         .contentShape(Capsule())

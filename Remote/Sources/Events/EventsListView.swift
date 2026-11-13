@@ -38,7 +38,7 @@ struct EventsListView: View {
                             } label: {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(agent.title).appText(.reading)
-                                    Text(agent.status.line).appText(.fine).foregroundStyle(.secondary)
+                                    Text(agent.status.line).appText(.fine).foregroundStyle(Paper.secondary)
                                 }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
@@ -48,12 +48,12 @@ struct EventsListView: View {
                                 Button {
                                     Task { await model.cancelWait(of: agent.agentID) }
                                 } label: {
-                                    Image(systemName: "xmark")
+                                    Image(icon: "xmark")
                                         // Decorative: the glyph that ends the wait, not text (FR-015).
                                         .glyph(.caption)
                                 }
                                 .buttonStyle(.plain)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Paper.secondary)
                                 .help("End this wait. Nothing will start the agent again for it.")
                             }
                         }
@@ -66,7 +66,7 @@ struct EventsListView: View {
                      ? "Nothing has happened yet. Events appear here as agents, workflows and the Mac do things."
                      : "Loading…")
                     .appText(.supporting)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
                     .paperListRow()
             }
             ForEach(shown.days, id: \.day) { day in
@@ -155,7 +155,7 @@ private struct EventSheet: View {
             List {
                 Section {
                     Text(event.sentence).appText(.reading)
-                    Text(event.name).appText(.fine).monospaced().foregroundStyle(.secondary)
+                    Text(event.name).appText(.fine).monospaced().foregroundStyle(Paper.secondary)
                 }
                 Section {
                     ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
@@ -185,7 +185,7 @@ struct EventsRow: View {
                 Spacer()
             }
             if let waiting {
-                Text(waiting).appText(.fine).foregroundStyle(.secondary).lineLimit(1)
+                Text(waiting).appText(.fine).foregroundStyle(Paper.secondary).lineLimit(1)
             }
         }
         .accessibilityElement(children: .combine)

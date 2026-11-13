@@ -11,6 +11,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statS
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import * as esbuild from "esbuild";
+import { lucide } from "./lucide.mjs";
 
 const web = dirname(fileURLToPath(import.meta.url));
 const repo = dirname(web);
@@ -24,7 +25,7 @@ if (process.versions.node !== wanted) {
 }
 
 // The files whose bytes decide dist's. Keep in step with WebDistManifestTests.inputs.
-const fixedInputs = ["index.html", "sandbox.html", "build.mjs", "tsconfig.json", "package.json", "package-lock.json", ".node-version"];
+const fixedInputs = ["index.html", "sandbox.html", "build.mjs", "lucide.mjs", "tsconfig.json", "package.json", "package-lock.json", ".node-version"];
 const inputFolders = ["src", "assets"];
 
 function files(folder) {
@@ -52,6 +53,7 @@ const common = {
   target: ["safari18", "chrome130", "firefox130"],
   logLevel: "warning",
   absWorkingDir: web,
+  plugins: [lucide],
 };
 await esbuild.build({
   ...common,
@@ -61,7 +63,8 @@ await esbuild.build({
   jsx: "automatic",
   jsxImportSource: "preact",
 });
-await esbuild.build({ ...common, entryPoints: ["src/app.css"], outfile: "dist/app.css" });
+// The faces' url()s point at assets/, which is copied as it is below, not bundled (#4992).
+await esbuild.build({ ...common, entryPoints: ["src/app.css"], outfile: "dist/app.css", external: ["/assets/*"] });
 // The page's service worker (#1486), at the top so its scope is the whole page: Web Push.
 await esbuild.build({ ...common, entryPoints: ["src/sw.ts"], outfile: "dist/sw.js", format: "iife" });
 // The sandbox proxy a view is drawn through (#187), served at another origin than the page.

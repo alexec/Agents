@@ -16,7 +16,7 @@ struct DictateButton: View {
     var body: some View {
         PushToTalkButton(tap: toggle, begin: beginPushToTalk, end: finishPushToTalk, cancel: dictation.stop) {
             // The microphone, blue while it listens: the waveform is voice mode's (Alex, 2026-10-29).
-            Image(systemName: "microphone")
+            Image(icon: "microphone")
                 .appText(.reading).fontWeight(.semibold)
                 .foregroundStyle(dictation.isListening ? AnyShapeStyle(.tint) : AnyShapeStyle(.primary))
                 .frame(width: 22, height: 22)

@@ -146,6 +146,10 @@
               "type": "string",
               "description": "The address it signs in with."
             },
+            "username": {
+              "type": "string",
+              "description": "The user name it signs in with, when that is not the address. Never a secret."
+            },
             "plan": {
               "type": "string",
               "description": "Free, Pro…"
@@ -448,7 +452,7 @@
           "type": "boolean"
         },
         "worktree": {
-          "description": "Optional. Where the new session works. Leave out to work in the folder. \"new\" makes a fresh git worktree, on its own branch, named from the prompt — for parallel work that should not touch the same files. Or the name of a worktree of this repository that is already there, as `git worktree list` shows it. Or the name of a branch not checked out anywhere, local or on a remote, to make a fresh worktree on that branch. On another machine, \"new\" or a branch name.",
+          "description": "Optional. Where the new session works. Leave out to work in the folder. \"new\" makes a fresh git worktree, on its own branch, named from the prompt — for parallel work that should not touch the same files. Or the name of a worktree of this repository that is already there, as `git worktree list` shows it. Or the name of a branch not checked out anywhere, local or on a remote, to make a fresh worktree on that branch. Or a new name with no slash, such as fix-github-issue-42, to make a fresh worktree with that name, on the branch agents/<name>. On another machine, \"new\" or a branch name.",
           "type": "string"
         }
       },

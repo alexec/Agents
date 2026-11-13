@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/alexec/agents/Go/internal/agentsd/store"
 	"github.com/alexec/agents/Go/wire"
@@ -188,6 +189,12 @@ func (d *Daemon) helperWorktree(written, folder string) (*wire.WorktreeChoice, e
 	}
 	if _, err := git(folder, "rev-parse", "--verify", "--quiet", "refs/heads/"+written); err == nil {
 		return &wire.WorktreeChoice{Branch: &wire.WorktreeChoiceBranch{Value: written}}, nil
+	}
+	// A plain name that is not there yet makes a new worktree with that name, on the
+	// branch agents/<name> (#5185): a lead names its lanes fix-github-issue-<n>.
+	// A name with a slash is a branch, so one that is not there is still refused.
+	if !strings.Contains(written, "/") && worktreeName(written, true, time.Now()) == written {
+		return &wire.WorktreeChoice{Named: &wire.WorktreeChoiceNamed{Value: written}}, nil
 	}
 	if len(names) == 0 {
 		return nil, &Error{Code: wire.FailureNotAWorktree, Message: `there is no worktree called "` + written + `" here. There are none yet; say "new" to make one.`}

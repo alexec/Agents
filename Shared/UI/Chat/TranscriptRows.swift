@@ -201,6 +201,8 @@ private struct ReplyBlocks: View {
     var body: some View {
         if case .entry(let entry) = item, let text = TurnRows.text(of: item) {
             MarkdownText(markdown: text, range: range)
+                // One selectable text for the words of these blocks (#5155).
+                .environment(\.selectsAcrossBlocks, true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .appText(.reading)
                 // A shell's code block in a reply can be run (#1533).
@@ -341,8 +343,11 @@ private struct EntryRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("From the app").appText(.reading).foregroundStyle(.tertiary)
                     BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                        // One selectable text for its words (#5155).
+                        .environment(\.selectsAcrossBlocks, true)
                         .appText(.reading)
                         .foregroundStyle(.secondary)
+                        .environment(\.quietProse, true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .copiesMessage(entry)
@@ -352,6 +357,8 @@ private struct EntryRow: View {
                 VStack(alignment: .trailing, spacing: 3) {
                     Text(actions.fromLine(entry.sender)).appText(.reading).foregroundStyle(.tertiary)
                     BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                        // One selectable text for its words (#5155).
+                        .environment(\.selectsAcrossBlocks, true)
                         .environment(\.textFillsWidth, false)
                         .appText(.reading)
                         .padding(12)
@@ -363,6 +370,8 @@ private struct EntryRow: View {
             } else {
                 // Theirs, so at the right, as wide as its words and no wider.
                 BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                    // One selectable text for its words (#5155).
+                    .environment(\.selectsAcrossBlocks, true)
                     .environment(\.textFillsWidth, false)
                     .appText(.reading)
                     .padding(12)
@@ -374,13 +383,14 @@ private struct EntryRow: View {
 
         case .agentMessage(_, let text, let blocks):
             BlocksView(blocks: blocks.isEmpty ? [.text(text)] : blocks)
+                // One selectable text for its words (#5155).
+                .environment(\.selectsAcrossBlocks, true)
                 .appText(.reading)
                 // A shell's code block in a reply can be run (#1533).
                 .environment(\.codeRuns, true)
                 // A table or code wider than the text may reach into the margins (#3895).
                 .environment(\.widensBlocks, true)
                 .copiesMessage(entry)
-
         case .agentThought(_, let text):
             ThoughtLine(text: text)
 
@@ -389,7 +399,8 @@ private struct EntryRow: View {
             Text(call.line).appText(.reading).foregroundStyle(.secondary)
 
         case .planUpdated(let plan):
-            PlanView(plan: plan)
+            // One line that opens to the steps (#5033): the plan as it is now is in the top card.
+            PlanLine(plan: plan)
 
         case .usageRecorded:
             // Dropped by `TranscriptEntry.display` before it gets here. The cost of a
@@ -466,7 +477,7 @@ private struct EntryRow: View {
             SandboxFailureCard(record: record)
 
         case .policyStopped(let refusal):
-            PolicyStopCard(refusal: refusal)
+            PolicyStopCard(refusal: refusal, entryID: entry.id)
 
         case .background(let item):
             BackgroundEntryLine(item: item)
@@ -1047,23 +1058,6 @@ private extension JSONValue {
     }
 }
 
-/// The agent is at work and the person is waiting: the same mark the sidebar row shows,
-/// in step with it (#2044), at the foot of the conversation, so the chat itself moves
-/// while nothing else on it does: the ring spins while it thinks or replies, and also
-/// pivots while it runs a tool (#2332). Live rather than recorded — it is there exactly as long as the wait is,
-/// and it rides the end of the transcript as the reply arrives.
-struct WorkingLine: View {
-    /// The tool it runs, or nil while it thinks (`RunningToolWords.tool`).
-    var tool: String?
-
-    var body: some View {
-        WorkingRing(size: 16, doing: tool != nil)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 2)
-            .accessibilityLabel(tool.map(RunningToolWords.label) ?? "Working")
-    }
-}
-
 /// How long the chat has been quiet and how old it is, at its foot: "Last activity 12
 /// minutes ago · started 3 hours ago" (#1564). Nothing under five minutes. Read again on
 /// the minute, as `ActivityTime` is.
@@ -1081,15 +1075,6 @@ struct QuietLine: View {
                     .padding(.bottom, 14)
             }
         }
-    }
-}
-
-/// The chat is being picked back up by the daemon, and nobody typed for it.
-struct ComingBackLine: View {
-    var body: some View {
-        Label(AgentsModel.comingBackDescription, icon: AgentsModel.comingBackSymbol)
-            .appText(.reading)
-            .foregroundStyle(.secondary)
     }
 }
 
@@ -1237,6 +1222,12 @@ struct CopiesMessage: ViewModifier {
             // On a host too old to branch, greyed and saying why (#1866).
             let greyedBranch = prompt != nil && branch == nil && actions.branchNeedsUpdate
             content
+                #if os(iOS)
+                // A long press on the words is the text view's, so its edit menu has these
+                // too (#5181).
+                .environment(\.messageMenu, MessageMenu(text: text, copy: { Self.copy(text) }, quote: quote,
+                                                         branch: branch, branchGreyed: greyedBranch))
+                #endif
                 .contextMenu {
                     Button("Copy Message") { Self.copy(text) }
                     if let quote {
@@ -1271,10 +1262,26 @@ struct CopiesMessage: ViewModifier {
     }
 }
 
+/// A message's actions, for the text view that draws its words on the phone (#5181): a long
+/// press there is the text view's, so its edit menu carries them, beside Copy.
+struct MessageMenu {
+    let text: String
+    let copy: () -> Void
+    let quote: ((String) -> Void)?
+    let branch: (() -> Void)?
+    /// Branch from Here, greyed: the host is too old to branch (#1866).
+    let branchGreyed: Bool
+}
+
+extension EnvironmentValues {
+    @Entry var messageMenu: MessageMenu? = nil
+}
+
 /// The words selected in a reply, for Quote in Prompt (#1553). Selectable text tells no one
 /// its selection, but it answers Copy: so it is asked to copy, and the pasteboard is put back
-/// as it was. The prompt bar's own words are not a reply's. The Remote has no such way, and
-/// quotes the whole message.
+/// as it was. The prompt bar's own words are not a reply's. On the Remote, the
+/// message's menu quotes the whole message; its words' edit menu quotes the words selected
+/// (`ProseEditMenu`, #5181).
 enum ChatSelection {
     @MainActor static func text() -> String? {
         #if os(macOS)

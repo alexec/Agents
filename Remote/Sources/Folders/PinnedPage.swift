@@ -28,7 +28,7 @@ struct PinnedPage: View {
         Group {
             if let problem {
                 ContentUnavailableView {
-                    Label("Not in the folder", systemImage: "doc.questionmark")
+                    Label("Not in the folder", icon: "doc.questionmark")
                 } description: {
                     Text(problem)
                 } actions: {
@@ -70,9 +70,9 @@ struct PinnedPage: View {
             }
             ToolbarItem(placement: .primaryAction) {
                 if pin != nil {
-                    Button("Unpin", systemImage: "pin.slash") { Task { await model.unpin(path, in: folder) } }
+                    Button("Unpin", icon: "pin.slash") { Task { await model.unpin(path, in: folder) } }
                 } else {
-                    Button("Pin to Folder", systemImage: "pin") { Task { await model.pin(path, in: folder) } }
+                    Button("Pin to Folder", icon: "pin") { Task { await model.pin(path, in: folder) } }
                         .disabled(model.pins(in: folder).count >= PinLimits.perFolder || problem != nil)
                 }
             }

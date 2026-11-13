@@ -1,9 +1,9 @@
 import AgentsKitCore
 import SwiftUI
 
-/// An agent's ask to be archived (#584, #649), as a card at the end of the transcript, the
-/// way a tool's permission question is asked (#827): in the attention tint, with what the
-/// agent last said, and Approve or Keep Session. It was a grey line over the chat, and was
+/// An agent's ask to be archived (#584, #649), as an Ask at the end of the transcript, the
+/// way a tool's permission question is asked (#827, #5031): what the agent last said, and
+/// Archive or Keep Session. It was a grey line over the chat, and was
 /// missed. The window and the Remote both draw it; the web page's is `ArchiveCard.tsx`.
 struct ArchiveRequestCard: View {
     let agent: Agent
@@ -16,16 +16,14 @@ struct ArchiveRequestCard: View {
     @State private var busy = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label(ArchiveRequestWords.question, icon: ArchiveRequestWords.symbol)
-                .appText(.reading).fontWeight(.semibold)
-                .tinted(.attention)
+        // An Ask (#5031): the question as the title, Keep Session and Archive in the foot.
+        AskCard(icon: ArchiveRequestWords.symbol, title: ArchiveRequestWords.question) {
             Text(agent.report?.message ?? ArchiveRequestWords.noReport)
                 .appText(.supporting)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 10) {
-                Spacer()
+        } buttons: {
+            Group {
                 Button(ArchiveRequestWords.keep) { answer(keep) }
                     .buttonStyle(.paper)
                 Button(ArchiveRequestWords.archive) { answer(approve) }
@@ -35,12 +33,6 @@ struct ArchiveRequestCard: View {
             }
             .disabled(busy || isDisabled)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(StateTint.attention.color?.opacity(0.07) ?? .clear, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder((StateTint.attention.color ?? .secondary).opacity(0.25)))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(ArchiveRequestWords.question)
     }
 
     private func answer(_ action: @escaping () async -> Void) {

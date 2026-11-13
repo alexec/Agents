@@ -33,7 +33,11 @@ struct PermissionSheet: View {
     private static let questionCap: CGFloat = 380
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        // An Ask (#5031): the call as the title, who asks beside it. The choices stay stacked
+        // in the body on the phone, so each reads whole at any text size.
+        AskCard(icon: request.toolCall.isPlanApproval ? "list.number" : "terminal",
+                title: request.toolCall.title,
+                asker: model.work.askerLine(request.agentID, subagent: request.subagent)) {
             question
 
             if let chosen {
@@ -42,9 +46,6 @@ struct PermissionSheet: View {
                 choices
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .paperRaised(in: RoundedRectangle(cornerRadius: 18))
         // In the chat column, at the end of the conversation, as on the Mac
         // (033, #723).
         .chatColumn()
@@ -57,17 +58,8 @@ struct PermissionSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 VStack(alignment: .leading, spacing: 4) {
-                    // Who is asking, by title and runtime (#121) — its subagent, when it
-                    // is one (057). Still the agent's question to answer, so it is here.
-                    if let asker = model.work.askerLine(request.agentID, subagent: request.subagent) {
-                        Text(asker).appText(.fine).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    Text(request.toolCall.title)
-                        .appText(.reading).fontWeight(.semibold)
-                        .fixedSize(horizontal: false, vertical: true)
                     if let kind = request.toolCall.kind, !request.toolCall.isPlanApproval {
-                        Text(kind).appText(.fine).foregroundStyle(.secondary)
+                        Text(kind).appText(.fine).foregroundStyle(Paper.secondary)
                     }
                 }
                 detail
@@ -166,7 +158,7 @@ private struct Sending: View {
             ProgressView().controlSize(.small)
             Text(Telling.words(doing: option.name, host: host))
                 .appText(.reading)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
             Spacer(minLength: 0)
         }
         .padding(.vertical, 6)

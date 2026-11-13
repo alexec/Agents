@@ -9,7 +9,7 @@ import type { CapacityLevel, ControlMachine, DiskAlarm, MachineWorkspace, Runtim
 import { fromWireDate } from "../protocol/dates";
 import type { Store } from "../model/store";
 import { headline, needWords } from "../model/disk";
-import { MessageBanner } from "./MessageKinds";
+import { Strip } from "./Strip";
 import { levelWords } from "../model/capacity";
 
 /** What a workspace host's strip says while it is stopped, starting or failed to start, or null
@@ -128,21 +128,18 @@ export function offlineStrip(host: string, row: ControlMachine | undefined, at: 
   };
 }
 
+/** The host's strip (#5034, first of the session's strips): grey, because the person need not act. */
 export function OfflineStrip({ store, host }: { store: Store; host: string }) {
   if (store.hostIsOnline(host)) return null;
   const since = store.downSince.value[host];
   const at = since ? new Date(since).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : null;
   const row = store.hosts.value.find((h) => h.id === host);
   const strip = offlineStrip(host, row, at, store.macHostID.value);
-  // A banner of the pane (docs/reference/design-system.md, "Messages"): neutral, because the person need not act.
   return (
-    <MessageBanner tone="neutral" name="offline-strip" busy={strip.starting} actions={strip.since !== null ? <Elapsed since={strip.since} />
-      : strip.start ? (
-        <button type="button" disabled={store.hostsBeingStarted.value.includes(host)}
-          aria-label={`Start ${row?.name ?? "this machine"}`} onClick={() => void store.startHost(host)}>Start</button>
-      ) : undefined}>
-      {strip.line}
-    </MessageBanner>
+    <Strip tone="neutral" name="offline-strip" icon="wifi-off" busy={strip.starting} line={strip.line}
+      accessory={strip.since !== null ? <Elapsed since={strip.since} /> : undefined}
+      primary={strip.start ? { label: "Start", title: `Start ${row?.name ?? "this machine"}`,
+        disabled: store.hostsBeingStarted.value.includes(host), run: () => void store.startHost(host) } : null} />
   );
 }
 

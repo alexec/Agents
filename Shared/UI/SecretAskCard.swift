@@ -54,13 +54,7 @@ struct SecretAskCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label {
-                Text(secret.name).monospaced().fontWeight(.semibold)
-            } icon: {
-                Image(icon: "key").foregroundStyle(.secondary)
-            }
-            .appText(.reading)
-            .accessibilityLabel("Asks for the secret \(secret.name)")
+            // The step or the name is the Ask's title (AskCard, #5031).
             if let reason, !reason.isEmpty {
                 Text(reason).appText(.reading)
                     .fixedSize(horizontal: false, vertical: true)
@@ -97,16 +91,19 @@ struct SecretAskCard: View {
                 AskBeforeUseToggle(isOn: $askBeforeUse)
                     .disabled(sending)
             }
+            // The Ask's foot (#5031): the two ways to say no as links on the left.
+            Divider().overlay(Paper.rule)
             HStack(spacing: 8) {
+                // No Escape: in the chat, an Escape meant for something else would decline it.
+                HStack(spacing: 4) {
+                    AskDecline("No thanks") { send(nil) }
+                    Text("·").foregroundStyle(.secondary)
+                    AskDecline(DeclineReasonField.opener, action: because)
+                }
+                .appText(.fine)
+                .disabled(sending)
                 if sending { Telling(host: host) }
                 Spacer(minLength: 0)
-                // No Escape: in the chat, an Escape meant for something else would decline it.
-                Button("No thanks") { send(nil) }
-                    .buttonStyle(.paper)
-                    .disabled(sending)
-                Button(DeclineReasonField.opener, action: because)
-                    .buttonStyle(.paper)
-                    .disabled(sending)
                 Button("Save securely", action: save)
                     .buttonStyle(.paperProminent)
                     .keyboardShortcut(.defaultAction)

@@ -33,7 +33,7 @@ struct ProjectRows: View {
             }
         } label: {
             LabeledContent("Project") {
-                Text(label(current)).foregroundStyle(.secondary)
+                Text(label(current)).foregroundStyle(Paper.secondary)
             }
             .appText(.reading)
         }
@@ -52,7 +52,7 @@ struct ProjectRows: View {
             }
         } label: {
             LabeledContent("On") {
-                Text(model.hostLabel(summary.host)).foregroundStyle(.secondary)
+                Text(model.hostLabel(summary.host)).foregroundStyle(Paper.secondary)
             }
             .appText(.reading)
         }
@@ -82,6 +82,6 @@ struct ProjectRows: View {
 
     @ViewBuilder
     private func choiceLabel(_ title: String, chosen: Bool) -> some View {
-        if chosen { Label(title, systemImage: "checkmark") } else { Text(title) }
+        if chosen { Label(title, icon: "checkmark") } else { Text(title) }
     }
 }

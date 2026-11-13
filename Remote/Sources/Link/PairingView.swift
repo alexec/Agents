@@ -44,7 +44,7 @@ struct PairingView: View {
     @ViewBuilder private var signIn: some View {
         Text("Type your control plane’s address. Sign in with an account added to your person there.")
             .appText(.fine)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Paper.secondary)
             .multilineTextAlignment(.center)
         SignInToPair(pair: { url, signIn, waiting in
             try await model.pairBySigningIn(at: url, with: signIn, waiting: waiting)
@@ -72,7 +72,7 @@ struct PairingView: View {
              : "On your Mac, choose Pair a Phone or iPad… in Agents’ menu bar item, or Pair a Device in "
                + "Agents ▸ Settings. Then scan the code it shows.")
             .appText(.fine)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Paper.secondary)
             .multilineTextAlignment(.center)
         Button {
             model.forgetPairingOutcome()
@@ -104,7 +104,7 @@ struct PairingView: View {
             ProgressView("Pairing…")
                 .appText(.fine)
         case .paired:
-            Label("Paired", systemImage: "checkmark.circle")
+            Label("Paired", icon: "checkmark.circle")
                 .appText(.fine)
         case .failed(let why):
             // The pairing's note (#4737), in place of its spinner.
@@ -126,7 +126,7 @@ private struct ScanSheet: View {
                         .ignoresSafeArea()
                 } else {
                     ContentUnavailableView("Can't use the camera",
-                                           systemImage: "camera",
+                                           icon: "camera",
                                            description: Text("Allow Agents to use the camera in Settings, "
                                                              + "then try again."))
                 }

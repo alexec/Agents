@@ -150,6 +150,7 @@ public enum AccountsWords {
         var f: [String: String] = ["service": a.service]
         f["description"] = a.description
         f["address"] = a.address
+        f["username"] = a.username
         f["plan"] = a.plan
         f["cost"] = a.monthlyCostUsd.map { $0 == $0.rounded() ? String(Int($0)) : String($0) }
         f["card"] = a.card
@@ -176,6 +177,7 @@ public enum AccountsWords {
                                         monthlyCostUsd: v("cost").flatMap { Double($0.replacingOccurrences(of: "$", with: "")) },
                                         card: v("card"), secret: v("secret"), twoFactor: v("twoFactor"), issue: v("issue"),
                                         made: v("made"), tokenExpires: v("tokenExpires"), notes: v("notes"),
-                                        projects: projects.isEmpty ? nil : projects, askBeforeUse: f[askField] == "off" ? false : nil)
+                                        projects: projects.isEmpty ? nil : projects, askBeforeUse: f[askField] == "off" ? false : nil,
+                                        username: v("username"))
     }
 }

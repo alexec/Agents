@@ -20,7 +20,7 @@ struct TakeOverView: View {
                 if let key, let agent {
                     content(key.source, agent: agent)
                 } else {
-                    ContentUnavailableView("This session is gone", systemImage: "questionmark.folder")
+                    ContentUnavailableView("This session is gone", icon: "questionmark.folder")
                 }
             }
             .navigationTitle(agent?.title ?? "")
@@ -29,7 +29,7 @@ struct TakeOverView: View {
             .toolbar {
                 if let close {
                     ToolbarItem(placement: .cancellationAction) {
-                        Button("Close", systemImage: "xmark", action: close)
+                        Button("Close", icon: "xmark", action: close)
                     }
                 }
             }

@@ -63,17 +63,6 @@ struct PromptBar: View {
                 // Where it works, its labels and its runtime, over the field as on the
                 // window and the page (#108, #242).
                 PromptHead(agent: agent)
-                PromptHeader(agent: agent,
-                             background: agent.background,
-                             backgroundActions: BackgroundActions(
-                                stop: { [model] item in await model.stopBackground(item, of: agent.id) },
-                                steps: { [chatActions] item in chatActions.subagentSteps?(item.id) }),
-                             // One line on a phone, the Mac's rows on an iPad (frame E).
-                             compactBackground: sizeClass == .compact)
-                CostLimitBanner(agent: agent, limits: model.costLimits, costState: model.costState,
-                                goOn: { Task { await model.letThisAgentGoOn(agent) } }) {
-                    RaiseTheLimitOnTheMac()
-                }
             }
             // A field note (#4737), shown only while there is one: a kept line would cost the
             // phone's bar a line for ever.
@@ -83,7 +72,7 @@ struct PromptBar: View {
             if draftLostSomething {
                 Text(PromptWords.draftLostSomething)
                     .appText(.fine)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             }
             if isCompleting {
                 CommandList(commands: matchingCommands, selected: selectedCommand, choose: accept)
@@ -300,7 +289,7 @@ struct PromptBar: View {
                             if acting == .stop {
                                 ProgressView()
                             } else {
-                                Image(systemName: PromptWords.stopSymbol)
+                                Image(icon: PromptWords.stopSymbol)
                                     .appText(.reading).fontWeight(.semibold)
                             }
                         }
@@ -318,7 +307,7 @@ struct PromptBar: View {
                 } else {
                     // No spinner: the prompt is in the chat at once, as the person's bubble (#4814).
                     Button(action: send) {
-                        Image(systemName: PromptWords.sendSymbol(willQueue: willQueue))
+                        Image(icon: PromptWords.sendSymbol(willQueue: willQueue))
                             .appText(.reading).fontWeight(.semibold)
                             .frame(width: 22, height: 22)
                     }
@@ -686,10 +675,10 @@ private struct PromptHead: View {
         } else {
             Button { editingLabels = true } label: {
                 if agent.labels.isEmpty {
-                    Label("Add label", systemImage: "plus")
+                    Label("Add label", icon: "plus")
                         .labelStyle(.titleAndIcon)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                 } else {
                     // The one line is the way to edit them: its chips do not filter, the
                     // field it opens does (#3898).

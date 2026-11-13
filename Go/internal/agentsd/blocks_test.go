@@ -140,7 +140,7 @@ func TestABlockOutlivesACardInTheSameTurn(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
 	waiting := &wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: "Waiting on the helper.", At: now(),
-		Block: &wire.Block{Waits: []wire.Wait{}, CheckAgainAt: new(now())}}
+		Block: &wire.Block{Waits: []wire.Wait{{AgentID: store.NewUUID(), NameAtReport: "Helper"}}, Deadline: new(now())}}
 	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason, a.Report = wire.AgentStateRunning, nil, waiting })
 	d.setState(a.ID, wire.AgentStateWaitingOnUser)
 	d.setState(a.ID, wire.AgentStateRunning)
@@ -293,7 +293,7 @@ func TestABlockClearedTwiceAtOnceResumesOnce(t *testing.T) {
 	lead := seeded(t, d, dir, func(a *wire.Agent) {
 		a.Title, a.State, a.EndedReason = title("Release"), wire.AgentStateFinished, reason(wire.EndedReasonEndTurn)
 		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: "Waiting for the reviews.", At: now(),
-			Block: &wire.Block{WakeOn: &anyOf, CheckAgainAt: new(wire.DateOf(time.Now().Add(time.Hour))), Waits: []wire.Wait{
+			Block: &wire.Block{WakeOn: &anyOf, Deadline: new(wire.DateOf(time.Now().Add(time.Hour))), Waits: []wire.Wait{
 				{AgentID: one.ID, NameAtReport: "Security review", Ending: ending},
 				{AgentID: two.ID, NameAtReport: "Performance review", Ending: ending},
 			}}}
@@ -341,7 +341,7 @@ func TestAWaitOutlivesAnotherAgentsMessage(t *testing.T) {
 	lead := seeded(t, d, dir, func(a *wire.Agent) {
 		a.Title, a.State, a.EndedReason = title("Release"), wire.AgentStateFinished, reason(wire.EndedReasonEndTurn)
 		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: "Waiting for the review and the check.", At: now(),
-			Block: &wire.Block{CheckAgainAt: new(wire.DateOf(time.Now().Add(time.Hour))), Waits: []wire.Wait{
+			Block: &wire.Block{Deadline: new(wire.DateOf(time.Now().Add(time.Hour))), Waits: []wire.Wait{
 				{AgentID: review.ID, NameAtReport: "Review"}, {AgentID: check.ID, NameAtReport: "Check"},
 			}}}
 	})
@@ -391,6 +391,31 @@ func TestAWaitOutlivesAnotherAgentsMessage(t *testing.T) {
 	waitFor(t, "its turn over", turnOver(3))
 }
 
+// A block that waits on no session is a time-only one that check_again made before #4843:
+// on load it is dropped, with no resume and no move up the list (#5152).
+func TestATimeOnlyBlockIsDroppedOnLoad(t *testing.T) {
+	fakeRuntimes(t)
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	old := seeded(t, d, t.TempDir(), func(a *wire.Agent) {
+		r := wire.AgentArchivedReasonByUser
+		a.State, a.ArchivedReason = wire.AgentStateArchived, &r
+		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: "Waiting for CI.", At: now(),
+			Block: &wire.Block{Waits: []wire.Wait{}, Deadline: new(wire.DateOf(time.Now().Add(-48 * time.Hour)))}}
+	})
+	d.resumeBlocks()
+	got := d.Store.Agent(old.ID)
+	if isOpenBlock(got.Report) || got.Report.Block.ClearedBy == nil || *got.Report.Block.ClearedBy != wire.BlockClearingDropped {
+		t.Fatalf("still open: %+v", got.Report.Block)
+	}
+	if len(got.QueuedPrompts) > 0 {
+		t.Fatalf("resumed: %+v", got.QueuedPrompts)
+	}
+	if got.LastActivityAt != old.LastActivityAt {
+		t.Fatalf("moved up its list: %v, was %v", got.LastActivityAt, old.LastActivityAt)
+	}
+}
+
 // A due block on an agent in a turn does not keep the block timer firing (#4687): aimed
 // at its time, which had passed, the timer fired every 20 ms until the turn ended, and
 // each pass copied and sorted every record. The block resumes as the turn ends.
@@ -401,7 +426,8 @@ func TestADueBlockInATurnFiresTheTimerOnce(t *testing.T) {
 	lead := seeded(t, d, t.TempDir(), func(a *wire.Agent) {
 		a.State, a.EndedReason = wire.AgentStateFinished, reason(wire.EndedReasonEndTurn)
 		a.Report = &wire.WorkReport{Outcome: wire.WorkOutcomeWaiting, Message: "Waiting for CI.", At: now(),
-			Block: &wire.Block{Waits: []wire.Wait{}, CheckAgainAt: new(wire.DateOf(time.Now().Add(-time.Minute)))}}
+			Block: &wire.Block{Waits: []wire.Wait{{AgentID: store.NewUUID(), NameAtReport: "CI watcher"}},
+				Deadline: new(wire.DateOf(time.Now().Add(-time.Minute)))}}
 	})
 	l := d.live(lead.ID)
 	l.mu.Lock()
@@ -422,7 +448,7 @@ func TestADueBlockInATurnFiresTheTimerOnce(t *testing.T) {
 	l.kick()
 	waitFor(t, "the block resumed", func() bool {
 		for _, u := range userMessages(d, lead.ID) {
-			if strings.HasPrefix(u, "The time you asked to check again has come.") {
+			if strings.HasPrefix(u, "The time you asked for has come.") {
 				return true
 			}
 		}

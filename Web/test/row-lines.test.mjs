@@ -169,8 +169,8 @@ test("a waiting row is one line: the first thing it waits for and how many more 
   assert.equal(mark.detail.split("\n")[0], "Docs — still working");
   assert.equal(mark.detail.split("\n")[2], "Waiting for build, held by “Ship it”, 1st in line");
   assert.equal(lines.waitMark({ state: "running" }, { names: [], lines: [] }, null, title), null);
-  assert.equal(lines.waitMark({ state: "finished" }, { names: [], lines: ["Checks again at 14:30"] }, null, title).line,
-    "Checks again at 14:30");
+  assert.equal(lines.waitMark({ state: "finished" }, { names: [], lines: ["Carries on by 14:30 at the latest"] }, null, title).line,
+    "Carries on by 14:30 at the latest");
 });
 
 test("the mark draws what it waits on, as WaitKind does (#5022)", () => {

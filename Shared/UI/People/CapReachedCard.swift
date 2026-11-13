@@ -19,7 +19,7 @@ struct CapReachedCard: View {
             Image(icon: "dollarsign.circle")
                 // Decorative: the card says what it is in words.
                 .glyph(size: 13)
-                .foregroundStyle(StateTint.attention.style(or: .primary))
+                .foregroundStyle(StateTint.warning.style(or: .primary))
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 Text(BotWords.capReachedTitle(reached)).fontWeight(.semibold)
@@ -30,7 +30,7 @@ struct CapReachedCard: View {
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
                     Button(BotWords.setCap) { isChanging = true }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.paperProminent)
                         .disabled(bot == nil || control == nil)
                     Button("OK") { people.dismissCap(reached) }
                         .buttonStyle(.bordered)

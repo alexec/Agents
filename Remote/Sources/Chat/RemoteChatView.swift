@@ -221,27 +221,13 @@ struct RemoteChatView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 StaleBanner()
-                // A server's agent whose host has gone: which, and since when (#239).
-                if let agent { HostOfflineStrip(host: agent.host) }
-                // Its folder gone (#119): which, and the ways on, before anything is typed.
-                if let agent, agent.missingFolder != nil, agent.state != .archived {
-                    RemoteMissingFolderStrip(agent: agent)
-                }
-                // Its account gone or refused by the organisation (#999): why, and Continue in New.
-                if let agent, agent.missingFolder == nil, let reason = model.accountMoveReason(agent) {
-                    RemoteAccountMoveStrip(agent: agent, reason: reason)
-                }
-                // A session failed when its allowance ran out (#1859): Continue when it is back, or Cancel.
-                if let agent, ContinueWhenBackWords.offers(agent) || agent.continueWhenBack != nil,
-                   model.host(agent.host, has: Capability.chatContinueWhenBack1) {
-                    RemoteContinueWhenBackStrip(agent: agent)
-                }
+                // What is wrong with the session's place, one strip at a time (#5034).
+                if let agent { strips(for: agent) }
                 // Under the banner, not over it: when the Mac has gone quiet, what
                 // the agent last said it would do is the less urgent of the two.
                 if let agent {
-                    // The goal it keeps working towards over the plan, as the window has them (#2742).
-                    GoalCard(agent: agent)
-                    CurrentPlanStrip(agent: agent)
+                    // What it works towards: the goal (#2742) and the plan, one Now card (#5033).
+                    NowTopCard(agent: agent)
                 }
                 // The agent asked to be looked at while something was being typed: said
                 // here, to be opened when the person chooses (034 FR-005). The main scene's.
@@ -321,7 +307,7 @@ struct RemoteChatView: View {
                         let state = model.panes.state(for: agent.id)
                         if state.pane == nil { state.show(state.defaultPane) } else { state.pane = nil }
                     } label: {
-                        Label("Panes", systemImage: "sidebar.right")
+                        Label("Panes", icon: "sidebar.right")
                     }
                     .accessibilityHint("Shows the page, files and terminal for this agent")
                 }
@@ -386,6 +372,32 @@ struct RemoteChatView: View {
                 })
             }
         }
+        // The sandbox failure it waits on, once in the transcript, is an Ask here, as on the
+        // Mac (#5031).
+        if let record = waitingSandbox, let keepStopped = sandboxAnswer(carryOn: false) {
+            cards.append(WaitingCard(id: "sandbox:" + agent.id.uuidString) {
+                SandboxAsk(record: record, setBy: model.sandboxSettings.setBy,
+                           keepStopped: keepStopped, continueWithout: sandboxAnswer(carryOn: true))
+                    .chatColumn()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            })
+        }
+        // A policy stop that can still be raised, once in the transcript, is an Ask here (#5031).
+        if let askForMore = actions.askForMore,
+           let stop = PolicyStopAsks.shared.raisable(model.work.entries, agent: agent) {
+            cards.append(WaitingCard(id: "policy:" + stop.id.uuidString) {
+                PolicyStopAsk(refusal: stop.refusal, entryID: stop.id, askForMore: askForMore,
+                              openPolicy: actions.openPolicy)
+                    .chatColumn()
+            })
+        }
+        // A view's Show or Send, once in its row, is an Ask here (#5031).
+        for host in views.asking {
+            cards.append(WaitingCard(id: "view:" + host.call.id.uuidString) {
+                AppViewAsk(host: host)
+                    .chatColumn()
+            })
+        }
         // An ask to be archived waits the same way, last when asked at once, as on the
         // Mac (#827).
         if agent.asksToArchive {
@@ -403,11 +415,10 @@ struct RemoteChatView: View {
         // iPad, a full-screen cover on an iPhone (#4141).
         let liveFrames = page.liveFrames.filter { $0.value.frame.agentID == agent.id }
         if agent.state == .running, !liveFrames.isEmpty {
-            cards.append(WaitingCard(id: "live:" + agent.id.uuidString) {
+            cards.append(WaitingCard(id: "live:" + agent.id.uuidString, asks: false) {
                 LiveTile(frames: liveFrames, open: { [openTakeOver] source in
                     openTakeOver(TakeOverKey(agentID: agent.id, source: source))
                 })
-                .chatColumn()
                 .transition(.opacity)
             })
         }
@@ -418,31 +429,32 @@ struct RemoteChatView: View {
                                         resume: { await model.resumeDesktopControl(agent.id) },
                                         takeOver: { await model.takeOverDesktopControl(agent.id) },
                                         isDisabled: model.isStale(agent))
-                    .chatColumn()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             })
         }
         // A wait on sessions or on a time, the same card in the same place (#2750): it was
         // lines under the chat's head, with Carry on in the toolbar.
         if let (report, block) = model.work.openBlock(agent) {
-            cards.append(WaitingCard(id: "block:" + agent.id.uuidString) {
+            cards.append(WaitingCard(id: "block:" + agent.id.uuidString, asks: false) {
                 BlockWaitCard(block: block, since: report.at, lines: model.blockLines(agent),
                               stop: { await model.carryOn(agent.id) },
                               help: AgentsModel.carryOnHelp(for: agent),
                               isDisabled: model.isStale(agent))
-                    .chatColumn()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             })
         }
         // The agent's wait on events, under the questions, as on the Mac (#1995).
         if agent.eventWait?.isOpen == true, let status = model.work.waitStatus(of: agent) {
-            cards.append(WaitingCard(id: "wait:" + agent.id.uuidString) {
+            // A wait only the person can settle is an Ask (#5031), in the chat column; any other
+            // is a part of the Now card (#5033), which keeps the column itself.
+            let asks = agent.eventWait?.lineResource == nil && agent.eventWait?.personLine != nil
+            cards.append(WaitingCard(id: "wait:" + agent.id.uuidString, asks: asks) {
                 WaitCard(status: status, eventWait: agent.eventWait,
                          lines: model.work.waitEventLines(of: agent),
                          continueNow: { await model.continueWaiting(of: agent.id, line: agent.eventWait?.lineResource) },
                          stop: { await model.cancelWait(of: agent.id) },
                          isDisabled: model.isStale(agent))
-                    .chatColumn()
+                    .chatColumn(asks)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             })
         }
@@ -554,6 +566,7 @@ struct RemoteChatView: View {
             // A subagent's own steps, in a sheet: the Mac's Background pane, on a phone
             // (057, frame E).
             subagentSteps: { id in subagentOnScreen = id },
+            stopBackground: { [model] item, agentID in await model.stopBackground(item, of: agentID) },
             turnEntries: { [model] agentID, range in await model.turnEntries(agentID, range) },
             reloadTranscript: { [model, popped] in
                 if let popped { await model.loadTranscript(of: popped) } else { await model.loadTranscript() }
@@ -717,7 +730,7 @@ private struct ChatMenu: View, Equatable {
         Menu {
             // Blocked (039): first, on a phone. The card in the chat keeps its own (#981).
             if sizeClass != .regular, state.isBlocked {
-                Button(AgentsModel.carryOnLabel, systemImage: "play.circle") {
+                Button(AgentsModel.carryOnLabel, icon: "play.circle") {
                     Task { await model.carryOn(id) }
                 }
                 .disabled(state.isStale)
@@ -731,29 +744,29 @@ private struct ChatMenu: View, Equatable {
                         Text("Find in Chat")
                         if !state.findsOnHost { Text(UpdateWords.hostNeedsUpdate) }
                     } icon: {
-                        Image(systemName: "text.magnifyingglass")
+                        Image(icon: "text.magnifyingglass")
                     }
                 }
                 .disabled(!state.findsOnHost)
-                Button("Prompts", systemImage: "list.number", action: prompts)
+                Button("Prompts", icon: "list.number", action: prompts)
             }
-            Button("Open File…", systemImage: "magnifyingglass", action: openFile)
-            Button(ChatThoughts.menuTitle(showsThoughts: showsThoughts), systemImage: "brain") { showsThoughts.toggle() }
+            Button("Open File…", icon: "magnifyingglass", action: openFile)
+            Button(ChatThoughts.menuTitle(showsThoughts: showsThoughts), icon: "brain") { showsThoughts.toggle() }
                 .accessibilityHint(ChatThoughts.menuHelp)
             // One menu in the bar, not two (#2808); Control-` still opens it from a keyboard.
             if let folderTerminal, state.hasFolderTerminal {
-                Button("Folder Terminal", systemImage: "apple.terminal") { folderTerminal() }
+                Button("Folder Terminal", icon: "apple.terminal") { folderTerminal() }
             }
             // The main scene's chat, in a scene of its own (#888), where the device has more
             // than one.
             if !state.isPopped, supportsMultipleWindows {
-                Button("Open in New Window", systemImage: "macwindow.badge.plus") {
+                Button("Open in New Window", icon: "macwindow.badge.plus") {
                     openWindow(id: PoppedChat.sceneID, value: id)
                 }
             }
             if !state.isArchived {
                 // As the Mac's Session menu has them (#342, #751).
-                Button("Rename…", systemImage: "pencil") {
+                Button("Rename…", icon: "pencil") {
                     if let agent = model.work.agent(id) { model.askToRename(agent) }
                 }
                 .disabled(state.isStale)
@@ -761,7 +774,7 @@ private struct ChatMenu: View, Equatable {
                     Button {
                         Task { await model.setMuted(id, !state.isMuted) }
                     } label: {
-                        Label(MuteWords.label(muted: state.isMuted), systemImage: MuteWords.symbol(muted: state.isMuted))
+                        Label(MuteWords.label(muted: state.isMuted), icon: MuteWords.symbol(muted: state.isMuted))
                         // What it does, under it (#2086): iOS menus draw a second Text as a subtitle.
                         Text(MuteWords.help(muted: state.isMuted))
                     }
@@ -770,7 +783,7 @@ private struct ChatMenu: View, Equatable {
                 Button {
                     Task { await model.fork(id) }
                 } label: {
-                    Label("Branch", systemImage: "arrow.triangle.branch")
+                    Label("Branch", icon: "arrow.triangle.branch")
                 }
                 .disabled(state.isStale)
                 // To another of the person's machines, with its unpushed work (#4037).
@@ -781,25 +794,25 @@ private struct ChatMenu: View, Equatable {
                         guard let agent = model.work.agent(id) else { return }
                         Task { await model.setPinned(agent, !state.isPinned) }
                     } label: {
-                        Label(state.isPinned ? "Unpin" : "Pin", systemImage: state.isPinned ? "pin.slash" : "pin")
+                        Label(state.isPinned ? "Unpin" : "Pin", icon: state.isPinned ? "pin.slash" : "pin")
                     }
                     .disabled(state.isStale)
                     Button {
                         Task { await model.archive(id, andLeave: state.leavesChat) }
                     } label: {
-                        Label("Archive", systemImage: "archivebox")
+                        Label("Archive", icon: "archivebox")
                     }
                     .disabled(state.isStale || state.isActing)
                 }
             } else {
                 Divider()
-                Button("Unarchive", systemImage: "tray.and.arrow.up") {
+                Button("Unarchive", icon: "tray.and.arrow.up") {
                     Task { await model.unarchive(id) }
                 }
                 .disabled(state.isStale)
             }
         } label: {
-            Label("Actions", systemImage: "ellipsis.circle")
+            Label("Actions", icon: "ellipsis.circle")
         }
     }
 }
@@ -869,14 +882,46 @@ struct ContextMeter: View {
 ///
 /// The agent's request, kept on the chat rather than taking the screen: somebody typing
 /// is not somebody to interrupt, and the file will still be there when they are done.
+extension RemoteChatView {
+    /// The session's strips (#5034): its host, folder, account, allowance and limit, in that
+    /// order, one at a time with "+N more". The limit's left the prompt bar for here.
+    @ViewBuilder
+    func strips(for agent: Agent) -> some View {
+        let reason = RemoteMissingFolderStrip.isShown(agent) ? nil : model.accountMoveReason(agent)
+        let kinds = SessionStripKind.allCases.filter { kind in
+            switch kind {
+            case .host: HostOfflineStrip.isShown(agent.host, model: model)
+            case .folder: RemoteMissingFolderStrip.isShown(agent)
+            case .account: reason != nil
+            case .allowance: RemoteContinueWhenBackStrip.isShown(agent, model: model)
+            case .limit: agent.state != .archived
+                && CostLimitStrip.isShown(agent: agent, limits: model.costLimits, costState: model.costState)
+            }
+        }
+        StripStack(kinds: kinds) { kind in
+            switch kind {
+            case .host: HostOfflineStrip(host: agent.host)
+            case .folder: RemoteMissingFolderStrip(agent: agent)
+            case .account: RemoteAccountMoveStrip(agent: agent, reason: reason ?? "")
+            case .allowance: RemoteContinueWhenBackStrip(agent: agent)
+            case .limit:
+                CostLimitStrip(agent: agent, limits: model.costLimits, costState: model.costState,
+                               goOn: { Task { await model.letThisAgentGoOn(agent) } })
+            }
+        }
+        .paneBannerInset()
+        .remoteBannerGround()
+    }
+}
+
 private struct OfferedFileStrip: View {
     @Environment(RemoteModel.self) private var model
     let file: ShownFile
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: ShownFile.isMarkdown(file.url) ? "doc.richtext" : "doc.text")
-                .foregroundStyle(.secondary)
+            Image(icon: ShownFile.isMarkdown(file.url) ? "doc.richtext" : "doc.text")
+                .foregroundStyle(Paper.secondary)
                 .accessibilityHidden(true)
             Text("Wants you to see \(Text(file.name).fontWeight(.semibold))")
                 .appText(.supporting)
@@ -888,7 +933,7 @@ private struct OfferedFileStrip: View {
             Button {
                 model.dismissOfferedFile()
             } label: {
-                Label("Not now", systemImage: "xmark")
+                Label("Not now", icon: "xmark")
                     .labelStyle(.iconOnly)
             }
             .buttonStyle(.borderless)

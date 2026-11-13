@@ -574,7 +574,7 @@ struct WorkCommentBox: View {
                     Spacer()
                     if let closes { closeButton(closes) }
                     Button("Comment") { Task { await comment() } }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.paperProminent)
                         .disabled(sending || empty)
                         .keyboardShortcut(.return, modifiers: .command)
                 }

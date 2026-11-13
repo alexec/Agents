@@ -54,7 +54,7 @@ struct SignInRequestCard: View {
                 }
                 HStack(spacing: 8) {
                     Button("Approve") { answer(true, request.needsCode ? typedCode : nil) }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.paperProminent)
                         .disabled(request.needsCode && typedCode.isEmpty)
                     Button("Deny") { answer(false, nil) }
                         .buttonStyle(.bordered)

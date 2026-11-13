@@ -510,6 +510,9 @@ public enum DaemonAPI {
         public static let secretsSessionRemove = "secrets/sessionRemove"
         /// Ask before use on or off (#4014, #4016). The person's own clients only.
         public static let secretsSetNeedsApproval = "secrets/setNeedsApproval"
+        /// Settings ▸ You ▸ Secrets ▸ On This Machine (#5122): the secrets a machine keeps for itself,
+        /// which agents saved there. The person's own clients only.
+        public static let secretsLocalList = "secrets/localList"
         public static let desktopControlState = "desktopControl/state"
         public static let desktopControlSet = "desktopControl/set"
         public static let desktopControlResume = "desktopControl/resume"
@@ -1677,15 +1680,13 @@ public enum DaemonAPI {
         /// Only with `blocked` (039): the agents it waits on, as it wrote them — ids or
         /// titles, resolved by the daemon. Optional, so an older helper still relays.
         public var waitingOn: [String]?
-        public var checkAgainInMinutes: Int?
 
         public init(token: String, outcome: String, message: String,
-                    waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil) {
+                    waitingOn: [String]? = nil) {
             self.token = token
             self.outcome = outcome
             self.message = message
             self.waitingOn = waitingOn
-            self.checkAgainInMinutes = checkAgainInMinutes
         }
     }
 
@@ -1712,7 +1713,6 @@ public enum DaemonAPI {
         public var prompts: [SuggestedPrompt]
         /// Only with `blocked` (039). See `ReportOutcomeRequest`.
         public var waitingOn: [String]?
-        public var checkAgainInMinutes: Int?
         /// `any` or `all` (#152): whether the first of `waitingOn` to finish resumes it.
         /// A string, checked at the daemon; left out is `all`.
         public var wakeOn: String?
@@ -1730,7 +1730,7 @@ public enum DaemonAPI {
 
         public init(token: String, outcome: String, message: String,
                     prompts: [SuggestedPrompt],
-                    waitingOn: [String]? = nil, checkAgainInMinutes: Int? = nil,
+                    waitingOn: [String]? = nil,
                     wakeOn: String? = nil, afterwards: String? = nil,
                     addLabels: [String] = [], removeLabels: [String] = [],
                     move: MoveAsk? = nil) {
@@ -1739,7 +1739,6 @@ public enum DaemonAPI {
             self.message = message
             self.prompts = prompts
             self.waitingOn = waitingOn
-            self.checkAgainInMinutes = checkAgainInMinutes
             self.wakeOn = wakeOn
             self.afterwards = afterwards
             self.addLabels = addLabels
@@ -1754,7 +1753,6 @@ public enum DaemonAPI {
             message = try c.decode(String.self, forKey: .message)
             prompts = try c.decode([SuggestedPrompt].self, forKey: .prompts)
             waitingOn = try c.decodeIfPresent([String].self, forKey: .waitingOn)
-            checkAgainInMinutes = try c.decodeIfPresent(Int.self, forKey: .checkAgainInMinutes)
             wakeOn = try c.decodeIfPresent(String.self, forKey: .wakeOn)
             afterwards = try c.decodeIfPresent(String.self, forKey: .afterwards)
             addLabels = try c.decodeIfPresent([String].self, forKey: .addLabels) ?? []

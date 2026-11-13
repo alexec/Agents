@@ -90,51 +90,51 @@ struct AgentCard: View {
                             .fontWeight(agent.drawsUnread ? .semibold : .regular)
                             .lineLimit(2)
                         if let workflowName = startedByWorkflowName {
-                            Image(systemName: "flowchart")
+                            Image(icon: "flowchart")
                                 .appText(.fine)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(Paper.tertiary)
                                 .accessibilityLabel("started by the workflow \(workflowName)")
                         }
                         // Mute Notifications (#2003), as the Mac's row marks it (#2085):
                         // a workflow's muted runs say so on its page too.
                         if agent.isMuted {
-                            Image(systemName: MuteWords.symbol)
+                            Image(icon: MuteWords.symbol)
                                 .appText(.fine)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(Paper.tertiary)
                                 .accessibilityLabel(MuteWords.muted)
                         }
                         // Started by another agent (028), marked as the Mac's row
                         // marks it.
                         if let starter = model.startedByAgentLabel(agent) {
-                            Image(systemName: AgentsModel.startedByAgentSymbol)
+                            Image(icon: AgentsModel.startedByAgentSymbol)
                                 .appText(.fine)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(Paper.tertiary)
                                 // Said, as the workflow mark is and the Mac's row says it (#1326).
                                 .accessibilityLabel(starter)
                         }
                         // A file it showed that the person has not looked at (#1802), as
                         // the Mac's row marks it: never Needs you.
                         if let file = FileToSeeWords.line(agent) {
-                            Image(systemName: FileToSeeWords.symbol)
+                            Image(icon: FileToSeeWords.symbol)
                                 .appText(.fine)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Paper.secondary)
                                 .accessibilityLabel(file)
                         }
                         // Its folder gone (#119), as the Mac's row and a folder's say it.
                         if agent.missingFolder != nil, agent.state != .archived {
-                            Label(MissingFolderWords.label, systemImage: "exclamationmark.triangle")
+                            Label(MissingFolderWords.label, icon: "exclamationmark.triangle")
                                 .appText(.fine)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Paper.secondary)
                         }
                         // Working in a worktree (030), named as on the Mac's row. A
                         // folder that has gone is the Mac's to say, above.
                         if let worktree = agent.worktree {
                             HStack(spacing: 3) {
-                                Image(systemName: "arrow.triangle.branch")
+                                Image(icon: "arrow.triangle.branch")
                                 Text(worktree.name).lineLimit(1)
                             }
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Paper.tertiary)
                             .strikethrough(agent.missingFolder != nil)
                             .help(agent.missingFolder != nil
                                   ? "\(worktree.branch ?? "detached") — \(worktree.root.path), which is not there any more"
@@ -157,12 +157,12 @@ struct AgentCard: View {
                         // Its place in the queue (#362), as the Mac's row says it.
                         Text(queued)
                             .appText(.supporting)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                     } else if let report = FileToSeeWords.reportLine(agent) {
                         // A file to see is named here first, as on the Mac (#1873).
                         Text(report)
                             .appText(.supporting)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .lineLimit(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -170,9 +170,9 @@ struct AgentCard: View {
                         RemoteSessionLabels(agent: agent, compact: true)
                     }
                     if let running = BackgroundWords.mark(agent.background) {
-                        Label(running, systemImage: "apple.terminal")
+                        Label(running, icon: "apple.terminal")
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .lineLimit(1)
                             .accessibilityElement(children: .ignore)
                             .accessibilityLabel(running)
@@ -187,22 +187,22 @@ struct AgentCard: View {
                     if let wait = model.work.waitMark(of: agent) {
                         Text(wait.line)
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .lineLimit(1)
                     }
                     // While the sidebar searches: the line it said that matches (#1585).
                     if let said = model.work.saidLines[agent.id] {
                         Text(said)
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .lineLimit(1)
                     }
                     // As on the Mac's row (#584). Archive itself is the swipe and the menu:
                     // the card is a link, and a button inside it would open the chat too.
                     if let line = ArchiveRequestWords.line(agent) {
-                        Label(line, systemImage: ArchiveRequestWords.symbol)
+                        Label(line, icon: ArchiveRequestWords.symbol)
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                     }
                 }
                 Spacer(minLength: 0)
@@ -276,14 +276,14 @@ struct AgentMenuItems: View {
             .disabled(isActing)
         }
         if model.canStop(agent) {
-            Button("Stop", systemImage: "stop.circle") {
+            Button("Stop", icon: "stop.circle") {
                 Task { await model.stop(agent.id) }
             }
             .disabled(isActing)
         }
         // The sessions it started too (#835).
         if agent.state != .archived, model.work.liveDescendants(of: agent.id).contains(where: model.canStop) {
-            Button("Stop All", systemImage: "stop.circle") {
+            Button("Stop All", icon: "stop.circle") {
                 Task { await model.stopAll(agent.id) }
             }
             .disabled(isActing)
@@ -292,7 +292,7 @@ struct AgentMenuItems: View {
             Button {
                 Task { await model.carryOn(agent.id) }
             } label: {
-                Label(AgentsModel.carryOnLabel, systemImage: "play.circle")
+                Label(AgentsModel.carryOnLabel, icon: "play.circle")
             }
             .help(AgentsModel.carryOnHelp(for: agent))
         }
@@ -311,7 +311,7 @@ struct AgentMenuItems: View {
                 .keyboardShortcut(ListKey.rename.shortcut)
             // A question it asked, out of Needs you for an hour, as l does (#4796).
             if let request = model.work.laterRequest(askedBy: agent.id) {
-                Button(ListKey.laterWord, systemImage: "clock") {
+                Button(ListKey.laterWord, icon: "clock") {
                     Task { await model.deferRequest(request, ListKey.laterTime) }
                 }
                 .keyboardShortcut(ListKey.later.shortcut)
@@ -320,9 +320,9 @@ struct AgentMenuItems: View {
             PinAgentButton(agent: agent)
             if model.isPinned(agent) {
                 let ids = model.pinnedSessions(in: agent.folderPath)
-                Button("Move Up", systemImage: "arrow.up") { step(-1, in: ids) }
+                Button("Move Up", icon: "arrow.up") { step(-1, in: ids) }
                     .disabled(ids.first == agent.id || model.isStale)
-                Button("Move Down", systemImage: "arrow.down") { step(1, in: ids) }
+                Button("Move Down", icon: "arrow.down") { step(1, in: ids) }
                     .disabled(ids.last == agent.id || model.isStale)
             }
             BranchAgentButton(agent: agent)
@@ -332,14 +332,14 @@ struct AgentMenuItems: View {
                 .keyboardShortcut(ListKey.archive.shortcut)
             // Deny an agent's ask to be archived (#773): the session stays.
             if agent.asksToArchive {
-                Button(ArchiveRequestWords.keep, systemImage: "tray.and.arrow.up") {
+                Button(ArchiveRequestWords.keep, icon: "tray.and.arrow.up") {
                     Task { await model.keepSession(agent) }
                 }
                 .disabled(model.isStale(agent))
             }
         } else {
             UnarchiveAgentButton(agent: agent)
-            Button("Delete…", systemImage: "trash", role: .destructive) { model.askingToDelete = agent }
+            Button("Delete…", icon: "trash", role: .destructive) { model.askingToDelete = agent }
                 .disabled(model.isStale(agent))
         }
     }
@@ -360,7 +360,7 @@ struct RenameAgentButton: View {
     let agent: Agent
 
     var body: some View {
-        Button("Rename…", systemImage: "pencil") { model.askToRename(agent) }
+        Button("Rename…", icon: "pencil") { model.askToRename(agent) }
             .disabled(model.isStale(agent))
     }
 }
@@ -375,7 +375,7 @@ struct PinAgentButton: View {
         Button {
             Task { await model.setPinned(agent, !pinned) }
         } label: {
-            Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
+            Label(pinned ? "Unpin" : "Pin", icon: pinned ? "pin.slash" : "pin")
         }
         .disabled(model.isStale)
     }
@@ -391,7 +391,7 @@ struct BranchAgentButton: View {
         Button {
             Task { await model.fork(agent.id) }
         } label: {
-            Label("Branch", systemImage: "arrow.triangle.branch")
+            Label("Branch", icon: "arrow.triangle.branch")
         }
         .disabled(model.isStale(agent))
     }
@@ -408,7 +408,7 @@ struct ArchiveAgentButton: View {
         Button {
             Task { await model.archive(agent.id, andLeave: leavesChat) }
         } label: {
-            Label("Archive", systemImage: "archivebox")
+            Label("Archive", icon: "archivebox")
         }
         .disabled(model.isStale(agent) || model.acting(agent.id) != nil)
     }
@@ -423,7 +423,7 @@ struct UnarchiveAgentButton: View {
         Button {
             Task { await model.unarchive(agent.id) }
         } label: {
-            Label("Unarchive", systemImage: "arrow.uturn.backward")
+            Label("Unarchive", icon: "arrow.uturn.backward")
         }
         .disabled(model.isStale(agent))
     }
@@ -439,7 +439,7 @@ struct MuteAgentButton: View {
             Button {
                 Task { await model.setMuted(agent.id, !agent.isMuted) }
             } label: {
-                Label(MuteWords.label(muted: agent.isMuted), systemImage: MuteWords.symbol(muted: agent.isMuted))
+                Label(MuteWords.label(muted: agent.isMuted), icon: MuteWords.symbol(muted: agent.isMuted))
                 // What it does, under it (#2086): iOS menus draw a second Text as a subtitle.
                 Text(MuteWords.help(muted: agent.isMuted))
             }
@@ -458,7 +458,7 @@ struct MarkReadButton: View {
             Task { await model.setUnread(agent.id, !agent.isUnread) }
         } label: {
             Label(agent.isUnread ? "Mark as Read" : "Mark as Unread",
-                  systemImage: agent.isUnread ? "envelope.open" : "envelope.badge")
+                  icon: agent.isUnread ? "envelope.open" : "envelope.badge")
         }
         .disabled(model.isStale(agent))
     }
@@ -500,7 +500,7 @@ struct StatusIcon: View {
                 // The beacon breathes in the accent, as the sidebar's (#2456, #2657).
                 WaitingBeacon(size: 18, kind: waitKind)
             } else if let symbol = shape.symbol {
-                Image(systemName: symbol)
+                Image(icon: symbol)
                     // Decorative: a glyph filling a 20-point well, not text (FR-015).
                     .glyph(size: 16)
                     .foregroundStyle((shape.wantsAPerson ? StateTint.attention : .none)

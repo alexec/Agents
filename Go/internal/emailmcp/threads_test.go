@@ -158,3 +158,49 @@ func TestThreadsPageWithoutListingAThreadTwice(t *testing.T) {
 		t.Fatalf("every thread once, the newest first: %v", titles)
 	}
 }
+
+// mark_conversation_read (#5137): a thread's unread mail is marked read, and the others stay
+// unread; all marks the folder's.
+func TestMarkThreadAndFolderRead(t *testing.T) {
+	ctx := context.Background()
+	f := newFakeMail(t, nil)
+	f.deliver("INBOX", threaded("ann@example.com", "plan@example.com", "Plan", 1))
+	f.deliver("INBOX", threaded("cy@example.com", "plan-2@example.com", "Re: Plan", 2,
+		"In-Reply-To: <plan@example.com>", "References: <plan@example.com>"))
+	f.deliver("INBOX", threaded("bob@example.com", "lunch@example.com", "Lunch", 3))
+	f.deliver("INBOX", threaded("eve@example.com", "hi@example.com", "Hello", 4))
+	m := f.mailbox()
+	unread := func() []string {
+		threads, _, err := m.Threads(ctx, "INBOX", "", true, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, th := range threads {
+			out = append(out, fmt.Sprintf("%s/%d", th.Title, th.Unread))
+		}
+		return out
+	}
+	threads, _, err := m.Threads(ctx, "INBOX", "", false, 0)
+	if err != nil || len(threads) != 3 || threads[2].Title != "Re: Plan" {
+		t.Fatalf("threads: %+v %v", threads, err)
+	}
+	if n, err := m.MarkThreadRead(ctx, threads[2].ID); err != nil || n != 2 {
+		t.Fatalf("marked the thread: %d %v", n, err)
+	}
+	if got := unread(); !slices.Equal(got, []string{"Hello/1", "Lunch/1"}) {
+		t.Fatalf("unread after the thread: %v", got)
+	}
+	if n, err := m.MarkThreadRead(ctx, threads[2].ID); err != nil || n != 0 {
+		t.Fatalf("marked again: %d %v", n, err)
+	}
+	if n, err := m.MarkFolderRead(ctx, "INBOX"); err != nil || n != 2 {
+		t.Fatalf("marked the folder: %d %v", n, err)
+	}
+	if got := unread(); len(got) != 0 {
+		t.Fatalf("unread after all: %v", got)
+	}
+	if _, err := m.MarkThreadRead(ctx, "nope"); err == nil || !strings.Contains(err.Error(), "list_conversations") {
+		t.Fatalf("not a conversation: %v", err)
+	}
+}

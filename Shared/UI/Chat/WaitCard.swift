@@ -36,46 +36,57 @@ struct WaitCard: View {
     @State private var confirmingEnd = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if let eventWait, eventWait.isOpen, !isLineWait {
-                TimelineView(.periodic(from: .now, by: 20)) { context in
-                    eventContent(eventWait, now: context.date)
+        if let personLine, let eventWait, eventWait.isOpen {
+            personAsk(personLine, eventWait)
+        } else {
+            waitBody
+        }
+    }
+
+    /// A wait only the person can settle (#3147) is an Ask (#5031): what it asks of them as the
+    /// title, how long as the asker's place, End Wait on the left, Carry On and Open on the right.
+    private func personAsk(_ title: String, _ wait: EventWait) -> some View {
+        TimelineView(.periodic(from: .now, by: 20)) { context in
+            let total = wait.deadline.map { max(1, Int(ceil($0.timeIntervalSince(wait.since) / 60))) }
+            let elapsed = max(0, Int(context.date.timeIntervalSince(wait.since) / 60))
+            AskCard(icon: "questionmark.circle", title: title,
+                    asker: WaitStatus.cardTime(elapsed: elapsed, total: total)) {
+                ForEach(lines) { line in
+                    eventLine(line)
+                        .appText(.fine)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .help(line.events.joined(separator: ", "))
                 }
-            } else {
-                Text(status.line)
-                    .appText(.reading).fontWeight(.semibold)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            HStack(spacing: 10) {
-                Spacer()
-                if let url = personURL {
-                    Link("Open", destination: url)
-                        .buttonStyle(.paperProminent)
-                        .help("Open \(url.absoluteString) in the browser.")
-                }
+            } decline: {
                 if status.cancellable {
-                    Button(lineResource.map(EventWait.lineCarryOnLabel) ?? Self.carryOn) {
-                        busy = true
-                        Task {
-                            await continueNow()
-                            busy = false
-                        }
-                    }
-                    .buttonStyle(.paper)
-                    .help(lineResource.map { "Leave the line for \($0.key) and carry on now, without it." }
-                        ?? Self.carryOnHelp)
-                    .disabled(busy || isDisabled)
-                    Button(Self.endWait, role: .destructive) {
+                    AskDecline(Self.endWait) {
                         #if os(iOS)
                         confirmingEnd = true
                         #else
                         end()
                         #endif
                     }
-                    .buttonStyle(.paper)
-                    .tinted(.failure)
                     .help(Self.endWaitHelp)
                     .disabled(busy || isDisabled)
+                }
+            } buttons: {
+                if status.cancellable {
+                    if personURL == nil {
+                        Button(Self.carryOn, action: carryOn)
+                            .buttonStyle(.paperProminent)
+                            .help(Self.carryOnHelp)
+                            .disabled(busy || isDisabled)
+                    } else {
+                        Button(Self.carryOn, action: carryOn)
+                            .buttonStyle(.paper)
+                            .help(Self.carryOnHelp)
+                            .disabled(busy || isDisabled)
+                    }
+                }
+                if let url = personURL {
+                    Link("Open", destination: url)
+                        .buttonStyle(.paperProminent)
+                        .help("Open \(url.absoluteString) in the browser.")
                 }
             }
         }
@@ -84,12 +95,49 @@ struct WaitCard: View {
         } message: {
             Text("Nothing will start the agent again for it. Carry On starts it now instead.")
         }
-        .padding(12)
+    }
+
+    /// The agent's own wait, as a part of the Now card (#5033): its head (the waiting mark of
+    /// #5022, what, how long), the bar to its deadline, its events when the card is open,
+    /// and Carry On and End Wait. The Now card draws the well.
+    private var waitBody: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let eventWait, eventWait.isOpen, !isLineWait {
+                TimelineView(.periodic(from: .now, by: 20)) { context in
+                    eventContent(eventWait, now: context.date)
+                }
+            } else {
+                NowHead(title: status.line) {
+                    Image(icon: "clock").foregroundStyle(.secondary)
+                }
+            }
+            HStack(spacing: 10) {
+                Spacer()
+                if status.cancellable {
+                    Button(Self.endWait, role: .destructive) {
+                        #if os(iOS)
+                        confirmingEnd = true
+                        #else
+                        end()
+                        #endif
+                    }
+                    .buttonStyle(.paper)
+                    .help(Self.endWaitHelp)
+                    .disabled(busy || isDisabled)
+                    Button(lineResource.map(EventWait.lineCarryOnLabel) ?? Self.carryOn, action: carryOn)
+                        .buttonStyle(.paperProminent)
+                        .help(lineResource.map { "Leave the line for \($0.key) and carry on now, without it." }
+                            ?? Self.carryOnHelp)
+                        .disabled(busy || isDisabled)
+                }
+            }
+        }
+        .confirmationDialog("End this wait?", isPresented: $confirmingEnd, titleVisibility: .visible) {
+            Button(Self.endWait, role: .destructive) { end() }
+        } message: {
+            Text("Nothing will start the agent again for it. Carry On starts it now instead.")
+        }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background((personLine == nil ? nil : StateTint.attention.color?.opacity(0.07)) ?? .clear,
-                    in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10)
-            .strokeBorder(((personLine == nil ? nil : StateTint.attention.color) ?? .secondary).opacity(0.25)))
         .accessibilityElement(children: .contain)
     }
 
@@ -100,6 +148,14 @@ struct WaitCard: View {
     private var isLineWait: Bool { lineResource != nil }
     private var personLine: String? { isLineWait ? nil : eventWait?.personLine }
     private var personURL: URL? { isLineWait ? nil : eventWait?.personURL }
+
+    private func carryOn() {
+        busy = true
+        Task {
+            await continueNow()
+            busy = false
+        }
+    }
 
     private func end() {
         busy = true
@@ -114,37 +170,29 @@ struct WaitCard: View {
         let total = wait.deadline.map { max(1, Int(ceil($0.timeIntervalSince(wait.since) / 60))) }
         let elapsed = max(0, Int(now.timeIntervalSince(wait.since) / 60))
         VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 7) {
-                if let personLine {
-                    // Needs you's mark and words, as the session's row has them (#3147).
-                    Image(icon: StatusShape.needsYou.symbol ?? "exclamationmark.circle.fill")
-                        .tinted(.attention)
-                        .accessibilityHidden(true)
-                    Text(personLine).fontWeight(.semibold).tinted(.attention)
-                } else {
-                    // The waiting mark's beacon, breathing as it does everywhere else (#2657).
-                    WaitingBeacon(size: 14, kind: WaitKind.of(wait))
-                    Text(wait.cardTitle).fontWeight(.semibold)
-                }
-                Spacer(minLength: 6)
-                Text(WaitStatus.cardTime(elapsed: elapsed, total: total))
-                    .appText(.fine).foregroundStyle(.secondary).monospacedDigit()
-            }
-            ForEach(lines) { line in
-                eventLine(line)
-                    .appText(.fine)
-                    .fixedSize(horizontal: false, vertical: true)
-                    // The events' own names, for whoever writes a wait or a workflow.
-                    .help(line.events.joined(separator: ", "))
+            // The waiting mark's beacon, breathing as it does everywhere else (#2657, #5022).
+            NowHead(title: wait.cardTitle, meta: WaitStatus.cardTime(elapsed: elapsed, total: total)) {
+                WaitingBeacon(size: 14, kind: WaitKind.of(wait))
             }
             if let deadline = wait.deadline {
-                ProgressView(value: min(1, max(0, now.timeIntervalSince(wait.since) / deadline.timeIntervalSince(wait.since))))
-                    .tint(.blue)
-                    .controlSize(.mini)
+                NowBar(fraction: now.timeIntervalSince(wait.since) / deadline.timeIntervalSince(wait.since))
+            }
+            if isOpen {
+                ForEach(lines) { line in
+                    eventLine(line)
+                        .appText(.fine)
+                        .fixedSize(horizontal: false, vertical: true)
+                        // The events' own names, for whoever writes a wait or a workflow.
+                        .help(line.events.joined(separator: ", "))
+                }
             }
         }
         .fixedSize(horizontal: false, vertical: true)
     }
+
+    /// Whether the Now card around it is open; alone, it shows all.
+    @Environment(\.nowOpen) private var nowOpen
+    private var isOpen: Bool { nowOpen?.wrappedValue ?? true }
 
     /// One of the card's event lines (#2747): "GitHub · PR merged (repo alexec/Agents)",
     /// the parenthesised arguments a link to the PR or issue they name, when they name
@@ -168,21 +216,23 @@ struct WaitCard: View {
 }
 
 /// A wait on sessions (`wait_for_event` on `agent.ended`), drawn as the wait on
-/// events is (#2750): the same card at the foot of the chat, with what it waits on, when it
-/// checks again as its deadline, and one way to stop it. It was a strip under the chat's
+/// events is (#2750): the same card at the foot of the chat, with what it waits on, its
+/// deadline, and one way to stop it. It was a strip under the chat's
 /// head with Carry on. Carry On carries the agent on now, as Carry On does on the wait on
 /// events (#3152). The web page's is `BlockWaitCard` in `Chat.tsx`.
 struct BlockWaitCard: View {
     let block: Block
     /// When it began to wait: its report's time.
     let since: Date
-    /// `AgentsModel.blockLines`: any of or all of, one line a session, and when it checks again.
+    /// `AgentsModel.blockLines`: any of or all of, one line a session, and its deadline.
     let lines: [String]
     let stop: () async -> Void
     var help = "Stop waiting and carry on now"
     var isDisabled = false
 
     @State private var busy = false
+
+    @Environment(\.nowOpen) private var nowOpen
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -198,39 +248,33 @@ struct BlockWaitCard: View {
                         busy = false
                     }
                 }
-                .buttonStyle(.paper)
+                .buttonStyle(.paperProminent)
                 .help(help)
                 .disabled(busy || isDisabled)
             }
         }
-        .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.25)))
         .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder
     private func content(now: Date) -> some View {
-        let deadline = block.checkAgainAt
+        let deadline = block.deadline
         let total = deadline.map { max(1, Int(ceil($0.timeIntervalSince(since) / 60))) }
         let elapsed = max(0, Int(now.timeIntervalSince(since) / 60))
         VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 7) {
+            NowHead(title: block.cardTitle(), meta: WaitStatus.cardTime(elapsed: elapsed, total: total)) {
                 WaitingBeacon(size: 14, kind: .agents)
-                Text(block.cardTitle()).fontWeight(.semibold)
-                Spacer(minLength: 6)
-                Text(WaitStatus.cardTime(elapsed: elapsed, total: total))
-                    .appText(.fine).foregroundStyle(.secondary).monospacedDigit()
-            }
-            ForEach(lines, id: \.self) { line in
-                Text(line)
-                    .appText(.fine)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             if let deadline, deadline > since {
-                ProgressView(value: min(1, max(0, now.timeIntervalSince(since) / deadline.timeIntervalSince(since))))
-                    .tint(.blue)
-                    .controlSize(.mini)
+                NowBar(fraction: now.timeIntervalSince(since) / deadline.timeIntervalSince(since))
+            }
+            if nowOpen?.wrappedValue ?? true {
+                ForEach(lines, id: \.self) { line in
+                    Text(line)
+                        .appText(.fine)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
         .fixedSize(horizontal: false, vertical: true)

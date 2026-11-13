@@ -24,6 +24,8 @@ public enum MissingFolderWords {
     public static let continueInFolder = "Continue in the folder"
     public static let recreateWorktree = "Recreate the worktree"
     public static let archive = "Archive"
+    /// Said on the folder's strip when a send was refused because the folder went (#5034).
+    public static let typedIsKept = "What you typed is still in the prompt."
 
     /// Why a send was refused, naming the folder.
     public static func refusal(path: String, wasWorktree: Bool) -> String {

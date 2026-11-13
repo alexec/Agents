@@ -88,6 +88,7 @@ const CapHandover1 = "handover/1"
 const CapHostBrowserSettings1 = "host.browser-settings/1"
 const CapHostDesktopControl1 = "host.desktop-control/1"
 const CapHostDriveApproval1 = "host.drive-approval/1"
+const CapHostLocalSecrets1 = "host.local-secrets/1"
 const CapHostLock1 = "host.lock/1"
 const CapHostLock2 = "host.lock/2"
 const CapHostLock3 = "host.lock/3"
@@ -133,6 +134,7 @@ const CapMailbox1 = "mailbox/1"
 const CapMarketplaces1 = "marketplaces/1"
 const CapMcpToolLevels1 = "mcp.tool-levels/1"
 const CapMcp1 = "mcp/1"
+const CapMessagesMarkRead1 = "messages.mark-read/1"
 const CapMessagesReply1 = "messages.reply/1"
 const CapMessages1 = "messages/1"
 const CapModes1 = "modes/1"
@@ -456,6 +458,7 @@ var HostCapabilities = pairs([][2]string{
 	{"mcp/tools", "mcp.tool-levels/1"},
 	{"mcp/verify", "mcp/1"},
 	{"messages/conversations", "messages/1"},
+	{"messages/markAllRead", "messages.mark-read/1"},
 	{"messages/read", "messages/1"},
 	{"messages/reply", "messages.reply/1"},
 	{"modes/remembered", "modes/1"},
@@ -550,6 +553,7 @@ var HostCapabilities = pairs([][2]string{
 	{"sandbox/state", "sandbox/1"},
 	{"secrets/addGrant", "host.secret-grants/1"},
 	{"secrets/grants", "host.secret-grants/1"},
+	{"secrets/localList", "host.local-secrets/1"},
 	{"secrets/removeGrant", "host.secret-grants/1"},
 	{"secrets/sessionList", "host.session-secrets/1"},
 	{"secrets/sessionRemove", "host.session-secrets/1"},

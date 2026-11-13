@@ -14,18 +14,18 @@ public struct Block: Codable, Hashable, Sendable {
     /// The agents it waits on, in the order it named them. Empty when it is waiting on
     /// something the app cannot see.
     public var waits: [Wait]
-    /// When to resume it anyway, to look at something the app cannot see.
-    public var checkAgainAt: Date?
+    /// When to resume it anyway, if the sessions it waits on have not ended by then.
+    public var deadline: Date?
     /// Whether the first of `waits` to end clears it, or only the last (#152). Nil is
     /// `all`, which is what every block before this was.
     public var wakeOn: WakeOn?
     public var clearedAt: Date?
     public var clearedBy: Clearing?
 
-    public init(waits: [Wait] = [], checkAgainAt: Date? = nil, wakeOn: WakeOn? = nil,
+    public init(waits: [Wait] = [], deadline: Date? = nil, wakeOn: WakeOn? = nil,
                 clearedAt: Date? = nil, clearedBy: Clearing? = nil) {
         self.waits = waits
-        self.checkAgainAt = checkAgainAt
+        self.deadline = deadline
         self.wakeOn = wakeOn
         self.clearedAt = clearedAt
         self.clearedBy = clearedBy
@@ -44,19 +44,15 @@ public struct Block: Codable, Hashable, Sendable {
     public enum Clearing: String, Codable, Hashable, Sendable {
         /// Every agent it waited on has finished — or, waking on any, the first has.
         case waits
-        /// The time it asked to be checked on came.
+        /// Its deadline came before the sessions it waited on ended.
         case time
         /// It was stopped or archived, and will not be resumed.
         case dropped
     }
 
-    /// The range an agent may ask to be checked on in: long enough apart that it does
-    /// not wake every few seconds, and short enough to cover an overnight CI run.
-    public static let checkAgainMinutes = 1...1440
-
     /// The two refusals about a block's words, said once for the helper and the daemon.
     public static let onlyWithBlocked =
-        "Nothing was recorded: waiting_on, wake_on and check_again_in_minutes only go with blocked."
+        "Nothing was recorded: waiting_on and wake_on only go with blocked."
     public static let unknownWakeOn = "Nothing was recorded: wake_on has to be any or all."
 
     public var isOpen: Bool { clearedAt == nil }
@@ -73,7 +69,7 @@ public struct Block: Codable, Hashable, Sendable {
     }
 
     public func isDue(now: Date) -> Bool {
-        checkAgainAt.map { $0 <= now } ?? false
+        deadline.map { $0 <= now } ?? false
     }
 
     /// The whole rule for resuming. A block that named nobody and gave no time is
@@ -159,22 +155,17 @@ public extension Block {
                               : "Carries on when all of these have finished"
     }
 
-    /// When it will check again, if it asked to.
-    func checkAgainLine() -> String? {
-        guard isOpen, let checkAgainAt else { return nil }
-        return "Checks again at \(checkAgainAt.formatted(date: .omitted, time: .shortened))"
+    /// When it carries on if the sessions have not ended by then.
+    func deadlineLine() -> String? {
+        guard isOpen, let deadline else { return nil }
+        return "Carries on by \(deadline.formatted(date: .omitted, time: .shortened)) at the latest"
     }
 
     /// The heading of its card at the foot of the chat, where a wait on events has its own
     /// (#2750): what it waits for, in a few words.
     func cardTitle() -> String {
-        switch waits.count {
-        // A wait on a time alone is an event wait on time.reached (#4843); only a block
-        // recorded before it has none.
-        case 0: "Waiting until a set time"
-        case 1: "Waiting for a session"
-        default: "Waiting for sessions"
-        }
+        // A wait on a time alone is an event wait on time.reached (#4843, #5152).
+        waits.count > 1 ? "Waiting for sessions" : "Waiting for a session"
     }
 
     /// What Carry on sends, as the person.
@@ -198,7 +189,7 @@ public extension Block {
                 ? "The block you reported has cleared: the agent you were waiting on has finished."
                 : "The block you reported has cleared: every agent you were waiting on has finished.")
         case .time, .dropped:
-            lines.append("The time you asked to check again has come.")
+            lines.append("The time you asked for has come.")
         }
         func line(_ wait: Wait) -> String {
             var line = "- \u{201C}\(name(wait))\u{201D} (id \(wait.agentID.uuidString)): "

@@ -157,7 +157,7 @@ struct SkillPreviewView: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(SharedInk.attention.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
+            .background(SharedInk.warning.opacity(0.14), in: RoundedRectangle(cornerRadius: 8))
     }
 
     /// Frame E's notes: what is there already, and anything the preview found.
@@ -199,7 +199,7 @@ struct SkillPreviewView: View {
             .fixedSize(horizontal: false, vertical: true)
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background((attention ? SharedInk.attention : SharedInk.reach).opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+            .background((attention ? SharedInk.warning : SharedInk.reach).opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
     }
 
     // MARK: The reader

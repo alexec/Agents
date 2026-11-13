@@ -1,5 +1,5 @@
 // The #157 walk: a blocked agent's wait lines on the page. Its row and its chat say what it
-// waits on, any of or all of, each agent's state and when it checks again, as the window's row
+// waits on, any of or all of, each agent's state and its deadline, as the window's row
 // does. Needs a scratch root with blocked agents titled "Lead, all of" and "Lead, any of" in
 // folder "work".
 //

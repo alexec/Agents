@@ -59,9 +59,9 @@ struct SidebarSessionRow: View {
             // What it wants, as the window's sidebar says it (#495): the state is the
             // row's mark; unread is the bold title (#1323). Archived keeps its icon.
             if agent.state == .archived {
-                Image(systemName: "archivebox")
+                Image(icon: "archivebox")
                     .glyph(size: 13)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
                     .frame(width: 20, height: 20)
                     .accessibilityLabel("Archived")
             } else if let mark = SessionMark(agent: markAgent, group: model.work.group(of: markAgent)) {
@@ -87,29 +87,29 @@ struct SidebarSessionRow: View {
                         if let place {
                             Text(place)
                                 .appText(.fine)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(Paper.tertiary)
                                 .lineLimit(1)
                         }
                     }
                     // Started by a workflow (the Mac row's mark), then by another agent.
                     if let workflowName = startedByWorkflowName {
-                        Image(systemName: "flowchart")
+                        Image(icon: "flowchart")
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Paper.tertiary)
                             .accessibilityLabel("started by the workflow \(workflowName)")
                     }
                     if let starter = model.startedByAgentLabel(agent) {
-                        Image(systemName: AgentsModel.startedByAgentSymbol)
+                        Image(icon: AgentsModel.startedByAgentSymbol)
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Paper.tertiary)
                             // Said, as the workflow mark is and the Mac's row says it (#1326).
                             .accessibilityLabel(starter)
                     }
                     // Mute Notifications (#2003), as on the Mac.
                     if agent.isMuted {
-                        Image(systemName: MuteWords.symbol)
+                        Image(icon: MuteWords.symbol)
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Paper.tertiary)
                             .accessibilityLabel(MuteWords.muted)
                     }
                     // Voice mode listens in this chat (#2518), beside the mute mark.
@@ -118,9 +118,9 @@ struct SidebarSessionRow: View {
                     }
                     // A file it showed that the person has not looked at (#1802), as on the Mac.
                     if let file = FileToSeeWords.line(agent) {
-                        Image(systemName: FileToSeeWords.symbol)
+                        Image(icon: FileToSeeWords.symbol)
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .accessibilityLabel(file)
                     }
                 }
@@ -131,28 +131,28 @@ struct SidebarSessionRow: View {
                     // Its place in its folder's queue (#362), as the Mac's row says it.
                     Text(queued)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                 } else if let reason = needsYouLine {
                     Text(reason)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .lineLimit(1)
                 } else if agent.missingFolder != nil, agent.state != .archived {
                     Text(MissingFolderWords.label)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                 } else if let said = model.work.saidLines[agent.id] {
                     // While the sidebar searches: the line it said that matches, in the
                     // report's place, so a row found by what it said says why (#1663).
                     Text(said)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .lineLimit(1)
                 } else if let report = FileToSeeWords.reportLine(agent) {
                     // A file to see is named here first, as on the Mac (#1873).
                     Text(report)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .lineLimit(1)
                 }
                 // The row is the title and that one line (#587): what it holds, waits on,
@@ -165,11 +165,11 @@ struct SidebarSessionRow: View {
                 Button(action: toggleFold) {
                     HStack(spacing: 3) {
                         Text("\(tree.children)")
-                        Image(systemName: "chevron.right")
+                        Image(icon: "chevron.right")
                             .rotationEffect(.degrees(tree.isUnfolded ? 90 : 0))
                     }
                     .appText(.fine)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
                     .padding(.horizontal, 6)
                     .frame(minHeight: 28)
                     .contentShape(Rectangle())
@@ -192,7 +192,7 @@ struct SidebarSessionRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityValue(agent.drawsUnread ? "unread" : "")
         .modifier(FoldAction(tree: tree, toggle: toggleFold))
-        .tag(SidebarItem.session(agent.id))
+        .paperTag(SidebarItem.session(agent.id))
         // Its chat fetched while an iPad's pointer rests on it, so a tap draws it at once (#4795).
         .prefetchesOnHover { [model, id = agent.id] in model.prefetch(id) }
         .contextMenu { AgentMenuItems(agent: agent) }
@@ -211,7 +211,7 @@ struct SidebarSessionRow: View {
         // archives, as in Mail. An archived one's Delete, which asks first (#4448).
         .swipeActions(edge: .trailing, allowsFullSwipe: agent.state != .archived) {
             if agent.state == .archived {
-                Button("Delete", systemImage: "trash") { model.askingToDelete = agent }
+                Button("Delete", icon: "trash") { model.askingToDelete = agent }
                     .tint(StateTint.failure.color)
                     .disabled(model.isStale(agent))
             } else {
@@ -289,23 +289,23 @@ private struct SessionMark: View {
         Group {
             switch kind {
             case .needsYou:
-                Image(systemName: "hand.raised.fill").sidebarMark(StateTint.attention.style(or: .secondary))
+                Image(icon: "hand.raised.fill").sidebarMark(StateTint.attention.style(or: .secondary))
             case .working:
                 // In the accent as the other marks (#1558, #2044); one ring for both
                 // activities (#2332).
                 WorkingRing(size: 14 * scale, color: onAccent ? Paper.ground : Paper.accent, doing: tool != nil)
             case .queued:
-                Image(systemName: "list.number").sidebarMark(Paper.accent)
+                Image(icon: "list.number").sidebarMark(Paper.accent)
             case .waiting:
                 // The waiting card's beacon, breathing in step with every other (#2456, #2657).
                 WaitingBeacon(size: 14 * scale, color: onAccent ? Paper.ground : Paper.accent,
                               kind: WaitKind.of(agent))
             case .paused:
-                Image(systemName: "pause.circle").sidebarMark(Paper.accent)
+                Image(icon: "pause.circle").sidebarMark(Paper.accent)
             case .done:
-                Image(systemName: "checkmark").sidebarMark(Paper.accent)
+                Image(icon: "checkmark").sidebarMark(Paper.accent)
             case .asksToArchive:
-                Image(systemName: ArchiveRequestWords.symbol).sidebarMark(StateTint.attention.style(or: .secondary))
+                Image(icon: ArchiveRequestWords.symbol).sidebarMark(StateTint.attention.style(or: .secondary))
             }
         }
         // Decorative: a mark filling the rows' 20-point well, as `WorkflowMark` (FR-015).
@@ -354,9 +354,9 @@ struct SidebarWorkflowRow: View {
             Spacer(minLength: 4)
             // Its runs send no notifications (#2003), as on the Mac.
             if summary.workflow.isMuted, !summary.isArchived {
-                Image(systemName: MuteWords.symbol)
+                Image(icon: MuteWords.symbol)
                     .appText(.fine)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Paper.tertiary)
                     .accessibilityLabel(MuteWords.muted)
             }
             // A running one counts from when this run started (#755).
@@ -370,7 +370,7 @@ struct SidebarWorkflowRow: View {
         .accessibilityValue([!summary.isEnabled && !summary.isArchived ? "turned off" : nil, summary.scopeSentence,
                              summary.hoursRowSentence(), summary.readyMadeUpdatedSentence]
             .compactMap { $0 }.joined(separator: ", "))
-        .tag(SidebarItem.workflow(summary.id, in: folder))
+        .paperTag(SidebarItem.workflow(summary.id, in: folder))
         // Pin or Unpin (#432), from the leading edge, as a session's row has it.
         .swipeActions(edge: .leading) {
             if !summary.isArchived {
@@ -379,11 +379,11 @@ struct SidebarWorkflowRow: View {
         }
         .swipeActions(edge: .trailing) {
             if summary.isArchived {
-                Button("Unarchive", systemImage: "arrow.uturn.backward") {
+                Button("Unarchive", icon: "arrow.uturn.backward") {
                     Task { await model.setWorkflowArchived(summary, false) }
                 }
             } else {
-                Button("Archive", systemImage: "archivebox") {
+                Button("Archive", icon: "archivebox") {
                     Task { await model.setWorkflowArchived(summary, true) }
                 }
                 .tint(.gray)
@@ -391,35 +391,35 @@ struct SidebarWorkflowRow: View {
         }
         .contextMenu {
             if summary.isArchived {
-                Button("Unarchive", systemImage: "arrow.uturn.backward") {
+                Button("Unarchive", icon: "arrow.uturn.backward") {
                     Task { await model.setWorkflowArchived(summary, false) }
                 }
             } else {
                 if summary.canBeApproved {
-                    Button("Approve", systemImage: "checkmark.shield") {
+                    Button("Approve", icon: "checkmark.shield") {
                         Task { await model.approveWorkflow(summary) }
                     }
                 }
                 // Not on this host, without archiving it everywhere (#391).
                 if summary.canBeDenied {
-                    Button("Deny", systemImage: "hand.raised.slash") {
+                    Button("Deny", icon: "hand.raised.slash") {
                         Task { await model.denyWorkflow(summary) }
                     }
                 }
                 if !summary.isUnapproved && summary.runsHere {
-                    Button("Run now", systemImage: "play") { Task { await model.runWorkflow(summary) } }
+                    Button("Run now", icon: "play") { Task { await model.runWorkflow(summary) } }
                         .disabled(summary.isRunning)
                 }
                 PinWorkflowButton(summary: summary)
                 if model.isPinned(summary) {
                     let ids = model.pinnedWorkflows(in: summary.folder)
-                    Button("Move Up", systemImage: "arrow.up") { step(-1, in: ids) }
+                    Button("Move Up", icon: "arrow.up") { step(-1, in: ids) }
                         .disabled(ids.first == summary.workflowID || model.isStale)
-                    Button("Move Down", systemImage: "arrow.down") { step(1, in: ids) }
+                    Button("Move Down", icon: "arrow.down") { step(1, in: ids) }
                         .disabled(ids.last == summary.workflowID || model.isStale)
                 }
                 Button(summary.isEnabled ? "Turn Off" : "Turn On",
-                       systemImage: summary.isEnabled ? "pause.circle" : "play.circle") {
+                       icon: summary.isEnabled ? "pause.circle" : "play.circle") {
                     Task { await model.setWorkflowEnabled(summary, !summary.isEnabled) }
                 }
                 if model.canMute(summary) {
@@ -427,12 +427,12 @@ struct SidebarWorkflowRow: View {
                     Button {
                         Task { await model.setWorkflowMuted(summary, !muted) }
                     } label: {
-                        Label(MuteWords.label(muted: muted), systemImage: MuteWords.symbol(muted: muted))
+                        Label(MuteWords.label(muted: muted), icon: MuteWords.symbol(muted: muted))
                         // What it does, under it (#2086).
                         Text(MuteWords.workflowHelp(muted: muted))
                     }
                 }
-                Button("Archive", systemImage: "archivebox") { Task { await model.setWorkflowArchived(summary, true) } }
+                Button("Archive", icon: "archivebox") { Task { await model.setWorkflowArchived(summary, true) } }
             }
         }
     }
@@ -455,7 +455,7 @@ struct PinWorkflowButton: View {
         Button {
             Task { await model.setPinned(summary, !pinned) }
         } label: {
-            Label(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin")
+            Label(pinned ? "Unpin" : "Pin", icon: pinned ? "pin.slash" : "pin")
         }
         .disabled(model.isStale)
     }
@@ -476,7 +476,7 @@ struct WorkflowMark: View {
             if summary.isRunning {
                 SyncedSpinner(diameter: 14 * scale, color: onAccent ? Paper.ground : Paper.accent)
             } else {
-                Image(systemName: symbol)
+                Image(icon: symbol)
                     // Decorative: the workflow's mark filling a 20-point well, not text (FR-015).
                     .glyph(size: 14)
                     // In the accent, as the sidebar's icons are, unless it wants a person (#495).
@@ -522,7 +522,7 @@ struct PinnedPageRows: View {
         let pins = model.pins(in: folder.folder)
         ForEach(Array(pins.enumerated()), id: \.element.path) { index, pin in
             HStack(spacing: 8) {
-                Image(systemName: pin.kind == .view ? "square.grid.2x2" : pin.kind == .html ? "globe" : "doc.text")
+                Image(icon: pin.kind == .view ? "square.grid.2x2" : pin.kind == .html ? "globe" : "doc.text")
                     .sidebarMark(Paper.accent)
                     .frame(width: 20)
                     .accessibilityHidden(true)
@@ -536,13 +536,13 @@ struct PinnedPageRows: View {
             .appText(.supporting)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(pin.title), pinned \(pin.kind == .view ? "view" : "page")" + (pin.missing ? ", missing" : ""))
-            .tag(SidebarItem.pin(pin.path, in: folder))
+            .paperTag(SidebarItem.pin(pin.path, in: folder))
             .contextMenu {
-                Button("Move Up", systemImage: "arrow.up") { step(pin, -1, in: pins) }
+                Button("Move Up", icon: "arrow.up") { step(pin, -1, in: pins) }
                     .disabled(index == 0)
-                Button("Move Down", systemImage: "arrow.down") { step(pin, 1, in: pins) }
+                Button("Move Down", icon: "arrow.down") { step(pin, 1, in: pins) }
                     .disabled(index == pins.count - 1)
-                Button("Unpin", systemImage: "pin.slash", role: .destructive) {
+                Button("Unpin", icon: "pin.slash", role: .destructive) {
                     Task { await model.unpin(pin.path, in: folder.folder) }
                 }
             }
@@ -572,7 +572,7 @@ struct ServerViewRows: View {
     var body: some View {
         ForEach(model.serverViews(in: folder.folder).filter { $0.hidden != true }) { view in
             HStack(spacing: 8) {
-                Image(systemName: "square.grid.2x2")
+                Image(icon: "square.grid.2x2")
                     .sidebarMark(Paper.accent)
                     .frame(width: 20)
                     .accessibilityHidden(true)
@@ -583,16 +583,16 @@ struct ServerViewRows: View {
                 if let count = view.count {
                     Text("\(count)")
                         .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                 }
             }
             .appText(.supporting)
             .accessibilityElement(children: .ignore)
             // VoiceOver says the count (#590).
             .accessibilityLabel("\(view.title), view" + (view.count.map { ", \($0)" } ?? ""))
-            .tag(SidebarItem.pin(view.path, in: folder))
+            .paperTag(SidebarItem.pin(view.path, in: folder))
             .contextMenu {
-                Button("Hide", systemImage: "eye.slash") {
+                Button("Hide", icon: "eye.slash") {
                     Task { await model.setViewHidden(view.path, true, in: folder.folder) }
                 }
             }
@@ -614,7 +614,7 @@ struct ShowHiddenViewsButton: View {
                     for view in hidden { await model.setViewHidden(view.path, false, in: summary.folder.folder) }
                 }
             } label: {
-                Label("Show Hidden Views (\(hidden.count))", systemImage: "eye")
+                Label("Show Hidden Views (\(hidden.count))", icon: "eye")
             }
             .disabled(model.isStale(on: summary.host))
         }

@@ -38,6 +38,7 @@ import { SecretsSection } from "./UserScope";
 import { AccountsSection } from "./Accounts";
 import { StatusListMark, StatusListLastLine, StatusSecretsPage, useUserScopeStatus } from "./StatusSecrets";
 import { SessionSecretsSection } from "./settings/SessionSecrets";
+import { LocalSecretsSection } from "./settings/LocalSecrets";
 import { WorkflowRow } from "./WorkflowRow";
 import { BackToList } from "./BackToList";
 import { DataTable } from "./DataTable";
@@ -49,6 +50,7 @@ import { eventsWaitingLine } from "../model/eventsWaiting";
 import type { Session } from "../session";
 import { ask } from "./MessageKinds";
 import { CommandMenu } from "./CommandMenu";
+import { Icon } from "./Icon";
 
 /**
  * How many requests and sessions need the person, across every folder: Agents' count in the bar.
@@ -117,7 +119,7 @@ export function NavBar({ store, session }: { store: Store; session: Session }) {
         <div class="nav-items wide-only">{shown.map(item)}</div>
         <div class="nav-menu narrow-only">
           <button type="button" class="nav-menu-button" aria-expanded={menuOpen.value} onClick={() => { menuOpen.value = !menuOpen.value; }}>
-            {navTitle[current]} {menuOpen.value ? "▴" : "▾"}
+            {navTitle[current]} <Icon name={menuOpen.value ? "chevron-up" : "chevron-down"} />
             {!menuOpen.value && shown.some((s) => countOf(store, s, admin) > 0) && <span class="sub-app-count" aria-hidden="true">•</span>}
           </button>
           {menuOpen.value && <div class="nav-menu-list">{shown.map(item)}</div>}
@@ -300,8 +302,10 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "machine" ? <MachinePage key={page.draw.host} store={store} host={page.draw.host} />
         : page.draw.kind === "features" ? <WorkFeatures store={store} />
         : page.draw.kind === "timeline" ? <WorkTimeline store={store} />
-        // The person's secrets and cards (#1760), then a machine's for one session (#3548); were in Settings ▸ Machines.
-        : page.draw.kind === "secrets" ? <><SecretsSection store={store} down={down} /><SessionSecretsSection store={store} down={down} /></>
+        // The person's secrets and cards (#1760), then a machine's for one session (#3548), then what agents saved
+        // on that machine (#5122); were in Settings ▸ Machines.
+        : page.draw.kind === "secrets" ? <><SecretsSection store={store} down={down} /><SessionSecretsSection store={store} down={down} />
+          <LocalSecretsSection store={store} down={down} /></>
         : page.draw.kind === "accounts" ? <AccountsSection store={store} down={down} />
         : page.draw.kind === "statusList" ? <StatusSecretsPage store={store} list={page.draw.list} />
         : page.draw.kind === "docs" ? (route.value.item

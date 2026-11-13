@@ -29,14 +29,18 @@
   --accent: light-dark(#1a52c0, #86b4ff);
   /* The chosen thing, a link card. */
   --line-accent: light-dark(#a9c2ee, #3d5687);
-  /* Needs you. */
-  --line-attention: light-dark(#ebbf9f, #6b4a33);
+  /* Needs you: the yellow's line (#5016). */
+  --line-attention: light-dark(#e3d196, #615326);
+  /* A warning: the orange's line (#5016). */
+  --line-warning: light-dark(#ebbf9f, #6b4a33);
   /* Done, approved. */
   --line-vouched: light-dark(#a9d3bb, #36614d);
   /* Failed. */
   --line-failure: light-dark(#eeb0b3, #6b3a3d);
-  /* Needs you; the only tint drawn in a list. */
-  --tint-attention: light-dark(#a3400e, #f3a672);
+  /* Needs you: a question, a request, a wait only the person can settle; the only tint drawn in a list. Yellow, never the warning's orange (#5016). */
+  --tint-attention: light-dark(#7a6200, #e6c04f);
+  /* A warning: something is wrong or nearly so, and a person should know. Not a request (#5016). */
+  --tint-warning: light-dark(#a3400e, #f3a672);
   /* Failed. */
   --tint-failure: light-dark(#b0222a, #f4878d);
   /* Approved, done: an ending the app can vouch for. */

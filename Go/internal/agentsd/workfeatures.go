@@ -28,8 +28,18 @@ func (d *Daemon) registerWorkFeatures() {
 }
 
 func (d *Daemon) workFeatures(ctx context.Context, r wire.WorkFeaturesRequest) (wire.WorkFeatures, error) {
+	// The timeline needs only the folders, so it is read beside the features and the plans,
+	// not after them: on a first read it is the slowest of the three.
+	var timeline map[string]wire.WorkTimelineEpic
+	var timelineErrs []string
+	timelineRead := make(chan struct{})
+	go func() {
+		defer close(timelineRead)
+		timeline, timelineErrs = d.workFeaturesTimeline(ctx, deref(r.Folder))
+	}()
 	features, items, err := d.forgeFeaturesRead(ctx, wire.ForgeFeaturesRequest(r))
 	if err != nil {
+		<-timelineRead
 		return wire.WorkFeatures{}, Invalid("work/features: %v", strings.TrimPrefix(err.Error(), "forge/features: "))
 	}
 	out := wire.WorkFeatures{Features: []wire.WorkFeature{}, Approvals: features.Approvals, Errors: features.Errors}
@@ -39,7 +49,7 @@ func (d *Daemon) workFeatures(ctx context.Context, r wire.WorkFeaturesRequest) (
 		}
 	}
 
-	// Each open epic's plan, a few at once, and each project's timeline beside them.
+	// Each open epic's plan, a few at once.
 	var epics []wire.ForgeItem
 	for _, f := range features.Features {
 		epics = append(epics, items.epics[strings.ToLower(f.Name)]...)
@@ -55,14 +65,12 @@ func (d *Daemon) workFeatures(ctx context.Context, r wire.WorkFeaturesRequest) (
 			}
 		})
 	}
-	var timeline map[string]wire.WorkTimelineEpic
-	var timelineErrs []string
-	wg.Go(func() { timeline, timelineErrs = d.workFeaturesTimeline(ctx, deref(r.Folder)) })
 	for n := range epics {
 		next <- n
 	}
 	close(next)
 	wg.Wait()
+	<-timelineRead
 	for _, e := range timelineErrs {
 		addError(wire.ForgeListError{Forge: "github", Message: e})
 	}

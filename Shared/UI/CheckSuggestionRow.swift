@@ -15,7 +15,7 @@ struct CheckSuggestionRowLabel: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(icon: urgent ? "exclamationmark.circle" : "lightbulb")
-                .sidebarMark(AnyShapeStyle(urgent ? StateTint.attention.color ?? Paper.accent : Paper.accent))
+                .sidebarMark(AnyShapeStyle(urgent ? StateTint.warning.color ?? Paper.accent : Paper.accent))
                 .frame(width: 16)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {

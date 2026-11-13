@@ -93,6 +93,28 @@ struct SealingTests {
         #expect(ClientSealing.seal(DaemonAPI.SealingWork(items: [moved]), with: admin, client: adminID).isEmpty)
     }
 
+    @Test func aClientOpensItsOwnCopyToRevealOrCopy() throws {
+        let key = DeviceKey.ephemeral()
+        let client = UUID()
+        let me = DaemonAPI.SealRecipient(id: ClientSealing.clientRecipient(client), name: "Window", publicKey: key.publicKey)
+        let card = CardSecret(number: "4242424242424242", expiry: "09/28", cvc: "123", name: "Ada Example", zip: "94110")
+        let sealed = try ClientSealing.sealSecret(user: "ada", name: "SHOP_CARD", version: 7, value: card.value, ask: true, to: [me])
+        let secret = DaemonAPI.UserSealedSecret(name: "SHOP_CARD", version: 7, sealed: try #require(sealed[me.id]),
+                                                kind: CardSecret.kind, needsApproval: true)
+        let value = try ClientSealing.open(secret, user: "ada", with: key, client: client)
+        let opened = try #require(CardSecret(value: value))
+        #expect(opened.part(.cvc) == "123")
+        #expect(opened.spacedNumber == "4242 4242 4242 4242")
+        // Another person, another version, or a flag the control plane changed does not open.
+        #expect(throws: (any Error).self) { try ClientSealing.open(secret, user: "kim", with: key, client: client) }
+        var changed = secret
+        changed.needsApproval = nil
+        #expect(throws: (any Error).self) { try ClientSealing.open(changed, user: "ada", with: key, client: client) }
+        #expect(CardSecret(value: "ghp_x") == nil)
+        #expect(UserScopeWords.copied(.cvc) == "Copied the CVC. The clipboard clears in 90 s.")
+        #expect(UserScopeWords.hidesIn(24, card: false) == "Hides in 24 s · in the audit log")
+    }
+
     @Test func aSecretIsSetAboveTheKeptVersion() {
         let row = DaemonAPI.UserSecretRow(name: "A", updated: "", machines: [], leftOn: nil, version: 4, waiting: ["box"])
         #expect(UserScopeWords.nextVersion(row, now: Date(timeIntervalSince1970: 1)) == 5)

@@ -31,9 +31,10 @@ agree with it, so this page cannot drift from the code.
   from the network: no web font, on any surface.
 - **One accent.** The cobalt of the app icon is for links, focus, controls and the
   prominent button. Nothing is drawn in the accent on a selection, where it is too faint.
-- **Three state tints, and only Needs you in colour in a list.** Orange means that a
-  person is needed, red means that something failed, and green means an ending that the
-  app can vouch for (approved, done). In a list, only **Needs you** is drawn in colour.
+- **Four state tints, and only Needs you in colour in a list.** Yellow means that a
+  person is needed, orange is a warning, red means that something failed, and green means
+  an ending that the app can vouch for (approved, done) (#5016). In a list, only **Needs
+  you** is drawn in colour.
 - **Label hues never read as a state.** A session label that names an issue (`#12`) is
   teal, and one that names a pull request (`P#12`) is violet. Neither is a tint.
 - **Every text colour can be read.** Each one (ink, secondary, tertiary, the accent, the
@@ -64,10 +65,12 @@ Mac window and the iPhone and iPad app hold the same value.
 | selection | `--paper-selection` | `Paper.selection` | `#ebe9e4` | `#363633` | The picked row, with a 3px accent bar at its edge. Every text colour is 4.5:1 or more on it. |
 | accent | `--accent` | `AccentColor.colorset` | `#1a52c0` | `#86b4ff` | The app icon's cobalt: links, focus, the chosen control, a switch that is on. |
 | line.accent | `--line-accent` | `Paper.lineAccent` | `#a9c2ee` | `#3d5687` | The chosen thing, a link card. |
-| line.attention | `--line-attention` | `Paper.lineAttention` | `#ebbf9f` | `#6b4a33` | Needs you. |
+| line.attention | `--line-attention` | `Paper.lineAttention` | `#e3d196` | `#615326` | Needs you: the yellow's line (#5016). |
+| line.warning | `--line-warning` | `Paper.lineWarning` | `#ebbf9f` | `#6b4a33` | A warning: the orange's line (#5016). |
 | line.vouched | `--line-vouched` | `Paper.lineVouched` | `#a9d3bb` | `#36614d` | Done, approved. |
 | line.failure | `--line-failure` | `Paper.lineFailure` | `#eeb0b3` | `#6b3a3d` | Failed. |
-| tint.attention | `--tint-attention` | `StateTint.orange` | `#a3400e` | `#f3a672` | Needs you; the only tint drawn in a list. |
+| tint.attention | `--tint-attention` | `StateTint.yellow` | `#7a6200` | `#e6c04f` | Needs you: a question, a request, a wait only the person can settle; the only tint drawn in a list. Yellow, never the warning's orange (#5016). |
+| tint.warning | `--tint-warning` | `StateTint.orange` | `#a3400e` | `#f3a672` | A warning: something is wrong or nearly so, and a person should know. Not a request (#5016). |
 | tint.failure | `--tint-failure` | `StateTint.red` | `#b0222a` | `#f4878d` | Failed. |
 | tint.vouched | `--tint-vouched` | `StateTint.green` | `#25684f` | `#92ccad` | Approved, done: an ending the app can vouch for. |
 | label.issue | `--label-issue` | `Paper.issue` | `#0c6278` | `#73cbe0` | A label naming an issue, #12. |
@@ -200,13 +203,17 @@ because no control is in view to change.
 |---|---|---|---|---|
 | **Neutral** | A status: offline, stale, in progress, set by your organisation. | None: `ink` on the `well`. | `info.circle`, or `wifi.slash` when offline | ⓘ |
 | **Attention** | A person is needed: pair, sign in, approve, choose the folder again. | `tint.attention` | `exclamationmark.circle.fill` | ⚠︎ |
+| **Warning** | The session's place is not right: a Strip (specs/session-cards, #5029). Not a request. | `tint.warning` | (#5034) | ⛔ |
 | **Failure** | Something failed: a read, an action, a limit that stopped the work. | `tint.failure` | `xmark.octagon.fill` | ✕ |
 | **Success** | An ending that the app can vouch for: done, sent, archived. | `tint.vouched` | `checkmark.circle.fill` | ✓ |
 
-- **There is no warning tone.** A warning is a status (neutral) or a failure. Yellow and
-  amber are not message colours: `forge.waiting` is for a check that runs, not a message.
-- **Orange means only that a person is needed** (specs/018 FR-006a). A cost limit that
-  stopped the work is a failure, not attention.
+- **The warning tone is for a Strip only** (specs/session-cards, Decided). The web's account
+  move strip has it first (#5029); #5034 moves the other strips, on all three clients. Outside
+  messages, a warning line (a field that would fail, an allowance nearly spent, a disk
+  that runs low) draws `tint.warning`, the orange.
+- **Yellow means only that a person is needed** (specs/018 FR-006a; #5016). Orange is a
+  warning, red is a failure: a request never reads as a warning. A cost limit that stopped
+  the work is a failure, not attention.
 - **The tint is on the icon only.** The words are in `ink`, the ground is `well` (a banner)
   or `raised` (a toast). A message never fills its ground with a tint.
 - **Never colour alone.** Each message has an icon and words.
@@ -245,7 +252,8 @@ The client stories (#4600) move each pattern to its kind. Inline error text in a
 | `.offline-strip` (`OfflineStrip.tsx`), its orange dot | Web | Banner | Neutral (the dot is not orange) |
 | `ArchivedStaleStrip`, `.offline-strip.archived-stale` | All | Banner | Neutral |
 | `MissingFolderStrip`, `RemoteMissingFolderStrip`, `.problem.folder-gone` | All | Banner | Attention |
-| `AccountMoveStrip`, `RemoteAccountMoveStrip` | Mac, Remote | Banner | Attention |
+| `AccountMoveStrip`, `RemoteAccountMoveStrip` | Mac, Remote | Banner | Attention (warning in #5034) |
+| `.account-move-strip` (`AccountMove.tsx`) | Web | Banner | Warning |
 | `ContinueWhenBackStrip`, `RemoteContinueWhenBackStrip` | Mac, Remote | Banner | Neutral |
 | `CostLimitBanner` | Mac, Remote | Banner | Failure |
 | `OrgPolicyStrip`, `.policy-banner` | All | Banner | Neutral |
@@ -293,6 +301,27 @@ On the Mac and the Remote, the kinds are `PaneBanner`, `FieldNote`, `SheetNote` 
 2. Run `scripts/design.sh gen`, and commit the files that it writes.
 3. Run `DesignTokensTests`, and change the Swift files or the AccentColor assets that it
    names.
+
+## How fresh the data is
+
+Alex, 2026-11-12 (#5139): every page that shows cached data says how old it is, with
+**"Last update <time ago>"**. Then the person knows how fresh the data is.
+
+- **Cached data** is data from an earlier read: the local copy, a read that is shown while
+  its source does not answer, a read when the page opens, or a poll of 30 s or more. A
+  page that reads again every 5 s or less shows the line only after a read fails.
+- **The time is the time of the read,** not the time of the content (a PR's `updatedAt`)
+  and not the time the link went down. When parts of a page were read at different
+  times, show the oldest.
+- **The words are the same on every client:** "Last update just now" (under 1 minute),
+  "Last update 5 min ago", "Last update 2 h ago", "Last update yesterday", then "Last
+  update 3 Nov". Do not show a clock time ("Updated 14:02") for the age of a list.
+- **It ticks:** every 10 s for the first minute, then once a minute.
+- **Where:** in the pane's banner, after its words, when the pane has one; when not, at
+  the top of the pane in `ink.secondary` at the caption step (at the trailing end of the
+  pane's header when it has one). It is a status line, not a control.
+
+The pages and the plan are in `specs/5139-last-update/spec.md`.
 
 ## Marks
 

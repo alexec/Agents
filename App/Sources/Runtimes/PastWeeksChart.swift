@@ -42,7 +42,7 @@ struct PastWeeksChart: View {
 
     private func tint(_ week: AllowanceReading, _ used: Double) -> Color {
         if week.spent || used >= 1 { return StateTint.failure.color ?? Paper.accent }
-        if used >= 0.8 { return StateTint.attention.color ?? Paper.accent }
+        if used >= 0.8 { return StateTint.warning.color ?? Paper.accent }
         return Paper.accent
     }
 }

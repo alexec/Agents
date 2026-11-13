@@ -73,7 +73,7 @@ private struct Elsewhere: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(name).appText(.reading).fontWeight(.semibold)
-            Text(detail).appText(.supporting).foregroundStyle(.secondary)
+            Text(detail).appText(.supporting).foregroundStyle(Paper.secondary)
             if let link {
                 Link(link.absoluteString, destination: link)
                     .appText(.fine)
@@ -105,7 +105,7 @@ struct ArtifactsList: View {
         Group {
             if artifacts.isEmpty {
                 ContentUnavailableView("Nothing exchanged",
-                                       systemImage: "doc",
+                                       icon: "doc",
                                        description: Text("A file attached to a prompt, or one an agent "
                                                          + "hands back by name, shows up here."))
             } else {
@@ -135,7 +135,7 @@ struct ArtifactsList: View {
                     if model.hasMoreBefore {
                         Text("Only what is in the part of the conversation read so far.")
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Paper.tertiary)
                             .paperListRow()
                     }
                 }
@@ -174,7 +174,7 @@ struct ArtifactsList: View {
                 }
             }
             .appText(.fine)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Paper.secondary)
         }
     }
 }

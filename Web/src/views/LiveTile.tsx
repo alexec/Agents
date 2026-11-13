@@ -8,6 +8,9 @@ import type { Store } from "../model/store";
 import type { LiveSource } from "../protocol/generated";
 import { freshFrames, shownFrame, tileState } from "../model/liveTile";
 import { tileKind, tileLocked, tileLockedBody, tileName, tileOpen, tileOpenHelp, tileSwitch, tileWaiting } from "../model/liveTileWords";
+import { nowDriving, nowWorking } from "../model/nowWords";
+import { NowHead, useNowOpen } from "./Now";
+import { WorkingMark } from "./SessionRow";
 
 // The window's SF Symbols, display, globe and iphone, drawn plain.
 function SourceIcon({ source }: { source: LiveSource }) {
@@ -26,35 +29,27 @@ export function LiveTile({ store, host, agentID, open }: {
   // Once a second, so a source whose frames stopped drops out.
   const [now, setNow] = useState(Date.now());
   const [chosen, setChosen] = useState<LiveSource | null>(null);
+  const isOpen = useNowOpen();
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
   const fresh = freshFrames(store.liveFrames.value, host, agentID, now);
   const shown = shownFrame(fresh, chosen);
-  if (!shown) return null;
+  // Its frames stopped: the Now card's working line, until the agent is done.
+  if (!shown) return <NowHead mark={<WorkingMark tool="drive" />} title={nowWorking} />;
   const { frame } = shown;
   const state = tileState(frame);
   const name = tileName(frame);
   const label = [name, state.kind === "locked" ? tileLocked : state.narration].filter(Boolean).join(": ");
   const sources = fresh.map((h) => h.frame.source).sort();
+  // A part of the Now card (#5033): "Driving the browser · what it did last", and while the card is
+  // open (it opens with a picture) the picture, the switch and Open.
   return (
-    <div class="cards">
-      <div class="card desktop-tile live-tile">
-        <div class="live-tile-head">
-          <p class="quiet strong live-tile-name"><SourceIcon source={frame.source} />{name}</p>
-          {sources.length > 1 && (
-            <div class="diff-choice live-tile-switch" role="group" aria-label={tileSwitch}>
-              {sources.map((source) => (
-                <button type="button" key={source} aria-pressed={source === frame.source} title={tileKind(source)}
-                  aria-label={tileKind(source)} onClick={() => setChosen(source)}><SourceIcon source={source} /></button>
-              ))}
-            </div>
-          )}
-          {frame.source !== "screen" && (
-            <button type="button" title={tileOpenHelp(frame.source)} onClick={() => open(frame.source)}>{tileOpen}</button>
-          )}
-        </div>
+    <div class="now-part desktop-tile live-tile">
+      <NowHead mark={<SourceIcon source={frame.source} />} title={nowDriving(frame.source)}
+        detail={state.kind === "locked" ? tileLocked : state.narration} />
+      {isOpen && <>
         <div role="img" aria-label={label}>
           {state.kind === "picture" ? (
             <img class="desktop-tile-picture" src={state.src} alt="" />
@@ -65,8 +60,23 @@ export function LiveTile({ store, host, agentID, open }: {
             </div>
           )}
         </div>
-        {state.narration && <p class="desktop-tile-narration" aria-hidden="true">{state.narration}</p>}
-      </div>
+        {(sources.length > 1 || frame.source !== "screen") && (
+          <div class="live-tile-head">
+            <p class="quiet live-tile-name">{name}</p>
+            {sources.length > 1 && (
+              <div class="diff-choice live-tile-switch" role="group" aria-label={tileSwitch}>
+                {sources.map((source) => (
+                  <button type="button" key={source} aria-pressed={source === frame.source} title={tileKind(source)}
+                    aria-label={tileKind(source)} onClick={() => setChosen(source)}><SourceIcon source={source} /></button>
+                ))}
+              </div>
+            )}
+            {frame.source !== "screen" && (
+              <button type="button" title={tileOpenHelp(frame.source)} onClick={() => open(frame.source)}>{tileOpen}</button>
+            )}
+          </div>
+        )}
+      </>}
     </div>
   );
 }
