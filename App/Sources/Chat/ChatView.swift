@@ -214,6 +214,18 @@ struct ChatView: View {
                 frame.pane = .changes
                 if !frame.isOpen { frame.open() }
             },
+            // A turn's Changed files card (#5035): the Changes pane, at the file or its list.
+            showChanges: { [model, frame, states, agent, hasInspector] path in
+                guard let agent else { return }
+                // A window of its own has no Changes pane: one file opens in the editor (#826).
+                if !hasInspector {
+                    if let path { model.open(URL(filePath: path), on: agent.host) }
+                    return
+                }
+                states.state(for: agent.id).changesSelection = path.map { ChangesSelection(path: ReportedChanges.key($0)) }
+                frame.pane = .changes
+                if !frame.isOpen { frame.open() }
+            },
             // The sidebar's Background pane, at that subagent (057, frame C).
             subagentSteps: { [model, frame, states, agent, hasInspector, openWindow] id in
                 guard let agent else { return }

@@ -48,6 +48,9 @@ struct ChatActions {
     /// pane, at that file and that tool call. Nil where there is no such pane, and then
     /// the edit offers nothing.
     var showEdit: (@MainActor (ToolCallContent.Diff, String?) -> Void)? = nil
+    /// Open the Changes pane at a file, by its path, or at its list for nil: a turn's Changed
+    /// files card (#5035). Nil where there is no such pane, and then the card does not open.
+    var showChanges: (@MainActor (String?) -> Void)? = nil
     /// Open a subagent's own steps, by its id (057): the Mac's Background pane, the
     /// phone's sheet. Nil offers nothing.
     var subagentSteps: (@MainActor (String) -> Void)? = nil

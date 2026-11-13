@@ -36,48 +36,83 @@ private struct AppViewInline: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            AppViewCaption(host: host)
-            Group {
-                switch host.phase {
-                case .loading:
-                    AppViewLoading(host: host)
-                        .frame(maxWidth: .infinity, minHeight: 60)
-                case .failed(let words):
-                    AppViewFailure(host: host, words: words)
-                        .frame(maxWidth: .infinity, minHeight: 60)
-                    if let text = host.call.resultText {
-                        Text(text).appText(.reading).textSelection(.enabled)
-                    }
-                case .asking:
-                    // Its Show or Don't Show is an Ask under "Waiting for you" (#5031).
-                    Text(AppViewAsk.waitsWords).appText(.supporting).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
-                case .gone:
-                    Text("This view was closed.").appText(.supporting).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 40)
-                case .ready:
-                    if host.isFullscreen {
-                        Button("Showing full screen. Back to the chat") { host.setFullscreen(false) }
-                            .buttonStyle(.plain)
-                            .appText(.supporting)
-                            .foregroundStyle(.secondary)
-                            .frame(maxWidth: .infinity, minHeight: 60)
-                    } else {
-                        AppViewWeb(host: host)
-                            .frame(height: host.height)
-                            .accessibilityLabel(host.title)
-                    }
-                }
+            // The view is an Object card (#5035): the live view as its preview, then the row of
+            // its name, ⋯ (Full screen, Pin to Folder) and › (full screen). Only the › opens:
+            // the view takes its own taps.
+            ObjectCard(icon: "square.grid.2x2", title: host.title, detail: detail,
+                       open: canOpen ? { host.setFullscreen(true) } : nil,
+                       openHelp: "Show this view in the chat's place",
+                       more: more, tapAnywhere: false) {
+                frame
             }
-            .frame(maxWidth: .infinity)
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-            .modifier(AppViewEdge(on: host.prefersBorder))
             AppViewAsks(host: host)
         }
         .onAppear { host.start() }
         .onChange(of: width, initial: true) { placeInline() }
         .onChange(of: scheme) { placeInline() }
         .onChange(of: host.isFullscreen) { if !host.isFullscreen { placeInline() } }
+    }
+
+    private var canOpen: Bool { host.phase == .ready && !host.isFullscreen }
+
+    /// "View · Cancelled · Pinned to this folder".
+    private var detail: String {
+        ["View", host.call.state == .cancelled ? "Cancelled" : nil, host.pinNote]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
+
+    private var more: [StripButton] {
+        var items: [StripButton] = []
+        if canOpen {
+            items.append(StripButton(title: "Full Screen", help: "Show this view in the chat's place") { host.setFullscreen(true) })
+        }
+        if host.canPin {
+            items.append(StripButton(title: "Pin to Folder", help: "Pin this view under the folder, opened by the same call") {
+                host.pinToFolder()
+            })
+        }
+        return items
+    }
+
+    @ViewBuilder private var frame: some View {
+        Group {
+            switch host.phase {
+            case .loading:
+                AppViewLoading(host: host)
+                    .frame(maxWidth: .infinity, minHeight: 60)
+            case .failed(let words):
+                VStack(alignment: .leading, spacing: 6) {
+                    AppViewFailure(host: host, words: words)
+                        .frame(maxWidth: .infinity, minHeight: 60)
+                    if let text = host.call.resultText {
+                        Text(text).appText(.reading).textSelection(.enabled)
+                    }
+                }
+                .padding(.horizontal, 12)
+            case .asking:
+                // Its Show or Don't Show is an Ask under "Waiting for you" (#5031).
+                Text(AppViewAsk.waitsWords).appText(.supporting).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+                    .padding(.horizontal, 12)
+            case .gone:
+                Text("This view was closed.").appText(.supporting).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 40)
+            case .ready:
+                if host.isFullscreen {
+                    Button("Showing full screen. Back to the chat") { host.setFullscreen(false) }
+                        .buttonStyle(.plain)
+                        .appText(.supporting)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 60)
+                } else {
+                    AppViewWeb(host: host)
+                        .frame(height: host.height)
+                        .accessibilityLabel(host.title)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
 
     private func placeInline() {
@@ -252,36 +287,6 @@ struct AppViewFullscreen: View {
     }
 }
 
-/// The name above a view, and the way to full screen and back.
-private struct AppViewCaption: View {
-    let host: AppViewHost
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Text(host.title).appText(.fine).foregroundStyle(.secondary)
-            if host.call.state == .cancelled {
-                Text("Cancelled").appText(.fine).foregroundStyle(.tertiary)
-            }
-            Spacer(minLength: 0)
-            if let note = host.pinNote {
-                Text(note).appText(.fine).foregroundStyle(.secondary).lineLimit(2)
-            }
-            if host.phase == .ready, !host.isFullscreen {
-                Button {
-                    host.setFullscreen(true)
-                } label: {
-                    Image(icon: "arrow.up.left.and.arrow.down.right")
-                        .accessibilityLabel("Full screen")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .help("Show this view in the chat's place")
-            }
-            AppViewMenu(host: host)
-        }
-    }
-}
-
 /// The view's menu: Pin to Folder (#189), when the call can feed a pin. Nothing else yet,
 /// so no menu at all without it.
 private struct AppViewMenu: View {
@@ -322,20 +327,6 @@ private struct AppViewAsks: View {
                 Spacer(minLength: 0)
                 Button("Don't Tell") { host.dropContext() }.buttonStyle(.plain).appText(.fine).foregroundStyle(.secondary)
             }
-        }
-    }
-}
-
-private struct AppViewEdge: ViewModifier {
-    let on: Bool
-
-    func body(content: Content) -> some View {
-        if on {
-            content
-                .clipShape(RoundedRectangle(cornerRadius: Paper.Radius.card))
-                .overlay(RoundedRectangle(cornerRadius: Paper.Radius.card).strokeBorder(Paper.rule, lineWidth: 1))
-        } else {
-            content
         }
     }
 }

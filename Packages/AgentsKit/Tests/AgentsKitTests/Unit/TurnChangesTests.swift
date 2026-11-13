@@ -16,6 +16,10 @@ struct TurnChangesTests {
         #expect(decoded.kind == card.kind)
         #expect(TranscriptEntry.display([card]).last?.isOutcome == true)
         #expect(TurnChangesWords.title(Self.changes) == "Changed 5 files")
+        // The Object card's quiet line names the files (#5035).
+        #expect(TurnChangesWords.names(Self.changes) == "a.txt, new.txt and 3 more")
+        #expect(TurnChangesWords.names(TurnChanges(turn: UUID(), files: Self.changes.files, before: "t1", after: "t2"))
+            == "a.txt and new.txt")
     }
 
     /// The undo is said on the card, and is no line of its own.

@@ -2245,22 +2245,11 @@ final class RemoteModel {
     ///
     /// Where it opens is the Mac's answer (034 FR-004): a Markdown file on the Page, any
     /// other file in Files at the line. A Mac without the panes gets today's sheet.
-    /// While the person is typing it is left where it is, and the chat offers it.
+    /// While the person is typing it is not opened: it is taken off all the same, and its
+    /// Object card in the chat opens it when the person chooses (034 FR-005, #5035).
     func openFileTheAgentWants() {
-        guard !isTyping, let selection, let file = work.takeFileToShow(for: selection) else { return }
-        open(file, for: selection)
-    }
-
-    /// The strip's Open, which the person chose, typing or not.
-    func openOfferedFile() {
         guard let selection, let file = work.takeFileToShow(for: selection) else { return }
-        open(file, for: selection)
-    }
-
-    /// The strip's ✕: not now. Taken off, as an opened one would be.
-    func dismissOfferedFile() {
-        guard let selection else { return }
-        _ = work.takeFileToShow(for: selection)
+        if !isTyping { open(file, for: selection) }
     }
 
     /// A file shown in the chat, opened again from its card (#836).

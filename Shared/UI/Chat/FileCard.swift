@@ -1,63 +1,39 @@
 import AgentsKitCore
 import SwiftUI
 
-/// A file an agent showed with `show_file`, where it showed it (#836). Layout A of
-/// specs/836-file-card/layout.svg: a chart, a diagram (#853) or a picture has its
-/// preview above the name; anything else is one line. A tap opens it in the Files pane at its line.
-/// The page draws the same card in FileCard.tsx.
+/// A file an agent showed with `show_file`, where it showed it (#836), as an Object card (#5035):
+/// a chart, a diagram (#853) or a picture has its preview above the name; anything else is one
+/// row. A tap opens it in the Files pane at its line. The page draws the same card in FileCard.tsx.
 struct FileCard: View {
     let file: ShownFile
     @Environment(\.chatActions) private var actions
     /// A spec's own mark, once its preview has read it: "Bar chart", not "Chart".
     @State private var mark: ChartMark?
 
-    /// The widest a card is drawn, and the tallest its preview.
-    static let width: CGFloat = 340
-    static let previewHeight: CGFloat = 150
-
     var body: some View {
         Group {
-            if let open = actions.showFile {
-                Button { open(file) } label: { card }
-                    .buttonStyle(.plain)
-                    .help("Open \(file.name) in Files")
+            if file.look == .chart || file.look == .diagram || file.look == .picture {
+                ObjectCard(icon: symbol, title: file.name, detail: detail,
+                           open: open, openHelp: "Open \(file.name) in Files") {
+                    FilePreview(file: file, mark: $mark)
+                        .frame(height: ObjectCard<EmptyView, EmptyView>.previewHeight)
+                }
             } else {
-                card
+                ObjectCard(icon: symbol, title: file.name, detail: detail,
+                           open: open, openHelp: "Open \(file.name) in Files",
+                           preview: { EmptyView() }, notes: { EmptyView() })
             }
         }
+        .frame(maxWidth: ObjectCard<EmptyView, EmptyView>.width, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(file.name), \(file.lookWords)")
         .accessibilityAddTraits(actions.showFile == nil ? [] : .isButton)
     }
 
-    private var card: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if file.look == .chart || file.look == .diagram || file.look == .picture {
-                FilePreview(file: file, mark: $mark)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: Self.previewHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-            }
-            HStack(spacing: 10) {
-                Image(icon: symbol)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 18)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(file.name).appText(.reading).fontWeight(.semibold).lineLimit(1)
-                    Text(detail).appText(.fine).foregroundStyle(.secondary).lineLimit(1)
-                }
-                Spacer(minLength: 0)
-                if actions.showFile != nil {
-                    Image(icon: "chevron.right").appText(.fine).foregroundStyle(.tertiary)
-                }
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: Self.width, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(.background))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(.separator))
-        .contentShape(RoundedRectangle(cornerRadius: 10))
+    /// A tap opens it in Files, where the chat can.
+    private var open: (@MainActor () -> Void)? {
+        guard let show = actions.showFile else { return nil }
+        let file = file
+        return { show(file) }
     }
 
     private var symbol: String {
@@ -96,7 +72,6 @@ private struct FilePreview: View {
 
     var body: some View {
         ZStack {
-            Rectangle().fill(.quaternary.opacity(0.5))
             switch shown {
             case .loading:
                 ProgressView().controlSize(.small)

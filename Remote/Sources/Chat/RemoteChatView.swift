@@ -229,9 +229,6 @@ struct RemoteChatView: View {
                     // What it works towards: the goal (#2742) and the plan, one Now card (#5033).
                     NowTopCard(agent: agent)
                 }
-                // The agent asked to be looked at while something was being typed: said
-                // here, to be opened when the person chooses (034 FR-005). The main scene's.
-                if popped == nil, let wanted = model.fileTheAgentWants { OfferedFileStrip(file: wanted) }
             }
         }
         .sheet(isPresented: Binding(get: { model.fileOnScreen != nil },
@@ -556,6 +553,13 @@ struct RemoteChatView: View {
                 panes.changesPath = diff.path
                 panes.show(.changes)
             },
+            // A turn's Changed files card (#5035): the Changes pane, at the file or its list.
+            showChanges: { [model] path in
+                guard let agentID else { if let path { model.fileOnScreen = path }; return }
+                let panes = model.panes.state(for: agentID)
+                panes.changesPath = path
+                panes.show(.changes)
+            },
             // A subagent's own steps, in a sheet: the Mac's Background pane, on a phone
             // (057, frame E).
             subagentSteps: { id in subagentOnScreen = id },
@@ -871,10 +875,6 @@ struct ContextMeter: View {
     }
 }
 
-/// "Wants you to see plan.md", with Open and not now (034 FR-005).
-///
-/// The agent's request, kept on the chat rather than taking the screen: somebody typing
-/// is not somebody to interrupt, and the file will still be there when they are done.
 extension RemoteChatView {
     /// The session's strips (#5034): its host, folder, account, allowance and limit, in that
     /// order, one at a time with "+N more". The limit's left the prompt bar for here.
@@ -904,35 +904,5 @@ extension RemoteChatView {
         }
         .paneBannerInset()
         .remoteBannerGround()
-    }
-}
-
-private struct OfferedFileStrip: View {
-    @Environment(RemoteModel.self) private var model
-    let file: ShownFile
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(icon: ShownFile.isMarkdown(file.url) ? "doc.richtext" : "doc.text")
-                .foregroundStyle(Paper.secondary)
-                .accessibilityHidden(true)
-            Text("Wants you to see \(Text(file.name).fontWeight(.semibold))")
-                .appText(.supporting)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: 8)
-            Button("Open") { model.openOfferedFile() }
-                .buttonStyle(.paper)
-            Button {
-                model.dismissOfferedFile()
-            } label: {
-                Label("Not now", icon: "xmark")
-                    .labelStyle(.iconOnly)
-            }
-            .buttonStyle(.borderless)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .paperWell(in: Rectangle())
     }
 }
