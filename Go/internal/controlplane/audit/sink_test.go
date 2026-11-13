@@ -120,6 +120,11 @@ func TestAnHTTPSinkGetsEachEntry(t *testing.T) {
 	if o == nil || line.Hash != Hash(o.Data) || !strings.Contains(string(line.Entry), `"seq":2`) {
 		t.Fatalf("line %s, stored %v", got[1], o)
 	}
+	// The lines are here before the sender reads the answer and marks them sent (#4907).
+	waitUntil(t, "send marked done", func() bool {
+		st := sinks.State()
+		return len(st) == 1 && st[0].Queued == 0 && st[0].SentAt != nil
+	})
 	st := sinks.State()
 	if len(st) != 1 || st[0].Sink.Token != nil || st[0].Sink.HasToken == nil || !*st[0].Sink.HasToken || st[0].SentAt == nil ||
 		st[0].LastError != nil || st[0].Queued != 0 {
