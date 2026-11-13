@@ -221,21 +221,8 @@ struct RemoteChatView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 StaleBanner()
-                // A server's agent whose host has gone: which, and since when (#239).
-                if let agent { HostOfflineStrip(host: agent.host) }
-                // Its folder gone (#119): which, and the ways on, before anything is typed.
-                if let agent, agent.missingFolder != nil, agent.state != .archived {
-                    RemoteMissingFolderStrip(agent: agent)
-                }
-                // Its account gone or refused by the organisation (#999): why, and Continue in New.
-                if let agent, agent.missingFolder == nil, let reason = model.accountMoveReason(agent) {
-                    RemoteAccountMoveStrip(agent: agent, reason: reason)
-                }
-                // A session failed when its allowance ran out (#1859): Continue when it is back, or Cancel.
-                if let agent, ContinueWhenBackWords.offers(agent) || agent.continueWhenBack != nil,
-                   model.host(agent.host, has: Capability.chatContinueWhenBack1) {
-                    RemoteContinueWhenBackStrip(agent: agent)
-                }
+                // What is wrong with the session's place, one strip at a time (#5034).
+                if let agent { strips(for: agent) }
                 // Under the banner, not over it: when the Mac has gone quiet, what
                 // the agent last said it would do is the less urgent of the two.
                 if let agent {
@@ -888,6 +875,39 @@ struct ContextMeter: View {
 ///
 /// The agent's request, kept on the chat rather than taking the screen: somebody typing
 /// is not somebody to interrupt, and the file will still be there when they are done.
+extension RemoteChatView {
+    /// The session's strips (#5034): its host, folder, account, allowance and limit, in that
+    /// order, one at a time with "+N more". The limit's left the prompt bar for here.
+    @ViewBuilder
+    func strips(for agent: Agent) -> some View {
+        let reason = RemoteMissingFolderStrip.isShown(agent) ? nil : model.accountMoveReason(agent)
+        let kinds = SessionStripKind.allCases.filter { kind in
+            switch kind {
+            case .host: HostOfflineStrip.isShown(agent.host, model: model)
+            case .folder: RemoteMissingFolderStrip.isShown(agent)
+            case .account: reason != nil
+            case .allowance: RemoteContinueWhenBackStrip.isShown(agent, model: model)
+            case .limit: agent.state != .archived
+                && CostLimitStrip.isShown(agent: agent, limits: model.costLimits, costState: model.costState)
+            }
+        }
+        StripStack(kinds: kinds) { kind in
+            switch kind {
+            case .host: HostOfflineStrip(host: agent.host)
+            case .folder: RemoteMissingFolderStrip(agent: agent)
+            case .account: RemoteAccountMoveStrip(agent: agent, reason: reason ?? "")
+            case .allowance: RemoteContinueWhenBackStrip(agent: agent)
+            case .limit:
+                CostLimitStrip(agent: agent, limits: model.costLimits, costState: model.costState,
+                               goOn: { Task { await model.letThisAgentGoOn(agent) } })
+            }
+        }
+        .paneBannerInset()
+        .remoteBannerGround()
+        .animation(ResponseMotion.response, value: kinds)
+    }
+}
+
 private struct OfferedFileStrip: View {
     @Environment(RemoteModel.self) private var model
     let file: ShownFile

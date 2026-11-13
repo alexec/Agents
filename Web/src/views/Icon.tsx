@@ -61,6 +61,12 @@ import trash2 from "lucide:trash-2";
 import triangleAlert from "lucide:triangle-alert";
 import workflow from "lucide:workflow";
 import x from "lucide:x";
+import wifiOff from "lucide:wifi-off";
+import folderSearch from "lucide:folder-search";
+import userX from "lucide:user-x";
+import history from "lucide:history";
+import coins from "lucide:coins";
+import building2 from "lucide:building-2";
 import zap from "lucide:zap";
 
 type Node = [string, Record<string, string>];
@@ -76,6 +82,7 @@ const icons = {
   "message-circle": messageCircle, "messages-square": messagesSquare, "octagon-alert": octagonAlert, paperclip,
   phone, play, plug, radio, "rotate-cw": rotateCw, sparkles, "square-check": squareCheck, "square-pen": squarePen,
   "square-terminal": squareTerminal, sun, target, "trash-2": trash2, "triangle-alert": triangleAlert, workflow, x, zap,
+  "wifi-off": wifiOff, "folder-search": folderSearch, "user-x": userX, history, coins, "building-2": building2,
 } satisfies Record<string, Node[]>;
 
 export type IconName = keyof typeof icons;

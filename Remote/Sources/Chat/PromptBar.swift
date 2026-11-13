@@ -63,10 +63,6 @@ struct PromptBar: View {
                 // Where it works, its labels and its runtime, over the field as on the
                 // window and the page (#108, #242).
                 PromptHead(agent: agent)
-                CostLimitBanner(agent: agent, limits: model.costLimits, costState: model.costState,
-                                goOn: { Task { await model.letThisAgentGoOn(agent) } }) {
-                    RaiseTheLimitOnTheMac()
-                }
             }
             // A field note (#4737), shown only while there is one: a kept line would cost the
             // phone's bar a line for ever.

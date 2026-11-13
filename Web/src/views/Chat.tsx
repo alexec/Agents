@@ -17,9 +17,10 @@ import { useWaitingCards, type WaitingCard } from "./Cards";
 import { OfflineStrip } from "./OfflineStrip";
 import { resourcesAsked } from "./Resources";
 import { KeptBubbles } from "./Kept";
-import { FolderGoneNotice, MissingFolderStrip } from "./MissingFolder";
-import { AccountMoveStrip } from "./AccountMove";
-import { ContinueStrip } from "./ContinueStrip";
+import { folderStripApplies, MissingFolderStrip } from "./MissingFolder";
+import { accountMoveReason, AccountMoveStrip } from "./AccountMove";
+import { continueStripApplies, ContinueStrip } from "./ContinueStrip";
+import { Strips } from "./Strip";
 import { NowBar, NowFoot, NowHead, NowTop, useNowOpen } from "./Now";
 import { nowBackground, nowWorking } from "../model/nowWords";
 import { freshFrames } from "../model/liveTile";
@@ -27,7 +28,7 @@ import { Telling } from "./Telling";
 import { Labels } from "./Labels";
 import { Prompt } from "./Prompt";
 import { PromptMenus } from "./PromptMenus";
-import { ContextMeter, CostLimitBanner, SandboxCapsule } from "./PromptStatus";
+import { ContextMeter, costLimitApplies, CostLimitStrip, SandboxCapsule } from "./PromptStatus";
 import { branchFromPrompt, RenameInput, SessionButtons, SessionMenu } from "./SessionMenu";
 import { Beacon } from "./SessionRow";
 import { drawable } from "../model/options";
@@ -671,11 +672,15 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
             ]} />
         </span>
       </header>
-      {hostDown && <OfflineStrip store={store} host={host} />}
-      <FolderGoneNotice store={store} host={host} agent={agent} />
-      <MissingFolderStrip store={store} host={host} agent={agent} />
-      <AccountMoveStrip store={store} host={host} agent={agent} />
-      <ContinueStrip store={store} host={host} agent={agent} disabled={down} />
+      {/* What is wrong with the session's place, one strip at a time, in this order (#5034). */}
+      <Strips strips={[
+        ...(hostDown ? [{ kind: "host" as const, node: <OfflineStrip store={store} host={host} /> }] : []),
+        ...(folderStripApplies(store, host, agent) ? [{ kind: "folder" as const, node: <MissingFolderStrip store={store} host={host} agent={agent} /> }] : []),
+        ...(accountMoveReason(store, host, agent) ? [{ kind: "account" as const, node: <AccountMoveStrip store={store} host={host} agent={agent} /> }] : []),
+        ...(continueStripApplies(store, host, agent) ? [{ kind: "allowance" as const, node: <ContinueStrip store={store} host={host} agent={agent} disabled={down} /> }] : []),
+        ...(agent && costLimitApplies(agent, store.costs.value[host]) ? [{ kind: "limit" as const, node: <CostLimitStrip agent={agent} costs={store.costs.value[host]}
+          goOn={() => void store.letAgentGoOn(host, agent)} /> }] : []),
+      ]} />
       {/* What it works towards: the goal (#2742) and the plan (#341), one Now card (#5033). */}
       <NowTop agent={agent} />
       {finding.value && agent && <FindBar store={store} host={host} agentID={agent.id} close={() => (finding.value = false)} />}
@@ -743,8 +748,6 @@ export function Chat({ store, host, session, down: linkDown }: { store: Store; h
           stop={agent && hasTurnInFlight(agent) ? () => void store.perform(host, agent.id, "agents/stop") : undefined}
           acting={agent && store.onItsWay.value[agent.id]}
           queues={willQueue(agent)} suggestion={agent?.suggestedPrompts?.[0]}
-          banner={agent && <CostLimitBanner agent={agent} costs={store.costs.value[host]}
-            goOn={() => void store.letAgentGoOn(host, agent)} />}
           recipient={store.recipient(host)}
           capabilities={agent ? store.account(host, agent.runtimeID)?.promptCapabilities : undefined}
           runtimeName={agent ? runtimeNameOn(store, host, agent.runtimeID) : undefined}

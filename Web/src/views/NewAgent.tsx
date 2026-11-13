@@ -506,7 +506,7 @@ export function NewAgent({ store, host, folder, folderName, down }: {
         <BackToList />
       </header>
       {/* The same strip as over a chat: a prompt here goes to that host too (#83). */}
-      {!down && <OfflineStrip store={store} host={host} />}
+      {!down && !store.hostIsOnline(host) && <div class="strips"><OfflineStrip store={store} host={host} /></div>}
       <div class="scroll new-heading">
         <Huddle focused={promptFocused.value} typed={typed.value} />
         <ProjectSwitch store={store} host={host} folder={folder} folderName={folderName} down={down} />

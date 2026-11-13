@@ -31,7 +31,7 @@ const slowSend = 400;
 const mentionPause = 150;
 
 export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName, onAttachments, disabled, send, recipient, starting = false, where, runtime, onTyping, children,
-  stop, acting, queues = false, suggestion, commands = [], findFiles, banner, sent = [] }: {
+  stop, acting, queues = false, suggestion, commands = [], findFiles, sent = [] }: {
   store: Store;
   /** Where the draft is kept: a session, or a new-agent form. */
   draftKey: string;
@@ -69,8 +69,6 @@ export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName
   commands?: readonly SlashCommand[] | undefined;
   /** Files under the agent's folders matching what follows an `@`, found by its host. */
   findFiles?: ((term: string) => Promise<FileMentionDTO[]>) | undefined;
-  /** A limit notice, above the field as in both Swift clients. */
-  banner?: ComponentChildren;
   /** The prompts the person sent in this session, oldest first: what Up gives back (#1551). */
   sent?: readonly string[];
 }) {
@@ -247,7 +245,6 @@ export function Prompt({ store, draftKey, placeholder, capabilities, runtimeName
           {runtime && <div class="bar-runtime">{runtime}</div>}
         </div>
       )}
-      {banner}
       {sending.value && (starting || slow.value) && (
         <Telling recipient={recipient} doing={starting ? "Starting" : "Sending"} />
       )}

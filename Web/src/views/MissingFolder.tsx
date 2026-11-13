@@ -1,11 +1,11 @@
 // An agent whose folder has gone (#119): a strip across the top of its chat saying which folder,
-// with the ways on, as the window's MissingFolderStrip; and the refusal of a send, said with the
-// same ways on and carrying what was typed. The prompt keeps the words either way.
+// with the ways on, as the window's MissingFolderStrip; a refused send is the same strip, carrying
+// what was typed (#5034). The prompt keeps the words either way.
 import type { Agent, Attachment } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { go } from "../route";
 import { archiveWithChildren } from "./SessionMenu";
-import { MessageBanner } from "./MessageKinds";
+import { Strip } from "./Strip";
 import {
   continueInFolderLabel, folderIsMissing, folderPath, mayRecreateWorktree, missingFolderLabel, recreateWorktreeLabel,
 } from "../model/missingFolder";
@@ -15,43 +15,30 @@ async function continueIn(store: Store, host: string, agent: Agent, text = "", a
   if (id) go({ host, folder: agent.worktree?.folder || agent.cwd, session: id });
 }
 
-function WaysOn({ store, host, agent, text, attachments, then }: {
-  store: Store; host: string; agent: Agent; text?: string; attachments?: Attachment[]; then?: () => void;
-}) {
-  return (
-    <span class="ways-on">
-      <button onClick={() => { then?.(); void continueIn(store, host, agent, text, attachments); }}>{continueInFolderLabel}</button>
-      {mayRecreateWorktree(agent) && (
-        <button onClick={() => { then?.(); void store.recreateWorktree(host, agent.id); }}>{recreateWorktreeLabel}</button>
-      )}
-      <button onClick={() => { then?.(); void archiveWithChildren(store, host, agent); }}>Archive</button>
-    </span>
-  );
-}
+export const typedIsKept = "What you typed is still in the prompt.";
 
-export function MissingFolderStrip({ store, host, agent }: { store: Store; host: string; agent: Agent | undefined }) {
-  if (!agent || !folderIsMissing(agent)) return null;
-  return (
-    // A banner of the chat (docs/reference/design-system.md, "Messages"): attention, the person must choose.
-    // Once, not twice: a refused send's notice above has the same ways on.
-    <MessageBanner tone="attention" name="missing-folder-strip"
-      actions={store.folderGone.value?.agentID !== agent.id ? <WaysOn store={store} host={host} agent={agent} /> : undefined}>
-      <span class="what" title={folderPath(agent)}>{missingFolderLabel} <span class="quiet">· {folderPath(agent)}</span></span>
-    </MessageBanner>
-  );
-}
-
-/** A send refused because the folder has gone, for the open chat: the host's words and the ways on. */
-export function FolderGoneNotice({ store, host, agent }: { store: Store; host: string; agent: Agent | undefined }) {
+/** Whether the session has a folder strip: its folder has gone, or a send was refused for it. */
+export function folderStripApplies(store: Store, host: string, agent: Agent | undefined): boolean {
+  if (!agent || agent.state === "archived") return false;
   const ask = store.folderGone.value;
-  if (!ask || !agent || ask.host !== host || ask.agentID !== agent.id) return null;
-  const close = () => { store.folderGone.value = null; };
+  return folderIsMissing(agent) || (!!ask && ask.host === host && ask.agentID === agent.id);
+}
+
+/** The folder's strip (#5034, second of the session's strips; #119): which folder, and the ways on. A send
+ *  the host refused because the folder went is this strip too: it says what was typed is still in the
+ *  prompt, and Continue in the folder takes it along. It was a notice of its own over this strip. */
+export function MissingFolderStrip({ store, host, agent }: { store: Store; host: string; agent: Agent | undefined }) {
+  if (!agent || !folderStripApplies(store, host, agent)) return null;
+  const ask = store.folderGone.value;
+  const refused = ask && ask.host === host && ask.agentID === agent.id ? ask : null;
+  const close = () => { if (refused) store.folderGone.value = null; };
   return (
-    <MessageBanner tone="attention" name="folder-gone" actions={<>
-      <WaysOn store={store} host={host} agent={agent} text={ask.text} attachments={ask.attachments} then={close} />
-      <button class="link" onClick={close}>Cancel</button>
-    </>}>
-      {ask.message} What you typed is still in the prompt.
-    </MessageBanner>
+    <Strip tone="warning" name={`missing-folder-strip${refused ? " folder-gone" : ""}`} icon="folder-search"
+      line={missingFolderLabel} detail={refused ? `${folderPath(agent)} · ${typedIsKept}` : folderPath(agent)}
+      title={refused ? `${refused.message} ${typedIsKept}` : folderPath(agent)}
+      primary={{ label: continueInFolderLabel, run: () => { close(); void continueIn(store, host, agent, refused?.text, refused?.attachments); } }}
+      second={{ label: "Archive", run: () => { close(); void archiveWithChildren(store, host, agent); } }}
+      more={mayRecreateWorktree(agent)
+        ? [{ label: recreateWorktreeLabel, run: () => { close(); void store.recreateWorktree(host, agent.id); } }] : []} />
   );
 }

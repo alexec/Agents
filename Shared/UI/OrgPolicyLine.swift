@@ -51,9 +51,9 @@ struct OrgPolicyStrip: View {
     let state: DaemonAPI.PolicyState?
 
     var body: some View {
-        // A neutral banner (#4737): set by the organisation, nothing for the person to do here.
+        // A grey strip (#5034): set by the organisation, nothing for the person to do here.
         if let state, state.startsNothing, let line = Self.line(state) {
-            PaneBanner(tone: .neutral, symbol: "building.2", line, detail: Self.detail(state))
+            Strip(tone: .neutral, symbol: "building.2", line: line, detail: Self.detail(state))
                 .paneBannerInset()
         }
     }
@@ -66,7 +66,7 @@ struct OrgPolicyStrip: View {
     private static func detail(_ state: DaemonAPI.PolicyState) -> String? {
         guard state.stopAll, let stop = state.policy?.stopAll, stop.on else { return nil }
         return [OrgPolicyWords.stoppedBy(stop), stop.note].compactMap { $0?.isEmpty == false ? $0 : nil }
-            .joined(separator: "\n")
+            .joined(separator: " · ")
     }
 }
 

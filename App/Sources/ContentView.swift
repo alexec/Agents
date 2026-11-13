@@ -417,18 +417,6 @@ struct ContentView: View {
             case .lendGit(let ask):
                 Button("Approve") { model.answerGitLend(ask, allowed: true) }
                 Button("Deny", role: .cancel) { model.answerGitLend(ask, allowed: false) }
-            case .folderGone(let ask):
-                // The ways on (#119). What was typed goes with Continue; Cancel leaves it
-                // in the bar.
-                Button(MissingFolderWords.continueInFolder) {
-                    Task { await model.continueInFolder(ask.agentID, text: ask.text, attachments: ask.attachments) }
-                }
-                .keyboardShortcut(.defaultAction)
-                if model.work.agent(ask.agentID)?.mayRecreateWorktree == true {
-                    Button(MissingFolderWords.recreateWorktree) { Task { await model.recreateWorktree(ask.agentID) } }
-                }
-                Button(MissingFolderWords.archive) { Task { await model.archive(ask.agentID) } }
-                Button("Cancel", role: .cancel) {}
             }
         } message: { alert in
             Text(alert.message)
@@ -466,13 +454,11 @@ struct ContentView: View {
 enum WindowAlert: Identifiable {
     case lend(SignInLendAsk)
     case lendGit(GitLendAsk)
-    case folderGone(FolderGoneAsk)
 
     var id: String {
         switch self {
         case .lend(let ask): "lend-\(ask.id)"
         case .lendGit(let ask): "lend-git-\(ask.id)"
-        case .folderGone(let ask): "folder-gone-\(ask.id)"
         }
     }
 
@@ -480,7 +466,6 @@ enum WindowAlert: Identifiable {
         switch self {
         case .lend(let ask): "Let \(ask.label) use this Mac’s \(ask.runtimeName) sign-in?"
         case .lendGit(let ask): ask.title
-        case .folderGone: "This agent’s folder isn’t there"
         }
     }
 
@@ -489,7 +474,6 @@ enum WindowAlert: Identifiable {
         case .lend(let ask):
             "Its agents will use \(ask.runtimeName) as you, through this Mac, whenever this Mac is awake. The sign-in itself stays on this Mac. You can stop it in Settings ▸ Machines."
         case .lendGit(let ask): ask.message
-        case .folderGone(let ask): ask.message + " What you typed is still in the prompt."
         }
     }
 
@@ -497,7 +481,6 @@ enum WindowAlert: Identifiable {
     static func wanted(by model: AppModel) -> WindowAlert? {
         if let ask = model.signInLendAsk { return .lend(ask) }
         if let ask = model.gitLendAsk { return .lendGit(ask) }
-        if let ask = model.folderGone { return .folderGone(ask) }
         return nil
     }
 
@@ -511,7 +494,6 @@ enum WindowAlert: Identifiable {
         case .lend: break
         // Escape is Deny, which its cancel button has said.
         case .lendGit: break
-        case .folderGone(let ask): if model.folderGone == ask { model.folderGone = nil }
         }
     }
 }

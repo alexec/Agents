@@ -134,7 +134,6 @@ struct PromptBar: View {
         GlassEffectContainer(spacing: 12) {
             VStack(alignment: .leading, spacing: 12) {
                 whereAndWhat
-                atItsLimit
                 startingOnOut
                 if draftLostSomething {
                     Text(PromptWords.draftLostSomething)
@@ -271,29 +270,6 @@ struct PromptBar: View {
             text = PromptQuote.adding(quote.words, to: text)
             focused = true
             model.offeredQuote = nil
-        }
-    }
-
-    // MARK: A limit reached
-
-    /// Said above the field when the open agent may take no more prompts, with
-    /// exactly two ways out: raise the limit, or let this one agent go on.
-    ///
-    /// Neither happens without the reader choosing it and neither is the default.
-    /// Nothing here sends a prompt — raising a ceiling makes an agent promptable
-    /// again; continuing is the reader's second act, deliberately.
-    @ViewBuilder
-    private var atItsLimit: some View {
-        // The phone's too (033). Only the way to raise it is the Mac's own.
-        if let agent {
-            CostLimitBanner(agent: agent, limits: model.costLimits, costState: model.costState,
-                            goOn: { Task { await model.letThisAgentGoOn(agent) } }) {
-                // The limits are rules of Agents ▸ Policy (#2957): open Settings there.
-                SettingsLink { Text("Raise the limit") }
-                    .buttonStyle(.paper)
-                    .appText(.fine)
-                    .simultaneousGesture(TapGesture().onEnded { model.settingsPaneAsked = .agentsPolicy })
-            }
         }
     }
 

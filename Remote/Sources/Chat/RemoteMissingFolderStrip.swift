@@ -1,33 +1,27 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Over a chat whose folder has gone (#119): that it has, which folder, and the ways on,
-/// as the Mac's strip over the chat has them: an attention banner (#4737).
+/// The folder's strip (#5034, second of the session's strips; #119): that the folder has gone,
+/// which folder, and the ways on, as the Mac's strip has them.
 struct RemoteMissingFolderStrip: View {
     @Environment(RemoteModel.self) private var model
     let agent: Agent
 
+    static func isShown(_ agent: Agent) -> Bool {
+        agent.missingFolder != nil && agent.state != .archived
+    }
+
     var body: some View {
-        let path = MissingFolderWords.shortPath(agent.cwd, home: "")
-        PaneBanner(tone: .attention, symbol: "folder.badge.questionmark",
-                   announcement: MissingFolderWords.label + " " + path) {
-            Text("\(MissingFolderWords.label) \(Text("· " + path).foregroundStyle(Paper.secondary))")
-                .lineLimit(1)
-                .truncationMode(.middle)
-        } actions: {
-            Button(MissingFolderWords.continueInFolder) {
-                Task { await model.continueInFolder(agent.id) }
-            }
-            if agent.mayRecreateWorktree {
-                Button(MissingFolderWords.recreateWorktree) {
-                    Task { await model.recreateWorktree(agent.id) }
-                }
-            }
-            Button(MissingFolderWords.archive) {
-                Task { await model.archive(agent.id) }
-            }
-        }
-        .paneBannerInset()
-        .remoteBannerGround()
+        Strip(tone: .warning, symbol: "folder.badge.questionmark", line: MissingFolderWords.label,
+              detail: MissingFolderWords.shortPath(agent.cwd, home: ""),
+              primary: StripButton(title: MissingFolderWords.continueInFolder) {
+                  Task { await model.continueInFolder(agent.id) }
+              },
+              second: StripButton(title: MissingFolderWords.archive) {
+                  Task { await model.archive(agent.id) }
+              },
+              more: agent.mayRecreateWorktree
+                  ? [StripButton(title: MissingFolderWords.recreateWorktree) { Task { await model.recreateWorktree(agent.id) } }]
+                  : [])
     }
 }

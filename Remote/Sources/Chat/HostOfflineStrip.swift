@@ -1,8 +1,8 @@
 import AgentsKitCore
 import SwiftUI
 
-/// Across the top of a chat or the start sheet whose server has gone (#239), as the
-/// window's `OfflineStrip`, a neutral banner (#4737): which host, and since when. The Mac's own link is
+/// The host's strip (#5034, first of the session's strips; #239), as the window's
+/// `OfflineStrip`: which host, and since when, with a grey glyph. The Mac's own link is
 /// `StaleBanner`'s, so this says nothing for an agent on the Mac.
 ///
 /// What is under it is what the phone last had, and greyed. The server's agents carry
@@ -13,8 +13,13 @@ struct HostOfflineStrip: View {
     @Environment(RemoteModel.self) private var model
     let host: MachineRef
 
+    @MainActor
+    static func isShown(_ host: MachineRef, model: RemoteModel) -> Bool {
+        host != .mac && model.isStale(on: host)
+    }
+
     var body: some View {
-        if host != .mac, model.isStale(on: host) {
+        if Self.isShown(host, model: model) {
             let name = model.hostName(host)
             let row = model.controlHost(host)
             let workspace = row?.workspace
@@ -23,10 +28,11 @@ struct HostOfflineStrip: View {
                 ?? OfflineWords.line(host: host, name: name,
                                      since: model.hostDownSince[host]?.formatted(date: .omitted, time: .shortened))
             let starting = workspace != nil && state == "starting"
-            // Neutral (#4737): the phone dials again by itself.
-            PaneBanner(tone: .neutral, symbol: MessageTone.offlineSymbol, busy: starting, announcement: line) {
-                Text(line)
-            } actions: {
+            let start = workspace.map { OfflineWords.offersStart(state: state, workspace: $0) } ?? false
+            Strip(tone: .neutral, symbol: MessageTone.offlineSymbol, busy: starting, line: line,
+                  primary: start ? StripButton(title: "Start", disabled: model.hostsBeingStarted.contains(host)) {
+                      Task { await model.startHost(host) }
+                  } : nil) {
                 if starting, let since = workspace?.since {
                     TimelineView(.periodic(from: since, by: 1)) { context in
                         Text(OfflineWords.elapsed(since: since, now: context.date))
@@ -34,16 +40,8 @@ struct HostOfflineStrip: View {
                             .monospacedDigit()
                             .foregroundStyle(Paper.secondary)
                     }
-                } else if let workspace, OfflineWords.offersStart(state: state, workspace: workspace) {
-                    Button("Start") {
-                        Task { await model.startHost(host) }
-                    }
-                    .disabled(model.hostsBeingStarted.contains(host))
-                    .accessibilityLabel("Start \(name)")
                 }
             }
-            .paneBannerInset()
-            .remoteBannerGround()
         }
     }
 }
