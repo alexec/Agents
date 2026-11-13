@@ -10,7 +10,7 @@ import { Fragment, type ComponentChildren } from "preact";
 import type { Store } from "../model/store";
 import { go, route, sectionOf, usageAsked } from "../route";
 import { gated, groupedPages, machinePages, navPages, navTitle, openPage, pagesShown, sectionKeys, sectionsShown, usagePaneTitle, usagePanes,
-  type NavPage, type NavSection } from "../model/nav";
+  type NavPage, type NavSection, pageRoute, routePageID } from "../model/nav";
 import { adminOf, adminsOnly } from "../model/console";
 import { hostAnswers, stateWords, versionWords } from "../model/capabilities";
 import { needingYou, placedSessions } from "../model/overview";
@@ -20,6 +20,7 @@ import { requestCount } from "./ConsoleRecords";
 import { policyNotSaved } from "./ConsolePolicy";
 import { orgPolicyNotSaved } from "./ConsoleOrgPolicy";
 import { ReportsPage } from "./Reports";
+import { BuildsPage } from "./Builds";
 import { WorkList, WorkPage } from "./Work";
 import { WorkReleasePage } from "./WorkRelease";
 import { WorkFeatures } from "./WorkFeatures";
@@ -43,7 +44,7 @@ import { WorkflowRow } from "./WorkflowRow";
 import { BackToList } from "./BackToList";
 import { DataTable } from "./DataTable";
 import { PageTitle, PersonMenu, SearchBox } from "./TopBar";
-import { pageCrumbs } from "../model/crumbs";
+import { pageCrumbs, type Crumb } from "../model/crumbs";
 import { MultiplierPage } from "./Multiplier";
 import { lowDetail, lowWords, runtimeTally, setupRuntimes } from "../model/runtimes";
 import { eventsWaitingLine } from "../model/eventsWaiting";
@@ -197,7 +198,7 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
   const r = route.value;
   // A page per machine under Machines (#3626).
   const more = section === "machines" ? machinePages(store.hosts.value, store.macHostID.value) : [];
-  const open = openPage(section, r.section, admin, more);
+  const open = openPage(section, routePageID(section, r), admin, more);
   const list = pagesShown(section, admin, open?.id, more);
   const registering = useSignal(false);
   useUserScopeStatus(store, section === "status");
@@ -244,8 +245,8 @@ export function SectionPage({ store, section, down }: { store: Store; section: E
                 </MachineRow>
               ) : (
                 <Fragment key={p.id}>
-                  <button type="button" class={`sub-app-row${p.id === open?.id ? " on" : ""}`}
-                    aria-current={p.id === open?.id ? "page" : undefined} onClick={() => go({ nav: section, section: p.id })}>
+                  <button type="button" class={`sub-app-row${p.id === open?.id ? " on" : ""}${p.under ? " under" : ""}`}
+                    aria-current={p.id === open?.id ? "page" : undefined} onClick={() => go(pageRoute(section, p))}>
                     {p.title}
                     <PageMark store={store} page={p} />
                   </button>
@@ -285,11 +286,14 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
   if (!gated(page, admin) && page.draw.kind === "activity") return <ActivityPageView store={store} page={page.draw.page} />;
   if (!gated(page, admin) && page.draw.kind === "settings") return <SettingsPage store={store} down={down} />;
   if (page.draw.kind === "multiplier") return <MultiplierPage store={store} />;
+  // A page under another (#5178) names that page in its breadcrumb: Reports › Planning › Builds.
+  const parent = page.under ? navPages[section].find((p) => p.id === page.under) : undefined;
   return (
-    <Framed title={page.title} section={section}>
+    <Framed title={page.title} section={section} parent={parent && { title: parent.title, to: { nav: section, section: parent.id } }}>
       {gated(page, admin) ? <p class="hint">{admin === null ? "Loading…" : roleProblemOf(store) ?? adminsOnly}</p>
         : page.draw.kind === "console" ? <ConsoleSection store={store} id={page.draw.id} down={down} />
         : page.draw.kind === "report" ? <ReportsPage store={store} section={page.draw.section} down={down} />
+        : page.draw.kind === "builds" ? <BuildsPage store={store} down={down} />
         : page.draw.kind === "machines" ? (admin === true ? <MachinesPage store={store} down={down} /> : <YourMachines store={store} />)
         : page.draw.kind === "workflows" ? <AllWorkflows store={store} down={down} />
         : page.draw.kind === "usage" ? <Usage store={store} />
@@ -324,10 +328,13 @@ function sectionOfPage(page: NavPage): Exclude<NavSection, "overview"> {
   return (Object.keys(navPages) as NavSection[]).find((s) => navPages[s].includes(page)) as Exclude<NavSection, "overview"> ?? "agents";
 }
 
-function Framed({ title, section, children }: { title: string; section: Exclude<NavSection, "overview">; children: ComponentChildren }) {
+function Framed({ title, section, parent, children }: { title: string; section: Exclude<NavSection, "overview">; parent?: Crumb | undefined;
+  children: ComponentChildren }) {
+  const crumbs = pageCrumbs(section, title);
   return (
     <section class="chat activity-page sub-app-page console" aria-label={title}>
-      <header class="column-head page-head"><BackToList /><PageTitle parts={pageCrumbs(section, title)}><h1>{title}</h1></PageTitle></header>
+      <header class="column-head page-head"><BackToList />
+        <PageTitle parts={parent ? [...crumbs.slice(0, -1), parent, ...crumbs.slice(-1)] : crumbs}><h1>{title}</h1></PageTitle></header>
       <div class="scroll">
         <div class="activity-body settings-body">{children}</div>
       </div>

@@ -98,7 +98,9 @@ export function parseRoute(hash: string): Route {
     if (nav === "docs" && !item && section !== "docs") return { nav, section: "docs", item: decodeURIComponent(section) };
     // A conversation's page is #/messages/<key> (#4344), the same way.
     if (nav === "messages" && !item && section !== "messages") return { nav, section: "messages", item: decodeURIComponent(section) };
-    if (item) return { nav, section: decodeURIComponent(section), item: decodeURIComponent(item) };
+    // An item keeps its own state after the "?" too: #/reports/value/builds?repo=… (#5178).
+    if (item) return query ? { nav, section: decodeURIComponent(section), item: decodeURIComponent(item), query }
+      : { nav, section: decodeURIComponent(section), item: decodeURIComponent(item) };
     return query ? { nav, section: decodeURIComponent(section), query } : { nav, section: decodeURIComponent(section) };
   }
   const parts = path.split("/").map((part) => decodeURIComponent(part));
@@ -165,7 +167,9 @@ function sectionHash(r: Route): string {
   if (!r.nav) return "#/";
   if (r.nav === "docs" && r.item) return `#/docs/${encodeURIComponent(r.item)}`;
   if (r.nav === "messages" && r.item) return `#/messages/${encodeURIComponent(r.item)}`;
-  return `#/${r.nav}` + (r.section ? "/" + encodeURIComponent(r.section) + (r.item ? "/" + encodeURIComponent(r.item) : r.query ? `?${r.query}` : "") : "");
+  return `#/${r.nav}` + (r.section ? "/" + encodeURIComponent(r.section) + (r.item ? "/" + encodeURIComponent(r.item) : "")
+    // A list's filters stay off an item's page, but Reports' pages under another keep theirs: #/reports/value/builds?… (#5178).
+    + (r.query && (!r.item || r.nav === "reports") ? `?${r.query}` : "") : "");
 }
 
 /** Whether an address is one from before #2141, or Machines ▸ Runtimes or Connectors from before #3631 and #3632, which the page writes
