@@ -1,3 +1,5 @@
+import { Strip } from "./Strip";
+import { go } from "../route";
 import type { Agent, CostState, PolicySetBy, SandboxChoice } from "../protocol/generated";
 import { line } from "../model/orgPolicy";
 import { optionLabel } from "./OrgPolicyLine";
@@ -6,22 +8,45 @@ import { followsSettings } from "../model/levels";
 import { costIsUnmeasured, dayTokenLimitReached, isAtMoneyLimit, isAtTokenLimit, tokenFigure } from "../model/limits";
 import { priced } from "../model/runtimes";
 
-export function CostLimitBanner({ agent, costs, goOn }: { agent: Agent; costs: CostState | undefined; goOn: () => void }) {
+// The limit strip's words, the window's and the Remote's too (CostLimitWords).
+export const costLimitWords = {
+  atItsLimit: "This agent reached its cost limit",
+  goOn: "Let this one go on",
+  goOnHelp: "Raises this agent's own ceiling. No other agent is changed.",
+  raise: "Raise the limit",
+  raiseHelp: "Opens Settings ▸ Agents ▸ Policy, where the limits are.",
+  dayTokens: "The day's token limit has been reached",
+  daySpending: "The day's spending limit has been reached",
+  waits: "Anything you send waits until you allow more.",
+  dayDetail: "What you send goes when the day rolls over",
+};
+
+/** Whether the agent, or the day, is at its limit. */
+export function costLimitApplies(agent: Agent | undefined, costs: CostState | undefined): boolean {
+  if (!agent || agent.state === "archived") return false;
+  const limits = costs?.limits;
+  return isAtMoneyLimit(agent, limits) || isAtTokenLimit(agent, limits) || dayTokenLimitReached(costs)
+    || (!!limits?.daily && (costs?.today?.[limits.daily.currency] ?? 0) >= limits.daily.amount);
+}
+
+/** The limit's strip (#5034, last of the session's strips). It was a banner over the prompt bar; it moved to
+ *  the top so that every "the agent cannot go on" is in one place (Alex, 2026-11-12). Orange, a warning. */
+export function CostLimitStrip({ agent, costs, goOn }: { agent: Agent; costs: CostState | undefined; goOn: () => void }) {
+  if (!costLimitApplies(agent, costs)) return null;
   const limits = costs?.limits;
   const atMoney = isAtMoneyLimit(agent, limits);
-  const atTokens = isAtTokenLimit(agent, limits);
-  const atAgentLimit = atMoney || atTokens;
-  const atDayTokens = dayTokenLimitReached(costs);
-  const atDayLimit = atDayTokens || (!!limits?.daily && (costs?.today?.[limits.daily.currency] ?? 0) >= limits.daily.amount);
+  const atAgentLimit = atMoney || isAtTokenLimit(agent, limits);
   const amount = Object.entries(agent.costToDate ?? {}).sort(([a], [b]) => a.localeCompare(b))
     .map(([currency, value]) => new Intl.NumberFormat(undefined, { style: "currency", currency }).format(value)).join(" · ");
   // Money, else tokens (#838): in the words of the limit it reached.
-  const used = !atMoney && atTokens ? `${(agent.tokensToDate ?? 0).toLocaleString()} tokens used.` : `${amount || ""} spent.`;
-  const day = atDayTokens ? "The day's token limit has been reached." : "The day's spending limit has been reached.";
-  return atAgentLimit || atDayLimit ? <div class="cost-limit" role="status">
-      <span>{atAgentLimit ? `This agent reached its cost limit. ${used} Anything you send waits until you allow more.` : `${day} What you send waits here, and goes when the day rolls over.`}</span>
-      {atAgentLimit && <button onClick={goOn}>Let this one go on</button>}
-    </div> : null;
+  const used = !atMoney && atAgentLimit ? `${(agent.tokensToDate ?? 0).toLocaleString()} tokens used` : `${amount || ""} spent`;
+  const raise = { label: costLimitWords.raise, title: costLimitWords.raiseHelp, run: () => go({ nav: "settings", section: "agentsPolicy" }) };
+  return atAgentLimit
+    ? <Strip tone="warning" name="cost-limit" icon="coins" line={costLimitWords.atItsLimit} detail={used}
+      title={`${costLimitWords.atItsLimit} · ${used}. ${costLimitWords.waits}`}
+      primary={{ label: costLimitWords.goOn, title: costLimitWords.goOnHelp, run: goOn }} second={raise} />
+    : <Strip tone="warning" name="cost-limit" icon="coins" line={dayTokenLimitReached(costs) ? costLimitWords.dayTokens : costLimitWords.daySpending}
+      detail={costLimitWords.dayDetail} primary={raise} />;
 }
 
 export function ContextMeter({ agent, costs }: { agent: Agent; costs: CostState | undefined }) {

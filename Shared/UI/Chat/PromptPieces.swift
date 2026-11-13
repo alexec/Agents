@@ -39,7 +39,7 @@ enum PromptWords {
         willQueue ? "Queue this, to go when the turn ends" : "Send"
     }
 
-    static let atItsCostLimit = "This agent has reached its cost limit"
+    static let atItsCostLimit = "This agent reached its cost limit"
     static let draftLostSomething = "A picture you had pasted was too large to keep, so it did not come back with the rest."
     static let dictationPrimerTitle = "Say it instead of typing it"
     static let dictationPrimer = "The phone listens while the button is on, and what you say becomes the words in the prompt. It is recognised on this phone where this phone can do it."
@@ -63,53 +63,71 @@ enum PromptWords {
     }
 }
 
-/// Said above the field when the open agent may take no more prompts, with exactly two
-/// ways out: raise the limit, or let this one agent go on.
+/// The limit's strip at the top of the chat (#5034), last of the session's strips: the open
+/// agent may take no more prompts. It was a banner over the prompt bar; it moved to the top so
+/// that every "the agent cannot go on" is in one place (Alex, 2026-11-12).
 ///
-/// Neither happens without the reader choosing it and neither is the default. Nothing
-/// here sends a prompt — raising a ceiling makes an agent promptable again; continuing
-/// is the reader's second act, deliberately.
+/// Its ways out: let this one agent go on, or raise the limit. Neither happens without the
+/// reader choosing it, and neither sends a prompt: raising a ceiling makes an agent promptable
+/// again; continuing is the reader's second act, deliberately.
 ///
-/// `raise` is each app's: the Mac opens its Settings, and a phone, which has no limits
-/// page of its own, says where they are changed.
-struct CostLimitBanner<Raise: View>: View {
+/// `raise` is the Mac's, which opens its Settings; a phone, which has no limits page of its
+/// own, says where they are changed (`raiseElsewhere`).
+struct CostLimitStrip: View {
     let agent: Agent
     let limits: CostLimits
     let costState: DaemonAPI.CostState?
     let goOn: () -> Void
-    @ViewBuilder let raise: () -> Raise
+    var raise: (() -> Void)?
+
+    /// Whether the agent, or the day, is at its limit.
+    static func isShown(agent: Agent, limits: CostLimits, costState: DaemonAPI.CostState?) -> Bool {
+        agent.isAtCostLimit(under: limits) || costState?.dayLimitReached == true
+    }
 
     var body: some View {
-        // A failure banner (#4737), both cases: a limit that stopped the work is broken about
-        // the agent's situation, not a question it has asked; orange is for the latter
-        // (FR-006a). Over the prompt bar rather than at the top of the chat, because what
-        // it holds back is what is sent.
+        // Orange, a warning (#5016): what is wrong, and its button fixes it.
+        let raiseButton = raise.map {
+            StripButton(title: CostLimitWords.raise, help: CostLimitWords.raiseHelp, action: $0)
+        }
         if agent.isAtCostLimit(under: limits) {
-            PaneBanner(tone: .failure, PromptWords.atItsCostLimit,
-                       detail: agent.spentWords(under: limits) + " Anything you send waits until you allow more.") {
-                raise()
-                Button("Let this one go on", action: goOn)
-                    .help("Raises this agent's own ceiling. No other agent is changed.")
-            }
+            Strip(tone: .warning, symbol: "dollarsign.circle", line: PromptWords.atItsCostLimit,
+                  detail: CostLimitWords.spent(agent.spentWords(under: limits), raisesHere: raise != nil),
+                  help: CostLimitWords.waits,
+                  primary: StripButton(title: CostLimitWords.goOn, help: CostLimitWords.goOnHelp, action: goOn),
+                  second: raiseButton)
         } else if costState?.dayLimitReached == true {
-            PaneBanner(tone: .failure,
-                       costState?.limits.isDayTokenLimitReached(tokensToday: costState?.tokensToday ?? 0) == true
-                           ? "The day's token limit has been reached"
-                           : "The day's spending limit has been reached",
-                       detail: "What you send waits here, and goes when the day rolls over.") {
-                raise()
-            }
+            Strip(tone: .warning, symbol: "dollarsign.circle",
+                  line: costState?.limits.isDayTokenLimitReached(tokensToday: costState?.tokensToday ?? 0) == true
+                      ? CostLimitWords.dayTokens : CostLimitWords.daySpending,
+                  detail: CostLimitWords.dayDetail(raisesHere: raise != nil),
+                  primary: raiseButton)
         }
     }
 }
 
-/// Where a phone says the limit is changed, in place of the Mac's Settings button.
-struct RaiseTheLimitOnTheMac: View {
-    var body: some View {
-        Text("Change the limit in Settings on your Mac.")
-            .appText(.fine)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
+/// The limit strip's words, the web page's too (`Web/src/views/PromptStatus.tsx`).
+enum CostLimitWords {
+    static let goOn = "Let this one go on"
+    static let goOnHelp = "Raises this agent's own ceiling. No other agent is changed."
+    static let raise = "Raise the limit"
+    static let raiseHelp = "Opens Settings ▸ Agents ▸ Policy, where the limits are."
+    static let dayTokens = "The day's token limit has been reached"
+    static let daySpending = "The day's spending limit has been reached"
+    /// Where a client with no limits page of its own says they are changed.
+    static let raiseOnTheMac = "Change the limit in Settings on your Mac."
+
+    /// Said in the strip's help: what the limit holds back.
+    static let waits = "Anything you send waits until you allow more."
+
+    /// "$4.20 spent", or on a phone with "Change the limit in Settings on your Mac." after it.
+    static func spent(_ spent: String, raisesHere: Bool) -> String {
+        let amount = spent.hasSuffix(".") ? String(spent.dropLast()) : spent
+        return raisesHere ? amount : amount + ". " + raiseOnTheMac
+    }
+
+    static func dayDetail(raisesHere: Bool) -> String {
+        "What you send goes when the day rolls over" + (raisesHere ? "" : ". " + raiseOnTheMac)
     }
 }
 

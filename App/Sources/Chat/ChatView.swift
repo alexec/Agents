@@ -49,7 +49,8 @@ struct ChatView: View {
                         // transcript scrolls on under it, as it does under the prompt.
                         .safeAreaInset(edge: .top, spacing: 0) {
                             VStack(spacing: 0) {
-                                OfflineStrip(host: agent.host)
+                                // What is wrong with the session's place, one strip at a time (#5034).
+                                strips(for: agent)
                                 actions(for: agent)
                                 if finding, popped == nil {
                                     ChatFindBar(agentID: agent.id,
@@ -311,14 +312,45 @@ struct ChatView: View {
         return { await model.answerSandbox(id, carryOn: carryOn) }
     }
 
+    /// The session's strips (#5034): its host, folder, account, allowance and limit, in that
+    /// order, one at a time with "+N more".
+    @ViewBuilder
+    private func strips(for agent: Agent) -> some View {
+        let reason = model.accountMoveReason(agent)
+        let kinds = SessionStripKind.allCases.filter { kind in
+            switch kind {
+            case .host: OfflineStrip.isShown(agent.host, model: model)
+            case .folder: MissingFolderStrip.isShown(agent, model: model)
+            case .account: reason != nil && !MissingFolderStrip.isShown(agent, model: model)
+            case .allowance: ContinueWhenBackStrip.isShown(agent, model: model)
+            case .limit: agent.state != .archived
+                && CostLimitStrip.isShown(agent: agent, limits: model.costLimits, costState: model.costState)
+            }
+        }
+        StripStack(kinds: kinds) { kind in
+            switch kind {
+            case .host: OfflineStrip(host: agent.host)
+            case .folder: MissingFolderStrip(agent: agent)
+            case .account: AccountMoveStrip(agent: agent, reason: reason ?? "")
+            case .allowance: ContinueWhenBackStrip(agent: agent)
+            case .limit:
+                CostLimitStrip(agent: agent, limits: model.costLimits, costState: model.costState,
+                               goOn: { Task { await model.letThisAgentGoOn(agent) } },
+                               raise: {
+                                   // The limits are rules of Agents ▸ Policy (#2957): open Settings there.
+                                   model.settingsPaneAsked = .agentsPolicy
+                                   openSettings()
+                               })
+            }
+        }
+        .chatColumn()
+        .padding(.top, kinds.isEmpty ? 0 : 8)
+    }
+
     /// What can be done to the chat as a whole, at the right-hand edge of its column.
     @ViewBuilder
     private func actions(for agent: Agent) -> some View {
-        if agent.missingFolder != nil, agent.state != .archived {
-            MissingFolderStrip(agent: agent)
-        } else if let reason = model.accountMoveReason(agent) {
-            AccountMoveStrip(agent: agent, reason: reason)
-        } else if agent.state == .archived {
+        if agent.state == .archived {
             // Matching the phone: an archived chat's own page is where Unarchive lives,
             // not only on the row you left it from.
             HStack(spacing: 8) {
@@ -334,9 +366,6 @@ struct ChatView: View {
             }
             .chatColumn()
             .padding(.vertical, 8)
-        } else if ContinueWhenBackWords.offers(agent) || agent.continueWhenBack != nil,
-                  model.host(agent.host, has: Capability.chatContinueWhenBack1) {
-            ContinueWhenBackStrip(agent: agent)
         }
     }
 

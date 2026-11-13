@@ -6218,7 +6218,7 @@ final class AppModel {
                                                                    attachments: attachments,
                                                                    voice: voice ? true : nil))
             } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.folderGone {
-                // Its own alert, with the ways on, carrying what was typed (#119).
+                // The folder's strip says so, with the ways on, carrying what was typed (#119, #5034).
                 self.folderGone = FolderGoneAsk(agentID: selection, message: error.message,
                                                 text: text, attachments: attachments)
                 throw SaidAlready()

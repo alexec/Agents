@@ -31,6 +31,10 @@ every turn, from `<its folder>/<its name>.behaviour`:
           with content, priority and status) as Claude's to-do list, then, with a tool named,
           calls it as `tool` does: for seeing the first build's plan page tick its tasks, and
           a task wait on a card (#5054).
+  usage <tokens>
+          it answers as `ok` does, and the turn reports that many tokens (half in, half
+          out) on its prompt response: for reaching a token limit, as the limit strip
+          needs (#5034).
   ok      (or no file) it answers, saying what it was handed.
 
 So a walk can make a runtime run out, and later come back, by rewriting one file.
@@ -210,6 +214,11 @@ def prompt(request_id, params):
         words.append(f"{NAME} here. I was handed the conversation so far ({len(handoff)} characters).")
     words.append(f"You said: {typed[0][:200] if typed else '(nothing)'}")
     say(session_id, "\n\n".join(words))
+    if how and how[0] == "usage" and len(how) > 1:
+        tokens = int(how[1])
+        reply(request_id, {"stopReason": "end_turn", "usage": {
+            "totalTokens": tokens, "inputTokens": tokens // 2, "outputTokens": tokens - tokens // 2}})
+        return
     reply(request_id, {"stopReason": "end_turn"})
 
 

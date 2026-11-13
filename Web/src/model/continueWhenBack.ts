@@ -7,6 +7,8 @@ import { fromWireDate } from "../protocol/dates";
 import { switchTime } from "./switchNote";
 
 export const continueCancelLabel = "Cancel";
+/** The strip over a paused chat, before it is asked to continue (ContinueWhenBackWords.paused). */
+export const continuePaused = "This runtime’s allowance is spent. The chat stopped.";
 export const continueHelp = "Sends “continue” in this chat when the allowance is back, or sooner if a turn on this runtime works.";
 
 /** Whether the chat offers the button: paused by a spent allowance, and not waiting yet. */
