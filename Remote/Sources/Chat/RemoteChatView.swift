@@ -869,7 +869,7 @@ private struct OfferedFileStrip: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: ShownFile.isMarkdown(file.url) ? "doc.richtext" : "doc.text")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
                 .accessibilityHidden(true)
             Text("Wants you to see \(Text(file.name).fontWeight(.semibold))")
                 .appText(.supporting)

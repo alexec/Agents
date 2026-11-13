@@ -32,7 +32,7 @@ struct HostOfflineStrip: View {
                         Text(OfflineWords.elapsed(since: since, now: context.date))
                             .appText(.fine)
                             .monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                     }
                 } else if let workspace, OfflineWords.offersStart(state: state, workspace: workspace) {
                     Button("Start") {

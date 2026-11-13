@@ -22,7 +22,7 @@ struct RemoteMoveToMachineSheet: View {
             Form {
                 if targets.isEmpty {
                     Section {
-                        Text(MoveToMachineWords.noTargets).foregroundStyle(.secondary)
+                        Text(MoveToMachineWords.noTargets).foregroundStyle(Paper.secondary)
                     }
                 } else {
                     Section {

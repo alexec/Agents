@@ -162,7 +162,7 @@ struct AttachmentStrip: View {
                                 Image(systemName: "xmark.circle.fill")
                             }
                             .buttonStyle(.plain)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .accessibilityLabel("Remove \(attachment.displayName)")
                         }
                         .appText(.supporting)

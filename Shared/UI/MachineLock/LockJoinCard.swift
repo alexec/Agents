@@ -40,10 +40,10 @@ struct LockJoinCard: View {
                 switch step {
                 case .waiting:
                     Button(LockWords.compare, action: compare)
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.paperProminent)
                 case .compare:
                     Button("Approve", action: approve)
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.paperProminent)
                 case .elsewhere, .revealing, .mismatch:
                     EmptyView()
                 }
@@ -167,7 +167,7 @@ struct ThisDeviceLockCard: View {
             }
             HStack(spacing: 8) {
                 Button(LockWords.use, action: use)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.paperProminent)
                     .disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
                 Button("Cancel") {
                     recovering = false
@@ -219,7 +219,7 @@ struct RecoveryKeyCard: View {
                 Text(LockWords.recoveryWhy).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
                     Button(LockWords.makeRecoveryButton, action: make)
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.paperProminent)
                     Button(LockWords.skip, action: dismiss)
                         .buttonStyle(.bordered)
                     if isBusy { ProgressView().controlSize(.small) }
@@ -239,7 +239,7 @@ struct RecoveryKeyCard: View {
                 Text(LockWords.recoveryShownOnce).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
                     Button(LockWords.savedIt, action: dismiss)
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.paperProminent)
                     Button(copied ? "Copied" : "Copy") {
                         Clipboard.copy(text)
                         copied = true

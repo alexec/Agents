@@ -17,7 +17,7 @@ struct LiveActivitySettingsSection: View {
         } footer: {
             Text("On, a prompt you send from here shows on the Lock Screen and in the Dynamic Island until its turn ends.")
                 .appText(.fine)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
         }
         .paperListRow()
     }

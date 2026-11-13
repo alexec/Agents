@@ -60,14 +60,14 @@ struct PermissionSheet: View {
                     // Who is asking, by title and runtime (#121) — its subagent, when it
                     // is one (057). Still the agent's question to answer, so it is here.
                     if let asker = model.work.askerLine(request.agentID, subagent: request.subagent) {
-                        Text(asker).appText(.fine).foregroundStyle(.secondary)
+                        Text(asker).appText(.fine).foregroundStyle(Paper.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Text(request.toolCall.title)
                         .appText(.reading).fontWeight(.semibold)
                         .fixedSize(horizontal: false, vertical: true)
                     if let kind = request.toolCall.kind, !request.toolCall.isPlanApproval {
-                        Text(kind).appText(.fine).foregroundStyle(.secondary)
+                        Text(kind).appText(.fine).foregroundStyle(Paper.secondary)
                     }
                 }
                 detail
@@ -166,7 +166,7 @@ private struct Sending: View {
             ProgressView().controlSize(.small)
             Text(Telling.words(doing: option.name, host: host))
                 .appText(.reading)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
             Spacer(minLength: 0)
         }
         .padding(.vertical, 6)

@@ -30,7 +30,7 @@ struct CapReachedCard: View {
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 8) {
                     Button(BotWords.setCap) { isChanging = true }
-                        .buttonStyle(.borderedProminent)
+                        .buttonStyle(.paperProminent)
                         .disabled(bot == nil || control == nil)
                     Button("OK") { people.dismissCap(reached) }
                         .buttonStyle(.bordered)

@@ -61,7 +61,7 @@ struct SidebarSessionRow: View {
             if agent.state == .archived {
                 Image(systemName: "archivebox")
                     .glyph(size: 13)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
                     .frame(width: 20, height: 20)
                     .accessibilityLabel("Archived")
             } else if let mark = SessionMark(agent: markAgent, group: model.work.group(of: markAgent)) {
@@ -87,7 +87,7 @@ struct SidebarSessionRow: View {
                         if let place {
                             Text(place)
                                 .appText(.fine)
-                                .foregroundStyle(.tertiary)
+                                .foregroundStyle(Paper.tertiary)
                                 .lineLimit(1)
                         }
                     }
@@ -95,13 +95,13 @@ struct SidebarSessionRow: View {
                     if let workflowName = startedByWorkflowName {
                         Image(systemName: "flowchart")
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Paper.tertiary)
                             .accessibilityLabel("started by the workflow \(workflowName)")
                     }
                     if let starter = model.startedByAgentLabel(agent) {
                         Image(systemName: AgentsModel.startedByAgentSymbol)
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Paper.tertiary)
                             // Said, as the workflow mark is and the Mac's row says it (#1326).
                             .accessibilityLabel(starter)
                     }
@@ -109,7 +109,7 @@ struct SidebarSessionRow: View {
                     if agent.isMuted {
                         Image(systemName: MuteWords.symbol)
                             .appText(.fine)
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(Paper.tertiary)
                             .accessibilityLabel(MuteWords.muted)
                     }
                     // Voice mode listens in this chat (#2518), beside the mute mark.
@@ -120,7 +120,7 @@ struct SidebarSessionRow: View {
                     if let file = FileToSeeWords.line(agent) {
                         Image(systemName: FileToSeeWords.symbol)
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .accessibilityLabel(file)
                     }
                 }
@@ -131,28 +131,28 @@ struct SidebarSessionRow: View {
                     // Its place in its folder's queue (#362), as the Mac's row says it.
                     Text(queued)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                 } else if let reason = needsYouLine {
                     Text(reason)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .lineLimit(1)
                 } else if agent.missingFolder != nil, agent.state != .archived {
                     Text(MissingFolderWords.label)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                 } else if let said = model.work.saidLines[agent.id] {
                     // While the sidebar searches: the line it said that matches, in the
                     // report's place, so a row found by what it said says why (#1663).
                     Text(said)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .lineLimit(1)
                 } else if let report = FileToSeeWords.reportLine(agent) {
                     // A file to see is named here first, as on the Mac (#1873).
                     Text(report)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .lineLimit(1)
                 }
                 // The row is the title and that one line (#587): what it holds, waits on,
@@ -169,7 +169,7 @@ struct SidebarSessionRow: View {
                             .rotationEffect(.degrees(tree.isUnfolded ? 90 : 0))
                     }
                     .appText(.fine)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
                     .padding(.horizontal, 6)
                     .frame(minHeight: 28)
                     .contentShape(Rectangle())
@@ -192,7 +192,7 @@ struct SidebarSessionRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityValue(agent.drawsUnread ? "unread" : "")
         .modifier(FoldAction(tree: tree, toggle: toggleFold))
-        .tag(SidebarItem.session(agent.id))
+        .paperTag(SidebarItem.session(agent.id))
         // Its chat fetched while an iPad's pointer rests on it, so a tap draws it at once (#4795).
         .prefetchesOnHover { [model, id = agent.id] in model.prefetch(id) }
         .contextMenu { AgentMenuItems(agent: agent) }
@@ -356,7 +356,7 @@ struct SidebarWorkflowRow: View {
             if summary.workflow.isMuted, !summary.isArchived {
                 Image(systemName: MuteWords.symbol)
                     .appText(.fine)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(Paper.tertiary)
                     .accessibilityLabel(MuteWords.muted)
             }
             // A running one counts from when this run started (#755).
@@ -370,7 +370,7 @@ struct SidebarWorkflowRow: View {
         .accessibilityValue([!summary.isEnabled && !summary.isArchived ? "turned off" : nil, summary.scopeSentence,
                              summary.hoursRowSentence(), summary.readyMadeUpdatedSentence]
             .compactMap { $0 }.joined(separator: ", "))
-        .tag(SidebarItem.workflow(summary.id, in: folder))
+        .paperTag(SidebarItem.workflow(summary.id, in: folder))
         // Pin or Unpin (#432), from the leading edge, as a session's row has it.
         .swipeActions(edge: .leading) {
             if !summary.isArchived {
@@ -536,7 +536,7 @@ struct PinnedPageRows: View {
             .appText(.supporting)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(pin.title), pinned \(pin.kind == .view ? "view" : "page")" + (pin.missing ? ", missing" : ""))
-            .tag(SidebarItem.pin(pin.path, in: folder))
+            .paperTag(SidebarItem.pin(pin.path, in: folder))
             .contextMenu {
                 Button("Move Up", systemImage: "arrow.up") { step(pin, -1, in: pins) }
                     .disabled(index == 0)
@@ -583,14 +583,14 @@ struct ServerViewRows: View {
                 if let count = view.count {
                     Text("\(count)")
                         .monospacedDigit()
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                 }
             }
             .appText(.supporting)
             .accessibilityElement(children: .ignore)
             // VoiceOver says the count (#590).
             .accessibilityLabel("\(view.title), view" + (view.count.map { ", \($0)" } ?? ""))
-            .tag(SidebarItem.pin(view.path, in: folder))
+            .paperTag(SidebarItem.pin(view.path, in: folder))
             .contextMenu {
                 Button("Hide", systemImage: "eye.slash") {
                     Task { await model.setViewHidden(view.path, true, in: folder.folder) }

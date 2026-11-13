@@ -165,7 +165,7 @@ struct RemoteProjectSettings: View {
                 if let total = Cost.total(of: summary.costToDate) {
                     Text(RemoteProjectSettingsWords.spentSince(total))
                 } else {
-                    Text(RemoteProjectSettingsWords.nothingPriced).foregroundStyle(.secondary)
+                    Text(RemoteProjectSettingsWords.nothingPriced).foregroundStyle(Paper.secondary)
                 }
             }
         } footer: {

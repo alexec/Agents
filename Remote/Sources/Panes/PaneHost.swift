@@ -134,7 +134,7 @@ struct PaneView: View {
             VStack(spacing: 0) {
                 Text("Update Agents on your Mac to read files and use the terminal here.")
                     .appText(.fine)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
                     .padding(12)
                 ArtifactsList()
             }

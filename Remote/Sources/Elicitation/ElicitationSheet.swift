@@ -31,7 +31,7 @@ struct ElicitationSheet: View {
             VStack(alignment: .leading, spacing: 4) {
                 // Who is asking, by title and runtime (#121).
                 if let asker = model.work.askerLine(request.agentID) {
-                    Text(asker).appText(.fine).foregroundStyle(.secondary)
+                    Text(asker).appText(.fine).foregroundStyle(Paper.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if (request.secret == nil && request.handOff == nil) || because != nil {
@@ -155,7 +155,7 @@ struct ElicitationSheet: View {
             if let description = schema.description {
                 Text(description)
                     .appText(.reading)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             ForEach(single.choices) { choice in
@@ -163,7 +163,7 @@ struct ElicitationSheet: View {
                     send(choice.title, action: .accept,
                          content: [single.property.name: .string(choice.value)])
                 } label: {
-                    label(choice.title, note: choice.description, onFill: true)
+                    label(choice.title, note: choice.description)
                 }
                 .buttonStyle(.paperProminentCard)
                 .controlSize(.large)
@@ -189,7 +189,7 @@ struct ElicitationSheet: View {
     private func page(_ link: String) -> some View {
         VStack(spacing: 8) {
             if let url = URL(string: link) {
-                Link(destination: url) { label("Open", note: link, onFill: true) }
+                Link(destination: url) { label("Open", note: link) }
                     .buttonStyle(.paperProminent)
                     .controlSize(.large)
             }
@@ -218,8 +218,8 @@ struct ElicitationSheet: View {
             .controlSize(.large)
     }
 
-    private func label(_ title: String, note: String?, onFill: Bool = false) -> some View {
-        AnswerLabel(title: title, note: note, onFill: onFill)
+    private func label(_ title: String, note: String?) -> some View {
+        AnswerLabel(title: title, note: note)
     }
 
     private func send(_ what: String,
@@ -246,7 +246,7 @@ private struct Sending: View {
             ProgressView().controlSize(.small)
             Text(Telling.words(doing: what, host: host))
                 .appText(.reading)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
             Spacer(minLength: 0)
         }
         .padding(.vertical, 6)

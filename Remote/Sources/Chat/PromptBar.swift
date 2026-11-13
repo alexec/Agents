@@ -83,7 +83,7 @@ struct PromptBar: View {
             if draftLostSomething {
                 Text(PromptWords.draftLostSomething)
                     .appText(.fine)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             }
             if isCompleting {
                 CommandList(commands: matchingCommands, selected: selectedCommand, choose: accept)
@@ -689,7 +689,7 @@ private struct PromptHead: View {
                     Label("Add label", systemImage: "plus")
                         .labelStyle(.titleAndIcon)
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                 } else {
                     // The one line is the way to edit them: its chips do not filter, the
                     // field it opens does (#3898).

@@ -39,7 +39,7 @@ struct RuntimesView: View {
                         VStack(alignment: .leading, spacing: 2) {
                             PassThroughRows(names: [name])
                             if let runtime = name.runtime {
-                                Text(OrgPolicyWords.runtimeName(runtime)).appText(.fine).foregroundStyle(.secondary)
+                                Text(OrgPolicyWords.runtimeName(runtime)).appText(.fine).foregroundStyle(Paper.secondary)
                             }
                         }
                     }
@@ -94,7 +94,7 @@ struct RuntimesView: View {
         .markedStale(model.isStale)
         .overlay {
             if model.runtimeAllowances?.rows.isEmpty != false {
-                Text("No runtimes on the Mac yet.").foregroundStyle(.secondary)
+                Text("No runtimes on the Mac yet.").foregroundStyle(Paper.secondary)
             }
         }
         .task {
@@ -163,7 +163,7 @@ private struct ReachesTheModelByMenu: View {
             }
         } label: {
             LabeledContent(OrgAccountWords.reachesTheModelBy) {
-                Text(current?.name ?? AccountProfile.defaultName).foregroundStyle(.secondary)
+                Text(current?.name ?? AccountProfile.defaultName).foregroundStyle(Paper.secondary)
             }
             .appText(.fine)
         }
@@ -188,21 +188,21 @@ private struct RuntimeAllowanceRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(row.title).fontWeight(.semibold)
-                .foregroundStyle(setBy == nil ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .foregroundStyle(setBy == nil ? AnyShapeStyle(.primary) : AnyShapeStyle(Paper.secondary))
             if let setBy { OrgPolicyLine(mark: setBy) }
             // An org account says where it is from (spec FR-023), never a key or an address.
             if row.isOrganisation {
-                Text(OrgAccountWords.fromOrganisation).appText(.fine).foregroundStyle(.secondary)
+                Text(OrgAccountWords.fromOrganisation).appText(.fine).foregroundStyle(Paper.secondary)
             }
             Text(row.unusable.map { "Not usable: \($0)" } ?? row.memberLine(now: at))
                 .appText(.fine)
-                .foregroundStyle(row.state.isOut ? StateTint.failure.style(or: .primary) : AnyShapeStyle(.secondary))
+                .foregroundStyle(row.state.isOut ? StateTint.failure.style(or: .primary) : AnyShapeStyle(Paper.secondary))
             if row.unusable == nil, let reading = PoolWords.reading(row.state.reading, now: at) {
-                Text(reading).appText(.fine).foregroundStyle(.secondary)
+                Text(reading).appText(.fine).foregroundStyle(Paper.secondary)
                 if let current = row.state.reading { AllowanceBar(reading: current) }
             }
             if let note = row.setupNote {
-                Text(LocalizedStringKey(note)).appText(.fine).foregroundStyle(.secondary)
+                Text(LocalizedStringKey(note)).appText(.fine).foregroundStyle(Paper.secondary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -222,7 +222,7 @@ struct RuntimesLink: View {
                     Circle().fill(StateTint.failure.style(or: .primary)).frame(width: 8, height: 8)
                         .accessibilityLabel("A runtime is out")
                 }
-                Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                Image(systemName: "chevron.right").foregroundStyle(Paper.tertiary)
             }
             .contentShape(Rectangle())
         }

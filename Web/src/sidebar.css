@@ -28,7 +28,7 @@
 .with-sidebar .sidebar-head { gap: 6px; border-bottom: none; padding: 0 10px; }
 .with-sidebar .sidebar .scroll { padding: 0 6px 8px; }
 .with-sidebar .sidebar .row { box-sizing: border-box; }
-.with-sidebar .sidebar-head-label { font-size: 0.6875rem; font-weight: 600; opacity: 0.5; margin: 12px 8px 4px; }
+.with-sidebar .sidebar-head-label { font-size: 0.6875rem; font-weight: 600; color: var(--paper-secondary); margin: 12px 8px 4px; }
 
 /* Activity: an icon in the accent, the page's name in the rows' type (#155, #495), and nothing at
    its end, which is only a session's (#587): the icon turns red when the page warns. */
@@ -49,7 +49,7 @@
 .with-sidebar .row.folder .pick { display: flex; flex-direction: column; align-items: flex-start; min-width: 0;
   border: none; background: none; padding: 4px 0; text-align: left; font: inherit; color: inherit; }
 /* The folder is its group's heading (#495): its name in grey, so the sessions under it read first. */
-.with-sidebar .row.folder .title { font-weight: 600; font-size: 0.75rem; opacity: 0.6; max-width: 100%; }
+.with-sidebar .row.folder .title { font-weight: 600; font-size: 0.75rem; color: var(--paper-secondary); max-width: 100%; }
 .with-sidebar .row.folder .subtitle { font-size: 0.71875rem; }
 .with-sidebar .row.folder .count { grid-column: 3; grid-row: 1; font-size: 0.6875rem; font-weight: 500; }
 .with-sidebar .folder-fold.greyed .row, .with-sidebar .folder-fold.greyed .subhead { opacity: 0.55; }
@@ -89,10 +89,10 @@
 .with-sidebar details.smart > summary .count.needs { color: var(--tint-attention); }
 /* Needs You's folded Later group (#4236), at its end, folding as Workflows does; its rows grey. */
 .with-sidebar details.smart details.later .row.session .name { opacity: 0.7; }
-.with-sidebar details.smart > summary .updated { margin-left: 0.5em; font-weight: 400; opacity: 0.6; white-space: nowrap; }
+.with-sidebar details.smart > summary .updated { margin-left: 0.5em; font-weight: 400; color: var(--paper-secondary); white-space: nowrap; }
 
 /* Which folder a row is in, after its title, under a group at the top (#495). */
-.with-sidebar .sidebar .place { font-size: 0.6875rem; font-weight: 400; opacity: 0.45; }
+.with-sidebar .sidebar .place { font-size: 0.6875rem; font-weight: 400; color: var(--paper-tertiary); }
 /* The folder's name whole up to 40% of the line, then cut, so a long one never pushes the
    title out (#936); cut to "p" it said nothing (#587). */
 .with-sidebar .sidebar .title.placed { display: flex; align-items: baseline; min-width: 0; }
@@ -100,7 +100,7 @@
 .with-sidebar .sidebar .title.placed :is(.place, .started-by) { flex: none; white-space: pre; }
 .with-sidebar .sidebar .title.placed .place { max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
 /* A lead's epic progress (#3270), whole after its title, in the grey of the row's second line. */
-.with-sidebar .sidebar .title.placed .lead-progress { flex: none; white-space: pre; font-weight: 400; opacity: 0.6; }
+.with-sidebar .sidebar .title.placed .lead-progress { flex: none; white-space: pre; font-weight: 400; color: var(--paper-secondary); }
 
 /* A session's mark in the sidebar (#495): an orange hand, the working ring (#2044, #2332), a list when queued,
    the breathing beacon (#2456, #2657), a pause mark (#630), a tick once done, read or not (#1323, #2363); every icon in the
@@ -162,7 +162,7 @@
 .with-sidebar .archived-middle { flex: 1; display: flex; flex-direction: column; justify-content: center; }
 .with-sidebar .archived-glyph { font-size: 2rem; opacity: 0.45; }
 .with-sidebar .archived-footer { display: flex; align-items: center; gap: 12px; padding: 14px 8px 8px; font-size: 0.75rem; }
-.with-sidebar .archived-footer > span:first-child { opacity: 0.6; }
+.with-sidebar .archived-footer > span:first-child { color: var(--paper-secondary); }
 .with-sidebar .archived-footer .spinner { width: 10px; height: 10px; }
 /* At a phone's width: the filter the full width, the title cut at one line, the footer centred. */
 @media (max-width: 759px) {
@@ -173,9 +173,9 @@
 /* Show all N under a fold's first archived matches, and More matches… after the folders (#193):
    fine and secondary, as the window's. */
 .sidebar button.link.show-all, .sidebar button.link.more-matches {
-  display: block; padding: 3px 8px; font-size: 0.75rem; color: inherit; opacity: 0.6; cursor: pointer; text-align: left;
+  display: block; padding: 3px 8px; font-size: 0.75rem; color: var(--paper-secondary); cursor: pointer; text-align: left;
 }
-.sidebar button.link.show-all:hover, .sidebar button.link.more-matches:hover { opacity: 0.9; }
+.sidebar button.link.show-all:hover, .sidebar button.link.more-matches:hover { color: var(--paper-ink); }
 .with-sidebar .sidebar .session { padding: 5px 8px; }
 .with-sidebar :is(details.archived, details.smart, details.activity) > summary { list-style: none; cursor: pointer; }
 .with-sidebar :is(details.archived, details.smart, details.activity) > summary::before { content: "›"; display: inline-block; width: 12px; opacity: 0.7; }
@@ -185,8 +185,8 @@
    secondary type, when it was put away under it, and Unarchive at its end. */
 .with-sidebar :is(details.archived-folders, details.activity) > summary.sidebar-head-label { margin-left: 0; }
 .with-sidebar .row.archived-folder { align-items: baseline; column-gap: 8px; padding: 4px 8px 4px 18px; cursor: default; }
-.with-sidebar .row.archived-folder .title { font-weight: 400; opacity: 0.65; }
-.with-sidebar .row.archived-folder .subtitle { font-size: 0.71875rem; opacity: 0.45; }
+.with-sidebar .row.archived-folder .title { font-weight: 400; color: var(--paper-secondary); }
+.with-sidebar .row.archived-folder .subtitle { font-size: 0.71875rem; color: var(--paper-tertiary); }
 .with-sidebar .row.archived-folder button.link { font-size: 0.75rem; cursor: pointer; }
 .with-sidebar .row.archived-folder button.link:disabled { opacity: 0.45; cursor: default; }
 
@@ -198,7 +198,7 @@
 .with-sidebar .sidebar-foot { border-top: 1px solid var(--paper-rule); }
 .with-sidebar .sidebar-foot .identity { border-top: none; }
 .with-sidebar .sidebar-foot .host-down { padding: 8px 12px 0; }
-.with-sidebar .foot-line { margin: 0; padding: 8px 12px 0; font-size: 0.75rem; opacity: 0.7; }
+.with-sidebar .foot-line { margin: 0; padding: 8px 12px 0; font-size: 0.75rem; color: var(--paper-secondary); }
 /* Start beside a stopped workspace's line (#961), as on its strip. */
 .with-sidebar .foot-line .foot-start { margin-left: 6px; font-size: inherit; }
 
@@ -214,7 +214,7 @@
 .with-sidebar .activity-body ul { list-style: none; margin: 0; padding: 0; }
 .with-sidebar .activity-body li { padding: 6px 0; border-bottom: 1px solid var(--paper-rule); }
 :is(.with-sidebar, .sub-app) .event-list li { display: grid; grid-template-columns: 48px minmax(0, 1fr); column-gap: 8px; }
-:is(.with-sidebar, .sub-app) .event-list .when { font-size: 0.75rem; opacity: 0.55; font-variant-numeric: tabular-nums; }
+:is(.with-sidebar, .sub-app) .event-list .when { font-size: 0.75rem; color: var(--paper-tertiary); font-variant-numeric: tabular-nums; }
 :is(.with-sidebar, .sub-app) .event-list .body { display: flex; flex-direction: column; gap: 2px; }
 .runtime-list li.out .strong { color: var(--tint-failure); }
 /* The share of the plan window used (#1097), under the reading's words. */
@@ -261,7 +261,7 @@
 :is(.with-sidebar, .sub-app) .settings-body .worktrees .worktree { padding: 6px 8px; border-bottom: 1px solid var(--paper-rule); }
 :is(.with-sidebar, .sub-app) .settings-body .worktrees .worktree p { margin: 0; }
 :is(.with-sidebar, .sub-app) .settings-body .worktrees .worktrees-head { margin: 14px 8px 4px; font-size: 0.8125rem; }
-:is(.with-sidebar, .sub-app) .event-day { font-size: 0.75rem; font-weight: 600; margin: 14px 8px 4px; opacity: 0.65; }
+:is(.with-sidebar, .sub-app) .event-day { font-size: 0.75rem; font-weight: 600; margin: 14px 8px 4px; color: var(--paper-secondary); }
 :is(.with-sidebar, .sub-app) .event-list .event-name { font-family: var(--font-mono); font-size: 0.6875rem; }
 /* An event's ref (#4732): small, and one click selects all of it, to copy. */
 :is(.with-sidebar, .sub-app) .event-list .event-ref { font-family: var(--font-mono); font-size: 0.625rem; user-select: all; overflow-wrap: anywhere; }
@@ -275,7 +275,7 @@
 .context-menu { position: fixed; top: 0; left: 0; display: flex; flex-direction: column; }
 .context-menu button { text-align: left; border: none; background: none; padding: 5px 10px; border-radius: var(--radius-control); }
 .context-menu button:hover:not(:disabled), .context-menu button:focus-visible { background: var(--paper-selection); outline: none; }
-.context-menu-heading { margin: 0; padding: 5px 10px 2px; font-weight: 600; opacity: 0.6; }
+.context-menu-heading { margin: 0; padding: 5px 10px 2px; font-weight: 600; color: var(--paper-secondary); }
 .context-menu button[role=menuitemcheckbox] { display: flex; max-width: 300px; }
 .context-menu button .tick { flex: none; display: inline-block; width: 1.2em; }
 .context-menu [role=menuitemcheckbox] + [role=menuitem] { margin-top: 4px; border-top: 1px solid var(--paper-rule); border-radius: 0; }
@@ -320,7 +320,7 @@
 :is(.with-sidebar, .sub-app) .event-open:hover { text-decoration: underline; }
 .event-detail dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: 0.8125rem; }
 .event-detail dl div { display: contents; }
-.event-detail dt { opacity: 0.6; }
+.event-detail dt { color: var(--paper-secondary); }
 .event-detail dd { margin: 0; overflow-wrap: anywhere; user-select: text; }
 .event-detail .event-name { font-family: var(--font-mono); margin: 0; }
 
@@ -329,9 +329,9 @@
 .with-sidebar .nav-item.child > .row.session { padding-left: calc(8px + 26px * var(--indent, 1)); }
 .with-sidebar .nav-item.parent { display: flex; align-items: flex-start; }
 .with-sidebar .nav-item.parent > .row { flex: 1; min-width: 0; }
-.with-sidebar .fold-count { border: none; background: none; padding: 8px 6px; font: inherit; color: inherit; cursor: pointer;
-  font-size: 0.6875rem; opacity: 0.6; white-space: nowrap; border-radius: var(--radius-card); }
-.with-sidebar .fold-count:hover { background: var(--paper-wash); opacity: 0.9; }
+.with-sidebar .fold-count { border: none; background: none; padding: 8px 6px; font: inherit; cursor: pointer;
+  font-size: 0.6875rem; color: var(--paper-secondary); white-space: nowrap; border-radius: var(--radius-card); }
+.with-sidebar .fold-count:hover { background: var(--paper-wash); color: var(--paper-ink); }
 .with-sidebar .fold-count .chevron { display: inline-block; margin-left: 3px; transition: transform 0.1s; }
 .with-sidebar .fold-count .chevron.open { transform: rotate(90deg); }
 
@@ -362,7 +362,7 @@
   margin: 0 4px 6px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); }
 .join-request .body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .join-request .title { font-weight: 400; overflow-wrap: anywhere; }
-.join-request .subtitle { font-size: 0.75rem; opacity: 0.65; }
+.join-request .subtitle { font-size: 0.75rem; color: var(--paper-secondary); }
 .join-request .join-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
 .with-sidebar .settings-body .join-requests { max-width: 420px; }
 /* Settings ▸ People (#994): a person's row, then their machines and clients. */
@@ -380,7 +380,7 @@
 .with-sidebar .settings-body .hint.attention { color: var(--tint-attention); }
 .with-sidebar .settings-body .hint.warning { color: var(--tint-warning); }
 button.destructive { color: var(--tint-failure); }
-button.prominent.destructive { background: var(--tint-failure); border-color: var(--tint-failure); color: var(--paper-ground); }
+button.prominent.destructive { background: var(--paper-raised); border-color: var(--tint-failure); box-shadow: inset 0 0 0 0.5px var(--tint-failure); color: var(--tint-failure); }
 .invite-code .code-text { font-family: var(--font-mono); padding: 6px 8px; border: 1px solid var(--paper-rule);
   border-radius: var(--radius-control); background: var(--paper-ground); user-select: all; overflow-wrap: anywhere; }
 .sheet .remove-lines { padding-left: 18px; min-height: 0; }

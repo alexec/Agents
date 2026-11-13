@@ -79,7 +79,7 @@ struct SignInToPair: View {
             }
             if let required, asking == nil, attempt == nil {
                 Button(SignInWords.orgButton(required.name), action: start)
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.paperProminent)
                     .disabled(Self.url(address) == nil)
             }
             if attempt != nil, asking != nil || waitingCode != nil {

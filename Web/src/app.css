@@ -41,15 +41,38 @@ button {
 }
 
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
 
+/* Paper v2 (#4993, the sheet in specs/4926-paper-v2): colour never fills a button. The prominent
+   one, the answer (send, a picked choice, a sheet's primary action), is raised paper with cobalt
+   words, bold, and a 1.5px cobalt edge, as the Mac's PaperProminentButtonStyle (#4999). */
 button.prominent {
-  background: var(--accent);
-  color: var(--paper-ground);
+  background: var(--paper-raised);
+  color: var(--accent);
+  font-weight: 650;
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 0.5px var(--accent);
+}
+
+/* Fields: raised paper with an edge of 3:1 or more (WCAG 1.4.11); the focused one an accent edge
+   and ring. A toggle or checkbox that is on is a flat accent. */
+input:is([type=text], [type=search], [type=email], [type=url], [type=password], [type=number], [type=date], [type=time], :not([type])),
+select, textarea {
+  border: 1px solid var(--paper-edge);
+  border-radius: var(--radius-control);
+  background: var(--paper-raised);
+  color: var(--paper-ink);
+}
+input:is([type=text], [type=search], [type=email], [type=url], [type=password], [type=number], [type=date], [type=time], :not([type])):focus-visible,
+select:focus-visible, textarea:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: var(--focus-gap);
   border-color: var(--accent);
 }
+::placeholder { color: var(--paper-tertiary); opacity: 1; }
+input[type=checkbox], input[type=radio], input[type=range], progress { accent-color: var(--accent); }
 
 a { color: var(--accent); }
 /* Said, not left to the browser: a link in the chat shows the hand (#515). */
@@ -115,7 +138,7 @@ a[href] { cursor: pointer; }
 }
 
 .pairing-note {
-  opacity: 0.65;
+  color: var(--paper-secondary);
   font-size: 0.75rem;
 }
 
@@ -259,7 +282,7 @@ input.rename {
   font-size: 0.65625rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  opacity: 0.55;
+  color: var(--paper-secondary);
   margin: 12px 8px 4px;
 }
 
@@ -276,9 +299,9 @@ input.rename {
 
 a.row { color: inherit; text-decoration: none; }
 .row:hover { background: var(--paper-wash); }
-.row.chosen { background: var(--paper-selection); }
+.row.chosen { background: var(--paper-selection); box-shadow: inset 3px 0 0 var(--accent); }
 .row .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .subtitle { grid-column: 1; font-size: 0.75rem; opacity: 0.65; }
+.row .subtitle { grid-column: 1; font-size: 0.75rem; color: var(--paper-secondary); }
 .row .dot {
   grid-column: 2;
   grid-row: 1 / span 2;
@@ -292,11 +315,11 @@ a.row { color: inherit; text-decoration: none; }
 .session { padding: 8px 10px; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 8px; align-items: start; }
 .session .body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .session .subtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.session .subtitle.quiet { opacity: 0.45; }
-.session .when { font-size: 0.6875rem; opacity: 0.45; font-variant-numeric: tabular-nums; padding-top: 2px; }
+.session .subtitle.quiet { color: var(--paper-tertiary); }
+.session .when { font-size: 0.6875rem; color: var(--paper-tertiary); font-variant-numeric: tabular-nums; padding-top: 2px; }
 .chips { display: flex; flex-wrap: wrap; gap: 4px; }
-.chip { font-size: 0.6875rem; padding: 0 6px; border-radius: 999px; background: var(--paper-wash); opacity: 0.85; }
-.chip.worktree { background: none; opacity: 0.55; padding: 0; }
+.chip { font-size: 0.6875rem; font-weight: 600; padding: 0 6px; border-radius: var(--radius-pill); background: var(--paper-raised); box-shadow: inset 0 0 0 1px var(--paper-rule); color: var(--paper-secondary); }
+.chip.worktree { background: none; box-shadow: none; font-weight: 400; color: var(--paper-tertiary); padding: 0; }
 
 /* The status mark: a spinner while working; the shape says who acts next. Only needs-you is in colour. */
 .status {
@@ -380,7 +403,7 @@ button.link {
 
 /* The chat: entries above, then the cards and the prompt, pinned to the foot. */
 /* Centred without its own display, so the narrow layout can still hide it. */
-.chat.empty { justify-content: center; align-items: center; opacity: 0.5; }
+.chat.empty { justify-content: center; align-items: center; color: var(--paper-secondary); }
 
 .transcript { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
 /* The chat holds the reader's turn itself, in every browser (Chat.tsx, #2310): the browser's own
@@ -455,7 +478,7 @@ button.link {
 .markdown .table-scroll :is(td, th).long { min-width: 12em; }
 .image-placeholder { opacity: 0.6; font-style: italic; }
 
-.quiet { opacity: 0.65; margin: 0; }
+.quiet { color: var(--paper-secondary); margin: 0; }
 .faint { opacity: 0.45; margin: 0; }
 .strong { font-weight: 600; margin: 0; }
 .small { font-size: 0.75rem; }
@@ -576,7 +599,7 @@ button.link.reading:hover { text-decoration: underline; }
 .wait-card-filters { color: var(--paper-ink); opacity: .68; overflow-wrap: anywhere; }
 /* The PR or issue named in them, as a link (#3077): the accent colour, underlined. */
 a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underline; }
-.wait-card-progress { height: 3px; overflow: hidden; border-radius: 99px; background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.wait-card-progress { height: 4px; overflow: hidden; border-radius: 2px; background: var(--paper-wash); }
 .wait-card-progress span { display: block; height: 100%; background: var(--accent); transition: width .15s linear; }
 .wait-card .wait-answers { display: flex; justify-content: flex-end; gap: 10px; }
 /* A wait only the person can settle (#3147): its session under Needs you. A request, not a
@@ -651,7 +674,7 @@ a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underli
   background: var(--paper-well); border: 1px solid var(--accent); border-radius: var(--radius-card); color: inherit; }
 .working, .more { margin: 0; }
 /* A quiet chat's foot (#1564): as a row's time, fine and grey. */
-.quiet-line { margin: 0; font-size: 0.75rem; opacity: 0.45; font-variant-numeric: tabular-nums; }
+.quiet-line { margin: 0; font-size: 0.75rem; color: var(--paper-tertiary); font-variant-numeric: tabular-nums; }
 .more { text-align: center; }
 .load-failure { display: flex; gap: 8px; align-items: baseline; margin: 0 0 12px; opacity: 0.75; font-size: 0.9em; }
 .spinner {
@@ -739,7 +762,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   flex-shrink: 1;
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
-  border-radius: var(--radius-floating);
+  border-radius: var(--radius-card);
   padding: 12px 14px;
   display: flex;
   flex-direction: column;
@@ -755,9 +778,9 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .card .row-options { flex-direction: row; flex-wrap: wrap; }
 .card .options button, .card .options .button {
   text-align: left;
-  border: 1px solid var(--paper-rule);
+  border: 1px solid var(--paper-edge);
   border-radius: var(--radius-control);
-  background: var(--paper-ground);
+  background: var(--paper-raised);
   padding: 6px 10px;
   display: flex;
   flex-direction: column;
@@ -765,33 +788,33 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   color: inherit;
   text-decoration: none;
 }
-.card button.prominent, .card .button.prominent { background: var(--accent); color: var(--paper-ground); border-color: var(--accent); }
+.card button.prominent, .card .button.prominent { background: var(--paper-raised); color: var(--accent); font-weight: 650; border-color: var(--accent); box-shadow: inset 0 0 0 0.5px var(--accent); }
 .card.inert button, .card.inert .button, .card button.held, .card .page.held button { opacity: 0.45; cursor: default; }
 .card [aria-disabled="true"] { cursor: default; }
-.card .telling { display: flex; align-items: center; gap: 6px; font-size: 0.6875rem; font-weight: 400; opacity: 0.75; }
+.card .telling { display: flex; align-items: center; gap: 6px; font-size: 0.6875rem; font-weight: 400; color: var(--paper-secondary); }
 .card .answered { margin: 0; font-weight: 500; }
 .card .form-row { display: flex; align-items: center; gap: 8px; }
 .card .form-row .spacer { flex: 1; }
-.card .form-row button { border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground); padding: 4px 10px; }
-.card .form-row button.prominent { background: var(--accent); color: var(--paper-ground); }
+.card .form-row button { border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-raised); padding: 4px 10px; }
+.card .form-row button.prominent { background: var(--paper-raised); color: var(--accent); border-color: var(--accent); }
 .card .field { display: flex; flex-direction: column; gap: 4px; }
 /* A checkbox and its words on one line: a yes/no field, and the secret card's For this session only (#3548). */
 .card .field.check { flex-direction: row; align-items: center; gap: 6px; }
 .card .field input[type="text"], .card .field input[type="number"], .card .field input[type="password"] {
   font: inherit;
   padding: 5px 8px;
-  border: 1px solid var(--paper-rule);
+  border: 1px solid var(--paper-edge);
   border-radius: var(--radius-control);
-  background: var(--paper-ground);
+  background: var(--paper-raised);
   color: inherit;
 }
 /* The secret card's Description (#4167), as its masked field. */
 .card .field textarea {
   font: inherit;
   padding: 5px 8px;
-  border: 1px solid var(--paper-rule);
+  border: 1px solid var(--paper-edge);
   border-radius: var(--radius-control);
-  background: var(--paper-ground);
+  background: var(--paper-raised);
   color: inherit;
   resize: vertical;
 }
@@ -819,6 +842,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
   border-radius: var(--radius-floating);
+  box-shadow: var(--shadow-floating);
   padding: 12px 12px 12px 14px;
 }
 
@@ -856,7 +880,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   height: 30px;
   padding: 0;
 }
-.send { background: var(--accent); color: var(--paper-ground); }
+.send { background: var(--paper-raised); color: var(--accent); border-color: var(--line-accent); }
 /* Send (or Stop) at the right of the action row, Attach at the left, as on the Mac and the Remote (#2751). */
 .prompt-actions .send { margin-left: auto; }
 
@@ -877,7 +901,7 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
 .offline-strip .elapsed { font-variant-numeric: tabular-nums; opacity: 0.7; }
 /* An agent whose folder has gone (#119): which, and the ways on, as the window's strip. */
 .missing-folder-strip .what { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.missing-folder-strip .quiet { opacity: 0.6; }
+.missing-folder-strip .quiet { color: var(--paper-secondary); }
 .ways-on { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 /* Open File: the file changed on disk under unsaved typing (#1858). */
 .changed-on-disk { padding: 6px 10px; font-size: 0.8rem; background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
@@ -910,9 +934,9 @@ dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-h
   overflow-y: auto;
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
-  border-radius: var(--radius-card);
+  border-radius: 12px;
   box-shadow: var(--shadow-floating);
-  padding: 4px;
+  padding: 5px;
 }
 
 /* Below 760: the back control and the heading only a phone's width shows; sidebar.css lays out
@@ -1043,7 +1067,7 @@ button.remove:hover { opacity: 1; }
 .popover [role^=menuitem] { text-align: left; background: none; border: none; padding: 6px 10px; border-radius: var(--radius-control); }
 .popover [role^=menuitem]:hover { background: var(--paper-wash); }
 /* An item's single key at its end (#4796), grey, as the window's menus draw one. */
-.popover [role^=menuitem] .menu-key { float: right; margin-left: 16px; font: inherit; font-size: 0.6875rem; opacity: 0.6; }
+.popover [role^=menuitem] .menu-key { float: right; margin-left: 16px; font: inherit; font-size: 0.6875rem; color: var(--paper-tertiary); }
 .queued-actions { display: flex; align-items: center; gap: 10px; font-size: 0.75rem; }
 /* A new session: the folder's name and folder in the middle, the bar at the foot (#108). */
 .new-heading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px; text-align: center; }
@@ -1076,7 +1100,7 @@ button.remove:hover { opacity: 1; }
 /* Started by a workflow or another agent (028, #251): quiet, after the title, as the window's mark. */
 .session .title .started-by { margin-left: 5px; font-size: 0.6875rem; font-weight: 400; opacity: 0.45; }
 .working.coming-back { opacity: 0.65; padding: 4px 0; }
-.unread-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.5; margin-right: 6px; vertical-align: middle; }
+.unread-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: middle; }
 
 /* US4: the files pane's tabs, the browser, a file, the changes and a live page. */
 .files .tabs button.tab { border: none; background: none; padding: 3px 10px; border-radius: var(--radius-control); }
@@ -1160,7 +1184,7 @@ dialog.image-viewer {
   color: inherit;
   background: var(--paper-raised);
   border: 1px solid var(--paper-rule);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-floating);
   box-shadow: var(--shadow-sheet);
   overflow: hidden;
 }
@@ -1359,7 +1383,7 @@ dialog.image-viewer .image-viewer-frame:hover .image-viewer-arrow, dialog.image-
 .request-list { list-style: none; margin: 0; padding: 0; }
 .request { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 8px; border-bottom: 1px solid var(--paper-rule); }
 .request-actions { display: inline-flex; gap: 6px; flex: none; }
-.request-actions .prominent { background: var(--accent); color: var(--paper-ground); border-color: var(--accent); }
+.request-actions .prominent { background: var(--paper-raised); color: var(--accent); border-color: var(--accent); }
 /* Raise for Today's amount (#3262): a short field with its unit before it. */
 .request-actions label.amount { display: inline-flex; align-items: center; gap: 4px; }
 .request-actions label.amount input { width: 7em; }
@@ -1508,7 +1532,7 @@ dialog.image-viewer .image-viewer-frame:hover .image-viewer-arrow, dialog.image-
 .telling { display: inline-flex; align-items: center; gap: 6px; font-size: 0.71875rem; opacity: 0.75; }
 .telling .spinner, .send .spinner { width: 10px; height: 10px; }
 .bar > .telling { margin: 0 4px 6px; }
-.send .spinner { --notch: var(--paper-ground); }
+.send .spinner { --notch: var(--accent); }
 .sessions.greyed .row.session, .sessions.greyed .row.workflow { opacity: 0.55; }
 
 /* Changes as a tree (#63): a changed file's square in its status colour; folders with their totals. */
@@ -1539,7 +1563,7 @@ dialog.image-viewer .image-viewer-frame:hover .image-viewer-arrow, dialog.image-
 .popover [role^=menuitem]:disabled { background: none; }
 .popover hr { border: none; border-top: 1px solid var(--paper-rule); margin: 4px 0; }
 .new-folder-host { display: flex; flex-direction: column; }
-.menu-head { margin: 6px 10px 2px; font-size: 0.6875rem; opacity: 0.55; }
+.menu-head { margin: 6px 10px 2px; font-size: 0.6875rem; color: var(--paper-secondary); }
 .empty-folders { display: flex; flex-direction: column; gap: 8px; padding: 12px 8px; }
 .empty-folders .quiet { line-height: 1.45; }
 .empty-runtimes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -2903,14 +2927,19 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 .message-icon.tone-attention { color: var(--tint-attention); }
 .message-icon.tone-failure { color: var(--tint-failure); }
 .message-icon.tone-success { color: var(--tint-vouched); }
-.message-icon.tone-neutral { opacity: 0.7; }
+.message-icon.tone-neutral { color: var(--paper-secondary); }
 .message-icon.spinner { width: 8px; height: 8px; }
 .message-words { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
 .message-actions { flex: none; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* A banner: inset at the top of its pane, under the toolbar; it comes and goes with a short animation. */
 .message-banner { display: flex; align-items: center; gap: 8px; margin: 8px 12px; padding: 7px 12px; font-size: 0.8125rem;
-  color: var(--paper-ink); background: var(--paper-well); border: 1px solid var(--paper-rule);
+  color: var(--paper-ink); background: var(--paper-raised); border: 1px solid var(--paper-rule);
   border-radius: var(--radius-card); animation: message-in 150ms ease-out; }
+/* Paper v2 (#4993): a tinted notice has a line in its colour and a 3px bar, as PaneBanner (#4999). */
+.message-banner.tone-attention { border-color: var(--line-attention); box-shadow: inset 3px 0 0 var(--tint-attention); }
+.message-banner.tone-failure { border-color: var(--line-failure); box-shadow: inset 3px 0 0 var(--tint-failure); }
+.message-banner.tone-success { border-color: var(--line-vouched); box-shadow: inset 3px 0 0 var(--tint-vouched); }
+.message-toast.tone-success .message-icon { color: var(--tint-vouched); }
 @keyframes message-in { from { opacity: 0; transform: translateY(-4px); } }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
 /* The one toast: fixed at the bottom centre of the viewport, above the prompt bar. */
@@ -2921,13 +2950,13 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
   border-radius: var(--radius-floating); box-shadow: var(--shadow-floating); pointer-events: auto;
   animation: toast-in 150ms ease-out; }
 .message-toast button.link { flex: none; }
-.message-close { flex: none; border: none; background: none; color: inherit; opacity: 0.6; padding: 0 2px; font: inherit; cursor: pointer; }
-.message-close:hover { opacity: 1; }
+.message-close { flex: none; border: none; background: none; color: var(--paper-secondary); padding: 0 2px; font: inherit; cursor: pointer; }
+.message-close:hover { color: var(--paper-ink); }
 @media (prefers-reduced-motion: reduce) { .message-banner, .message-toast { animation: none; } }
 /* An alert: a choice that blocks the work, in place of window.confirm. */
 dialog.message-alert { width: min(420px, calc(100vw - 32px)); }
 .message-alert h2 { margin: 0 0 6px; }
-.message-alert-detail { margin: 0; white-space: pre-line; opacity: 0.8; }
+.message-alert-detail { margin: 0; white-space: pre-line; color: var(--paper-secondary); }
 .message-alert .sheet-actions { margin-top: 16px; }
 .message-alert button.destructive { color: var(--tint-failure); }
 

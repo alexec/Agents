@@ -262,7 +262,7 @@ struct FilesPane: View {
                     if listing.isTruncated {
                         Text("\(listing.omitted) more, not shown")
                             .appText(.fine)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                             .paperListRow()
                     }
                 }
@@ -301,14 +301,14 @@ struct FilesPane: View {
                         case .note(_, let words, let depth):
                             Text(words)
                                 .appText(.fine)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Paper.secondary)
                                 .padding(.leading, FileTreeRow.indent(depth))
                                 .paperListRow()
                         case .problem(let folder, let words, let depth):
                             HStack(spacing: 8) {
                                 Text(words)
                                     .appText(.fine)
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(Paper.secondary)
                                 Button("Try Again") {
                                     reads.read(folder, agentID: agent.id, files: model.files) { readUnread() }
                                 }
@@ -420,7 +420,7 @@ struct FilesPane: View {
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: entry.isDirectory ? "folder" : "doc")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
                     .frame(width: 20)
                     .accessibilityHidden(true)
                 Text(entry.name)
@@ -433,18 +433,18 @@ struct FilesPane: View {
                         .accessibilityLabel(ChangeWords.status(changed.state))
                     if let added = changed.added, let removed = changed.removed {
                         Text("+\(added) −\(removed)").appText(.fine).monospacedDigit()
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Paper.secondary)
                     }
                 } else if entry.isDirectory, let folderTotals {
                     Text("+\(folderTotals.added) −\(folderTotals.removed)")
-                        .appText(.fine).monospacedDigit().foregroundStyle(.secondary)
+                        .appText(.fine).monospacedDigit().foregroundStyle(Paper.secondary)
                 } else if touched {
                     // Older transcripts may know a touched path before the git list does.
                     Circle().fill(.tint).frame(width: 7, height: 7)
                         .accessibilityLabel("Changed by the agent")
                 }
                 if entry.isDirectory {
-                    Image(systemName: "chevron.right").appText(.fine).foregroundStyle(.tertiary)
+                    Image(systemName: "chevron.right").appText(.fine).foregroundStyle(Paper.tertiary)
                 }
             }
             .contentShape(Rectangle())
@@ -521,7 +521,7 @@ struct FilesPane: View {
                 if isTruncated {
                     Text(FileReading.truncationNote(shown: text.utf8.count, of: size))
                         .appText(.fine)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Paper.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
@@ -756,11 +756,11 @@ private struct Said: View {
         VStack(spacing: 6) {
             Image(systemName: symbol)
                 .appText(.title)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(Paper.tertiary)
                 .accessibilityHidden(true)
             Text(message)
                 .appText(.supporting)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Paper.secondary)
                 .multilineTextAlignment(.center)
             if let retry {
                 Button("Try Again", action: retry)

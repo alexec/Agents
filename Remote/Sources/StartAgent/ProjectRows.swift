@@ -33,7 +33,7 @@ struct ProjectRows: View {
             }
         } label: {
             LabeledContent("Project") {
-                Text(label(current)).foregroundStyle(.secondary)
+                Text(label(current)).foregroundStyle(Paper.secondary)
             }
             .appText(.reading)
         }
@@ -52,7 +52,7 @@ struct ProjectRows: View {
             }
         } label: {
             LabeledContent("On") {
-                Text(model.hostLabel(summary.host)).foregroundStyle(.secondary)
+                Text(model.hostLabel(summary.host)).foregroundStyle(Paper.secondary)
             }
             .appText(.reading)
         }

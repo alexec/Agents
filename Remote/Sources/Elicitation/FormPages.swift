@@ -46,14 +46,14 @@ struct FormPages: View {
             if let description = schema.description {
                 Text(description)
                     .appText(.reading)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if last > 0 {
                 Text("Question \(page + 1) of \(pages.count)")
                     .appText(.fine)
                     .monospacedDigit()
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
             }
             current
             footer
@@ -147,11 +147,11 @@ struct FormPages: View {
                 MarkdownText(markdown: property.title ?? property.name)
                     .appText(.reading).fontWeight(.medium)
                 if property.isRequired {
-                    Text("needed").appText(.fine).foregroundStyle(.tertiary)
+                    Text("needed").appText(.fine).foregroundStyle(Paper.tertiary)
                 }
             }
             if let description = property.description {
-                Text(description).appText(.reading).foregroundStyle(.secondary)
+                Text(description).appText(.reading).foregroundStyle(Paper.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -168,7 +168,7 @@ struct FormPages: View {
                 Image(systemName: chosen ? "checkmark.circle.fill" : "circle")
                     .accessibilityHidden(true)
             }
-            AnswerLabel(title: title, note: description, onFill: chosen)
+            AnswerLabel(title: title, note: description)
         }
         if chosen {
             Button(action: choose) { label }
@@ -209,7 +209,7 @@ struct FormPages: View {
             if page == last, let problem = schema.problems(with: values).first {
                 Text(problem)
                     .appText(.fine)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Paper.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 8) {
@@ -254,7 +254,7 @@ struct FormPages: View {
                         focusedField = nil
                         send(summary, .accept, values)
                     } label: {
-                        AnswerLabel(title: "Submit", note: nil, onFill: true)
+                        AnswerLabel(title: "Submit", note: nil)
                     }
                     .buttonStyle(.paperProminent)
                     .controlSize(.large)
@@ -369,16 +369,11 @@ struct FormPages: View {
 }
 
 /// An answer's words on a button: full width, wrapping rather than truncating, with
-/// what it means underneath.
-///
-/// `onFill` is about contrast and was found by looking at it: what a choice means is
-/// often the substance of the question, and `.secondary` on the prominent fill is the
-/// one place it has no contrast left. On a fill the note is the fill's own text colour
-/// held back a little; off one, `.secondary` as usual.
+/// what it means underneath, in the secondary grey. A prominent answer is raised paper
+/// with cobalt words since Paper v2 (#4999), not a fill, so its note is the same grey.
 struct AnswerLabel: View {
     let title: String
     let note: String?
-    var onFill = false
 
     var body: some View {
         VStack(spacing: 2) {
@@ -386,8 +381,7 @@ struct AnswerLabel: View {
             if let note, !note.isEmpty {
                 Text(note)
                     .appText(.fine)
-                    .foregroundStyle(onFill ? AnyShapeStyle(Paper.ground.opacity(0.85))
-                                            : AnyShapeStyle(.secondary))
+                    .foregroundStyle(Paper.secondary)
             }
         }
         .frame(maxWidth: .infinity)

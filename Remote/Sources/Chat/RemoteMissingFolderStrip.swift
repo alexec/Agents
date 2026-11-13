@@ -11,7 +11,7 @@ struct RemoteMissingFolderStrip: View {
         let path = MissingFolderWords.shortPath(agent.cwd, home: "")
         PaneBanner(tone: .attention, symbol: "folder.badge.questionmark",
                    announcement: MissingFolderWords.label + " " + path) {
-            Text("\(MissingFolderWords.label) \(Text("· " + path).foregroundStyle(.secondary))")
+            Text("\(MissingFolderWords.label) \(Text("· " + path).foregroundStyle(Paper.secondary))")
                 .lineLimit(1)
                 .truncationMode(.middle)
         } actions: {
