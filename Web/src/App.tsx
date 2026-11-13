@@ -4,6 +4,7 @@ import type { Session } from "./session";
 import { Columns } from "./views/Columns";
 import { OtherControlPlane, Pairing, Suspended, Unsupported } from "./views/Pairing";
 import { TakeOverPage } from "./views/TakeOverPage";
+import { QuestionPage, showsFirstBuild } from "./views/FirstBuild";
 import { route } from "./route";
 
 export function App({ session, store }: { session: Session; store: Store }) {
@@ -35,6 +36,8 @@ export function App({ session, store }: { session: Session; store: Store }) {
         return <TakeOverPage key={`${r.host}|${r.session}|${r.takeOver}`} store={store} host={r.host} session={r.session}
           source={r.takeOver} down={state.kind === "down"} />;
       }
+      // A newcomer's first open (#5051): the question page on the whole page, no columns.
+      if (showsFirstBuild(store)) return <QuestionPage />;
       return <Columns session={session} store={store} />;
     }
   }
