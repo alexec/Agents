@@ -4,10 +4,12 @@
 // it through Playwright (#3534, agentsd's browsertools.go); clients watch it by a screencast
 // (screencast.go, #3528).
 //
-// On a Mac with Google Chrome installed, it is that Chrome (#5207, spike #5127): Google
-// Chrome stable, in a profile of its own, with a window just below the screen and none of
-// the test flags, for every site. A site's check sees the real Chrome it is, which Google's
-// sign-in needs (#4837). Elsewhere, the Chromium is Playwright's own build (Chrome for
+// With Google Chrome installed, it is that Chrome (#5207, spike #5127): Google Chrome
+// stable, in a profile of its own, headed and with none of the test flags, for every site.
+// A site's check sees the real Chrome it is, which Google's sign-in needs (#4837). On a Mac
+// its window is just below the screen; on a Linux machine with no display it is on an Xvfb
+// screen of its own, which agentsd starts and stops with it (xvfb.go, #5227, spike #5209).
+// Elsewhere, the Chromium is Playwright's own build (Chrome for
 // Testing), installed by Playwright's own installer (`playwright-core install chromium`)
 // from the pinned @playwright/mcp toolset, so the browser and the tools that drive it
 // always match. chromedp starts it and speaks CDP.
@@ -108,6 +110,8 @@ type process struct {
 	stop     func()
 	// headed is whether it has a window (off-screen), not headless.
 	headed bool
+	// display is the Xvfb screen agentsd started for it (":<n>"), or "" (#5227).
+	display string
 	// chrome is whether it is Google Chrome stable (#5207), not Chrome for Testing.
 	chrome bool
 	// webauthn is whether its pages have WebAuthn, for a software passkey (#4085).
@@ -187,7 +191,9 @@ func (m *Machine) Endpoint(progress func(string)) (string, error) {
 	m.startLoop()
 	m.changed(true)
 	started := "headless"
-	if p.chrome {
+	if p.chrome && p.display != "" {
+		started = "as Google Chrome, on the Xvfb screen " + p.display
+	} else if p.chrome {
 		started = "as Google Chrome, with a window below the screen"
 	} else if p.headed {
 		started = "with a window off-screen"
@@ -524,22 +530,33 @@ func launchChromium(exe, profile string, env []string, how mode) (*process, erro
 	return p, err
 }
 
-// findChrome is Google Chrome stable on this Mac, in /Applications or ~/Applications, or ""
-// (#5207). Linux keeps Chrome for Testing until #5209 tries Chrome there.
+// findChrome is Google Chrome stable on this machine, or "" (#5207, #5227).
 func findChrome() string {
-	if runtime.GOOS != "darwin" {
-		return ""
-	}
-	dirs := []string{"/Applications"}
-	if home, err := os.UserHomeDir(); err == nil {
-		dirs = append(dirs, filepath.Join(home, "Applications"))
-	}
-	for _, dir := range dirs {
-		if exe := filepath.Join(dir, "Google Chrome.app", "Contents", "MacOS", "Google Chrome"); executable(exe) {
+	home, _ := os.UserHomeDir()
+	for _, exe := range chromePaths(runtime.GOOS, home) {
+		if executable(exe) {
 			return exe
 		}
 	}
 	return ""
+}
+
+// chromePaths are where Google Chrome stable can be on goos, in the order they are tried:
+// on a Mac, /Applications and ~/Applications (#5207); on Linux, where Google's .deb and .rpm
+// put it (#5227). Google ships no Chrome for Linux on arm64, so there it is not found, and
+// the browser is Chrome for Testing.
+func chromePaths(goos, home string) []string {
+	switch goos {
+	case "darwin":
+		paths := []string{"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"}
+		if home != "" {
+			paths = append(paths, filepath.Join(home, "Applications", "Google Chrome.app", "Contents", "MacOS", "Google Chrome"))
+		}
+		return paths
+	case "linux":
+		return []string{"/usr/bin/google-chrome-stable", "/usr/bin/google-chrome", "/opt/google/chrome/chrome"}
+	}
+	return nil
 }
 
 // launchChrome starts Google Chrome stable (#5207): headed, on the kept profile, its
@@ -549,11 +566,39 @@ func findChrome() string {
 // how asks for it (#4085), as for Chrome for Testing. Its window goes just below the screen
 // before the first page opens.
 //
+// Where no window can open (a Linux server: no DISPLAY or WAYLAND_DISPLAY), it runs on an
+// Xvfb screen that agentsd starts for it alone (#5227), which stops when Chrome does. Nobody
+// sees that screen, so its window stays where Chrome puts it. With no Xvfb, or one that does
+// not start, it says why, and the browser is Chrome for Testing, headless.
+//
 // The port is not 0: Google Chrome with --remote-debugging-port=0 sets navigator.webdriver
 // on every page, where a port of its own leaves it false, as a person's Chrome has it
 // (measured on Chrome 157, #5207). A port another program takes between the pick and the
 // start is tried again on a new one.
 func launchChrome(exe, profile string, env []string, how mode) (*process, error) {
+	if canHead(env) {
+		return launchChromeOn(exe, profile, env, how, moveBelowScreen)
+	}
+	x, err := startXvfb(env)
+	if err != nil {
+		return nil, err
+	}
+	p, err := launchChromeOn(exe, profile, append(withoutKey(env, "DISPLAY"), "DISPLAY="+x.display), how, func(context.Context) {})
+	if err != nil {
+		x.stop()
+		return nil, err
+	}
+	p.display = x.display
+	go func() {
+		// Xvfb ends with Chrome: a stop, an idle stop or a crash.
+		<-p.done
+		x.stop()
+	}()
+	return p, nil
+}
+
+// launchChromeOn is launchChrome on the display env names, with place for its window.
+func launchChromeOn(exe, profile string, env []string, how mode, place func(context.Context)) (*process, error) {
 	var err error
 	for range 3 {
 		var port int
@@ -575,7 +620,7 @@ func launchChrome(exe, profile string, env []string, how mode) (*process, error)
 		}
 		var p *process
 		at := func() (string, error) { return listening(port) }
-		if p, _, err = run(opts, how, func(ctx context.Context) { moveBelowScreen(ctx) }, at); err == nil {
+		if p, _, err = run(opts, how, place, at); err == nil {
 			return p, nil
 		}
 	}
