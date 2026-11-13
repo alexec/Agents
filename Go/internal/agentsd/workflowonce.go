@@ -318,7 +318,10 @@ func (d *Daemon) archiveAlarm(folder, id string) (wire.WorkflowSummary, error) {
 		kept = st.LastOutcome
 	}
 	d.workflowMu.Unlock()
-	s, err := d.archiveWorkflow(wire.WorkflowArchiveRequest{Folder: store.FolderURL(folder), WorkflowID: id, Archived: true}, false)
+	// The app's own `archived: true` keeps the approval, as the person's Archive does: an
+	// approved file is not "changed since you approved it" for that line alone. A file not
+	// approved as it stood stays waiting.
+	s, err := d.archiveWorkflow(wire.WorkflowArchiveRequest{Folder: store.FolderURL(folder), WorkflowID: id, Archived: true}, true)
 	if err != nil {
 		return s, err
 	}

@@ -98,6 +98,10 @@ func TestAnAlarmFiresOnceAndArchivesItself(t *testing.T) {
 		s := listOne(t, c, folder)
 		return s.IsArchived && s.LastOutcome != nil && s.LastOutcome.Ran != nil
 	})
+	// Archiving itself keeps its approval: it is not "changed since you approved it".
+	if s := listOne(t, c, folder); s.AwaitingApproval != nil {
+		t.Fatalf("%+v", s.AwaitingApproval)
+	}
 	text, _ := os.ReadFile(filepath.Join(workflowsFolder(dir), "alarm.md"))
 	if !strings.Contains(string(text), "archived: true") {
 		t.Fatal(string(text))
