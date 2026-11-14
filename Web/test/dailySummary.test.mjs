@@ -2,10 +2,12 @@
 // DailySummaryControls.swift says, offers every half hour, and sits on Settings ▸ Workflows.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { load } from "./load.mjs";
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+// The store and its slices (#5384).
+const readStore = () => [read("Web/src/model/store.ts"), ...readdirSync(new URL("../src/model/store/", import.meta.url)).map((name) => read(`Web/src/model/store/${name}`))].join("\n");
 const w = await load("src/model/dailySummaryWords.ts");
 
 test("the control's words are the window's and the Remote's", () => {
@@ -31,7 +33,7 @@ test("every half hour is offered, and a hand-set time too", () => {
 
 test("Settings ▸ Workflows draws it, and dailySummary/changed keeps it", () => {
   assert.ok(read("Web/src/views/AgentConfigEditor.tsx").includes('kind === "workflows" && <DailySummaryControl'));
-  const store = read("Web/src/model/store.ts");
+  const store = readStore();
   assert.ok(store.includes('case "dailySummary/changed":'));
   assert.ok(store.includes('"dailySummary/setSettings"'));
 });

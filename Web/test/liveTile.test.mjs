@@ -4,10 +4,12 @@
 // and is drawn at the end of the chat.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { load } from "./load.mjs";
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+// The store and its slices (#5384).
+const readStore = () => [read("Web/src/model/store.ts"), ...readdirSync(new URL("../src/model/store/", import.meta.url)).map((name) => read(`Web/src/model/store/${name}`))].join("\n");
 const m = await load("src/model/liveTile.ts");
 const w = await load("src/model/liveTileWords.ts");
 const swift = read("Shared/UI/Chat/LiveTile.swift");
@@ -65,7 +67,7 @@ test("the tile names its source as the window does", () => {
 });
 
 test("the store keeps each source's latest frame and the chat draws the tile while the agent runs", () => {
-  const store = read("Web/src/model/store.ts");
+  const store = readStore();
   assert.match(store, /case "live\/frame": \{\s*const frame = params as LiveFrame;\s*this\.liveFrames\.value = \{ \.\.\.this\.liveFrames\.peek\(\), \[frame\.source\]:/);
   const chat = read("Web/src/views/Chat.tsx");
   // A part of the Now card at the foot (#5033), not a card in Waiting for you.
