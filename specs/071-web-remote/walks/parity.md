@@ -15,7 +15,7 @@
 
 ## Tiers (#2796)
 
-Alex chose tiers on 2026-10-27 (#2796). Each row has a **Tier** cell after its Feature. The tier says which clients must have the feature. The Mac window and the web page are full clients. The tiers trim only the Remote, except Web + Mac link (#4937), which the Mac window does not draw.
+Alex chose tiers on 2026-10-27 (#2796). Each row has a **Tier** cell after its Feature, and a **Role** cell after the Tier (#5290, epic #5288). The tier says which clients must have the feature. The Mac window and the web page are full clients. The tiers trim only the Remote, except Web + Mac link (#4937), which the Mac window does not draw.
 
 - **Core:** all three clients. A change is made on all three in the same branch, or a parity issue is filed for each client that does not get it yet.
 - **Mac + web:** the Mac window and the web page. The Remote does not have them: #2798 removes each one from the Remote completely, with no line in its place (Alex, 2026-10-29). Nobody files a Remote parity issue. Until a feature is removed, the Remote's cell says what the Remote has now.
@@ -48,11 +48,31 @@ Alex chose tiers on 2026-10-27 (#2796). Each row has a **Tier** cell after its F
 
 A new report, a figure about other people, or a team or admin feature is Web only (#3224), or Web + Mac link when people look for it on the Mac and Alex chooses a link (#4936).
 
-A new row gets its tier when it is added, from the lists above. When a new feature is on none of the lists, its tier is Mac + web, because the Remote keeps only Core by default (Alex, #2796). An issue that wants it on the Remote says why.
+A new row gets its role when it is added, and its tier from the role (above), or from the lists here when they still say so. When a new feature is on none of the lists, its tier is Mac + web, because the Remote keeps only Core by default (Alex, #2796). An issue that wants it on the Remote says why.
+
+## Roles (#5290, epic #5288)
+
+A tier says which clients draw a feature. A **role** says who uses it, and the role gives the tier. Alex chose roles on 2026-11-13 (#5206): a new feature gets a role first, and its tier follows from the rule below. Nobody picks a tier by hand.
+
+The roles: **Engineer** directs agents and does the work, on their own machines and folders; **Lead** plans work and sees it done (Work: issues, PRs, epics, Timeline, Releases, Team Workflows, Estimates, Forecast; Velocity and Features); **Admin** manages the estate (People and Groups, Sign-in, Requests, Policy, Model Access, Catalogue, Read API, Audit and Sinks, Backups, Live Now, the fleet's Machines); **Report reader** reads what the organisation used and did (Spend, Outcomes, Time, Adoption, Runtimes, Workflows, Saved Views). The control plane is not a role: it is headless. A role is of the feature, not a permission, and one person can have several.
+
+The surfaces: **Desk** is the Mac window (and the Windows and Linux shells, #4456, #4454); **Hand** is the Remote on iPhone and iPad (and the Android shell, #4466); **Web** is the web page in any browser.
+
+| Role | Cell | Web | Desk (Mac) | Hand (Remote) | Tier |
+|---|---|---|---|---|---|
+| Engineer, agent work | Engineer (agent work) | yes | yes | yes | Core |
+| Engineer, set-up (folders, connectors, Agent Configuration, Folder Settings, own usage, Docs, Messages) | Engineer (set-up) | yes | yes | no | Mac + web |
+| Lead | Lead | yes | a link to the web page; Work ▸ Features and Velocity stay native | no (Features and Velocity stay) | Web + Mac link (Features, Velocity: Core) |
+| Admin | Admin | yes | no; a link only where an engineer looks for it (Edit in Console) | no | Web only, or Web + Mac link |
+| Report reader | Report reader | yes | a link to the web page (Reports, #4938) | no | Web + Mac link |
+
+Mac only, Web only and Remote only stay what only that client can do (hover, Finder, the menu bar) or the web's own frame; Engineer rows may carry them, and Admin rows may be Web only.
+
+`scripts/parity-counts.py` fails on a row whose tier is not one its role gives. A row that is not yet right has its Role cell end in **(tier moves)**: a child of epic #5288 changes a client (Mac, Remote or Web), then takes the mark off. A mark on a row that agrees fails too. `scripts/parity-counts.py --mismatches` lists the marked rows by the client to change.
 
 ## Counts
 
-`scripts/parity-counts.py` counts the rows of every screen by verdict: **same**, **by design** and **delta**, and by tier: **Core**, **Mac + web**, **Web + Mac link**, **Mac only**, **Web only** and **Remote only**. A row with any open delta counts as delta, even where another side's difference is by design. The script fails when a row has no tier it knows, and says which tiers replace the old **One client** (#4759). The counts are not kept by hand (#2020).
+`scripts/parity-counts.py` counts the rows of every screen by verdict: **same**, **by design** and **delta**, by tier: **Core**, **Mac + web**, **Web + Mac link**, **Mac only**, **Web only** and **Remote only**, and by role (#5290). A row with any open delta counts as delta, even where another side's difference is by design. The script fails when a row has no tier it knows, and says which tiers replace the old **One client** (#4759). The counts are not kept by hand (#2020).
 
 The deltas are tracked by 33 issues:
 - **Already open:** #226 (the Remote's one sidebar) and #235 (the page's one sidebar at phone width).
