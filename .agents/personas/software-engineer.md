@@ -61,19 +61,26 @@ starts lanes.
      one Alex means, ask on the PR.
    - Closed: Alex dropped it. Go to step 9.
 7. Wait for the pull request to merge. Use one `wait_for_event` call with
-   `events: ["pr.merged", "pr.closed", "checks.failed", "checks.passed", "pr.conflicted"]`,
+   `events: ["pr.merged", "pr.closed", "pr.blocked", "checks.passed"]`,
    `where: {"pr": <n>}` and `until_minutes: 60`, and end your turn. Any one of the
    events starts you again. Then do what the event says:
    - `pr.merged`: go on to step 8.
    - `pr.closed` (closed without a merge): go to step 9.
-   - `checks.failed`: follow `.agents/skills/fix-failed-checks/SKILL.md` on your
-     branch, push, and wait again. You fix your own PR's checks, also when a Fix failed
-     checks workflow is on.
+   - `pr.blocked` (#5321): the PR cannot merge until you act. Do what each of its
+     `reasons` says (`docs/reference/events.md`, "Blocked pull requests"), push once,
+     and wait again:
+     - `required_check_failed`: follow `.agents/skills/fix-failed-checks/SKILL.md` on
+       your branch for each of `failedChecks`. You fix your own PR's checks, also when a
+       Fix failed checks workflow is on.
+     - `conflict` or `behind`: rebase onto main, push, and run
+       `scripts/rearm-automerge.sh <pr>`.
+     - `changes_requested`: read the review (`reviewUrl`), make the changes, and say on
+       the PR what you changed.
+     - `automerge_disabled`: find out why (`gh pr view <n>`), fix that, and turn on
+       squash auto-merge again.
    - `checks.passed` (#3035): run `scripts/rearm-automerge.sh --stalled`, and wait
      again — checks going green is exactly when a clean PR can be left unmerged
      (#1741), so this wakes for that without waiting for the time limit.
-   - `pr.conflicted`: rebase onto main, push, run `scripts/rearm-automerge.sh <pr>`, and
-     wait again.
    - No event before the time limit: run `scripts/rearm-automerge.sh --stalled`, and
      wait again.
 
