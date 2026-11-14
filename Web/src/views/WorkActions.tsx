@@ -39,11 +39,11 @@ export function WorkLogSheet({ log, close }: { log: { title: string; text: strin
  * warning (conflicts), a clock (auto-merge), a page (a draft). */
 function MergeGlyph({ row }: { row: MergeRow }) {
   const icon: IconName = row.kind === "draft" ? "file-text" : row.kind === "autoMerge" ? "clock" : row.kind === "review" && row.sign === "wait" ? "circle-dot"
-    : row.kind === "conflicts" && row.sign === "fail" ? "triangle-alert" : row.sign === "fail" ? "x" : row.sign === "wait" ? "dot" : "check";
+    : row.kind === "conflicts" && row.sign === "fail" ? "triangle-alert" : row.sign === "fail" ? "x" : row.sign === "wait" ? "loader-circle" : "check";
   return <span class={`work-merge-glyph ${row.sign}`} aria-hidden="true"><Icon name={icon} /></span>;
 }
 
-const checkIcon = (state: string): IconName => state === "passing" ? "check" : state === "failing" ? "x" : state === "running" ? "dot" : "ban";
+const checkIcon = (state: string): IconName => state === "passing" ? "check" : state === "failing" ? "x" : state === "running" ? "loader-circle" : "ban";
 const checkWord: Record<string, string> = { passing: "passed", failing: "failed", running: "running", skipped: "skipped" };
 
 /** A check's glyph in its sign's colour, its state said to a screen reader. */

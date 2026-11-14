@@ -407,7 +407,7 @@ function FlightLine({ flight, phone }: { flight: InFlight; phone: boolean }) {
     <li class={phone ? undefined : "wide-only"}>
       <a class={`work-feature-row work-flight-row is-${mark}`} href={itemHref(item)} title={`Open ${shortRef(item.node.ref)}'s page`}
         onClick={(e) => openItem(e, item)}>
-        <span class="mark" role="img" aria-label={mark === "attention" ? "Needs you" : "Working"}><Icon name={mark === "attention" ? "triangle-alert" : "dot"} /></span>
+        <span class="mark" role="img" aria-label={mark === "attention" ? "Needs you" : "Working"}><Icon name={mark === "attention" ? "triangle-alert" : "loader-circle"} /></span>
         <span class="name"><span class="ref quiet">{shortRef(item.node.ref)}</span> <ForgeTitle text={item.title} /></span>
         <span class="words"><span class="sep" aria-hidden="true">· </span>{words}</span>
         {pr && <span class="pr small"><StateIcon kind="pr" state="open" size={12} />{pr}</span>}

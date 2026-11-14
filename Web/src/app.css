@@ -2761,7 +2761,8 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
   background: var(--paper-well); color: color-mix(in srgb, currentColor 70%, transparent); font: inherit; font-size: 0.875rem; text-align: left; cursor: pointer; }
 .work-plan-band .strong { color: var(--paper-ink); }
 .work-plan-band.still { cursor: default; }
-.work-plan-band .chevron { display: inline-block; width: 12px; }
+.work-plan-band { align-items: center; }
+.work-plan-band svg.chevron { width: 14px; height: 14px; vertical-align: 0; opacity: 0.6; }
 .work-plan-band .end { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .work-plan-step + .work-plan-step, .work-plan-rows + .work-plan-step { border-top: 1px solid var(--paper-rule); }
 .work-plan-rows { list-style: none; margin: 0; padding: 0; }

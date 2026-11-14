@@ -32,7 +32,7 @@ import { Icon, type IconName } from "./Icon";
 
 const holdsRuntime = (s: AgentState) => s === "starting" || s === "running" || s === "waitingOnUser";
 /** The mark's icon before line 2's words; a closed child's state icon says it is done. */
-const markIcon: Record<PlanMark, IconName | undefined> = { done: undefined, working: "dot", attention: "triangle-alert", waiting: "circle", blocked: "ban" };
+const markIcon: Record<PlanMark, IconName | undefined> = { done: undefined, working: "loader-circle", attention: "triangle-alert", waiting: "circle", blocked: "ban" };
 
 export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = [], writes, waiting = false, wrote, fromCopy }: {
   store: Store; host: string; lineageHost: string | undefined; detail: ForgeItemDetail; asked: number;

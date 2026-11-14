@@ -293,7 +293,7 @@ export function WorkRowView({ row, several, dim, pick, read, open, latest: isLat
           </span>
         </span>
         <span class="work-row-end small">
-          {checks && <span class={`work-checks ${checks.tone}`} title={checks.words} aria-label={checks.words}><Glyph of={checks.mark} /></span>}
+          {checks && <span class={`work-checks ${checks.tone}`} title={checks.words} aria-label={checks.words}>{checks.tone === "running" ? <Icon name="loader-circle" /> : <Glyph of={checks.mark} />}</span>}
           {review && <span class={`work-review${row.review === "changes_requested" ? " bad" : ""}`}>{review}</span>}
           {comments > 0 && <span class="work-count" aria-label={`${comments} comment${comments === 1 ? "" : "s"}`}>
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" /></svg>{comments}</span>}
