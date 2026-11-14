@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Ports TimeLedgerTests: a turn's time is cut where what it waits on changes, banked by

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // When a milestone lands (#4620), by method H as an epic (specs/4533-forecasting/spec.md):

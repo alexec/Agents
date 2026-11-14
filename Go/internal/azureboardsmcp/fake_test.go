@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // A fake Azure DevOps over HTTP (no account, #3804): the work item paths the server reads and

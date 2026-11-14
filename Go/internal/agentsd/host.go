@@ -16,8 +16,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The host's own plumbing, as the Swift host serves it on a server: the one answer a

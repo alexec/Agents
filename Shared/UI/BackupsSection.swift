@@ -19,6 +19,8 @@ struct BackupsSection: View {
     var title = "Backups"
     /// The Mac's folder picker; nil where the folder is only shown.
     var chooseFolder: (() -> Void)?
+    /// When `state` was read (#5146): the section says how old it is, at the end of its heading.
+    var readAt: Date?
 
     @State private var confirming: DaemonAPI.Backup?
     @State private var said: String?
@@ -73,7 +75,11 @@ struct BackupsSection: View {
                 }
             }
         } header: {
-            Text(title)
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                Spacer(minLength: 8)
+                if let readAt { LastUpdateText(read: readAt) }
+            }
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
                 if let error = said ?? state.lastError {

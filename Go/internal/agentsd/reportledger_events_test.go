@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Outcomes and Time (#2019): sessions, the pull requests of this host's agents' branches

@@ -17,6 +17,8 @@ struct MachinePage: View {
 
     @State private var usage: DaemonAPI.MachineUsageState?
     @State private var failure: String?
+    /// When the last `machine/usage` read worked (#5146): a read that fails then says how old the page is.
+    @State private var readAt: Date?
 
     private var name: String { model.hosts.label(host) }
     private var offline: Bool { model.hosts.isOffline(host) }
@@ -85,6 +87,7 @@ struct MachinePage: View {
         .task(id: host) {
             usage = nil
             failure = nil
+            readAt = nil
             guard answersUsage else { return }
             while !Task.isCancelled {
                 if !offline { await read() }
@@ -143,6 +146,12 @@ struct MachinePage: View {
                     .compactMap { $0 }
                 if !waits.isEmpty {
                     Text(waits.joined(separator: " · ")).foregroundStyle(.secondary)
+                }
+                // A read every 3 s says no age while it works; one that fails says how old this is (#5146).
+                if let failure {
+                    LastUpdateTimeline(read: readAt ?? .distantPast) { now in
+                        Text(LastUpdate.banner(failure, read: readAt, now: now)).foregroundStyle(.secondary)
+                    }
                 }
             } else if let failure {
                 Text(failure).foregroundStyle(.secondary)
@@ -224,6 +233,7 @@ struct MachinePage: View {
             usage = try await model.client(for: host).call(DaemonAPI.Method.machineUsage, DaemonAPI.Empty(),
                                                              returning: DaemonAPI.MachineUsageState.self)
             failure = nil
+            readAt = Date()
         } catch let error as JSONRPCError {
             failure = error.message
         } catch {

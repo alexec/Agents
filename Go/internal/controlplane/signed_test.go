@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/machinelock"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/machinelock"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #3492: a request its sender signed goes to the machine with its params and signature as

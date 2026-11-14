@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
 )
 
 // Groups (#1761, spec 736 data-model.md "Group"): everyone, or named users. A group owns

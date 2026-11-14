@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Ports TurnSummaryTests and TurnsPageTests: a finished turn is its ask, its last block,

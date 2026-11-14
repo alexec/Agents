@@ -9,8 +9,8 @@ import (
 
 	"github.com/chromedp/cdproto/target"
 
-	"github.com/alexec/agents/Go/internal/browser"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/browser"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A device profile for each session's tabs (#4086): browser_emulate_device makes the

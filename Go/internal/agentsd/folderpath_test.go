@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
 )
 
 // A folder's .agents/workflows, or its .agents, that is a link takes none of the app's

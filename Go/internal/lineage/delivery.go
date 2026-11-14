@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The delivery figures (#4552, epic #4551): the four DORA keys, DORA 2025's rework rate,

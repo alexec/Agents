@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The host's list is what its handlers make (#1748): a capability is in it when every method

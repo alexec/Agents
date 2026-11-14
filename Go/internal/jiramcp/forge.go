@@ -13,7 +13,7 @@ import (
 
 	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
 
-	"github.com/alexec/agents/Go/internal/richtext"
+	"github.com/agentloops-dev/agents/Go/internal/richtext"
 )
 
 // The daemon's forge reads and writes (#3260, after Linear's in #3209): the issues of many

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Several accounts per runtime (#840): an added account is a folder of its own, with the

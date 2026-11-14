@@ -54,10 +54,10 @@ Use `forge/plan` when the daemon has it (#3267). Until then, read it with `gh`:
 ```zsh
 epic=<n>
 gh issue view $epic --json title,state,labels,milestone,body
-gh api repos/alexec/Agents/issues/$epic/sub_issues --paginate \
+gh api repos/agentloops-dev/Agents/issues/$epic/sub_issues --paginate \
   -q '.[] | "\(.number) \(.state) \([.labels[].name]|join(","))  \(.title)"'
 # for each open child:
-gh api repos/alexec/Agents/issues/<child>/dependencies/blocked_by \
+gh api repos/agentloops-dev/Agents/issues/<child>/dependencies/blocked_by \
   -q '.[] | "\(.number) \(.state)"'
 ```
 
@@ -122,10 +122,10 @@ only the keys it has. A wait that names nothing is refused. When you start again
   the milestone's goal). Then add it to the epic and set what it waits for:
 
   ```zsh
-  id=$(gh api repos/alexec/Agents/issues/<new> -q .id)
-  gh api -X POST repos/alexec/Agents/issues/$epic/sub_issues -F sub_issue_id=$id
-  blocker=$(gh api repos/alexec/Agents/issues/<blocker> -q .id)
-  gh api -X POST repos/alexec/Agents/issues/<new>/dependencies/blocked_by -F issue_id=$blocker
+  id=$(gh api repos/agentloops-dev/Agents/issues/<new> -q .id)
+  gh api -X POST repos/agentloops-dev/Agents/issues/$epic/sub_issues -F sub_issue_id=$id
+  blocker=$(gh api repos/agentloops-dev/Agents/issues/<blocker> -q .id)
+  gh api -X POST repos/agentloops-dev/Agents/issues/<new>/dependencies/blocked_by -F issue_id=$blocker
   ```
 
 - **A child that is no longer needed:** close it as not planned, with one line that says

@@ -26,9 +26,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/alexec/agents/Go/internal/bitbucketmcp"
-	"github.com/alexec/agents/Go/internal/buildinfo"
-	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/agentloops-dev/agents/Go/internal/bitbucketmcp"
+	"github.com/agentloops-dev/agents/Go/internal/buildinfo"
+	"github.com/agentloops-dev/agents/Go/internal/connections"
 )
 
 func main() {

@@ -59,6 +59,12 @@ struct StaleBanner: View {
 }
 
 extension View {
+    /// The banner at the top of a page that shows what was last read (#5147): every page says
+    /// when the Mac stopped answering and how old what it shows is, not only the chat.
+    func staleBanner() -> some View {
+        safeAreaInset(edge: .top, spacing: 0) { StaleBanner() }
+    }
+
     /// The ground under the Remote's banners at the top of a page: what scrolls under the
     /// inset does not show between them (#4737).
     func remoteBannerGround() -> some View {

@@ -12,7 +12,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/agentloops-dev/agents/Go/internal/connections"
 	"github.com/emersion/go-imap/v2"
 	"github.com/emersion/go-imap/v2/imapclient"
 )

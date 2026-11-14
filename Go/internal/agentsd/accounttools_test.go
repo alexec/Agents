@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // manage_accounts' import reads the old registry's snake_case files (#3909, #3967).

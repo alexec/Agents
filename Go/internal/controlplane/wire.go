@@ -3,8 +3,8 @@ package controlplane
 import (
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controlplane/records"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The control plane's methods answer with the types in Go/wire, made from Packages/Wire

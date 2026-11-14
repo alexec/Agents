@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // lineage/forecast (#4526; the method is the #4523 spike's, specs/4533-forecasting/spec.md):

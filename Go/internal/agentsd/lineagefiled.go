@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Issues an agent files (#3582), so a dictated idea reaches the issues it became:

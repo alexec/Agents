@@ -18,6 +18,7 @@ import { askingLine, badges, checkFailedLine, canRemove, orgLines, providerManag
   removeTitle, roleNote, roleWord, roles, rotateFoot, rotateMessage, rotateTitle, rotated } from "../model/people";
 import { JoinRequests } from "./JoinRequest";
 import { Modal } from "./Modal";
+import { HeadWithUpdate } from "./LastUpdate";
 
 function sentence(error: unknown): string {
   // A control plane before #994 knows one person and no list.
@@ -369,7 +370,7 @@ function PeopleOrBots({ store, down, kind }: { store: Store; down: boolean; kind
   const headId = bots ? "settings-bots" : "settings-people";
   return (
     <section aria-labelledby={headId}>
-      <h3 class="section-head" id={headId}>{bots ? botWords.title : "People"}</h3>
+      <HeadWithUpdate id={headId} title={bots ? botWords.title : "People"} at={store.peopleAt.value} />
       {!bots && <JoinRequests store={store} down={down} explained />}
       {said && <p class="hint">{said}</p>}
       {/* Each bot stopped at a cap, while it is true (#2073). */}

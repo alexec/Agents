@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // What the events read from Forgejo or Gitea (#1753), in the gitlab server's shape

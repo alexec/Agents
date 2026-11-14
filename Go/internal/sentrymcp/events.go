@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The MCP events (#3583), polled only: `events/list` and `events/poll` of the events draft

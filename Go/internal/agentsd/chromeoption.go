@@ -7,7 +7,7 @@ import (
 	goruntime "runtime"
 	"strings"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Use Chrome (#1837): a Claude session started with `--chrome`, so it can drive the

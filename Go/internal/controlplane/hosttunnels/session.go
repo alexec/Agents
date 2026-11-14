@@ -12,7 +12,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/procgroup"
+	"github.com/agentloops-dev/agents/Go/internal/procgroup"
 )
 
 // connecting is HostTunnels.connecting: how long a master has to come up. ssh's own

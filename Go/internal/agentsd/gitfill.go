@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // git/fill is asked on the control-plane channel only (#1122). It is not a window method:

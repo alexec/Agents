@@ -53,6 +53,10 @@ struct PeoplePane: View {
 
     var body: some View {
         Form {
+            // Read when it opens and on each change (#5146): how old the list is, at the top.
+            if let readAt = people.listAt {
+                Section {} header: { LastUpdateText(read: readAt) }
+            }
             if let problem = problem ?? people.listProblem {
                 Section {
                     Text(problem).appText(.supporting).tinted(.failure)

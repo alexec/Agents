@@ -3,7 +3,7 @@ package agentsd
 import (
 	"strings"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // goalIn is the session's goal in a session_info_update's _meta (#2742): JetBrains' AIR

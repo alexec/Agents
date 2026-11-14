@@ -75,7 +75,7 @@ test("the agent's tasks are to do until its plan comes", () => {
 test("the plan ticks the agent's tasks by their words", () => {
   const facts = { runtimeReady: true, githubConnected: true, waitsForPerson: false, plan: plan([
     ["Set up the agent runtime", "completed"], ["Connect GitHub", "completed"],
-    ["Make the repository from alexec/web-service-starter", "completed"],
+    ["Make the repository from agentloops-dev/web-service-starter", "completed"],
     ["Set up Google Cloud (Cloud Run).", "in_progress"], ["Set up Sentry", "pending"],
   ]) };
   assert.deepEqual(m.taskStates("web-service", facts), ["done", "done", "done", "doing", "to-do", "to-do", "to-do"]);

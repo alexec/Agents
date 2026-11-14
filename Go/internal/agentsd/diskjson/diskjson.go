@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 var dateType = reflect.TypeOf(wire.Date(0))

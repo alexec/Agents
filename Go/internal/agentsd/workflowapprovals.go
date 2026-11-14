@@ -8,8 +8,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A workflow waiting for an OK is asked as a changed guarded file is (#569, #1322), as

@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
 )
 
 // Git, run as the Swift host runs it (GitWorktrees.git, GitChanges.run): no optional

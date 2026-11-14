@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The person's attention (#2805): a burst, then one notice back each cool-down, never

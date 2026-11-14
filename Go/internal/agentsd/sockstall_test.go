@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A daemon.sock client that never reads does not hold Broadcast, or the clients that do

@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // bring_back (#2947): a branch of a folder on another machine comes back into the agent's
