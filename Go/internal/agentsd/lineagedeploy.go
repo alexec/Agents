@@ -319,7 +319,8 @@ func rollbackLocked(f *deploysFile, ref string, rec deployRecord) bool {
 
 // deployResolvedLocked is a deploy's details as a walk says them: its version and environments as the
 // title, its state (replaced for a succeeded deploy a newer one replaced), rollback as a label,
-// share:<per cent> as a label when it is live with less than all the traffic, and its start.
+// share:<per cent> as a label when it is live with less than all the traffic, its start, and the
+// deploy itself, for the Work pages' Deployed and Live in rows (#5243).
 func deployResolvedLocked(f *deploysFile, ref string, rec deployRecord) wire.LineageResolved {
 	what := ""
 	if v := rec.Deploy.Version; v.Name != nil {
@@ -338,7 +339,8 @@ func deployResolvedLocked(f *deploysFile, ref string, rec deployRecord) wire.Lin
 	if replacedLocked(f, ref, rec) {
 		state = "replaced"
 	}
-	out := wire.LineageResolved{Title: title, State: &state, CreatedAt: rec.Deploy.Started}
+	dep := rec.Deploy
+	out := wire.LineageResolved{Title: title, State: &state, CreatedAt: rec.Deploy.Started, Deploy: &dep}
 	if rollbackLocked(f, ref, rec) {
 		out.Labels = []string{"rollback"}
 	}

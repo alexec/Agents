@@ -190,7 +190,9 @@ The deploy events make the lineage nodes (#5241). The code is
   build that goes to TestFlight and then to the App Store is one artifact in two deploys.
 - **A deploy's details** (its artifacts, state, start and end) are not links. The host
   keeps each deploy's last event in `<root>/lineage-deploys.json`, at most 1,000. A walk
-  gives them as the deploy's resolved title (*v0.18.0 to testflight*), state and labels.
+  gives them as the deploy's resolved title (*v0.18.0 to testflight*), state and labels,
+  and the deploy itself (`LineageResolved.deploy`, #5243), from which a release's **Deployed** and a
+  pull request's **Live in** on the web page's Work pages draw a row for each environment.
 - **Computed, not stored:** a succeeded deploy's state is `replaced` when it is no longer
   live in any of its environments. It has the label `rollback` when its release is
   older than the release it replaced. **What a deploy brings** is the PRs between the last

@@ -6830,6 +6830,11 @@ export interface LineageResolved {
    * rate.
    */
   createdAt?: WireDate;
+  /**
+   * A deploy node's last event (#5243): its target (component, environment and tier), version,
+   * times and url, so a Work page's Deployed and Live in rows say them. Only on a deploy node.
+   */
+  deploy?: Deploy;
 }
 
 /** A runtime of lineage/figures' sessions, and how many of them it ran (#4427). */
@@ -17031,7 +17036,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   LineageNodeRequest: { required: ["node"], optional: ["depth"] },
   LineageOverhead: { required: ["windowDays", "linked", "unlinked", "uncounted"], optional: ["currency", "unlinkedRatio", "epicRatio"] },
   LineagePRCI: { required: ["headSha"], optional: ["pushedAt", "greenAt"] },
-  LineageResolved: { required: ["title"], optional: ["state", "labels", "createdAt"] },
+  LineageResolved: { required: ["title"], optional: ["state", "labels", "createdAt", "deploy"] },
   LineageRuntimeCount: { required: ["runtimeID", "sessions"], optional: [] },
   LineageSessionIssue: { required: ["node"], optional: ["title"] },
   LineageSessionMatch: { required: ["agentID", "on"], optional: [] },

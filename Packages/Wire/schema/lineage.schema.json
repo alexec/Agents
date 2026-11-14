@@ -1242,6 +1242,10 @@
         "createdAt": {
           "$ref": "core.schema.json#/definitions/WireDate",
           "description": "When the forge says the issue or PR was made (#4552): a bug's filing, for the change failure rate."
+        },
+        "deploy": {
+          "$ref": "core.schema.json#/definitions/Deploy",
+          "description": "A deploy node's last event (#5243): its target (component, environment and tier), version, times and url, so a Work page's Deployed and Live in rows say them. Only on a deploy node."
         }
       },
       "required": [
