@@ -1,0 +1,666 @@
+{
+  "openrpc": "1.3.2",
+  "info": {
+    "title": "agentsd: machines",
+    "version": "0",
+    "description": "The host methods of the machines group; see daemon.openrpc.json for the rest of the document."
+  },
+  "methods": [
+    {
+      "name": "daemon/lockReset",
+      "x-capability": "host.lock/4",
+      "description": "agentsd lock reset (#3493, specs/3399-machine-lock D4): this machine forgets the lock it pinned, the invite and the request to join, and asks the control plane for its person's lock again, which it then pins on first use. Only on daemon.sock, from this machine's own account: never on a channel the control plane opened, nor on the window's local socket.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "daemon/ping",
+      "x-capability": "daemon/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/PingResponse"
+        }
+      }
+    },
+    {
+      "name": "daemon/policyState",
+      "x-capability": "host.policy/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The organisation's policy as this machine follows it (#998, T027).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/PolicyState"
+        }
+      }
+    },
+    {
+      "name": "daemon/policyStateChanged",
+      "x-capability": "host.policy/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "description": "The policy this machine follows changed, or the kill switch turned (#998).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/PolicyState"
+          }
+        }
+      ]
+    },
+    {
+      "name": "daemon/quit",
+      "x-capability": "daemon/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/QuitRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "daemon/status",
+      "x-capability": "daemon/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/DaemonStatus"
+        }
+      }
+    },
+    {
+      "name": "device/changed",
+      "x-capability": "device/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/DeviceNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "devices/announce",
+      "x-capability": "devices/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/DeviceAnnouncement"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/AnnounceReply"
+        }
+      }
+    },
+    {
+      "name": "devices/forget",
+      "x-capability": "devices/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/DeviceForget"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "devices/list",
+      "x-capability": "devices/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/connections.schema.json#/definitions/Device"
+          }
+        }
+      }
+    },
+    {
+      "name": "events/cancelWait",
+      "x-capability": "events/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/CancelWaitRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/workflows.schema.json#/definitions/WaitingAgent"
+          }
+        }
+      }
+    },
+    {
+      "name": "events/changed",
+      "x-capability": "events/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/EventsChange"
+          }
+        }
+      ]
+    },
+    {
+      "name": "events/list",
+      "x-capability": "events/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/EventsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/EventsPage"
+        }
+      }
+    },
+    {
+      "name": "events/raise",
+      "x-capability": "events/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/EventRaiseRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Event"
+        }
+      }
+    },
+    {
+      "name": "events/server",
+      "x-capability": "events/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/ServerReachabilityChange"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Event"
+        }
+      }
+    },
+    {
+      "name": "lock/hello",
+      "x-capability": "host.lock/3",
+      "description": "A client opens a checked channel to this machine (#3492, specs/3399-machine-lock D6): the machine checks the client's signing key against its person's lock and answers with its own key, and from then on every request and answer on the channel carries an HMAC and a count. Once the machine holds a lock, it refuses a request on a channel from the control plane that has no HMAC from a channel opened this way, or no signature of a key in the lock (LockSignature), except the few the control plane asks for itself.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/LockHello"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/LockHelloReply"
+        }
+      }
+    },
+    {
+      "name": "mac/open",
+      "x-capability": "mac/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/MacPathRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "mac/reveal",
+      "x-capability": "mac/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/MacPathRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "mac/terminal",
+      "x-capability": "mac/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/MacTerminalRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "machine/usage",
+      "x-capability": "machine.usage/1",
+      "description": "A machine's page (#3626): its CPU and memory now, and every disk its agents write to with its level. Asked while the page is open; nothing is kept between asks but the machine's last CPU time.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/MachineUsageState"
+        }
+      }
+    },
+    {
+      "name": "pool/applyAllowances",
+      "x-capability": "pool/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/ApplyAllowancesRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Changed"
+        }
+      }
+    },
+    {
+      "name": "relay/grant",
+      "x-capability": "relay/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/RelayGrantRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/RelayGrantReply"
+        }
+      }
+    },
+    {
+      "name": "relay/offer",
+      "x-capability": "relay/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/RelayOffer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "retention/changed",
+      "x-capability": "retention/1",
+      "x-notification": true,
+      "description": "How long archived agents are kept, after a change.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/RetentionState"
+          }
+        }
+      ]
+    },
+    {
+      "name": "retention/set",
+      "x-capability": "retention/1",
+      "description": "Change how long archived agents are kept. Unconfirmed, a change that would delete agents now is only described.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/RetentionSetRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/RetentionSetResult"
+        }
+      }
+    },
+    {
+      "name": "retention/state",
+      "x-capability": "retention/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/RetentionState"
+        }
+      }
+    },
+    {
+      "name": "selfUpdate/changed",
+      "x-capability": "host.update/1",
+      "description": "A Mac's host, when how it updates Agents Host changes (#2178).",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SelfUpdate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "selfUpdate/set",
+      "x-capability": "host.update/1",
+      "description": "A Mac's host: turn updating Agents Host by itself on or off (#2178). Kept in host-update.json in the root.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SelfUpdateSet"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/SelfUpdate"
+        }
+      }
+    },
+    {
+      "name": "selfUpdate/status",
+      "x-capability": "host.update/1",
+      "description": "A Mac's host: how it updates Agents Host to the release the control plane names (#2178). Only a Mac's host serves it.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/SelfUpdate"
+        }
+      }
+    },
+    {
+      "name": "surface/identify",
+      "x-capability": "surface/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/SurfaceIdentification"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "time/history",
+      "x-capability": "time/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/TimeHistory"
+        }
+      }
+    }
+  ]
+}

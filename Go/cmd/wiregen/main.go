@@ -1,5 +1,5 @@
 // Command wiregen makes the wire types from Packages/Wire (#1135): the schema
-// (schema/*.schema.json) and the methods (daemon.openrpc.json, control.openrpc.json).
+// (schema/*.schema.json) and the methods (daemon.openrpc.json and daemon/*.openrpc.json, control.openrpc.json).
 //
 //	wiregen [-root <repo>] [-check]
 //
@@ -11,6 +11,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -20,8 +21,9 @@ import (
 
 // The files wiregen reads and writes, from the repository root.
 const (
-	SchemaDir  = "Packages/Wire/schema" // one *.schema.json per domain (#5380)
-	DaemonRPC  = "Packages/Wire/daemon.openrpc.json"
+	SchemaDir  = "Packages/Wire/schema"              // one *.schema.json per domain (#5380)
+	DaemonRPC  = "Packages/Wire/daemon.openrpc.json" // the host's header: info, declared capabilities, errors
+	DaemonDir  = "Packages/Wire/daemon"              // its methods, one *.openrpc.json per group (#5381)
 	ControlRPC = "Packages/Wire/control.openrpc.json"
 	GoTypes    = "Go/wire/types_gen.go"
 	GoMethods  = "Go/wire/methods_gen.go"
@@ -71,6 +73,65 @@ func main() {
 	}
 }
 
+// withMethodFiles adds the methods of every DaemonDir file to the host document's header, in
+// name order (each file keeps its own in name order, and readRPC checks the whole).
+func withMethodFiles(root string, header []byte) ([]byte, error) {
+	var top map[string]json.RawMessage
+	if err := json.Unmarshal(header, &top); err != nil {
+		return nil, fmt.Errorf("%s: %w", DaemonRPC, err)
+	}
+	paths, err := filepath.Glob(filepath.Join(root, DaemonDir, "*.openrpc.json"))
+	if err != nil || len(paths) == 0 {
+		return nil, fmt.Errorf("%s: no method files", DaemonDir)
+	}
+	type method struct {
+		name string
+		raw  json.RawMessage
+	}
+	var all []method
+	seen := map[string]string{}
+	for _, path := range paths {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		var part struct {
+			Methods []json.RawMessage `json:"methods"`
+		}
+		if err := json.Unmarshal(b, &part); err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+		var names []string
+		for _, raw := range part.Methods {
+			var n struct {
+				Name string `json:"name"`
+			}
+			if err := json.Unmarshal(raw, &n); err != nil {
+				return nil, fmt.Errorf("%s: %w", path, err)
+			}
+			if other, ok := seen[n.Name]; ok {
+				return nil, fmt.Errorf("%s: method %s is also in %s", path, n.Name, other)
+			}
+			seen[n.Name] = path
+			names = append(names, n.Name)
+			all = append(all, method{n.Name, raw})
+		}
+		if err := inNameOrder("methods", names); err != nil {
+			return nil, fmt.Errorf("%s: %w", path, err)
+		}
+	}
+	sort.SliceStable(all, func(i, j int) bool { return all[i].name < all[j].name })
+	raws := make([]json.RawMessage, len(all))
+	for i, m := range all {
+		raws[i] = m.raw
+	}
+	var err2 error
+	if top["methods"], err2 = json.Marshal(raws); err2 != nil {
+		return nil, err2
+	}
+	return json.Marshal(top)
+}
+
 // generate makes every generated file from the documents under root, by path.
 func generate(root string) (map[string]string, error) {
 	read := func(path string) ([]byte, error) {
@@ -102,6 +163,11 @@ func generate(root string) (map[string]string, error) {
 		b, err := read(d.path)
 		if err != nil {
 			return nil, err
+		}
+		if d.path == DaemonRPC {
+			if b, err = withMethodFiles(root, b); err != nil {
+				return nil, err
+			}
 		}
 		rpc, err := readRPC(b, d.target, doc)
 		if err != nil {

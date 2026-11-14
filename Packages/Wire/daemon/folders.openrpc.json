@@ -1,0 +1,2387 @@
+{
+  "openrpc": "1.3.2",
+  "info": {
+    "title": "agentsd: folders",
+    "version": "0",
+    "description": "The host methods of the folders group; see daemon.openrpc.json for the rest of the document."
+  },
+  "methods": [
+    {
+      "name": "artifact/write",
+      "x-capability": "artifact/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ArtifactWriteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      },
+      "description": "Write a file an agent may read, whole (#415). With `base`, refused with fileChanged when the file changed on disk since the edit began (#1858), so nobody's change is written over unseen."
+    },
+    {
+      "name": "backups/changed",
+      "x-capability": "backups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/BackupState"
+          }
+        }
+      ]
+    },
+    {
+      "name": "backups/configure",
+      "x-capability": "backups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/BackupSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/BackupState"
+        }
+      }
+    },
+    {
+      "name": "backups/make",
+      "x-capability": "backups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/BackupMakeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/BackupState"
+        }
+      }
+    },
+    {
+      "name": "backups/restore",
+      "x-capability": "backups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/BackupRestoreRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/BackupRestoreResult"
+        }
+      }
+    },
+    {
+      "name": "backups/state",
+      "x-capability": "backups/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/BackupState"
+        }
+      }
+    },
+    {
+      "name": "browser/ack",
+      "x-capability": "browser/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/BrowserAckRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "browser/clear",
+      "x-capability": "host.browser-settings/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Clear the cookies and site data of one site, or of every site, in the machine's browser's kept profile (#3535). The person's own clients only.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/BrowserClearRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/BrowserState"
+        }
+      }
+    },
+    {
+      "name": "browser/frame",
+      "x-capability": "browser/1",
+      "description": "A frame of the machine's browser's page (#3528), to each client that watches it.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/BrowserFrame"
+          }
+        }
+      ]
+    },
+    {
+      "name": "browser/input",
+      "x-capability": "browser/2",
+      "description": "The person's click, scroll, key or paste in the machine's browser's page (#3528).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/BrowserInputRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/BrowserInputResult"
+        }
+      }
+    },
+    {
+      "name": "browser/navigate",
+      "x-capability": "browser/1",
+      "description": "Back, Forward, Reload or an address in the machine's browser (#3528).",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/BrowserNavigateRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "browser/pageChanged",
+      "x-capability": "browser/1",
+      "description": "The machine's browser started, stopped, failed or moved to another page (#3528), to each client that watches it.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/BrowserPageState"
+          }
+        }
+      ]
+    },
+    {
+      "name": "browser/state",
+      "x-capability": "host.browser-settings/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Settings ▸ Browser (#3535): the machine's browser's download and the sites its kept profile has cookies for. It starts Chromium to read them when it is downloaded and not running. The person's own clients only.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/BrowserState"
+        }
+      }
+    },
+    {
+      "name": "browser/unwatch",
+      "x-capability": "browser/1",
+      "description": "The client stops watching the machine's browser (#3528). The host also stops when the connection ends.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "browser/watch",
+      "x-capability": "browser/1",
+      "description": "The client watches the machine's browser (#3528, spike #3527): the host sends browser/frame and browser/pageChanged to it until browser/unwatch. It starts nothing: browser/navigate with go does.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/BrowserWatchRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/BrowserPageState"
+        }
+      }
+    },
+    {
+      "name": "browserControl/set",
+      "x-capability": "host.drive-approval/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Set the browser for this machine: Ask, Always Approve or Off (#4264). Refused notPermitted from any caller but the person's own clients: never an agent, an MCP tool or a workflow.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/BrowserControlSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/BrowserControlSettings"
+        }
+      }
+    },
+    {
+      "name": "browserControl/state",
+      "x-capability": "host.drive-approval/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The browser for this machine (#4264): when never set, Ask on a machine a person uses and Always Approve on one only agents use.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/BrowserControlSettings"
+        }
+      }
+    },
+    {
+      "name": "changes/file",
+      "x-capability": "changes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ChangesFileRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/ChangedFileDetail"
+        }
+      }
+    },
+    {
+      "name": "changes/list",
+      "x-capability": "changes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ChangesListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/ChangesList"
+        }
+      }
+    },
+    {
+      "name": "changes/undoTurn",
+      "x-capability": "changes.undo/1",
+      "description": "Put the files a turn changed back as they were before it (#3437), from the snapshot the host took as the turn began. Refused while the agent's turn runs.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/UndoTurnRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/UndoTurnResult"
+        }
+      }
+    },
+    {
+      "name": "clone/changed",
+      "x-capability": "clone/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/CloneNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "desktopControl/liveFrame",
+      "x-capability": "host.desktop-control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The live tile's frame (#3004, US4, FR-011): sent to the clients showing an agent that holds the screen lease, after each drive_screen action and at least every 5 seconds while it is idle. Locked and no image while the Mac's screen is locked (FR-012). Never recorded.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/DesktopControlLiveFrame"
+          }
+        }
+      ]
+    },
+    {
+      "name": "desktopControl/resume",
+      "x-capability": "host.desktop-control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Let an agent paused by the person's touch drive again (#3004, US3): its drive_screen goes on from where it stopped. Refused notPaused when it is not paused; refused notPermitted from any caller but the person's own clients.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "desktopControl/set",
+      "x-capability": "host.desktop-control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Set desktop control for this Mac: Ask, Always Approve or Off (#3004, FR-004, #4264). Refused notPermitted from any caller but the person's own clients: never an agent, an MCP tool or a workflow.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/DesktopControlSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/DesktopControlSettings"
+        }
+      }
+    },
+    {
+      "name": "desktopControl/state",
+      "x-capability": "host.desktop-control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Desktop control for this Mac (#3004, #4264): when never set, Ask on a machine a person uses and Always Approve on one only agents use.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/DesktopControlSettings"
+        }
+      }
+    },
+    {
+      "name": "desktopControl/takeOver",
+      "x-capability": "host.desktop-control/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Take the screen back from an agent (#3004, US3, FR-008): its screen lease is let go at once, and its drive_screen call answers that the person took over. Refused notHeld when it does not hold the screen lease; refused notPermitted from any caller but the person's own clients.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "disk/changed",
+      "x-capability": "disk/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/DiskState"
+          }
+        }
+      ]
+    },
+    {
+      "name": "disk/state",
+      "x-capability": "disk/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/DiskState"
+        }
+      }
+    },
+    {
+      "name": "dropbox/put",
+      "x-capability": "dropbox/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/DropboxPutRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/DropboxPutResponse"
+        }
+      }
+    },
+    {
+      "name": "files/browse",
+      "x-capability": "files/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FilesBrowseRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/DirectoryListing"
+        }
+      }
+    },
+    {
+      "name": "files/changed",
+      "x-capability": "files/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FilesChangedNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "files/complete",
+      "x-capability": "files.complete/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FileCompletionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FileCompletions"
+        }
+      }
+    },
+    {
+      "name": "files/diagnostics",
+      "x-capability": "files.diagnostics/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FileDiagnosticsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FileDiagnostics"
+        }
+      }
+    },
+    {
+      "name": "files/list",
+      "x-capability": "files/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FilesListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/DirectoryListing"
+        }
+      }
+    },
+    {
+      "name": "files/mention",
+      "x-capability": "files/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FileMentionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/files.schema.json#/definitions/FileMentionDTO"
+          }
+        }
+      }
+    },
+    {
+      "name": "files/read",
+      "x-capability": "files/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FilesReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FileReading"
+        }
+      }
+    },
+    {
+      "name": "files/readText",
+      "x-capability": "files/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FilesTextRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FilesText"
+        }
+      }
+    },
+    {
+      "name": "files/saveText",
+      "x-capability": "files/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FilesSaveTextRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "files/unwatch",
+      "x-capability": "files/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FilesWatchRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "files/watch",
+      "x-capability": "files/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FilesWatchRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "files/write",
+      "x-capability": "files/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FilesWriteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FilesWriteResponse"
+        }
+      }
+    },
+    {
+      "name": "folder/changed",
+      "x-capability": "folder/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "folder/removed",
+      "x-capability": "folder/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FolderRemovedNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "folders/add",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/AddFolderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/archive",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FolderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/bringBack",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/BringBackRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/BringBack"
+        }
+      }
+    },
+    {
+      "name": "folders/bringBackFrom",
+      "x-capability": "bring.back/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/BringBackFromRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/BringBackSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/bringingBack",
+      "x-capability": "bring.back/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/machines.schema.json#/definitions/BringBackNotification"
+          }
+        }
+      }
+    },
+    {
+      "name": "folders/clone",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/CloneRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/clones",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/machines.schema.json#/definitions/CloneSummary"
+          }
+        }
+      }
+    },
+    {
+      "name": "folders/delete",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FolderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "folders/find",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FoldersFindRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/machines.schema.json#/definitions/FoundFolder"
+          }
+        }
+      }
+    },
+    {
+      "name": "folders/keepGuardedChange",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/GuardedChangeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/list",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FoldersListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+          }
+        }
+      }
+    },
+    {
+      "name": "folders/notCommitted",
+      "x-capability": "folders.not-committed/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FolderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/NotCommittedResponse"
+        }
+      }
+    },
+    {
+      "name": "folders/readGuardedChange",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/GuardedChangeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/GuardedChangeReading"
+        }
+      }
+    },
+    {
+      "name": "folders/receive",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/ReceiveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/receiveState",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/ReceiveStateRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/ReceiveState"
+        }
+      }
+    },
+    {
+      "name": "folders/receiveUpload",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/ReceiveUploadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "folders/send",
+      "x-capability": "send/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SendRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/SendSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/sendFacts",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SendFactsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/SendFacts"
+        }
+      }
+    },
+    {
+      "name": "folders/sendPack",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SendPackRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/SendPack"
+        }
+      }
+    },
+    {
+      "name": "folders/sendRead",
+      "x-capability": "folders/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SendReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/SendRead"
+        }
+      }
+    },
+    {
+      "name": "folders/sends",
+      "x-capability": "send/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/machines.schema.json#/definitions/SendNotification"
+          }
+        }
+      }
+    },
+    {
+      "name": "folders/setDiskSpace",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SetDiskSpaceRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/setHelperLimits",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/SetHelperLimitsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/setPRCostComment",
+      "x-capability": "lineage.comment/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/SetPRCostCommentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/setPinned",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/SetPinnedRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/setProject",
+      "x-capability": "projects/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/SetFolderProjectRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/setWorkingHours",
+      "x-capability": "folders.working-hours/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/SetWorkingHoursRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/unarchive",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FolderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "folders/undoGuardedChange",
+      "x-capability": "folders/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/GuardedChangeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "git/fill",
+      "x-capability": "git/1",
+      "description": "Asked by the control plane on the lending host's channel 0, for a lend a person allowed (#1122).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/GitCredentialRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/GitCredential"
+        }
+      }
+    },
+    {
+      "name": "pages/changed",
+      "x-capability": "pages/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/PagesChangedNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "processes/list",
+      "x-capability": "processes/1",
+      "description": "The machine's CPU and memory, and the daemon's processes with each session's runtime and its children (#3453). Asked while a machine's page is open; nothing is kept between asks but each process's last CPU time.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/ProcessesState"
+        }
+      }
+    },
+    {
+      "name": "sandbox/changed",
+      "x-capability": "sandbox/1",
+      "x-notification": true,
+      "description": "The saved command-sandbox defaults (064).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/SandboxSettings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "sandbox/set",
+      "x-capability": "sandbox/1",
+      "description": "Save command-sandbox defaults. A default the catalog does not offer for that runtime is dropped. An agent's own choice is left as it is (064).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/SandboxSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/SandboxSettings"
+        }
+      }
+    },
+    {
+      "name": "sandbox/state",
+      "x-capability": "sandbox/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/SandboxSettings"
+        }
+      }
+    },
+    {
+      "name": "shell/attach",
+      "x-capability": "shell/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ShellAttachRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/ShellAttachResponse"
+        }
+      }
+    },
+    {
+      "name": "shell/close",
+      "x-capability": "shell/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ShellRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "shell/detach",
+      "x-capability": "shell/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ShellRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "shell/input",
+      "x-capability": "shell/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ShellInputRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "shell/list",
+      "x-capability": "shell/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/ShellListResponse"
+        }
+      }
+    },
+    {
+      "name": "shell/open",
+      "x-capability": "shell/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ShellAttachRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/ShellOpenResponse"
+        }
+      }
+    },
+    {
+      "name": "shell/output",
+      "x-capability": "shell/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ShellOutputNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "shell/resize",
+      "x-capability": "shell/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ShellResizeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "shell/restart",
+      "x-capability": "shell/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ShellAttachRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/ShellAttachResponse"
+        }
+      }
+    },
+    {
+      "name": "shell/signal",
+      "x-capability": "shell/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ShellSignalRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "shell/stateChanged",
+      "x-capability": "shell/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ShellStateNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "simulators/boot",
+      "x-capability": "simulators/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SimulatorRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "simulators/home",
+      "x-capability": "simulators/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SimulatorRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "simulators/list",
+      "x-capability": "simulators/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/SimulatorList"
+        }
+      }
+    },
+    {
+      "name": "simulators/screen",
+      "x-capability": "simulators/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SimulatorScreenRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/SimulatorScreen"
+        }
+      }
+    },
+    {
+      "name": "simulators/shutdown",
+      "x-capability": "simulators/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SimulatorRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "simulators/tap",
+      "x-capability": "simulators/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SimulatorTapRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "storage/writeFailed",
+      "x-capability": "storage/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/WriteFailure"
+          }
+        }
+      ]
+    },
+    {
+      "name": "worktrees/all",
+      "x-capability": "worktrees/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/reports.schema.json#/definitions/FolderWorktrees"
+          }
+        }
+      }
+    },
+    {
+      "name": "worktrees/check",
+      "x-capability": "worktrees/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/WorktreeRemovalRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/RemovalCheck"
+        }
+      }
+    },
+    {
+      "name": "worktrees/list",
+      "x-capability": "worktrees/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/WorktreesListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/WorktreesListResponse"
+        }
+      }
+    },
+    {
+      "name": "worktrees/remove",
+      "x-capability": "worktrees/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/WorktreeRemovalRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/WorktreeRemoved"
+        }
+      }
+    },
+    {
+      "name": "worktrees/removeBuildOutput",
+      "x-capability": "worktrees/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/WorktreeRemovalRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/BuildOutputRemoved"
+        }
+      }
+    },
+    {
+      "name": "worktrees/sized",
+      "x-capability": "worktrees/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/WorktreesSized"
+          }
+        }
+      ]
+    }
+  ]
+}
