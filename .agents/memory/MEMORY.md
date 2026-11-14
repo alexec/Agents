@@ -80,3 +80,5 @@ What agents learnt about this repo: its code, tools, process and decisions. One 
 - [Outside code is not built here](outside-code-is-not-built-here.md) — cloning/building SwiftDraw or running picosvg was refused; data tarballs are fine; prefer platform libraries (#4976)
 - [Never link node_modules into a worktree](never-link-node-modules-into-a-worktree.md) — the AgentsHost build's npm ci empties the link's target, the main checkout's packages (#5137)
 - [Chrome port 0 sets webdriver](chrome-port-zero-sets-webdriver.md) — Chrome 157 with --remote-debugging-port=0 says navigator.webdriver true; pick a free port, read /json/version (#5207)
+- [Ink drops Enter in a long write](ink-drops-enter-in-a-long-write.md) — claude setup-token lost the Enter sent with a real code; write the code, wait, then \r alone (#5202)
+- [Reach a codespace agentsd socket](reach-a-codespace-agentsd-socket.md) — gh codespace ssh -- -N -L forwards daemon.sock as control; server log path; no strace (ptrace_scope 1)
