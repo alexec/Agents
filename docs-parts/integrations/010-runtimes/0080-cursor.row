@@ -1,1 +1,1 @@
-| Cursor | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 2026.10.01-e373342: failed at turn, in `.agents/reviews/runtimes/cursor-2026-10-17.md` (skipped 2026-11-12: Cursor not signed in on this Mac) | `RuntimeCatalog.swift`, `runtimes.go` | |
+| Cursor | Mac, Remote, web, server | broken (fails at turn) | 2026-10-17, 2026.10.01-e373342: failed at turn, in `.agents/reviews/runtimes/cursor-2026-10-17.md` (skipped 2026-11-14: Cursor not signed in on this Mac) | `RuntimeCatalog.swift`, `runtimes.go` | |
