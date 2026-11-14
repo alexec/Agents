@@ -118,3 +118,12 @@ test("the empty states say why", () => {
     "Forgejo: Agent Loops does not read its CI runs yet, so there is nothing to draw for codeberg.org/scratch/app.");
   assert.equal(b.workflowShown(undefined, ["deploy.yml", "ci.yml"]), "ci.yml");
 });
+
+test("a Pipeline line's Build trends opens its run's drill-down (#5180)", () => {
+  const want = "repo=github:alexec/agents&range=month&drill=github:run:alexec/agents%23123";
+  assert.equal(b.buildsRunLinkQuery("github:alexec/agents/actions/run/123"), want);
+  assert.equal(b.buildsRunLinkQuery("github:run:alexec/agents#123"), want);
+  assert.equal(b.buildsRunLinkQuery("nonsense"), undefined);
+  assert.deepEqual(b.parseBuildsQuery(want).drill, { ref: "github:run:alexec/agents#123", against: undefined, job: undefined });
+  assert.match(b.buildsRunLinkHelp("release"), /release’s CI run/);
+});
