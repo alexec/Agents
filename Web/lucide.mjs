@@ -22,8 +22,8 @@ export const lucide = {
       }
       // Each child of a Lucide SVG is one empty element (`<path d="…" />`): its tag and its attributes.
       const body = svg.slice(svg.indexOf(">", svg.indexOf("<svg")) + 1, svg.lastIndexOf("</svg>"));
-      const icon = [...body.matchAll(/<([a-z]+)((?:\s+[a-z-]+="[^"]*")*)\s*\/>/g)].map(([, tag, attributes]) =>
-        [tag, Object.fromEntries([...attributes.matchAll(/([a-z-]+)="([^"]*)"/g)].map(([, name, value]) => [name, value]))]);
+      const icon = [...body.matchAll(/<([a-z]+)((?:\s+[a-z0-9-]+="[^"]*")*)\s*\/>/g)].map(([, tag, attributes]) =>
+        [tag, Object.fromEntries([...attributes.matchAll(/([a-z0-9-]+)="([^"]*)"/g)].map(([, name, value]) => [name, value]))]);
       if (icon.length === 0) return { errors: [{ text: `lucide-static's ${args.path}.svg has no elements we can read` }] };
       return { contents: `export default ${JSON.stringify(icon)};`, loader: "js" };
     });

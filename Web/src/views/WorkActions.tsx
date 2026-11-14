@@ -17,6 +17,7 @@ import { ViewDiff } from "./chat/ViewDiff";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Modal } from "./Modal";
 import { StateIcon } from "./WorkParts";
+import { Icon, type IconName } from "./Icon";
 
 const openLink = (url: string) => { window.open(url, "_blank", "noopener,noreferrer"); };
 
@@ -37,17 +38,17 @@ export function WorkLogSheet({ log, close }: { log: { title: string; text: strin
 /** A merge box row's glyph, in its sign's colour: a tick, a cross, an eye (a review to give), a dot (running), a
  * warning (conflicts), a clock (auto-merge), a page (a draft). */
 function MergeGlyph({ row }: { row: MergeRow }) {
-  const glyph = row.kind === "draft" ? "▤" : row.kind === "autoMerge" ? "◷" : row.kind === "review" && row.sign === "wait" ? "◉"
-    : row.kind === "conflicts" && row.sign === "fail" ? "⚠" : row.sign === "fail" ? "✕" : row.sign === "wait" ? "●" : "✓";
-  return <span class={`work-merge-glyph ${row.sign}`} aria-hidden="true">{glyph}</span>;
+  const icon: IconName = row.kind === "draft" ? "file-text" : row.kind === "autoMerge" ? "clock" : row.kind === "review" && row.sign === "wait" ? "circle-dot"
+    : row.kind === "conflicts" && row.sign === "fail" ? "triangle-alert" : row.sign === "fail" ? "x" : row.sign === "wait" ? "loader-circle" : "check";
+  return <span class={`work-merge-glyph ${row.sign}`} aria-hidden="true"><Icon name={icon} /></span>;
 }
 
-const checkGlyph = (state: string) => state === "passing" ? "✓" : state === "failing" ? "✕" : state === "running" ? "●" : "⊘";
+const checkIcon = (state: string): IconName => state === "passing" ? "check" : state === "failing" ? "x" : state === "running" ? "loader-circle" : "ban";
 const checkWord: Record<string, string> = { passing: "passed", failing: "failed", running: "running", skipped: "skipped" };
 
 /** A check's glyph in its sign's colour, its state said to a screen reader. */
 function CheckGlyph({ state }: { state: string }) {
-  return <span class={`work-merge-glyph ${checkSign(state)}`} role="img" aria-label={checkWord[state] ?? state}>{checkGlyph(state)}</span>;
+  return <span class={`work-merge-glyph ${checkSign(state)}`} role="img" aria-label={checkWord[state] ?? state}><Icon name={checkIcon(state)} /></span>;
 }
 
 /** A pull request's merge box (pull-request.md note 10), as the window's WorkMergeBox (#4406): a bordered box at the end
@@ -118,7 +119,7 @@ export function WorkMergeBox({ store, host, detail, box, writes, waiting = false
               <button type="button" class="work-merge-row link-row" onClick={checksPage} aria-label={`${row.title}: the checks`}>
                 <MergeGlyph row={row} />
                 <span class="words"><span class="strong">{row.title}</span>{row.line && <span class="quiet small">{row.line}</span>}</span>
-                <span class="quiet small">{checks.length} <span aria-hidden="true">›</span></span>
+                <span class="quiet small">{checks.length} <Icon name="chevron-right" /></span>
               </button>
             ) : (
               <div class="work-merge-row">
@@ -153,17 +154,17 @@ export function WorkMergeBox({ store, host, detail, box, writes, waiting = false
                   <span class={`split-button work-merge-button${box.waits ? " waits" : ""}`}>
                     <button type="button" class="prominent" disabled={busy.value} onClick={() => merge(methods[0], box.waits)}>{mergeMain(methods, box.waits)}</button>
                     <button type="button" class="prominent" disabled={busy.value || menu.length === 0} aria-label="More ways to merge"
-                      onClick={(e) => openContextMenu(e, menu)}>▾</button>
+                      onClick={(e) => openContextMenu(e, menu)}><Icon name="chevron-down" /></button>
                   </span>
                 )}
                 {box.resolve && item.url && <button type="button" onClick={() => openLink(`${item.url}/conflicts`)}>{resolveOnForge(node.ref)}</button>}
                 {box.approves && detail.head && (
                   <button type="button" class="work-approve" disabled={busy.value} onClick={() => void act("forge/approve", { node, sha: detail.head })}>
-                    <span aria-hidden="true">✓</span>Approve</button>
+                    <Icon name="check" />Approve</button>
                 )}
                 {box.reruns && (
                   <button type="button" class="work-rerun" disabled={busy.value} onClick={() => void act("forge/rerun", { node })}>
-                    <span aria-hidden="true">↻</span>Rerun failed</button>
+                    <Icon name="rotate-cw" />Rerun failed</button>
                 )}
                 {busy.value && <span class="work-spinner" aria-label="Working" />}
               </div>
@@ -204,7 +205,7 @@ export function WorkFilesChanged({ store, host, detail, row = false }: { store: 
         <svg class="work-files-glyph" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
           <path d="M5.5 1.75h5.25l3 3v7.5a1 1 0 0 1-1 1H5.5a1 1 0 0 1-1-1v-9.5a1 1 0 0 1 1-1ZM2.25 4.5v9.25a1 1 0 0 0 1 1h7" /></svg>
         {row ? <><span class="words">Files changed</span>{loading.value && <span class="work-spinner" aria-label="Loading" />}
-          {n !== undefined && <span class="quiet">{n}</span>}<span class="quiet" aria-hidden="true">›</span></>
+          {n !== undefined && <span class="quiet">{n}</span>}<Icon name="chevron-right" class="quiet" /></>
           : <>{filesChangedWords(n)}{loading.value && <span class="work-spinner" aria-label="Loading" />}</>}
       </button>
       {problem.value && <span class="hint failure small">{problem.value}</span>}
@@ -249,7 +250,7 @@ export function WorkChecksPage({ store, host, detail, writes, back, wrote }: {
     <section class="work-checks-page" aria-label="Checks">
       <div class="work-page-bar">
         <nav class="work-place" aria-label="Place">
-          <button type="button" class="link" onClick={back}><span aria-hidden="true">‹ </span>{shortRef(node.ref)}</button>
+          <button type="button" class="link" onClick={back}><Icon name="chevron-left" />{shortRef(node.ref)}</button>
         </nav>
       </div>
       <h2>Checks</h2>
@@ -259,7 +260,7 @@ export function WorkChecksPage({ store, host, detail, writes, back, wrote }: {
           onClick={() => void run(() => store.link.call("forge/rerun", { node }, host) as Promise<ForgeDone>, (done) => {
             said.value = { words: doneWords("forge/rerun", done), failed: false };
             wrote();
-          })}><span aria-hidden="true">↻</span>Rerun failed</button>
+          })}><Icon name="rotate-cw" />Rerun failed</button>
       )}
       {said.value && <p class={said.value.failed ? "hint failure small" : "quiet small"} role="status">{said.value.words}</p>}
       <ul class="work-checks-list">
@@ -270,7 +271,7 @@ export function WorkChecksPage({ store, host, detail, writes, back, wrote }: {
               <button type="button" disabled={!opens || busy.value} onClick={() => open(c)}
                 title={reads && c.state === "failing" ? "The end of this check's log" : c.url ? `Its page on ${forgeName(node.ref)}` : undefined}>
                 <CheckGlyph state={c.state} /><span class="name">{c.name}</span>
-                {opens && <span class="quiet" aria-hidden="true">›</span>}
+                {opens && <Icon name="chevron-right" class="quiet" />}
               </button>
             </li>
           );
@@ -337,7 +338,7 @@ export function WorkCommentBox({ store, host, node, closes, noun = "issue", said
           {(closes === "open" || closes === "closed") && (
             <button type="button" disabled={sending.value} onClick={() => void send(closes === "open" ? "close" : "reopen")}
               title={closes === "open" ? (noun === "issue" ? "Close it as completed" : "Close it without merging") : undefined}>
-              <span aria-hidden="true" class={`work-close-mark ${closes}${noun === "issue" ? "" : " pull"}`}>{closes === "open" ? (noun === "issue" ? "✓" : "✕") : "↺"}</span>{closeWords}</button>
+              <Icon name={closes === "open" ? (noun === "issue" ? "check" : "x") : "undo-2"} class={`work-close-mark ${closes}${noun === "issue" ? "" : " pull"}`} />{closeWords}</button>
           )}
           <button type="submit" class="prominent" disabled={sending.value || empty} title="Comment (⌘↩)">Comment</button>
         </div>
@@ -355,7 +356,7 @@ export function WorkStatusMenu({ state, status, transitions, busy, move }: {
   const menu = (event: MouseEvent) => openContextMenu(event, transitions.map((t): MenuItem => ({ label: t.name, run: () => move(t.id) })));
   return (
     <button type="button" class={`work-state work-status-menu ${state}`} disabled={busy || transitions.length === 0} onClick={menu}
-      title={transitions.length === 0 ? "No moves" : "Move it by its workflow"}>{status ?? "Status"} <span aria-hidden="true">▾</span></button>
+      title={transitions.length === 0 ? "No moves" : "Move it by its workflow"}>{status ?? "Status"} <Icon name="chevron-down" /></button>
   );
 }
 
@@ -401,7 +402,7 @@ export function WorkLabelsPicker({ store, host, node, has, close, pick }: {
             return (
               <button key={l.name} type="button" role="menuitemcheckbox" aria-checked={on} title={on ? "Take it off" : "Add it"}
                 onClick={() => pick(l.name, !on)}>
-                <span class="tick" aria-hidden="true">{on ? "✓" : ""}</span>
+                <span class="tick" aria-hidden="true">{on && <Icon name="check" />}</span>
                 <span class="work-label-dot" style={l.color ? { background: `#${l.color.replace(/^#/, "")}` } : undefined} aria-hidden="true" />
                 <span class="name">{l.name}</span>
               </button>
