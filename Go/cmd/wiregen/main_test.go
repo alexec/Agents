@@ -94,7 +94,7 @@ func TestGeneratedGoIsNotAligned(t *testing.T) {
 // A definition or a method out of name order is refused, so that a new one goes where its
 // name sorts and two features that each add one do not meet at the end (#2020).
 func TestDefinitionsAndMethodsAreInNameOrder(t *testing.T) {
-	if _, err := readDocument([]byte(`{"definitions": {"B": {"type": "string"}, "A": {"type": "string"}}}`)); err == nil || !strings.Contains(err.Error(), "put it before B") {
+	if _, err := readDocument(Part{Path: "t.schema.json", Data: []byte(`{"definitions": {"B": {"type": "string"}, "A": {"type": "string"}}}`)}); err == nil || !strings.Contains(err.Error(), "put it before B") {
 		t.Errorf("unsorted definitions: err = %v", err)
 	}
 	doc := &Document{Definitions: map[string]*Schema{}}

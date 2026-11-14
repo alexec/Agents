@@ -1,0 +1,4007 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agents.alexecollins.com/schema/workflows.schema.json",
+  "title": "The wire: workflows types",
+  "description": "Part of the source of every type on the wire (#1135, #5380): one file per domain in Packages/Wire/schema. A $ref to another file names it (core.schema.json#/definitions/JSONValue); scripts/wire.sh gen reads them all.",
+  "definitions": {
+    "AnswerElicitationRequest": {
+      "type": "object",
+      "properties": {
+        "requestID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "action": {
+          "$ref": "#/definitions/AnswerElicitationRequestAction"
+        },
+        "content": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "core.schema.json#/definitions/JSONValue"
+          }
+        },
+        "reason": {
+          "description": "Why the person declined, in their words (#4039): only with decline or cancel. The agent reads it.",
+          "type": "string"
+        },
+        "sendID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "requestID",
+        "action",
+        "content"
+      ],
+      "additionalProperties": false
+    },
+    "AnswerElicitationRequestAction": {
+      "type": "string",
+      "enum": [
+        "accept",
+        "decline",
+        "cancel"
+      ]
+    },
+    "AnswerRequest": {
+      "type": "object",
+      "properties": {
+        "permissionID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "optionID": {
+          "type": "string"
+        },
+        "sendID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "permissionID",
+        "optionID"
+      ],
+      "additionalProperties": false
+    },
+    "Approval": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/ApprovalKind"
+        },
+        "key": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "line": {
+          "type": "string"
+        },
+        "since": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ApprovalAction"
+          }
+        },
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "kind",
+        "key",
+        "title",
+        "line",
+        "actions"
+      ],
+      "additionalProperties": false
+    },
+    "ApprovalAction": {
+      "type": "string",
+      "enum": [
+        "approve",
+        "deny",
+        "requestChanges",
+        "dismiss"
+      ]
+    },
+    "ApprovalAnswer": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "kind": {
+          "$ref": "#/definitions/ApprovalKind"
+        },
+        "key": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/definitions/ApprovalAction"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder",
+        "kind",
+        "key",
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "ApprovalKind": {
+      "type": "string",
+      "enum": [
+        "mcpServer",
+        "workflow",
+        "plugin",
+        "file",
+        "archive",
+        "workflowFailed",
+        "deploy"
+      ]
+    },
+    "ApprovalReadRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "kind": {
+          "$ref": "#/definitions/ApprovalKind"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder",
+        "kind",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "Block": {
+      "type": "object",
+      "properties": {
+        "waits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Wait"
+          }
+        },
+        "deadline": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When the wait ends if its sessions have not (#5152; was checkAgainAt)."
+        },
+        "wakeOn": {
+          "$ref": "machines.schema.json#/definitions/BlockWakeOn"
+        },
+        "clearedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "clearedBy": {
+          "$ref": "#/definitions/BlockClearing"
+        }
+      },
+      "required": [
+        "waits"
+      ],
+      "additionalProperties": false
+    },
+    "BlockClearing": {
+      "type": "string",
+      "enum": [
+        "waits",
+        "time",
+        "dropped"
+      ]
+    },
+    "BusDelivery": {
+      "type": "object",
+      "description": "bus/deliver (#4729): one event on the bus that matched subscriptions of this machine, and which ones. Best effort: usually once, sometimes never, rarely twice.",
+      "properties": {
+        "event": {
+          "$ref": "#/definitions/BusEvent"
+        },
+        "subscriptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "event",
+        "subscriptions"
+      ],
+      "additionalProperties": false
+    },
+    "BusEvent": {
+      "type": "object",
+      "description": "An event on the bus (#4729, spec 4724-event-bus, \"The bus\"): its envelope, and its data sealed to the person's machines (#4825). The control plane reads only refs, names and times (principle 7, #4726) and opens no sealed copy; a machine with no copy of its own reads the subject's state now, by its ref.",
+      "properties": {
+        "specversion": {
+          "type": "string",
+          "description": "The CloudEvents version of the envelope (#4728, spec 4724-event-bus, \"An event\"): always \"1.0\"."
+        },
+        "id": {
+          "type": "string",
+          "description": "The event's ref (#4728): the subject's ref, \"@\", the type, and, when the same type can happen again to that thing, \"/\" and the provider's key for this one, such as github:pr:alexec/agents#4702@pr.commented/2457. It comes from the provider's data only, never from the machine or the clock, so two machines make the same id for the same happening."
+        },
+        "type": {
+          "type": "string",
+          "description": "The event's type, noun.verbed (#4728): the same as name, which stays for one release."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Who the event is about (#4728): github, jira, slack and so on; agents for the app's own events; server:<name> for an MCP server's event that says no subject."
+        },
+        "topic": {
+          "type": "string",
+          "description": "The provider's space (#4728, spec 4724-event-bus, \"Topics\"): a repo's full name, a Jira project, a Slack channel; the project or the machine for the app's own events. Lower case; can be empty."
+        },
+        "subject": {
+          "$ref": "core.schema.json#/definitions/Ref",
+          "description": "The ref of the thing the event happened to (#4728). None for an MCP server's event that says no subject."
+        },
+        "source": {
+          "type": "string",
+          "description": "provider:topic, as CloudEvents asks for one (#4728)."
+        },
+        "time": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When it happened, in RFC 3339 (#4728): the provider's own time when it says one."
+        },
+        "producer": {
+          "type": "string",
+          "description": "The machine that raised it (#4728), as agents:machine:#<machine>. Not part of the event's identity."
+        },
+        "sealed": {
+          "type": "array",
+          "items": {
+            "$ref": "org.schema.json#/definitions/BusSealedData"
+          },
+          "description": "The event's data (at most 256 KB), sealed by the machine that raised it to each machine of its person's lock (#4825). In bus/deliver, only the copy for the machine it goes to. None when the data is larger, or the machine has no lock."
+        },
+        "poll": {
+          "type": "string",
+          "description": "The producer lease of the poll that made it (#4731), when a machine polled a server for it: a hash of the folder's project, the server's name, the event and its filters, the same on every machine. The control plane delivers it to the machines that stand by on that poll. Not part of the event's identity."
+        }
+      },
+      "required": [
+        "specversion",
+        "id",
+        "type",
+        "provider",
+        "topic",
+        "source",
+        "time",
+        "producer"
+      ],
+      "additionalProperties": false
+    },
+    "BusLease": {
+      "type": "object",
+      "description": "bus/lease (#4731, spec 4724-event-bus, \"The bus\", step 6): the polls a machine is about to make, at most 100, each asking for its producer lease or renewing it, and the leases it lets go (its Mac goes to sleep, a subscription ended). The control plane gives each lease to one machine at a time, for 5 minutes from its last renewal.",
+      "properties": {
+        "polls": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The polls' keys (BusEvent.poll), each 1 to 128 bytes."
+        },
+        "release": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The keys of the leases this machine lets go. One another machine holds is left as it is."
+        }
+      },
+      "required": [
+        "polls"
+      ],
+      "additionalProperties": false
+    },
+    "BusLeased": {
+      "type": "object",
+      "description": "bus/lease's answer (#4731): who holds each poll's lease now, in the order asked.",
+      "properties": {
+        "leases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BusProducerLease"
+          }
+        }
+      },
+      "required": [
+        "leases"
+      ],
+      "additionalProperties": false
+    },
+    "BusLogPage": {
+      "type": "object",
+      "description": "bus/log's answer (#4732): envelopes of the caller's bus, newest first. Envelope only, as the bus keeps it: no data.",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BusEvent"
+          }
+        },
+        "next": {
+          "type": "string",
+          "description": "Where the next page back starts, as before; none when nothing older was read."
+        },
+        "hasMore": {
+          "type": "boolean",
+          "description": "Whether older envelopes are on the bus log."
+        }
+      },
+      "required": [
+        "events",
+        "hasMore"
+      ],
+      "additionalProperties": false
+    },
+    "BusLogQuery": {
+      "type": "object",
+      "description": "bus/log (#4732, spec 4724-event-bus, \"The bus log\"): a page of the caller's bus log, newest first, narrowed by the envelope's fields.",
+      "properties": {
+        "before": {
+          "type": "string",
+          "description": "The next of the page before: only envelopes older than it."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "At most this many; 100 when absent, never more than 500."
+        },
+        "provider": {
+          "type": "string",
+          "description": "Only events of this provider (#4732): github, jira, agents and so on."
+        },
+        "type": {
+          "type": "string",
+          "description": "Only events of this type (#4732), noun.verbed, or noun.* for every type of that noun."
+        },
+        "topic": {
+          "type": "string",
+          "description": "Only events on this topic (#4732), such as a repo's full name; lower case."
+        }
+      },
+      "additionalProperties": false
+    },
+    "BusProducerLease": {
+      "type": "object",
+      "description": "One producer lease (#4731): the machine that polls, until when, and whether it is the one that asked. A machine that is not the holder stands by: it does not poll, and the control plane delivers it what the holder's poll makes.",
+      "properties": {
+        "poll": {
+          "type": "string"
+        },
+        "holder": {
+          "type": "string",
+          "description": "The holder's machine id on the control plane."
+        },
+        "mine": {
+          "type": "boolean"
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "poll",
+        "holder",
+        "mine",
+        "until"
+      ],
+      "additionalProperties": false
+    },
+    "BusPublish": {
+      "type": "object",
+      "description": "bus/publish (#4729): events a machine recorded, at most 100 at a time, oldest first. Best effort: one not sent when it happened is never sent later.",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BusEvent"
+          }
+        }
+      },
+      "required": [
+        "events"
+      ],
+      "additionalProperties": false
+    },
+    "BusPublished": {
+      "type": "object",
+      "description": "bus/publish's answer (#4729): how many events were new on the bus, and how many were dropped as copies of one already on it (the same id).",
+      "properties": {
+        "kept": {
+          "type": "integer"
+        },
+        "dropped": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kept",
+        "dropped"
+      ],
+      "additionalProperties": false
+    },
+    "BusSubscribe": {
+      "type": "object",
+      "description": "bus/subscribe (#4729): every subscription of a machine, at most 1,000. It replaces the ones the machine sent before; an empty list ends them all. A machine sends it again after each connect, as the control plane keeps none across a restart.",
+      "properties": {
+        "subscriptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BusSubscription"
+          }
+        }
+      },
+      "required": [
+        "subscriptions"
+      ],
+      "additionalProperties": false
+    },
+    "BusSubscribed": {
+      "type": "object",
+      "description": "bus/subscribe's answer (#4729): how many subscriptions the control plane holds for the machine now.",
+      "properties": {
+        "count": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "count"
+      ],
+      "additionalProperties": false
+    },
+    "BusSubscription": {
+      "type": "object",
+      "description": "One subscription on the bus (#4729): a wait or a workflow trigger of a machine. Each field that is there must match the event's envelope; one that is not there matches every event.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The machine's own name for it, sent back with each event it matches."
+        },
+        "provider": {
+          "type": "string",
+          "description": "The event's provider: github, jira, agents and so on."
+        },
+        "type": {
+          "type": "string",
+          "description": "The event's type, noun.verbed, or noun.* for every type of that noun."
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The topics it is about; none for every topic. Lower case."
+        },
+        "subject": {
+          "$ref": "core.schema.json#/definitions/Ref",
+          "description": "The one thing it is about."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "CancelWaitRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
+    "ContentBlock": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "text"
+            },
+            "text": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "text"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "image"
+            },
+            "mimeType": {
+              "type": "string"
+            },
+            "data": {
+              "type": "string"
+            },
+            "uri": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "mimeType",
+            "data"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "audio"
+            },
+            "mimeType": {
+              "type": "string"
+            },
+            "data": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "mimeType",
+            "data"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "resource_link"
+            },
+            "uri": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "mimeType": {
+              "type": "string"
+            },
+            "size": {
+              "type": "number"
+            },
+            "annotations": {
+              "$ref": "#/definitions/ContentBlockAnnotations"
+            }
+          },
+          "required": [
+            "type",
+            "uri",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "resource"
+            },
+            "resource": {
+              "type": "object",
+              "properties": {
+                "uri": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "blob": {
+                  "type": "string"
+                },
+                "mimeType": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "uri"
+              ],
+              "additionalProperties": false
+            },
+            "annotations": {
+              "$ref": "#/definitions/ContentBlockAnnotations"
+            }
+          },
+          "required": [
+            "type",
+            "resource"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "ContentBlock (ACP/ContentBlock.swift): the protocol's own block shapes, as sent. A block of a kind this build doesn't know is written back as it came, so any other `type` may arrive."
+    },
+    "ContentBlockAnnotations": {
+      "type": "object",
+      "properties": {
+        "audience": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "priority": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DeclareResourceRequest": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "$ref": "#/definitions/DeclaredResource"
+        },
+        "replacing": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "resource"
+      ],
+      "additionalProperties": false
+    },
+    "DeclaredResource": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/ResourceName"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "holders": {
+          "type": "integer"
+        },
+        "defaultMinutes": {
+          "type": "integer"
+        },
+        "maximumMinutes": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "displayName",
+        "description",
+        "holders"
+      ],
+      "additionalProperties": false
+    },
+    "DeployCheckEvent": {
+      "type": "object",
+      "description": "check.changed's details (#5262): the check, and what it is on: the deploy's ref when it is a deploy's check, and the target either way. component, environment and tier are the target's, flat, so a wait or a trigger can narrow by them.",
+      "properties": {
+        "check": {
+          "$ref": "sessions.schema.json#/definitions/DeployCheck"
+        },
+        "deploy": {
+          "type": "string"
+        },
+        "target": {
+          "$ref": "core.schema.json#/definitions/DeployTarget"
+        },
+        "component": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "core.schema.json#/definitions/EnvironmentTier"
+        }
+      },
+      "required": [
+        "check",
+        "target",
+        "component",
+        "environment",
+        "tier"
+      ],
+      "additionalProperties": false
+    },
+    "DeployEvent": {
+      "type": "object",
+      "description": "deploy.started, deploy.succeeded and deploy.failed's details (#5262), and deploy.waiting's beside its own: the deploy, and its target's component, environment and tier, flat, so a wait or a trigger can narrow by them (tier: production). outcome is deploy.failed's: failed or cancelled.",
+      "properties": {
+        "deploy": {
+          "$ref": "core.schema.json#/definitions/Deploy"
+        },
+        "component": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "core.schema.json#/definitions/EnvironmentTier"
+        },
+        "outcome": {
+          "$ref": "core.schema.json#/definitions/DeployOutcome"
+        }
+      },
+      "required": [
+        "deploy",
+        "component",
+        "environment",
+        "tier"
+      ],
+      "additionalProperties": false
+    },
+    "DestinationStateAnswer": {
+      "type": "object",
+      "properties": {
+        "destinationState": {
+          "$ref": "core.schema.json#/definitions/DestinationState"
+        }
+      },
+      "required": [
+        "destinationState"
+      ],
+      "additionalProperties": false
+    },
+    "DiscardDraftRequest": {
+      "type": "object",
+      "properties": {
+        "draftID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "draftID"
+      ],
+      "additionalProperties": false
+    },
+    "DraftCheck": {
+      "type": "object",
+      "properties": {
+        "passed": {
+          "type": "boolean"
+        },
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "$ref": "machines.schema.json#/definitions/MachineInfo"
+          }
+        },
+        "problem": {
+          "type": "string"
+        },
+        "ssh": {
+          "type": "string"
+        },
+        "noSSH": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "passed"
+      ],
+      "additionalProperties": false
+    },
+    "DraftOptionsNotification": {
+      "type": "object",
+      "properties": {
+        "draftID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "sessions.schema.json#/definitions/ConfigOption"
+          }
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "sessions.schema.json#/definitions/SlashCommand"
+          }
+        },
+        "failure": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "draftID",
+        "options",
+        "commands"
+      ],
+      "additionalProperties": false
+    },
+    "DraftQuestion": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "start",
+            "stop",
+            "check"
+          ]
+        },
+        "workspace": {
+          "type": "string"
+        },
+        "cost": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "yes": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "text",
+        "yes"
+      ],
+      "additionalProperties": false
+    },
+    "DraftStep": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "read",
+            "help",
+            "check",
+            "ask",
+            "prove",
+            "note"
+          ]
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "at",
+        "kind",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "DriveApproval": {
+      "type": "string",
+      "description": "Whether an agent's lease of the browser or the screen waits on a person (#4264). ask: each lease opens a Needs you request of kind approve (secretUse, use browser or screen), the default on a machine that a person uses; always: it never asks, the default on a machine that only agents use (a bot's machine, a Codespace), where ask counts as always, as nobody answers there; off: the tools are not offered, and are refused.",
+      "enum": [
+        "ask",
+        "always",
+        "off"
+      ]
+    },
+    "ElicitationAnswer": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string"
+        },
+        "answer": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "question",
+        "answer"
+      ],
+      "additionalProperties": false
+    },
+    "ElicitationHandOff": {
+      "description": "An agent's hand_to_person (#3529): one step the person does on the page in the machine's browser (solve a CAPTCHA, sign in). The form's one choice is Done or Can't do it; a client that can show the machine's browser offers Open the page, unless the step is in another window (window).",
+      "type": "object",
+      "properties": {
+        "step": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "window": {
+          "description": "Where the person does the step when it is not in the machine's browser (#5095): one of the agents' own Chrome windows, as \"the agents' Chrome (DevTools port 9233), at the tab “Create account”\". A client then offers no Open the page and says this window instead.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step"
+      ],
+      "additionalProperties": false
+    },
+    "ElicitationNotification": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "requestID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "request": {
+          "$ref": "#/definitions/ElicitationRequest"
+        }
+      },
+      "required": [
+        "agentID",
+        "requestID"
+      ],
+      "additionalProperties": false
+    },
+    "ElicitationRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "elicitationID": {
+          "type": "string"
+        },
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "message": {
+          "type": "string"
+        },
+        "mode": {
+          "$ref": "#/definitions/ElicitationRequestMode"
+        },
+        "scope": {
+          "$ref": "#/definitions/ElicitationRequestScope"
+        },
+        "askedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "secret": {
+          "$ref": "org.schema.json#/definitions/ElicitationSecret"
+        },
+        "handOff": {
+          "$ref": "#/definitions/ElicitationHandOff"
+        }
+      },
+      "required": [
+        "id",
+        "agentID",
+        "mode",
+        "scope",
+        "askedAt"
+      ],
+      "additionalProperties": false
+    },
+    "ElicitationRequestMode": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "form": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/ElicitationSchema"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "form"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "url"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ElicitationRequestScope": {
+      "type": "string",
+      "enum": [
+        "session",
+        "request"
+      ]
+    },
+    "ElicitationSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "properties": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ElicitationSchemaProperty"
+          }
+        }
+      },
+      "required": [
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "ElicitationSchemaProperty": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "isRequired": {
+          "type": "boolean"
+        },
+        "kind": {
+          "$ref": "#/definitions/ElicitationSchemaPropertyKind"
+        },
+        "defaultValue": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "name",
+        "isRequired",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "ElicitationSchemaPropertyChoice": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "ElicitationSchemaPropertyFormat": {
+      "type": "string",
+      "enum": [
+        "email",
+        "uri",
+        "date",
+        "date-time"
+      ]
+    },
+    "ElicitationSchemaPropertyKind": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "string": {
+              "type": "object",
+              "properties": {
+                "format": {
+                  "$ref": "#/definitions/ElicitationSchemaPropertyFormat"
+                },
+                "minLength": {
+                  "type": "integer"
+                },
+                "maxLength": {
+                  "type": "integer"
+                },
+                "choices": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/ElicitationSchemaPropertyChoice"
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "string"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "number": {
+              "type": "object",
+              "properties": {
+                "minimum": {
+                  "type": "number"
+                },
+                "maximum": {
+                  "type": "number"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "number"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "integer": {
+              "type": "object",
+              "properties": {
+                "minimum": {
+                  "type": "integer"
+                },
+                "maximum": {
+                  "type": "integer"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "integer"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "boolean": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "boolean"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "multiSelect": {
+              "type": "object",
+              "properties": {
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/ElicitationSchemaPropertyChoice"
+                  }
+                },
+                "minItems": {
+                  "type": "integer"
+                },
+                "maxItems": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "items"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "multiSelect"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "EventDraft": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "scope": {
+          "$ref": "#/definitions/EventScope"
+        },
+        "sentence": {
+          "type": "string"
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "message": {
+          "type": "string"
+        },
+        "chainDepth": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "at",
+        "scope",
+        "sentence",
+        "details",
+        "chainDepth"
+      ],
+      "additionalProperties": false
+    },
+    "EventPattern": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "filters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "anyOf": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "provider": {
+          "type": "string",
+          "description": "Only events of this provider (#4730): github, jira, agents and so on. With provider, topics or subject the pattern also hears the person's other machines' events, on the bus."
+        },
+        "topics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Only events about one of these topics (#4730), lower case: a repo's full name, a Jira project, a Slack channel."
+        },
+        "subject": {
+          "$ref": "core.schema.json#/definitions/Ref",
+          "description": "Only events about this one thing (#4730)."
+        },
+        "debounce": {
+          "type": "number",
+          "description": "Seconds (#4730): a burst of matches on one subject and type is held this long and delivered once, the last one, with how many came. Best effort."
+        }
+      },
+      "required": [
+        "name",
+        "filters"
+      ],
+      "additionalProperties": false,
+      "description": "EventPattern (Model/EventPattern.swift), as its encode(to:) writes it (073): `filters` holds every filter as one string, a list joined by `|` so an older build reads it as a value that never matches, and `anyOf` holds the lists whole. Read `anyOf` over `filters`."
+    },
+    "EventPublisher": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "EventRaiseRequest": {
+      "type": "object",
+      "properties": {
+        "draft": {
+          "$ref": "#/definitions/EventDraft"
+        },
+        "consequences": {
+          "type": "array",
+          "items": {
+            "$ref": "org.schema.json#/definitions/Consequence"
+          }
+        }
+      },
+      "required": [
+        "draft"
+      ],
+      "additionalProperties": false
+    },
+    "EventScope": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "mac": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "mac"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "folder": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "core.schema.json#/definitions/URLString"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "folder"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "EventWait": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "patterns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EventPattern"
+          }
+        },
+        "from": {
+          "type": "integer"
+        },
+        "deadline": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "since": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "ending": {
+          "$ref": "#/definitions/EventWaitEnding"
+        },
+        "resumePromptID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "serverEvents": {
+          "type": "array",
+          "items": {
+            "$ref": "machines.schema.json#/definitions/WaitServerEvent"
+          }
+        },
+        "forPerson": {
+          "type": "boolean",
+          "description": "Only the connected person can carry this on (#3051): review.requested or issue.assigned today. Left out or false for everything else."
+        }
+      },
+      "required": [
+        "id",
+        "patterns",
+        "from",
+        "since"
+      ],
+      "additionalProperties": false
+    },
+    "EventWaitEnding": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "matched": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "integer"
+                },
+                "extraMatches": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "position",
+                "extraMatches"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "matched"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "timedOut": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "timedOut"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cancelled": {
+              "type": "object",
+              "properties": {
+                "by": {
+                  "$ref": "#/definitions/EventWaitEndingCanceller"
+                }
+              },
+              "required": [
+                "by"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "cancelled"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "couldNotWake": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "couldNotWake"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "EventWaitEndingCanceller": {
+      "type": "string",
+      "enum": [
+        "agent",
+        "person",
+        "prompt",
+        "stopped",
+        "archived",
+        "archiveRequested"
+      ]
+    },
+    "EventsChange": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "$ref": "core.schema.json#/definitions/Event"
+        },
+        "waiting": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WaitingAgent"
+          }
+        }
+      },
+      "required": [
+        "waiting"
+      ],
+      "additionalProperties": false
+    },
+    "EventsListRequest": {
+      "type": "object",
+      "properties": {
+        "before": {
+          "type": "integer"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "scope": {
+          "$ref": "#/definitions/EventScope"
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "org.schema.json#/definitions/EventGroup"
+          }
+        }
+      },
+      "required": [
+        "limit"
+      ],
+      "additionalProperties": false
+    },
+    "EventsPage": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/Event"
+          }
+        },
+        "waiting": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WaitingAgent"
+          }
+        },
+        "producer": {
+          "type": "string",
+          "description": "This machine's producer ref (#4732), agents:machine:#<machine>, as its own events say it: an event whose producer is another says which machine raised it."
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "events",
+        "waiting",
+        "hasMore"
+      ],
+      "additionalProperties": false
+    },
+    "Goal": {
+      "type": "object",
+      "properties": {
+        "objective": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/definitions/GoalStatus"
+        },
+        "iterations": {
+          "type": "integer",
+          "description": "How many turns it took towards the goal, where the runtime counts them."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why it last stopped or paused, in the runtime's words."
+        },
+        "tokensUsed": {
+          "type": "integer"
+        },
+        "tokenBudget": {
+          "type": "integer",
+          "description": "The tokens it can use on the goal, when it has a budget."
+        },
+        "timeUsedSeconds": {
+          "type": "number"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When the host last heard of it."
+        }
+      },
+      "required": [
+        "objective",
+        "status",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "GoalStatus": {
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "blocked",
+        "limited",
+        "complete"
+      ],
+      "description": "Where a goal stands (#2742): active (it can drive more work, whether or not a turn runs now), paused, blocked, limited (a usage or token budget ran out) or complete."
+    },
+    "KeepRequest": {
+      "type": "object",
+      "description": "machines/keep: a request for a stopped host, kept until it is up. signed is the same request signed by the client (#3492, D6): a host that holds its person's lock takes only that, so the control plane keeps and delivers it as it is.",
+      "properties": {
+        "host": {
+          "$ref": "machines.schema.json#/definitions/MachineRef"
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "signed": {
+          "$ref": "org.schema.json#/definitions/LockDelivery"
+        }
+      },
+      "required": [
+        "host",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "KeptDelivered": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "$ref": "machines.schema.json#/definitions/MachineRef"
+        },
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "host",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "KeptList": {
+      "type": "object",
+      "properties": {
+        "kept": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/KeptRequest"
+          }
+        }
+      },
+      "required": [
+        "kept"
+      ],
+      "additionalProperties": false
+    },
+    "KeptRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "host": {
+          "$ref": "machines.schema.json#/definitions/MachineRef"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "text": {
+          "type": "string"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "runtimeID": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "failed": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "host",
+        "kind",
+        "text",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "KeptRequestID": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "$ref": "machines.schema.json#/definitions/MachineRef"
+        },
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "host",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Lease": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "$ref": "#/definitions/ResourceName"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "holder": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "grantedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "expiresAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "warned": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "resource",
+        "displayName",
+        "holder",
+        "grantedAt",
+        "expiresAt",
+        "warned"
+      ],
+      "additionalProperties": false
+    },
+    "LeaseNameRequest": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "LeaseNote": {
+      "type": "object",
+      "properties": {
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "note"
+      ],
+      "additionalProperties": false
+    },
+    "LeaseRequest": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "minutes": {
+          "type": "integer"
+        },
+        "wait": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "token",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "LeaseSnapshot": {
+      "type": "object",
+      "properties": {
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ResourceState"
+          }
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "resources",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "LeaseTokenRequest": {
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "token"
+      ],
+      "additionalProperties": false
+    },
+    "Need": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/NeedID"
+        },
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "kind": {
+          "$ref": "#/definitions/NeedKind"
+        },
+        "raisedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "headline": {
+          "$ref": "reports.schema.json#/definitions/Headline"
+        }
+      },
+      "required": [
+        "id",
+        "folder",
+        "kind",
+        "raisedAt",
+        "headline"
+      ],
+      "additionalProperties": false
+    },
+    "NeedKind": {
+      "type": "string",
+      "enum": [
+        "permission",
+        "elicitation",
+        "report",
+        "guardedChange",
+        "notice",
+        "request"
+      ]
+    },
+    "PinArrangeWorkflowsRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "workflowIDs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "workflowIDs"
+      ],
+      "additionalProperties": false
+    },
+    "Plan": {
+      "type": "object",
+      "properties": {
+        "planID": {
+          "type": "string"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "sessions.schema.json#/definitions/PlanEntry"
+          }
+        },
+        "state": {
+          "$ref": "#/definitions/PlanState"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "entries",
+        "state",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "PlanState": {
+      "type": "string",
+      "enum": [
+        "current",
+        "withdrawn"
+      ]
+    },
+    "QuickAnswer": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/QuickAnswerKind"
+        },
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "isDestructive": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "title",
+        "isDestructive"
+      ],
+      "additionalProperties": false
+    },
+    "QuickAnswerKind": {
+      "type": "string",
+      "enum": [
+        "choice",
+        "reply"
+      ]
+    },
+    "RemoveRequestList": {
+      "type": "object",
+      "description": "people/removeRequests (#1002): the Remove requests waiting for an admin, oldest first.",
+      "properties": {
+        "requests": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/RemoveRequest"
+          }
+        }
+      },
+      "required": [
+        "requests"
+      ],
+      "additionalProperties": false
+    },
+    "RemoveResourceRequest": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "RequestAnswer": {
+      "type": "object",
+      "description": "One of the answers: form for a question, a secret or a step (#3863); checklist and approval for a forge item (#3865); secretUse for the use of a secret with Ask before use (#4015).",
+      "properties": {
+        "form": {
+          "$ref": "#/definitions/RequestFormAnswer"
+        },
+        "checklist": {
+          "$ref": "#/definitions/RequestChecklistAnswer"
+        },
+        "approval": {
+          "$ref": "#/definitions/RequestApprovalAnswer"
+        },
+        "secretUse": {
+          "$ref": "org.schema.json#/definitions/RequestSecretUseAnswer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RequestApprovalAnswer": {
+      "type": "object",
+      "description": "A needs-approval pull request's answer: approve adds approved, changes adds changes-wanted; the note is the person's comment on it.",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "approve",
+            "changes"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "RequestChecklistAnswer": {
+      "type": "object",
+      "description": "The checklist's lines now ticked, by index. When every line is ticked, the request is answered.",
+      "properties": {
+        "done": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      },
+      "required": [
+        "done"
+      ],
+      "additionalProperties": false
+    },
+    "RequestChecklistLine": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "done": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "text",
+        "done"
+      ],
+      "additionalProperties": false
+    },
+    "RequestDeferral": {
+      "type": "object",
+      "description": "When a deferred request comes back (#4233): at until, or when the person is next at the Mac (atMac: the Mac's presence changes from not here to here), whichever is first.",
+      "properties": {
+        "until": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "atMac": {
+          "type": "boolean"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When it was deferred."
+        },
+        "by": {
+          "$ref": "org.schema.json#/definitions/AuditActor"
+        }
+      },
+      "required": [
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "RequestDetail": {
+      "type": "object",
+      "description": "The part of a request that depends on its source.",
+      "properties": {
+        "elicitation": {
+          "$ref": "#/definitions/ElicitationRequest"
+        },
+        "secretUse": {
+          "$ref": "org.schema.json#/definitions/RequestSecretUse"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RequestDroppedWhy": {
+      "type": "string",
+      "enum": [
+        "askerEnded",
+        "folderArchived",
+        "forgeClosed",
+        "restarted",
+        "byPerson"
+      ]
+    },
+    "RequestFormAnswer": {
+      "type": "object",
+      "description": "The answer elicitations/answer takes, for a question, a secret or a step.",
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/AnswerElicitationRequestAction"
+        },
+        "content": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "core.schema.json#/definitions/JSONValue"
+          }
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "RequestKind": {
+      "type": "string",
+      "enum": [
+        "decide",
+        "approve",
+        "account",
+        "step",
+        "secret"
+      ]
+    },
+    "RequestSource": {
+      "type": "string",
+      "enum": [
+        "question",
+        "secret",
+        "handOff",
+        "permission",
+        "guardedChange",
+        "forge",
+        "secretUse"
+      ]
+    },
+    "RequestState": {
+      "type": "string",
+      "enum": [
+        "open",
+        "answered",
+        "dropped"
+      ]
+    },
+    "RequestWaiter": {
+      "type": "object",
+      "properties": {
+        "agent": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "since": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "agent",
+        "since"
+      ],
+      "additionalProperties": false
+    },
+    "RequestsAnswer": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "answer": {
+          "$ref": "#/definitions/RequestAnswer"
+        }
+      },
+      "required": [
+        "id",
+        "answer"
+      ],
+      "additionalProperties": false
+    },
+    "RequestsDefer": {
+      "type": "object",
+      "description": "Later (#4233): until, atMac or both; until is after now.",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "until": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "atMac": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "RequestsDrop": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "why": {
+          "$ref": "#/definitions/RequestDroppedWhy"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "RequestsList": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/RequestsListState"
+        },
+        "folder": {
+          "type": "string",
+          "description": "Only this folder's, by URL."
+        }
+      },
+      "additionalProperties": false
+    },
+    "RequestsListResult": {
+      "type": "object",
+      "properties": {
+        "requests": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/Request"
+          }
+        }
+      },
+      "required": [
+        "requests"
+      ],
+      "additionalProperties": false
+    },
+    "RequestsListState": {
+      "type": "string",
+      "description": "open (the default), ended, or all.",
+      "enum": [
+        "open",
+        "ended",
+        "all"
+      ]
+    },
+    "RequestsUndefer": {
+      "type": "object",
+      "description": "Bring back now (#4233).",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "ResourceKind": {
+      "type": "string",
+      "enum": [
+        "screen",
+        "simulator",
+        "browser",
+        "named"
+      ]
+    },
+    "ResourceName": {
+      "type": "string",
+      "description": "ResourceName (Model/Lease.swift): the name, trimmed and lower-cased, as a single string.",
+      "x-ts-type": "string & { readonly __brand: \"ResourceName\" }"
+    },
+    "ResourceState": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/definitions/ResourceName"
+        },
+        "kind": {
+          "$ref": "#/definitions/ResourceKind"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "isGone": {
+          "type": "boolean"
+        },
+        "holds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Lease"
+          }
+        },
+        "lease": {
+          "$ref": "#/definitions/Lease"
+        },
+        "places": {
+          "type": "number"
+        },
+        "declared": {
+          "$ref": "#/definitions/DeclaredResource"
+        },
+        "line": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/LineMember"
+          }
+        },
+        "endingSoon": {
+          "type": "boolean"
+        },
+        "capacityWait": {
+          "type": "string",
+          "description": "Why its line waits for the machine, not for a holder (#4579, #4748): \"this Mac is near capacity\", \"this Mac is at capacity\", or \"this Mac has capacity again\" while the line is served one a look. Only on a compute resource (capacity, build) with a free place and a line; absent otherwise and from a host from before #4748."
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "displayName",
+        "isGone",
+        "line",
+        "endingSoon"
+      ],
+      "additionalProperties": false,
+      "description": "ResourceState (Daemon/DaemonAPI.swift), as its encode(to:) writes it (#116): every holder in `holds`, and the first again as `lease` for a reader from before counted holders. A host from before #116 sends only `lease`, so `holds`, `places` and `declared` may be missing."
+    },
+    "ServedRequestKind": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "readFile": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "readFile"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "writeFile": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "byteCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "path",
+                "byteCount"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "writeFile"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "runCommand": {
+              "type": "object",
+              "properties": {
+                "command": {
+                  "type": "string"
+                },
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "command",
+                "args"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "runCommand"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ServedRequestOutcome": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "served": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "served"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "refused": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "refused"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "failed": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "failed"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TeamTrigger": {
+      "type": "object",
+      "description": "workflows/trigger and workflows/fire (#2011, spec 736 FR-035): a folder or control-plane event (a server's, such as github or a channel's) or a schedule that a runs-on: workflow's trigger matched. A machine sends it to the control plane, which sends it once to one of the bot's machines. workflow is the folder's name and the workflow's id; trigger, the same words on every machine that heard it; event, the event (none for a schedule); dueAt, a schedule's due time.",
+      "properties": {
+        "workflow": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": "string"
+        },
+        "runsOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "event": {
+          "$ref": "core.schema.json#/definitions/Event"
+        },
+        "dueAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "workflow",
+        "trigger",
+        "runsOn"
+      ],
+      "additionalProperties": false
+    },
+    "TeamTriggerFired": {
+      "type": "object",
+      "description": "workflows/fire's answer: ran is true when the machine took the trigger (it runs it, or records why not, as for any trigger); false when it cannot take it here (no such workflow, or runs-on: does not match this machine), and the control plane tries another.",
+      "properties": {
+        "ran": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ran"
+      ],
+      "additionalProperties": false
+    },
+    "TeamTriggerSent": {
+      "type": "object",
+      "description": "workflows/trigger's answer: taken is true when runs-on: names a bot, and the control plane sends the trigger once to one of its machines; false when it names none, and the machine goes on as before.",
+      "properties": {
+        "taken": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "taken"
+      ],
+      "additionalProperties": false
+    },
+    "TeamWorkflowRuns": {
+      "type": "object",
+      "description": "One workflow a bot ran in the last 7 days (#1804, M6): how many times, and when last.",
+      "properties": {
+        "workflow": {
+          "type": "string"
+        },
+        "runs": {
+          "type": "integer"
+        },
+        "lastRunAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "workflow",
+        "runs"
+      ],
+      "additionalProperties": false
+    },
+    "TeamWorkflows": {
+      "type": "object",
+      "description": "console/teamWorkflows' answer (#1804, M6): every bot, for an admin.",
+      "properties": {
+        "bots": {
+          "type": "array",
+          "items": {
+            "$ref": "connections.schema.json#/definitions/TeamBot"
+          }
+        }
+      },
+      "required": [
+        "bots"
+      ],
+      "additionalProperties": false
+    },
+    "ViewResource": {
+      "type": "object",
+      "properties": {
+        "uri": {
+          "type": "string"
+        },
+        "mimeType": {
+          "type": "string"
+        },
+        "html": {
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "org.schema.json#/definitions/AppViewPolicy"
+        },
+        "prefersBorder": {
+          "type": "boolean"
+        },
+        "variables": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "uri",
+        "mimeType",
+        "html",
+        "policy",
+        "variables"
+      ],
+      "additionalProperties": false
+    },
+    "Wait": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "nameAtReport": {
+          "type": "string"
+        },
+        "ending": {
+          "$ref": "#/definitions/WaitEnding"
+        }
+      },
+      "required": [
+        "agentID",
+        "nameAtReport"
+      ],
+      "additionalProperties": false
+    },
+    "WaitEnding": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "how": {
+          "$ref": "#/definitions/WaitEndingHow"
+        }
+      },
+      "required": [
+        "at",
+        "how"
+      ],
+      "additionalProperties": false
+    },
+    "WaitEndingHow": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "finished": {
+              "type": "object",
+              "properties": {
+                "outcome": {
+                  "$ref": "reports.schema.json#/definitions/WorkOutcome"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "finished"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "stopped": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "sessions.schema.json#/definitions/EndedReason"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "stopped"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "archived": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "archived"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "gone": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "gone"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WaitStatus": {
+      "type": "object",
+      "properties": {
+        "line": {
+          "type": "string"
+        },
+        "mark": {
+          "type": "string"
+        },
+        "cancellable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "line",
+        "mark",
+        "cancellable"
+      ],
+      "additionalProperties": false
+    },
+    "WaitingAgent": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "title": {
+          "type": "string"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "status": {
+          "$ref": "#/definitions/WaitStatus"
+        }
+      },
+      "required": [
+        "agentID",
+        "title",
+        "folder",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "Workflow": {
+      "type": "object",
+      "properties": {
+        "workflowID": {
+          "type": "string"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "name": {
+          "type": "string"
+        },
+        "triggers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkflowTrigger"
+          }
+        },
+        "mode": {
+          "$ref": "#/definitions/WorkflowMode"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "problem": {
+          "$ref": "#/definitions/WorkflowProblem"
+        },
+        "unknownFields": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "core.schema.json#/definitions/JSONValue"
+          }
+        },
+        "settings": {
+          "$ref": "#/definitions/WorkflowSettings"
+        },
+        "cooldown": {
+          "type": "number"
+        },
+        "hours": {
+          "$ref": "#/definitions/WorkflowHours"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "archived": {
+          "type": "boolean"
+        },
+        "whenDone": {
+          "$ref": "#/definitions/WorkflowWhenDone"
+        },
+        "continueWhenBack": {
+          "description": "`continue-when-back: true`: a run's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918).",
+          "type": "boolean"
+        },
+        "muted": {
+          "description": "`muted: true`: every run of the workflow starts muted (#2003), and muting or unmuting the workflow mutes or unmutes its runs.",
+          "type": "boolean"
+        },
+        "runsOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "runs-on: (#1761, FR-034), which replaced hosts:: labels a machine must all have to run it: its id, its os (macos, linux), its provider, and its user's or bot's name. None runs on every machine of each person who turned it on."
+        }
+      },
+      "required": [
+        "workflowID",
+        "folder",
+        "name",
+        "triggers",
+        "mode",
+        "prompt",
+        "unknownFields",
+        "settings"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowApproval": {
+      "type": "object",
+      "properties": {
+        "digest": {
+          "type": "string"
+        },
+        "isNew": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "digest",
+        "isNew"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowApproveRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "workflowID": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder",
+        "workflowID",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowArchiveRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "workflowID": {
+          "type": "string"
+        },
+        "archived": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "workflowID",
+        "archived"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowCause": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "byHand": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "byHand"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "trigger": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/WorkflowTrigger"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "trigger"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WorkflowClaim": {
+      "type": "object",
+      "description": "workflows/claimRun (#1761, FR-034): a machine asks to run a runs-on: workflow for one trigger. The first to ask wins; the trigger is the same words on every machine that heard it.",
+      "properties": {
+        "workflow": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "workflow",
+        "trigger"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowClaimed": {
+      "type": "object",
+      "description": "workflows/claimRun's answer: won is false when another machine runs it.",
+      "properties": {
+        "won": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "won"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowEnableRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "workflowID": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "workflowID",
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowHours": {
+      "type": "object",
+      "description": "hours: (#4818): when a workflow may start, as the file says it. A fire outside it is held, and starts when it opens; Run now always runs.",
+      "properties": {
+        "between": {
+          "type": "string",
+          "description": "As the file says it, \"09:00-18:00\"; it can go past midnight, \"18:00-09:00\". Absent is the whole day."
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/Weekday"
+          },
+          "description": "The days its window starts on. Absent is every day."
+        },
+        "timeZone": {
+          "type": "string",
+          "description": "time-zone:, an IANA name. Absent is the person's timeZone setting, else the host's zone."
+        },
+        "named": {
+          "$ref": "#/definitions/WorkflowHoursName",
+          "description": "hours: working or hours: not-working (#4821): the project's working hours (Folder.workingHours), or every time outside them. With it, between, days and timeZone are absent."
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkflowHoursName": {
+      "type": "string",
+      "enum": [
+        "working",
+        "not-working"
+      ],
+      "description": "A named window in a workflow's hours: (#4821)."
+    },
+    "WorkflowLimit": {
+      "type": "string",
+      "enum": [
+        "folder"
+      ]
+    },
+    "WorkflowLimitSettings": {
+      "type": "object",
+      "description": "How many approved workflows may be turned on in each folder. An unset value means 20. The range is 1 to 100. Kept in workflow-limit.json.",
+      "properties": {
+        "total": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkflowMode": {
+      "type": "string",
+      "enum": [
+        "new",
+        "standing",
+        "triggering"
+      ]
+    },
+    "WorkflowMuteRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "workflowID": {
+          "type": "string"
+        },
+        "muted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "workflowID",
+        "muted"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowOffReason": {
+      "type": "string",
+      "enum": [
+        "file",
+        "writtenByAgent",
+        "agent",
+        "person"
+      ]
+    },
+    "WorkflowOutcome": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ran": {
+              "type": "object",
+              "properties": {
+                "agentID": {
+                  "$ref": "core.schema.json#/definitions/UUID"
+                },
+                "at": {
+                  "$ref": "core.schema.json#/definitions/WireDate"
+                }
+              },
+              "required": [
+                "agentID",
+                "at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "ran"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "refused": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/WorkflowRefusal"
+                },
+                "at": {
+                  "$ref": "core.schema.json#/definitions/WireDate"
+                },
+                "repeats": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "_0",
+                "at",
+                "repeats"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "refused"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WorkflowProblem": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "unreadable": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unreadable"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "triggerNotSupported": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "triggerNotSupported"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unsupportedMode": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unsupportedMode"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WorkflowRefusal": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "chainTooDeep": {
+              "type": "object",
+              "properties": {
+                "depth": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "depth"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "chainTooDeep"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "runInFlight": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "runInFlight"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "queued": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "queued"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "queueFull": {
+              "type": "object",
+              "properties": {
+                "limit": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "limit"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "queueFull"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "archived": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "archived"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "disabled": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "disabled"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "overLimit": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/WorkflowLimit"
+                },
+                "allowed": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "overLimit"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unreadable": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unreadable"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "triggerNotSupported": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "triggerNotSupported"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "agentUnavailable": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "agentUnavailable"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "noTriggeringAgent": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "noTriggeringAgent"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "missedWhileClosed": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "missedWhileClosed"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "folderGone": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "folderGone"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "dayLimitReached": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "dayLimitReached"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "settingRefused": {
+              "type": "object",
+              "properties": {
+                "setting": {
+                  "type": "string"
+                },
+                "detail": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "setting",
+                "detail"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "settingRefused"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "awaitingApproval": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "awaitingApproval"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "deniedHere": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "deniedHere"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "coolingDown": {
+              "type": "object",
+              "properties": {
+                "until": {
+                  "$ref": "core.schema.json#/definitions/WireDate"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "coolingDown"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "outsideHours": {
+              "type": "object",
+              "properties": {
+                "until": {
+                  "$ref": "core.schema.json#/definitions/WireDate"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "outsideHours"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WorkflowRemovedNotification": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "workflowID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder",
+        "workflowID"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "workflowID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder",
+        "workflowID"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowSchedule": {
+      "type": "object",
+      "properties": {
+        "minutes": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "hours": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "The first and the last hour of between:. The first is after the last when it goes past midnight (#4818): the hours after midnight belong to the day before."
+        },
+        "startMinute": {
+          "type": "integer"
+        },
+        "endMinute": {
+          "type": "integer"
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/Weekday"
+          }
+        }
+      },
+      "required": [
+        "minutes",
+        "hours",
+        "startMinute",
+        "endMinute",
+        "days"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowSettings": {
+      "type": "object",
+      "properties": {
+        "permissionMode": {
+          "type": "string"
+        },
+        "runtimeID": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "effort": {
+          "type": "string"
+        },
+        "permissionRequests": {
+          "type": "string",
+          "description": "permission-requests: request-cards or yes-to-all (#2658)."
+        },
+        "sandbox": {
+          "type": "string",
+          "description": "sandbox: default, runtime or none (#2658)."
+        },
+        "options": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "options",
+        "labels"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowSettingsRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "workflowID": {
+          "type": "string"
+        },
+        "settings": {
+          "$ref": "#/definitions/WorkflowSettings"
+        },
+        "cooldown": {
+          "type": "string"
+        },
+        "hours": {
+          "$ref": "#/definitions/WorkflowHours",
+          "description": "The hours: to write (#4820): between:, days: and time-zone:. With no between: and no days: it takes hours: out, so the workflow may start at any time. Left out means left alone, as the cooldown is."
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "whenDone": {
+          "type": "string"
+        },
+        "continueWhenBack": {
+          "type": "boolean"
+        },
+        "runsOn": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "runs-on: (#1761, FR-034), which replaced hosts:: labels a machine must all have to run it: its id, its os (macos, linux), its provider, and its user's or bot's name. None runs on every machine of each person who turned it on."
+        }
+      },
+      "required": [
+        "folder",
+        "workflowID",
+        "settings"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowSummary": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": [
+            "folder",
+            "user"
+          ]
+        },
+        "content": {
+          "type": "string"
+        },
+        "workflow": {
+          "$ref": "#/definitions/Workflow"
+        },
+        "isArchived": {
+          "type": "boolean"
+        },
+        "isEnabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "overLimit": {
+          "$ref": "#/definitions/WorkflowLimit"
+        },
+        "totalLimit": {
+          "type": "integer"
+        },
+        "nextFireAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "nextFireAtByTrigger": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "core.schema.json#/definitions/WireDate"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "lastOutcome": {
+          "$ref": "#/definitions/WorkflowOutcome"
+        },
+        "causingEvent": {
+          "type": "integer"
+        },
+        "causingEventName": {
+          "type": "string"
+        },
+        "isRunning": {
+          "type": "boolean"
+        },
+        "hearsFor": {
+          "type": "string",
+          "description": "A bot's workflow that does not run here (#2027): the bot's name. This machine hears its server triggers with its own servers, once approved here, and sends each match to the control plane, which runs it on one of the bot's machines. Nothing of it runs here."
+        },
+        "readyMadeUpdatedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When the daemon wrote a newer ready-made version over this unedited copy (#4071), for 7 days after it did."
+        },
+        "newerReadyMade": {
+          "type": "string",
+          "description": "An edited copy of a ready-made workflow whose ready-made version changed since the daemon made the copy (#4071): what the newer version changes. The daemon never writes over an edited copy."
+        },
+        "awaitingApproval": {
+          "$ref": "#/definitions/WorkflowApproval"
+        },
+        "deniedHere": {
+          "$ref": "#/definitions/WorkflowApproval"
+        },
+        "lastFiredAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "lastFiredBy": {
+          "$ref": "#/definitions/WorkflowCause"
+        },
+        "cooldownEndsAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "hoursOpenAt": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When a fire held outside the workflow's hours: can start (#4818): the first time its hours: are open once its cooldown is over. Absent while its hours: are open by then."
+        },
+        "holdsAFire": {
+          "type": "boolean"
+        },
+        "queued": {
+          "type": "integer"
+        },
+        "offReason": {
+          "$ref": "#/definitions/WorkflowOffReason"
+        },
+        "standingAgentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "mcpTriggers": {
+          "type": "array",
+          "items": {
+            "$ref": "mcp.schema.json#/definitions/MCPTriggerStatus"
+          }
+        }
+      },
+      "required": [
+        "workflow",
+        "isArchived",
+        "isEnabled",
+        "nextFireAtByTrigger",
+        "isRunning",
+        "holdsAFire",
+        "queued"
+      ],
+      "additionalProperties": false,
+      "x-fallback": "defaults",
+      "description": "Read forgivingly (Workflow.swift's init(from:)): a field that is missing or does not read takes its default (`isEnabled` true; false, 0, [] or absent for the rest)."
+    },
+    "WorkflowTrigger": {
+      "$ref": "#/definitions/WorkflowTriggerStored"
+    },
+    "WorkflowTriggerStored": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "schedule": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/WorkflowSchedule"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "schedule"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unrecognised": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "keys": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "$ref": "core.schema.json#/definitions/JSONValue"
+                  }
+                }
+              },
+              "required": [
+                "name",
+                "keys"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unrecognised"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WorkflowWhenDone": {
+      "type": "string",
+      "enum": [
+        "keep",
+        "archive-allowed",
+        "archive"
+      ]
+    },
+    "WorkflowWriteRequest": {
+      "type": "object",
+      "properties": {
+        "workflowID": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "workflowID",
+        "content"
+      ],
+      "additionalProperties": false
+    },
+    "WorkflowsListRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "folder",
+            "user"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,4500 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agents.alexecollins.com/schema/machines.schema.json",
+  "title": "The wire: machines types",
+  "description": "Part of the source of every type on the wire (#1135, #5380): one file per domain in Packages/Wire/schema. A $ref to another file names it (core.schema.json#/definitions/JSONValue); scripts/wire.sh gen reads them all.",
+  "definitions": {
+    "ACPProviderInfo": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "protocol": {
+          "type": "string"
+        },
+        "configured": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "AdoptRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "sessionID": {
+          "type": "string"
+        },
+        "cwd": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "sessionID",
+        "cwd"
+      ],
+      "additionalProperties": false
+    },
+    "AgentMachines": {
+      "type": "object",
+      "description": "machines/forAgent: what list_machines shows an agent.",
+      "properties": {
+        "providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentMachinesProvider"
+          }
+        },
+        "hosts": {
+          "description": "Every machine of the person's, by name, where start_session can start a session (#2887). Absent from an older control plane.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentMachinesHost"
+          }
+        }
+      },
+      "required": [
+        "providers"
+      ],
+      "additionalProperties": false
+    },
+    "AgentMachinesHost": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "AgentMachinesMachine": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "hostState": {
+          "type": "string"
+        },
+        "cost": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why it failed, on a make that failed (#4706)."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "AgentMachinesProvider": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/ProviderID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "canMake": {
+          "type": "boolean"
+        },
+        "canDelete": {
+          "type": "boolean"
+        },
+        "options": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentMachinesMachine"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "canMake",
+        "canDelete",
+        "workspaces"
+      ],
+      "additionalProperties": false
+    },
+    "AnnounceReply": {
+      "type": "object",
+      "description": "What devices/announce answers: the device's record.",
+      "properties": {
+        "device": {
+          "$ref": "connections.schema.json#/definitions/Device"
+        }
+      },
+      "required": [
+        "device"
+      ],
+      "additionalProperties": false
+    },
+    "AssessRuntimeRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "model": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "AssessRuntimeResult": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "model": {
+          "type": "string"
+        },
+        "reportPath": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "reportPath"
+      ],
+      "additionalProperties": false
+    },
+    "Backup": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "rootID": {
+          "type": "string"
+        },
+        "madeAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "agents": {
+          "type": "integer"
+        },
+        "thisMachine": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "machine",
+        "rootID",
+        "madeAt",
+        "bytes",
+        "agents",
+        "thisMachine"
+      ],
+      "additionalProperties": false
+    },
+    "BackupEvery": {
+      "type": "string",
+      "enum": [
+        "off",
+        "daily",
+        "weekly"
+      ],
+      "x-fallback": "daily"
+    },
+    "BackupMakeRequest": {
+      "type": "object",
+      "properties": {
+        "wait": {
+          "type": "boolean",
+          "description": "Answer once the backup is made, not at once: a provider's delete waits for it (#1815)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "BackupRestoreRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "BackupRestoreResult": {
+      "type": "object",
+      "properties": {
+        "restored": {
+          "type": "integer"
+        },
+        "skipped": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "restored",
+        "skipped"
+      ],
+      "additionalProperties": false
+    },
+    "BackupSettings": {
+      "type": "object",
+      "properties": {
+        "every": {
+          "$ref": "#/definitions/BackupEvery"
+        },
+        "keep": {
+          "type": "integer"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/definitions/BackupTarget",
+          "description": "Where backups go (#1815): this machine's folder, or the control plane's store. Left out is the machine's default: the store for a server linked to a control plane, else the folder."
+        }
+      },
+      "required": [
+        "every",
+        "keep"
+      ],
+      "additionalProperties": false
+    },
+    "BackupState": {
+      "type": "object",
+      "properties": {
+        "settings": {
+          "$ref": "#/definitions/BackupSettings"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "backups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Backup"
+          }
+        },
+        "making": {
+          "type": "boolean"
+        },
+        "lastError": {
+          "type": "string"
+        },
+        "canUseControl": {
+          "type": "boolean",
+          "description": "The machine is linked to a control plane, so it can back up to the control plane's store (#1815)."
+        },
+        "sameDisk": {
+          "type": "boolean",
+          "description": "The backup folder is on the disk of what it backs up, and not a synced folder (#2139): a backup there undoes a mistake, but is lost with the disk."
+        }
+      },
+      "required": [
+        "settings",
+        "folder",
+        "backups",
+        "making"
+      ],
+      "additionalProperties": false
+    },
+    "BackupStoreCommit": {
+      "type": "object",
+      "description": "A host's backup whose parts are all uploaded: the control plane writes its .json last, then keeps the newest keep of this host's (#1815).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "parts": {
+          "type": "integer"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "rootID": {
+          "type": "string"
+        },
+        "madeAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "agents": {
+          "type": "integer"
+        },
+        "keep": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "parts",
+        "machine",
+        "rootID",
+        "madeAt",
+        "bytes",
+        "agents",
+        "keep"
+      ],
+      "additionalProperties": false
+    },
+    "BackupStoreList": {
+      "type": "object",
+      "properties": {
+        "backups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Backup"
+          }
+        }
+      },
+      "required": [
+        "backups"
+      ],
+      "additionalProperties": false
+    },
+    "BackupStorePart": {
+      "type": "object",
+      "description": "One part of a backup, at most 8 MiB (#1815): a host's upload, or the control plane's answer to a download.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "On an upload, the backup's name; this host's own folder is the control plane's to say."
+        },
+        "part": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        }
+      },
+      "required": [
+        "name",
+        "part",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "BackupStorePartRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "A listed backup's id: <host>/<name>."
+        },
+        "part": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "part"
+      ],
+      "additionalProperties": false
+    },
+    "BackupTarget": {
+      "type": "string",
+      "enum": [
+        "folder",
+        "control"
+      ],
+      "x-fallback": "folder"
+    },
+    "BlockWakeOn": {
+      "type": "string",
+      "enum": [
+        "any",
+        "all"
+      ]
+    },
+    "BranchFromRequest": {
+      "type": "object",
+      "description": "agents/branchFrom (#1658): a new session that goes on from just before the person's prompt `entryID` in `agentID`.",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "entryID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "agentID",
+        "entryID"
+      ],
+      "additionalProperties": false
+    },
+    "BranchSummary": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "remote": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "BringBack": {
+      "type": "object",
+      "description": "What folders/bringBack did (#1473): the branches that moved forward or were made, and whether the uncommitted changes were applied.",
+      "properties": {
+        "moved": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "applied": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "moved",
+        "applied"
+      ],
+      "additionalProperties": false
+    },
+    "BringBackFromRequest": {
+      "type": "object",
+      "description": "folders/bringBackFrom (#4640): Bring Back from ‹machine›… from a client. This host brings `branches` of the repository at `source` on `machine` (the control plane's id or name for it; `machineName` is the name the person knows it by, for the words), less the commits it has, and with `includeChanges` the uncommitted changes there, into the repository at `folder` here, through the control plane, as bring_back does (#2947). Branches move forward only.",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "includeChanges": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "machine",
+        "source",
+        "branches",
+        "includeChanges"
+      ],
+      "additionalProperties": false
+    },
+    "BringBackNotification": {
+      "type": "object",
+      "description": "bringBack/changed (#4640): how a bring-back that folders/bringBackFrom started goes. `read` of `total` bytes are here (0 of 0 while the bundle is made there); `finished` once it ended, whichever way: `result` is what it did, or `problem` says why it stopped, in the person's words.",
+      "properties": {
+        "bringBack": {
+          "$ref": "#/definitions/BringBackSummary"
+        },
+        "read": {
+          "type": "integer"
+        },
+        "total": {
+          "type": "integer"
+        },
+        "finished": {
+          "type": "boolean"
+        },
+        "problem": {
+          "type": "string"
+        },
+        "result": {
+          "$ref": "#/definitions/BringBack"
+        }
+      },
+      "required": [
+        "bringBack",
+        "read",
+        "total",
+        "finished"
+      ],
+      "additionalProperties": false
+    },
+    "BringBackRequest": {
+      "type": "object",
+      "description": "Brings a host's branches back into this Mac's repository at `folder` (Bring back from ‹host›…, #1473): fetches the `bundle` upload, moves `branches` forward only, also where a worktree has one checked out, and applies the `patch` upload (the host's uncommitted changes) in `folder`, whose checked-out branch must be `patchOn`. It stops, and changes nothing, when a branch here has commits of its own or a worktree with a branch that moves has uncommitted changes.",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "bundle": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "patch": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "patchOn": {
+          "type": "string"
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SentBranch"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "branches"
+      ],
+      "additionalProperties": false
+    },
+    "BringBackSummary": {
+      "type": "object",
+      "description": "One bring-back folders/bringBackFrom started (#4640): the folder here, and the folder on the machine it comes from.",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "startedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "id",
+        "folder",
+        "machine",
+        "machineName",
+        "source",
+        "startedAt"
+      ],
+      "additionalProperties": false
+    },
+    "CapacityLevel": {
+      "type": "string",
+      "description": "A machine's capacity (#4578): ok; near (load per core above 1.5, or memory pressure warn); or full (load per core above 2.5, memory pressure critical, or swap more than half used). It rises at once, and falls only after two looks under its line.",
+      "enum": [
+        "ok",
+        "near",
+        "full"
+      ]
+    },
+    "CapacityState": {
+      "type": "object",
+      "description": "capacity/state and capacity/changed (#4748): the machine's level, pushed when it moves, so a machine's row says it with no page open.",
+      "properties": {
+        "level": {
+          "$ref": "#/definitions/CapacityLevel"
+        },
+        "words": {
+          "type": "string",
+          "description": "The level as a sentence's subject and verb: \"this Mac is near capacity\" or \"this Mac is at capacity\". Absent at ok."
+        }
+      },
+      "required": [
+        "level"
+      ],
+      "additionalProperties": false
+    },
+    "CatchUpLeases": {
+      "type": "object",
+      "properties": {
+        "leases": {
+          "$ref": "workflows.schema.json#/definitions/LeaseSnapshot"
+        },
+        "hosted": {
+          "$ref": "mcp.schema.json#/definitions/HostedMCPSnapshot"
+        },
+        "health": {
+          "$ref": "mcp.schema.json#/definitions/MCPHealthSnapshot"
+        }
+      },
+      "required": [
+        "leases",
+        "hosted",
+        "health"
+      ],
+      "additionalProperties": false
+    },
+    "CatchUpPart": {
+      "type": "string",
+      "enum": [
+        "workflows",
+        "pins",
+        "leases",
+        "runtimes",
+        "allowances",
+        "modes",
+        "sandbox",
+        "costs"
+      ],
+      "description": "A part this host does not know is left out of CatchUpRequest.parts."
+    },
+    "CatchUpRequest": {
+      "type": "object",
+      "properties": {
+        "agents": {
+          "$ref": "core.schema.json#/definitions/ListRequest"
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "CatchUpSnapshot": {
+      "type": "object",
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": {
+            "$ref": "sessions.schema.json#/definitions/Agent"
+          }
+        },
+        "agentChanges": {
+          "$ref": "files.schema.json#/definitions/AgentChanges"
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "org.schema.json#/definitions/PermissionRequest"
+          }
+        },
+        "elicitations": {
+          "type": "array",
+          "items": {
+            "$ref": "workflows.schema.json#/definitions/ElicitationRequest"
+          }
+        },
+        "attention": {
+          "$ref": "connections.schema.json#/definitions/AttentionPending"
+        },
+        "resuming": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/UUID"
+          }
+        },
+        "disk": {
+          "$ref": "#/definitions/DiskState"
+        },
+        "storeNotes": {
+          "$ref": "core.schema.json#/definitions/StoreNotes"
+        },
+        "achievements": {
+          "$ref": "reports.schema.json#/definitions/Achievements"
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "$ref": "workflows.schema.json#/definitions/WorkflowSummary"
+          }
+        },
+        "pins": {
+          "type": "array",
+          "items": {
+            "$ref": "files.schema.json#/definitions/FolderPins"
+          }
+        },
+        "leases": {
+          "$ref": "#/definitions/CatchUpLeases"
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "$ref": "files.schema.json#/definitions/FolderSummary"
+          }
+        }
+      },
+      "required": [
+        "folders",
+        "agents",
+        "permissions",
+        "elicitations",
+        "attention",
+        "resuming"
+      ],
+      "additionalProperties": false
+    },
+    "ClientAnnounce": {
+      "type": "object",
+      "description": "clients/announce, on a pairing connection.",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "publicKey": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ClientKind"
+        }
+      },
+      "required": [
+        "id",
+        "publicKey",
+        "name",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "ClientKind": {
+      "type": "string",
+      "enum": [
+        "mac",
+        "iPhone",
+        "iPad",
+        "unknown",
+        "browser"
+      ],
+      "x-fallback": "unknown",
+      "description": "ClientRecord.Kind: a kind a later build added reads as `unknown`."
+    },
+    "ClientPairingRequest": {
+      "type": "object",
+      "description": "clients/startPairing: `browser` for the web remote's code (071); a grant an older window sends is not read.",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "grant": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ClientRecord": {
+      "type": "object",
+      "description": "A paired screen, as clients/list says it (ClientRecord).",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/ClientKind"
+        },
+        "publicKey": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        },
+        "paired": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "lastSeen": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "mayNotify": {
+          "type": "boolean"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "rev": {
+          "type": "integer"
+        },
+        "forgotten": {
+          "type": "boolean"
+        },
+        "forgottenAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "knownEpoch": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "publicKey",
+        "paired",
+        "rev"
+      ],
+      "additionalProperties": false
+    },
+    "ClientRequest": {
+      "type": "object",
+      "description": "clients/forget.",
+      "properties": {
+        "client": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "client"
+      ],
+      "additionalProperties": false
+    },
+    "CloneNotification": {
+      "type": "object",
+      "properties": {
+        "clone": {
+          "$ref": "#/definitions/CloneSummary"
+        },
+        "finished": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "clone",
+        "finished"
+      ],
+      "additionalProperties": false
+    },
+    "CloneRequest": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "CloneSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "url": {
+          "type": "string"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "startedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "id",
+        "url",
+        "folder",
+        "startedAt"
+      ],
+      "additionalProperties": false
+    },
+    "DaemonStatus": {
+      "type": "object",
+      "properties": {
+        "turnsInFlight": {
+          "type": "integer"
+        },
+        "agentsLive": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "turnsInFlight",
+        "agentsLive"
+      ],
+      "additionalProperties": false
+    },
+    "DetectedServer": {
+      "type": "object",
+      "description": "One host in the ssh config, and what machines/detect did with it (#429).",
+      "properties": {
+        "alias": {
+          "type": "string"
+        },
+        "resolved": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "added",
+            "known",
+            "bastion",
+            "unreachable",
+            "failed"
+          ]
+        },
+        "detail": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "alias",
+        "resolved",
+        "outcome"
+      ],
+      "additionalProperties": false
+    },
+    "DiskAlarm": {
+      "type": "object",
+      "properties": {
+        "reading": {
+          "$ref": "#/definitions/DiskReading"
+        },
+        "level": {
+          "$ref": "#/definitions/DiskLevel"
+        },
+        "threshold": {
+          "type": "integer"
+        },
+        "worktrees": {
+          "type": "array",
+          "items": {
+            "$ref": "reports.schema.json#/definitions/DiskWorktree"
+          }
+        }
+      },
+      "required": [
+        "reading",
+        "level",
+        "threshold",
+        "worktrees"
+      ],
+      "additionalProperties": false
+    },
+    "DiskLevel": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "low",
+        "critical"
+      ]
+    },
+    "DiskReading": {
+      "type": "object",
+      "properties": {
+        "volume": {
+          "type": "string"
+        },
+        "mount": {
+          "type": "string"
+        },
+        "freeBytes": {
+          "type": "integer"
+        },
+        "totalBytes": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "volume",
+        "mount",
+        "freeBytes",
+        "totalBytes"
+      ],
+      "additionalProperties": false
+    },
+    "DiskState": {
+      "type": "object",
+      "properties": {
+        "alarms": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DiskAlarm"
+          }
+        }
+      },
+      "required": [
+        "alarms"
+      ],
+      "additionalProperties": false
+    },
+    "DiskThresholds": {
+      "type": "object",
+      "properties": {
+        "lowPercent": {
+          "type": "integer"
+        },
+        "criticalPercent": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DropboxPutRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "subfolder": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        }
+      },
+      "required": [
+        "folder",
+        "name",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "DropboxPutResponse": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "FirstBuildStartRequest": {
+      "type": "object",
+      "description": "firstBuild/start (#5056, spec 5048 section 7): the newcomer's idea, as typed, the starter the plan page shows, and the runtime its first task set up. The host makes the folder ~/.agents/first-build when it is not there, writes the first prompt itself, so every client sends the same, and labels the session first-build. It answers with the session's id. While a first-build session that is not archived is there, it refuses with firstBuildRunning, with that session's id as the data, unless another is true (New App…, #5132).",
+      "properties": {
+        "idea": {
+          "type": "string",
+          "description": "The person's words, as typed. Not empty."
+        },
+        "starter": {
+          "$ref": "#/definitions/FirstBuildStarter"
+        },
+        "runtimeID": {
+          "type": "string",
+          "description": "The runtime that the plan page's first task set up, as agents/start takes it."
+        },
+        "another": {
+          "type": "boolean",
+          "description": "New App… (#5132): start one more first build, also while a first-build session is there. Absent or false keeps the newcomer's rule: refuse with firstBuildRunning."
+        }
+      },
+      "required": [
+        "idea",
+        "starter",
+        "runtimeID"
+      ],
+      "additionalProperties": false
+    },
+    "FirstBuildStarter": {
+      "type": "string",
+      "description": "The starter that a first build begins from (#5048): iphone-app is agentloops-dev/iphone-app-starter, web-service is agentloops-dev/web-service-starter, as make_app_repository names them.",
+      "enum": [
+        "iphone-app",
+        "web-service"
+      ]
+    },
+    "FleetBoard": {
+      "type": "object",
+      "description": "console/fleet's answer (#1804): every machine on the control plane, for an admin.",
+      "properties": {
+        "machines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FleetMachine"
+          }
+        }
+      },
+      "required": [
+        "machines"
+      ],
+      "additionalProperties": false
+    },
+    "FleetMachine": {
+      "type": "object",
+      "description": "One machine on Console ▸ Machines (#1804): its machines/list row, whose it is, and how many of its agents were running when it last listed them. Numbers only, never what the agents said.",
+      "properties": {
+        "host": {
+          "$ref": "org.schema.json#/definitions/ControlMachine"
+        },
+        "ownerName": {
+          "type": "string",
+          "description": "Its person's or bot's name; empty when nobody owns it."
+        },
+        "bot": {
+          "type": "boolean",
+          "description": "Whether its owner is a bot (#1761)."
+        },
+        "running": {
+          "type": "integer",
+          "description": "Its agents running when it last listed them; absent when it never has."
+        },
+        "heardAt": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When it last listed its agents."
+        }
+      },
+      "required": [
+        "host",
+        "ownerName",
+        "bot"
+      ],
+      "additionalProperties": false
+    },
+    "FoundFolder": {
+      "type": "object",
+      "properties": {
+        "typed": {
+          "type": "string"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "isRepository": {
+          "type": "boolean"
+        },
+        "isFolder": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "exists",
+        "isRepository",
+        "isFolder"
+      ],
+      "additionalProperties": false
+    },
+    "MacPathRequest": {
+      "type": "object",
+      "description": "mac/reveal, mac/open: a path on the host; app names the app to open it with.",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "app": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "MacTerminalRequest": {
+      "type": "object",
+      "description": "mac/terminal: Terminal, in path if given.",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MachineAnnounce": {
+      "type": "object",
+      "description": "machines/announce, on an enrolment connection.",
+      "properties": {
+        "publicKey": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "machineID": {
+          "type": "string"
+        },
+        "implementation": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "publicKey",
+        "name",
+        "platform",
+        "version",
+        "machineID"
+      ],
+      "additionalProperties": false
+    },
+    "MachineClient": {
+      "type": "object",
+      "description": "A paired window a host may let in on its local socket (#1118), with the key it proves itself with.",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "publicKey": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        },
+        "person": {
+          "type": "string",
+          "description": "The person the window belongs to (#994). The host lets it in only when it is the host's own user (FR-020)."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "publicKey"
+      ],
+      "additionalProperties": false
+    },
+    "MachineClients": {
+      "type": "object",
+      "description": "machine/clients: every window paired with the control plane, which a host checks its local socket against (#1118).",
+      "properties": {
+        "clients": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MachineClient"
+          }
+        },
+        "user": {
+          "type": "string",
+          "description": "The user the host belongs to (#994). With it, the host lets in only a window whose person is that user (FR-020); without it (an older control plane), every window listed."
+        }
+      },
+      "required": [
+        "clients"
+      ],
+      "additionalProperties": false
+    },
+    "MachineEnroll": {
+      "type": "object",
+      "description": "machines/startEnroll (#1761): with as, a bot's machine code, an admin's only. Without, the caller's own, as before.",
+      "properties": {
+        "as": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "MachineFolderSend": {
+      "type": "object",
+      "description": "machines/sendFolder, through machine/machines: one step of an agent's start_session with send (#2929), which sends this folder's branch to another of the person's machines first, or of its bring_back (#2947), which brings a branch back from there, or of its move_session (#3717), which moves a session there with its branch. Exactly one of state, upload, receive, facts, pack, read and moveIn; the control plane sends that machine's folders/receiveState, folders/receiveUpload, folders/receive, folders/sendFacts, folders/sendPack, folders/sendRead or agents/moveIn.",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/ReceiveStateRequest"
+        },
+        "upload": {
+          "$ref": "#/definitions/ReceiveUploadRequest"
+        },
+        "receive": {
+          "$ref": "#/definitions/ReceiveRequest"
+        },
+        "facts": {
+          "$ref": "#/definitions/SendFactsRequest"
+        },
+        "pack": {
+          "$ref": "#/definitions/SendPackRequest"
+        },
+        "read": {
+          "$ref": "#/definitions/SendReadRequest"
+        },
+        "moveIn": {
+          "$ref": "#/definitions/SessionMoveIn"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "MachineFolderSent": {
+      "type": "object",
+      "description": "What machines/sendFolder's step answered (#2929, #2947): state for state, folder for receive, facts for facts, pack for pack, read for read, none for upload.",
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/ReceiveState"
+        },
+        "folder": {
+          "$ref": "files.schema.json#/definitions/FolderSummary"
+        },
+        "facts": {
+          "$ref": "#/definitions/SendFacts"
+        },
+        "pack": {
+          "$ref": "#/definitions/SendPack"
+        },
+        "read": {
+          "$ref": "#/definitions/SendRead"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MachineHello": {
+      "type": "object",
+      "description": "machine/hello, on every connect of an uplink. `implementation` is `swift` or `go` (#1134).",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "version": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "machineID": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "implementation": {
+          "type": "string"
+        },
+        "capabilities": {
+          "type": "array",
+          "description": "The capabilities this host has (#1748): each one whose methods it all serves, and the ones it declares. None from a host older than #1748.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "version",
+        "platform",
+        "machineID"
+      ],
+      "additionalProperties": false
+    },
+    "MachineHelloAnswer": {
+      "type": "object",
+      "description": "The control plane's answer to machine/hello (#4100): what it can do, so the host asks only what it answers, such as machine/accounts with machine.accounts/1. An older control plane answers {}: no list, so the host asks it nothing new.",
+      "properties": {
+        "capabilities": {
+          "type": "array",
+          "description": "The control plane's capabilities (#1748), as control/status says them to a client.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "MachineInfo": {
+      "type": "object",
+      "description": "One workspace, as its provider last listed it. `state` is running, starting, stopping, stopped or unknown; or failed, for a make that failed, with the provider's `reason` (#3972). `joining` while New Machine waits for it to join the control plane, and `notJoined` once the control plane gave up waiting (#4610).",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "ssh": {
+          "type": "string"
+        },
+        "tunnel": {
+          "type": "boolean"
+        },
+        "hostKeyRenews": {
+          "type": "boolean",
+          "description": "Its ssh host key is made again at each start, as a Google Cloud workstation's is (#1701): after a Start the control plane made, the first ssh takes the key it is offered and pins it again."
+        },
+        "cost": {
+          "type": "string"
+        },
+        "idleTimeoutMinutes": {
+          "type": "integer",
+          "description": "The provider stops it by itself after this many minutes with no use, as GitHub stops a codespace (#4803): the machine's page says so."
+        },
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why the make failed, in the provider's words, when `state` is failed."
+        },
+        "joining": {
+          "type": "boolean",
+          "description": "New Machine made it and the control plane waits for it to join: the row says Making… (#4610)."
+        },
+        "notJoined": {
+          "type": "string",
+          "description": "Why the control plane gave up waiting for it to join, once it did (#4610): the row says so, with Delete."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "MachineInstall": {
+      "type": "object",
+      "description": "machines/install (MachineInstall.Request): a server over ssh, with its key, the fingerprint trusted, a tunnel. Add as Machine… names the provider and the workspace too (#3497): a codespace whose provider a machine carries is installed from that machine, with the token kept there.",
+      "properties": {
+        "destination": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "trust": {
+          "type": "string"
+        },
+        "tunnel": {
+          "type": "boolean"
+        },
+        "provider": {
+          "$ref": "core.schema.json#/definitions/ProviderID"
+        },
+        "workspace": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "MachineLastHeard": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "$ref": "files.schema.json#/definitions/FolderSummary"
+          }
+        },
+        "agents": {
+          "type": "array",
+          "items": {
+            "$ref": "sessions.schema.json#/definitions/Agent"
+          }
+        },
+        "heardAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "MachineLink": {
+      "type": "object",
+      "description": "machines/link. A machine whose ssh host key the control plane has not trusted yet (one that joined with the command, #3379) is refused -32069 hostKeyToTrust, data {fingerprint}, until trust is that fingerprint: the key is then kept for the machine's ssh start.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "provider": {
+          "$ref": "core.schema.json#/definitions/ProviderID"
+        },
+        "workspace": {
+          "type": "string"
+        },
+        "startWhenUsed": {
+          "type": "boolean"
+        },
+        "stopWhenIdleMinutes": {
+          "type": "integer"
+        },
+        "trust": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "provider",
+        "workspace"
+      ],
+      "additionalProperties": false
+    },
+    "MachineOptions": {
+      "type": "object",
+      "description": "machines/setMachineOptions. stopWhenIdleMinutes 0 turns it off.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "startWhenUsed": {
+          "type": "boolean"
+        },
+        "stopWhenIdleMinutes": {
+          "type": "integer"
+        },
+        "startForSchedules": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "MachineProjects": {
+      "type": "object",
+      "description": "projects/joined's answer and machine/projects (#2669): the projects that this machine's folders name, with their slots, all of them each time.",
+      "properties": {
+        "projects": {
+          "type": "array",
+          "items": {
+            "$ref": "files.schema.json#/definitions/ProjectTools"
+          }
+        }
+      },
+      "required": [
+        "projects"
+      ],
+      "additionalProperties": false
+    },
+    "MachineProviderDraftCall": {
+      "type": "object",
+      "description": "machine/providerDraft: a writing agent called one of the writer's tools (#858).",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "draft": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "tool": {
+          "type": "string"
+        },
+        "arguments": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "agentID",
+        "draft",
+        "tool"
+      ],
+      "additionalProperties": false
+    },
+    "MachineRef": {
+      "type": "string",
+      "x-ts-type": "string & { readonly __brand: \"MachineRef\" }"
+    },
+    "MachineRelease": {
+      "type": "object",
+      "description": "machine/release (#2178): the release the control plane names, as X.Y.Z.",
+      "properties": {
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "MachineRequest": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "purge": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "MachineSchedule": {
+      "type": "object",
+      "description": "A host's next scheduled workflow (#1004).",
+      "properties": {
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "workflow": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MachineSessionCall": {
+      "type": "object",
+      "description": "machines/sessionCall, through machine/machines (#2927): an agent's read_session, message_session, stop_session, archive_session, or list_sessions and agent.ended wait status, on a session it started on another of the person's machines with start_session. The control plane sends that machine's agents/fromStarter, with call.from in its own words.",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "call": {
+          "$ref": "sessions.schema.json#/definitions/SessionCall"
+        }
+      },
+      "required": [
+        "host",
+        "call"
+      ],
+      "additionalProperties": false
+    },
+    "MachineSessionStart": {
+      "type": "object",
+      "description": "machines/startSession, through machine/machines (#2887): an agent's start_session on another of the person's machines, by its name. The control plane sends that machine's agents/start.",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "start": {
+          "$ref": "sessions.schema.json#/definitions/StartRequest"
+        }
+      },
+      "required": [
+        "host",
+        "start"
+      ],
+      "additionalProperties": false
+    },
+    "MachineStatus": {
+      "type": "object",
+      "description": "machine/status on channel 0 (#691 US4): each agent working or waiting on a person, and the next scheduled workflow.",
+      "properties": {
+        "idle": {
+          "type": "boolean"
+        },
+        "running": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "schedule": {
+          "$ref": "#/definitions/MachineSchedule"
+        }
+      },
+      "required": [
+        "idle",
+        "running"
+      ],
+      "additionalProperties": false
+    },
+    "MachineStop": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "confirmRunning": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "MachineSummaryFacts": {
+      "type": "object",
+      "description": "One of the person's other machines in machines/summaryFacts (#3354): its facts, or, when it is off or did not answer, unreached, the words that say why.",
+      "properties": {
+        "machine": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "facts": {
+          "$ref": "core.schema.json#/definitions/SummaryFacts"
+        },
+        "unreached": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "machineName"
+      ],
+      "additionalProperties": false
+    },
+    "MachineTunnel": {
+      "type": "object",
+      "properties": {
+        "up": {
+          "type": "boolean"
+        },
+        "problem": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "up"
+      ],
+      "additionalProperties": false
+    },
+    "MachineTunnelChanged": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "tunnel": {
+          "$ref": "#/definitions/MachineTunnel"
+        }
+      },
+      "required": [
+        "name",
+        "tunnel"
+      ],
+      "additionalProperties": false
+    },
+    "MachineUpdate": {
+      "type": "object",
+      "description": "machines/update (#1766): a host the control plane installed over ssh, updated the same way. The server and its key are given again, as at the install, because the control plane keeps neither; the host's own root and membership stay.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "trust": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "MachinesSummaryFacts": {
+      "type": "object",
+      "description": "machines/summaryFacts (#3354): the daily summary's facts from each of the person's other machines, by name.",
+      "properties": {
+        "machines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MachineSummaryFacts"
+          }
+        }
+      },
+      "required": [
+        "machines"
+      ],
+      "additionalProperties": false
+    },
+    "MarkRuntimeAvailable": {
+      "type": "object",
+      "properties": {
+        "credentialKey": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "credentialKey"
+      ],
+      "additionalProperties": false
+    },
+    "MemoryPressure": {
+      "type": "string",
+      "description": "The kernel's memory pressure (#4578): macOS kern.memorystatus_vm_pressure_level, or Linux PSI memory (warn when some avg10 is 10% or more, critical when full avg10 is 10% or more).",
+      "enum": [
+        "normal",
+        "warn",
+        "critical"
+      ]
+    },
+    "MissingFolder": {
+      "type": "object",
+      "properties": {
+        "branchKept": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "branchKept"
+      ],
+      "additionalProperties": false
+    },
+    "MoveAnswer": {
+      "type": "object",
+      "description": "What a person's move came to. The message is what the window may show.",
+      "properties": {
+        "when": {
+          "$ref": "#/definitions/MoveWhen"
+        },
+        "message": {
+          "type": "string"
+        },
+        "agent": {
+          "$ref": "sessions.schema.json#/definitions/Agent"
+        }
+      },
+      "required": [
+        "when",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "MoveAsker": {
+      "type": "string",
+      "enum": [
+        "agent",
+        "person"
+      ]
+    },
+    "MoveNotification": {
+      "type": "object",
+      "description": "move/changed (#4641): how a move to another machine goes, whoever asked for it. `sent` of `total` bytes of the branch are on that machine (0 of 0 while the bundle is made); `branchSent` once they are all there and the session itself goes; `finished` once it ended, whichever way: with no `problem` the session is there and gone from here, else `problem` says why it stopped, in the person's words, and the session stays here.",
+      "properties": {
+        "agentID": { "$ref": "core.schema.json#/definitions/UUID" },
+        "machine": { "type": "string" },
+        "machineName": { "type": "string" },
+        "folder": { "type": "string" },
+        "startedAt": { "$ref": "core.schema.json#/definitions/WireDate" },
+        "sent": { "type": "integer" },
+        "total": { "type": "integer" },
+        "branchSent": { "type": "boolean" },
+        "finished": { "type": "boolean" },
+        "problem": { "type": "string" }
+      },
+      "required": ["agentID", "machine", "machineName", "folder", "startedAt", "sent", "total", "branchSent", "finished"],
+      "additionalProperties": false
+    },
+    "MoveRequest": {
+      "type": "object",
+      "description": "The person moving an agent (053). No target takes back the person's move that is waiting.",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "target": {
+          "$ref": "#/definitions/MoveTarget"
+        },
+        "removeLeft": {
+          "type": "boolean"
+        },
+        "discardChanges": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agentID",
+        "removeLeft",
+        "discardChanges"
+      ],
+      "additionalProperties": false
+    },
+    "MoveTarget": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "newWorktree": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "newWorktree"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "existing": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "core.schema.json#/definitions/URLString"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "existing"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "folderPath": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "folderPath"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MoveToMachineAnswer": {
+      "type": "object",
+      "description": "What agents/moveToMachine did (#3790): the folder on that machine the session now goes on in, and whether it carries on there at once, as it was working when it moved.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "carriesOn": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "carriesOn"
+      ],
+      "additionalProperties": false
+    },
+    "MoveToMachineRequest": {
+      "type": "object",
+      "description": "The person moving a session to another of their machines (#3790), as move_session does (#3717). `machine` is the control plane's id or name for it, and `machineName` the name the person knows it by, for the words; `folder` is an absolute path there, or, when left out, the folder of the session's project there.",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "machine"
+      ],
+      "additionalProperties": false
+    },
+    "MoveWhen": {
+      "type": "string",
+      "enum": [
+        "now",
+        "afterTurn",
+        "nothing"
+      ]
+    },
+    "PendingMove": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "$ref": "#/definitions/MoveTarget"
+        },
+        "removeLeft": {
+          "type": "boolean"
+        },
+        "discardChanges": {
+          "type": "boolean"
+        },
+        "askedBy": {
+          "$ref": "#/definitions/MoveAsker"
+        },
+        "askedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "target",
+        "removeLeft",
+        "discardChanges",
+        "askedBy",
+        "askedAt"
+      ],
+      "additionalProperties": false
+    },
+    "PingResponse": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "additionalProperties": false
+    },
+    "PlaneMoveAction": {
+      "type": "string",
+      "description": "What a client asks of a move of the control plane (#4255), as the Mac window's sheets do it: status says how it stands; move and return open Move to Another Machine… and Run It Here Again…; the rest are the sheets' buttons and the overview's.",
+      "enum": [
+        "status",
+        "move",
+        "return",
+        "saveKey",
+        "useKey",
+        "continue",
+        "back",
+        "check",
+        "announce",
+        "withdraw",
+        "moveNow",
+        "cancel",
+        "close",
+        "stopForwarding",
+        "stopReturnForwarding",
+        "dismiss"
+      ]
+    },
+    "PlaneMoveAsk": {
+      "type": "object",
+      "description": "control/planeMove and control/planeMoveWanted (#4255): a client asks the window on the Mac that moves the control plane to do one step. The window does it with this Mac's control key, which never leaves the Mac.",
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/PlaneMoveAction"
+        },
+        "address": {
+          "type": "string",
+          "description": "With check on a move: where the other machine's control plane is, its https address; with no scheme, https."
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "PlaneMoveFlow": {
+      "type": "object",
+      "description": "Where a move a client asked for is, as the Mac window's sheet would draw it (#4255), in its words.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "move",
+            "return"
+          ],
+          "description": "Move to Another Machine… or Run It Here Again…."
+        },
+        "step": {
+          "type": "string",
+          "enum": [
+            "key",
+            "check",
+            "told",
+            "moving"
+          ],
+          "description": "The sheet's frame: key and check (P, Q or V), told (R or W), moving (S or X)."
+        },
+        "title": {
+          "type": "string"
+        },
+        "lead": {
+          "type": "string",
+          "description": "The line under the title."
+        },
+        "address": {
+          "type": "string",
+          "description": "Where the control plane goes, or comes back from."
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PlaneMoveLine"
+          },
+          "description": "The checks (key, check) or the stages (moving), in order."
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PlaneMoveMember"
+          },
+          "description": "Who has heard where it goes (told)."
+        },
+        "knowing": {
+          "type": "string",
+          "description": "How many know, in words (told)."
+        },
+        "otherKey": {
+          "type": "boolean",
+          "description": "Run It Here Again…: the other machine holds another key, so this Mac takes it first (Use Key…)."
+        },
+        "checked": {
+          "type": "boolean",
+          "description": "Every check passed: Tell Everyone may be asked."
+        },
+        "busy": {
+          "type": "boolean",
+          "description": "A check or a step runs on the Mac now."
+        },
+        "taken": {
+          "type": "boolean",
+          "description": "The other end serves now: Cancel can't undo it."
+        },
+        "failed": {
+          "type": "boolean",
+          "description": "A stage failed: Close, not Cancel."
+        },
+        "problem": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "step",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "PlaneMoveLine": {
+      "type": "object",
+      "description": "One check or stage of a move (#4255).",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "waiting",
+            "yes",
+            "no",
+            "todo",
+            "doing",
+            "done",
+            "failed",
+            "warning"
+          ]
+        },
+        "note": {
+          "type": "string",
+          "description": "Why it failed, or a note under it."
+        }
+      },
+      "required": [
+        "label",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "PlaneMoveMember": {
+      "type": "object",
+      "description": "A window, phone or machine of the control plane, and whether it knows where the control plane goes (#4255).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "description": "What it is, and when it last connected, in words."
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "knows",
+            "cantFollow",
+            "notYet"
+          ]
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "PlaneMoveRow": {
+      "type": "object",
+      "description": "A row of the control plane's move card (#4255): Move to Another Machine, This Mac moved its control plane, a forwarding row, or the way back's.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "move",
+            "moved",
+            "forwarding",
+            "returned"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "attention": {
+          "type": "boolean",
+          "description": "Its dot is orange."
+        },
+        "button": {
+          "type": "string",
+          "description": "Its button's words."
+        },
+        "action": {
+          "$ref": "#/definitions/PlaneMoveAction"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "confirm": {
+          "type": "string",
+          "description": "Asked before the action, as Stop forwarding?'s message."
+        }
+      },
+      "required": [
+        "kind",
+        "title",
+        "detail"
+      ],
+      "additionalProperties": false
+    },
+    "PrewarmRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "why": {
+          "$ref": "#/definitions/PrewarmRequestWhy"
+        }
+      },
+      "required": [
+        "agentID",
+        "why"
+      ],
+      "additionalProperties": false
+    },
+    "PrewarmRequestWhy": {
+      "type": "string",
+      "enum": [
+        "opened",
+        "typing"
+      ]
+    },
+    "ProcessesState": {
+      "type": "object",
+      "description": "processes/list (#3453): the machine's totals and the daemon's process tree, in tree order, the daemon first. At most 200 processes; omitted counts the rest.",
+      "properties": {
+        "machine": {
+          "$ref": "reports.schema.json#/definitions/MachineUsage"
+        },
+        "processes": {
+          "type": "array",
+          "items": {
+            "$ref": "reports.schema.json#/definitions/ProcessUsage"
+          }
+        },
+        "omitted": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "machine",
+        "processes",
+        "omitted"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectMachine": {
+      "type": "object",
+      "description": "A machine of projects/sessions (#3276) that has a folder of the project, by id and name.",
+      "properties": {
+        "machine": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "machineName": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "machineName"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectMachineFolders": {
+      "type": "object",
+      "description": "One machine of machines/projectFolders (#3277): its id and name, and the absolute paths of its folders in the project.",
+      "properties": {
+        "machine": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "machine",
+        "machineName",
+        "folders"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderAdd": {
+      "type": "object",
+      "description": "providers/add and providers/update. `machine` is the machine that carries the provider (#3398): it runs the provider's server, and `secrets` go on to it, never kept by the control plane. None picks the caller's first online machine; an update without it keeps the one it has. `cli` is not kept; `draft` is the draft this accepts (#858).",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/ProviderID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "commands",
+            "stdio",
+            "http"
+          ]
+        },
+        "command": {
+          "type": "string"
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "url": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "commands": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "map": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "machine": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "cli": {
+          "type": "string"
+        },
+        "draft": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "name",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderCarried": {
+      "type": "object",
+      "description": "What a provider's machine answers to providers/carry, providers/keepSecrets, providers/forget and providers/ssh (#3398): the call's result, or why it failed, in words for the person. Channel 0 has no error path.",
+      "properties": {
+        "result": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProviderCarry": {
+      "type": "object",
+      "description": "providers/carry (#3398): the control plane asks the machine that carries a provider to call it. `record` is the provider's record, which never holds a secret; the machine runs its server with the secrets it keeps. `secrets` is only a draft's, for this call, and is not kept.",
+      "properties": {
+        "provider": {
+          "$ref": "core.schema.json#/definitions/ProviderID"
+        },
+        "record": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "call": {
+          "type": "string",
+          "enum": [
+            "check",
+            "list",
+            "start",
+            "stop",
+            "options",
+            "create",
+            "delete",
+            "tools"
+          ]
+        },
+        "workspace": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "options": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "firstBoot": {
+          "type": "string"
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "provider",
+        "record",
+        "call"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderCreate": {
+      "type": "object",
+      "description": "providers/create. With no `id`, the person's default provider: the first one added that they may make machines from (#3972). With no `name`, `machine-N`, from the person's own counter. With no `options`, the provider's defaults: each field's `default`, or else the first of its `enum`.",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/ProviderID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "options": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "clones": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository to start it from (#1809), an https git address. A provider whose New Machine form has `repository`, such as Codespaces, makes the workspace from it; any other has the host clone it once it joins, before `clones`."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProviderCreated": {
+      "type": "object",
+      "description": "What providers/create made.",
+      "properties": {
+        "workspace": {
+          "$ref": "#/definitions/MachineInfo"
+        },
+        "joining": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "workspace",
+        "joining"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftAnswer": {
+      "type": "object",
+      "description": "providers/draftAnswer: yes or no to a question.",
+      "properties": {
+        "draft": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "question": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "yes": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "draft",
+        "question",
+        "yes"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftAnswered": {
+      "type": "object",
+      "description": "A draft answered with no agent: the server follows the contract, or a shipped map fits.",
+      "properties": {
+        "note": {
+          "type": "string"
+        },
+        "map": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "preset": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "note"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftRequest": {
+      "type": "object",
+      "description": "providers/draftCancel.",
+      "properties": {
+        "draft": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "draft"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftSign": {
+      "type": "object",
+      "description": "The writing agent's start, for the client that asked for the draft to sign (#3542): the machine that holds its person's lock takes no start the control plane sends in its own words. The client checks that it starts only a draft's writer (agents/start, the draft's purpose, sandboxed, no MCP servers or other folders), signs method and params as they are (a LockSignature to machine), and sends the signature with providers/draftSigned.",
+      "properties": {
+        "machine": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftSigned": {
+      "type": "object",
+      "description": "providers/draftSigned (#3542): the signature of a draft's sign, which the control plane delivers with the start as it came.",
+      "properties": {
+        "draft": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "lock": {
+          "$ref": "org.schema.json#/definitions/LockSignature"
+        }
+      },
+      "required": [
+        "draft",
+        "lock"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftStart": {
+      "type": "object",
+      "description": "providers/draftStart (#858).",
+      "properties": {
+        "form": {
+          "$ref": "#/definitions/ProviderAdd"
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "provider": {
+          "$ref": "core.schema.json#/definitions/ProviderID"
+        },
+        "runtimeID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "form",
+        "runtimeID"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftStarted": {
+      "type": "object",
+      "properties": {
+        "draft": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "answered": {
+          "$ref": "#/definitions/ProviderDraftAnswered"
+        },
+        "sign": {
+          "$ref": "#/definitions/ProviderDraftSign"
+        }
+      },
+      "required": [
+        "draft"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderDraftUpdate": {
+      "type": "object",
+      "description": "control/providerDraft: how a draft stands, to the client that started it.",
+      "properties": {
+        "draft": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "state": {
+          "type": "string"
+        },
+        "runtimeName": {
+          "type": "string"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "workflows.schema.json#/definitions/DraftStep"
+          }
+        },
+        "cost": {
+          "type": "string"
+        },
+        "draftJSON": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "check": {
+          "$ref": "workflows.schema.json#/definitions/DraftCheck"
+        },
+        "question": {
+          "$ref": "workflows.schema.json#/definitions/DraftQuestion"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "draft",
+        "state",
+        "runtimeName",
+        "steps"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderList": {
+      "type": "object",
+      "description": "providers/list and control/providersChanged.",
+      "properties": {
+        "providers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProviderSummary"
+          }
+        }
+      },
+      "required": [
+        "providers"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderOptions": {
+      "type": "object",
+      "description": "providers/options: the New Machine form, a JSON Schema, with what New Machine would make (#4634). With no `id`, the person's default provider.",
+      "properties": {
+        "schema": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "id": {
+          "$ref": "core.schema.json#/definitions/ProviderID",
+          "description": "The provider the form is for: the one asked for, or else the person's default."
+        },
+        "values": {
+          "$ref": "core.schema.json#/definitions/JSONValue",
+          "description": "The values the form starts with: the options the person made a machine with last on this provider, over each field's `default` or else the first of its `enum`."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name New Machine would give: the person's next `machine-N`. Not kept until a make uses it."
+        }
+      },
+      "required": [
+        "schema"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderRequest": {
+      "type": "object",
+      "description": "providers/remove, providers/refresh, providers/options (with no `id`, the default provider).",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/ProviderID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProviderRuntime": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "isDefault": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "isDefault"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderRuntimes": {
+      "type": "object",
+      "description": "providers/runtimes: what may write, on which host, or why none.",
+      "properties": {
+        "runtimes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProviderRuntime"
+          }
+        },
+        "host": {
+          "type": "string"
+        },
+        "why": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimes"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderSSH": {
+      "type": "object",
+      "description": "providers/ssh (#3398): the machine that carries a codespaces provider starts a codespace's agentsd over ssh (`start`), reads its host key (`hostKey`), installs Agents in it with a host code from the control plane (`install`, #3497), or holds an ssh session to it that GitHub counts as use while its machine works (`keepAwake`, renewed each few minutes, and `letSleep`, #4637), with the token it keeps. Its result is ProviderSSHResult.",
+      "properties": {
+        "provider": {
+          "$ref": "core.schema.json#/definitions/ProviderID"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "start",
+            "hostKey",
+            "install",
+            "keepAwake",
+            "letSleep"
+          ]
+        },
+        "hostCode": {
+          "type": "string",
+          "description": "install's host code: the codespace runs the control plane's install.sh with it, from the address and pin it names."
+        },
+        "destination": {
+          "type": "string"
+        },
+        "codespace": {
+          "type": "string",
+          "description": "The codespace's name, for gh."
+        },
+        "knownHosts": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "renew": {
+          "type": "boolean"
+        },
+        "trust": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "op",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderSSHResult": {
+      "type": "object",
+      "description": "providers/ssh's result (#3398): the host key taken, in known_hosts form, and for hostKey a fingerprint to trust first.",
+      "properties": {
+        "knownHosts": {
+          "type": "string"
+        },
+        "needsTrust": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProviderSummary": {
+      "type": "object",
+      "description": "A provider for the Providers page, never its commands, headers or secrets' values.",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/ProviderID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "contract": {
+          "type": "integer"
+        },
+        "mapped": {
+          "type": "boolean"
+        },
+        "preset": {
+          "type": "string"
+        },
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MachineInfo"
+          }
+        },
+        "listedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "current": {
+          "type": "boolean"
+        },
+        "problem": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string",
+          "description": "The group whose users may use it (#1761); none is the admins' alone."
+        },
+        "mayUse": {
+          "type": "boolean",
+          "description": "The caller may start machines from it (#1761): they are in its group. Absent from an older control plane, which lets everyone."
+        },
+        "default": {
+          "type": "boolean",
+          "description": "New Machine makes the caller's machines on it (#3979): the one they made a machine on last or chose with Make Default, or else the first one added. True on one provider at most; absent from an older control plane."
+        },
+        "machine": {
+          "$ref": "#/definitions/MachineRef",
+          "description": "The machine that carries it: runs its server and keeps its secrets (#3398). Absent for one made before, which must be added again."
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "machineOffline": {
+          "type": "boolean",
+          "description": "Its machine is offline: its machines can't be started, stopped, made or deleted until it is back (#3398)."
+        },
+        "sshToolMissing": {
+          "type": "string",
+          "description": "The CLI its machines are reached through over ssh (gh, coder) when the control plane's machine has none (#3367). Absent when it needs none or has it."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "secrets",
+        "capabilities",
+        "contract",
+        "mapped",
+        "workspaces",
+        "current"
+      ],
+      "additionalProperties": false
+    },
+    "QuitRequest": {
+      "type": "object",
+      "properties": {
+        "stopAgents": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "stopAgents"
+      ],
+      "additionalProperties": false
+    },
+    "ReceiveRequest": {
+      "type": "object",
+      "description": "Makes or brings up to date a host's copy of a Mac's repository (#1123): fetches the `bundle` upload, moves `branches` forward only, checks out `checkout`, sets `origin`, applies the `patch` upload (uncommitted changes), and adds the folder as a folder. It stops, and changes nothing, when the host has changes or commits of its own.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "bundle": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "patch": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SentBranch"
+          }
+        },
+        "checkout": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder",
+        "branches",
+        "checkout"
+      ],
+      "additionalProperties": false
+    },
+    "ReceiveState": {
+      "type": "object",
+      "description": "What a host has at a folder before a send (#1123). `heads` are the commits of its branches, so the Mac's bundle carries only what the host lacks. `ownChanges` is true when the folder has changes that the last send did not put there.",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "repository": {
+          "type": "boolean"
+        },
+        "ownChanges": {
+          "type": "boolean"
+        },
+        "heads": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "exists",
+        "repository",
+        "ownChanges",
+        "heads"
+      ],
+      "additionalProperties": false
+    },
+    "ReceiveStateRequest": {
+      "type": "object",
+      "description": "Asks a host about a folder a Mac will send a repository to (Send to ‹host›…, #1123). `folder` may start with ~/.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "ReceiveUploadRequest": {
+      "type": "object",
+      "description": "One part of a file a Mac sends (#1123), at `offset` in the upload. A part is at most 16 MB; the host keeps the upload until folders/receive uses it.",
+      "properties": {
+        "upload": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "data": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        }
+      },
+      "required": [
+        "upload",
+        "offset",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "RequestUpdate": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "$ref": "core.schema.json#/definitions/Request"
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "RequiredCapabilities": {
+      "type": "object",
+      "description": "What the control plane needs of a peer to route for it (#1748): a host without each of host is needsUpdate, and a client without each of client is answered -32008.",
+      "properties": {
+        "host": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "client": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "host",
+        "client"
+      ],
+      "additionalProperties": false
+    },
+    "ResumingNotification": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "isResuming": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agentID",
+        "isResuming"
+      ],
+      "additionalProperties": false
+    },
+    "ResumingResponse": {
+      "type": "object",
+      "properties": {
+        "agentIDs": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/UUID"
+          }
+        }
+      },
+      "required": [
+        "agentIDs"
+      ],
+      "additionalProperties": false
+    },
+    "Runtime": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "executable": {
+          "type": "string"
+        },
+        "arguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "install": {
+          "$ref": "#/definitions/RuntimeInstall"
+        },
+        "installPage": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "usesAppCopyOnly": {
+          "type": "boolean"
+        },
+        "accountFolderVariable": {
+          "description": "The variable that names the folder its sign-in is kept in, for a runtime that can have more than one account (#840): CLAUDE_CONFIG_DIR, CODEX_HOME.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "executable",
+        "arguments",
+        "installPage",
+        "usesAppCopyOnly"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeAssessmentCheck": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "area": {
+          "type": "string"
+        },
+        "verdict": {
+          "$ref": "#/definitions/RuntimeAssessmentVerdict"
+        },
+        "evidence": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "area",
+        "verdict",
+        "evidence"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeAssessmentScore": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "runtimeID": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "runtimeVersion": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "scoredAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "reportPath": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuntimeAssessmentCheck"
+          }
+        }
+      },
+      "required": [
+        "agentID",
+        "runtimeID",
+        "scoredAt",
+        "checks"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeAssessmentVerdict": {
+      "type": "string",
+      "enum": [
+        "passed",
+        "failed",
+        "not_offered"
+      ]
+    },
+    "RuntimeAvailability": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "available": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "supportsResume": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "path",
+                "supportsResume"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "available"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "missing": {
+              "type": "object",
+              "properties": {
+                "lookedIn": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "lookedIn"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "missing"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "needsSignIn": {
+              "type": "object",
+              "properties": {
+                "authMethods": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "fixCommand": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "authMethods"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "needsSignIn"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "failed": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "failed"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "installing": {
+              "type": "object",
+              "properties": {
+                "progress": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "installing"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "installFailed": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "installFailed"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "RuntimeInstall": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "toolset": {
+              "type": "object",
+              "properties": {
+                "runtimeID": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "runtimeID"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "toolset"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "script": {
+              "type": "object",
+              "properties": {
+                "url": {
+                  "$ref": "core.schema.json#/definitions/URLString"
+                },
+                "shell": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "url",
+                "shell"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "script"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "npmGlobal": {
+              "type": "object",
+              "properties": {
+                "package": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "package"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "npmGlobal"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "RuntimeRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeSession": {
+      "type": "object",
+      "properties": {
+        "sessionID": {
+          "type": "string"
+        },
+        "cwd": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "additionalDirectories": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/URLString"
+          }
+        },
+        "title": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "isHeld": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sessionID",
+        "cwd"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeStatus": {
+      "type": "object",
+      "properties": {
+        "runtime": {
+          "$ref": "#/definitions/Runtime"
+        },
+        "availability": {
+          "$ref": "#/definitions/RuntimeAvailability"
+        },
+        "checkedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "outdated": {
+          "type": "boolean"
+        },
+        "poolNote": {
+          "type": "string"
+        },
+        "isOut": {
+          "type": "boolean"
+        },
+        "setBy": {
+          "$ref": "org.schema.json#/definitions/PolicySetBy",
+          "description": "Set when the organisation's policy does not allow this runtime here (#998, FR-010)."
+        },
+        "signIn": {
+          "$ref": "org.schema.json#/definitions/RuntimeSignIn"
+        },
+        "version": {
+          "type": "string",
+          "description": "The installed copy's version: the toolset's pinned version for the app's own copy, else what the runtime's --version says (#3674). Absent when it is not installed or does not say."
+        }
+      },
+      "required": [
+        "runtime",
+        "availability",
+        "checkedAt",
+        "outdated"
+      ],
+      "additionalProperties": false
+    },
+    "SSHHost": {
+      "type": "object",
+      "description": "A server ssh knows by a name, for Add a Machine's server box (#610).",
+      "properties": {
+        "alias": {
+          "type": "string"
+        },
+        "resolved": {
+          "type": "string"
+        },
+        "throughBastion": {
+          "type": "boolean"
+        },
+        "isBastion": {
+          "type": "boolean"
+        },
+        "known": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "alias",
+        "resolved",
+        "throughBastion",
+        "isBastion",
+        "known"
+      ],
+      "additionalProperties": false
+    },
+    "SSHHostsRequest": {
+      "type": "object",
+      "description": "machines/sshHosts (#610): with a destination, just that, as typed.",
+      "properties": {
+        "destination": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SelfUpdate": {
+      "type": "object",
+      "description": "How a Mac's host updates Agents Host to the release the control plane names, with no administrator (#2178).",
+      "properties": {
+        "autoUpdate": {
+          "type": "boolean"
+        },
+        "state": {
+          "$ref": "#/definitions/SelfUpdateState"
+        },
+        "running": {
+          "type": "string",
+          "description": "The version this copy is."
+        },
+        "release": {
+          "type": "string",
+          "description": "The release the control plane named last; none until it names one."
+        },
+        "message": {
+          "type": "string",
+          "description": "Why it failed or cannot, in a sentence for the person."
+        }
+      },
+      "required": [
+        "autoUpdate",
+        "state",
+        "running"
+      ],
+      "additionalProperties": false
+    },
+    "SelfUpdateSet": {
+      "type": "object",
+      "description": "selfUpdate/set (#2178).",
+      "properties": {
+        "autoUpdate": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "autoUpdate"
+      ],
+      "additionalProperties": false
+    },
+    "SelfUpdateState": {
+      "type": "string",
+      "description": "Where updating Agents Host is (#2178): upToDate, off (the person turned it off), downloading, waiting (ready; it waits for the last turn to end), restarting, failed (the next release named tries again), cannot (this copy cannot update itself, such as one in a folder only an administrator changes).",
+      "enum": [
+        "upToDate",
+        "off",
+        "downloading",
+        "waiting",
+        "restarting",
+        "failed",
+        "cannot"
+      ],
+      "x-fallback": "upToDate"
+    },
+    "SendFacts": {
+      "type": "object",
+      "description": "What the Send sheet shows (#1123): the local branches, the one checked out (none when detached), the origin, and whether anything is uncommitted.",
+      "properties": {
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "current": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "hasChanges": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "branches",
+        "hasChanges"
+      ],
+      "additionalProperties": false
+    },
+    "SendFactsRequest": {
+      "type": "object",
+      "description": "Asks this Mac's host about a repository to send (Send to ‹host›…, #1123).",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "SendFile": {
+      "type": "object",
+      "description": "A file the host made for a send, read with folders/sendRead (#1123).",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "size": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "size"
+      ],
+      "additionalProperties": false
+    },
+    "SendNotification": {
+      "type": "object",
+      "description": "send/changed (#4613): how a send that folders/send started goes. `sent` of `total` bytes are on the other machine (0 of 0 while the bundle is made); `finished` once it ended, whichever way: `received` is the folder it became there, or `problem` says why it stopped, in the person's words.",
+      "properties": {
+        "send": {
+          "$ref": "#/definitions/SendSummary"
+        },
+        "sent": {
+          "type": "integer"
+        },
+        "total": {
+          "type": "integer"
+        },
+        "finished": {
+          "type": "boolean"
+        },
+        "problem": {
+          "type": "string"
+        },
+        "received": {
+          "$ref": "files.schema.json#/definitions/FolderSummary"
+        }
+      },
+      "required": [
+        "send",
+        "sent",
+        "total",
+        "finished"
+      ],
+      "additionalProperties": false
+    },
+    "SendPack": {
+      "type": "object",
+      "description": "What folders/sendPack made (#1123): each branch at its commit, the bundle (none when the receiving host has every commit) and the patch (none when nothing is uncommitted).",
+      "properties": {
+        "commits": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SentBranch"
+          }
+        },
+        "bundle": {
+          "$ref": "#/definitions/SendFile"
+        },
+        "patch": {
+          "$ref": "#/definitions/SendFile"
+        }
+      },
+      "required": [
+        "commits"
+      ],
+      "additionalProperties": false
+    },
+    "SendPackRequest": {
+      "type": "object",
+      "description": "Makes what a send carries (#1123): a bundle of `branches` without the commits in `leavingOut` (the receiving host's), and with `includeChanges` a patch of the uncommitted changes, new files git does not ignore among them.",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "leavingOut": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "includeChanges": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "branches",
+        "leavingOut",
+        "includeChanges"
+      ],
+      "additionalProperties": false
+    },
+    "SendRead": {
+      "type": "object",
+      "description": "A part of at most 1 MB (#1530). `end` is true for the last, and then the host removes the file.",
+      "properties": {
+        "data": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        },
+        "end": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "data",
+        "end"
+      ],
+      "additionalProperties": false
+    },
+    "SendReadRequest": {
+      "type": "object",
+      "description": "One part of a file folders/sendPack made, from `offset` (#1123).",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "offset": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "offset"
+      ],
+      "additionalProperties": false
+    },
+    "SendRequest": {
+      "type": "object",
+      "description": "folders/send (#4613): Send to ‹machine›… from a client. This host sends `branches` of the repository at `folder`, less the commits the folder there has, and with `includeChanges` its uncommitted changes, to `destination` on `machine` (the control plane's id or name for it; `machineName` is the name the person knows it by, for the words), through the control plane, as start_session with send does (#2929). There `checkout` is checked out and `origin` set.",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "checkout": {
+          "type": "string"
+        },
+        "includeChanges": {
+          "type": "boolean"
+        },
+        "origin": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder",
+        "machine",
+        "destination",
+        "branches",
+        "checkout",
+        "includeChanges"
+      ],
+      "additionalProperties": false
+    },
+    "SendSummary": {
+      "type": "object",
+      "description": "One send folders/send started (#4613): the folder here, and the folder on the machine it goes to.",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "startedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "id",
+        "folder",
+        "machine",
+        "machineName",
+        "destination",
+        "startedAt"
+      ],
+      "additionalProperties": false
+    },
+    "SentBranch": {
+      "type": "object",
+      "description": "A branch the Mac sends, at the commit it has (#1123).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "commit"
+      ],
+      "additionalProperties": false
+    },
+    "ServerReachabilityChange": {
+      "type": "object",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "online": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "server",
+        "online"
+      ],
+      "additionalProperties": false
+    },
+    "SessionMoveIn": {
+      "type": "object",
+      "description": "agents/moveIn (#3717): a session moving here from another of the person's machines, with move_session. `upload` is the export of its record and its transcript, sent with folders/receiveUpload; `folder` is the folder here it goes on in, where its branch was sent first. It keeps its id, labels and times, and goes on in this machine's root; its runtime reads the app's record ahead of its next prompt (`movedFrom`). `from` is the machine it leaves (the control plane writes `machine`), and the agent there that started it, when that agent stays there. With `carryOn`, it starts again here at once, as it was working when it moved.",
+      "properties": {
+        "upload": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "from": {
+          "$ref": "sessions.schema.json#/definitions/StartedFrom"
+        },
+        "carryOn": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "upload",
+        "folder",
+        "from"
+      ],
+      "additionalProperties": false
+    },
+    "SessionMovedFrom": {
+      "type": "object",
+      "description": "The machine a session moved here from with move_session (#3717), and when.",
+      "properties": {
+        "machine": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "machine",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "SetDiskSpaceRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "diskSpace": {
+          "$ref": "#/definitions/DiskThresholds"
+        }
+      },
+      "required": [
+        "folder",
+        "diskSpace"
+      ],
+      "additionalProperties": false
+    },
+    "SetProviderRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "providerID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "providerID"
+      ],
+      "additionalProperties": false
+    },
+    "SharedRuntimeName": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "SharedRuntimeOnlyServer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "runtimeID": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "runtimeID",
+        "file"
+      ],
+      "additionalProperties": false
+    },
+    "SharedServer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "transport": {
+          "description": "`stdio`, `http` or `sse`.",
+          "type": "string"
+        },
+        "summary": {
+          "description": "The command and its first arguments, or the URL without its query.",
+          "type": "string"
+        },
+        "envNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "headerNames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "clash": {
+          "description": "The runtimes with a server of this name in their own config, and that file.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "reach": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "files.schema.json#/definitions/SharedReach"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "transport",
+        "summary",
+        "envNames",
+        "headerNames",
+        "clash",
+        "reach"
+      ],
+      "additionalProperties": false
+    },
+    "Simulator": {
+      "type": "object",
+      "description": "An iOS simulator on a Mac host (#842): its UDID, its name, its system and whether it is booted.",
+      "properties": {
+        "udid": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "os": {
+          "type": "string"
+        },
+        "booted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "udid",
+        "name",
+        "os",
+        "booted"
+      ],
+      "additionalProperties": false
+    },
+    "SimulatorList": {
+      "type": "object",
+      "description": "simulators/list: the host's simulators, booted first. Reason says why there are none to list, when a host has no simulators (not a Mac, no Xcode).",
+      "properties": {
+        "simulators": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Simulator"
+          }
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "simulators"
+      ],
+      "additionalProperties": false
+    },
+    "SimulatorRequest": {
+      "type": "object",
+      "description": "simulators/boot and simulators/shutdown: one simulator, by its UDID.",
+      "properties": {
+        "udid": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "udid"
+      ],
+      "additionalProperties": false
+    },
+    "SimulatorScreen": {
+      "type": "object",
+      "description": "A booted simulator's screen as a JPEG, and its size in pixels.",
+      "properties": {
+        "jpeg": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        },
+        "width": {
+          "type": "integer"
+        },
+        "height": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "jpeg",
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
+    },
+    "SimulatorScreenRequest": {
+      "type": "object",
+      "description": "simulators/screen: a booted simulator's screen, at most maxHeight pixels tall (1200 when left out).",
+      "properties": {
+        "udid": {
+          "type": "string"
+        },
+        "maxHeight": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "udid"
+      ],
+      "additionalProperties": false
+    },
+    "SimulatorTapRequest": {
+      "type": "object",
+      "description": "simulators/tap: a touch on a booted simulator's screen, where from 0 to 1 across (x) and down (y).",
+      "properties": {
+        "udid": {
+          "type": "string"
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "udid",
+        "x",
+        "y"
+      ],
+      "additionalProperties": false
+    },
+    "StartedMachinePreview": {
+      "type": "object",
+      "description": "A started machine in people/removePreview: the branches and worktrees on it with work that is not pushed. `unknown` says why it could not be asked (offline, or it did not answer), and then `unpushed` is empty.",
+      "properties": {
+        "host": {
+          "$ref": "#/definitions/MachineRef"
+        },
+        "name": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "unpushed": {
+          "type": "array",
+          "items": {
+            "$ref": "reports.schema.json#/definitions/UnpushedWork"
+          }
+        },
+        "unknown": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "host",
+        "name",
+        "state",
+        "unpushed"
+      ],
+      "additionalProperties": false
+    },
+    "TunnelOpen": {
+      "type": "object",
+      "description": "tunnel/open, from the borrowing host (T091).",
+      "properties": {
+        "runtime": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtime",
+        "ref"
+      ],
+      "additionalProperties": false
+    },
+    "UpdateState": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "unknown": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "unknown"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "current": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "current"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "available": {
+              "type": "object",
+              "properties": {
+                "commit": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "commit"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "available"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WaitServerEvent": {
+      "type": "object",
+      "properties": {
+        "trigger": {
+          "$ref": "mcp.schema.json#/definitions/MCPEventTrigger"
+        },
+        "servers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "trigger",
+        "servers"
+      ],
+      "additionalProperties": false
+    },
+    "WakeSettings": {
+      "type": "object",
+      "description": "Whether this Mac is kept awake for agents, and for how long after they stop (024), as wake.json in the root.",
+      "properties": {
+        "keepsAwake": {
+          "type": "boolean"
+        },
+        "graceHours": {
+          "type": "integer"
+        },
+        "warmRuntimes": {
+          "type": "integer",
+          "description": "How many finished sessions keep their runtime running, ready for a reply (#183, #4044): 0 to 8, default 3, 0 turning the warm pool off. A runtime with background processes does not count against it."
+        },
+        "awakeOnPower": {
+          "type": "boolean"
+        },
+        "backgroundHours": {
+          "type": "integer",
+          "description": "How long a finished runtime whose background processes (a dev server, a build, a watcher) still run is kept, counted from its last turn's end (#4044): 1 to 24 hours, default 4. Its processes are then ended with it. 0, or missing, from a client that does not know it, keeps the value the host has."
+        },
+        "releaseAfterMinutes": {
+          "type": "integer",
+          "description": "How long a finished runtime with no background processes is kept, counted from its last turn's end, before the host ends it (#4044, #4513): 0 to 1440 minutes, default 10. An agent that waits for an event (wait_for_event, a lease) is then continued with session/load when the event comes. 0 releases none for being idle; warmRuntimes still holds. Missing, from a client that does not know it, keeps the value the host has. A runtime that can neither load nor resume a conversation is kept while its agent waits."
+        }
+      },
+      "required": [
+        "keepsAwake",
+        "graceHours",
+        "warmRuntimes",
+        "awakeOnPower"
+      ],
+      "additionalProperties": false
+    },
+    "WakeState": {
+      "type": "object",
+      "description": "Why the Mac is, or is not, being kept awake (024).",
+      "properties": {
+        "isHolding": {
+          "type": "boolean"
+        },
+        "agentsInFlight": {
+          "type": "integer"
+        },
+        "heldBackByBattery": {
+          "type": "boolean"
+        },
+        "batteryPercent": {
+          "type": "integer"
+        },
+        "since": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "graceUntil": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "onPower": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "isHolding",
+        "agentsInFlight",
+        "heldBackByBattery",
+        "onPower"
+      ],
+      "additionalProperties": false
+    },
+    "WebPagePairing": {
+      "type": "object",
+      "description": "machine/pairWebPage (#4214): the web page's address with a one-time browser code after #code=, for the agent browser to open.",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "WebRemoteStatus": {
+      "type": "object",
+      "properties": {
+        "port": {
+          "type": "integer"
+        },
+        "served": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "port",
+        "served"
+      ],
+      "additionalProperties": false
+    },
+    "WebServe": {
+      "type": "object",
+      "description": "control/setWeb (#4252, 071 FR-002): serve Agents to browsers on the control plane's Mac, or stop. Off closes the loopback listener; a page open through it stays connected.",
+      "properties": {
+        "on": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "on"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

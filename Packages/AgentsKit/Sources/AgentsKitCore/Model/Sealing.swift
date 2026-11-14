@@ -8,7 +8,7 @@ import Foundation
 /// them. The control plane keeps and sends the envelopes and never opens one. The window and the
 /// Remote seal again for a machine that joined, or a client paired, after a value was sealed:
 /// `ClientSealing.sealWaiting`, at each connection and on `control/sealingWanted`.
-/// The types are hand-written against `Packages/Wire/daemon.schema.json` (`WireSchemaTests`).
+/// The types are hand-written against `Packages/Wire/schema` (`WireSchemaTests`).
 public extension DaemonAPI {
     /// A machine or a client to seal to: `m:<machine id>` or `c:<CLIENT ID>`, and its key.
     struct SealRecipient: Codable, Sendable, Hashable {

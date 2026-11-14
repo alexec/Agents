@@ -45,7 +45,7 @@ struct MachineBrowserTests {
     }
 
     @Test func whatTheClientSendsIsWhatTheSchemaSays() throws {
-        let schema = try WireSchema(WireSchemaTests.read("daemon.schema.json"))
+        let schema = try WireSchema(WireSchemaTests.readSchema())
         func check(_ value: some Encodable, _ name: String) throws {
             let json = try JSONValue.parse(JSONEncoder().encode(value))
             #expect(schema.errors(json, against: name) == [], "\(name)")

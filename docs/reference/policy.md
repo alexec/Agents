@@ -10,7 +10,7 @@ The organisation's policy (#998): one document on the control plane, signed by i
 sent to every machine. Each rule is optional. A rule that is not set sets no ceiling. Why
 and how it is sent: [Policy](../explanation/control-plane.md#policy).
 
-The types are in `Packages/Wire/daemon.schema.json` (`OrgPolicy`, `SignedPolicy`,
+The types are in `Packages/Wire/schema` (`OrgPolicy`, `SignedPolicy`,
 `PolicySignature`, `PolicyRefusal`, `PolicySetBy`), and the methods in
 `Packages/Wire/control.openrpc.json`.
 

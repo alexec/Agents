@@ -41,7 +41,7 @@ struct GovernanceWordsTests {
 
     /// The ask, the request and the list fit Packages/Wire, which the Go control plane is made from.
     @Test func theTypesFitTheSchema() throws {
-        let schema = try WireSchema(WireSchemaTests.read("daemon.schema.json"))
+        let schema = try WireSchema(WireSchemaTests.readSchema())
         let full = DaemonAPI.CatalogRequest(id: "r1", kind: .skills, name: "review", source: "acme", why: "For reviews",
                                             user: "u1", userName: "Sam", at: Date(timeIntervalSinceReferenceDate: 700_000_000),
                                             state: .approved, group: "g1", groupName: "Platform", decidedBy: "Priya",

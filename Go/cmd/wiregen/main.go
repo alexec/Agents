@@ -1,5 +1,5 @@
 // Command wiregen makes the wire types from Packages/Wire (#1135): the schema
-// (daemon.schema.json) and the methods (daemon.openrpc.json, control.openrpc.json).
+// (schema/*.schema.json) and the methods (daemon.openrpc.json, control.openrpc.json).
 //
 //	wiregen [-root <repo>] [-check]
 //
@@ -15,11 +15,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 )
 
 // The files wiregen reads and writes, from the repository root.
 const (
-	SchemaFile = "Packages/Wire/daemon.schema.json"
+	SchemaDir  = "Packages/Wire/schema" // one *.schema.json per domain (#5380)
 	DaemonRPC  = "Packages/Wire/daemon.openrpc.json"
 	ControlRPC = "Packages/Wire/control.openrpc.json"
 	GoTypes    = "Go/wire/types_gen.go"
@@ -79,13 +80,22 @@ func generate(root string) (map[string]string, error) {
 		}
 		return b, nil
 	}
-	b, err := read(SchemaFile)
+	paths, err := filepath.Glob(filepath.Join(root, SchemaDir, "*.schema.json"))
+	if err != nil || len(paths) == 0 {
+		return nil, fmt.Errorf("%s: no schema files", SchemaDir)
+	}
+	sort.Strings(paths)
+	var parts []Part
+	for _, path := range paths {
+		b, err := os.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		parts = append(parts, Part{Path: filepath.ToSlash(path), Data: b})
+	}
+	doc, err := readDocument(parts...)
 	if err != nil {
 		return nil, err
-	}
-	doc, err := readDocument(b)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %w", SchemaFile, err)
 	}
 	var rpcs []*RPC
 	for _, d := range []struct{ path, target string }{{DaemonRPC, "host"}, {ControlRPC, "control"}} {

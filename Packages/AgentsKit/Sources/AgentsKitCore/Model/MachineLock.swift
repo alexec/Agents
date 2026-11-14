@@ -9,7 +9,7 @@ import Foundation
 /// last saw. A client that is not in the lock asks to join (#3490, D2): it commits to its
 /// key and a nonce, a signer sends a nonce of its own, then the client shows its nonce, and
 /// both screens show six digits.
-/// The types are hand-written against `Packages/Wire/daemon.schema.json` (`WireSchemaTests`).
+/// The types are hand-written against `Packages/Wire/schema` (`WireSchemaTests`).
 public extension DaemonAPI {
     enum LockEntryKind: String, Codable, Sendable, Hashable {
         case root, addClient, addMachine, invite, remove, recovery

@@ -1,0 +1,3940 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agents.alexecollins.com/schema/reports.schema.json",
+  "title": "The wire: reports types",
+  "description": "Part of the source of every type on the wire (#1135, #5380): one file per domain in Packages/Wire/schema. A $ref to another file names it (core.schema.json#/definitions/JSONValue); scripts/wire.sh gen reads them all.",
+  "definitions": {
+    "Achievements": {
+      "type": "object",
+      "properties": {
+        "earned": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EarnedAchievement"
+          }
+        }
+      },
+      "required": [
+        "earned"
+      ],
+      "additionalProperties": false
+    },
+    "AgentWorktree": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "root": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "base": {
+          "type": "string"
+        },
+        "madeByApp": {
+          "type": "boolean"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "name",
+        "root",
+        "folder",
+        "madeByApp"
+      ],
+      "additionalProperties": false
+    },
+    "AllowanceReading": {
+      "type": "object",
+      "properties": {
+        "window": {
+          "type": "string"
+        },
+        "used": {
+          "type": "number"
+        },
+        "resetsAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "spent": {
+          "type": "boolean"
+        },
+        "nearlySpent": {
+          "type": "boolean"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "spent",
+        "nearlySpent",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "AllowanceState": {
+      "type": "object",
+      "properties": {
+        "credentialKey": {
+          "type": "string"
+        },
+        "entryID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "status": {
+          "$ref": "#/definitions/AllowanceStateStatus"
+        },
+        "since": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "changedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "learnedFrom": {
+          "$ref": "#/definitions/AllowanceStateSource"
+        },
+        "lastRateLimit": {
+          "$ref": "core.schema.json#/definitions/RateLimitInfo"
+        },
+        "reading": {
+          "$ref": "#/definitions/AllowanceReading"
+        },
+        "weeks": {
+          "type": "array",
+          "description": "The last reading of each weekly plan window (#3438): one per window and reset time, at most six per window, oldest first. The Runtimes page shows the past ones' final share.",
+          "items": {
+            "$ref": "#/definitions/AllowanceReading"
+          }
+        },
+        "spent": {
+          "$ref": "#/definitions/AllowanceStateSpent"
+        },
+        "rateLimitStreak": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/WireDate"
+          }
+        },
+        "modelsOut": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AllowanceStateModelOut"
+          }
+        }
+      },
+      "required": [
+        "credentialKey",
+        "entryID",
+        "status",
+        "since",
+        "changedAt",
+        "learnedFrom",
+        "spent",
+        "rateLimitStreak"
+      ],
+      "additionalProperties": false
+    },
+    "AllowanceStateModelOut": {
+      "type": "object",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "since": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "retryAfter": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "model",
+        "since",
+        "retryAfter"
+      ],
+      "additionalProperties": false
+    },
+    "AllowanceStateOutReason": {
+      "type": "string",
+      "enum": [
+        "allowanceSpent",
+        "overage",
+        "creditUsedUp",
+        "creditExpired",
+        "rateLimitPersisted",
+        "runtimeFailed"
+      ]
+    },
+    "AllowanceStateSource": {
+      "type": "string",
+      "enum": [
+        "typedFailure",
+        "words",
+        "overageReport",
+        "ledger",
+        "expiry",
+        "person",
+        "runtimeFailure"
+      ]
+    },
+    "AllowanceStateSpent": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "known": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/Cost"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "known"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unknown": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "unknown"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "AllowanceStateStatus": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "available": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "available"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "rateLimited": {
+              "type": "object",
+              "properties": {
+                "until": {
+                  "$ref": "core.schema.json#/definitions/WireDate"
+                }
+              },
+              "required": [
+                "until"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "rateLimited"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "out": {
+              "type": "object",
+              "properties": {
+                "until": {
+                  "$ref": "core.schema.json#/definitions/WireDate"
+                },
+                "retryAfter": {
+                  "$ref": "core.schema.json#/definitions/WireDate"
+                },
+                "why": {
+                  "$ref": "#/definitions/AllowanceStateOutReason"
+                }
+              },
+              "required": [
+                "why"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "out"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ApplyAllowancesRequest": {
+      "type": "object",
+      "properties": {
+        "states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AllowanceState"
+          }
+        }
+      },
+      "required": [
+        "states"
+      ],
+      "additionalProperties": false
+    },
+    "BudgetRaise": {
+      "type": "object",
+      "description": "A budget raised for one person for one UTC day (#998, FR-019), kept in the policy and swept the day after.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "day": {
+          "type": "string",
+          "description": "The UTC day, YYYY-MM-DD."
+        },
+        "daily": {
+          "type": "number"
+        },
+        "dailyTokens": {
+          "type": "integer"
+        },
+        "by": {
+          "$ref": "org.schema.json#/definitions/AuditActor"
+        },
+        "request": {
+          "type": "string",
+          "description": "The request in Console ▸ Requests it answers."
+        }
+      },
+      "required": [
+        "user",
+        "day",
+        "by"
+      ],
+      "additionalProperties": false
+    },
+    "BudgetRequest": {
+      "type": "object",
+      "description": "A person's Ask for More (#3262, spec 998 FR-019): at their organisation's budget, they ask an admin to raise it for today (UTC). One a person a day; it goes the day after.",
+      "properties": {
+        "id": { "type": "string" },
+        "user": { "type": "string" },
+        "userName": { "type": "string" },
+        "day": { "type": "string", "description": "The UTC day it asks for, YYYY-MM-DD." },
+        "at": { "$ref": "core.schema.json#/definitions/WireDate" },
+        "why": { "type": "string" },
+        "state": { "$ref": "#/definitions/BudgetRequestState" },
+        "daily": { "type": "number", "description": "The budget a day in dollars the admin raised it to." },
+        "dailyTokens": { "type": "integer", "description": "The tokens a day the admin raised it to." },
+        "decidedBy": { "type": "string" },
+        "decidedAt": { "$ref": "core.schema.json#/definitions/WireDate" }
+      },
+      "required": ["id", "user", "userName", "day", "at", "state"],
+      "additionalProperties": false
+    },
+    "BudgetRequestList": {
+      "type": "object",
+      "description": "policy/requests (#3262): to an admin, today's Ask for More requests waiting; to anyone, their own of today.",
+      "properties": {
+        "requests": { "type": "array", "items": { "$ref": "#/definitions/BudgetRequest" } }
+      },
+      "required": ["requests"],
+      "additionalProperties": false
+    },
+    "BudgetRequestState": {
+      "type": "string",
+      "enum": ["waiting", "raised", "refused"]
+    },
+    "BuildsBetween": {
+      "type": "object",
+      "description": "A default-branch run of the workflow after a change's last fast run, up to its first slow one (#5177, board 2): whether its run started the job (a run whose paths did not select it did not), and how long the job ran, in seconds.",
+      "properties": {
+        "run": {
+          "$ref": "#/definitions/BuildsRunRef"
+        },
+        "ran": {
+          "type": "boolean"
+        },
+        "jobRun": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "run",
+        "ran"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsChange": {
+      "type": "object",
+      "description": "A change point in one job's run time on the default branch (#5177): the runs either side of the step, the medians of its run time and of its wait (for a runner and its turn) on each side, in seconds, and the score. slower says the run time went up. between is each run in between; points are the job's runs around the change. The finder does not blame: firstSlow is the first run to look at.",
+      "properties": {
+        "workflow": {
+          "type": "string"
+        },
+        "job": {
+          "type": "string"
+        },
+        "slower": {
+          "type": "boolean"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "lastFast": {
+          "$ref": "#/definitions/BuildsRunRef"
+        },
+        "firstSlow": {
+          "$ref": "#/definitions/BuildsRunRef"
+        },
+        "medianBefore": {
+          "type": "number"
+        },
+        "medianAfter": {
+          "type": "number"
+        },
+        "queueBefore": {
+          "type": "number"
+        },
+        "queueAfter": {
+          "type": "number"
+        },
+        "score": {
+          "type": "number"
+        },
+        "runner": {
+          "type": "string"
+        },
+        "slowedSent": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When this machine sent ci.slowed for the change (#5200); absent when it sent none (a speed-up, or a change found too long after its first slow run)."
+        },
+        "between": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsBetween"
+          }
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsPoint"
+          }
+        }
+      },
+      "required": [
+        "workflow",
+        "job",
+        "slower",
+        "at",
+        "lastFast",
+        "firstSlow",
+        "medianBefore",
+        "medianAfter",
+        "queueBefore",
+        "queueAfter",
+        "score",
+        "between",
+        "points"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsDay": {
+      "type": "object",
+      "description": "One day of a build trend (#5177), the day (YYYY-MM-DD) in the request's time zone.",
+      "properties": {
+        "day": {
+          "type": "string"
+        },
+        "figures": {
+          "$ref": "#/definitions/BuildsFigures"
+        }
+      },
+      "required": [
+        "day",
+        "figures"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsFigures": {
+      "type": "object",
+      "description": "A set of CI runs' figures (#5177, spec 5166): runs is the first attempts, green those that passed, reruns the later attempts, counted apart and out of the time figures. Each time figure is of the runs that passed, in seconds: toGreen (made to the last job's end), run (the time a job ran), runner (waiting for a runner) and turn (waiting its turn: made to the first job made); run + runner + turn = toGreen. With a job picked, the job's own run and runner wait.",
+      "properties": {
+        "runs": {
+          "type": "integer"
+        },
+        "green": {
+          "type": "integer"
+        },
+        "reruns": {
+          "type": "integer"
+        },
+        "toGreen": {
+          "$ref": "#/definitions/BuildsStat"
+        },
+        "run": {
+          "$ref": "#/definitions/BuildsStat"
+        },
+        "runner": {
+          "$ref": "#/definitions/BuildsStat"
+        },
+        "turn": {
+          "$ref": "#/definitions/BuildsStat"
+        }
+      },
+      "required": [
+        "runs",
+        "green",
+        "reruns",
+        "toGreen",
+        "run",
+        "runner",
+        "turn"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsHistory": {
+      "type": "object",
+      "description": "builds/history's answer (#5177): the filters' choices in the range (workflows, jobs, branches), the range's figures and each day's, the change points found in the range (on the default branch, whatever the branch filter), and the job that waited longest for a runner. readAt is when this machine last read the forge's runs (Last update); filledFrom is the oldest day the backfill reached, absent before it starts. reader is github or gitlab, or none when Agents does not read CI timings from the repository's forge.",
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "defaultBranch": {
+          "type": "string"
+        },
+        "reader": {
+          "type": "string",
+          "enum": [
+            "azuredevops",
+            "github",
+            "gitlab",
+            "none"
+          ]
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "jobs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "total": {
+          "$ref": "#/definitions/BuildsFigures"
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsDay"
+          }
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsChange"
+          }
+        },
+        "longestRunnerWait": {
+          "$ref": "#/definitions/BuildsRunnerWait"
+        },
+        "readAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "filledFrom": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "repo",
+        "reader",
+        "workflows",
+        "jobs",
+        "branches",
+        "total",
+        "days",
+        "changes"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsHistoryRequest": {
+      "type": "object",
+      "description": "builds/history (#5177): a repository (github:alexec/agents), runs made in [from, to), and the filters: a workflow's file name (ci.yml), a job, and the default branch (no branch and no pullRequests), the pull requests' runs, or one branch. timeZone (an IANA name) says the days; UTC when not said. scope is for builds/historyAll (#5232): whose machines' copies the control plane reads, as reports/value's; a machine leaves it out.",
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "from": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "to": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "workflow": {
+          "type": "string"
+        },
+        "job": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "pullRequests": {
+          "type": "boolean"
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope"
+        }
+      },
+      "required": [
+        "repo",
+        "from",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsJob": {
+      "type": "object",
+      "description": "One job of a CI run attempt (#5177): made (waiting for a runner from then), started and ended, in seconds from the run's made time; runner is its first runner label. A forge with no steps has none.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "made": {
+          "type": "number"
+        },
+        "started": {
+          "type": "number"
+        },
+        "ended": {
+          "type": "number"
+        },
+        "conclusion": {
+          "type": "string"
+        },
+        "runner": {
+          "type": "string"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsStep"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "made",
+        "started",
+        "ended",
+        "steps"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsPoint": {
+      "type": "object",
+      "description": "One run of a job around a change (#5177, board 2): its ci-run ref, when it was made, the job's run time and its wait (for a runner and its turn), in seconds.",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "made": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "ran": {
+          "type": "number"
+        },
+        "queue": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "ref",
+        "made",
+        "ran",
+        "queue"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsRun": {
+      "type": "object",
+      "description": "One CI run attempt, with its jobs and their steps (#5177, board 3): times in seconds from made; started is the attempt's start, ended its last job's end, turn its wait for its turn.",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "attempt": {
+          "type": "integer"
+        },
+        "workflow": {
+          "type": "string"
+        },
+        "event": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "headSha": {
+          "type": "string"
+        },
+        "pr": {
+          "type": "integer"
+        },
+        "url": {
+          "type": "string"
+        },
+        "default": {
+          "type": "boolean"
+        },
+        "tag": {
+          "type": "boolean"
+        },
+        "made": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "started": {
+          "type": "number"
+        },
+        "ended": {
+          "type": "number"
+        },
+        "turn": {
+          "type": "number"
+        },
+        "conclusion": {
+          "type": "string"
+        },
+        "jobs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsJob"
+          }
+        }
+      },
+      "required": [
+        "ref",
+        "id",
+        "attempt",
+        "workflow",
+        "made",
+        "started",
+        "ended",
+        "turn",
+        "jobs"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsRunAnswer": {
+      "type": "object",
+      "description": "builds/run's answer (#5177): the run attempt, and the run to compare it with (the newest passed first attempt of its workflow before it on its branch, or on the default branch when its branch has none). attempts is how many attempts the store has of the run.",
+      "properties": {
+        "run": {
+          "$ref": "#/definitions/BuildsRun"
+        },
+        "before": {
+          "$ref": "#/definitions/BuildsRun"
+        },
+        "attempts": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "run",
+        "attempts"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsRunRef": {
+      "type": "object",
+      "description": "A CI run attempt, named (#5177): its ci-run ref (github:run:alexec/agents#123), id, attempt and when it was made; its address, head commit, branch, pull request and conclusion when known.",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "id": {
+          "type": "integer"
+        },
+        "attempt": {
+          "type": "integer"
+        },
+        "made": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "url": {
+          "type": "string"
+        },
+        "headSha": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "pr": {
+          "type": "integer"
+        },
+        "conclusion": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "id",
+        "attempt",
+        "made"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsRunRequest": {
+      "type": "object",
+      "description": "builds/run (#5177): a repository and a run's ci-run ref; its first attempt when attempt is not said. scope is for builds/runAll (#5232), as builds/historyAll's.",
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "attempt": {
+          "type": "integer"
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope"
+        }
+      },
+      "required": [
+        "repo",
+        "ref"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsRunnerWait": {
+      "type": "object",
+      "description": "The job of a range's passed runs that waited longest for a runner (#5177, board 3 note 4): its run, its name, the wait and its run time, in seconds.",
+      "properties": {
+        "run": {
+          "$ref": "#/definitions/BuildsRunRef"
+        },
+        "job": {
+          "type": "string"
+        },
+        "wait": {
+          "type": "number"
+        },
+        "ran": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "run",
+        "job",
+        "wait",
+        "ran"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsStat": {
+      "type": "object",
+      "description": "A median and a 90th percentile of n values, in seconds (#5177); 0 and 0 when n is 0.",
+      "properties": {
+        "median": {
+          "type": "number"
+        },
+        "p90": {
+          "type": "number"
+        },
+        "n": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "median",
+        "p90",
+        "n"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsStep": {
+      "type": "object",
+      "description": "One step of a job (#5177), started and ended in seconds from the run's made time, as the forge says them.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "number": {
+          "type": "integer"
+        },
+        "started": {
+          "type": "number"
+        },
+        "ended": {
+          "type": "number"
+        },
+        "conclusion": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "number",
+        "started",
+        "ended"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsSync": {
+      "type": "object",
+      "description": "builds/sync (#5232): what changed in one repository's build timings on a machine since its last send, for the control plane's copy. Each day is a UTC day the runs were made (YYYY-MM-DD) and all its runs as the machine has them now, so a day with no runs is gone; reset starts the copy of the repository again from this send, the first of a whole send. defaultBranch, readAt and filledFrom are as builds/history says them. Only refs, times, attempts, conclusions, runner labels and the names of workflows, jobs and steps: no titles, no logs (principle 7).",
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "reset": {
+          "type": "boolean"
+        },
+        "defaultBranch": {
+          "type": "string"
+        },
+        "readAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "filledFrom": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsSyncDay"
+          }
+        }
+      },
+      "required": [
+        "repo",
+        "days"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsSyncAnswer": {
+      "type": "object",
+      "description": "builds/sync's answer (#5232). full: the control plane has no copy of this repository from this machine (a new or moved control plane), so the machine sends all its days again, the first with reset.",
+      "properties": {
+        "full": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "BuildsSyncDay": {
+      "type": "object",
+      "description": "One UTC day of a repository's build timings (#5232): its date (YYYY-MM-DD) and every run attempt made on it.",
+      "properties": {
+        "day": {
+          "type": "string"
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsRun"
+          }
+        }
+      },
+      "required": [
+        "day",
+        "runs"
+      ],
+      "additionalProperties": false
+    },
+    "CatalogUsage": {
+      "type": "object",
+      "description": "governance/usage (#2019, M5), an admin's: who uses each MCP server and skill, at each version, from what each machine last reported.",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "mcp.schema.json#/definitions/CatalogUseRow"
+          }
+        },
+        "machines": {
+          "type": "integer",
+          "description": "How many machines have reported."
+        }
+      },
+      "required": [
+        "rows",
+        "machines"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectReport": {
+      "type": "object",
+      "description": "Where the Mac's window is in a Connect to Another… a client asked for (#4257), told to the person's clients as control/connectReported. One of step or problem.",
+      "properties": {
+        "step": {
+          "type": "string",
+          "description": "What the window does now, in its words (Pairing…, Joining…, or that the sign-in is open on this Mac)."
+        },
+        "problem": {
+          "type": "string",
+          "description": "Why it stopped. This Mac is as it was."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Cost": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "amount",
+        "currency"
+      ],
+      "additionalProperties": false
+    },
+    "CostLimits": {
+      "type": "object",
+      "properties": {
+        "perAgent": {
+          "$ref": "#/definitions/Cost"
+        },
+        "daily": {
+          "$ref": "#/definitions/Cost"
+        },
+        "perAgentTokens": {
+          "type": "integer"
+        },
+        "dailyTokens": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "CostState": {
+      "type": "object",
+      "properties": {
+        "limits": {
+          "$ref": "#/definitions/CostLimits"
+        },
+        "today": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "day": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "tokensToday": {
+          "type": "integer"
+        },
+        "organisation": {
+          "$ref": "#/definitions/CostLimits",
+          "description": "The organisation's budgets for this person today, in US dollars and tokens, with any raise (#998, FR-016). Each limit in force is the lower of this and limits."
+        },
+        "setBy": {
+          "$ref": "org.schema.json#/definitions/PolicySetBy",
+          "description": "Set when the organisation's budgets cap this person's own limits, or this person is at a budget today (#998)."
+        }
+      },
+      "required": [
+        "limits",
+        "today",
+        "day",
+        "tokensToday"
+      ],
+      "additionalProperties": false
+    },
+    "DayRecap": {
+      "type": "object",
+      "properties": {
+        "prsMerged": {
+          "type": "integer"
+        },
+        "agents": {
+          "type": "integer"
+        },
+        "peakAgents": {
+          "type": "integer"
+        },
+        "longestClear": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "agents",
+        "peakAgents",
+        "longestClear"
+      ],
+      "additionalProperties": false
+    },
+    "DiskWorktree": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "partial": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "bytes",
+        "partial"
+      ],
+      "additionalProperties": false
+    },
+    "EarnedAchievement": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "id",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "FeatureUsage": {
+      "type": "object",
+      "description": "reports/features (#2165): each feature this host counted, a method it serves or an app tool, with its uses in the last 7 and the last `days` days, the least used first. A feature with no use is in it too. Counts only, never what a call said; they stay on the machine. since is the first day counted in the range.",
+      "properties": {
+        "days": {
+          "type": "integer"
+        },
+        "since": {
+          "type": "string",
+          "description": "YYYY-MM-DD in the host's zone."
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FeatureUse"
+          }
+        }
+      },
+      "required": [
+        "days",
+        "features"
+      ],
+      "additionalProperties": false
+    },
+    "FeatureUse": {
+      "type": "object",
+      "description": "One feature's uses (#2165). clients is who used it: mac, remote, web, agent or workflow.",
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "week": {
+          "type": "integer"
+        },
+        "quarter": {
+          "type": "integer"
+        },
+        "clients": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "lastUsed": {
+          "type": "string",
+          "description": "YYYY-MM-DD in the host's zone."
+        }
+      },
+      "required": [
+        "method",
+        "week",
+        "quarter",
+        "clients"
+      ],
+      "additionalProperties": false
+    },
+    "FolderWorktrees": {
+      "type": "object",
+      "properties": {
+        "worktrees": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorktreeSummary"
+          }
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder",
+        "worktrees"
+      ],
+      "additionalProperties": false
+    },
+    "Headline": {
+      "type": "object",
+      "properties": {
+        "h1": {
+          "type": "string"
+        },
+        "h2": {
+          "type": "string"
+        },
+        "h3": {
+          "type": "string"
+        },
+        "answers": {
+          "type": "array",
+          "items": {
+            "$ref": "workflows.schema.json#/definitions/QuickAnswer"
+          }
+        }
+      },
+      "required": [
+        "h1",
+        "h2",
+        "h3"
+      ],
+      "additionalProperties": false
+    },
+    "MachineUsage": {
+      "type": "object",
+      "description": "processes/list (#3453): the whole machine's CPU and memory now; and its capacity (#4578), as the last capacity look (every 15 s) found it. The capacity fields are absent until the first look.",
+      "properties": {
+        "cpuPercent": {
+          "type": "number",
+          "description": "Every core together, 0 to 100, since the last ask, or over half a second when there was none in the last minute."
+        },
+        "cpuCount": {
+          "type": "integer"
+        },
+        "memoryUsed": {
+          "type": "integer",
+          "description": "Bytes in use."
+        },
+        "memoryTotal": {
+          "type": "integer",
+          "description": "Bytes the machine has."
+        },
+        "loadPerCore": {
+          "type": "number",
+          "description": "The 1-minute load average divided by the cores: the run queue per core (#4578)."
+        },
+        "loadPerCore5": {
+          "type": "number",
+          "description": "The 5-minute load average divided by the cores."
+        },
+        "memoryPressure": {
+          "$ref": "machines.schema.json#/definitions/MemoryPressure"
+        },
+        "swapUsedPercent": {
+          "type": "number",
+          "description": "Swap in use, 0 to 100; 0 when the machine has none."
+        },
+        "capacity": {
+          "$ref": "machines.schema.json#/definitions/CapacityLevel"
+        }
+      },
+      "required": [
+        "cpuPercent",
+        "cpuCount",
+        "memoryUsed",
+        "memoryTotal"
+      ],
+      "additionalProperties": false
+    },
+    "MachineUsageState": {
+      "type": "object",
+      "description": "machine/usage (#3626): a machine's page. Its CPU and memory now, as processes/list has them, and every disk its agents write to, ok ones too, as the last disk look (every minute) found them.",
+      "properties": {
+        "machine": {
+          "$ref": "#/definitions/MachineUsage"
+        },
+        "disks": {
+          "type": "array",
+          "description": "Each volume once: the most critical first, then the least free.",
+          "items": {
+            "$ref": "machines.schema.json#/definitions/DiskAlarm"
+          }
+        }
+      },
+      "required": [
+        "machine",
+        "disks"
+      ],
+      "additionalProperties": false
+    },
+    "MachineWorkspace": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "$ref": "core.schema.json#/definitions/ProviderID"
+        },
+        "providerName": {
+          "type": "string"
+        },
+        "workspace": {
+          "type": "string"
+        },
+        "workspaceName": {
+          "type": "string"
+        },
+        "workspaceState": {
+          "type": "string"
+        },
+        "hostState": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        },
+        "since": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "problem": {
+          "type": "string"
+        },
+        "stoppedBy": {
+          "type": "string"
+        },
+        "canStart": {
+          "type": "boolean"
+        },
+        "canStop": {
+          "type": "boolean"
+        },
+        "startWhenUsed": {
+          "type": "boolean"
+        },
+        "stopWhenIdleMinutes": {
+          "type": "integer"
+        },
+        "cost": {
+          "type": "string"
+        },
+        "idleTimeoutMinutes": {
+          "type": "integer",
+          "description": "As its provider last listed it: the provider stops it after this many minutes with no use (#4803)."
+        },
+        "current": {
+          "type": "boolean"
+        },
+        "startForSchedules": {
+          "type": "boolean"
+        },
+        "tellsSchedule": {
+          "type": "boolean"
+        },
+        "nextWorkflow": {
+          "type": "string"
+        },
+        "nextWorkflowAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "wakeAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "provider",
+        "providerName",
+        "workspace",
+        "workspaceName",
+        "workspaceState",
+        "canStart",
+        "canStop",
+        "startWhenUsed",
+        "current"
+      ],
+      "additionalProperties": false
+    },
+    "MachineWorkspaceCall": {
+      "type": "object",
+      "description": "machine/machines, for an agent there: who asked, for the log, and its call. deliver is what the other machine is to get, signed by this one (#3492, D7): the control plane delivers it as it is, in place of its own words.",
+      "properties": {
+        "agent": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "params": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "deliver": {
+          "$ref": "org.schema.json#/definitions/LockDelivery"
+        }
+      },
+      "required": [
+        "agent",
+        "method",
+        "params"
+      ],
+      "additionalProperties": false
+    },
+    "Multiplier": {
+      "type": "object",
+      "description": "The Multiplier (#3901, #3903; method in specs/3901-multiplier/spec.md): the PRs the person's agents merged in the last 7 days, less the merged reverts, against the PRs an average engineer merged in a week in 2025. With a control plane it counts all the person's machines, else this machine. multiplier and engineerHours are absent when nothing is counted: the page shows — ×, not 0×.",
+      "properties": {
+        "prsMerged": {
+          "type": "integer",
+          "description": "The PRs counted: merged in the range, less the merged reverts, never below 0. A PR counts when a session of the person worked on it."
+        },
+        "reverts": {
+          "type": "integer",
+          "description": "The merged reverts in the range."
+        },
+        "multiplier": {
+          "type": "number",
+          "description": "prsMerged ÷ baseline.prsPerWeek, to one decimal: 5.0 is 5.0×."
+        },
+        "engineerHours": {
+          "type": "number",
+          "description": "prsMerged × baseline.hoursPerWeek ÷ baseline.prsPerWeek, to the whole hour."
+        },
+        "agentsWorking": {
+          "type": "integer",
+          "description": "This machine's agents with a turn running now."
+        },
+        "since": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "The start of the range: 7 days before it was counted."
+        },
+        "baseline": {
+          "$ref": "#/definitions/MultiplierBaseline"
+        },
+        "changedBy": {
+          "$ref": "lineage.schema.json#/definitions/LineageNode",
+          "description": "On multiplier/changed: the PR whose merge or revert changed it."
+        },
+        "bestWeek": {
+          "type": "number",
+          "description": "The person's best week (#3988): the highest Multiplier of a calendar week, Monday to Sunday in the host's time zone, this week too, counted as multiplier is. Absent until the first counted merge is 7 days old, or when no week has a figure."
+        },
+        "mostAtOnce": {
+          "type": "integer",
+          "description": "The most of this machine's agents in a turn at the same time, ever (#3988): the time history's record. Absent when none has run."
+        },
+        "firstMergeAt": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When the person's first counted merge or merged revert happened (#4250), in the record the host keeps (90 days of ended work) or the control plane's. Absent: their agents have not merged a PR yet, and the page says their first one starts the count."
+        }
+      },
+      "required": [
+        "prsMerged",
+        "reverts",
+        "agentsWorking",
+        "since",
+        "baseline"
+      ],
+      "additionalProperties": false
+    },
+    "MultiplierBaseline": {
+      "type": "object",
+      "description": "What the Multiplier compares with (#3902), so that no client keeps its own copy: an engineer with no AI in 2025.",
+      "properties": {
+        "prsPerWeek": {
+          "type": "number",
+          "description": "Merged PRs a week: 1.4 unless the person set their own (#3991), from 0.1 to 100, to one decimal."
+        },
+        "hoursPerWeek": {
+          "type": "number",
+          "description": "The hours of that week: 40."
+        },
+        "source": {
+          "type": "string",
+          "description": "Where the figure is from, for the page's small line: DX 2025."
+        },
+        "line": {
+          "type": "string",
+          "description": "The person's own line under the figures (#3991), from Settings ▸ Cost ▸ Multiplier. Absent: the default line, \"An average engineer merged <prsPerWeek> PRs a week (<source>)\"."
+        }
+      },
+      "required": [
+        "prsPerWeek",
+        "hoursPerWeek",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "MultiplierCountParams": {
+      "type": "object",
+      "description": "multiplier/count's params (#3988): the host's time zone, so the control plane counts calendar weeks as the person does, and the person's baseline (#3991).",
+      "properties": {
+        "timeZone": {
+          "type": "string",
+          "description": "An IANA zone name, such as Europe/London. Absent or unknown: UTC."
+        },
+        "prsPerWeek": {
+          "type": "number",
+          "description": "The person's baseline on the host (#3991), so the figure is the same on every machine. Absent: 1.4."
+        }
+      },
+      "additionalProperties": false
+    },
+    "PRCostComment": {
+      "type": "string",
+      "enum": [
+        "off",
+        "tokens",
+        "cost"
+      ],
+      "description": "What the host says on a folder's pull request when it merges (#2352): nothing (off, the default), the tokens and time only, or the cost too. Kept in the folder's .agents/folder.json, so the repo's people choose what a public repo publishes."
+    },
+    "Payment": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "allowance": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "allowance"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "freeTier": {
+              "type": "object",
+              "properties": {
+                "reset": {
+                  "$ref": "core.schema.json#/definitions/ResetRule"
+                }
+              },
+              "required": [
+                "reset"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "freeTier"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "freeCredit": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "$ref": "#/definitions/Cost"
+                },
+                "expires": {
+                  "$ref": "core.schema.json#/definitions/WireDate"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "freeCredit"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "prepaid": {
+              "type": "object",
+              "properties": {
+                "amount": {
+                  "$ref": "#/definitions/Cost"
+                },
+                "expires": {
+                  "$ref": "core.schema.json#/definitions/WireDate"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "prepaid"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PlaneMoveReport": {
+      "type": "object",
+      "description": "control/planeMoveReport and control/planeMoveReported (#4255): how a move of the control plane stands on the Mac that does it, in the Mac window's words: Settings ▸ Control plane ▸ Overview's rows, and the sheet a client opened.",
+      "properties": {
+        "mac": {
+          "type": "string",
+          "description": "The Mac whose window says it."
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "machines.schema.json#/definitions/PlaneMoveRow"
+          }
+        },
+        "flow": {
+          "$ref": "machines.schema.json#/definitions/PlaneMoveFlow"
+        },
+        "problem": {
+          "type": "string",
+          "description": "Why an overview step (Stop Forwarding) failed."
+        }
+      },
+      "required": [
+        "mac",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyBudgets": {
+      "type": "object",
+      "description": "Each person's budget per UTC day and per agent (#998, FR-016): a ceiling over their own CostLimits. Money is US dollars.",
+      "properties": {
+        "daily": {
+          "type": "number"
+        },
+        "dailyTokens": {
+          "type": "integer"
+        },
+        "perAgent": {
+          "type": "number"
+        },
+        "perAgentTokens": {
+          "type": "integer"
+        },
+        "allowUnmetered": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Runtime ids that may run under a budget though their turns report neither a cost nor tokens."
+        },
+        "raises": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BudgetRaise"
+          },
+          "description": "An admin's raises, each for one person and one UTC day."
+        }
+      },
+      "required": [
+        "allowUnmetered",
+        "raises"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyRuleBudgets": {
+      "type": "object",
+      "description": "Money and tokens a layer caps per agent and per UTC day (#2957, data-model.md \"PolicyRules\"). Unset means no limit. Unlike OrgPolicy's PolicyBudgets, no allowUnmetered or raises: only the organisation layer has those (FR-003).",
+      "properties": {
+        "perAgent": {
+          "$ref": "#/definitions/Cost"
+        },
+        "daily": {
+          "$ref": "#/definitions/Cost"
+        },
+        "perAgentTokens": {
+          "type": "integer"
+        },
+        "dailyTokens": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PresenceReport": {
+      "type": "object",
+      "properties": {
+        "watching": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "mayNotify": {
+          "type": "boolean"
+        },
+        "showing": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "alsoShowing": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/UUID"
+          }
+        }
+      },
+      "required": [
+        "active"
+      ],
+      "additionalProperties": false
+    },
+    "ProblemReport": {
+      "type": "object",
+      "description": "A problem report, ready to post (#3718): the new issue's title and body, and the GitHub page that opens it already filled in, so the person posts it from their own account. Every known token shape and every home folder in it is cut out (~ in place of a home), and nothing is sent anywhere: the client shows the body, then opens the url.",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string",
+          "description": "Markdown: what happened, what the person expected, and the versions, the machine and the runtime; with the recent log lines when asked."
+        },
+        "url": {
+          "type": "string",
+          "description": "The repository's new-issue page with the title and body in its query. When the body is too long for a link, the oldest log lines are left out of the link first, then the end of the body."
+        }
+      },
+      "required": [
+        "title",
+        "body",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "ProblemReportRequest": {
+      "type": "object",
+      "description": "What the person wrote in Report a Problem, and which client it is (#3718).",
+      "properties": {
+        "happened": {
+          "type": "string",
+          "description": "What happened, in the person's words."
+        },
+        "expected": {
+          "type": "string",
+          "description": "What the person expected."
+        },
+        "client": {
+          "type": "string",
+          "description": "The client and its version, such as \"Mac window 0.17.0\" or \"Web page\"."
+        },
+        "clientOS": {
+          "type": "string",
+          "description": "The client's OS, such as \"macOS 26.1\", or the browser's."
+        },
+        "runtime": {
+          "type": "string",
+          "description": "The runtime of the open session, when there is one."
+        },
+        "withLog": {
+          "type": "boolean",
+          "description": "Add this machine's recent daemon.log lines."
+        }
+      },
+      "required": [
+        "happened",
+        "expected",
+        "client",
+        "clientOS",
+        "withLog"
+      ],
+      "additionalProperties": false
+    },
+    "ProcessUsage": {
+      "type": "object",
+      "description": "One process of processes/list (#3453): the daemon, a session's runtime, or a child of either.",
+      "properties": {
+        "pid": {
+          "type": "integer"
+        },
+        "parent": {
+          "type": "integer"
+        },
+        "depth": {
+          "type": "integer",
+          "description": "0 for the daemon; a child is one deeper than its parent."
+        },
+        "name": {
+          "type": "string"
+        },
+        "cpuPercent": {
+          "type": "number",
+          "description": "Of one core, so more than 100 on several, over the same time as the machine's; 0 for a process the last ask did not list."
+        },
+        "memory": {
+          "type": "integer",
+          "description": "Resident bytes."
+        },
+        "agentId": {
+          "$ref": "core.schema.json#/definitions/UUID",
+          "description": "The session whose runtime this is, or whose runtime started it."
+        },
+        "title": {
+          "type": "string",
+          "description": "That session's title, when it has one."
+        }
+      },
+      "required": [
+        "pid",
+        "parent",
+        "depth",
+        "name",
+        "cpuPercent",
+        "memory"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderWorkspaceRequest": {
+      "type": "object",
+      "description": "providers/deleteWorkspace (#4610): one of a provider's workspaces that no machine is linked to.",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/ProviderID"
+        },
+        "workspace": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "workspace"
+      ],
+      "additionalProperties": false
+    },
+    "ReportCounts": {
+      "type": "object",
+      "description": "What a machine's agents did in an hour or a day (#2019, R2 to R6), counted from its own event log and its time ledger: never a conversation's words. Absent from a machine before #2019.",
+      "properties": {
+        "sessions": {
+          "type": "integer",
+          "description": "Agents that began their first turn (agent.started)."
+        },
+        "failedSessions": {
+          "type": "integer",
+          "description": "Agents that ended in an error that nobody chose (agent.failed)."
+        },
+        "prsOpened": {
+          "type": "integer",
+          "description": "Pull and merge requests opened from an agent's branch on this machine (pr.opened)."
+        },
+        "prsMerged": {
+          "type": "integer",
+          "description": "Those merged (pr.merged)."
+        },
+        "prsReverted": {
+          "type": "integer",
+          "description": "Of those merged, the ones that revert another: a title that starts with \"Revert\"."
+        },
+        "mergeSeconds": {
+          "type": "number",
+          "description": "The merged ones' time from their agent's start to the merge, added up: divide by prsMerged for the mean."
+        },
+        "waits": {
+          "type": "integer",
+          "description": "The times an agent waited for its person in a turn (a question, a form, a permission)."
+        },
+        "waitBuckets": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          },
+          "description": "The waits by how long each was: under 1 minute, 5, 15, 60, 240, and longer. Six numbers."
+        },
+        "workflowRuns": {
+          "type": "integer",
+          "description": "Runs a workflow started (workflow.ran)."
+        },
+        "workflowFailures": {
+          "type": "integer",
+          "description": "Runs whose agent ended in an error (agent.failed of an agent a workflow started)."
+        }
+      },
+      "required": [
+        "sessions",
+        "failedSessions",
+        "prsOpened",
+        "prsMerged",
+        "prsReverted",
+        "mergeSeconds",
+        "waits",
+        "waitBuckets",
+        "workflowRuns",
+        "workflowFailures"
+      ],
+      "additionalProperties": false
+    },
+    "ReportDelivery": {
+      "type": "object",
+      "description": "A repo's delivery figures on Reports ▸ Planning (#4555): lineage.DeliveryOf over the scope's machines' nodes, each node once, with each release tag's time from its earliest link. Of a scope, never of a person.",
+      "properties": {
+        "repo": {
+          "type": "string",
+          "description": "As LineageCostNode.repo, in the full form (#4800)."
+        },
+        "figures": {
+          "$ref": "lineage.schema.json#/definitions/LineageDelivery"
+        }
+      },
+      "required": [
+        "repo",
+        "figures"
+      ],
+      "additionalProperties": false
+    },
+    "ReportEstimateError": {
+      "type": "object",
+      "description": "How far the estimates were from the actual figures (#3561), over the issues closed in the range that had an estimate when their work started: the median of max(estimate/actual, actual/estimate), so 1.5 means 1.5 times too high or too low. A figure is absent when no issue had it. coverage and landsAtErrorDays (#4525) check the claims the kept estimate made: how often its P10-P90 dollar range held the actual, and how many days its landing date was off by, the median over the same issues.",
+      "properties": {
+        "issues": {
+          "type": "integer",
+          "description": "The closed issues with an estimate."
+        },
+        "cost": {
+          "type": "number",
+          "description": "In US dollars."
+        },
+        "workingSeconds": {
+          "type": "number",
+          "description": "In the agents' time at work."
+        },
+        "coverage": {
+          "type": "number",
+          "description": "How often the kept estimate's P10 to P90 dollar range held the actual, 0 to 1; it should be about 0.8 (#4525)."
+        },
+        "landsAtErrorDays": {
+          "type": "number",
+          "description": "The median of how many days the kept landing date was off by (#4525)."
+        }
+      },
+      "required": [
+        "issues"
+      ],
+      "additionalProperties": false
+    },
+    "ReportExport": {
+      "type": "object",
+      "description": "reports/export's answer (#1811): the rows as CSV or JSON lines.",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "format": {
+          "$ref": "#/definitions/ReportFormat"
+        }
+      },
+      "required": [
+        "text",
+        "count",
+        "format"
+      ],
+      "additionalProperties": false
+    },
+    "ReportForecastScore": {
+      "type": "object",
+      "description": "How the kept landing forecasts scored (#4528): of the epics that landed in the range with a forecast kept on their node (lineage/forecast's first one, #4526), how many landed by its P50 date and by its P85 date. A good P85 holds about 85% of the time, and a P50 about half. errorDays is the median of how many days the P50 date was off by. An epic lands when the last PR of it or its children merges.",
+      "properties": {
+        "epics": {
+          "type": "integer"
+        },
+        "p50Held": {
+          "type": "integer"
+        },
+        "p85Held": {
+          "type": "integer"
+        },
+        "errorDays": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "epics",
+        "p50Held",
+        "p85Held"
+      ],
+      "additionalProperties": false
+    },
+    "ReportFormat": {
+      "type": "string",
+      "enum": [
+        "csv",
+        "jsonl"
+      ]
+    },
+    "ReportNode": {
+      "type": "object",
+      "description": "One row of reports/nodes (#3118): an issue, PR or release, its cost rolled up from every machine in the scope as reports/value adds it up. own is what was banked on the node itself; total adds its parts (an issue's PRs; a release's issues and PRs); waste is the parts' PRs closed without a merge or reverted. sessions is how many sessions worked on it and its parts, each once. leadTimeSeconds is from the first work on it to its last PR merged, absent before a merge. resolved is the newest title, state and labels any machine sent; absent when none had them.",
+      "properties": {
+        "node": {
+          "$ref": "lineage.schema.json#/definitions/LineageNode"
+        },
+        "repo": {
+          "type": "string",
+          "description": "The repo or tracker the node is in, as LineageCostNode's."
+        },
+        "resolved": {
+          "$ref": "lineage.schema.json#/definitions/LineageResolved"
+        },
+        "cost": {
+          "$ref": "#/definitions/ReportNodeCost"
+        },
+        "sessions": {
+          "type": "integer"
+        },
+        "leadTimeSeconds": {
+          "type": "number"
+        },
+        "cycleTimeSeconds": {
+          "type": "number",
+          "description": "From the start of work on it (its own, its PRs' or, for an epic, its children's startedAt) to its last PR merged (#3562); absent before a merge or with no start."
+        },
+        "startedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "The first start of work on it or its parts (#3562)."
+        },
+        "level": {
+          "type": "string",
+          "description": "An issue's level, as LineageCostNode's (#3562)."
+        },
+        "feature": {
+          "type": "string"
+        },
+        "outcome": {
+          "type": "string",
+          "description": "A PR's end, as LineageCostNode's; absent while open."
+        },
+        "lastAt": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "The last change to it or any of its parts."
+        }
+      },
+      "required": [
+        "node",
+        "cost",
+        "sessions",
+        "lastAt"
+      ],
+      "additionalProperties": false
+    },
+    "ReportNodeCost": {
+      "type": "object",
+      "description": "A reports/nodes row's cost (#3118).",
+      "properties": {
+        "own": {
+          "$ref": "lineage.schema.json#/definitions/LineageCost"
+        },
+        "total": {
+          "$ref": "lineage.schema.json#/definitions/LineageCost"
+        },
+        "waste": {
+          "$ref": "lineage.schema.json#/definitions/LineageCost"
+        }
+      },
+      "required": [
+        "own",
+        "total",
+        "waste"
+      ],
+      "additionalProperties": false
+    },
+    "ReportNodes": {
+      "type": "object",
+      "description": "reports/nodes' answer (#3118): a page of at most 100 nodes. cursor asks for the next page; absent on the last. limited says there are more pages. unresolved is how many nodes of the kind no machine sent a title, state or labels for: a state or label filter matches none of them.",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportNode"
+          }
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limited": {
+          "type": "boolean"
+        },
+        "unresolved": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "nodes",
+        "limited",
+        "unresolved"
+      ],
+      "additionalProperties": false
+    },
+    "ReportNodesQuery": {
+      "type": "object",
+      "description": "reports/nodes (#3118): the lineage nodes of one kind in a scope, with filters and pages. The scope is as reports/value's. state is open, closed or merged, from the node's resolved state (a PR with none falls back to its outcome); releases have no state in v1. repo is a repo's ref (github:repo:#alexec/agents; the old github:alexec/agents is read too). since is on the node's last change. limit is 1 to 100, 50 when absent. cursor is the last page's, opaque.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "issue, pr or release."
+        },
+        "state": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "since": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "sort": {
+          "$ref": "#/definitions/ReportNodesSort"
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope",
+          "description": "Me, a group or the organisation (#1804)."
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "ReportNodesSort": {
+      "type": "string",
+      "enum": [
+        "newest",
+        "cost",
+        "waste",
+        "leadTime"
+      ],
+      "description": "newest (the last change first; the default), cost (total, the most first), waste (the most first) or leadTime (the longest first; nodes with none last)."
+    },
+    "ReportPage": {
+      "type": "string",
+      "enum": [
+        "spend",
+        "outcomes",
+        "time",
+        "runtimes",
+        "adoption",
+        "workflows",
+        "value"
+      ],
+      "description": "A page of Reports (#1804, #2019)."
+    },
+    "ReportPolicy": {
+      "type": "object",
+      "description": "Who sees what in Reports (#1804), set by an admin in Console ▸ Report Policy.",
+      "properties": {
+        "totalsOnly": {
+          "type": "boolean",
+          "description": "A group lead sees the group's totals only, with no person or machine named. An admin always sees each person."
+        },
+        "leads": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": "Each group's leads, by group id: users who see the group's reports."
+        },
+        "budgetsUSD": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "A budget for a calendar month in US dollars, by group id, or \"org\" for the organisation."
+        }
+      },
+      "required": [
+        "totalsOnly",
+        "leads",
+        "budgetsUSD"
+      ],
+      "additionalProperties": false
+    },
+    "ReportQuery": {
+      "type": "object",
+      "description": "reports/usage and reports/export (#1811). With no scope, an admin sees every person and a member their own machines; a scope (#1804) is one the caller may see (reports/scopes).",
+      "properties": {
+        "range": {
+          "$ref": "#/definitions/ReportRange"
+        },
+        "format": {
+          "$ref": "#/definitions/ReportFormat",
+          "description": "For reports/export; CSV when absent."
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope",
+          "description": "Me, a group or the organisation (#1804)."
+        }
+      },
+      "required": [
+        "range"
+      ],
+      "additionalProperties": false
+    },
+    "ReportRange": {
+      "type": "string",
+      "enum": [
+        "day",
+        "week",
+        "month",
+        "threeMonths"
+      ],
+      "description": "D is the last 24 hours by the hour; W, M and 3M the last 7, 30 and 90 days by the day (UTC)."
+    },
+    "ReportRow": {
+      "type": "object",
+      "description": "One hour or day of one machine's folder and runtime, with its person (#1811).",
+      "properties": {
+        "at": {
+          "type": "string",
+          "description": "The UTC hour (\"2026-10-21T15\") or day (\"2026-10-21\")."
+        },
+        "person": {
+          "type": "string"
+        },
+        "personName": {
+          "type": "string"
+        },
+        "host": {
+          "$ref": "machines.schema.json#/definitions/MachineRef"
+        },
+        "hostName": {
+          "type": "string"
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "workflow": {
+          "type": "string",
+          "description": "The workflow that started the agents of this row (#2019), by its id; absent for agents a person or another agent started."
+        },
+        "cost": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "By currency."
+        },
+        "inputTokens": {
+          "type": "integer"
+        },
+        "outputTokens": {
+          "type": "integer"
+        },
+        "thoughtTokens": {
+          "type": "integer"
+        },
+        "cachedReadTokens": {
+          "type": "integer"
+        },
+        "cachedWriteTokens": {
+          "type": "integer"
+        },
+        "turns": {
+          "type": "integer"
+        },
+        "unpricedTurns": {
+          "type": "integer"
+        },
+        "workingSeconds": {
+          "type": "number",
+          "description": "The agent, its tools and waiting on others: TimeBucket's agent + tools + others."
+        },
+        "waitingSeconds": {
+          "type": "number",
+          "description": "Waiting for the person: TimeBucket's person."
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The groups the person is in (#1804), by id, for a group or organisation scope; absent when the person is hidden."
+        },
+        "counts": {
+          "$ref": "#/definitions/ReportCounts",
+          "description": "What the agents did (#2019): sessions, pull requests and waits."
+        },
+        "folder": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string",
+          "description": "The project the folder is in (#2670), by id, as its machine last reported it (projects/joined); absent for a folder in no project."
+        },
+        "projectName": {
+          "type": "string",
+          "description": "The project's name, absent with project."
+        }
+      },
+      "required": [
+        "at",
+        "person",
+        "personName",
+        "host",
+        "hostName",
+        "folder",
+        "runtime",
+        "cost",
+        "inputTokens",
+        "outputTokens",
+        "thoughtTokens",
+        "cachedReadTokens",
+        "cachedWriteTokens",
+        "turns",
+        "unpricedTurns",
+        "workingSeconds",
+        "waitingSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "ReportScope": {
+      "type": "object",
+      "description": "Whose rows a report adds up (#1804).",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/ReportScopeKind"
+        },
+        "group": {
+          "type": "string",
+          "description": "The group's id, for kind group."
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "ReportScopeKind": {
+      "type": "string",
+      "enum": [
+        "me",
+        "group",
+        "org"
+      ],
+      "description": "Me (the caller's own machines), a group's people, or every person (#1804)."
+    },
+    "ReportScopeOption": {
+      "type": "object",
+      "description": "A scope the caller may see, with its name (#1804).",
+      "properties": {
+        "scope": {
+          "$ref": "#/definitions/ReportScope"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ReportScopes": {
+      "type": "object",
+      "description": "reports/scopes' answer (#1804): Me, each group the caller leads (every group for an admin), and the organisation for an admin.",
+      "properties": {
+        "scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportScopeOption"
+          }
+        },
+        "admin": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "scopes",
+        "admin"
+      ],
+      "additionalProperties": false
+    },
+    "ReportValue": {
+      "type": "object",
+      "description": "reports/value (#2351): what the work in a scope cost and what it delivered, from the lineage nodes that the scope's machines send (#2350). A node is in the range when it last changed in it, with its whole cost. total is the work on issues, PRs and releases (a release session's own, #4524); waste is the PRs closed without a merge and merged reverts; unlinked is the turns with no issue or PR. perMergedPR is total by the PRs merged, by currency. leadTimeSeconds is the median of the issues' lead times. issues and releases (#3023) are the most costly first, at most 100 each; limited says there are more.",
+      "properties": {
+        "range": {
+          "$ref": "#/definitions/ReportRange"
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope"
+        },
+        "total": {
+          "$ref": "lineage.schema.json#/definitions/LineageCost"
+        },
+        "waste": {
+          "$ref": "lineage.schema.json#/definitions/LineageCost"
+        },
+        "unlinked": {
+          "$ref": "lineage.schema.json#/definitions/LineageCost"
+        },
+        "loaded": {
+          "$ref": "lineage.schema.json#/definitions/LineageCost",
+          "description": "total and unlinked together (#4524): what the work cost all in, as the agents spent it."
+        },
+        "overhead": {
+          "$ref": "lineage.schema.json#/definitions/LineageOverhead",
+          "description": "The scope's overhead over the 14 days to now (#4524), whatever the range."
+        },
+        "perMergedPR": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "By currency."
+        },
+        "prsMerged": {
+          "type": "integer"
+        },
+        "prsClosed": {
+          "type": "integer"
+        },
+        "prsReverted": {
+          "type": "integer"
+        },
+        "failedChecks": {
+          "type": "integer"
+        },
+        "leadTimeSeconds": {
+          "type": "number"
+        },
+        "cycleTimeSeconds": {
+          "type": "number",
+          "description": "The median of the issues' cycle times (#3562)."
+        },
+        "estimateError": {
+          "$ref": "#/definitions/ReportEstimateError"
+        },
+        "forecastScore": {
+          "$ref": "#/definitions/ReportForecastScore",
+          "description": "How the kept landing forecasts of the epics that landed in the range scored (#4528); absent when none had one."
+        },
+        "openEpics": {
+          "type": "array",
+          "items": {
+            "$ref": "lineage.schema.json#/definitions/LineageNode"
+          },
+          "description": "The open epics in the scope (#4528), the most recently changed first, at most 20, so Reports ▸ Planning can ask lineage/forecast when each lands."
+        },
+        "delivery": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportDelivery"
+          },
+          "description": "The scope's delivery figures (#4555, epic #4551), a repo each: the repos with the most PRs merged in the 28 days to now, at most 3, the most first, whatever the range. Absent from a control plane before it; empty when no repo had a merge."
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportValueRow"
+          }
+        },
+        "releases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportValueRow"
+          },
+          "description": "One row per release (#3023): the PRs part-of it and the issues those PRs fix."
+        },
+        "limited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "range",
+        "scope",
+        "total",
+        "waste",
+        "unlinked",
+        "perMergedPR",
+        "prsMerged",
+        "prsClosed",
+        "prsReverted",
+        "failedChecks",
+        "issues",
+        "releases"
+      ],
+      "additionalProperties": false
+    },
+    "ReportValueRow": {
+      "type": "object",
+      "description": "One issue or release on Reports ▸ Value (#2351): its cost rolled up from every machine in the scope, as lineage/cost adds it up, and how its PRs ended.",
+      "properties": {
+        "node": {
+          "$ref": "lineage.schema.json#/definitions/LineageNode"
+        },
+        "total": {
+          "$ref": "lineage.schema.json#/definitions/LineageCost"
+        },
+        "waste": {
+          "$ref": "lineage.schema.json#/definitions/LineageCost"
+        },
+        "prsMerged": {
+          "type": "integer"
+        },
+        "prsClosed": {
+          "type": "integer"
+        },
+        "prsReverted": {
+          "type": "integer"
+        },
+        "failedChecks": {
+          "type": "integer"
+        },
+        "leadTimeSeconds": {
+          "type": "number",
+          "description": "From the first work on it to its last PR merged; absent before a merge."
+        },
+        "cycleTimeSeconds": {
+          "type": "number",
+          "description": "From the start of work on it to its last PR merged, as ReportNode's (#3562)."
+        },
+        "level": {
+          "type": "string",
+          "description": "An issue's level, as LineageCostNode's (#3562)."
+        }
+      },
+      "required": [
+        "node",
+        "total",
+        "waste",
+        "prsMerged",
+        "prsClosed",
+        "prsReverted",
+        "failedChecks"
+      ],
+      "additionalProperties": false
+    },
+    "ReportView": {
+      "type": "object",
+      "description": "A saved view of Reports (#2019, R8): a page with its scope, range and way to add up, kept for the person who saved it.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Given by the control plane; empty to save a new view."
+        },
+        "name": {
+          "type": "string"
+        },
+        "page": {
+          "$ref": "#/definitions/ReportPage"
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope"
+        },
+        "range": {
+          "$ref": "#/definitions/ReportRange"
+        },
+        "by": {
+          "type": "string",
+          "description": "The way the page adds up: person, folder, machine, runtime, group or workflow."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "page",
+        "scope",
+        "range"
+      ],
+      "additionalProperties": false
+    },
+    "ReportViewID": {
+      "type": "object",
+      "description": "reports/deleteView (#2019).",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "ReportViews": {
+      "type": "object",
+      "description": "The caller's saved views of Reports (#2019), in the order they were saved.",
+      "properties": {
+        "views": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportView"
+          }
+        }
+      },
+      "required": [
+        "views"
+      ],
+      "additionalProperties": false
+    },
+    "ReportedEdit": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "oldText": {
+          "type": "string"
+        },
+        "newText": {
+          "type": "string"
+        },
+        "toolCallID": {
+          "type": "string"
+        },
+        "index": {
+          "type": "integer"
+        },
+        "entryIndex": {
+          "type": "integer"
+        },
+        "replaceAll": {
+          "type": "boolean"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "path",
+        "newText",
+        "toolCallID",
+        "index",
+        "entryIndex",
+        "replaceAll",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeAllowances": {
+      "type": "object",
+      "properties": {
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RuntimeAllowancesRow"
+          }
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "shared": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AllowanceState"
+          }
+        }
+      },
+      "required": [
+        "rows",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "RuntimeAllowancesRow": {
+      "type": "object",
+      "properties": {
+        "credentialKey": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/AllowanceState"
+        },
+        "unusable": {
+          "type": "string"
+        },
+        "setupNote": {
+          "description": "Something one of the runtime's features needs on this host and lacks, with the step that fixes it (#1946). Only on the runtime's own sign-in row.",
+          "type": "string"
+        },
+        "accountID": {
+          "description": "The added account this row is for (#840), or an org account (org:<route id>, #999); absent for the runtime's own sign-in.",
+          "type": "string"
+        },
+        "accountName": {
+          "description": "That account's name.",
+          "type": "string"
+        },
+        "tokensToday": {
+          "description": "An org account's tokens today on this host, as its model relay counted them from the provider's answers (#999, D12): fresh input, cache writes and output. Only on an org account's row.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "credentialKey",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "SealingWork": {
+      "type": "object",
+      "description": "sealing/work (#3397).",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "org.schema.json#/definitions/SealingItem"
+          }
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "SetPRCostCommentRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "prCostComment": {
+          "$ref": "#/definitions/PRCostComment"
+        }
+      },
+      "required": [
+        "folder",
+        "prCostComment"
+      ],
+      "additionalProperties": false
+    },
+    "SetWorkingHoursRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "hours": {
+          "$ref": "workflows.schema.json#/definitions/WorkflowHours",
+          "description": "Absent, or hours that limit nothing, takes the setting out: 09:00-17:00, Mon-Fri. Never named."
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "SpendCaps": {
+      "type": "object",
+      "description": "Spend caps (#1761, spec 736 FR-033): a bot or a group stops starting work once its spend today (UTC) reaches one. None is no cap.",
+      "properties": {
+        "dailyUSD": {
+          "type": "number"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "TimeBucket": {
+      "type": "object",
+      "properties": {
+        "agent": {
+          "type": "number"
+        },
+        "tools": {
+          "type": "number"
+        },
+        "others": {
+          "type": "number"
+        },
+        "person": {
+          "type": "number"
+        },
+        "turns": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agent",
+        "tools",
+        "others",
+        "person",
+        "turns"
+      ],
+      "additionalProperties": false
+    },
+    "TimeHistory": {
+      "type": "object",
+      "properties": {
+        "hours": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/definitions/TimeBucket"
+            }
+          }
+        },
+        "days": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/definitions/TimeBucket"
+            }
+          }
+        },
+        "now": {
+          "type": "string"
+        },
+        "timeZone": {
+          "type": "string",
+          "description": "The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day stamps are in (#1267). Absent from a host too old to say: read as the viewer's own."
+        },
+        "recap": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/DayRecap"
+          }
+        },
+        "records": {
+          "$ref": "#/definitions/TimeRecords"
+        },
+        "approvalWait": {
+          "$ref": "lineage.schema.json#/definitions/LineageDeliveryFigure",
+          "description": "How long this machine's PRs waited for a person's answer (#4553), over every repo it has: the approvalWait of LineageDelivery. Reports ▸ Time's line on the web page. Absent from a host too old to say."
+        }
+      },
+      "required": [
+        "hours",
+        "days",
+        "now",
+        "recap",
+        "records"
+      ],
+      "additionalProperties": false
+    },
+    "TimeRecord": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "day": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "day"
+      ],
+      "additionalProperties": false
+    },
+    "TimeRecords": {
+      "type": "object",
+      "properties": {
+        "mostAgents": {
+          "$ref": "#/definitions/TimeRecord"
+        },
+        "mostPRs": {
+          "$ref": "#/definitions/TimeRecord"
+        },
+        "longestClear": {
+          "$ref": "#/definitions/TimeRecord"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TurnUsage": {
+      "type": "object",
+      "properties": {
+        "totalTokens": {
+          "type": "integer"
+        },
+        "inputTokens": {
+          "type": "integer"
+        },
+        "outputTokens": {
+          "type": "integer"
+        },
+        "thoughtTokens": {
+          "type": "integer"
+        },
+        "cachedReadTokens": {
+          "type": "integer"
+        },
+        "cachedWriteTokens": {
+          "type": "integer"
+        },
+        "cost": {
+          "$ref": "#/definitions/Cost"
+        },
+        "route": {
+          "type": "string",
+          "description": "The org route the turn went through (#999)."
+        },
+        "relayTokens": {
+          "$ref": "connections.schema.json#/definitions/RelayTokens",
+          "description": "The relay's count for an org account's turn, beside what the runtime reported (#999)."
+        }
+      },
+      "required": [
+        "totalTokens",
+        "inputTokens",
+        "outputTokens"
+      ],
+      "additionalProperties": false
+    },
+    "UnpushedWork": {
+      "type": "object",
+      "description": "A worktree with work that is not pushed: commits ahead of its upstream (`ahead`), or on a branch with no upstream (`unmerged`, commits not on the base), and changes not committed (`uncommitted`).",
+      "properties": {
+        "worktree": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "ahead": {
+          "type": "integer"
+        },
+        "unmerged": {
+          "type": "integer"
+        },
+        "uncommitted": {
+          "type": "integer"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder",
+        "worktree"
+      ],
+      "additionalProperties": false
+    },
+    "Usage": {
+      "type": "object",
+      "properties": {
+        "used": {
+          "type": "integer"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "cost": {
+          "$ref": "#/definitions/Cost"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "used",
+        "size",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "UsageBucket": {
+      "type": "object",
+      "properties": {
+        "cost": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "inputTokens": {
+          "type": "integer"
+        },
+        "outputTokens": {
+          "type": "integer"
+        },
+        "thoughtTokens": {
+          "type": "integer"
+        },
+        "cachedReadTokens": {
+          "type": "integer"
+        },
+        "cachedWriteTokens": {
+          "type": "integer"
+        },
+        "turns": {
+          "type": "integer"
+        },
+        "unpricedTurns": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cost",
+        "inputTokens",
+        "outputTokens",
+        "thoughtTokens",
+        "cachedReadTokens",
+        "cachedWriteTokens",
+        "turns",
+        "unpricedTurns"
+      ],
+      "additionalProperties": false
+    },
+    "UsageHistory": {
+      "type": "object",
+      "properties": {
+        "hours": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/definitions/UsageBucket"
+            }
+          }
+        },
+        "days": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/definitions/UsageBucket"
+            }
+          }
+        },
+        "now": {
+          "type": "string"
+        },
+        "timeZone": {
+          "type": "string",
+          "description": "The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day stamps are in (#1267). Absent from a host too old to say: read as the viewer's own."
+        }
+      },
+      "required": [
+        "hours",
+        "days",
+        "now"
+      ],
+      "additionalProperties": false
+    },
+    "UsageReport": {
+      "type": "object",
+      "description": "reports/usage's answer (#1811): rows oldest first, by the hour for D and by the day otherwise.",
+      "properties": {
+        "range": {
+          "$ref": "#/definitions/ReportRange"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ReportRow"
+          }
+        },
+        "admin": {
+          "type": "boolean",
+          "description": "Whether the caller sees every person's machines."
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope",
+          "description": "The scope the rows are of (#1804)."
+        },
+        "personsHidden": {
+          "type": "boolean",
+          "description": "The rows say no person and no machine (#1804): a group lead's view when the policy says totals only."
+        },
+        "groupNames": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "The name of each group the rows name (#1804)."
+        },
+        "budgetUSD": {
+          "type": "number",
+          "description": "The scope's budget for a calendar month, in US dollars (#1804); absent when it has none."
+        },
+        "monthSpentUSD": {
+          "type": "number",
+          "description": "What the scope spent this calendar month (UTC), in US dollars, beside budgetUSD (#2057); absent when there is no budget."
+        }
+      },
+      "required": [
+        "range",
+        "rows",
+        "admin"
+      ],
+      "additionalProperties": false
+    },
+    "UsageRollup": {
+      "type": "object",
+      "description": "usage/rollup (#1811): a machine's hours and days that changed since it last sent them, sent each hour on its channel 0. The control plane keeps hours 7 days and days 90.",
+      "properties": {
+        "hours": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UsageRollupPeriod"
+          }
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UsageRollupPeriod"
+          }
+        },
+        "work": {
+          "type": "array",
+          "items": {
+            "$ref": "lineage.schema.json#/definitions/LineageCostNode"
+          },
+          "description": "The lineage nodes whose banked cost or rollup links changed since the last send (#2350), each whole: the control plane keeps a machine's latest of each, 90 days."
+        }
+      },
+      "required": [
+        "hours",
+        "days"
+      ],
+      "additionalProperties": false
+    },
+    "UsageRollupPeriod": {
+      "type": "object",
+      "description": "An hour (\"2026-10-21T15\") or a day (\"2026-10-21\"), in UTC, and its rows: the whole of that period on this machine, which replaces what was sent before.",
+      "properties": {
+        "at": {
+          "type": "string"
+        },
+        "rows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/UsageRollupRow"
+          }
+        }
+      },
+      "required": [
+        "at",
+        "rows"
+      ],
+      "additionalProperties": false
+    },
+    "UsageRollupRow": {
+      "type": "object",
+      "description": "One folder and runtime's usage in an hour or a day (#1811), as a machine adds it up.",
+      "properties": {
+        "runtime": {
+          "type": "string"
+        },
+        "workflow": {
+          "type": "string",
+          "description": "The workflow that started the agents of this row (#2019), by its id; absent for agents a person or another agent started."
+        },
+        "cost": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "By currency."
+        },
+        "inputTokens": {
+          "type": "integer"
+        },
+        "outputTokens": {
+          "type": "integer"
+        },
+        "thoughtTokens": {
+          "type": "integer"
+        },
+        "cachedReadTokens": {
+          "type": "integer"
+        },
+        "cachedWriteTokens": {
+          "type": "integer"
+        },
+        "turns": {
+          "type": "integer"
+        },
+        "unpricedTurns": {
+          "type": "integer"
+        },
+        "workingSeconds": {
+          "type": "number",
+          "description": "The agent, its tools and waiting on others: TimeBucket's agent + tools + others."
+        },
+        "waitingSeconds": {
+          "type": "number",
+          "description": "Waiting for the person: TimeBucket's person."
+        },
+        "counts": {
+          "$ref": "#/definitions/ReportCounts",
+          "description": "What the agents did (#2019): sessions, pull requests and waits."
+        },
+        "limitTokens": {
+          "type": "integer",
+          "description": "The row's tokens as the machine counts them for a limit (#998, FR-017): fresh input and output, no cache reads and no thoughts. Absent from an older machine, whose rows count as inputTokens + outputTokens."
+        },
+        "route": {
+          "type": "string",
+          "description": "The org route of this row's turns (#999, FR-021); absent for the person's own sign-in and accounts."
+        },
+        "folder": {
+          "type": "string",
+          "description": "The folder name, so the same repository on two machines adds up."
+        }
+      },
+      "required": [
+        "folder",
+        "runtime",
+        "cost",
+        "inputTokens",
+        "outputTokens",
+        "thoughtTokens",
+        "cachedReadTokens",
+        "cachedWriteTokens",
+        "turns",
+        "unpricedTurns",
+        "workingSeconds",
+        "waitingSeconds"
+      ],
+      "additionalProperties": false
+    },
+    "VelocityBucket": {
+      "type": "object",
+      "description": "The PRs that landed in an hour or a day in one repository (#4596): merged is every PR the agents worked on that merged, merged reverts included; reverted is the merged reverts among them.",
+      "properties": {
+        "merged": {
+          "type": "integer"
+        },
+        "reverted": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "merged",
+        "reverted"
+      ],
+      "additionalProperties": false
+    },
+    "VelocityHistory": {
+      "type": "object",
+      "description": "velocity/history's answer (#4596): the PRs that landed, by the hour (168 hours) and by the day (90 days), then by repository (its ref, github:repo:#alexec/agents), from this machine's lineage store. Shaped as usage/history is.",
+      "properties": {
+        "hours": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/definitions/VelocityBucket"
+            }
+          }
+        },
+        "days": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/definitions/VelocityBucket"
+            }
+          }
+        },
+        "now": {
+          "type": "string"
+        },
+        "timeZone": {
+          "type": "string",
+          "description": "The host's time zone, an IANA identifier such as America/Los_Angeles, that its hour and day stamps are in (#1267). Absent from a host too old to say: read as the viewer's own."
+        }
+      },
+      "required": [
+        "hours",
+        "days",
+        "now"
+      ],
+      "additionalProperties": false
+    },
+    "WorkFeature": {
+      "type": "object",
+      "description": "A feature in work/features (#4586): feature is it as forge/features says it. epics are its open epics, the newest first, each with where it is in its plan and its children. loose are its open issues that are not epics and have no parent (of the newest 500 open issues), the newest update first, as children are: when each started, and whether it waits for a person.",
+      "properties": {
+        "feature": {
+          "$ref": "forge.schema.json#/definitions/ForgeFeature"
+        },
+        "epics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkFeatureEpic"
+          }
+        },
+        "loose": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkTimelineChild"
+          }
+        }
+      },
+      "required": [
+        "feature",
+        "epics",
+        "loose"
+      ],
+      "additionalProperties": false
+    },
+    "WorkFeatureEpic": {
+      "type": "object",
+      "description": "An open epic in work/features (#4586), from forge/plan and work/timeline. steps is the number of steps in its plan (ForgePlan.steps), and step the first of them with an open child, absent when none is open. blockedOutside are the open blockers outside the plan of that step's open children (an issue of another epic), each once. forecast is its open line's close as work/timeline forecasts it, on GitHub only; absent when there is too little history or nothing to forecast. children are its sub-issues in the plan's order (at most 100), each with its start, close and wait as in work/timeline; absent when its plan could not be read (errors says why).",
+      "properties": {
+        "item": {
+          "$ref": "forge.schema.json#/definitions/ForgeItem"
+        },
+        "step": {
+          "type": "integer"
+        },
+        "steps": {
+          "type": "integer"
+        },
+        "blockedOutside": {
+          "type": "array",
+          "items": {
+            "$ref": "lineage.schema.json#/definitions/LineageNode"
+          }
+        },
+        "forecast": {
+          "$ref": "#/definitions/WorkTimelineForecast"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkTimelineChild"
+          }
+        }
+      },
+      "required": [
+        "item",
+        "steps"
+      ],
+      "additionalProperties": false
+    },
+    "WorkFeatures": {
+      "type": "object",
+      "description": "work/features (#4586, specs/4328-work-look/features-delivery.md): the Features page's one read. features are forge/features' features, by name, each with its open epics and its loose open issues, so an open feature's epics and children draw with no second read. approvals are as in forge/features. errors say a forge, a plan or a timeline that could not be read.",
+      "properties": {
+        "features": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkFeature"
+          }
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "forge.schema.json#/definitions/ForgeListError"
+          }
+        }
+      },
+      "required": [
+        "features"
+      ],
+      "additionalProperties": false
+    },
+    "WorkFeaturesRequest": {
+      "type": "object",
+      "description": "work/features (#4586): the features of every folder on this machine, or of one folder's repo, as forge/features.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "board": {
+          "type": "string",
+          "description": "A board's url, from forge/boards (#3282): only the epics on that board."
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorkOutcome": {
+      "type": "string",
+      "enum": [
+        "done",
+        "nothing_to_do",
+        "needs_answer",
+        "waiting"
+      ],
+      "x-fallback": "done",
+      "description": "How a turn ended (#1916): only a question needs the person. A value this build does not know, such as an old record's `blocked`, `stuck` or `partly_done`, reads as `done`."
+    },
+    "WorkReport": {
+      "type": "object",
+      "properties": {
+        "outcome": {
+          "$ref": "#/definitions/WorkOutcome"
+        },
+        "message": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "block": {
+          "$ref": "workflows.schema.json#/definitions/Block"
+        }
+      },
+      "required": [
+        "outcome",
+        "message",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimeline": {
+      "type": "object",
+      "description": "work/timeline (#4172, specs/time-stream/wireframe.md sections 4, 7 to 9): the epics of a project whose work overlaps from to to, each with its children, its segments and, while open, its forecast (M10); and the releases published in the window. timeZone is the working clock's: this host's, an IANA name, absent when it has none. backtest is how the forecast did on the epics whose work ended in the last 30 days, run again at most once a day; absent when there are too few. errors are the forges that could not be read, as forge/issues says them.",
+      "properties": {
+        "epics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkTimelineEpic"
+          }
+        },
+        "releases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkTimelineRelease"
+          }
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "backtest": {
+          "$ref": "#/definitions/WorkTimelineBacktest"
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "epics",
+        "releases"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineBacktest": {
+      "type": "object",
+      "description": "work/timeline's backtest (#4172): the forecast stopped just after 25, 50, 75 and 90% of each past segment's children closed, made from what had ended before that moment, and set against the real close. error is the median of forecast/actual or actual/forecast, whichever is more than 1 (×2.2 says off by a factor of 2.2). cuts is how many forecasts it made, of epics segments; holds how many closes fell in P10 to P90. width is the factor that widens the band around P50 (in log terms) until it holds 8 in 10 of them; each forecast's band is already widened by it. at is when it ran.",
+      "properties": {
+        "error": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        },
+        "cuts": {
+          "type": "integer"
+        },
+        "holds": {
+          "type": "integer"
+        },
+        "epics": {
+          "type": "integer"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "error",
+        "width",
+        "cuts",
+        "holds",
+        "epics",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineChild": {
+      "type": "object",
+      "description": "A child of an epic in work/timeline (#4172). item has its labels with their colours, for the hover card's chips (#4428). stateReason is completed or not_planned, where the forge says it. startedAt is the earliest of the first session linked to it in lineage, the opening of the first pull request that closes it, and its close; absent while nothing has started it. waitsForPerson: it is open and labelled alex-todo or needs-account, so it is not forecast. forecastAt is an open child's forecast close: its epic's P50 shared out along the line, in the order of the children.",
+      "properties": {
+        "item": {
+          "$ref": "forge.schema.json#/definitions/ForgeItem"
+        },
+        "stateReason": {
+          "type": "string"
+        },
+        "createdAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "startedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "closedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "waitsForPerson": {
+          "type": "boolean"
+        },
+        "forecastAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "item",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineEpic": {
+      "type": "object",
+      "description": "An epic in work/timeline (#4172). children are its sub-issues (at most 100). segments are its lines, the first first: a segment starts at its first child's start (absent when none has started) and ends at its last child's close (absent while one is open); a child filed after a segment ended starts a new one. forecast is the open segment's close, absent when it has no child to forecast or there is too little history.",
+      "properties": {
+        "item": {
+          "$ref": "forge.schema.json#/definitions/ForgeItem"
+        },
+        "stateReason": {
+          "type": "string"
+        },
+        "createdAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "closedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkTimelineChild"
+          }
+        },
+        "segments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkTimelineSegment"
+          }
+        },
+        "forecast": {
+          "$ref": "#/definitions/WorkTimelineForecast"
+        }
+      },
+      "required": [
+        "item",
+        "createdAt",
+        "children",
+        "segments"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineForecast": {
+      "type": "object",
+      "description": "An open epic's forecast in work/timeline (#4172, M10): mid is the P50 of its close, low to high the band (P10 to P90, widened by the backtest's width) that holds the close 8 times in 10. waits says that children wait for a person: the line stops there and does not join, and mid is when the rest close.",
+      "properties": {
+        "low": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "mid": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "high": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "waits": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "low",
+        "mid",
+        "high"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineRelease": {
+      "type": "object",
+      "description": "A release in work/timeline (#4172): its tag, when it was published, on which repo (owner/name).",
+      "properties": {
+        "tag": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "repo": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tag",
+        "at",
+        "repo"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineRequest": {
+      "type": "object",
+      "description": "work/timeline (#4172): the epics of a project (its id, from a folder's .agents/folder.json) whose work overlaps from to to.",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "from": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "to": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "project",
+        "from",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "WorkTimelineSegment": {
+      "type": "object",
+      "description": "A line of an epic in work/timeline (#4172): from its first child's start to its last child's close.",
+      "properties": {
+        "startedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "closedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WorktreeChoice": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "new": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "new"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "existing": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "core.schema.json#/definitions/URLString"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "existing"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "named": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "named"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "branch": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "branch"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WorktreeRemovalRequest": {
+      "type": "object",
+      "properties": {
+        "root": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "confirmed": {
+          "type": "boolean"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder",
+        "root",
+        "confirmed"
+      ],
+      "additionalProperties": false
+    },
+    "WorktreeRemoved": {
+      "type": "object",
+      "properties": {
+        "removedBranch": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "removedBranch"
+      ],
+      "additionalProperties": false
+    },
+    "WorktreeSize": {
+      "type": "object",
+      "properties": {
+        "bytes": {
+          "type": "integer"
+        },
+        "partial": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "bytes",
+        "partial"
+      ],
+      "additionalProperties": false
+    },
+    "WorktreeSizeNote": {
+      "type": "object",
+      "properties": {
+        "root": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "size": {
+          "$ref": "#/definitions/WorktreeSize"
+        }
+      },
+      "required": [
+        "root",
+        "size"
+      ],
+      "additionalProperties": false
+    },
+    "WorktreeStatus": {
+      "type": "object",
+      "properties": {
+        "uncommitted": {
+          "type": "integer"
+        },
+        "ahead": {
+          "type": "integer"
+        },
+        "behind": {
+          "type": "integer"
+        },
+        "unmerged": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "uncommitted"
+      ],
+      "additionalProperties": false
+    },
+    "WorktreeSummary": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "root": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "madeByApp": {
+          "type": "boolean"
+        },
+        "agents": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/UUID"
+          }
+        },
+        "status": {
+          "$ref": "#/definitions/WorktreeStatus"
+        },
+        "size": {
+          "$ref": "#/definitions/WorktreeSize"
+        },
+        "isFolder": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "root",
+        "isFolder",
+        "exists",
+        "madeByApp",
+        "agents"
+      ],
+      "additionalProperties": false
+    },
+    "WorktreesListRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "WorktreesListResponse": {
+      "type": "object",
+      "properties": {
+        "isRepository": {
+          "type": "boolean"
+        },
+        "canMakeNew": {
+          "type": "boolean"
+        },
+        "whyNot": {
+          "type": "string"
+        },
+        "worktrees": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorktreeSummary"
+          }
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "$ref": "machines.schema.json#/definitions/BranchSummary"
+          }
+        }
+      },
+      "required": [
+        "isRepository",
+        "canMakeNew",
+        "worktrees",
+        "branches"
+      ],
+      "additionalProperties": false
+    },
+    "WorktreesSized": {
+      "type": "object",
+      "properties": {
+        "sizes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorktreeSizeNote"
+          }
+        }
+      },
+      "required": [
+        "sizes"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

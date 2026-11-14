@@ -5,7 +5,7 @@ and the control plane (#1135, step 0 of the move to Go, #1134). It is not a Swif
 
 | File | What |
 |---|---|
-| `daemon.schema.json` | Every type, as JSON Schema draft-07 definitions |
+| `schema/<domain>.schema.json` | Every type, as JSON Schema draft-07 definitions, one file per domain (`core`, `sessions`, `files`, `workflows`, `machines`, `org`, `connections`, `mcp`, `forge`, `lineage`, `reports`). A `$ref` to another file names it (`core.schema.json#/definitions/JSONValue`); the methods' `$ref`s name it too (`schema/sessions.schema.json#/definitions/Agent`). A definition is in one file only (#5380) |
 | `daemon.openrpc.json` | The methods a host answers (sent with `h`), its notifications, and the failure codes |
 | `control.openrpc.json` | The methods the control plane answers itself, and its notifications |
 
@@ -32,9 +32,9 @@ today's encoder, and checks the output against the schema. It also checks that
 
 ## Changing a type
 
-1. Change the definition in `daemon.schema.json` (or a method in an `*.openrpc.json`). A new
+1. Change the definition in its file under `schema/` (or a method in an `*.openrpc.json`). A new
    definition or method goes where its name sorts, not at the end: `gen` refuses one out of
-   name order, so two features that each add one touch different lines (#2020).
+   name order within its file, so two features that each add one touch different lines (#2020).
 2. Run `scripts/wire.sh gen` and commit what it writes.
 3. Change the Swift by hand until `WireSchemaTests` passes.
 

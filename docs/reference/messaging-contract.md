@@ -15,7 +15,7 @@ a third-party server (Discord, Telegram, Teams) can follow it too, with no chang
 Why messaging is a contract over MCP, and the forges are not, is in
 [Connector levels](../explanation/connector-levels.md#a-contract-or-in-process).
 
-The shapes are in `Packages/Wire/daemon.schema.json` (#1135), so the Go servers, the daemon
+The shapes are in `Packages/Wire/schema` (#1135), so the Go servers, the daemon
 and the clients use one type: `MessagingListRequest`, `MessagingConversations`,
 `MessagingConversation`, `MessagingConversationKind`, `MessagingReadRequest`,
 `MessagingMessages`, `MessagingMessage`, `MessagingReplyRequest`, `MessagingMarkReadRequest` and

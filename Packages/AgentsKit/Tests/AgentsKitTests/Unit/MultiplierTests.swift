@@ -37,7 +37,7 @@ struct MultiplierTests {
     }
 
     @Test func writesWhatTheSchemaSays() throws {
-        let schema = try WireSchema(WireSchemaTests.read("daemon.schema.json"))
+        let schema = try WireSchema(WireSchemaTests.readSchema())
         let written = try WireSchemaTests.through(DaemonAPI.Multiplier.self)(JSONValue.parse(Self.changed))
         #expect(schema.errors(written, against: "Multiplier").isEmpty)
     }

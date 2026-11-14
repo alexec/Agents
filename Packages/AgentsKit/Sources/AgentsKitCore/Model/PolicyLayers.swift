@@ -2,7 +2,7 @@ import Foundation
 
 /// Policy layers (#2957): the rules an organisation, a person ("You") or a folder may set, the
 /// resolver's effective result, and the person's own signed layer. The types are hand-written
-/// against `Packages/Wire/daemon.schema.json` (`WireSchemaTests`); `policylayers.Resolve` in Go
+/// against `Packages/Wire/schema` (`WireSchemaTests`); `policylayers.Resolve` in Go
 /// is the one place the layers are actually combined (R12: clients draw, the machine decides).
 public extension DaemonAPI {
     /// Money and tokens a layer caps per agent and per UTC day (data-model.md "PolicyRules").

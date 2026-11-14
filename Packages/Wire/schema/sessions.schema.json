@@ -1,0 +1,2665 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agents.alexecollins.com/schema/sessions.schema.json",
+  "title": "The wire: sessions types",
+  "description": "Part of the source of every type on the wire (#1135, #5380): one file per domain in Packages/Wire/schema. A $ref to another file names it (core.schema.json#/definitions/JSONValue); scripts/wire.sh gen reads them all.",
+  "definitions": {
+    "ACPPromptCapabilities": {
+      "type": "object",
+      "properties": {
+        "image": {
+          "type": "boolean"
+        },
+        "audio": {
+          "type": "boolean"
+        },
+        "embeddedContext": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AfterTurn": {
+      "type": "string",
+      "enum": [
+        "request_archive",
+        "archive"
+      ]
+    },
+    "Agent": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "revision": {
+          "type": "integer",
+          "description": "Where this record's last change is in its host's order of changes (#4785): a number per host that goes up with each change to any of its records, kept on disk. Ask for the records changed since with ListRequest.changedSince."
+        },
+        "runtimeID": {
+          "type": "string"
+        },
+        "cwd": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "title": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SessionLabel"
+          }
+        },
+        "state": {
+          "$ref": "#/definitions/AgentState"
+        },
+        "runtimeSessionID": {
+          "type": "string"
+        },
+        "runtimeKeepsCopy": {
+          "type": "boolean",
+          "description": "Delete leaves the runtime's own copy of the conversation (#3669): its files are not known and its adapter cannot delete a session (OpenCode without session/delete). Set when the runtime's session starts; absent when Delete erases it, or nothing is known yet."
+        },
+        "startOptions": {
+          "$ref": "#/definitions/StartOptions"
+        },
+        "advertisedOptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConfigOption"
+          }
+        },
+        "availableCommands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SlashCommand"
+          }
+        },
+        "createdAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "lastActivityAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "browserUsedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When the agent's first browser call of its latest turn that used the browser came (#3916). A client opens the session's Agent Browser pane when this moves."
+        },
+        "isUnread": {
+          "type": "boolean"
+        },
+        "isMuted": {
+          "description": "Mute Notifications (#2003): the session still goes under Needs you and counts in the badge, but sends no push, no Mac notification and no banner. A muted workflow's runs start muted.",
+          "type": "boolean"
+        },
+        "reportSeenAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "endedReason": {
+          "$ref": "#/definitions/EndedReason"
+        },
+        "archivedReason": {
+          "$ref": "#/definitions/AgentArchivedReason"
+        },
+        "usage": {
+          "$ref": "reports.schema.json#/definitions/Usage"
+        },
+        "lastTurnUsage": {
+          "$ref": "reports.schema.json#/definitions/TurnUsage"
+        },
+        "costToDate": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "costCeiling": {
+          "$ref": "reports.schema.json#/definitions/Cost"
+        },
+        "tokensToDate": {
+          "type": "integer"
+        },
+        "tokenCeiling": {
+          "type": "integer"
+        },
+        "plans": {
+          "type": "array",
+          "items": {
+            "$ref": "workflows.schema.json#/definitions/Plan"
+          }
+        },
+        "background": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BackgroundItem"
+          }
+        },
+        "additionalDirectories": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/URLString"
+          }
+        },
+        "mcpServers": {
+          "type": "array",
+          "items": {
+            "$ref": "mcp.schema.json#/definitions/MCPServer"
+          }
+        },
+        "queuedPrompts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/QueuedPrompt"
+          }
+        },
+        "suggestedPrompts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SuggestedPrompt"
+          }
+        },
+        "startedByWorkflow": {
+          "type": "string"
+        },
+        "purpose": {
+          "$ref": "#/definitions/AgentPurpose"
+        },
+        "startedByRun": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "startedByAgent": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "chainDepth": {
+          "type": "integer"
+        },
+        "eventWait": {
+          "$ref": "workflows.schema.json#/definitions/EventWait"
+        },
+        "worktree": {
+          "$ref": "reports.schema.json#/definitions/AgentWorktree"
+        },
+        "pendingMove": {
+          "$ref": "machines.schema.json#/definitions/PendingMove"
+        },
+        "startingPoint": {
+          "$ref": "#/definitions/StartingPoint"
+        },
+        "startRequestID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "persona": {
+          "type": "string"
+        },
+        "restartPickUps": {
+          "type": "integer"
+        },
+        "report": {
+          "$ref": "reports.schema.json#/definitions/WorkReport"
+        },
+        "outcomeAsked": {
+          "type": "boolean"
+        },
+        "archiveRequest": {
+          "$ref": "#/definitions/ArchiveRequest"
+        },
+        "afterTurn": {
+          "$ref": "#/definitions/AfterTurn"
+        },
+        "archivedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "sandboxOverride": {
+          "$ref": "org.schema.json#/definitions/SandboxChoice"
+        },
+        "effectiveSandbox": {
+          "$ref": "org.schema.json#/definitions/EffectiveSandbox"
+        },
+        "pendingSandboxFailure": {
+          "$ref": "org.schema.json#/definitions/SandboxFailureRecord"
+        },
+        "desktopControlPause": {
+          "$ref": "org.schema.json#/definitions/DesktopControlPause",
+          "description": "Set while this agent holds the screen lease and the person's own touch on the mouse or keyboard paused its drive_screen (#3004, US3, FR-007): every client offers Resume and Take Over (desktopControl/resume, desktopControl/takeOver). Cleared by either, and when the turn ends."
+        },
+        "missingFolder": {
+          "$ref": "machines.schema.json#/definitions/MissingFolder"
+        },
+        "listsLeftOut": {
+          "type": "boolean"
+        },
+        "titleIsPersons": {
+          "type": "boolean"
+        },
+        "runtimeTitle": {
+          "type": "string"
+        },
+        "madeInRoot": {
+          "type": "string"
+        },
+        "queuedStart": {
+          "$ref": "#/definitions/QueuedStart"
+        },
+        "branchedFrom": {
+          "$ref": "core.schema.json#/definitions/UUID",
+          "description": "The session this one was branched from at one of its prompts (#1658). Until it has a conversation of its own, its runtime reads the record it was given ahead of its first prompt."
+        },
+        "movedFrom": {
+          "$ref": "machines.schema.json#/definitions/SessionMovedFrom",
+          "description": "The machine it moved here from with move_session (#3717). Until it has a conversation of its own on this machine, its runtime reads the app's record ahead of its next prompt."
+        },
+        "fileToSee": {
+          "$ref": "files.schema.json#/definitions/ShownFile",
+          "description": "The last file it showed with show_file that the person has not looked at (#1802): a mark on its row, never a group or a badge. Cleared when the person opens the conversation or marks it read."
+        },
+        "continueWhenBack": {
+          "$ref": "#/definitions/ContinueWhenBack",
+          "description": "The person asked a chat paused by a spent allowance to carry on when the allowance is back (#1859). At `at` the host sends \"continue\" in the same chat; a turn that works, any other message, Stop or Archive takes it away."
+        },
+        "runningTool": {
+          "type": "string",
+          "description": "While a turn runs, the title of the tool the agent is running now, the newest when more than one is (#1902). Absent while it thinks or replies. It changes only once a new value has held for a second, so a short tool never shows and a short gap between two does not flash. Cleared when the turn ends."
+        },
+        "accountID": {
+          "description": "The added account its runtime runs with (#840); absent for the runtime's own sign-in.",
+          "type": "string"
+        },
+        "auto": {
+          "$ref": "core.schema.json#/definitions/AutoPick",
+          "description": "Set when the agent started on Auto (#2658, FR-007)."
+        },
+        "clientPermission": {
+          "$ref": "org.schema.json#/definitions/ClientPermissionMode",
+          "description": "The agent's own answer to permission requests (#2658, FR-019); absent follows Settings."
+        },
+        "levels": {
+          "$ref": "core.schema.json#/definitions/Levels",
+          "description": "The shared values the agent runs with now (#2658), where its own settings match one; a field that is absent shows Custom."
+        },
+        "voiceHungUpAt": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When the agent last ended voice mode with hang_up (#2375): the person said they were done talking. A client in voice mode on this chat says the reply, then turns voice mode off."
+        },
+        "goal": {
+          "$ref": "workflows.schema.json#/definitions/Goal",
+          "description": "The standing aim its runtime keeps working towards over many turns (#2742), as Codex's and Claude's adapters report it on a session_info_update under _meta.jetbrains.air.goal. Absent when the runtime reports none, or cleared it."
+        },
+        "project": {
+          "type": "string",
+          "description": "The project its folder is in (#3276), as the folder's .agents/folder.json names it now. Absent for a folder in no project."
+        }
+      },
+      "required": [
+        "id",
+        "runtimeID",
+        "cwd",
+        "state",
+        "startOptions",
+        "advertisedOptions",
+        "availableCommands",
+        "createdAt",
+        "lastActivityAt"
+      ],
+      "additionalProperties": false
+    },
+    "AgentArchivedReason": {
+      "type": "string",
+      "enum": [
+        "byUser",
+        "byAgent"
+      ]
+    },
+    "AgentConfigEditorRequest": {
+      "type": "object",
+      "properties": {
+        "folder": { "$ref": "core.schema.json#/definitions/URLString" },
+        "kind": { "type": "string", "enum": ["skills", "personas", "workflows"] }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    },
+    "AgentConfigEditorSaveRequest": {
+      "type": "object",
+      "properties": {
+        "folder": { "$ref": "core.schema.json#/definitions/URLString" },
+        "kind": { "type": "string", "enum": ["skills", "personas", "workflows"] },
+        "path": { "type": "string" },
+        "content": { "type": "string" },
+        "delete": { "type": "boolean" }
+      },
+      "required": ["kind", "path", "content"],
+      "additionalProperties": false
+    },
+    "AgentPurpose": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "providerDraft": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "core.schema.json#/definitions/UUID"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "providerDraft"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "AgentRemovedNotification": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
+    "AgentRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
+    "AgentState": {
+      "type": "string",
+      "enum": [
+        "starting",
+        "running",
+        "waitingOnUser",
+        "finished",
+        "stopped",
+        "archived",
+        "queued"
+      ],
+      "x-fallback": "stopped",
+      "description": "A state this build does not know reads as `stopped` (Agent's init(from:)), with endedReason `unrecognised`."
+    },
+    "AgentStopRequest": {
+      "type": "object",
+      "description": "agents/stop (#2435): the agent, and whether an admin stopped it from the Console, so its owner reads who stopped it. Only a label on the owner's own transcript: whoever sends it could already stop the agent.",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "byAdmin": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
+    "ArchiveRequest": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "whenTurnEnds": {
+              "type": "object",
+              "properties": {
+                "since": {
+                  "$ref": "core.schema.json#/definitions/WireDate"
+                }
+              },
+              "required": [
+                "since"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "whenTurnEnds"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "requested": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "$ref": "core.schema.json#/definitions/WireDate"
+                }
+              },
+              "required": [
+                "at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "requested"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Attachment": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "block": {
+          "$ref": "workflows.schema.json#/definitions/ContentBlock"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "byteCount": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "block",
+        "displayName"
+      ],
+      "additionalProperties": false
+    },
+    "BackgroundItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/BackgroundItemKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "taskType": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "command": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/BackgroundItemState"
+        },
+        "canStop": {
+          "type": "boolean"
+        },
+        "isStopping": {
+          "type": "boolean"
+        },
+        "parentID": {
+          "type": "string"
+        },
+        "toolCallID": {
+          "type": "string"
+        },
+        "outputFilePath": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "lastToolName": {
+          "type": "string"
+        },
+        "startedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "endedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "state",
+        "canStop",
+        "isStopping",
+        "startedAt"
+      ],
+      "additionalProperties": false
+    },
+    "BackgroundItemKind": {
+      "type": "string",
+      "enum": [
+        "task",
+        "subagent"
+      ]
+    },
+    "BackgroundItemState": {
+      "type": "string",
+      "enum": [
+        "running",
+        "paused",
+        "completed",
+        "failed",
+        "stopped",
+        "disconnected"
+      ]
+    },
+    "ChartHint": {
+      "type": "object",
+      "properties": {
+        "mark": {
+          "$ref": "#/definitions/ChartMark"
+        },
+        "x": {
+          "type": "string"
+        },
+        "y": {
+          "type": "string"
+        },
+        "color": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "mark",
+        "x",
+        "y"
+      ],
+      "additionalProperties": false
+    },
+    "ChartMark": {
+      "type": "string",
+      "enum": [
+        "bar",
+        "line",
+        "point",
+        "area"
+      ]
+    },
+    "CheckSuggestion": {
+      "type": "object",
+      "description": "A finding of the read-only daily checks (#3355) in a folder, in the sidebar's For Review (#3331) until a session is started from it (suggestions/start) or it is dismissed (suggestions/dismiss).",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable for the suggestion: what suggestions/start and suggestions/dismiss name."
+        },
+        "title": {
+          "type": "string",
+          "description": "What is wrong, in a line."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "What Start sends to the new session."
+        },
+        "link": {
+          "$ref": "core.schema.json#/definitions/URLString",
+          "description": "The page it is about, such as the failing run or the pull request."
+        },
+        "urgent": {
+          "type": "boolean"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When the check found it."
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "prompt",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "ConfigChoice": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "setBy": {
+          "$ref": "org.schema.json#/definitions/PolicySetBy",
+          "description": "Set when the organisation's policy refuses this choice (#998, FR-010): a mode above the ceiling, or a model it does not allow."
+        }
+      },
+      "required": [
+        "value",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ConfigOption": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "description": "\"select\", \"boolean\", or a kind this build doesn't know, carried as itself."
+        },
+        "currentValue": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ConfigChoice"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "org.schema.json#/definitions/ConfigChoiceGroup"
+              }
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "type"
+      ],
+      "additionalProperties": false,
+      "description": "ConfigOption (Model/Options.swift), as its encode(to:) writes it: `type` is the kind's wire name, and `options` is a flat list for one unnamed group, else the groups."
+    },
+    "ConsoleStopAgent": {
+      "type": "object",
+      "description": "console/stopAgent (#2019, M9): an admin stops one agent on any machine of the organisation, as Console ▸ Live Now does.",
+      "properties": {
+        "host": {
+          "$ref": "machines.schema.json#/definitions/MachineRef"
+        },
+        "agent": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "host",
+        "agent"
+      ],
+      "additionalProperties": false
+    },
+    "ContinueInNewRequest": {
+      "type": "object",
+      "description": "agents/continueInNew (#999): a new session in the same folder that reads this one and carries on, on another account of its runtime.",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "accountID": {
+          "description": "The account the new session uses: an added account, an org account (org:<route id>) or default for the runtime's own sign-in. Absent: the runtime's account for new sessions (Reaches the Model By).",
+          "type": "string"
+        },
+        "requestID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "auto": {
+          "type": "boolean",
+          "description": "Continue on Auto (#2658, FR-022): the successor starts on the runtime Auto would pick now, with the session's values. Only for an Auto session."
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
+    "ContinueWhenBack": {
+      "type": "object",
+      "description": "When a chat paused by a spent allowance carries on by itself (#1859).",
+      "properties": {
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When it sends \"continue\": the provider's reset time, or the app's next check of the runtime."
+        },
+        "resetKnown": {
+          "type": "boolean",
+          "description": "True when `at` is the time the provider said the allowance resets; false when it is only the app's next check."
+        }
+      },
+      "required": [
+        "at",
+        "resetKnown"
+      ],
+      "additionalProperties": false
+    },
+    "DeleteSessionRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "sessionID": {
+          "type": "string"
+        },
+        "confirmed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "sessionID"
+      ],
+      "additionalProperties": false
+    },
+    "DeployCheck": {
+      "type": "object",
+      "description": "A condition with a state on a deploy or a target (#5262): an approval, a test, a health status, a soak time, a window, an App Review. kind is an open string (approval, test, health, soak, window, review…). when is before (it can hold the deploy) or after (it says how what runs there is). state is the model's, rawState the system's own word. Checks are details and events, not lineage nodes.",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "system": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "when": {
+          "$ref": "#/definitions/DeployCheckWhen"
+        },
+        "state": {
+          "$ref": "core.schema.json#/definitions/DeployState"
+        },
+        "rawState": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "system",
+        "when",
+        "state",
+        "rawState"
+      ],
+      "additionalProperties": false
+    },
+    "DeployCheckWhen": {
+      "type": "string",
+      "enum": [
+        "before",
+        "after"
+      ],
+      "description": "Whether a check is before a deploy (it can hold it) or after it (on what runs there)."
+    },
+    "EditQueuedRequest": {
+      "type": "object",
+      "description": "agents/editQueued (#1552): a queued prompt's new words, in its place in the queue.",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "promptID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "promptID",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "EditQueuedResult": {
+      "type": "object",
+      "description": "Whether the prompt was still waiting and now has the new words. False: it was sent, or taken back, first.",
+      "properties": {
+        "edited": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "edited"
+      ],
+      "additionalProperties": false
+    },
+    "EndedReason": {
+      "type": "string",
+      "enum": [
+        "endTurn",
+        "maxTokens",
+        "maxTurnRequests",
+        "refusal",
+        "cancelled",
+        "processDied",
+        "daemonGone",
+        "costLimit",
+        "unrecognised",
+        "stoppedByAgent",
+        "signInRefused",
+        "runtimeError",
+        "allowanceSpent",
+        "rateLimited",
+        "sandboxFailed",
+        "imported",
+        "stoppedByAdmin"
+      ],
+      "x-fallback": "unrecognised",
+      "description": "A reason this build does not know reads as `unrecognised`."
+    },
+    "EntryNotification": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "entry": {
+          "$ref": "#/definitions/TranscriptEntry"
+        },
+        "index": {
+          "type": "integer"
+        },
+        "oversized": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "entry"
+      ],
+      "additionalProperties": false
+    },
+    "LabelVocabularyRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "OptionsRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "cwd": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "mcpServers": {
+          "type": "array",
+          "items": {
+            "$ref": "mcp.schema.json#/definitions/MCPServer"
+          }
+        }
+      },
+      "required": [
+        "runtimeID",
+        "cwd",
+        "mcpServers"
+      ],
+      "additionalProperties": false
+    },
+    "OptionsResponse": {
+      "type": "object",
+      "properties": {
+        "draftID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConfigOption"
+          }
+        },
+        "commands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SlashCommand"
+          }
+        }
+      },
+      "required": [
+        "draftID",
+        "options",
+        "commands"
+      ],
+      "additionalProperties": false
+    },
+    "PeopleList": {
+      "type": "object",
+      "description": "people/list (#994): every user for an admin; for a member, only themselves.",
+      "properties": {
+        "people": {
+          "type": "array",
+          "items": {
+            "$ref": "org.schema.json#/definitions/PersonRow"
+          }
+        },
+        "admin": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "people",
+        "admin"
+      ],
+      "additionalProperties": false
+    },
+    "PlanEntry": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "priority": {
+          "$ref": "#/definitions/PlanEntryPriority"
+        },
+        "status": {
+          "$ref": "#/definitions/PlanEntryStatus"
+        }
+      },
+      "required": [
+        "content",
+        "priority",
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "PlanEntryPriority": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ]
+    },
+    "PlanEntryStatus": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "in_progress",
+        "completed"
+      ]
+    },
+    "PromptOrigin": {
+      "type": "string",
+      "enum": [
+        "person",
+        "app",
+        "agent"
+      ]
+    },
+    "PromptRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "text": {
+          "type": "string"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Attachment"
+          }
+        },
+        "from": {
+          "$ref": "#/definitions/PromptOrigin"
+        },
+        "sendID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "voice": {
+          "type": "boolean",
+          "description": "Sent from voice mode (#2322): the daemon puts the voice-mode text in front of the words, as the prompt's preface."
+        }
+      },
+      "required": [
+        "agentID",
+        "text",
+        "attachments",
+        "from"
+      ],
+      "additionalProperties": false
+    },
+    "QueuedPrompt": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "text": {
+          "type": "string"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Attachment"
+          }
+        },
+        "queuedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "from": {
+          "$ref": "#/definitions/PromptOrigin"
+        },
+        "preface": {
+          "type": "string"
+        },
+        "sender": {
+          "$ref": "connections.schema.json#/definitions/MessageSender"
+        }
+      },
+      "required": [
+        "id",
+        "text",
+        "attachments",
+        "queuedAt",
+        "from"
+      ],
+      "additionalProperties": false
+    },
+    "QueuedStart": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "permissionMode": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "worktree": {
+          "$ref": "reports.schema.json#/definitions/WorktreeChoice"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "labels"
+      ],
+      "additionalProperties": false
+    },
+    "RememberedOptionsRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "cwd": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "cwd"
+      ],
+      "additionalProperties": false
+    },
+    "RemovalCheck": {
+      "type": "object",
+      "properties": {
+        "blockedBy": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/UUID"
+          }
+        },
+        "uncommitted": {
+          "type": "integer"
+        },
+        "unmerged": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "blockedBy",
+        "uncommitted",
+        "unmerged"
+      ],
+      "additionalProperties": false
+    },
+    "RenameRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "SessionCall": {
+      "type": "object",
+      "description": "agents/fromStarter (#2927): the agent that started a session from another machine reads, messages, stops or archives it, or asks how it stands. The host answers only when from is the session's StartedFrom. The control plane writes from.machine and from.who; the asking host writes from.agent.",
+      "properties": {
+        "from": {
+          "$ref": "#/definitions/StartedFrom"
+        },
+        "session": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "status",
+            "read",
+            "message",
+            "stop",
+            "archive"
+          ]
+        },
+        "message": {
+          "description": "With op message: the words.",
+          "type": "string"
+        },
+        "replace": {
+          "description": "With op message: replace the message of the starter's that waits, as message_session's replace.",
+          "type": "boolean"
+        },
+        "project": {
+          "description": "The asking agent's project (#3277). The host also answers status, read and message for a session that from did not start, when its folder is in this project now; stop and archive stay the starter's. The control plane checks that the asking machine has a folder of it.",
+          "type": "string"
+        },
+        "watch": {
+          "description": "With op status and project (#3277): the asker waits on it with wait_for_event on agent.ended, so the host tells the asker's machine when it ends, as it tells a starter.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "from",
+        "session",
+        "op"
+      ],
+      "additionalProperties": false
+    },
+    "SessionCallReply": {
+      "type": "object",
+      "description": "What agents/fromStarter says (#2927): the words for the agent, the session's title, and how it ended, absent while it goes on.",
+      "properties": {
+        "said": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "ended": {
+          "$ref": "workflows.schema.json#/definitions/WaitEndingHow"
+        }
+      },
+      "required": [
+        "said"
+      ],
+      "additionalProperties": false
+    },
+    "SessionEnded": {
+      "type": "object",
+      "description": "machines/sessionEnded through machine/machines, then agents/endedElsewhere (#2927): a session started from another machine has ended, so its starter's wait on agent.ended can wake. The host sends machine as the starter's machine; the control plane sends it on as the ended session's.",
+      "properties": {
+        "machine": {
+          "type": "string"
+        },
+        "session": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "starter": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "how": {
+          "$ref": "workflows.schema.json#/definitions/WaitEndingHow"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "session",
+        "starter",
+        "how"
+      ],
+      "additionalProperties": false
+    },
+    "SessionLabel": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string"
+        },
+        "owner": {
+          "$ref": "#/definitions/SessionLabelOwner"
+        },
+        "addedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "value",
+        "owner",
+        "addedAt"
+      ],
+      "additionalProperties": false
+    },
+    "SessionLabelOwner": {
+      "type": "string",
+      "enum": [
+        "person",
+        "agent"
+      ]
+    },
+    "SessionsListRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "cwd": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "cwd"
+      ],
+      "additionalProperties": false
+    },
+    "SetLabelsRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "add": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "remove": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "agentID",
+        "add",
+        "remove"
+      ],
+      "additionalProperties": false
+    },
+    "SetMutedRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "muted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agentID",
+        "muted"
+      ],
+      "additionalProperties": false
+    },
+    "SetOptionRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "optionID": {
+          "type": "string"
+        },
+        "value": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "agentID",
+        "optionID",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "SetUnreadRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "unread": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agentID",
+        "unread"
+      ],
+      "additionalProperties": false
+    },
+    "SlashCommand": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "inputHint": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "StartOptions": {
+      "type": "object",
+      "properties": {
+        "values": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "core.schema.json#/definitions/JSONValue"
+          }
+        },
+        "extraArguments": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "values",
+        "extraArguments"
+      ],
+      "additionalProperties": false
+    },
+    "StartRequest": {
+      "type": "object",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "cwd": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Attachment"
+          }
+        },
+        "startOptions": {
+          "$ref": "#/definitions/StartOptions"
+        },
+        "draftID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "additionalDirectories": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/URLString"
+          }
+        },
+        "mcpServers": {
+          "type": "array",
+          "items": {
+            "$ref": "mcp.schema.json#/definitions/MCPServer"
+          }
+        },
+        "worktree": {
+          "$ref": "reports.schema.json#/definitions/WorktreeChoice"
+        },
+        "requestID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "sandbox": {
+          "$ref": "org.schema.json#/definitions/SandboxChoice"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "persona": {
+          "type": "string"
+        },
+        "levels": {
+          "$ref": "core.schema.json#/definitions/Levels",
+          "description": "The values in the shared words (#2658). With runtimeID auto, the daemon picks the runtime (FR-006)."
+        },
+        "purpose": {
+          "$ref": "#/definitions/AgentPurpose"
+        },
+        "accountID": {
+          "description": "The added account the session uses (#840); absent for the runtime's own sign-in.",
+          "type": "string"
+        },
+        "voice": {
+          "description": "Started from voice mode (#2375): its first prompt asks for a short spoken reply, as agents/prompt's voice does.",
+          "type": "boolean"
+        },
+        "startedFrom": {
+          "$ref": "#/definitions/StartedFrom",
+          "description": "An agent on another machine started it, through the control plane (#2887): its chat says who."
+        }
+      },
+      "required": [
+        "runtimeID",
+        "cwd",
+        "prompt",
+        "attachments",
+        "startOptions",
+        "additionalDirectories",
+        "mcpServers",
+        "labels"
+      ],
+      "additionalProperties": false
+    },
+    "StartedFrom": {
+      "type": "object",
+      "description": "The agent on another machine that started a session with start_session (#2887). The control plane writes machine and who; the asking host writes agent.",
+      "properties": {
+        "machine": {
+          "type": "string"
+        },
+        "agent": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "who": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "agent",
+        "who"
+      ],
+      "additionalProperties": false
+    },
+    "StartingPoint": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "commit": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository",
+        "commit"
+      ],
+      "additionalProperties": false
+    },
+    "StopBackgroundRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "itemID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "itemID"
+      ],
+      "additionalProperties": false
+    },
+    "SuggestedPrompt": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "label": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "prompt"
+      ],
+      "additionalProperties": false
+    },
+    "SuggestionRequest": {
+      "type": "object",
+      "description": "suggestions/start or suggestions/dismiss (#3331): the person's Start or Dismiss on a suggestion of the daily checks in For Review.",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "id": {
+          "type": "string",
+          "description": "The suggestion's id, as its CheckSuggestion says it."
+        }
+      },
+      "required": [
+        "folder",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "SummaryPage": {
+      "type": "object",
+      "description": "One saved page of the daily summary (#3721), in ~/.agents/summaries on this machine: the sidebar's Summary row and the Summary page.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The file's name without .md, such as 2026-11-06-1810: what summaries/read names."
+        },
+        "title": {
+          "type": "string",
+          "description": "The page's first heading, such as \"Daily summary, Fri 6 Nov\"; the name when it has none."
+        },
+        "savedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "unread": {
+          "type": "boolean",
+          "description": "Nobody has read it with summaries/read since it was saved."
+        },
+        "writer": {
+          "$ref": "core.schema.json#/definitions/UUID",
+          "description": "The Daily summary workflow's session that wrote it: the page's \"How this was written\". Absent for a page saved before #3721."
+        }
+      },
+      "required": [
+        "name",
+        "title",
+        "savedAt",
+        "unread"
+      ],
+      "additionalProperties": false
+    },
+    "SummaryPageText": {
+      "type": "object",
+      "description": "summaries/read (#3721): a saved page of the daily summary and its Markdown.",
+      "properties": {
+        "page": {
+          "$ref": "#/definitions/SummaryPage"
+        },
+        "markdown": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "page",
+        "markdown"
+      ],
+      "additionalProperties": false
+    },
+    "ToolCall": {
+      "type": "object",
+      "properties": {
+        "toolCallID": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "content": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ToolCallContent"
+          }
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ToolCallLocation"
+          }
+        },
+        "rawInput": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "rawOutput": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "raw": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "title",
+        "content",
+        "locations"
+      ],
+      "additionalProperties": false
+    },
+    "ToolCallContent": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "content"
+            },
+            "content": {
+              "$ref": "workflows.schema.json#/definitions/ContentBlock"
+            }
+          },
+          "required": [
+            "type",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "diff"
+            },
+            "path": {
+              "type": "string"
+            },
+            "newText": {
+              "type": "string"
+            },
+            "oldText": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "path",
+            "newText"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "terminal"
+            },
+            "terminalId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "terminalId"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "ToolCallContent (ACP/ToolCallContent.swift): the protocol's shapes, as sent. Anything else is written back as it came, so another `type` may arrive."
+    },
+    "ToolCallLocation": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "TranscriptEntry": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "kind": {
+          "$ref": "#/definitions/TranscriptEntryKind"
+        },
+        "subagentID": {
+          "type": "string"
+        },
+        "sender": {
+          "$ref": "connections.schema.json#/definitions/MessageSender"
+        }
+      },
+      "required": [
+        "id",
+        "at",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "TranscriptEntryKind": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "userMessage": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                },
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "workflows.schema.json#/definitions/ContentBlock"
+                  }
+                },
+                "from": {
+                  "$ref": "#/definitions/PromptOrigin"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "userMessage"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "agentMessage": {
+              "type": "object",
+              "properties": {
+                "messageID": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                },
+                "blocks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "workflows.schema.json#/definitions/ContentBlock"
+                  }
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "agentMessage"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "agentThought": {
+              "type": "object",
+              "properties": {
+                "messageID": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "agentThought"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "toolCall": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/ToolCall"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "toolCall"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "toolCallUpdate": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/ToolCall"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "toolCallUpdate"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "planUpdated": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "workflows.schema.json#/definitions/Plan"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "planUpdated"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "usageRecorded": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "reports.schema.json#/definitions/TurnUsage"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "usageRecorded"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "servedRequest": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "core.schema.json#/definitions/ServedRequest"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "servedRequest"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "elicitationAsked": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "workflows.schema.json#/definitions/ElicitationRequest"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "elicitationAsked"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "elicitationAnswered": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "$ref": "core.schema.json#/definitions/UUID"
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "answers": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "workflows.schema.json#/definitions/ElicitationAnswer"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "summary"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "elicitationAnswered"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "compaction": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "workflows.schema.json#/definitions/ContentBlock"
+                  }
+                },
+                "id": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "status",
+                "summary"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "compaction"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "notice": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "connections.schema.json#/definitions/SessionNotice"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "notice"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "permissionAsked": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "org.schema.json#/definitions/PermissionRequest"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "permissionAsked"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "permissionAnswered": {
+              "type": "object",
+              "properties": {
+                "optionID": {
+                  "type": "string"
+                },
+                "optionName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "optionID"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "permissionAnswered"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "optionChanged": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "value": {
+                  "$ref": "core.schema.json#/definitions/JSONValue"
+                }
+              },
+              "required": [
+                "id",
+                "value"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "optionChanged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "stateChanged": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/AgentState"
+                },
+                "reason": {
+                  "$ref": "#/definitions/EndedReason"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "stateChanged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "background": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/BackgroundItem"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "background"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "workReported": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "reports.schema.json#/definitions/WorkReport"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "workReported"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "runtimeNote": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "runtimeNote"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sandboxFailure": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "org.schema.json#/definitions/SandboxFailureRecord"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "sandboxFailure"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "policyStopped": {
+              "type": "object",
+              "description": "A rule of the policy stopped this agent (#2957, FR-025): a prompt that waits, or a turn that ended at a budget. The chat draws it as the Stopped by a policy card, with the rule, the layer that decides and the value.",
+              "properties": {
+                "_0": {
+                  "$ref": "org.schema.json#/definitions/PolicyRefusal"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "policyStopped"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "appView": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "files.schema.json#/definitions/AppViewCall"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "appView"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "fileShown": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "files.schema.json#/definitions/ShownFile"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "fileShown"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "notified": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "connections.schema.json#/definitions/SentNotice"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "notified"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "noticeDelivered": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "connections.schema.json#/definitions/NoticeDelivery"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "noticeDelivered"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "The files a turn changed (#3437), recorded as the turn ends when they differ from the snapshot the host took as it began. The chat draws it as the Changed files card at the end of the turn, with Undo These Changes.",
+          "properties": {
+            "turnChanged": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "files.schema.json#/definitions/TurnChanges"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "turnChanged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "A turn's changes put back (#3437), recorded after the turn's turnChanged entry. A client draws it on that card, never as a line of its own.",
+          "properties": {
+            "turnUndone": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "#/definitions/TurnUndo"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "turnUndone"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "x-fallback": "keep",
+      "description": "One key, the kind's name, holding its fields. A kind this build does not know is kept whole and written back as it was read (TranscriptEntry+Coding.swift)."
+    },
+    "TranscriptPage": {
+      "type": "object",
+      "properties": {
+        "firstIndex": {
+          "type": "integer"
+        },
+        "total": {
+          "type": "integer"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TranscriptEntry"
+          }
+        }
+      },
+      "required": [
+        "firstIndex",
+        "total",
+        "entries"
+      ],
+      "additionalProperties": false
+    },
+    "TranscriptRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "before": {
+          "type": "integer"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "from": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "limit"
+      ],
+      "additionalProperties": false
+    },
+    "TurnPhase": {
+      "type": "string",
+      "enum": [
+        "working",
+        "question",
+        "approval",
+        "done",
+        "needs_you",
+        "paused",
+        "failed",
+        "gone"
+      ],
+      "description": "Where a session's turn is, as its Live Activity says it (#1744): working; a question or an approval waiting on the person; done; ended cleanly but wanting the person, as Needs you in the sidebars (#1861); stopped on purpose, as Paused in the sidebars (#1869); or ended in error, as Unexpected stop; or gone (archived or deleted)."
+    },
+    "TurnSummary": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "start": {
+          "type": "integer"
+        },
+        "end": {
+          "type": "integer"
+        },
+        "ask": {
+          "$ref": "#/definitions/TranscriptEntry"
+        },
+        "outcome": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TranscriptEntry"
+          }
+        },
+        "steps": {
+          "type": "integer"
+        },
+        "usage": {
+          "$ref": "reports.schema.json#/definitions/TurnUsage"
+        }
+      },
+      "required": [
+        "id",
+        "start",
+        "end"
+      ],
+      "additionalProperties": false
+    },
+    "TurnUndo": {
+      "type": "object",
+      "description": "The files changes/undoTurn put back as they were before turn `turn` (#3437).",
+      "properties": {
+        "turn": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "putBack": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "turn",
+        "putBack"
+      ],
+      "additionalProperties": false
+    },
+    "TurnsPage": {
+      "type": "object",
+      "properties": {
+        "turns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TurnSummary"
+          }
+        },
+        "firstTurn": {
+          "type": "integer"
+        },
+        "openStart": {
+          "type": "integer"
+        },
+        "firstPrompt": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "turns",
+        "firstTurn",
+        "openStart"
+      ],
+      "additionalProperties": false
+    },
+    "TurnsRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "before": {
+          "type": "integer"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "limit"
+      ],
+      "additionalProperties": false
+    },
+    "UndoTurnRequest": {
+      "type": "object",
+      "description": "changes/undoTurn (#3437): put the files turn `turn` (its prompt's entry) changed back as they were before it. Without confirmed, a file that changed again after the turn puts nothing back, and the result names it.",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "turn": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "confirmed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agentID",
+        "turn"
+      ],
+      "additionalProperties": false
+    },
+    "UndoTurnResult": {
+      "type": "object",
+      "description": "What changes/undoTurn did: the files it put back, or, when it put nothing back for want of confirmed, the files that changed again after the turn (changedSince).",
+      "properties": {
+        "putBack": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "changedSince": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "putBack",
+        "changedSince"
+      ],
+      "additionalProperties": false
+    },
+    "UnqueueRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "promptID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "agentID",
+        "promptID"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
