@@ -533,8 +533,10 @@ const (
 	mostAnnotated = 20
 )
 
-// deployPattern is a deploy's ref, <target>:<id>/<version>, as testflight:com.example.app/42.
-var deployPattern = regexp.MustCompile(`^[a-z][a-z0-9-]{0,19}:[^\s/]+(/[^\s/]+)*/[^\s/]+$`)
+// deployPattern is what a deploy notice says (#3584, #5241): <target>:<id>/<version>, as
+// testflight:com.example.app/42, or the environment it went to first,
+// <environment>=<target>:<id>/<version>, as testflight=testflight:com.example.app/42.
+var deployPattern = regexp.MustCompile(`^([A-Za-z0-9][A-Za-z0-9._-]{0,63}=)?[a-z][a-z0-9-]{0,19}:[^\s/=]+(/[^\s/]+)*/[^\s/]+$`)
 
 // RunDeploys reads the run's check suite: only its check runs (jobs) that have annotations are
 // read, so a run that deployed nothing costs one request.
@@ -544,7 +546,7 @@ func (g *RealGitHub) RunDeploys(ctx context.Context, repo string, run CompletedR
 	}
 	var suite struct {
 		CheckRuns []struct {
-			ID     int `json:"id"`
+			ID     int64 `json:"id"`
 			Output struct {
 				Annotations int `json:"annotations_count"`
 			} `json:"output"`
@@ -560,23 +562,41 @@ func (g *RealGitHub) RunDeploys(ctx context.Context, repo string, run CompletedR
 			continue
 		}
 		read++
-		var notes []struct {
-			Level   string `json:"annotation_level"`
-			Title   string `json:"title"`
-			Message string `json:"message"`
-		}
-		if err := g.get(ctx, fmt.Sprintf("repos/%s/check-runs/%d/annotations?per_page=100", repo, c.ID), false, &notes); err != nil {
+		if err := g.jobDeploys(ctx, repo, c.ID, &deploys); err != nil {
 			return nil, err
-		}
-		for _, n := range notes {
-			ref := strings.TrimSpace(n.Message)
-			if n.Level == "notice" && n.Title == deployTitle && deployPattern.MatchString(ref) &&
-				!slices.Contains(deploys, ref) && len(deploys) < mostDeploys {
-				deploys = append(deploys, ref)
-			}
 		}
 	}
 	return deploys, nil
+}
+
+// JobDeploys are the deploy notices one Actions job wrote (#5241): a job's check run has the
+// job's id.
+func (g *RealGitHub) JobDeploys(ctx context.Context, repo string, job int64) ([]string, error) {
+	if _, _, err := ownerName(repo); err != nil {
+		return nil, err
+	}
+	var deploys []string
+	return deploys, g.jobDeploys(ctx, repo, job, &deploys)
+}
+
+// jobDeploys adds the deploy notices of check run id to deploys, each once, at most mostDeploys.
+func (g *RealGitHub) jobDeploys(ctx context.Context, repo string, id int64, deploys *[]string) error {
+	var notes []struct {
+		Level   string `json:"annotation_level"`
+		Title   string `json:"title"`
+		Message string `json:"message"`
+	}
+	if err := g.get(ctx, fmt.Sprintf("repos/%s/check-runs/%d/annotations?per_page=100", repo, id), false, &notes); err != nil {
+		return err
+	}
+	for _, n := range notes {
+		ref := strings.TrimSpace(n.Message)
+		if n.Level == "notice" && n.Title == deployTitle && deployPattern.MatchString(ref) &&
+			!slices.Contains(*deploys, ref) && len(*deploys) < mostDeploys {
+			*deploys = append(*deploys, ref)
+		}
+	}
+	return nil
 }
 
 // listRuns hands each run of list (a branch's only, when branch is set) updated at or after

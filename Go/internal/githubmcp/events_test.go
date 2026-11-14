@@ -34,8 +34,10 @@ type fakeGitHub struct {
 	// deployments and jobs are the repo's Deployments and its jobs' conclusions (#5240).
 	deployments []Deployment
 	jobs        map[int64]string
-	err         error
-	noRepo      bool
+	// jobDeploys are each job's deploy notices (#5241).
+	jobDeploys map[int64][]string
+	err        error
+	noRepo     bool
 	// reviews and assigned are what ask the connection's owner, alexec (#2034).
 	reviews  []OpenPR
 	assigned []Issue
@@ -203,6 +205,12 @@ func (f *fakeGitHub) Deployments(_ context.Context, _, environment, since string
 		}
 	}
 	return out, nil
+}
+
+func (f *fakeGitHub) JobDeploys(_ context.Context, _ string, job int64) ([]string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.jobDeploys[job], nil
 }
 
 func (f *fakeGitHub) JobConclusion(_ context.Context, _ string, job int64) (string, error) {

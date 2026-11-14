@@ -136,3 +136,41 @@ For a GitHub repo that deploys with `environment:` jobs, the defaults fill every
 | Target | repo × environment |
 | Deploy | the Deployment and its statuses |
 | Check | the environment's required reviewers, as a waiting deploy (#3587) |
+
+## In lineage
+
+The deploy events make the lineage nodes (#5241). The code is
+`Go/internal/agentsd/lineagedeploy.go`.
+
+| Node | Ref | Example |
+|---|---|---|
+| `deploy`, one try | `<forge>:deploy:<repo>#<deployment id>` | `github:deploy:alexec/agents#7639583967` |
+| `environment` | `<forge>:environment:<repo>#<name>` | `github:environment:alexec/agents#testflight` |
+
+| Link | From → to |
+|---|---|
+| `deploys` | deploy → release, when a `v*` tag names the version; else deploy → commit |
+| `part-of` | deploy → environment |
+| `builds` | ci-run → deploy: the run of the deploy's job |
+| `seen-in` | health → deploy, as before |
+
+- **The environment's name** is the job's deploy notice's, when the job wrote one:
+  `::notice title=deploy::<environment>=<artifact>`, as
+  `testflight=testflight:<bundle id>/<build>`. The old form, `<target>:<id>/<version>`,
+  names the target's kind (`testflight`). With no notice, it is the job's forge
+  environment. The github server reads the job's notices when the job ends, so a deploy
+  can move from its forge environment to the notice's.
+- **A notice's artifact** goes into the deploy's version beside the commit. So a TestFlight
+  build that goes to TestFlight and then to the App Store is one artifact in two deploys.
+- **A deploy's details** (its artifacts, state, start and end) are not links. The host
+  keeps each deploy's last event in `<root>/lineage-deploys.json`, at most 1,000. A walk
+  gives them as the deploy's resolved title (*v0.18.0 to testflight*), state and labels.
+- **Computed, not stored:** a succeeded deploy's state is `replaced` when a newer deploy
+  succeeded in each of its environments. It has the label `rollback` when its release is
+  older than the release it replaced. **What a deploy brings** is the PRs between the last
+  deploy that succeeded in the same environment and this deploy, from the forge's compare
+  of their commits. A walk gives them as `brings` links with the source `computed`. The
+  host works them out in the background and never stores them.
+- **Old nodes:** before #5241, a `deploy` node was an artifact (`testflight:deploy:…#812`),
+  `part-of` a `target`, and a release was `deployed-as` it. Nothing makes those now. They
+  are read until they age out of the store's bounds.

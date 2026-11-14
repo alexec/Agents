@@ -24,6 +24,7 @@ type lineageBook struct {
 	issueParentBook
 	releaseTagsBook
 	lineageResolveBook
+	lineageDeployBook
 	lineageSyncBook
 }
 
@@ -43,6 +44,7 @@ func (d *Daemon) closeLineage() {
 	d.lineageSettle(2 * time.Second)
 	d.stopLinker()
 	d.resolveSettle(2 * time.Second)
+	d.deploySettle(2 * time.Second)
 	d.closeCost()
 	d.closeLineageSync()
 	d.closeCISync()
@@ -70,6 +72,6 @@ func (d *Daemon) registerLineage() {
 		if r.Depth != nil {
 			depth = int(*r.Depth)
 		}
-		return d.resolvedGraph(d.lineage().Walk(r.Node, depth)), nil
+		return d.deployGraph(d.resolvedGraph(d.lineage().Walk(r.Node, depth))), nil
 	})
 }

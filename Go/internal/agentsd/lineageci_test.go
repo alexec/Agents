@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agent-loops/Go/internal/lineage"
 	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
@@ -111,86 +110,17 @@ func TestRepoOfRunURL(t *testing.T) {
 	}
 }
 
-// #3584: what run.completed on a version tag says the run deployed is a deploy node: the
-// release is deployed-as it, and it is part-of its target, so a walk from an issue reaches the
-// TestFlight build that shipped it. A ref that is not <target>:<id>/<version> links nothing.
-func TestLineageReleaseDeployedAsATestFlightBuild(t *testing.T) {
+// #5241: a run's deploy notices make no deploy nodes of their own any more: the deploy.*
+// events do (lineagedeploy_test.go). run.completed on a version tag still builds the release.
+func TestLineageRunCompletedMakesNoDeployNodes(t *testing.T) {
 	d, _ := start(t, t.TempDir())
 	defer d.Shutdown()
-	issue := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#3584"}
-	pr := wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#9"}
 	release := wire.LineageNode{Kind: "release", Ref: "github:release:alexec/agents#v0.17.0"}
-	d.lineageDo(func() {
-		d.link(pr, issue, "fixes", "pr-body")
-		d.link(pr, release, "part-of", "forge")
-	})
 	d.lineageEvent(wire.Event{Name: "run.completed", Details: map[string]string{"payload": `{"run":{"id":500,"attempt":1,` +
 		`"workflow":"release.yml","event":"push","branch":"v0.17.0","url":"https://github.com/alexec/Agents/actions/runs/500",` +
 		`"conclusion":"success"},"completedAt":"2026-11-05T10:00:00Z",` +
-		`"deploys":["testflight:com.alexecollins.agents.remote/812","not a deploy","testflight:"]}`}})
-	deploy := "testflight:deploy:com.alexecollins.agents.remote#812"
-	wantLinks(t, active(d, release),
-		"github:run:alexec/agents#500 builds "+release.Ref+" (forge)",
-		release.Ref+" deployed-as "+deploy+" (forge)",
-		pr.Ref+" part-of "+release.Ref+" (forge)")
-	wantLinks(t, active(d, wire.LineageNode{Kind: "deploy", Ref: deploy}),
-		release.Ref+" deployed-as "+deploy+" (forge)",
-		deploy+" part-of testflight:target:#com.alexecollins.agents.remote (forge)")
-	// Issue, PR, release, deploy: 3 links, past the default depth of 2 (#3588 walks further).
-	reached := false
-	for _, l := range d.lineage().Walk(issue, lineage.MostDepth).Links {
-		reached = reached || (l.From == release && l.Rel == lineage.RelDeployedAs && l.To.Ref == deploy)
-	}
-	if !reached {
-		t.Fatalf("a walk from %s does not reach %s", issue.Ref, deploy)
-	}
-}
-
-func TestLineageTestFlightBuildDeployedAsAnAppStoreVersion(t *testing.T) {
-	d, _ := start(t, t.TempDir())
-	defer d.Shutdown()
-	issue := wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#3657"}
-	pr := wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#9"}
-	release := wire.LineageNode{Kind: "release", Ref: "github:release:alexec/agents#v0.17.0"}
-	d.lineageDo(func() {
-		d.link(pr, issue, "fixes", "pr-body")
-		d.link(pr, release, "part-of", "forge")
-	})
-	d.lineageEvent(wire.Event{Name: "run.completed", Details: map[string]string{"payload": `{"run":{"id":501,"attempt":1,` +
-		`"workflow":"app-store.yml","event":"push","branch":"v0.17.0","url":"https://github.com/alexec/Agents/actions/runs/501",` +
-		`"conclusion":"success"},"completedAt":"2026-11-06T10:00:00Z",` +
-		`"deploys":["testflight:com.alexecollins.agents.remote/812","appstore:com.alexecollins.agents.remote/0.17.0",` +
-		`"testflight:com.example.other/3"]}`}})
-	build, store := "testflight:deploy:com.alexecollins.agents.remote#812", "appstore:deploy:com.alexecollins.agents.remote#0.17.0"
-	wantLinks(t, active(d, wire.LineageNode{Kind: "deploy", Ref: store}),
-		build+" deployed-as "+store+" (forge)",
-		release.Ref+" deployed-as "+store+" (forge)",
-		store+" part-of appstore:target:#com.alexecollins.agents.remote (forge)")
-	// Issue, PR, release, App Store version: 3 links.
-	reached := false
-	for _, l := range d.lineage().Walk(issue, lineage.MostDepth).Links {
-		reached = reached || (l.From == release && l.To.Ref == store)
-	}
-	if !reached {
-		t.Fatalf("a walk from %s does not reach %s", issue.Ref, store)
-	}
-}
-
-func TestDeployNodes(t *testing.T) {
-	for ref, want := range map[string]string{
-		"testflight:com.example.app/42":      "testflight:target:#com.example.app",
-		"cloudrun:project/service/rev-00042": "cloudrun:target:#project/service",
-		"appstore:com.example.app/1.2.0":     "appstore:target:#com.example.app",
-		"testflight:com.example.app/":        "",
-		"testflight:com.example.app":         "",
-		"com.example.app/42":                 "",
-		"testflight:a b/42":                  "",
-	} {
-		_, target, ok := deployNodes(ref)
-		if ok != (want != "") || target.Ref != want {
-			t.Errorf("deployNodes(%q) = %q, %v; want %q", ref, target.Ref, ok, want)
-		}
-	}
+		`"deploys":["testflight:com.alexecollins.agents.remote/812"]}`}})
+	wantLinks(t, active(d, release), "github:run:alexec/agents#500 builds "+release.Ref+" (forge)")
 }
 
 // #4554: checks.* keep the PR's last head commit's first run and last pass on its cost node; a
