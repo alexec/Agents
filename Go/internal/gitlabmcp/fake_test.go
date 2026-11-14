@@ -269,6 +269,17 @@ func (f *fakeGitLab) serve(w http.ResponseWriter, r *http.Request) {
 		answer(200, stated(done, "", ""))
 	case len(parts) == 1 && parts[0] == "pipelines":
 		answer(200, stated(f.pipes, "status", q.Get("status")))
+	case len(parts) == 1 && parts[0] == "deployments" && q.Get("updated_after") != "":
+		// GitLab's updated_after and environment, newest updated first (#5244).
+		out := []obj{}
+		for _, d := range orEmpty(f.deploys) {
+			env, _ := d["environment"].(obj)
+			if up, _ := d["updated_at"].(string); up >= q.Get("updated_after") && (q.Get("environment") == "" || env["name"] == q.Get("environment")) {
+				out = append(out, d)
+			}
+		}
+		sort.SliceStable(out, func(i, j int) bool { return fmt.Sprint(out[i]["updated_at"]) > fmt.Sprint(out[j]["updated_at"]) })
+		answer(200, out)
 	case len(parts) == 1 && parts[0] == "deployments":
 		// GitLab's finished_after and finished_before, by finished_at.
 		out := []obj{}

@@ -569,6 +569,21 @@ the url the job's. `deploy.failed`'s `outcome` is `cancelled` when its job was c
 the event, `github:deploy:<owner/repo>#<deployment id>@deploy.succeeded`, from GitHub's data
 only, so two machines make the same id.
 
+The `gitlab`, `azuredevops` and `bitbucket` servers send the same three events in the same
+shape (#5244), from each forge's own record of a job that deploys, so no CI change is needed
+there either. GitLab and Bitbucket keep only a deployment's state now, so a deployment that
+started and ended between two polls sends both, each at its own time:
+
+| Server | Read | started | succeeded | failed (`outcome`) | tier | not read |
+| --- | --- | --- | --- | --- | --- | --- |
+| `gitlab` | `deployments` updated since the cursor | `running` (the job's start) | `success` | `failed`, `canceled` (`cancelled`) | GitLab's own `tier` (GitLab guesses it from the name) | `created` (the job has not started and may still be `blocked`), `blocked` (`deploy.waiting`'s), `skipped` |
+| `azuredevops` | the project's environments (20) and each one's newest deployment records (25); a record's build, once its event is sent, for the commit and the tag | a record with a start | `succeeded`, `succeededWithIssues` | `failed`, `canceled` (`cancelled`) | by the environment's name (Azure DevOps has none) | `skipped`, `abandoned`; a record of another repository's build |
+| `bitbucket` | the newest 50 `deployments` and the `environments` | `IN_PROGRESS` | `COMPLETED`, `SUCCESSFUL` | `FAILED`, `STOPPED` (`cancelled`) | the environment's type: Test, Staging, Production | `UNDEPLOYED` |
+
+The project or repository is the component. Azure DevOps's pipeline and stage are the target's
+`labels`. Bitbucket's version has no name: its deployment does not say the run's tag. Forgejo
+has no deployments: it has none of these events.
+
 ### Subjects and keys
 
 What each of this folder's MCP servers says of its events' envelope (#4728). The topic is
@@ -588,6 +603,7 @@ it, so two machines can make two ids for one change.
 | `gitlab` | `issue.*`, `review.comment`, `pr.merged`, `pr.closed`, states | `gitlab:issue:` or `gitlab:mr:<group/project>#<n>` | as `github` |
 | `gitlab` | `checks.failed` | `gitlab:pipeline:<group/project>#<pipeline id>` | the pipeline's update time |
 | `gitlab` | `run.completed`, `deploy.waiting` | `gitlab:pipeline:<group/project>#<pipeline id>` | the update time, or the blocked deployments |
+| `gitlab`, `azuredevops`, `bitbucket` | `deploy.started`, `deploy.succeeded`, `deploy.failed` | `<server>:deploy:<repo>#<deployment id>` (Bitbucket's uuid, Azure DevOps's record id) | none: each is sent once for a deployment |
 | `forgejo`, `bitbucket` | `issue.*`, `review.comment`, `pr.merged`, `pr.closed`, states | `<server>:issue:` or `<server>:pr:<owner/repo>#<n>` | as `github` |
 | `forgejo`, `bitbucket` | `checks.failed` | the PR | the head commit and the time |
 | `bitbucket` | `run.completed` | `bitbucket:run:<workspace/name>#<build number>` | the finish time |

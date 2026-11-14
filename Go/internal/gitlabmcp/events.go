@@ -121,6 +121,12 @@ var events = append([]event{
 			"canApprove":   map[string]any{"type": "boolean"},
 			"waitingSince": str,
 		})},
+	deployEvent("deploy.started", "Deploy started",
+		"A GitLab deployment went running: a job with an environment: began to deploy, whatever started its pipeline. One event per deployment."),
+	deployEvent("deploy.succeeded", "Deploy succeeded",
+		"A GitLab deployment went success: a job with an environment: deployed. One event per deployment."),
+	deployEvent("deploy.failed", "Deploy failed",
+		"A GitLab deployment went failed or canceled: a job with an environment: did not deploy. One event per deployment. outcome is cancelled when GitLab says canceled, else failed."),
 	{Name: "pr.opened", Title: "Merge request opened",
 		Description: "A merge request was opened, or a draft was marked ready: a merge request open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownMRs,
 		Input:       mrInput(),
@@ -421,6 +427,13 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 				Subject: issueRef(project, it.Issue.Number), Key: it.ID})
 		}
 		return list, listed, nil
+	}
+	if mcpevents.IsDeployEvent(name) {
+		deploys, listed, err := gl.Deployments(ctx, project, a.deploy.Environment, since)
+		if err != nil {
+			return nil, Listed{}, err
+		}
+		return mcpevents.DeployCandidates(name, a.deploy, deploys), listed, nil
 	}
 	switch name {
 	case "review.comment":

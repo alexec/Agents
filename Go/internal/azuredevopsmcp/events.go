@@ -129,6 +129,12 @@ var events = []event{
 			"canApprove":   map[string]any{"type": "boolean"},
 			"waitingSince": str,
 		})},
+	deployEvent("deploy.started", "Deploy started",
+		"An Azure Pipelines deployment job began to deploy to an environment: its deployment record has a start. One event per record."),
+	deployEvent("deploy.succeeded", "Deploy succeeded",
+		"An Azure Pipelines deployment job deployed to an environment: its record's result is succeeded or succeededWithIssues. One event per record."),
+	deployEvent("deploy.failed", "Deploy failed",
+		"An Azure Pipelines deployment job did not deploy to an environment: its record's result is failed or canceled. One event per record. outcome is cancelled when it was canceled, else failed."),
 	{Name: "pr.opened", Title: "Pull request opened",
 		Description: "A pull request was opened, or a draft was published: a pull request active and not a draft now that was not at the last poll. Drafts never count. Reactivated, it is raised again." + ownPRs,
 		Input:       prInput(),
@@ -329,6 +335,10 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 	wanted := func(m PR, trusted bool) bool {
 		return (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) && a.closesOne(m) &&
 			(a.mine && a.byMe(m, yours) || !a.mine && (a.anyone || trusted))
+	}
+	if mcpevents.IsDeployEvent(name) {
+		list, err := deployCandidates(ctx, f, name, a)
+		return list, Listed{}, err
 	}
 	switch name {
 	case "run.completed":
