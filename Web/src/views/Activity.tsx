@@ -35,7 +35,6 @@ import { velocityHere } from "../model/velocity";
 import { TimeCharts } from "./TimeCharts";
 import { VelocityCharts } from "./VelocityCharts";
 import { pageHost } from "./Multiplier";
-import { LastUpdate } from "./LastUpdate";
 import { oldestRead } from "../model/lastUpdate";
 import { Capability } from "../protocol/capabilities.generated";
 import { OrgBudget, OrgPolicyLine, PassThroughList } from "./OrgPolicyLine";
