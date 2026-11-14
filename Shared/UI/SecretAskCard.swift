@@ -16,8 +16,8 @@ struct SecretAskCard: View {
     let sending: Bool
     /// Save or No thanks (nil).
     let send: @MainActor (Answer?) -> Void
-    /// No, because… (#4039): the client asks why in place of the card.
-    let because: @MainActor () -> Void
+    /// Dismiss (#5295): the card goes with no answer, and the person replies in the prompt.
+    let dismiss: @MainActor () -> Void
     @State private var text = ""
     @State private var sessionOnly = false
     @State private var askBeforeUse = true
@@ -39,12 +39,12 @@ struct SecretAskCard: View {
     }
 
     init(secret: ElicitationRequest.Secret, reason: String?, host: String, sending: Bool,
-         because: @escaping @MainActor () -> Void, send: @escaping @MainActor (Answer?) -> Void) {
+         dismiss: @escaping @MainActor () -> Void, send: @escaping @MainActor (Answer?) -> Void) {
         self.secret = secret
         self.reason = reason
         self.host = host
         self.sending = sending
-        self.because = because
+        self.dismiss = dismiss
         self.send = send
         _about = State(initialValue: secret.description ?? "")
     }
@@ -91,14 +91,14 @@ struct SecretAskCard: View {
                 AskBeforeUseToggle(isOn: $askBeforeUse)
                     .disabled(sending)
             }
-            // The Ask's foot (#5031): the two ways to say no as links on the left.
+            // The Ask's foot (#5031): No thanks and Dismiss as links on the left.
             Divider().overlay(Paper.rule)
             HStack(spacing: 8) {
                 // No Escape: in the chat, an Escape meant for something else would decline it.
                 HStack(spacing: 4) {
                     AskDecline("No thanks") { send(nil) }
                     Text("·").foregroundStyle(.secondary)
-                    AskDecline(DeclineReasonField.opener, action: because)
+                    AskDecline(AskDecline.dismiss, action: dismiss)
                 }
                 .appText(.fine)
                 .disabled(sending)

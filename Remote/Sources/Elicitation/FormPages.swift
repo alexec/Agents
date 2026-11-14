@@ -23,8 +23,8 @@ struct FormPages: View {
     /// it did not.
     let send: (_ what: String, _ action: DaemonAPI.AnswerElicitationRequest.Action,
                _ content: [String: JSONValue]) -> Void
-    /// No, because… (#4039): the sheet asks why in place of the pages.
-    let because: () -> Void
+    /// Dismiss (#5295): the card goes with no answer, and the person replies in the prompt.
+    let dismiss: () -> Void
 
     @State private var values: [String: JSONValue] = [:]
     @State private var step = 0
@@ -231,8 +231,8 @@ struct FormPages: View {
                 }
                 .buttonStyle(.paper)
                 .controlSize(.large)
-                Button(action: because) {
-                    AnswerLabel(title: DeclineReasonField.opener, note: nil)
+                Button(action: dismiss) {
+                    AnswerLabel(title: AskDecline.dismiss, note: nil)
                 }
                 .buttonStyle(.paper)
                 .controlSize(.large)

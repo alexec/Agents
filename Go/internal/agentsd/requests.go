@@ -318,7 +318,7 @@ func (d *Daemon) raiseRequestEvent(name string, r wire.Request, extra map[string
 
 // formAnswerSummary is the answer's summary on the record: never a secret's value.
 func formAnswerSummary(action wire.AnswerElicitationRequestAction, said []wire.ElicitationAnswer) *string {
-	s := outcomeSummary(action)
+	s := answeredSummary(action)
 	if len(said) > 0 {
 		var parts []string
 		for _, a := range said {
@@ -416,7 +416,11 @@ func (d *Daemon) answerLostForm(req wire.ElicitationRequest, action wire.AnswerE
 	d.takeAnsweredBy(req.ID)
 	d.formDown(req.AgentID, req.ID) // a lost form's card is drawn (#4990): it goes now
 	d.record(req.AgentID, wire.TranscriptEntryKind{ElicitationAnswered: &wire.TranscriptEntryKindElicitationAnswered{ID: req.ID,
-		Summary: outcomeSummary(action), Answers: said}})
+		Summary: answeredSummary(action), Answers: said}})
+	// A dismissed lost form (#5295): the person's next message is the reply.
+	if action == wire.AnswerElicitationRequestActionCancel {
+		return nil
+	}
 	if err := d.promptFromApp(req.AgentID, d.formAnsweredWords(req, action, content, said, "")); err != nil {
 		log.Printf("agent %s: request answer: %v", req.AgentID, err)
 	}

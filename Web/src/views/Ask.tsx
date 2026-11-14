@@ -20,7 +20,7 @@ export function Ask({ glyph, title, asker, label, alert = false, inert = false, 
   inert?: boolean;
   /** A class of its own, for what only this ask draws. */
   extra?: string;
-  /** The ways to say no, as links on the foot's left: "No thanks · No, because…", Reject, Keep stopped. */
+  /** The ways to say no, as links on the foot's left: "No thanks · Dismiss", Reject, Keep stopped. */
   decline?: ComponentChildren;
   /** The second button and the primary one, in that order. */
   buttons?: ComponentChildren;
