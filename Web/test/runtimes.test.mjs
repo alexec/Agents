@@ -328,3 +328,11 @@ test("Your setup: a runtime is in use when it is installed somewhere (#3744)", (
   assert.equal(r.machinesSummary([{ host: "m", status: missing }, { host: "s" }], () => true).inUse, false);
   assert.equal(r.machinesSummary([{ host: "m", status: missing }, { host: "s", status: at({ needsSignIn: { authMethods: [] } }) }], () => true).inUse, true);
 });
+
+test("runtimes: the page's Last update is its oldest read (#5145)", () => {
+  const at = (checkedAt) => ({ ...status("claude", "Claude"), checkedAt });
+  const reference = Date.UTC(2001, 0, 1);
+  assert.equal(r.runtimesReadAt([]), undefined);
+  assert.equal(r.runtimesReadAt([[at(600)], [at(60)]]), reference + 60_000, "an offline machine's older list");
+  assert.equal(r.runtimesReadAt([[at(600)]], [{ rows: [], at: 300 }]), reference + 300_000, "the allowances' read");
+});

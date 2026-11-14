@@ -474,13 +474,13 @@ test("the Connectors row: none hosted says nothing, one stopped in use is the co
 });
 
 test("Connectors: every connector's health, the person's and each folder's, in the words the Mac has (#753)", async () => {
-  const { healthTally, healthLine, healthKind, healthLastError, healthTone, personalServers, folderServers, fileProblem } =
+  const { healthTally, healthLine, healthKind, healthLastError, healthReadAt, healthTone, personalServers, folderServers, fileProblem } =
     await load("src/model/hostedMCP.ts");
   const snapshot = {
     at: 0,
     problems: [{ folder: "/w/b", message: "mcp.json is not valid JSON. (line 3)" }],
     servers: [
-      { name: "github", transport: "http", hosted: false, check: "answered", tools: 3, checkedAt: 0 },
+      { name: "github", transport: "http", hosted: false, check: "answered", tools: 3, checkedAt: 60 },
       { name: "local", transport: "stdio", hosted: false, check: "failed", lastError: "The command was not found.", checkedAt: 0 },
       { name: "shared", transport: "stdio", hosted: true, check: "unchecked" },
       { name: "tools", folder: "/w/a", transport: "stdio", hosted: false, check: "waiting" },
@@ -491,8 +491,11 @@ test("Connectors: every connector's health, the person's and each folder's, in t
   assert.equal(fileProblem(snapshot, "file:///w/b"), "mcp.json is not valid JSON. (line 3)");
   assert.equal(fileProblem(snapshot), undefined);
   const [github, local, shared, tools] = snapshot.servers;
-  assert.match(healthLine(github), /^Answered · 3 tools · checked \d\d:\d\d$/);
-  assert.match(healthLine(local), /^Didn't answer · checked /);
+  // No clock time on a row: the page says "Last update" from the oldest check (#5145).
+  assert.equal(healthLine(github), "Answered · 3 tools");
+  assert.equal(healthLine(local), "Didn't answer");
+  assert.equal(healthReadAt(snapshot.servers), Date.UTC(2001, 0, 1), "the oldest check, in ms since 1970");
+  assert.equal(healthReadAt([shared, tools]), undefined, "none checked: no line");
   assert.equal(healthLastError(local), "The command was not found.");
   assert.equal(healthLastError(github), undefined);
   assert.equal(healthLine(shared), "Hosted · starts on the first call");
