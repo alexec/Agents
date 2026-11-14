@@ -109,6 +109,11 @@ only the keys it has. A wait that names nothing is refused. When you start again
   requested, auto-merge off; its `reasons` say which): its lane fixes it. If the lane
   has ended or stopped, message it about its own PR (`message_session`), never to widen
   its work. Leave a PR labelled `needs-approval` alone: it waits for Alex.
+- **The wait is refused** with "No server here offers pr.blocked" (#5437: the
+  installed app is older than #5321): wait instead on `["issue.closed", "pr.merged",
+  "checks.failed", "pr.conflicted"]`, with the same `where`, and use that list for the
+  rest of this session. `checks.failed` and `pr.conflicted` on a child's PR are
+  `pr.blocked` above.
 - **An event that is not about this epic** (a PR that fixes a child and something else):
   wait again.
 - **The time limit:** run `scripts/rearm-automerge.sh --stalled`, read the plan again,

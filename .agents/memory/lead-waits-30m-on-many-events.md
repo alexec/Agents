@@ -10,4 +10,4 @@ Alex, 2026-10-17: "Don't wait for 3h for pr.merged, only wait 30m. You have othe
 
 **Why:** a lead that waits only on merges misses red CI and stuck lanes for hours.
 
-**How to apply:** every lead wait_for_event: `until_minutes: 30`, events `pr.merged`, `pr.blocked` (server github; since #5433 it replaces `checks.failed` and `pr.conflicted`) and `agent.finished`. There is no `ci.failed`. On a timeout, check open PRs' checks and lanes, then wait again. Related: [[lead-wakes-on-any-lane]], [[golang-migration-lead]].
+**How to apply:** every lead wait_for_event: `until_minutes: 30`, events `pr.merged`, `pr.blocked` (server github; since #5433 it replaces `checks.failed` and `pr.conflicted`, which come back when the installed app does not offer `pr.blocked` yet, #5437) and `agent.finished`. There is no `ci.failed`. On a timeout, check open PRs' checks and lanes, then wait again. Related: [[lead-wakes-on-any-lane]], [[golang-migration-lead]].
