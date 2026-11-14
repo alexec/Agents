@@ -21,6 +21,9 @@ export interface BuildsAsk {
   p90: boolean;
   /** A change picked (board 2): its job and its first slow run's ref. */
   change?: { job: string; ref: string } | undefined;
+  /** One run opened (board 3, #5179): its ref, the run to compare it with when not builds/run's own choice (board 2's
+   * last fast run), and the job picked, whose steps go first. */
+  drill?: { ref: string; against?: string | undefined; job?: string | undefined } | undefined;
 }
 
 export const pullsBranch = "pulls";
@@ -31,6 +34,7 @@ export function parseBuildsQuery(query: string | undefined): BuildsAsk {
   const range = ranges.find((r) => r === q.get("range")) ?? "month";
   const change = q.get("change");
   const of = q.get("of");
+  const drill = q.get("drill");
   return {
     repo: q.get("repo") || undefined,
     range,
@@ -39,6 +43,7 @@ export function parseBuildsQuery(query: string | undefined): BuildsAsk {
     branch: q.get("branch") ?? "",
     p90: q.get("stat") === "p90",
     change: change && of ? { job: of, ref: change } : undefined,
+    ...drill ? { drill: { ref: drill, against: q.get("against") || undefined, job: of || undefined } } : {},
   };
 }
 
@@ -52,6 +57,11 @@ export function buildsQuery(a: BuildsAsk): string {
   if (a.branch) q.set("branch", a.branch);
   if (a.p90) q.set("stat", "p90");
   if (a.change) { q.set("change", a.change.ref); q.set("of", a.change.job); }
+  if (a.drill) {
+    q.set("drill", a.drill.ref);
+    if (a.drill.against) q.set("against", a.drill.against);
+    if (a.drill.job && !a.change) q.set("of", a.drill.job);
+  }
   return q.toString().replace(/%3A/gi, ":").replace(/%2F/gi, "/");
 }
 
