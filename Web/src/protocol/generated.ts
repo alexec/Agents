@@ -1670,7 +1670,7 @@ export interface BuildsFigures {
 export interface BuildsHistory {
   repo: string;
   defaultBranch?: string;
-  reader: "github" | "gitlab" | "none";
+  reader: "azuredevops" | "github" | "gitlab" | "none";
   workflows: string[];
   jobs: string[];
   branches: string[];

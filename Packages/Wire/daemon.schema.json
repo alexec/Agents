@@ -3628,6 +3628,7 @@
         "reader": {
           "type": "string",
           "enum": [
+            "azuredevops",
             "github",
             "gitlab",
             "none"
