@@ -11860,6 +11860,8 @@ type QueuedStart struct {
 
 	Model *string `json:"model,omitzero"`
 
+	Effort *string `json:"effort,omitzero"`
+
 	Worktree *WorktreeChoice `json:"worktree,omitzero"`
 
 	Labels []string `json:"labels"`

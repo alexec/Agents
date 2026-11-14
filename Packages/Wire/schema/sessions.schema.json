@@ -1114,6 +1114,9 @@
         "model": {
           "type": "string"
         },
+        "effort": {
+          "type": "string"
+        },
         "worktree": {
           "$ref": "reports.schema.json#/definitions/WorktreeChoice"
         },

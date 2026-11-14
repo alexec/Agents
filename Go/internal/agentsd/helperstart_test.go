@@ -127,3 +127,59 @@ func helperID(text string) wire.UUID {
 	}
 	return ""
 }
+
+// #5441: start_session takes an effort, by the value or the name the start form shows, and
+// refuses one the runtime does not offer, naming the ones it does; a queued helper keeps it.
+func TestStartSessionChoosesEffort(t *testing.T) {
+	fakeRuntimes(t)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	dir := folder(t, c, 1)
+	lead := seeded(t, d, dir, func(a *wire.Agent) { a.RuntimeID = "codex" })
+	m := appClient(t, d, lead.ID)
+	m.post("initialize", map[string]any{}, 1)
+	// Nothing offered yet: the word as written, under the option Auto's table knows.
+	text, isErr := m.tool(2, "start_session", map[string]any{"prompt": "untold", "effort": "high"})
+	if isErr {
+		t.Fatal(text)
+	}
+	if v := d.Store.Agent(helperID(text)).StartOptions.Values["reasoning_effort"]; string(v) != `"high"` {
+		t.Fatalf("%s", v)
+	}
+	cat := "thought_level"
+	d.remember("codex\t/x\t", optionEntry{SavedAt: now(), Options: []wire.ConfigOption{{ID: "reasoning_effort", Name: "Reasoning effort", Type: "select", Category: &cat,
+		Options: json.RawMessage(`[{"value":"low","name":"Low"},{"value":"medium","name":"Medium"},{"value":"high","name":"High"}]`)}}})
+	text, isErr = m.tool(3, "start_session", map[string]any{"prompt": "quick", "effort": "Low"})
+	if isErr {
+		t.Fatal(text)
+	}
+	if v := d.Store.Agent(helperID(text)).StartOptions.Values["reasoning_effort"]; string(v) != `"low"` {
+		t.Fatalf("%s", v)
+	}
+	if text, isErr := m.tool(4, "start_session", map[string]any{"prompt": "x", "effort": "max"}); !isErr ||
+		text != "Nothing was started: Codex does not offer the effort max. It offers: low, medium, high." {
+		t.Fatal(text)
+	}
+	if text, isErr := m.tool(5, "start_session", map[string]any{"prompt": "x", "runtime": "auto", "effort": "low"}); !isErr ||
+		!strings.Contains(text, "on Auto the effort follows the model's level") {
+		t.Fatal(text)
+	}
+	// A queued helper keeps the effort, and starts with it.
+	c.call(t, 6, "policy/setFolder", map[string]any{"folder": "file://" + dir + "/", "rules": map[string]any{"helpers": map[string]any{"mostRunning": 1}}})
+	startedBy := lead.ID
+	busy := seeded(t, d, dir, func(a *wire.Agent) { a.State = wire.AgentStateRunning; a.StartedByAgent = &startedBy })
+	text, isErr = m.tool(7, "start_session", map[string]any{"prompt": "later", "effort": "medium"})
+	if isErr || !strings.HasPrefix(text, "Queued ") {
+		t.Fatal(text)
+	}
+	queued := helperID(text)
+	if s := d.Store.Agent(queued).QueuedStart; s == nil || s.Effort == nil || *s.Effort != "medium" {
+		t.Fatalf("%+v", s)
+	}
+	d.change(busy.ID, func(a *wire.Agent) { a.State = wire.AgentStateFinished })
+	d.startFromQueue(dir)
+	waitFor(t, "the queued helper started", func() bool { return d.Store.Agent(queued).State != wire.AgentStateQueued })
+	if v := d.Store.Agent(queued).StartOptions.Values["reasoning_effort"]; string(v) != `"medium"` {
+		t.Fatalf("%s", v)
+	}
+}

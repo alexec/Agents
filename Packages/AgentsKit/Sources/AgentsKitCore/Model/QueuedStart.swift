@@ -10,14 +10,16 @@ public struct QueuedStart: Codable, Hashable, Sendable {
     public var runtimeID: String?
     public var permissionMode: String?
     public var model: String?
+    public var effort: String?
     public var worktree: WorktreeChoice?
     public var labels: [String]
 
     public init(runtimeID: String? = nil, permissionMode: String? = nil, model: String? = nil,
-                worktree: WorktreeChoice? = nil, labels: [String] = []) {
+                effort: String? = nil, worktree: WorktreeChoice? = nil, labels: [String] = []) {
         self.runtimeID = runtimeID
         self.permissionMode = permissionMode
         self.model = model
+        self.effort = effort
         self.worktree = worktree
         self.labels = labels
     }
@@ -27,6 +29,7 @@ public struct QueuedStart: Codable, Hashable, Sendable {
         runtimeID = try c.decodeIfPresent(String.self, forKey: .runtimeID)
         permissionMode = try c.decodeIfPresent(String.self, forKey: .permissionMode)
         model = try c.decodeIfPresent(String.self, forKey: .model)
+        effort = try c.decodeIfPresent(String.self, forKey: .effort)
         worktree = try? c.decodeIfPresent(WorktreeChoice.self, forKey: .worktree)
         labels = try c.decodeIfPresent([String].self, forKey: .labels) ?? []
     }
