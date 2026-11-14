@@ -1834,7 +1834,7 @@ type BuildsHistory struct {
 	FilledFrom *Date `json:"filledFrom,omitzero"`
 }
 
-// builds/history (#5177): a repository (github:alexec/agents), runs made in [from, to), and the filters: a workflow's file name (ci.yml), a job, and the default branch (no branch and no pullRequests), the pull requests' runs, or one branch. timeZone (an IANA name) says the days; UTC when not said.
+// builds/history (#5177): a repository (github:alexec/agents), runs made in [from, to), and the filters: a workflow's file name (ci.yml), a job, and the default branch (no branch and no pullRequests), the pull requests' runs, or one branch. timeZone (an IANA name) says the days; UTC when not said. scope is for builds/historyAll (#5232): whose machines' copies the control plane reads, as reports/value's; a machine leaves it out.
 type BuildsHistoryRequest struct {
 	Repo string `json:"repo"`
 
@@ -1851,6 +1851,8 @@ type BuildsHistoryRequest struct {
 	Branch *string `json:"branch,omitzero"`
 
 	PullRequests *bool `json:"pullRequests,omitzero"`
+
+	Scope *ReportScope `json:"scope,omitzero"`
 }
 
 // One job of a CI run attempt (#5177): made (waiting for a runner from then), started and ended, in seconds from the run's made time; runner is its first runner label. A forge with no steps has none.
@@ -1948,13 +1950,15 @@ type BuildsRunRef struct {
 	Conclusion *string `json:"conclusion,omitzero"`
 }
 
-// builds/run (#5177): a repository and a run's ci-run ref; its first attempt when attempt is not said.
+// builds/run (#5177): a repository and a run's ci-run ref; its first attempt when attempt is not said. scope is for builds/runAll (#5232), as builds/historyAll's.
 type BuildsRunRequest struct {
 	Repo string `json:"repo"`
 
 	Ref string `json:"ref"`
 
 	Attempt *int64 `json:"attempt,omitzero"`
+
+	Scope *ReportScope `json:"scope,omitzero"`
 }
 
 // The job of a range's passed runs that waited longest for a runner (#5177, board 3 note 4): its run, its name, the wait and its run time, in seconds.
@@ -1988,6 +1992,33 @@ type BuildsStep struct {
 	Ended float64 `json:"ended"`
 
 	Conclusion *string `json:"conclusion,omitzero"`
+}
+
+// builds/sync (#5232): what changed in one repository's build timings on a machine since its last send, for the control plane's copy. Each day is a UTC day the runs were made (YYYY-MM-DD) and all its runs as the machine has them now, so a day with no runs is gone; reset starts the copy of the repository again from this send, the first of a whole send. defaultBranch, readAt and filledFrom are as builds/history says them. Only refs, times, attempts, conclusions, runner labels and the names of workflows, jobs and steps: no titles, no logs (principle 7).
+type BuildsSync struct {
+	Repo string `json:"repo"`
+
+	Reset *bool `json:"reset,omitzero"`
+
+	DefaultBranch *string `json:"defaultBranch,omitzero"`
+
+	ReadAt *Date `json:"readAt,omitzero"`
+
+	FilledFrom *Date `json:"filledFrom,omitzero"`
+
+	Days []BuildsSyncDay `json:"days"`
+}
+
+// builds/sync's answer (#5232). full: the control plane has no copy of this repository from this machine (a new or moved control plane), so the machine sends all its days again, the first with reset.
+type BuildsSyncAnswer struct {
+	Full *bool `json:"full,omitzero"`
+}
+
+// One UTC day of a repository's build timings (#5232): its date (YYYY-MM-DD) and every run attempt made on it.
+type BuildsSyncDay struct {
+	Day string `json:"day"`
+
+	Runs []BuildsRun `json:"runs"`
 }
 
 // bus/deliver (#4729): one event on the bus that matched subscriptions of this machine, and which ones. Best effort: usually once, sometimes never, rarely twice.

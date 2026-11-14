@@ -2,14 +2,17 @@ package agentsd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/agentloops-dev/agents/Go/internal/citimings"
 	"github.com/agentloops-dev/agents/Go/wire"
 )
 
@@ -252,5 +255,104 @@ func TestCITimingsGitLab(t *testing.T) {
 	mr, err := d.buildsRun(wire.BuildsRunRequest{Repo: "gitlab:group/project", Ref: "gitlab:run:group/project#22"})
 	if err != nil || mr.Run.Pr == nil || *mr.Run.Pr != 9 || (mr.Run.Default != nil && *mr.Run.Default) {
 		t.Fatalf("merge request pipeline %+v %v", mr.Run, err)
+	}
+}
+
+// #5232: the machine sends its days of runs to the control plane: first all of them with reset,
+// then only a day that changed; a control plane with no copy is sent all again, and what is
+// unsent outlives the daemon.
+func TestCITimingsSyncSendsWhatChanged(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	srv, _ := ciFakeGitHub(t, now)
+	root := t.TempDir()
+	d, err := New(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.ciAPI = srv.URL
+	h := ciRepoHere{forgeRepo{"github", "alexec/agents"}, t.TempDir()}
+	if err := d.readCIRepo(context.Background(), h); err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	var sent []wire.BuildsSync
+	full := false
+	d.SetControlCapabilities(func() []string { return []string{wire.CapBuildsCopy1} })
+	d.SetControlAsk(askControl(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		if method != wire.CallBuildsSync.Name {
+			return json.RawMessage(`{}`), nil
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		sent = append(sent, params.(wire.BuildsSync))
+		if full {
+			full = false
+			return json.RawMessage(`{"full":true}`), nil
+		}
+		return json.RawMessage(`{}`), nil
+	}))
+	took := func() []wire.BuildsSync {
+		t.Helper()
+		d.sendCITimings()
+		mu.Lock()
+		defer mu.Unlock()
+		out := sent
+		sent = nil
+		return out
+	}
+	repo := citimings.Repo{Forge: "github", Path: "alexec/agents"}
+	days, err := d.ciTimings().DayList(repo)
+	if err != nil || len(days) == 0 {
+		t.Fatalf("days %v %v", days, err)
+	}
+	first := took()
+	if len(first) != 1 || first[0].Reset == nil || first[0].Repo != "github:alexec/agents" || len(first[0].Days) != len(days) ||
+		first[0].DefaultBranch == nil || *first[0].DefaultBranch != "main" || first[0].ReadAt == nil {
+		t.Fatalf("first %+v", first)
+	}
+	runs := 0
+	for _, day := range first[0].Days {
+		runs += len(day.Runs)
+	}
+	if runs == 0 {
+		t.Fatal("no runs sent")
+	}
+	if again := took(); len(again) != 0 {
+		t.Fatalf("sent again: %+v", again)
+	}
+
+	d.noteCIDays(repo, days[0])
+	changed := took()
+	if len(changed) != 1 || changed[0].Reset != nil || len(changed[0].Days) != 1 || changed[0].Days[0].Day != days[0] {
+		t.Fatalf("changed %+v", changed)
+	}
+
+	// A control plane with no copy: the next send is every day again, with reset.
+	full = true
+	d.noteCIDays(repo, days[0])
+	again := took()
+	if len(again) != 2 || again[0].Reset != nil || again[1].Reset == nil || len(again[1].Days) != len(days) {
+		t.Fatalf("after full %+v", again)
+	}
+
+	// What is unsent is kept: a new daemon on the same root sends it.
+	d.noteCIDays(repo, days[0])
+	d.closeCISync()
+	d2, err := New(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	d2.SetControlCapabilities(func() []string { return []string{wire.CapBuildsCopy1} })
+	d2.SetControlAsk(askControl(func(_ context.Context, _ string, params any) (json.RawMessage, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		sent = append(sent, params.(wire.BuildsSync))
+		return json.RawMessage(`{}`), nil
+	}))
+	d2.sendCITimings()
+	mu.Lock()
+	defer mu.Unlock()
+	if len(sent) != 1 || len(sent[0].Days) != 1 || sent[0].Days[0].Day != days[0] {
+		t.Fatalf("after a restart %+v", sent)
 	}
 }

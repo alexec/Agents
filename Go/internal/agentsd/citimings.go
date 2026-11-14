@@ -42,8 +42,9 @@ import (
 // run.completed subscription, because an event reaches the daemon only when a workflow or a
 // wait subscribes to it. An event still makes the next read sooner. Alex can overrule.
 //
-// The control plane's copy (the spike's "Copy on the control plane") is its own task: the web
-// page asks the host that has the folder, as lineage/figures does, while the Mac is awake.
+// The control plane keeps a copy (#5232, cisync.go): each day of runs that changes goes to it
+// a few seconds later (builds/sync), and it answers builds/historyAll and builds/runAll from
+// it while this machine sleeps.
 
 const (
 	ciFirstRead  = time.Minute
@@ -248,9 +249,7 @@ func (d *Daemon) readCITimings(ctx context.Context) {
 }
 
 // ciReads says the build timings read a forge's CI: its builds/history reader.
-func ciReads(forge string) bool {
-	return forge == "github" || forge == "gitlab" || forge == "azuredevops"
-}
+func ciReads(forge string) bool { return citimings.Reads(forge) }
 
 func (d *Daemon) readCIRepo(ctx context.Context, h ciRepoHere) error {
 	key := citimings.Repo{Forge: h.repo.forge, Path: h.repo.path}.String()
@@ -271,7 +270,9 @@ func (d *Daemon) readCIRepo(ctx context.Context, h ciRepoHere) error {
 	d.ciMu.Unlock()
 	if sweep {
 		repo := citimings.Repo{Forge: h.repo.forge, Path: h.repo.path}
-		if err := d.ciTimings().Sweep(repo, nowFunc()); err != nil {
+		changed, err := d.ciTimings().Sweep(repo, nowFunc())
+		d.noteCIDays(repo, changed...)
+		if err != nil {
 			return fmt.Errorf("sweep: %w", err)
 		}
 		d.ciChanged(key)
@@ -317,6 +318,7 @@ func (d *Daemon) ciDefaultBranch(ctx context.Context, h ciRepoHere, key string) 
 	st.Default, st.DefaultAt = repo.DefaultBranch, nowFunc()
 	d.saveCIFileLocked()
 	d.ciMu.Unlock()
+	d.noteCIMeta(key)
 	return repo.DefaultBranch, nil
 }
 
@@ -336,6 +338,7 @@ func (d *Daemon) ciLive(ctx context.Context, h ciRepoHere, key, def string) erro
 	d.ciRepoLocked(key).ReadAt = &at
 	d.saveCIFileLocked()
 	d.ciMu.Unlock()
+	d.noteCIMeta(key)
 	return nil
 }
 
@@ -379,6 +382,7 @@ func (d *Daemon) ciBackfill(ctx context.Context, h ciRepoHere, key, def string) 
 		st.Filled = now.Sub(from) >= citimings.KeepDays*24*time.Hour
 		d.saveCIFileLocked()
 		d.ciMu.Unlock()
+		d.noteCIMeta(key)
 	}
 	return nil
 }
@@ -506,6 +510,9 @@ func (d *Daemon) ciKeepRuns(ctx context.Context, h ciRepoHere, def string, runs 
 		}
 		if err := d.ciTimings().Put(repo, got...); err != nil {
 			return added, err
+		}
+		for _, run := range got {
+			d.noteCIDays(repo, citimings.DayOf(run.MadeAt()))
 		}
 		added++
 	}
@@ -702,68 +709,47 @@ func (d *Daemon) registerBuilds() {
 }
 
 func (d *Daemon) buildsHistory(r wire.BuildsHistoryRequest) (wire.BuildsHistory, error) {
-	repo, err := citimings.ParseRepo(r.Repo)
+	a, err := citimings.ReadHistoryAsk(r)
 	if err != nil {
 		return wire.BuildsHistory{}, Invalid("builds/history: %v", err)
 	}
-	from, to := r.From.Time(), r.To.Time()
-	if !to.After(from) || to.Sub(from) > (citimings.KeepDays+1)*24*time.Hour {
-		return wire.BuildsHistory{}, Invalid("builds/history: from must be before to, at most %d days", citimings.KeepDays)
-	}
-	loc := time.UTC
-	if r.TimeZone != nil && *r.TimeZone != "" {
-		if loc, err = time.LoadLocation(*r.TimeZone); err != nil {
-			return wire.BuildsHistory{}, Invalid("builds/history: no time zone %q", *r.TimeZone)
-		}
-	}
-	out := wire.BuildsHistory{Repo: repo.String(), Reader: "none", Workflows: []string{}, Jobs: []string{},
-		Branches: []string{}, Days: []wire.BuildsDay{}, Changes: []wire.BuildsChange{}, Total: buildsFigures(citimings.Figures{})}
-	if !ciReads(repo.Forge) {
+	out := citimings.EmptyHistory(a.Repo)
+	if !ciReads(a.Repo.Forge) {
 		return out, nil
 	}
-	out.Reader = repo.Forge
+	out.Reader = a.Repo.Forge
 	d.ciMu.Lock()
-	if st := d.ciFileLocked().Repos[repo.String()]; st != nil {
-		if st.Default != "" {
-			out.DefaultBranch = new(st.Default)
-		}
-		if st.ReadAt != nil {
-			out.ReadAt = new(wire.DateOf(*st.ReadAt))
-		}
-		if st.FilledFrom != nil {
-			out.FilledFrom = new(wire.DateOf(*st.FilledFrom))
-		}
+	if st := d.ciFileLocked().Repos[a.Repo.String()]; st != nil {
+		out.DefaultBranch, out.ReadAt, out.FilledFrom = st.wireMeta()
 	}
 	d.ciMu.Unlock()
-	runs, err := d.ciTimings().Runs(repo, from, to)
+	runs, err := d.ciTimings().Runs(a.Repo, a.From, a.To)
 	if err != nil {
 		return out, err
 	}
-	f := citimings.Filter{Workflow: deref(r.Workflow), Job: deref(r.Job), Branch: deref(r.Branch),
-		PullRequests: r.PullRequests != nil && *r.PullRequests}
-	out.Workflows, out.Jobs, out.Branches = buildsNames(runs)
-	total, days := citimings.Trend(runs, f, loc)
-	out.Total = buildsFigures(total)
-	for _, day := range days {
-		out.Days = append(out.Days, wire.BuildsDay{Day: day.Day, Figures: buildsFigures(day.Figures)})
-	}
-	if w, ok := citimings.LongestRunnerWait(runs, f); ok {
-		out.LongestRunnerWait = &wire.BuildsRunnerWait{Run: buildsRunRef(w.Run), Job: w.Job, Wait: w.Wait, Ran: w.Ran}
-	}
-	changes, err := d.ciChangesOf(repo)
+	changes, err := d.ciChangesOf(a.Repo)
 	if err != nil {
 		return out, err
 	}
-	for _, c := range changes {
-		at := c.FirstSlow.MadeAt()
-		if at.Before(from) || !at.Before(to) || f.Workflow != "" && c.Workflow != f.Workflow || f.Job != "" && c.Job != f.Job {
-			continue
-		}
-		bc := buildsChange(c)
-		bc.SlowedSent = d.ciSlowedSentAt(repo, c)
-		out.Changes = append(out.Changes, bc)
+	// A change point says when this machine sent its ci.slowed (#5200).
+	return citimings.History(out, a, runs, changes, func(c citimings.Change, w *wire.BuildsChange) {
+		w.SlowedSent = d.ciSlowedSentAt(a.Repo, c)
+	}), nil
+}
+
+// wireMeta is the repository's default branch, last read and backfill reach, as the wire says
+// them.
+func (st *ciRepoState) wireMeta() (def *string, readAt, filledFrom *wire.Date) {
+	if st.Default != "" {
+		def = new(st.Default)
 	}
-	return out, nil
+	if st.ReadAt != nil {
+		readAt = new(wire.DateOf(*st.ReadAt))
+	}
+	if st.FilledFrom != nil {
+		filledFrom = new(wire.DateOf(*st.FilledFrom))
+	}
+	return def, readAt, filledFrom
 }
 
 func (d *Daemon) buildsRun(r wire.BuildsRunRequest) (wire.BuildsRunAnswer, error) {
@@ -779,92 +765,12 @@ func (d *Daemon) buildsRun(r wire.BuildsRunRequest) (wire.BuildsRunAnswer, error
 	if r.Attempt != nil {
 		want = int(*r.Attempt)
 	}
-	for _, run := range attempts {
-		if run.Attempt != want {
-			continue
-		}
-		out := wire.BuildsRunAnswer{Run: buildsRun(run), Attempts: int64(len(attempts))}
-		// The run before is days old at most for a pull request; StepDays covers it.
-		near, err := d.ciTimings().Runs(repo, run.MadeAt().AddDate(0, 0, -citimings.StepDays), run.MadeAt().Add(time.Second))
-		if err != nil {
-			return out, err
-		}
-		if before, ok := citimings.Before(near, run); ok {
-			b := buildsRun(before)
-			out.Before = &b
-		}
-		return out, nil
+	out, ok, err := citimings.RunAnswer(attempts, want, func(run citimings.Run) ([]citimings.Run, error) {
+		from, to := citimings.NearFrom(run)
+		return d.ciTimings().Runs(repo, from, to)
+	})
+	if !ok {
+		return out, Invalid("builds/run: no attempt %d of %s", want, r.Ref)
 	}
-	return wire.BuildsRunAnswer{}, Invalid("builds/run: no attempt %d of %s", want, r.Ref)
-}
-
-func buildsNames(runs []citimings.Run) (workflows, jobs, branches []string) {
-	workflows, jobs, branches = citimings.Names(runs)
-	for _, l := range []*[]string{&workflows, &jobs, &branches} {
-		if *l == nil {
-			*l = []string{}
-		}
-	}
-	return workflows, jobs, branches
-}
-
-func buildsStat(s citimings.Stat) wire.BuildsStat {
-	return wire.BuildsStat{Median: s.Median, P90: s.P90, N: int64(s.N)}
-}
-
-func buildsFigures(f citimings.Figures) wire.BuildsFigures {
-	return wire.BuildsFigures{Runs: int64(f.Runs), Green: int64(f.Green), Reruns: int64(f.Reruns),
-		ToGreen: buildsStat(f.ToGreen), Run: buildsStat(f.Run), Runner: buildsStat(f.Runner), Turn: buildsStat(f.Turn)}
-}
-
-func buildsRunRef(r citimings.Run) wire.BuildsRunRef {
-	out := wire.BuildsRunRef{Ref: r.Ref, ID: r.ID, Attempt: int64(r.Attempt), Made: wire.DateOf(r.MadeAt()),
-		URL: optional(r.URL), HeadSha: optional(r.HeadSHA), Branch: optional(r.Branch), Conclusion: optional(r.Conclusion)}
-	if r.PR > 0 {
-		out.Pr = new(int64(r.PR))
-	}
-	return out
-}
-
-func buildsChange(c citimings.Change) wire.BuildsChange {
-	out := wire.BuildsChange{Workflow: c.Workflow, Job: c.Job, Slower: c.Slower(), At: wire.DateOf(c.FirstSlow.MadeAt()),
-		LastFast: buildsRunRef(c.LastFast), FirstSlow: buildsRunRef(c.FirstSlow), MedianBefore: c.MedianBefore,
-		MedianAfter: c.MedianAfter, QueueBefore: c.QueueBefore, QueueAfter: c.QueueAfter, Score: c.Score,
-		Runner: optional(c.Runner), Between: []wire.BuildsBetween{}, Points: []wire.BuildsPoint{}}
-	for _, b := range c.Between {
-		w := wire.BuildsBetween{Run: buildsRunRef(b.Run), Ran: b.Ran}
-		if b.Ran {
-			w.JobRun = new(b.JobRun)
-		}
-		out.Between = append(out.Between, w)
-	}
-	for _, p := range c.Points {
-		out.Points = append(out.Points, wire.BuildsPoint{Ref: p.Run.Ref, Made: wire.DateOf(p.Run.MadeAt()), Ran: p.Ran, Queue: p.Queue})
-	}
-	return out
-}
-
-func buildsRun(r citimings.Run) wire.BuildsRun {
-	out := wire.BuildsRun{Ref: r.Ref, ID: r.ID, Attempt: int64(r.Attempt), Workflow: r.Workflow, Event: optional(r.Event),
-		Branch: optional(r.Branch), HeadSha: optional(r.HeadSHA), URL: optional(r.URL), Made: wire.DateOf(r.MadeAt()),
-		Started: r.Started, Ended: r.Ended, Turn: r.Turn(), Conclusion: optional(r.Conclusion), Jobs: []wire.BuildsJob{}}
-	if r.PR > 0 {
-		out.Pr = new(int64(r.PR))
-	}
-	if r.Default {
-		out.Default = new(true)
-	}
-	if r.Tag {
-		out.Tag = new(true)
-	}
-	for _, j := range r.Jobs {
-		job := wire.BuildsJob{Name: j.Name, Made: j.Made, Started: j.Started, Ended: j.Ended, Conclusion: optional(j.Conclusion),
-			Runner: optional(j.Runner), Steps: []wire.BuildsStep{}}
-		for _, s := range j.Steps {
-			job.Steps = append(job.Steps, wire.BuildsStep{Name: s.Name, Number: int64(s.Number), Started: s.Started,
-				Ended: s.Ended, Conclusion: optional(s.Conclusion)})
-		}
-		out.Jobs = append(out.Jobs, job)
-	}
-	return out
+	return out, err
 }

@@ -25,6 +25,8 @@ public enum Capability {
     public static let bringBack1 = "bring.back/1"
     public static let browser1 = "browser/1"
     public static let browser2 = "browser/2"
+    public static let buildsCopy1 = "builds.copy/1"
+    public static let buildsRead1 = "builds.read/1"
     public static let buildsTrends1 = "builds.trends/1"
     public static let capacity1 = "capacity/1"
     public static let catalog1 = "catalog/1"
@@ -708,6 +710,9 @@ public enum Capability {
         "bots/make": "bots/1",
         "bots/setCaps": "bots/1",
         "bots/stopRun": "bots/1",
+        "builds/historyAll": "builds.read/1",
+        "builds/runAll": "builds.read/1",
+        "builds/sync": "builds.copy/1",
         "bus/lease": "events.leases/1",
         "bus/log": "events.bus/1",
         "bus/publish": "events.bus/1",
