@@ -89,6 +89,7 @@ func TestCITimingsReadAndAnswer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer d.Shutdown()
 	d.ciAPI = srv.URL
 	h := ciRepoHere{forgeRepo{"github", "alexec/agents"}, t.TempDir()}
 	if err := d.readCIRepo(context.Background(), h); err != nil {
@@ -156,6 +157,7 @@ func TestCITimingsBackfillKeepsToItsBudget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer d.Shutdown()
 	d.ciAPI = srv.URL
 	h := ciRepoHere{forgeRepo{"github", "alexec/agents"}, t.TempDir()}
 	if err := d.readCIRepo(context.Background(), h); err != nil {
@@ -269,6 +271,10 @@ func TestCITimingsSyncSendsWhatChanged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Shut down before the second daemon reads the same root; Shutdown saves what is unsent.
+	var once sync.Once
+	stop := func() { once.Do(d.Shutdown) }
+	defer stop()
 	d.ciAPI = srv.URL
 	h := ciRepoHere{forgeRepo{"github", "alexec/agents"}, t.TempDir()}
 	if err := d.readCIRepo(context.Background(), h); err != nil {
@@ -337,11 +343,12 @@ func TestCITimingsSyncSendsWhatChanged(t *testing.T) {
 
 	// What is unsent is kept: a new daemon on the same root sends it.
 	d.noteCIDays(repo, days[0])
-	d.closeCISync()
+	stop()
 	d2, err := New(context.Background(), root)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer d2.Shutdown()
 	d2.SetControlCapabilities(func() []string { return []string{wire.CapBuildsCopy1} })
 	d2.SetControlAsk(askControl(func(_ context.Context, _ string, params any) (json.RawMessage, error) {
 		mu.Lock()
