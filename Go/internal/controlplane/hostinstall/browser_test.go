@@ -3,6 +3,7 @@ package hostinstall
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,6 +13,11 @@ import (
 // headless, and never fails the install. The fake server has no sudo, so it installs
 // nothing here.
 func TestTheBrowserStepSaysWhyItInstallsNothing(t *testing.T) {
+	// The fake server is this machine. GitHub's Linux runners have Chrome and Xvfb
+	// already: then the step has nothing to do and says nothing.
+	_, chrome := exec.LookPath("google-chrome-stable")
+	_, xvfb := exec.LookPath("Xvfb")
+	installed := chrome == nil && xvfb == nil
 	for _, tc := range []struct{ uname, says string }{
 		{"Linux aarch64", "Google ships no Chrome for Linux Linux aarch64."},
 		// Not root and no sudo: on a Mac, not Debian; on a Linux runner, no root.
@@ -24,6 +30,12 @@ func TestTheBrowserStepSaysWhyItInstallsNothing(t *testing.T) {
 		server.installBrowser(context.Background(), func(format string, args ...any) {
 			lines = append(lines, fmt.Sprintf(format, args...))
 		}, "Dev box")
+		if installed {
+			if len(lines) != 0 {
+				t.Fatalf("%s, Chrome and Xvfb there: %q", tc.uname, lines)
+			}
+			continue
+		}
 		if len(lines) != 1 || !strings.HasPrefix(lines[0], "Dev box: The agents' browser here stays Chrome for Testing headless:") ||
 			!strings.Contains(lines[0], tc.says) {
 			t.Fatalf("%s: %q", tc.uname, lines)
