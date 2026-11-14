@@ -1,0 +1,11 @@
+## Model gateways
+
+An organisation's way to the model (#999): an org key or a gateway, sealed by an admin's
+app to each machine and kept by the control plane as ciphertext it cannot open (#3397,
+`docs/explanation/org-keys-and-gateways.md`). Slice 1
+keeps routes and sends them; slice 2 keeps them on the machine and reaches the model through
+its relay. Slice 3 shows the routes to members on the Mac and the web page (#2283; the Remote's went with #2798).
+Open issues: `is:open label:integration gateway`.
+
+| Integration | Clients that show it | State | Last checked | Where | Gaps |
+| --- | --- | --- | --- | --- | --- |

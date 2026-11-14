@@ -1,0 +1,1 @@
+| Caddy with ACME | control plane | tested on a real account | 2026-10-18, Let's Encrypt certificates for control.agentloops.dev and views.agentloops.dev (`specs/058-control-plane/walks/1461.md`) | `deploy/` | |

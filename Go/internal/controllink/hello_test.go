@@ -19,7 +19,8 @@ func TestHelloKeepsTheControlPlanesCapabilities(t *testing.T) {
 		{`{"capabilities":["machine.accounts/1","user/3"]}`, []string{"machine.accounts/1", "user/3"}},
 		{`{}`, []string{}},
 	} {
-		u := &Uplink{}
+		told := make(chan []string, 1)
+		u := &Uplink{OnCapabilities: func(list []string) { told <- list }}
 		u.out = &sender{out: make(chan string, 1), done: make(chan struct{})}
 		u.hello(context.Background(), MachineHello{Version: "1"})
 		if u.ControlCapabilities() != nil {
@@ -42,6 +43,15 @@ func TestHelloKeepsTheControlPlanesCapabilities(t *testing.T) {
 		}
 		if got := u.ControlCapabilities(); got == nil || !slices.Equal(got, tc.want) {
 			t.Fatalf("%s: kept %v", tc.result, got)
+		}
+		// And says it, so what waits on a capability goes now (#5410).
+		select {
+		case got := <-told:
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("%s: told %v", tc.result, got)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("%s: OnCapabilities not told", tc.result)
 		}
 	}
 }

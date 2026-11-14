@@ -895,6 +895,7 @@ def open_shared_issue(record, rids, dry_run):
 
 REVIEWS = ".agents/reviews/runtimes"
 PAGE = "docs/reference/integrations.md"
+PARTS = "docs-parts/integrations"
 ASSESSMENTS_BRANCH = "nightly/runtime-assessments"
 
 
@@ -1002,13 +1003,21 @@ def open_assessments_pr(run, record, reviews, rows, dry_run):
             os.makedirs(os.path.dirname(os.path.join(work, path)), exist_ok=True)
             with open(os.path.join(work, path), "w") as f:
                 f.write(text)
-        page = os.path.join(work, PAGE)
-        if rows and os.path.isfile(page):
-            with open(page) as f:
-                text = f.read()
-            with open(page, "w") as f:
-                f.write(update_rows(text, record, rows))
-        sh(["git", "-C", work, "add", "-A", "--", REVIEWS, PAGE], check=True)
+        if rows:
+            # The page is made from per-row files (#5386): rewrite the runtimes' rows there,
+            # then make the page again.
+            begin, end = "<!-- runtimes:begin -->\n", "<!-- runtimes:end -->"
+            for dirpath, _, files in sorted(os.walk(os.path.join(work, PARTS))):
+                for name in sorted(f for f in files if f.endswith(".row")):
+                    path = os.path.join(dirpath, name)
+                    with open(path) as f:
+                        row = f.read()
+                    changed = update_rows(begin + row + end, record, rows)
+                    if changed != begin + row + end:
+                        with open(path, "w") as f:
+                            f.write(changed[len(begin):-len(end)])
+            sh(["python3", os.path.join(work, "scripts", "docs-parts.py"), "gen"], cwd=work, check=True)
+        sh(["git", "-C", work, "add", "-A", "--", REVIEWS, PAGE, PARTS], check=True)
         if sh(["git", "-C", work, "diff", "--cached", "--quiet"])[0] == 0:
             print("  assessments: nothing new for the integrations page")
             return None

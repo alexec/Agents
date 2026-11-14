@@ -5,6 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { load } from "./load.mjs";
+import { appCss } from "./appCss.mjs";
 
 const read = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 const w = await load("src/model/nowWords.ts");
@@ -59,7 +60,7 @@ test("one Now card at the foot, after Waiting for you, and nothing of it over th
 });
 
 test("the Now card is on the well, with its bar in the accent and no state colour", () => {
-  const css = read("Web/src/app.css");
+  const css = appCss();
   const card = css.match(/^\.now-card \{([^}]*)\}/m);
   assert.ok(card, "a .now-card rule");
   assert.match(card[1], /background: var\(--paper-well\)/);

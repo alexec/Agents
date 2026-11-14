@@ -101,13 +101,14 @@ server's (`github.com/github/github-mcp-server/v2`, a library): by default the
 (`HiddenTools`) never offered to the model. The events are the ones the ci server raised
 (CIWatcher.swift, #383, removed in #1231), with the same names, arguments, data and eventIds, and the same cursor, paging and
 trust filter (#728), polled only: `checks.failed`, `pr.opened`, `pr.merged`, `pr.closed`,
-`pr.conflicted`, `issue.opened`, `issue.labelled`, `issue.commented`, `issue.closed`.
+`pr.conflicted`, `pr.blocked` (#5321), `issue.opened`, `issue.labelled`, `issue.commented`, `issue.closed`.
 `run.completed` is new here (#3444): a workflow run that finished, whatever started it and
 whatever its conclusion, for the runs no pull request owns (a tag's `release.yml`, a
 `workflow_dispatch` dry run); `workflow`, `branch` (a branch or a tag) and `run` filter it.
 Its `deploys` are what the run's jobs say they deployed (#3584), each a notice
-`::notice title=deploy::<target>:<id>/<version>`, as `testflight:<bundle id>/<build>` or
-`appstore:<bundle id>/<version>` (#3657): one
+`::notice title=deploy::<environment>=<target>:<id>/<version>`, as
+`testflight=testflight:<bundle id>/<build>` or `app-store=appstore:<bundle id>/<version>`
+(#3657, #5242; the old form has no `<environment>=`): one
 request for the run's check suite, and one for each job that has annotations.
 `deploy.waiting` (#3587) is a run held by an environment with required reviewers (a job's
 `environment: production`), once per run, attempt and set of environments, with the
@@ -116,7 +117,9 @@ reviewers and `canApprove` (whether the connected account is one of them); `work
 `deploy.started`, `deploy.succeeded` and `deploy.failed` (#5240) are a GitHub Deployment's
 changes of state, read from `deployments` and each one's `statuses`, with the wire's
 `DeployEvent` as their details; `environment`, `tier` and `component` filter them
-(`githubmcp/deployments.go`, `docs/reference/events.md`, "Deploys").
+(`githubmcp/deployments.go`, `docs/reference/events.md`, "Deploys"). The gitlab,
+azuredevops and bitbucket servers send the same three from their forge's deployments (#5244),
+through `mcpevents/deploys.go`, which makes the candidates and the `DeployEvent` for all three.
 CodeRabbit's events are new here (#1344): `review.posted` (once per review of the head
 commit: each time its `CodeRabbit` status on it goes to success, or its review with no status) and `review.comment` (each
 review comment by it). Its tools `coderabbit_review`, `coderabbit_reply` and

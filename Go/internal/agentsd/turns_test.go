@@ -46,7 +46,7 @@ func TestMain(m *testing.M) {
 	// layer turns it on for its daemon (releaseOn).
 	releaseLayerHere = false
 	// The machine's memory pressure does not move a test's warm pool (#4514).
-	pressureNow = func() string { return "" }
+	setPressureNow(func() string { return "" })
 	// The browser is Chrome for Testing, which a test fakes: never the machine's own Google
 	// Chrome, which GitHub's Linux runners have, with Xvfb (#5227).
 	browser.FindChrome = func() string { return "" }

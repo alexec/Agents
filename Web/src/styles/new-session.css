@@ -1,0 +1,125 @@
+/* US3: the prompt's menus, attachments, labels, the session menu, the new-session form. */
+.prompt .attach { background: var(--paper-raised); border: 1px solid var(--paper-rule); font-size: 0.875rem; }
+.prompt.off { opacity: 0.6; }
+.menus { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.menus .spacer { flex: 1; }
+/* A new session's sandbox would not start (064, #257): what it said, and the way on. */
+.sandbox-refusal { display: flex; align-items: center; gap: 10px; padding: 10px; margin-bottom: 6px; border-radius: 8px;
+  background: color-mix(in srgb, var(--tint-warning) 7%, transparent); }
+.sandbox-refusal > div { flex: 1; min-width: 0; }
+.sandbox-refusal p { margin: 0; }
+.menus-right { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-left: auto; }
+.options-note { opacity: 0.68; font-size: 0.75rem; }
+.model-effort { position: relative; }
+.model-effort > summary { list-style: none; cursor: pointer; }
+.model-effort > summary::-webkit-details-marker { display: none; }
+.model-effort-menu { position: absolute; z-index: 20; right: 0; bottom: calc(100% + 6px); display: flex; gap: 6px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: var(--shadow-floating); }
+/* The shared words' pills (#2658): the values in a column, the runtime's own behind ⋯. */
+.level-select { position: relative; }
+.level-select .model-effort-menu { flex-direction: column; align-items: stretch; min-width: 260px; left: 0; right: auto; }
+.menus-right .level-select .model-effort-menu { left: auto; right: 0; }
+.level-own summary { cursor: pointer; padding: 4px 0; }
+.level-own { display: flex; flex-direction: column; gap: 6px; }
+/* Settings ▸ Agent Runtimes ▸ Auto: the order, and the Mappings tables, scrolling sideways when narrow. */
+.auto-runtimes { list-style: none; padding: 0; margin: 0 0 8px; }
+.auto-runtimes li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.auto-table { overflow-x: auto; margin: 8px 0 16px; }
+.auto-table table { border-collapse: collapse; }
+.auto-table th, .auto-table td { text-align: left; vertical-align: top; padding: 4px 10px 4px 0; }
+.auto-table caption { text-align: left; font-weight: 600; padding-bottom: 4px; }
+.auto-cell { display: flex; flex-direction: column; gap: 2px; }
+.client-permission-control { position: relative; flex: none; }
+.client-permission-control > summary { list-style: none; cursor: pointer; }
+.client-permission-control > summary::-webkit-details-marker { display: none; }
+.client-permission-menu { position: absolute; z-index: 20; left: 0; bottom: calc(100% + 6px); width: min(330px, calc(100vw - 36px)); padding: 6px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); box-shadow: var(--shadow-floating); }
+.client-permission-choice { display: grid; width: 100%; gap: 2px; padding: 7px 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.client-permission-choice:hover, .client-permission-choice[aria-pressed=true] { background: var(--paper-selection); }
+.client-permission-choice:disabled { opacity: 0.55; cursor: default; }
+.client-permission-title { display: flex; gap: 7px; align-items: baseline; }
+.client-permission-title > span { width: 1.15em; }
+.client-permission-menu > p { margin: 5px 8px 3px; }
+.client-permission-confirm { padding: 4px 8px; }
+.client-permission-confirm > p { margin: 0 0 6px; }
+.client-permission-actions { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.context-meter { display: inline-flex; align-items: center; gap: 5px; opacity: 0.72; font-size: 0.6875rem; font-variant-numeric: tabular-nums; }
+.context-ring { --used: 0%; width: 12px; height: 12px; box-sizing: border-box; border: 2px solid var(--paper-rule); border-radius: 50%; background: conic-gradient(var(--paper-ink) var(--used), transparent 0); }
+.context-ring.close { background: conic-gradient(var(--tint-failure) var(--used), transparent 0); }
+.pill {
+  position: relative;
+  flex: none;
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  white-space: nowrap;
+  color: inherit;
+}
+.pill.on { background: var(--paper-selection); }
+.pill.select select {
+  /* The browser's own menu, over the pill: every choice is reachable by keyboard and screen reader. */
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  cursor: pointer;
+  font: inherit;
+}
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.attachments { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.prompt > .attachments { flex: 0 1 auto; max-height: 25%; overflow-y: auto; }
+.attachments li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  max-width: 240px;
+  padding: 3px 8px;
+  border-radius: var(--radius-card);
+  background: var(--paper-well);
+  font-size: 0.75rem;
+}
+button.remove { background: none; border: none; padding: 0 2px; opacity: 0.55; font-size: 0.8125rem; line-height: 1; }
+button.remove:hover { opacity: 1; }
+.labels { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.labels .chip { display: inline-flex; align-items: center; gap: 2px; font-size: 0.75rem; padding: 2px 8px; }
+/* A label's chip by what it names (labelKind, #2958): an issue and a pull request in their own
+   hue, finished work grey, anything else as any chip. The tint is mixed into the paper, so the
+   chip is opaque (#3196). */
+.chip.label.issue, .chip.label.pullRequest { opacity: 1; color: var(--hue); background: color-mix(in srgb, var(--hue) 16%, var(--paper-ground)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hue) 50%, transparent); }
+.chip.label.issue { --hue: var(--label-issue); }
+.chip.label.pullRequest { --hue: var(--label-pull); }
+.chip.label.finished { opacity: 0.6; background: var(--paper-ground); box-shadow: inset 0 0 0 1px var(--paper-rule); }
+/* One the agent added is outlined, not filled (#2997), as LabelChip draws it: who added a label
+   shows at a glance, whatever its hue. On the page's paper, not see-through (#3196), as LabelChip. */
+.chip.label.agent { background: var(--paper-ground); }
+.chip.label.agent.plain { box-shadow: inset 0 0 0 1px var(--paper-rule); }
+/* A chip that filters the sidebar by its label (#3898), and the one the search asks for. */
+.chip.label.filters, .labels .chip button.filter { cursor: pointer; }
+.labels .chip button.filter { border: none; background: none; padding: 0; font: inherit; color: inherit; }
+.chip.label.chosen { box-shadow: inset 0 0 0 1.5px var(--hue, var(--accent)); }
+.label-field { flex: 0 1 auto; width: 7em; min-width: 4em; border: none; background: none; font: inherit; font-size: 0.75rem; color: inherit; outline: none; }
+/* Below 760, the prompt head's labels folded to one line (#1107): a tap opens the field. */
+.labels-folded { display: inline-flex; align-items: center; gap: 4px; min-width: 0; border: none; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.labels-folded .chip { font-size: 0.75rem; padding: 2px 8px; max-width: 10em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.labels-folded .more, .labels-folded .add { font-size: 0.75rem; opacity: 0.7; white-space: nowrap; }
+.bar-where:has(> .labels-anchor) { flex-wrap: nowrap; }
+.labels-anchor { margin-right: 0; min-width: 0; display: inline-flex; }
+.labels-popover { width: min(300px, calc(100vw - 32px)); display: flex; flex-direction: column; align-items: flex-end; gap: 8px; padding: 10px; }
+.labels-popover .labels { align-self: stretch; }
+.labels-popover .done { border: none; background: none; color: var(--accent); padding: 0; font: inherit; font-size: 0.75rem; }
+.bar-where:has(> .labels-anchor) .pill.place { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.popover.right { right: 0; left: auto; min-width: 160px; display: flex; flex-direction: column; }
+.popover [role^=menuitem] { text-align: left; background: none; border: none; padding: 6px 10px; border-radius: var(--radius-control); }
+.popover [role^=menuitem]:hover { background: var(--paper-wash); }
+/* An item's single key at its end (#4796), grey, as the window's menus draw one. */
+.popover [role^=menuitem] .menu-key { float: right; margin-left: 16px; font: inherit; font-size: 0.6875rem; color: var(--paper-tertiary); }
+.queued-actions { display: flex; align-items: center; gap: 10px; font-size: 0.75rem; }
+/* A new session: the folder's name and folder in the middle, the bar at the foot (#108). */
+.new-heading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 20px; text-align: center; }
+.new-heading h1 { margin: 0; font-size: 1.375rem; font-weight: 600; }
+.new-heading .persona-choice { display: flex; flex-direction: column; align-items: center; gap: 4px; max-width: 100%; align-self: stretch; }
+.new-heading .persona-choice p { white-space: normal; }
+.new-heading .persona-segments { flex-wrap: nowrap; }
+.new-heading .persona-segments button { flex: none; white-space: nowrap; }
+.new-heading p { margin: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

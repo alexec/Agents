@@ -69,6 +69,10 @@ type OpenMR struct {
 	Draft     bool
 	Conflicts *bool
 	Trusted   bool
+	// Blocking is why it cannot merge until its author acts, and SkipsBlocked a draft or one
+	// labelled needs-approval (pr.blocked, #5321).
+	Blocking     mcpevents.Blocking
+	SkipsBlocked bool
 }
 
 // MergedMR is a merge request that merged.
@@ -231,6 +235,9 @@ type GitLab interface {
 	PipelineDeploys(ctx context.Context, project string, c CompletedPipeline) ([]string, error)
 	// WaitingDeploys are the pipelines whose deployments wait for an approval, of branch when set.
 	WaitingDeploys(ctx context.Context, project, branch string) ([]WaitingDeploy, error)
+	// Deployments are the project's deployments updated at or after since, of environment when
+	// it is set, in the deploy model (#5244).
+	Deployments(ctx context.Context, project, environment, since string) ([]mcpevents.ForgeDeploy, Listed, error)
 	// Approvers is who may answer a waiting pipeline, and whether the connection's owner may.
 	Approvers(ctx context.Context, project string, w WaitingDeploy) (reviewers []string, canApprove bool, err error)
 	// IssueActivity is what happened to the project's issues at or after since, of one kind.

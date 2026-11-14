@@ -1,0 +1,5 @@
+
+Mac only, Web only and Remote only stay what only that client can do (hover, Finder, the menu bar) or the web's own frame; Engineer rows may carry them, and Admin rows may be Web only.
+
+`scripts/parity-counts.py` fails on a row whose tier is not one its role gives. A row that is not yet right has its Role cell end in **(tier moves)**: a child of epic #5288 changes a client (Mac, Remote or Web), then takes the mark off. A mark on a row that agrees fails too. `scripts/parity-counts.py --mismatches` lists the marked rows by the client to change.
+

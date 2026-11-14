@@ -1,0 +1,116 @@
+/* What runs in the background, over the prompt (057). */
+.background { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 2px; font-size: 0.75rem; }
+.background li { display: flex; gap: 6px; opacity: 0.75; }
+.background .noun { font-weight: 500; }
+.background .age { margin-left: auto; font-variant-numeric: tabular-nums; }
+.background li { align-items: baseline; }
+.background li.stopping { opacity: 0.5; }
+.background .stop { font-size: 0.6875rem; padding: 0 8px; }
+dialog.sheet:has(.subagent-steps) { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
+.subagent-steps p { margin: 0; }
+.subagent-steps .asked { padding: 10px; border-radius: 8px; background: var(--paper-ground); display: flex; flex-direction: column; gap: 3px; }
+
+/* Cards at the end of the conversation (#723): a question or a permission, answered here or
+   elsewhere. A long question or a single choice's list scrolls inside its card (#381, the window's
+   #371). */
+.cards { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.waiting { display: flex; flex-direction: column; gap: 8px; }
+.waiting:empty { display: none; }
+/* The one Ask (#5031; specs/session-cards/spec.md, family 4): a fixed head (glyph, title, asker),
+   one body, a fixed foot (the ways to say no as links on the left, at most two buttons on the right,
+   the primary last). The yellow left edge and the label over them are the one mark of needs you (#5016). */
+.waiting-label { margin: 4px 0 0; font-size: 0.6875rem; font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; color: var(--tint-attention); }
+.card.ask { border-left: 3px solid var(--tint-attention); border-radius: var(--radius-floating); }
+.ask-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.ask-glyph { flex: none; color: var(--tint-attention); align-self: center; }
+.ask-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ask-title p { margin: 0; }
+.ask-asker { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.6875rem; color: var(--paper-secondary); }
+.ask p { margin: 0; }
+.ask-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-top: 1px solid var(--paper-rule); padding-top: 8px; margin-top: 2px; }
+.ask-foot .spacer { flex: 1; }
+.ask-decline { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; font-size: 0.75rem; color: var(--paper-secondary); }
+.ask-decline button.link, .ask-foot button.link, .card.ask .form-row button.link { font-size: 0.75rem; cursor: pointer; border: none; background: none; padding: 0; color: var(--accent); box-shadow: none; }
+.ask-decline button.link[aria-disabled="true"], .ask-decline button.link:disabled { opacity: 0.45; cursor: default; }
+.ask .ask-foot button:not(.link), .ask .ask-foot .button { border: 1px solid var(--paper-edge); border-radius: var(--radius-control); background: var(--paper-raised); padding: 4px 10px; color: inherit; text-decoration: none; }
+.ask .ask-foot button.prominent, .ask .ask-foot .button.prominent { color: var(--accent); border-color: var(--accent); font-weight: 650; box-shadow: inset 0 0 0 0.5px var(--accent); }
+.ask-more { position: relative; }
+.ask-more > summary { list-style: none; cursor: pointer; padding: 4px 6px; border-radius: var(--radius-control); color: var(--paper-secondary); }
+.ask-more > summary::-webkit-details-marker { display: none; }
+.ask-more-menu { position: absolute; right: 0; bottom: calc(100% + 4px); z-index: 2; display: flex; flex-direction: column; gap: 4px; padding: 6px; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-control); white-space: nowrap; }
+.ask .secret-more > summary { cursor: pointer; color: var(--accent); }
+.ask .secret-more[open] { display: flex; flex-direction: column; gap: 8px; }
+/* Under 480 px, the buttons go under the words (spec rule 5). */
+@media (max-width: 480px) {
+  .ask-foot .spacer { flex-basis: 100%; height: 0; }
+}
+.card {
+  min-height: 0;
+  flex-shrink: 1;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.card .question { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.card .options { display: flex; flex-direction: column; gap: 6px; }
+.card .choices { min-height: 0; max-height: 320px; overflow-y: auto; }
+/* A paged form's page scrolls inside the window's 260 pt cap, so Submit and No thanks stay under it (#546). */
+.card .page { min-height: 0; max-height: 260px; overflow-y: auto; flex-shrink: 1; }
+.card .plan-shown { display: flex; align-items: center; gap: 8px; margin: 4px 0 0; }
+.card .plan-text { margin-top: 6px; user-select: text; }
+.card .row-options { flex-direction: row; flex-wrap: wrap; }
+.card .options button, .card .options .button {
+  text-align: left;
+  border: 1px solid var(--paper-edge);
+  border-radius: var(--radius-control);
+  background: var(--paper-raised);
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: inherit;
+  text-decoration: none;
+}
+.card button.prominent, .card .button.prominent { background: var(--paper-raised); color: var(--accent); font-weight: 650; border-color: var(--accent); box-shadow: inset 0 0 0 0.5px var(--accent); }
+.card.inert button, .card.inert .button, .card button.held, .card .page.held button { opacity: 0.45; cursor: default; }
+.card [aria-disabled="true"] { cursor: default; }
+.card .telling { display: flex; align-items: center; gap: 6px; font-size: 0.6875rem; font-weight: 400; color: var(--paper-secondary); }
+.card .answered { margin: 0; font-weight: 500; }
+.card .form-row { display: flex; align-items: center; gap: 8px; }
+.card .form-row .spacer { flex: 1; }
+.card .form-row button { border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-raised); padding: 4px 10px; }
+.card .form-row button.prominent { background: var(--paper-raised); color: var(--accent); border-color: var(--accent); }
+.card .field { display: flex; flex-direction: column; gap: 4px; }
+/* A checkbox and its words on one line: a yes/no field, and the secret card's For this session only (#3548). */
+.card .field.check { flex-direction: row; align-items: center; gap: 6px; }
+.card .field input[type="text"], .card .field input[type="number"], .card .field input[type="password"] {
+  font: inherit;
+  padding: 5px 8px;
+  border: 1px solid var(--paper-edge);
+  border-radius: var(--radius-control);
+  background: var(--paper-raised);
+  color: inherit;
+}
+/* The secret card's Description (#4167), as its masked field. */
+.card .field textarea {
+  font: inherit;
+  padding: 5px 8px;
+  border: 1px solid var(--paper-edge);
+  border-radius: var(--radius-control);
+  background: var(--paper-raised);
+  color: inherit;
+  resize: vertical;
+}
+.card .asked { margin: 0; display: flex; align-items: baseline; gap: 4px; }
+/* An agent's ask_secret (#2885): the name, why and where, close together as on the window. */
+.card .secret { margin: 0; }
+
+.foot { padding: 0 12px 12px; max-height: 100%; min-height: 0; display: flex; flex-direction: column; }
+.foot > * { flex-shrink: 0; }
+/* A new session's guarded changes still sit over its prompt (#531). */
+.foot > .cards { flex-shrink: 1; margin-bottom: 8px; overflow-y: auto; }
+

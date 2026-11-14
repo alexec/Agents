@@ -416,6 +416,8 @@ func join(ctx context.Context, cl commandLine, d *agentsd.Daemon) {
 	d.SetControl(up.Tell)
 	d.SetControlAsk(up.Ask)
 	d.SetControlCapabilities(up.ControlCapabilities)
+	// What a capability gates goes when the control plane says it, not an hour later (#5410).
+	up.OnCapabilities = func([]string) { safe.Go("control capabilities", d.ControlCapabilitiesKnown) }
 	// Its agents and workflows wait for the first answer: a host the control plane forgot
 	// starts none (#4985). The last run's answer counts until then.
 	d.AwaitMembership(strings.HasSuffix(joinProblem(loc.Root), controllink.Refuse(controllink.Forgotten).Error()))

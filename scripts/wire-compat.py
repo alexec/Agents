@@ -23,6 +23,7 @@ import subprocess
 import sys
 
 DOCUMENTS = ["Packages/Wire/daemon.openrpc.json", "Packages/Wire/control.openrpc.json"]
+METHOD_DIR = "Packages/Wire/daemon"  # the host's methods, one *.openrpc.json per group (#5381)
 SCHEMA_DIR = "Packages/Wire/schema"  # one *.schema.json per domain (#5380)
 OLD_SCHEMA = "Packages/Wire/daemon.schema.json"  # a release before the split has this one file
 PREFIX = "daemon.schema.json#/definitions/"
@@ -172,8 +173,17 @@ def compare(before, after):
     return problems
 
 
+def method_files(revision):
+    """The files under Packages/Wire/daemon at a revision (none before the split)."""
+    if revision is None:
+        return sorted(glob.glob(METHOD_DIR + "/*.openrpc.json"))
+    listed = git("ls-tree", "--name-only", revision, METHOD_DIR + "/")
+    return sorted(p for p in listed.stdout.splitlines() if p.endswith(".openrpc.json")) if listed.returncode == 0 else []
+
+
 def side(revision):
-    return Side([read(revision, d) for d in DOCUMENTS], read_schema(revision))
+    documents = [read(revision, d) for d in DOCUMENTS] + [read(revision, p) for p in method_files(revision)]
+    return Side(documents, read_schema(revision))
 
 
 def selftest():

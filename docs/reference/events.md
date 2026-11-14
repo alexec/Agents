@@ -523,7 +523,7 @@ trigger is:
 
   | Event | Names it with | `any: true` |
   | --- | --- | --- |
-  | `pr.merged`, `pr.closed`, `pr.conflicted`, `pr.commented`, `pr.reviewed`, `pr.labelled`, `pr.unlabelled`, `review.posted`, `review.comment` | `pr`, `branch`, `fixes` or `mine` | yes |
+  | `pr.merged`, `pr.closed`, `pr.conflicted`, `pr.blocked`, `pr.commented`, `pr.reviewed`, `pr.labelled`, `pr.unlabelled`, `review.posted`, `review.comment` | `pr`, `branch`, `fixes` or `mine` | yes |
   | `checks.failed`, `checks.passed` | `pr`, `branch`, `fixes` or `mine` | yes |
   | `run.completed` | `run`, `branch`, `workflow` or `pipeline` (Azure DevOps) | yes |
   | `issue.closed`, `issue.commented`, `issue.labelled` | `issue` or `label` | yes |
@@ -553,6 +553,41 @@ iPhone and iPad and the web page: when it was last asked and when the last event
 why not (**Can't reach github**, the server no longer offers the event, refused it, or doesn't
 take the filters).
 
+### Blocked pull requests
+
+`pr.blocked` (#5321) fires when an open pull request goes into a state where it cannot
+merge until its author does something. A lane or a lead can wait on `pr.blocked`,
+`pr.merged` and `pr.closed`, and that covers every case. `checks.failed`, `pr.conflicted`
+and `pr.reviewed` stay as they are.
+
+- **When.** The PR goes from not blocked to blocked, or its head commit or its set of
+  reasons changes. It never fires twice for the same head and the same reasons: a rerun that
+  fails again on the same head is not a new event, and neither is a forge that is still
+  working out whether the PR can merge.
+- **Not a reason.** A check that still runs; a draft; a PR labelled `needs-approval`, or one
+  that waits for a person's review (GitHub's rule for changes not made by a person). These
+  need a person or time, not the author.
+- **Payload.** `pr`, `headSha`, `blockedAt`, and `reasons`, in this order, one or more of:
+
+  | Reason | What it means | More data |
+  | --- | --- | --- |
+  | `conflict` | The PR conflicts with its base. | |
+  | `required_check_failed` | A check that the base's rule requires failed on the head. A check that is not required (as `go-darwin`) is not counted. | `failedChecks`: each one's `name` and `url` |
+  | `changes_requested` | A reviewer asked for changes. | `reviewUrl` |
+  | `automerge_disabled` | The forge turned auto-merge off. A PR that never had it on is not blocked. | |
+  | `behind` | The base's rule wants the branch up to date with its base, and it is not. Only under that rule. | |
+- **Filters.** The same as `pr.conflicted`: `repo` (`project` on GitLab), `branch`, `pr`,
+  `fixes`, `anyone`, `mine`, `any`.
+- **What each forge reads.** Each forge reads the reasons it can see in its list of open
+  pull requests:
+
+  | Server | Reasons it reads | From |
+  | --- | --- | --- |
+  | `github` | all five | `mergeable`, `mergeStateStatus` (`BEHIND`), `reviewDecision`, the last auto-merge event of the timeline, and the head's checks against the required checks of the base's rulesets and branch protection, in one GraphQL query |
+  | `gitlab` | `conflict`, `required_check_failed` (the head pipeline), `changes_requested`, `behind` | `detailed_merge_status`, one reason at a time |
+  | `azuredevops` | `conflict`, `changes_requested` | `mergeStatus`, and a reviewer's vote of *waiting for author* or *rejected* |
+  | `forgejo`, `bitbucket` | `conflict` | the same read as `pr.conflicted` |
+
 ### Deploys
 
 The `github` server sends `deploy.started`, `deploy.succeeded` and `deploy.failed` (#5240)
@@ -569,6 +604,21 @@ the url the job's. `deploy.failed`'s `outcome` is `cancelled` when its job was c
 the event, `github:deploy:<owner/repo>#<deployment id>@deploy.succeeded`, from GitHub's data
 only, so two machines make the same id.
 
+The `gitlab`, `azuredevops` and `bitbucket` servers send the same three events in the same
+shape (#5244), from each forge's own record of a job that deploys, so no CI change is needed
+there either. GitLab and Bitbucket keep only a deployment's state now, so a deployment that
+started and ended between two polls sends both, each at its own time:
+
+| Server | Read | started | succeeded | failed (`outcome`) | tier | not read |
+| --- | --- | --- | --- | --- | --- | --- |
+| `gitlab` | `deployments` updated since the cursor | `running` (the job's start) | `success` | `failed`, `canceled` (`cancelled`) | GitLab's own `tier` (GitLab guesses it from the name) | `created` (the job has not started and may still be `blocked`), `blocked` (`deploy.waiting`'s), `skipped` |
+| `azuredevops` | the project's environments (20) and each one's newest deployment records (25); a record's build, once its event is sent, for the commit and the tag | a record with a start | `succeeded`, `succeededWithIssues` | `failed`, `canceled` (`cancelled`) | by the environment's name (Azure DevOps has none) | `skipped`, `abandoned`; a record of another repository's build |
+| `bitbucket` | the newest 50 `deployments` and the `environments` | `IN_PROGRESS` | `COMPLETED`, `SUCCESSFUL` | `FAILED`, `STOPPED` (`cancelled`) | the environment's type: Test, Staging, Production | `UNDEPLOYED` |
+
+The project or repository is the component. Azure DevOps's pipeline and stage are the target's
+`labels`. Bitbucket's version has no name: its deployment does not say the run's tag. Forgejo
+has no deployments: it has none of these events.
+
 ### Subjects and keys
 
 What each of this folder's MCP servers says of its events' envelope (#4728). The topic is
@@ -584,10 +634,12 @@ it, so two machines can make two ids for one change.
 | `github` | `run.completed`, `deploy.waiting` | `github:run:<owner/repo>#<run id>` | the attempt (and the environments) |
 | `github` | `deploy.started`, `deploy.succeeded`, `deploy.failed` | `github:deploy:<owner/repo>#<deployment id>` | none: each is sent once for a Deployment |
 | `github` | `pr.merged` / `pr.closed` | the PR | none / the close time |
+| `github`, `gitlab`, `forgejo`, `bitbucket`, `azuredevops` | `pr.blocked` | the PR (the merge request on GitLab) | the head commit and the reasons, as `<sha>:conflict,behind` |
 | `github` | `pr.conflicted` and the other states | the PR, or the issue for `issue.assigned` | the review for `review.posted`, else the poll time |
 | `gitlab` | `issue.*`, `review.comment`, `pr.merged`, `pr.closed`, states | `gitlab:issue:` or `gitlab:mr:<group/project>#<n>` | as `github` |
 | `gitlab` | `checks.failed` | `gitlab:pipeline:<group/project>#<pipeline id>` | the pipeline's update time |
 | `gitlab` | `run.completed`, `deploy.waiting` | `gitlab:pipeline:<group/project>#<pipeline id>` | the update time, or the blocked deployments |
+| `gitlab`, `azuredevops`, `bitbucket` | `deploy.started`, `deploy.succeeded`, `deploy.failed` | `<server>:deploy:<repo>#<deployment id>` (Bitbucket's uuid, Azure DevOps's record id) | none: each is sent once for a deployment |
 | `forgejo`, `bitbucket` | `issue.*`, `review.comment`, `pr.merged`, `pr.closed`, states | `<server>:issue:` or `<server>:pr:<owner/repo>#<n>` | as `github` |
 | `forgejo`, `bitbucket` | `checks.failed` | the PR | the head commit and the time |
 | `bitbucket` | `run.completed` | `bitbucket:run:<workspace/name>#<build number>` | the finish time |

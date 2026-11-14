@@ -831,6 +831,7 @@ export const ControlCapabilities: Readonly<Record<string, Capability>> = {
   "machines/summaryFacts": "summary.machines/1",
   "machines/unlink": "machines/1",
   "machines/update": "machines/1",
+  "machines/versions": "machines/1",
   "multiplier/count": "multiplier/1",
   "notices/take": "notices/1",
   "orgRoutes/check": "org-routes/2",

@@ -31,7 +31,7 @@ var (
 	repoProperty = property{Name: "repo", Kind: "string",
 		Description: "The repository on Azure DevOps, as organization/project/name (collection/project/name on Azure DevOps Server). Left out, the repository this folder pushes to.",
 		Pattern:     repoPattern, LooksLike: "organization/project/name"}
-	prProperty = property{Name: "pr", Kind: "integer", Description: "Only this pull request, by number."}
+	prProperty = property{Name: "pr", Kind: "integers", Description: "Only this pull request, or these, by number."}
 	// anyoneProperty opts into anyone's comment or pull request (#728); left out, only the project's own people.
 	anyoneProperty = property{Name: "anyone", Kind: "boolean",
 		Description: "true: from anyone, bots and forks too. Left out, never a bot (a build service) and for a pull request never one from a fork. Only a project's members can write to it on Azure DevOps."}
@@ -129,6 +129,12 @@ var events = []event{
 			"canApprove":   map[string]any{"type": "boolean"},
 			"waitingSince": str,
 		})},
+	deployEvent("deploy.started", "Deploy started",
+		"An Azure Pipelines deployment job began to deploy to an environment: its deployment record has a start. One event per record."),
+	deployEvent("deploy.succeeded", "Deploy succeeded",
+		"An Azure Pipelines deployment job deployed to an environment: its record's result is succeeded or succeededWithIssues. One event per record."),
+	deployEvent("deploy.failed", "Deploy failed",
+		"An Azure Pipelines deployment job did not deploy to an environment: its record's result is failed or canceled. One event per record. outcome is cancelled when it was canceled, else failed."),
 	{Name: "pr.opened", Title: "Pull request opened",
 		Description: "A pull request was opened, or a draft was published: a pull request active and not a draft now that was not at the last poll. Drafts never count. Reactivated, it is raised again." + ownPRs,
 		Input:       prInput(),
@@ -143,6 +149,10 @@ var events = []event{
 		Description: "An active pull request began to conflict with its target branch, so it cannot merge until it is rebased. Once per conflict: it is raised again only after it merges cleanly and then conflicts anew." + ownPRs,
 		Input:       namedInput(),
 		Payload:     object(map[string]any{"pr": prSchema(nil), "conflictedAt": str})},
+	{Name: "pr.blocked", Title: "Pull request blocked",
+		Description: mcpevents.BlockedDescription("On Azure DevOps: conflict from mergeStatus, and changes_requested from a reviewer's vote of waiting for author or rejected; policies (required builds) and auto-complete are not read."+ownPRs),
+		Input:       namedInput(),
+		Payload:     mcpevents.BlockedPayload(prSchema(nil))},
 	// For the person, not the repository (#2034): what asks the token's owner for something.
 	{Name: "review.requested", Title: "Review requested from me",
 		Description: "The Azure DevOps account whose token this server has was added as a reviewer of an active pull request and has not voted: once per request, so a vote reset by a new push is a new one. Anyone's pull request, a fork's too.",
@@ -237,6 +247,20 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			}
 			return out, nil
 		})
+	case "pr.blocked":
+		was := polls.CursorIDs(p)
+		return s.pollDiff(e.Name, "blockedAt", a, p, func() ([]state, error) {
+			prs, err := s.AzureDevOps.OpenPRs(ctx, a.repo)
+			var out []state
+			for _, m := range prs {
+				if m.SkipsBlocked || (a.mine && !a.byMe(m.PR, yours)) || (!a.mine && !a.anyone && !m.Trusted) {
+					continue
+				}
+				bs := mcpevents.Blocked(fmt.Sprintf("%s:%s:%d", e.Name, a.repo, m.PR.Number), m.blocking(), was)
+				out = append(out, state{mr: m.PR, on: &bs.On, key: bs.Key, json: m.PR.json(), extra: bs.Data})
+			}
+			return out, err
+		})
 	case "pr.conflicted":
 		return s.pollDiff(e.Name, "conflictedAt", a, p, func() ([]state, error) {
 			prs, err := s.AzureDevOps.OpenPRs(ctx, a.repo)
@@ -285,10 +309,14 @@ func contains(list []string, s string) bool { return slices.Contains(list, s) }
 
 // state is a pull request and whether its state (in conflict, or open and ready) is on now;
 // nil keeps the one it had.
+// key, when set, is part of its id and its envelope's key; extra is more of the event's data
+// (pr.blocked's, #5321).
 type state struct {
-	mr   PR
-	on   *bool
-	json map[string]any
+	mr    PR
+	on    *bool
+	json  map[string]any
+	key   string
+	extra map[string]any
 }
 
 func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() ([]state, error)) (map[string]any, *rpcError) {
@@ -300,11 +328,19 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 		all, err := states()
 		var out []mcpevents.State
 		for _, st := range all {
-			if (a.pr != 0 && st.mr.Number != a.pr) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
+			if !a.wantsPR(st.mr.Number) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
 				continue
 			}
-			out = append(out, mcpevents.State{ID: fmt.Sprintf("%s:%s:%d", name, a.repo, st.mr.Number), Number: st.mr.Number,
-				On: st.on, Data: map[string]any{root: st.json}, Subject: diffRef(root, a.repo, st.mr.Number)})
+			id := fmt.Sprintf("%s:%s:%d", name, a.repo, st.mr.Number)
+			if st.key != "" {
+				id += ":" + st.key
+			}
+			data := map[string]any{root: st.json}
+			for k, v := range st.extra {
+				data[k] = v
+			}
+			out = append(out, mcpevents.State{ID: id, Number: st.mr.Number,
+				On: st.on, Data: data, Subject: diffRef(root, a.repo, st.mr.Number), Key: st.key})
 		}
 		return out, err
 	})
@@ -327,8 +363,12 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 	// mine: the owner's own pull request, active or completed or abandoned, trusted or not;
 	// else the trust filter (#728, #3797). fixes narrows every one by the work items it closes.
 	wanted := func(m PR, trusted bool) bool {
-		return (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) && a.closesOne(m) &&
+		return a.wantsPR(m.Number) && (a.branch == "" || m.Branch == a.branch) && a.closesOne(m) &&
 			(a.mine && a.byMe(m, yours) || !a.mine && (a.anyone || trusted))
+	}
+	if mcpevents.IsDeployEvent(name) {
+		list, err := deployCandidates(ctx, f, name, a)
+		return list, Listed{}, err
 	}
 	switch name {
 	case "run.completed":
@@ -375,7 +415,7 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		for _, c := range comments {
 			// Trust is the commenter's; mine only narrows the pull request (#3797).
 			m := c.PR
-			if at := mcpevents.Normalized(c.At); at != "" && (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) &&
+			if at := mcpevents.Normalized(c.At); at != "" && a.wantsPR(m.Number) && (a.branch == "" || m.Branch == a.branch) &&
 				a.closesOne(m) && a.byMe(m, yours) && (a.anyone || c.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d:%d:%d", repo, c.PR.Number, c.ThreadID, c.ID), Time: at,
 					Data:    func() (map[string]any, error) { return c.data(), nil },

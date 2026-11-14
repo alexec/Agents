@@ -30,7 +30,7 @@ var (
 	projectProperty = property{Name: "project", Kind: "string",
 		Description: "The GitLab project, by its path (group/name, subgroups too) or its id. Left out, the project this folder pushes to.",
 		Pattern:     projectPattern, LooksLike: "group/name or a project id"}
-	prProperty = property{Name: "pr", Kind: "integer", Description: "Only this merge request, by number (its iid, as !12)."}
+	prProperty = property{Name: "pr", Kind: "integers", Description: "Only this merge request, or these, by number (its iid, as !12)."}
 	// anyoneProperty opts into anyone's issue, comment or merge request (#728); left out, only the project's own people.
 	anyoneProperty = property{Name: "anyone", Kind: "boolean",
 		Description: "true: from anyone, bots, forks and people outside the project too. Left out, only the project's members with Reporter access or more, never a bot, and for a merge request never one from a fork."}
@@ -121,6 +121,12 @@ var events = append([]event{
 			"canApprove":   map[string]any{"type": "boolean"},
 			"waitingSince": str,
 		})},
+	deployEvent("deploy.started", "Deploy started",
+		"A GitLab deployment went running: a job with an environment: began to deploy, whatever started its pipeline. One event per deployment."),
+	deployEvent("deploy.succeeded", "Deploy succeeded",
+		"A GitLab deployment went success: a job with an environment: deployed. One event per deployment."),
+	deployEvent("deploy.failed", "Deploy failed",
+		"A GitLab deployment went failed or canceled: a job with an environment: did not deploy. One event per deployment. outcome is cancelled when GitLab says canceled, else failed."),
 	{Name: "pr.opened", Title: "Merge request opened",
 		Description: "A merge request was opened, or a draft was marked ready: a merge request open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownMRs,
 		Input:       mrInput(),
@@ -135,6 +141,10 @@ var events = append([]event{
 		Description: "An open merge request began to conflict with its target branch, so it cannot merge until it is rebased. Once per conflict: it is raised again only after it merges cleanly and then conflicts anew." + ownMRs,
 		Input:       namedInput(),
 		Payload:     object(map[string]any{"pr": mrSchema(nil), "conflictedAt": str})},
+	{Name: "pr.blocked", Title: "Merge request blocked",
+		Description: mcpevents.BlockedDescription("On GitLab: detailed_merge_status, one reason at a time (conflict, need_rebase as behind, ci_must_pass as required_check_failed with the head pipeline, requested_changes); automerge_disabled is never read, as GitLab does not say who turned auto-merge off."+ownMRs),
+		Input:       namedInput(),
+		Payload:     mcpevents.BlockedPayload(mrSchema(nil))},
 	// For the person, not the project (#2034): what asks the connection's owner for something.
 	{Name: "review.requested", Title: "Review requested from me",
 		Description: "The GitLab account this server is connected as was made a reviewer of an open merge request: once per request, so one taken off and put back is a new one. Anyone's merge request, a fork's too.",
@@ -313,6 +323,20 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			}
 			return out, err
 		})
+	case "pr.blocked":
+		was := polls.CursorIDs(p)
+		return s.pollDiff(e.Name, "blockedAt", a, p, func() ([]state, error) {
+			mrs, err := s.GitLab.OpenMRs(ctx, a.project)
+			var out []state
+			for _, m := range mrs {
+				if m.SkipsBlocked || (a.mine && !a.byMe(m.MR, yours)) || (!a.mine && !a.anyone && !m.Trusted) {
+					continue
+				}
+				bs := mcpevents.Blocked(fmt.Sprintf("%s:%s:%d", e.Name, a.project, m.MR.Number), m.Blocking, was)
+				out = append(out, state{mr: m.MR, on: &bs.On, key: bs.Key, json: m.MR.json(), extra: bs.Data})
+			}
+			return out, err
+		})
 	case "pr.opened":
 		return s.pollDiff(e.Name, "openedAt", a, p, func() ([]state, error) {
 			mrs, err := s.GitLab.OpenMRs(ctx, a.project)
@@ -347,10 +371,14 @@ func contains(list []string, s string) bool { return slices.Contains(list, s) }
 
 // state is a merge request and whether its state (in conflict, or open and ready) is on now;
 // nil keeps the one it had.
+// key, when set, is part of its id and its envelope's key; extra is more of the event's data
+// (pr.blocked's, #5321).
 type state struct {
-	mr   MR
-	on   *bool
-	json map[string]any
+	mr    MR
+	on    *bool
+	json  map[string]any
+	key   string
+	extra map[string]any
 }
 
 func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() ([]state, error)) (map[string]any, *rpcError) {
@@ -362,11 +390,19 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 		all, err := states()
 		var out []mcpevents.State
 		for _, st := range all {
-			if (a.pr != 0 && st.mr.Number != a.pr) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
+			if !a.wantsPR(st.mr.Number) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
 				continue
 			}
-			out = append(out, mcpevents.State{ID: fmt.Sprintf("%s:%s:%d", name, a.project, st.mr.Number), Number: st.mr.Number,
-				On: st.on, Data: map[string]any{root: st.json}, Subject: diffRef(root, a.project, st.mr.Number)})
+			id := fmt.Sprintf("%s:%s:%d", name, a.project, st.mr.Number)
+			if st.key != "" {
+				id += ":" + st.key
+			}
+			data := map[string]any{root: st.json}
+			for k, v := range st.extra {
+				data[k] = v
+			}
+			out = append(out, mcpevents.State{ID: id, Number: st.mr.Number,
+				On: st.on, Data: data, Subject: diffRef(root, a.project, st.mr.Number), Key: st.key})
 		}
 		return out, err
 	})
@@ -397,7 +433,7 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 	// mine: the owner's own merge request, open or merged or closed, trusted or not; else the
 	// trust filter (#728, #3797). fixes narrows every one by the issues it closes.
 	wanted := func(m MR, trusted bool) bool {
-		return (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) && a.closesOne(m) &&
+		return a.wantsPR(m.Number) && (a.branch == "" || m.Branch == a.branch) && a.closesOne(m) &&
 			(a.mine && a.byMe(m, yours) || !a.mine && (a.anyone || trusted))
 	}
 	if kind, ok := strings.CutPrefix(name, "issue."); ok {
@@ -422,6 +458,13 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 		}
 		return list, listed, nil
 	}
+	if mcpevents.IsDeployEvent(name) {
+		deploys, listed, err := gl.Deployments(ctx, project, a.deploy.Environment, since)
+		if err != nil {
+			return nil, Listed{}, err
+		}
+		return mcpevents.DeployCandidates(name, a.deploy, deploys), listed, nil
+	}
 	switch name {
 	case "review.comment":
 		comments, listed, err := gl.ReviewComments(ctx, project, since)
@@ -432,7 +475,7 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 		for _, c := range comments {
 			// Trust is the commenter's; mine only narrows the merge request (#3797).
 			m := c.MR
-			if at := mcpevents.Normalized(c.At); at != "" && (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) &&
+			if at := mcpevents.Normalized(c.At); at != "" && a.wantsPR(m.Number) && (a.branch == "" || m.Branch == a.branch) &&
 				a.closesOne(m) && a.byMe(m, yours) && (a.anyone || c.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d", project, c.ID), Time: at,
 					Data:    func() (map[string]any, error) { return c.data(), nil },
@@ -515,7 +558,7 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 			list = append(list, candidate{EventID: fmt.Sprintf("checks.failed:%s:%d:%s", project, pl.ID, at), Time: at,
 				Subject: pipelineRef(project, pl.ID), Key: at,
 				Data: func() (map[string]any, error) {
-					if a.pr != 0 && pl.MRNumber != 0 && pl.MRNumber != a.pr {
+					if pl.MRNumber != 0 && !a.wantsPR(pl.MRNumber) {
 						return nil, nil
 					}
 					details, err := gl.PipelineDetails(ctx, project, pl)

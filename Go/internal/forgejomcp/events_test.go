@@ -17,11 +17,12 @@ import (
 
 func TestTheEventsAreTheGitLabServersNames(t *testing.T) {
 	// The gitlab server's, but for run.completed and deploy.waiting, which each forge has
-	// where its API does; run.completed is after checks.failed, as there (#4217).
+	// where its API does; run.completed is after checks.failed, as there (#4217). Forgejo has
+	// no deployments, so none of deploy.started, deploy.succeeded and deploy.failed (#5244).
 	without := func(names []string) []string {
 		var out []string
 		for _, n := range names {
-			if n != "run.completed" && n != "deploy.waiting" {
+			if n != "run.completed" && n != "deploy.waiting" && !mcpevents.IsDeployEvent(n) {
 				out = append(out, n)
 			}
 		}
@@ -328,7 +329,7 @@ func TestBaseURL(t *testing.T) {
 // Every event about one pull request is named by pr, branch, fixes or mine, or takes any
 // (#3797); the issue events but issue.opened take a list of issues and any too.
 func TestEventsListSchemas(t *testing.T) {
-	named := map[string]bool{"checks.failed": true, "pr.merged": true, "pr.closed": true, "pr.conflicted": true, "review.comment": true}
+	named := map[string]bool{"checks.failed": true, "pr.merged": true, "pr.closed": true, "pr.conflicted": true, "pr.blocked": true, "review.comment": true}
 	for _, e := range eventsList()["events"].([]any) {
 		e := e.(map[string]any)
 		name := e["name"].(string)

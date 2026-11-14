@@ -1,6 +1,6 @@
 // bitbucket-mcp: the `bitbucket` MCP server (#2828), on stdio, in the gitlab server's shape
 // (Go/cmd/gitlab-mcp): polled events of a Bitbucket Cloud folder's pull requests, their checks
-// and its issues (checks.failed, pr.opened, pr.merged, pr.closed, pr.conflicted,
+// and its issues (checks.failed, pr.opened, pr.merged, pr.closed, pr.conflicted, pr.blocked,
 // review.requested, review.comment, issue.opened, issue.labelled, issue.commented,
 // issue.closed, issue.assigned), and tools that read them and comment, over the REST API 2.0.
 // As the person who connected Bitbucket (#3785, in the store connections.EnvName names), or

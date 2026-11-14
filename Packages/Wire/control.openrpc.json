@@ -4123,6 +4123,27 @@
       "description": "Update a server's host over ssh (#1766): its server and key given again, the host key checked as at an install, the server's root checked to be this host's, then the control plane's agentsd, MCP servers and toolsets copied and the host started again. The answer is an install's: {needsTrust, name} first for a key not yet trusted, then {updated: true, name}."
     },
     {
+      "name": "machines/versions",
+      "description": "A machine's Agents versions and each change of them, as observed deploys (#5272), for its page (#5273).",
+      "x-capability": "machines/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/MachineRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/MachineVersions"
+        }
+      }
+    },
+    {
       "name": "multiplier/count",
       "x-capability": "multiplier/1",
       "description": "A host, on its channel 0 (#3903): the Multiplier of the machine's person over all their machines' lineage, cached until a machine sends new lineage, with the best week in the host's timeZone (#3988). agentsWorking and mostAtOnce are absent: the host gives its own.",

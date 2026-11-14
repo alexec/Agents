@@ -1,0 +1,1 @@
+| Activity rows (Events, Resources, Runtimes, Today) in the folders' type, no icons (2026-10-03) | #155 | **has** | The page's Activity rows lost their glyphs and take the folder names' weight and left edge, as the window's do. Trailing status text unchanged. Window shots: `specs/145-one-sidebar/walks/155/`. |

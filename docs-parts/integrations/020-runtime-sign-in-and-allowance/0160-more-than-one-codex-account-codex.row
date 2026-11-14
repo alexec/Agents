@@ -1,0 +1,1 @@
+| More than one Codex account (`CODEX_HOME`) | Mac, Remote, web | built (not walked: no Codex on the walk's Mac) | 2026-10-21 | `Go/internal/agentsd/accounts.go` | Alex to test with two real sign-ins (#3414) |

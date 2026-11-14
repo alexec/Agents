@@ -1,6 +1,6 @@
 ---
 name: fix-failed-checks
-description: Find why a pull request's checks or a merge request's pipeline failed, fix it on its branch and push, or run the failed jobs again when the failure is not caused by the change. Use when the Fix failed checks workflow starts on checks.failed, or when someone asks you to fix failed checks.
+description: Find why a pull request's checks or a merge request's pipeline failed, fix it on its branch and push, or run the failed jobs again when the failure is not caused by the change. Use when the Fix failed checks workflow starts on checks.failed, when a lane's pr.blocked names required_check_failed, or when someone asks you to fix failed checks.
 ---
 
 # Fix failed checks
@@ -23,6 +23,11 @@ comment when you cannot get to the log. On Forgejo the same is true of a check f
 CI than Forgejo Actions (Woodpecker, say). `failed_log` needs Forgejo 16 or Gitea 1.25, and
 `retry_pipeline` Forgejo 17 or Gitea 1.26; on an older server each says so and gives the
 run's address.
+
+A lane that waits on `pr.blocked` (#5321) comes here for the reason
+`required_check_failed`. That event has no `run.id`: take it from each of its
+`failedChecks`' `url` (on GitHub, `…/actions/runs/<run.id>/job/<job id>`), and use the
+event's `pr` and your own branch.
 
 0. **Stop at once when the pull request is labelled `needs-approval`** (#2811). It is a UI
    enhancement that waits for Alex's approval, and its checks are fixed only after Alex

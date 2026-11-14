@@ -42,17 +42,21 @@ type fakeAzureDevOps struct {
 	builds     []obj
 	timeline   map[int][]obj // build → its records
 	approvals  []obj         // the project's pending approvals
-	logs       map[int]string
-	changes    map[int][]obj     // pull request → the files its newest push changes
-	fileDiffs  []obj             // what filediffs answers
-	files      map[string]string // commit:path → the file's text
-	policies   []obj             // the target branch's "Limit merge types" policies
-	commits    []obj             // the repository's commits, newest first (#3952)
-	tags       map[string]string // tag → its commit's id
-	merged     map[string]int    // a merge commit's id → its completed pull request
-	me         string
-	posted     []obj // what was POSTed, PATCHed or PUT, with its method and path
-	status     int   // answer every request with this, when set
+	// environments are the project's environments, and records each one's deployment
+	// records, newest first (#5244).
+	environments []obj
+	records      map[int][]obj
+	logs         map[int]string
+	changes      map[int][]obj     // pull request → the files its newest push changes
+	fileDiffs    []obj             // what filediffs answers
+	files        map[string]string // commit:path → the file's text
+	policies     []obj             // the target branch's "Limit merge types" policies
+	commits      []obj             // the repository's commits, newest first (#3952)
+	tags         map[string]string // tag → its commit's id
+	merged       map[string]int    // a merge commit's id → its completed pull request
+	me           string
+	posted       []obj // what was POSTed, PATCHed or PUT, with its method and path
+	status       int   // answer every request with this, when set
 	// signIn answers as Azure DevOps does a token it does not take: 203 and a sign-in page.
 	signIn bool
 	server *httptest.Server
@@ -140,6 +144,7 @@ var (
 	statusesPath   = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/statuses$`)
 	iterationsPath = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/iterations$`)
 	buildPath      = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)$`)
+	recordsPath    = regexp.MustCompile(`^/acme/Web App/_apis/distributedtask/environments/([0-9]+)/environmentdeploymentrecords$`)
 	timelinePath   = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)/timeline$`)
 	logPath        = regexp.MustCompile(`^/acme/Web App/_apis/build/builds/([0-9]+)/logs/([0-9]+)$`)
 	labelsPath     = regexp.MustCompile(`^` + gitRoot + `/pullRequests/([0-9]+)/labels(?:/[^/]+)?$`)
@@ -310,6 +315,16 @@ func (f *fakeAzureDevOps) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		w.WriteHeader(http.StatusNotFound)
 		_, _ = w.Write([]byte(`{"message":"The requested build could not be found."}`))
+	case p == "/acme/Web App/_apis/distributedtask/environments":
+		var envs []obj
+		for _, e := range f.environments {
+			if q.Get("name") == "" || e["name"] == q.Get("name") {
+				envs = append(envs, e)
+			}
+		}
+		list(envs)
+	case recordsPath.MatchString(p):
+		list(f.records[n(recordsPath.FindStringSubmatch(p))])
 	case p == "/acme/Web App/_apis/pipelines/approvals":
 		if q.Get("state") != "pending" || q.Get("$expand") != "steps,permissions" {
 			f.t.Errorf("approvals %v", q)

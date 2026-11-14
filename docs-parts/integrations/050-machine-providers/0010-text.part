@@ -1,0 +1,8 @@
+## Machine providers
+
+The machines hosts run on. The contract is in [Machine providers](machine-providers.md).
+The presets are in `Go/internal/workspacecommands/presets.go` (Swift until #1364).
+Open issues: `is:open label:integration workspace`.
+
+| Integration | Clients that show it | State | Last checked | Where | Gaps |
+| --- | --- | --- | --- | --- | --- |

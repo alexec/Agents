@@ -1,0 +1,1 @@
+| Base URL (LiteLLM, Portkey, …) | control plane, machine; Mac, web | built | 2026-10-22, relay against a fake API only | `Go/internal/controlplane/orgroutes.go`, `Go/internal/agentsd/modelrelay.go` | Alex to test with a real gateway (#3413) |

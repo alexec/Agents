@@ -97,7 +97,7 @@ with a form for the rest), then close it. Otherwise give it a lane as above.
 ## 3. Wait
 
 End each pass with one `wait_for_event` call: `events: ["issue.closed", "pr.merged",
-"checks.failed", "pr.conflicted"]`, `where: {"issue": [<open children>], "fixes": ["#<child>",
+"pr.blocked"]`, `where: {"issue": [<open children>], "fixes": ["#<child>",
 …]}`, `until_minutes: 60`. Then end your turn. The wait names this epic's children (#3797):
 `issue` for `issue.closed`, and `fixes` for the PR events, which match a PR whose body
 closes one of them, so you know the child before its lane opens the PR. Each event takes
@@ -105,9 +105,15 @@ only the keys it has. A wait that names nothing is refused. When you start again
 
 - **`issue.closed` or `pr.merged`** of a child: read the plan again (step 1) and start
   the lanes of the children that are now ready (step 2).
-- **`checks.failed` or `pr.conflicted`** on a child's PR: its lane fixes it. If the lane
+- **`pr.blocked`** on a child's PR (#5321: a conflict, a failed required check, changes
+  requested, auto-merge off; its `reasons` say which): its lane fixes it. If the lane
   has ended or stopped, message it about its own PR (`message_session`), never to widen
   its work. Leave a PR labelled `needs-approval` alone: it waits for Alex.
+- **The wait is refused** with "No server here offers pr.blocked" (#5437: the
+  installed app is older than #5321): wait instead on `["issue.closed", "pr.merged",
+  "checks.failed", "pr.conflicted"]`, with the same `where`, and use that list for the
+  rest of this session. `checks.failed` and `pr.conflicted` on a child's PR are
+  `pr.blocked` above.
 - **An event that is not about this epic** (a PR that fixes a child and something else):
   wait again.
 - **The time limit:** run `scripts/rearm-automerge.sh --stalled`, read the plan again,
@@ -200,7 +206,7 @@ lanes' own issues. A wait takes one label, so the time limit catches the issues 
 other labels.
 
 ```json
-{"events": ["pr.merged", "checks.failed", "pr.conflicted",
+{"events": ["pr.merged", "pr.blocked",
             "issue.opened", "issue.labelled", "issue.closed"],
  "where": {"fixes": ["#<issue of a lane>", …], "label": "bug"},
  "until_minutes": 60}

@@ -1,0 +1,74 @@
+/* Settings ▸ Processes (#3453): the numbers line up. */
+.process-usage { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* Personas from a marketplace (#3678), as the Mac's AddPersonaSheet. */
+.persona-catalog { display: grid; gap: 6px; margin-bottom: 14px; }
+.persona-catalog-head { display: flex; align-items: center; gap: 8px; }
+.persona-catalog-head h4 { margin: 0; flex: 1; }
+.persona-catalog-head button { margin-left: auto; }
+.persona-catalog-row { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); min-width: 0; }
+.persona-catalog-row .hint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.persona-catalog-row .spacer, .persona-sheet-head .spacer { flex: 1; }
+.persona-sheet .sheet-actions { align-items: center; }
+.persona-sheet .sheet-actions .hint { margin-right: auto; }
+.chip.attention { background: color-mix(in srgb, var(--tint-warning) 22%, var(--paper-ground)); opacity: 1; }
+dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
+.persona-sheet { min-width: 0; }
+.persona-sheet h2 { margin: 0; }
+.persona-sheet-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.persona-sheet input[type="search"] { width: 100%; box-sizing: border-box; }
+.persona-results { display: grid; gap: 6px; max-height: 50vh; overflow: auto; }
+.persona-result { display: grid; gap: 2px; text-align: left; padding: 8px 12px; }
+.persona-result .chip { margin-left: 6px; }
+.persona-preview { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 14px; min-height: 0; }
+.persona-facts { display: grid; gap: 5px; margin: 0 0 10px; }
+.persona-facts div { display: grid; grid-template-columns: 8.5em 1fr; gap: 10px; }
+.persona-facts dt { opacity: 0.7; }
+.persona-facts dd { margin: 0; overflow-wrap: anywhere; }
+.persona-file { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); padding: 14px; overflow: auto; max-height: 55vh; }
+.persona-file pre { margin: 6px 0 0; white-space: pre-wrap; font-family: var(--font-mono); }
+.persona-note { margin: 0 0 8px; padding: 10px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.persona-note.attention { background: color-mix(in srgb, var(--tint-warning) 14%, transparent); }
+.persona-diff { max-height: 55vh; overflow: auto; }
+@media (max-width: 640px) { .persona-preview { grid-template-columns: 1fr; } }
+
+/* The Multiplier page (#3990), as the window's MultiplierPage: the crowd, the Multiplier, three numbers, the
+   bests, the earned badges and the rising line, then the baseline's line and the keys at the foot. */
+.multiplier-page { flex: 1; min-height: 100%; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; padding: 24px; overflow-y: auto; }
+.multiplier-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; max-width: 820px; text-align: center; }
+.multiplier-body p { margin: 0; }
+.crowd { position: relative; width: 100%; margin-bottom: 12px; }
+.crowd canvas { display: block; }
+.crowd-you { position: absolute; overflow: visible; }
+.crowd-each { position: absolute; right: 4px; bottom: 4px; }
+.multiplier-range { opacity: 0.7; }
+.multiplier-hero { font-size: clamp(3rem, 9vw, 5.5rem); font-weight: 700; line-height: 1.05; margin-top: 8px !important; margin-bottom: 48px !important; font-variant-numeric: tabular-nums; }
+.multiplier-hero.empty { opacity: 0.55; margin-bottom: 8px !important; }
+.multiplier-stats { display: flex; gap: clamp(24px, 6vw, 72px); justify-content: center; }
+.multiplier-stat { display: flex; flex-direction: column; gap: 4px; }
+.multiplier-figure { font-size: 2.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.multiplier-bests { margin-top: 28px !important; opacity: 0.75; font-variant-numeric: tabular-nums; }
+.multiplier-bests strong { font-weight: 600; }
+.multiplier-badges { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 24px; }
+.badge-row { display: flex; align-items: center; gap: 8px; }
+.badge { width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--paper-on-fill); font-size: 15px; font-weight: 600; background: var(--accent);
+  cursor: default; }
+.badge.new { animation: badge-in 0.5s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes badge-in { from { transform: scale(0); } to { transform: scale(1); } }
+.badge-count { margin-left: 6px; font-variant-numeric: tabular-nums; }
+.multiplier-news { height: 28px; line-height: 28px; margin-top: 20px !important; font-weight: 600; color: var(--accent); white-space: pre; }
+.multiplier-news.down { color: inherit; opacity: 0.7; }
+.multiplier-news span { display: inline-block; animation: news-rise 3s ease-out forwards; }
+@keyframes news-rise { 0% { transform: translateY(16px); opacity: 0; } 13% { transform: none; opacity: 1; } 80% { transform: none; opacity: 1; } 100% { transform: translateY(-12px); opacity: 0; } }
+.multiplier-foot { text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.multiplier-foot p { margin: 0; }
+@media (prefers-reduced-motion: reduce) { .badge.new, .multiplier-news span { animation: none; } }
+
+/* The take-over tab (#4141): the agent browser or a simulator on the whole page, a slim head over it,
+   and a hand-off's step between them. */
+.take-over-head h1 { flex: 0 1 auto; }
+.take-over-hand-off { padding: 8px 12px 0; }
+.take-over-page { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px 12px 12px; overflow: auto; }
+.take-over-page > .agent-browser { flex: 1; height: auto; min-height: 0; }
+.take-over-page .simulator-screen { max-height: calc(100vh - 140px); }
+

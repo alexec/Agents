@@ -1,0 +1,66 @@
+/* A panel that leaves the page working (#5203): the server runtime's sign-in, in the corner. */
+dialog.sheet.modeless {
+  position: fixed;
+  inset: auto 16px 16px auto;
+  margin: 0;
+  z-index: 20;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+dialog.sheet::backdrop { background: color-mix(in srgb, var(--paper-scrim) 25%, transparent); }
+/* Project Settings and Folder Settings (#3280): tabs over a grid of a label and its value. */
+dialog.sheet:has(.settings-sheet) { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
+.settings-sheet [role="tabpanel"] { min-height: 260px; }
+.settings-grid { display: grid; grid-template-columns: max-content 1fr; gap: 12px 14px; margin: 0; }
+.settings-grid dt { color: var(--ink-secondary, inherit); opacity: 0.75; text-align: right; }
+.settings-grid dd { margin: 0; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.project-folders { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.project-folders li { display: grid; grid-template-columns: 90px 1fr auto auto auto; gap: 10px; align-items: baseline; }
+.project-folders .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.not-committed-paths { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.not-committed-paths code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.switch-row { display: flex; gap: 8px; align-items: center; }
+.settings-sheet .sheet-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.settings-sheet .sheet-actions.start { justify-content: flex-start; }
+.sheet-body { display: flex; flex-direction: column; gap: 10px; }
+.sheet h2 { margin: 0; font-size: 0.9375rem; font-weight: 600; }
+.sheet input[type="text"],
+.connect-sheet .token-form input {
+  font: inherit;
+  color: inherit;
+  padding: 5px 8px;
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control);
+  background: var(--paper-ground);
+}
+.sheet-note { margin: 10px 0 0; font-size: 0.75rem; opacity: 0.65; min-height: 2.6em; }
+.sheet-body .sheet-note { margin: 0; }
+/* A secret's Description (#4167): the sheet's own font, not a textarea's monospace. */
+.sheet-body textarea { font: inherit; resize: vertical; }
+.sheet-note.failure { color: var(--tint-failure); opacity: 1; }
+/* The Add Folder sheet's Project (#2671). */
+.new-folder-project { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.new-folder-project label { display: flex; flex-direction: column; gap: 2px; font-size: 0.8125rem; }
+.new-folder-project p { margin: 0; }
+.sheet-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+/* Report a Problem (#3718): the two fields, then the issue's text as GitHub gets it. */
+.report-problem label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8125rem; }
+.report-problem label.check { flex-direction: row; align-items: center; gap: 6px; }
+.report-problem textarea {
+  font: inherit; color: inherit; padding: 5px 8px; resize: vertical;
+  border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground);
+}
+.report-problem p { margin: 0; }
+.report-problem .report-body {
+  margin: 0; max-height: 260px; overflow: auto; padding: 8px; font-size: 0.75rem; white-space: pre-wrap;
+  border: 1px solid var(--paper-rule); border-radius: var(--radius-control);
+}
+.report-problem .sheet-actions .spacer { flex: 1; }
+/* Move to Machine… (#3790): the machine, the folder there, and what goes. */
+.move-to-machine { width: min(460px, 86vw); }
+.move-to-machine label { display: flex; flex-direction: column; gap: 4px; font-size: 0.8125rem; }
+.move-to-machine select, .move-to-machine input[type=text] {
+  font: inherit; color: inherit; padding: 5px 8px;
+  border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground);
+}
+.move-to-machine p { margin: 0; }

@@ -1,0 +1,1 @@
+| Google Cloud (Compute Engine VM and Cloud KMS) for the control plane | control plane | tested on a real account | 2026-10-18, `up.sh` made the VM `agents-control`, the live control plane moved there and back (`specs/058-control-plane/walks/1461.md`) | `deploy/gcp/up.sh`, `deploy/gcp/down.sh`, `deploy/gcp/startup.sh` | |

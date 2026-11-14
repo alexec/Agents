@@ -30,7 +30,7 @@ var (
 	repoProperty = property{Name: "repo", Kind: "string",
 		Description: "The repository on Forgejo or Gitea, as owner/name. Left out, the repository this folder pushes to.",
 		Pattern:     repoPattern, LooksLike: "owner/name"}
-	prProperty = property{Name: "pr", Kind: "integer", Description: "Only this pull request, by number."}
+	prProperty = property{Name: "pr", Kind: "integers", Description: "Only this pull request, or these, by number."}
 	// anyoneProperty opts into anyone's issue, comment or pull request (#728); left out, only the repository's own people.
 	anyoneProperty = property{Name: "anyone", Kind: "boolean",
 		Description: "true: from anyone, bots, forks and people outside the repository too. Left out, only its collaborators with write access or more, never a bot, and for a pull request never one from a fork."}
@@ -119,6 +119,10 @@ var events = append([]event{
 		Description: "An open pull request began to conflict with its base branch, so it cannot merge until it is rebased. Once per conflict: it is raised again only after it merges cleanly and then conflicts anew." + ownPRs,
 		Input:       namedPRInput("Only the pull request from this branch."),
 		Payload:     object(map[string]any{"pr": prSchema(nil), "conflictedAt": str})},
+	{Name: "pr.blocked", Title: "Pull request blocked",
+		Description: mcpevents.BlockedDescription("On Forgejo: only conflict, from mergeable as pr.conflicted reads it; Forgejo's listing says nothing of required checks, changes requested or auto-merge."+ownPRs),
+		Input:       namedPRInput("Only the pull request from this branch."),
+		Payload:     mcpevents.BlockedPayload(prSchema(nil))},
 	// For the person, not the repository (#2034): what asks the token's owner for something.
 	{Name: "review.requested", Title: "Review requested from me",
 		Description: "The Forgejo account whose token this server has was asked to review an open pull request: once per request, so one taken off and put back is a new one. Anyone's pull request, a fork's too.",
@@ -273,6 +277,20 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			}
 			return out, nil
 		})
+	case "pr.blocked":
+		was := polls.CursorIDs(p)
+		return s.pollDiff(e.Name, "blockedAt", a, p, func() ([]state, error) {
+			prs, err := s.Forgejo.OpenPRs(ctx, a.repo)
+			var out []state
+			for _, m := range prs {
+				if m.SkipsBlocked || (a.mine && !a.byMe(m.PR, yours)) || (!a.mine && !a.anyone && !m.Trusted) {
+					continue
+				}
+				bs := mcpevents.Blocked(fmt.Sprintf("%s:%s:%d", e.Name, a.repo, m.PR.Number), m.blocking(), was)
+				out = append(out, state{mr: m.PR, on: &bs.On, key: bs.Key, json: m.PR.json(), extra: bs.Data})
+			}
+			return out, err
+		})
 	case "pr.conflicted":
 		return s.pollDiff(e.Name, "conflictedAt", a, p, func() ([]state, error) {
 			prs, err := s.Forgejo.OpenPRs(ctx, a.repo)
@@ -324,10 +342,14 @@ func contains(list []string, s string) bool { return slices.Contains(list, s) }
 
 // state is a pull request and whether its state (in conflict, or open and ready) is on now;
 // nil keeps the one it had.
+// key, when set, is part of its id and its envelope's key; extra is more of the event's data
+// (pr.blocked's, #5321).
 type state struct {
-	mr   PR
-	on   *bool
-	json map[string]any
+	mr    PR
+	on    *bool
+	json  map[string]any
+	key   string
+	extra map[string]any
 }
 
 // pollDiff raises an event for each pull request whose state is on now and was not at the
@@ -343,11 +365,19 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 		prs, err := states()
 		var out []mcpevents.State
 		for _, st := range prs {
-			if (a.pr != 0 && st.mr.Number != a.pr) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
+			if !a.wantsPR(st.mr.Number) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
 				continue
 			}
-			out = append(out, mcpevents.State{ID: fmt.Sprintf("%s:%s:%d", name, a.repo, st.mr.Number), Number: st.mr.Number,
-				On: st.on, Data: map[string]any{root: st.json}, Subject: diffRef(root, a.repo, st.mr.Number)})
+			id := fmt.Sprintf("%s:%s:%d", name, a.repo, st.mr.Number)
+			if st.key != "" {
+				id += ":" + st.key
+			}
+			data := map[string]any{root: st.json}
+			for k, v := range st.extra {
+				data[k] = v
+			}
+			out = append(out, mcpevents.State{ID: id, Number: st.mr.Number,
+				On: st.on, Data: data, Subject: diffRef(root, a.repo, st.mr.Number), Key: st.key})
 		}
 		return out, err
 	})
@@ -374,7 +404,7 @@ func candidates(ctx context.Context, f Forgejo, name string, a args, yours *Your
 	// mine: the owner's own pull request, trusted or not, open or not (#3797); else the
 	// trust filter (#728). fixes narrows either.
 	wanted := func(m PR, trusted bool) bool {
-		return (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) && a.closesOne(m) &&
+		return a.wantsPR(m.Number) && (a.branch == "" || m.Branch == a.branch) && a.closesOne(m) &&
 			(a.mine && a.byMe(m, yours) || !a.mine && (a.anyone || trusted))
 	}
 	if kind, ok := strings.CutPrefix(name, "issue."); ok {
@@ -408,7 +438,7 @@ func candidates(ctx context.Context, f Forgejo, name string, a args, yours *Your
 		var list []candidate
 		// Trust is about who commented; mine only narrows the pull request (#3797).
 		for _, c := range comments {
-			if at := mcpevents.Normalized(c.At); at != "" && (a.pr == 0 || c.PR.Number == a.pr) && (a.branch == "" || c.PR.Branch == a.branch) &&
+			if at := mcpevents.Normalized(c.At); at != "" && a.wantsPR(c.PR.Number) && (a.branch == "" || c.PR.Branch == a.branch) &&
 				a.closesOne(c.PR) && a.byMe(c.PR, yours) && (a.anyone || c.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d", repo, c.ID), Time: at,
 					Data:    func() (map[string]any, error) { return c.data(), nil },

@@ -436,6 +436,9 @@ func TestAWaitOnAServersEvent(t *testing.T) {
 	}{
 		{map[string]any{"events": "pr.merged", "where": map[string]any{"nope": 1}, "until_minutes": 5},
 			`ci's pr.merged takes pr, repo; "nope" is not one of its arguments. Nothing is waiting.`},
+		// A list for a key that takes one value says what to do instead (#5436).
+		{map[string]any{"events": "pr.merged", "where": map[string]any{"pr": []int{5, 6}}, "until_minutes": 5},
+			"ci's pr.merged: pr should be an integer. pr takes one value here, not a list: name one pr, or leave pr out and narrow the wait by another key it takes. Nothing is waiting."},
 		{map[string]any{"events": "pr.closed", "until_minutes": 5}, "No server here offers pr.closed. ci offers pr.merged."},
 		{map[string]any{"events": "pr.merged", "where": map[string]any{"server": "gh"}, "until_minutes": 5}, "gh is not an MCP server here. Servers here: ci."},
 	} {

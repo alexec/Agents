@@ -470,6 +470,32 @@ func (m mergeRequest) conflicts() *bool {
 	return new(m.HasConflicts)
 }
 
+// blocking is why it cannot merge until its author acts (#5321), as detailed_merge_status
+// says: one reason at a time, conflict first.
+func (m mergeRequest) blocking() mcpevents.Blocking {
+	b := mcpevents.Blocking{HeadSHA: m.SHA}
+	if c := m.conflicts(); c == nil {
+		b.Unknown = true
+	} else {
+		b.Conflict = *c
+	}
+	switch m.DetailedMergeStatus {
+	case "need_rebase":
+		b.Behind = true
+	case "ci_must_pass":
+		url := m.WebURL + "/pipelines"
+		if m.HeadPipeline != nil && m.HeadPipeline.WebURL != "" {
+			url = m.HeadPipeline.WebURL
+		}
+		b.FailedChecks = []mcpevents.FailedCheck{{Name: "pipeline", URL: url}}
+	case "ci_still_running":
+		b.ChecksRunning = true
+	case "requested_changes":
+		b.ChangesRequested = true
+	}
+	return b
+}
+
 func (m mergeRequest) mergeSHA() string {
 	for _, sha := range []string{m.MergeCommitSHA, m.SquashCommitSHA, m.SHA} {
 		if sha != "" {
@@ -575,7 +601,8 @@ func (g *RealGitLab) OpenMRs(ctx context.Context, project string) ([]OpenMR, err
 			if err != nil {
 				return nil, err
 			}
-			out = append(out, OpenMR{MR: m.mr(), Author: m.Author.Username, Draft: m.draft(), Conflicts: m.conflicts(), Trusted: trusted})
+			out = append(out, OpenMR{MR: m.mr(), Author: m.Author.Username, Draft: m.draft(), Conflicts: m.conflicts(), Trusted: trusted,
+				Blocking: m.blocking(), SkipsBlocked: mcpevents.SkipsBlocked(m.draft(), m.Labels)})
 		}
 		if len(list) < perPage {
 			break

@@ -166,6 +166,7 @@ var namedEvents = map[string]struct {
 	"pr.merged":       {"PR", "every PR in the repo", prNamingKeys},
 	"pr.closed":       {"PR", "every PR in the repo", prNamingKeys},
 	"pr.conflicted":   {"PR", "every PR in the repo", prNamingKeys},
+	"pr.blocked":      {"PR", "every PR in the repo", prNamingKeys},
 	"pr.commented":    {"PR", "every PR in the repo", prNamingKeys},
 	"pr.reviewed":     {"PR", "every PR in the repo", prNamingKeys},
 	"pr.labelled":     {"PR", "every PR in the repo", prNamingKeys},
@@ -219,6 +220,31 @@ func propertiesOf(schema json.RawMessage) map[string]bool {
 	out := map[string]bool{}
 	for k := range s.Properties {
 		out[k] = true
+	}
+	return out
+}
+
+// oneValueWords says what to do instead when a where key that takes one value was given a
+// list (#5436), so the next try works: name one, or leave the key out and narrow the wait by
+// another key the event takes, as fixes or branch.
+func oneValueWords(given map[string][]string, schema json.RawMessage) string {
+	var s struct {
+		Properties map[string]struct {
+			Type json.RawMessage `json:"type"`
+		} `json:"properties"`
+	}
+	json.Unmarshal(schema, &s)
+	var keys []string
+	for k, vs := range given {
+		p, ok := s.Properties[k]
+		if len(vs) > 1 && ok && !strings.Contains(string(p.Type), `"array"`) {
+			keys = append(keys, k)
+		}
+	}
+	sort.Strings(keys)
+	var out string
+	for _, k := range keys {
+		out += " " + k + " takes one value here, not a list: name one " + k + ", or leave " + k + " out and narrow the wait by another key it takes."
 	}
 	return out
 }
@@ -359,7 +385,7 @@ func (d *Daemon) checkMCPWait(names []string, filters map[string][]string, folde
 				typed := mcpWaitArguments(own, def.InputSchema)
 				if len(def.InputSchema) > 0 {
 					if p := jsonSchemaProblem(mustRaw(typed), def.InputSchema, server+"'s "+def.Name); p != "" {
-						problems = append(problems, p)
+						problems = append(problems, p+oneValueWords(own, def.InputSchema))
 						continue
 					}
 				}
