@@ -11101,6 +11101,7 @@ export interface QueuedStart {
   runtimeID?: string;
   permissionMode?: string;
   model?: string;
+  effort?: string;
   worktree?: WorktreeChoice;
   labels: string[];
 }
@@ -17387,7 +17388,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ProviderWorkspaceRequest: { required: ["id", "workspace"], optional: [] },
   PushToken: { required: ["environment"], optional: ["token"] },
   QueuedPrompt: { required: ["id", "text", "attachments", "queuedAt", "from"], optional: ["preface", "sender"] },
-  QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "worktree"] },
+  QueuedStart: { required: ["labels"], optional: ["runtimeID", "permissionMode", "model", "effort", "worktree"] },
   QuickAnswer: { required: ["kind", "id", "title", "isDestructive"], optional: ["field"] },
   QuitRequest: { required: ["stopAgents"], optional: [] },
   RateLimitInfo: { required: [], optional: ["status", "resetsAt", "rateLimitType", "utilization", "overageStatus", "overageResetsAt", "isUsingOverage", "overageInUse", "overageDisabledReason"] },

@@ -287,8 +287,12 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 	if err != nil {
 		return "", err
 	}
+	effort := strings.TrimSpace(argString(args, "effort"))
 	mode := inheritedMode(me, runtimeID)
 	if runtimeID == autoRuntimeID {
+		if effort != "" {
+			return "", Invalid("Nothing was started: on Auto the effort follows the model's level (fast, balanced or smart), so name no effort, or name a runtime.")
+		}
 		return d.startAutoHelper(me, args, prompt, model, labels)
 	}
 	if wanted := strings.TrimSpace(argString(args, "permission_mode")); wanted != "" {
@@ -306,9 +310,16 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 	if rt == nil {
 		return "", Invalid("Nothing was started: there is no runtime called \"%s\" — this version knows %s.", runtimeID, knownRuntimes())
 	}
+	var effortID string
+	if effort != "" {
+		var why string
+		if effortID, effort, why = d.helperEffort(runtimeID, effort); why != "" {
+			return "", Invalid("Nothing was started: %s", why)
+		}
+	}
 	// Another machine has runtimes, folders and limits of its own (#2887).
 	if onMachine(args) != "" {
-		return d.startOnMachine(me, args, helperRequest(runtimeID, "", prompt, model, mode, nil, labels))
+		return d.startOnMachine(me, args, withEffort(helperRequest(runtimeID, "", prompt, model, mode, nil, labels), effortID, effort))
 	}
 	if why := d.unavailableRuntime(rt); why != "" {
 		return "", Invalid("Nothing was started: %s.", why)
@@ -321,7 +332,7 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 	}
 	d.countProject(folder)
 	if full, busy := d.helperHold(folder); full != "" || busy != "" || len(d.helperQueue(folder)) > 0 {
-		return d.queueHelper(me, prompt, runtimeID, model, mode, worktree, labels, full, busy)
+		return d.queueHelper(me, prompt, runtimeID, model, effort, mode, worktree, labels, full, busy)
 	}
 	scope := limitScope(folder)
 	d.queueMu.Lock()
@@ -335,7 +346,8 @@ func (d *Daemon) startSession(caller wire.UUID, args map[string]json.RawMessage)
 		d.reservedHelpers[scope]--
 		d.queueMu.Unlock()
 	}()
-	id, err := d.startFor(helperRequest(runtimeID, folder, prompt, model, mode, worktree, labels), startedBy{agent: &caller, owner: wire.SessionLabelOwnerAgent})
+	id, err := d.startFor(withEffort(helperRequest(runtimeID, folder, prompt, model, mode, worktree, labels), effortID, effort),
+		startedBy{agent: &caller, owner: wire.SessionLabelOwnerAgent})
 	if err != nil {
 		code, msg := errMessage(err)
 		return "", &Error{Code: code, Message: "Nothing was started: " + msg}
@@ -375,8 +387,55 @@ func helperRequest(runtimeID, folder, prompt, model string, mode *string, worktr
 		McpServers: []wire.MCPServer{}, Worktree: worktree, Labels: labels, Levels: levels}
 }
 
+// helperEffort is start_session's effort (#5441) as the runtime's effort option takes it:
+// the option's id and the value, matched by value or by name as the start form shows them,
+// or why it is refused. With nothing offered yet on this machine, the word is taken as
+// written, under the option Auto's table knows for the runtime, as offeredMode does.
+func (d *Daemon) helperEffort(runtimeID, effort string) (id, value, why string) {
+	name := runtimeName(runtimeID)
+	offers := d.runtimeOffers(runtimeID)
+	id = effortOptionID(offers)
+	if id == "" {
+		if len(offers) == 0 {
+			if id = knownEffortOptionID(runtimeID); id != "" {
+				return id, effort, ""
+			}
+		}
+		return "", "", name + " offers no effort to choose, so name none."
+	}
+	choices, _ := optionChoices(offers, id)
+	values := make([]string, 0, len(choices))
+	for _, c := range choices {
+		if strings.EqualFold(c.Value, effort) || strings.EqualFold(c.Name, effort) {
+			return id, c.Value, ""
+		}
+		values = append(values, c.Value)
+	}
+	return "", "", name + " does not offer the effort " + effort + ". It offers: " + strings.Join(values, ", ") + "."
+}
+
+// knownEffortOptionID is the effort option's id in Auto's model table, or "".
+func knownEffortOptionID(runtimeID string) string {
+	for _, cell := range autoModels[runtimeID] {
+		for k := range cell.options {
+			if strings.Contains(k, "effort") {
+				return k
+			}
+		}
+	}
+	return ""
+}
+
+// withEffort is r with the effort set, when there is one.
+func withEffort(r wire.StartRequest, id, value string) wire.StartRequest {
+	if id != "" && value != "" {
+		r.StartOptions.Values[id] = jsonString(value)
+	}
+	return r
+}
+
 // queueHelper is queueHelper: a queued record, started by itself when there is a place.
-func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string, mode *string, worktree *wire.WorktreeChoice,
+func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model, effort string, mode *string, worktree *wire.WorktreeChoice,
 	labels []string, full, busy string) (string, error) {
 	folder := folderPath(caller)
 	// why is the whole reason it waits: the machine first, then the places.
@@ -424,6 +483,9 @@ func (d *Daemon) queueHelper(caller *wire.Agent, prompt, runtimeID, model string
 		QueuedStart:   &wire.QueuedStart{RuntimeID: &rt, PermissionMode: mode, Worktree: worktree, Labels: labels}}
 	if model != "" {
 		a.QueuedStart.Model = &model
+	}
+	if effort != "" {
+		a.QueuedStart.Effort = &effort
 	}
 	if a.QueuedStart.Labels == nil {
 		a.QueuedStart.Labels = []string{}
@@ -587,7 +649,18 @@ func (d *Daemon) startQueued(q wire.Agent, folder string) {
 	r := helperRequest(runtimeID, folderPath(&q), prompt, model, s.PermissionMode, s.Worktree, nil)
 	reuse := q
 	reuse.QueuedPrompts = nil
-	if _, err := d.startFor(r, startedBy{agent: q.StartedByAgent, owner: wire.SessionLabelOwnerAgent, queued: &reuse}); err != nil {
+	var err error
+	if s.Effort != nil && *s.Effort != "" {
+		id, value, why := d.helperEffort(runtimeID, *s.Effort)
+		if why != "" {
+			err = Invalid("%s", why)
+		}
+		r = withEffort(r, id, value)
+	}
+	if err == nil {
+		_, err = d.startFor(r, startedBy{agent: q.StartedByAgent, owner: wire.SessionLabelOwnerAgent, queued: &reuse})
+	}
+	if err != nil {
 		_, why := errMessage(err)
 		if a := d.Store.Agent(q.ID); a != nil && a.State == wire.AgentStateQueued {
 			d.record(q.ID, runtimeNote("It could not start from the queue: "+why))
@@ -745,7 +818,7 @@ func (d *Daemon) startAutoHelper(me *wire.Agent, args map[string]json.RawMessage
 		if levels.Model != nil {
 			m = string(*levels.Model)
 		}
-		return d.queueHelper(me, prompt, autoRuntimeID, m, &w, worktree, labels, full, busy)
+		return d.queueHelper(me, prompt, autoRuntimeID, m, "", &w, worktree, labels, full, busy)
 	}
 	r := helperRequest(autoRuntimeID, folder, prompt, "", nil, worktree, labels)
 	r.Levels = levels

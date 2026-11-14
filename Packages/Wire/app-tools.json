@@ -424,6 +424,10 @@
           "description": "Why you are making this call, in one short sentence for the person.",
           "type": "string"
         },
+        "effort": {
+          "description": "Optional. The effort, as a workflow's `effort:`: one of the values or names the start form offers for that runtime (such as low, medium or high). One the runtime does not offer is refused, naming the ones it does. Leave out for the model's usual effort. On Auto the effort follows the model's level, so name none.",
+          "type": "string"
+        },
         "folder": {
           "description": "With machine: the folder to work in on that machine, as an absolute path. Leave it out for this project's folder there.",
           "type": "string"
