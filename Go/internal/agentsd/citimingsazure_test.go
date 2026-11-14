@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/azuredevopsmcp"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/azuredevopsmcp"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // ciFakeAzure is an Azure DevOps with three finished builds: one on main whose job was run
