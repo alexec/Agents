@@ -116,7 +116,7 @@ final class AppModel {
     var machineJoins: [String: MachineJoin] = [:]
     /// How many New Machine calls wait for the provider's answer (#4610): a *Making…* row
     /// each, until the control plane lists the machine as joining.
-    private(set) var machinesBeingMade = 0
+    var machinesBeingMade = 0
     /// Goes up on each `control/lineageChanged` (#4276): Work ▸ Timeline reads the sessions again.
     private(set) var lineageChanges = 0
     /// A runtime of this Mac's that refused for want of a sign-in: the window answers
@@ -1285,7 +1285,7 @@ final class AppModel {
     /// The settings and secrets that follow the person to their machines (#1760).
     let userScope = UserScopeState()
     /// Hosts whose Start was pressed here and not answered yet.
-    private(set) var hostsBeingStarted: Set<MachineRef> = []
+    var hostsBeingStarted: Set<MachineRef> = []
     /// Prompts and starts the control plane keeps for stopped workspaces (#691 US3), every host's.
     var kept: [DaemonAPI.KeptRequest] = []
     /// The kept starts the New Agent prompt has shown here: the one that reaches its host opens.
@@ -3699,7 +3699,7 @@ final class AppModel {
     /// This Mac's host as the control plane last listed it (#1481): reached at launch over
     /// its local socket, before the list comes, so its agents work with the control plane
     /// away. Tried again while the control plane stays away, until it answers.
-    private func reachKeptHost(_ controlLink: ControlLink) async {
+    func reachKeptHost(_ controlLink: ControlLink) async {
         guard !controlPlaneListed, let kept = keptHost else { return }
         if let server = controlHosts[kept.id], await server.isConnected { return }
         if hosts.controlled[kept.id] == nil {
