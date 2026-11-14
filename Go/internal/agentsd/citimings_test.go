@@ -140,7 +140,7 @@ func TestCITimingsReadAndAnswer(t *testing.T) {
 		t.Fatalf("attempt 2: %+v %v", second, err)
 	}
 
-	other, err := d.buildsHistory(wire.BuildsHistoryRequest{Repo: "bitbucket:group/project",
+	other, err := d.buildsHistory(wire.BuildsHistoryRequest{Repo: "forgejo:group/project",
 		From: wire.DateOf(now.Add(-time.Hour)), To: wire.DateOf(now)})
 	if err != nil || other.Reader != "none" {
 		t.Fatalf("a forge with no reader: %+v %v", other, err)
@@ -362,5 +362,132 @@ func TestCITimingsSyncSendsWhatChanged(t *testing.T) {
 	defer mu.Unlock()
 	if len(sent) != 1 || len(sent[0].Days) != 1 || sent[0].Days[0].Day != days[0] {
 		t.Fatalf("after a restart %+v", sent)
+	}
+}
+
+// A fake Bitbucket with three completed pipelines: one on main run again by "Rerun failed
+// steps" (run 2), one for a pull request with its steps on two pages, and one on main older
+// than the store keeps.
+func TestCITimingsBitbucket(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	at := func(d time.Duration) string { return now.Add(d).UTC().Format(time.RFC3339) }
+	var srv *httptest.Server
+	repo := "/2.0/repositories/team/app"
+	mux := http.NewServeMux()
+	mux.HandleFunc(repo, func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer test" {
+			t.Errorf("auth %q", r.Header.Get("Authorization"))
+		}
+		fmt.Fprint(w, `{"mainbranch":{"name":"main"}}`)
+	})
+	var lists atomic.Int32
+	mux.HandleFunc(repo+"/pipelines/", func(w http.ResponseWriter, r *http.Request) {
+		lists.Add(1)
+		q := r.URL.Query()
+		if q.Get("status") != "COMPLETED" || q.Get("sort") != "-created_on" {
+			t.Errorf("listed %s", r.URL.RawQuery)
+		}
+		if q.Get("page") != "1" {
+			fmt.Fprint(w, `{"values":[]}`)
+			return
+		}
+		fmt.Fprintf(w, `{"values":[
+		 {"uuid":"{a}","build_number":41,"run_number":2,"created_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"SUCCESSFUL"}},
+		  "target":{"type":"pipeline_ref_target","ref_type":"branch","ref_name":"main","commit":{"hash":"aaa"},"selector":{"type":"branches","pattern":"main"}},"trigger":{"name":"PUSH"}},
+		 {"uuid":"{b}","build_number":42,"created_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"FAILED"}},
+		  "target":{"type":"pipeline_pullrequest_target","source":"feature","destination":"main","commit":{"hash":"bbb"},"selector":{"type":"pull-requests","pattern":"**"},"pullrequest":{"id":9}},"trigger":{"name":"PUSH"}},
+		 {"uuid":"{c}","build_number":7,"created_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"SUCCESSFUL"}},
+		  "target":{"type":"pipeline_ref_target","ref_type":"branch","ref_name":"main","selector":{"type":"default"}},"trigger":{"name":"PUSH"}}]}`,
+			at(-2*time.Hour), at(-time.Hour), at(-30*time.Minute), at(-20*time.Minute), at(-100*24*time.Hour), at(-100*24*time.Hour))
+	})
+	mux.HandleFunc(repo+"/pipelines/41/steps/", func(w http.ResponseWriter, _ *http.Request) {
+		base := -2 * time.Hour
+		fmt.Fprintf(w, `{"values":[
+		 {"name":"Build","run_number":1,"started_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"SUCCESSFUL"}}},
+		 {"name":"Test","run_number":1,"started_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"FAILED"}}},
+		 {"name":"Test","run_number":2,"started_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"SUCCESSFUL"}},"runs_on":["self.hosted","linux"]}]}`,
+			at(base+30*time.Second), at(base+2*time.Minute), at(base+2*time.Minute), at(base+5*time.Minute), at(base+40*time.Minute), at(base+45*time.Minute))
+	})
+	mux.HandleFunc(repo+"/pipelines/42/steps/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("page") == "2" {
+			fmt.Fprintf(w, `{"values":[{"name":"Deploy","state":{"name":"COMPLETED","result":{"name":"NOT_RUN"}},"completed_on":%q}]}`, at(-20*time.Minute))
+			return
+		}
+		fmt.Fprintf(w, `{"values":[{"name":"Test","started_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"FAILED"}}}],"next":%q}`,
+			at(-29*time.Minute), at(-21*time.Minute), srv.URL+repo+"/pipelines/42/steps/?pagelen=100&page=2")
+	})
+	mux.HandleFunc(repo+"/pipelines/7/steps/", func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("read the steps of a pipeline older than the store keeps")
+	})
+	srv = httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	d, err := New(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.ciBitbucketAPI = srv.URL + "/2.0/"
+	h := ciRepoHere{forgeRepo{"bitbucket", "team/app"}, t.TempDir()}
+	if err := d.readCIRepo(context.Background(), h); err != nil {
+		t.Fatal(err)
+	}
+	hist, err := d.buildsHistory(wire.BuildsHistoryRequest{Repo: "bitbucket:team/app",
+		From: wire.DateOf(now.Add(-24 * time.Hour)), To: wire.DateOf(now.Add(time.Hour))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hist.Reader != "bitbucket" || hist.DefaultBranch == nil || *hist.DefaultBranch != "main" || hist.ReadAt == nil {
+		t.Fatalf("history %+v", hist)
+	}
+	// Main's first run failed its Test step; the second is a rerun of it.
+	if hist.Total.Runs != 1 || hist.Total.Reruns != 1 || hist.Total.Green != 0 {
+		t.Fatalf("total %+v", hist.Total)
+	}
+	main, err := d.buildsRun(wire.BuildsRunRequest{Repo: "bitbucket:team/app", Ref: "bitbucket:run:team/app#41", Attempt: new(int64(2))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Run 2 is its rerun steps only; its runner is the first runs-on label.
+	if main.Attempts != 2 || *main.Run.Conclusion != "success" {
+		t.Fatalf("pipeline 41's attempts %+v", main)
+	}
+	if r := main.Run; r.Default == nil || !*r.Default || len(r.Jobs) != 1 || r.Jobs[0].Name != "Test" || r.Jobs[0].Runner == nil ||
+		*r.Jobs[0].Runner != "self.hosted" || r.Started != 2400 || r.Ended != 3600 || r.URL == nil ||
+		*r.URL != "https://bitbucket.org/team/app/pipelines/results/41" || r.Workflow != "main" {
+		t.Fatalf("pipeline 41 %+v", r)
+	}
+	first, err := d.buildsRun(wire.BuildsRunRequest{Repo: "bitbucket:team/app", Ref: "bitbucket:run:team/app#41"})
+	if err != nil || len(first.Run.Jobs) != 2 || *first.Run.Conclusion != "failure" || first.Run.Started != 30 || first.Run.Ended != 300 {
+		t.Fatalf("pipeline 41, run 1 %+v %v", first.Run, err)
+	}
+	pr, err := d.buildsRun(wire.BuildsRunRequest{Repo: "bitbucket:team/app", Ref: "bitbucket:run:team/app#42"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := pr.Run; r.Pr == nil || *r.Pr != 9 || r.Default != nil || len(r.Jobs) != 2 || *r.Conclusion != "failure" ||
+		*r.Jobs[1].Conclusion != "skipped" || r.Jobs[0].Made != 60 || r.Jobs[0].Ended != 540 {
+		t.Fatalf("pipeline 42 %+v", r)
+	}
+	d.ciMu.Lock()
+	st := *d.ciFileLocked().Repos["bitbucket:team/app"]
+	calls := d.ciFileLocked().BitbucketCalls
+	d.ciMu.Unlock()
+	if !st.Filled || st.FilledFrom == nil || st.BackfillPage != 1 {
+		t.Fatalf("backfill %+v", st)
+	}
+	// The repository, the list twice (live, backfill), and 41's one and 42's two pages of steps.
+	if calls != 6 {
+		t.Fatalf("%d Bitbucket calls", calls)
+	}
+
+	// A second read keeps what it has: no steps again.
+	if err := d.readCIRepo(context.Background(), h); err != nil {
+		t.Fatal(err)
+	}
+	d.ciMu.Lock()
+	again := d.ciFileLocked().BitbucketCalls
+	d.ciMu.Unlock()
+	if again != calls+1 {
+		t.Fatalf("%d Bitbucket calls after a second read", again)
 	}
 }

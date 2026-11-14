@@ -39,9 +39,9 @@ func ReadHistoryAsk(r wire.BuildsHistoryRequest) (HistoryAsk, error) {
 }
 
 // Reads says a machine reads CI timings from forge (GitHub #5177, GitLab #5221, Azure DevOps
-// #5222), so the history of its repositories has a reader.
+// #5222, Bitbucket #5223), so the history of its repositories has a reader.
 func Reads(forge string) bool {
-	return forge == "github" || forge == "gitlab" || forge == "azuredevops"
+	return forge == "github" || forge == "gitlab" || forge == "azuredevops" || forge == "bitbucket"
 }
 
 // EmptyHistory is the answer for a repository with no runs: reader none, as for a forge

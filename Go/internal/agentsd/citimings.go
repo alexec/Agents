@@ -42,6 +42,8 @@ import (
 // run.completed subscription, because an event reaches the daemon only when a workflow or a
 // wait subscribes to it. An event still makes the next read sooner. Alex can overrule.
 //
+// Bitbucket Pipelines are read the same way (citimings_bitbucket.go, #5223).
+//
 // The control plane keeps a copy (#5232, cisync.go): each day of runs that changes goes to it
 // a few seconds later (builds/sync), and it answers builds/historyAll and builds/runAll from
 // it while this machine sleeps.
@@ -80,9 +82,10 @@ type ciTimingsBook struct {
 	// found at a generation.
 	ciGen     map[string]int
 	ciChanges map[string]ciChangesFound
-	// ciAPI is GitHub's API; "" is api.github.com. A test sets it. ciGitLabAPI is the same for
-	// GitLab's root, with no connection needed.
-	ciAPI, ciGitLabAPI string
+	// ciAPI is GitHub's API; "" is api.github.com. A test sets it. ciGitLabAPI and
+	// ciBitbucketAPI are the same for GitLab's root and Bitbucket's API, with no connection
+	// needed.
+	ciAPI, ciGitLabAPI, ciBitbucketAPI string
 }
 
 type ciChangesFound struct {
@@ -100,6 +103,8 @@ type ciTimingsFile struct {
 	Limit int       `json:"limit,omitempty"`
 	// AzureDevOpsCalls counts Azure DevOps's calls this hour apart (citimingsazure.go).
 	AzureDevOpsCalls int `json:"azureDevOpsCalls,omitempty"`
+	// BitbucketCalls is the Bitbucket calls made this hour, which Bitbucket bounds apart.
+	BitbucketCalls int `json:"bitbucketCalls,omitempty"`
 }
 
 type ciRepoState struct {
@@ -112,7 +117,9 @@ type ciRepoState struct {
 	BackfillTo time.Time  `json:"backfillTo"`
 	FilledFrom *time.Time `json:"filledFrom,omitempty"`
 	Filled     bool       `json:"filled,omitempty"`
-	SweptAt    time.Time  `json:"sweptAt"`
+	// BackfillPage is the last page of a paged list the backfill read (Bitbucket's).
+	BackfillPage int       `json:"backfillPage,omitempty"`
+	SweptAt      time.Time `json:"sweptAt"`
 	// Slowed is each change ci.slowed was sent for, by its id (#5200, cislowed.go).
 	Slowed map[string]ciSlowedSent `json:"slowed,omitempty"`
 }
@@ -196,11 +203,13 @@ type ciRepoHere struct {
 	folder string
 }
 
-// ciReposHere is the GitHub, GitLab and Azure DevOps repositories the folders push to, at most
-// ciMostRepos. A GitLab one counts when the person's GitLab connection is on its root.
+// ciReposHere is the GitHub, GitLab, Azure DevOps and Bitbucket repositories the folders push
+// to, at most ciMostRepos. A GitLab one counts when the person's GitLab connection is on its
+// root, a Bitbucket one when this machine has a Bitbucket token.
 func (d *Daemon) ciReposHere(ctx context.Context) []ciRepoHere {
 	seen := map[string]bool{}
 	var out []ciRepoHere
+	_, bitbucketToken, _ := d.ciBitbucketAuth()
 	for _, f := range d.folderPaths() {
 		r := d.folderRepo(f)
 		if r.forge == "gitlab" {
@@ -210,7 +219,7 @@ func (d *Daemon) ciReposHere(ctx context.Context) []ciRepoHere {
 				continue
 			}
 		}
-		if !ciReads(r.forge) || seen[r.forge+":"+r.path] || len(out) >= ciMostRepos {
+		if !ciReads(r.forge) || r.forge == "bitbucket" && bitbucketToken == "" || seen[r.forge+":"+r.path] || len(out) >= ciMostRepos {
 			continue
 		}
 		seen[r.forge+":"+r.path] = true
@@ -309,8 +318,15 @@ func (d *Daemon) ciDefaultBranch(ctx context.Context, h ciRepoHere, key string) 
 	}
 	var repo struct {
 		DefaultBranch string `json:"default_branch"`
+		// MainBranch is Bitbucket's.
+		MainBranch struct {
+			Name string `json:"name"`
+		} `json:"mainbranch"`
 	}
-	if err := json.Unmarshal(raw, &repo); err != nil || repo.DefaultBranch == "" {
+	if json.Unmarshal(raw, &repo) == nil && repo.DefaultBranch == "" {
+		repo.DefaultBranch = repo.MainBranch.Name
+	}
+	if repo.DefaultBranch == "" {
 		return "", fmt.Errorf("%s did not say the default branch", ciForgeName(h))
 	}
 	d.ciMu.Lock()
@@ -324,6 +340,9 @@ func (d *Daemon) ciDefaultBranch(ctx context.Context, h ciRepoHere, key string) 
 
 // ciLive reads the newest finished runs, until a page has nothing new.
 func (d *Daemon) ciLive(ctx context.Context, h ciRepoHere, key, def string) error {
+	if h.repo.forge == "bitbucket" {
+		return d.ciBitbucketLive(ctx, h, key, def)
+	}
 	for page := 1; page <= ciLivePages; page++ {
 		listed, added, err := d.ciPage(ctx, h, def, page, nil, nowFunc())
 		if err != nil {
@@ -344,6 +363,9 @@ func (d *Daemon) ciLive(ctx context.Context, h ciRepoHere, key, def string) erro
 
 // ciBackfill reads older windows while the hour's budget lasts.
 func (d *Daemon) ciBackfill(ctx context.Context, h ciRepoHere, key, def string) error {
+	if h.repo.forge == "bitbucket" {
+		return d.ciBitbucketBackfill(ctx, h, key, def)
+	}
 	for ctx.Err() == nil && d.ciBudgetLeft() {
 		d.ciMu.Lock()
 		st := d.ciRepoLocked(key)
@@ -561,8 +583,11 @@ func (d *Daemon) ciGet(ctx context.Context, h ciRepoHere, path string) ([]byte, 
 	d.ciHourLocked(f)
 	f.Calls++
 	d.ciMu.Unlock()
-	if h.repo.forge == "gitlab" {
+	switch h.repo.forge {
+	case "gitlab":
 		return d.ciGetGitLab(ctx, h, path)
+	case "bitbucket":
+		return d.ciGetBitbucket(ctx, path)
 	}
 	owner, _, _ := strings.Cut(h.repo.path, "/")
 	token, _ := d.githubTokenFor(ctx, owner)
@@ -643,8 +668,11 @@ func (d *Daemon) ciGetGitLab(ctx context.Context, h ciRepoHere, path string) ([]
 
 // ciRepoPath is the path of the repository itself.
 func (d *Daemon) ciRepoPath(h ciRepoHere) string {
-	if h.repo.forge == "gitlab" {
+	switch h.repo.forge {
+	case "gitlab":
 		return "projects/" + ciGitLabID(h)
+	case "bitbucket":
+		return ciBitbucketPath(h, "")
 	}
 	return "repos/" + h.repo.path
 }
@@ -655,8 +683,11 @@ func ciGitLabID(h ciRepoHere) string {
 }
 
 func ciForgeName(h ciRepoHere) string {
-	if h.repo.forge == "gitlab" {
+	switch h.repo.forge {
+	case "gitlab":
 		return "GitLab"
+	case "bitbucket":
+		return "Bitbucket"
 	}
 	return "GitHub"
 }
