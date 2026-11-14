@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="640" viewBox="0 0 1240 640" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+<defs><filter id="shadow" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.18"/></filter></defs>
+<rect width="1240" height="640" fill="#E7EAEE"/>
+<text x="24.0" y="34.0" font-size="15" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">4 · Option: a Deploys page, every component in every environment (Work ▸ Deploys)</text>
+<text x="24.0" y="54.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">A new screen, so it is Alex's to choose (spec, 'Questions for Alex', 1). Each cell is a target: its live version, since when, and what goes next.</text>
+<text x="24.0" y="70.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">Real: the four targets and their versions now. Shown on the web page; the Mac window would be the same, a row in the Work group.</text>
+<g filter="url(#shadow)"><rect x="24" y="96" width="1192" height="520" rx="8" fill="#F7F8F9"/></g>
+<rect x="24.0" y="96.0" width="1192.0" height="44.0" rx="8" fill="#FFFFFF"/>
+<path d="M24.0 140.0L1216.0 140.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="48.0" y="124.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Overview</text>
+<text x="129.6" y="124.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Agents</text>
+<text x="196.8" y="124.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">Work</text>
+<rect x="194.8" y="137.0" width="32.8" height="2.0" rx="0" fill="#0A6CDB"/>
+<text x="249.6" y="124.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Docs</text>
+<text x="302.4" y="124.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Messages</text>
+<text x="384.0" y="124.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Machines</text>
+<text x="465.6" y="124.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Workflows</text>
+<text x="554.4" y="124.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Reports</text>
+<text x="628.8" y="124.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Requests</text>
+<text x="710.4" y="124.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">People</text>
+<text x="777.6" y="124.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Settings</text>
+<text x="48.0" y="178.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Work</text>
+<text x="48.0" y="202.0" font-size="13" fill="#1C1D20" font-variant-numeric="tabular-nums">Issues</text>
+<text x="48.0" y="226.0" font-size="13" fill="#1C1D20" font-variant-numeric="tabular-nums">Pull requests</text>
+<text x="48.0" y="250.0" font-size="13" fill="#1C1D20" font-variant-numeric="tabular-nums">Features</text>
+<text x="48.0" y="274.0" font-size="13" fill="#1C1D20" font-variant-numeric="tabular-nums">Releases</text>
+<rect x="40.0" y="282.0" width="176.0" height="26.0" rx="6" fill="#EEF0F3"/>
+<text x="48.0" y="298.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">Deploys</text>
+<path d="M234.0 140.0L234.0 616.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="264.0" y="176.0" font-size="20" fill="#1C1D20" font-weight="700" font-variant-numeric="tabular-nums">Deploys</text>
+<text x="264.0" y="198.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">Last update 72 min ago</text>
+<circle cx="454.0" cy="194.0" r="9" fill="#B35900"/>
+<text x="454.0" y="198.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle" font-variant-numeric="tabular-nums">15</text>
+<text x="404.0" y="236.0" font-size="12" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">testflight</text>
+<text x="604.0" y="236.0" font-size="12" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">app-store</text>
+<rect x="604.0" y="241.0" width="74.0" height="18.0" rx="9.0" fill="#EEE8F8"/>
+<text x="641.0" y="254.0" font-size="10" fill="#5B3FA0" font-weight="600" text-anchor="middle" font-variant-numeric="tabular-nums">production</text>
+<text x="804.0" y="236.0" font-size="12" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">github-releases</text>
+<rect x="804.0" y="241.0" width="74.0" height="18.0" rx="9.0" fill="#EEE8F8"/>
+<text x="841.0" y="254.0" font-size="10" fill="#5B3FA0" font-weight="600" text-anchor="middle" font-variant-numeric="tabular-nums">production</text>
+<text x="1004.0" y="236.0" font-size="12" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">github-pages</text>
+<rect x="1004.0" y="241.0" width="74.0" height="18.0" rx="9.0" fill="#EEE8F8"/>
+<text x="1041.0" y="254.0" font-size="10" fill="#5B3FA0" font-weight="600" text-anchor="middle" font-variant-numeric="tabular-nums">production</text>
+<circle cx="1184.0" cy="232.0" r="9" fill="#B35900"/>
+<text x="1184.0" y="236.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle" font-variant-numeric="tabular-nums">16</text>
+<path d="M264.0 270.0L1204.0 270.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="264.0" y="300.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">Remote</text>
+<rect x="396.0" y="278.0" width="184.0" height="64.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="408.0" y="300.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">v0.18.0</text>
+<rect x="534.0" y="284.0" width="40.4" height="19.0" rx="9.5" fill="#E3F4E8"/>
+<text x="554.2" y="298.0" font-size="11" fill="#1A7F37" font-weight="600" text-anchor="middle" font-variant-numeric="tabular-nums">Live</text>
+<text x="408.0" y="318.0" font-size="11" fill="#5B616B" font-variant-numeric="tabular-nums">since 8 Nov, 10:51</text>
+<rect x="596.0" y="278.0" width="184.0" height="64.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="608.0" y="300.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">v0.18.0</text>
+<rect x="734.0" y="284.0" width="40.4" height="19.0" rx="9.5" fill="#E3F4E8"/>
+<text x="754.2" y="298.0" font-size="11" fill="#1A7F37" font-weight="600" text-anchor="middle" font-variant-numeric="tabular-nums">Live</text>
+<text x="608.0" y="318.0" font-size="11" fill="#5B616B" font-variant-numeric="tabular-nums">since 8 Nov, 10:52</text>
+<text x="608.0" y="334.0" font-size="11" fill="#8A9099" font-variant-numeric="tabular-nums">next: none waiting</text>
+<text x="804.0" y="300.0" font-size="13" fill="#8A9099" font-variant-numeric="tabular-nums">–</text>
+<text x="1004.0" y="300.0" font-size="13" fill="#8A9099" font-variant-numeric="tabular-nums">–</text>
+<path d="M264.0 356.0L1204.0 356.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="264.0" y="386.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">Mac app</text>
+<text x="404.0" y="386.0" font-size="13" fill="#8A9099" font-variant-numeric="tabular-nums">–</text>
+<text x="604.0" y="386.0" font-size="13" fill="#8A9099" font-variant-numeric="tabular-nums">–</text>
+<rect x="796.0" y="364.0" width="184.0" height="64.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="808.0" y="386.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">v0.18.0</text>
+<rect x="934.0" y="370.0" width="40.4" height="19.0" rx="9.5" fill="#E3F4E8"/>
+<text x="954.2" y="384.0" font-size="11" fill="#1A7F37" font-weight="600" text-anchor="middle" font-variant-numeric="tabular-nums">Live</text>
+<text x="808.0" y="404.0" font-size="11" fill="#5B616B" font-variant-numeric="tabular-nums">since 8 Nov, 10:16</text>
+<text x="1004.0" y="386.0" font-size="13" fill="#8A9099" font-variant-numeric="tabular-nums">–</text>
+<path d="M264.0 442.0L1204.0 442.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="264.0" y="472.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">Docs</text>
+<text x="404.0" y="472.0" font-size="13" fill="#8A9099" font-variant-numeric="tabular-nums">–</text>
+<text x="604.0" y="472.0" font-size="13" fill="#8A9099" font-variant-numeric="tabular-nums">–</text>
+<text x="804.0" y="472.0" font-size="13" fill="#8A9099" font-variant-numeric="tabular-nums">–</text>
+<rect x="996.0" y="450.0" width="184.0" height="64.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="1008.0" y="472.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">1357c99</text>
+<rect x="1134.0" y="456.0" width="40.4" height="19.0" rx="9.5" fill="#E3F4E8"/>
+<text x="1154.2" y="470.0" font-size="11" fill="#1A7F37" font-weight="600" text-anchor="middle" font-variant-numeric="tabular-nums">Live</text>
+<text x="1008.0" y="490.0" font-size="11" fill="#5B616B" font-variant-numeric="tabular-nums">since 13 Nov, 14:13</text>
+<text x="264.0" y="554.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">A click on a cell opens the deploy's job; on a version, its release page (board 1).</text>
+</svg>

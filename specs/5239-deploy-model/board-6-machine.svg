@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="760" viewBox="0 0 1240 760" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+<defs><filter id="shadow" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.18"/></filter></defs>
+<rect width="1240" height="760" fill="#E7EAEE"/>
+<text x="24.0" y="34.0" font-size="15" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">6 · A machine's page: this machine runs this version, with these changes, since time X</text>
+<text x="24.0" y="54.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">The Mac window; the Remote and the web page draw the same section (the machine page is Core, #3626).</text>
+<text x="24.0" y="70.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">Real: the versions (0.18.0 and origin/main's build), the 544 PRs between them and the newest titles. Scratch: the machines' names and the times they changed.</text>
+<g filter="url(#shadow)"><rect x="24" y="96" width="1192" height="640" rx="10" fill="#F7F8F9"/></g>
+<circle cx="44.0" cy="116.0" r="6" fill="#FF5F57"/>
+<circle cx="64.0" cy="116.0" r="6" fill="#FEBC2E"/>
+<circle cx="84.0" cy="116.0" r="6" fill="#28C840"/>
+<text x="114.0" y="121.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Machines ▸ mac-mini</text>
+<path d="M24.0 136.0L1216.0 136.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="52.0" y="174.0" font-size="22" fill="#1C1D20" font-weight="700" font-variant-numeric="tabular-nums">mac-mini</text>
+<rect x="164.0" y="156.0" width="53.6" height="19.0" rx="9.5" fill="#E3F4E8"/>
+<text x="190.8" y="170.0" font-size="11" fill="#1A7F37" font-weight="600" text-anchor="middle" font-variant-numeric="tabular-nums">Online</text>
+<text x="52.0" y="196.0" font-size="12" fill="#8A9099" font-style="italic" font-variant-numeric="tabular-nums">CPU 0.4 per core · memory 61 % · disk 48 % free, as today</text>
+<path d="M52.0 218.0L1188.0 218.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="52.0" y="236.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Agents</text>
+<circle cx="106.0" cy="232.0" r="9" fill="#B35900"/>
+<text x="106.0" y="236.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle" font-variant-numeric="tabular-nums">19</text>
+<text x="52.0" y="266.0" font-size="20" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">0.18.1-dev.544</text>
+<text x="221.0" y="266.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">+g8162a5a06</text>
+<text x="52.0" y="288.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">since 13 Nov, 15:22 · 544 changes since 0.18.0, the version before ›</text>
+<circle cx="664.0" cy="284.0" r="9" fill="#B35900"/>
+<text x="664.0" y="288.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle" font-variant-numeric="tabular-nums">20</text>
+<text x="52.0" y="308.0" font-size="11" fill="#8A9099" font-variant-numeric="tabular-nums">built from main at 8162a5a06, 13 Nov, 15:13; installed with ship-app</text>
+<rect x="52.0" y="344.0" width="640.0" height="300.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="68.0" y="370.0" font-size="12" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">544 changes since 0.18.0 · newest first</text>
+<circle cx="354.0" cy="366.0" r="9" fill="#B35900"/>
+<text x="354.0" y="370.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle" font-variant-numeric="tabular-nums">21</text>
+<text x="68.0" y="398.0" font-size="12" fill="#0A6CDB" font-variant-numeric="tabular-nums">#5250</text>
+<text x="124.0" y="398.0" font-size="12" fill="#1C1D20" font-variant-numeric="tabular-nums">toolsets: bump @agentclientprotocol/codex-acp</text>
+<text x="676.0" y="398.0" font-size="11" fill="#8A9099" text-anchor="end" font-variant-numeric="tabular-nums">13 Nov</text>
+<text x="68.0" y="432.0" font-size="12" fill="#0A6CDB" font-variant-numeric="tabular-nums">#5249</text>
+<text x="124.0" y="432.0" font-size="12" fill="#1C1D20" font-variant-numeric="tabular-nums">toolsets: bump @agentclientprotocol/claude-agent-acp</text>
+<text x="676.0" y="432.0" font-size="11" fill="#8A9099" text-anchor="end" font-variant-numeric="tabular-nums">13 Nov</text>
+<text x="68.0" y="466.0" font-size="12" fill="#0A6CDB" font-variant-numeric="tabular-nums">#5247</text>
+<text x="124.0" y="466.0" font-size="12" fill="#1C1D20" font-variant-numeric="tabular-nums">Remote: Start now draws its icon through Button(_:icon:) (fixes main)</text>
+<text x="676.0" y="466.0" font-size="11" fill="#8A9099" text-anchor="end" font-variant-numeric="tabular-nums">13 Nov</text>
+<text x="68.0" y="500.0" font-size="12" fill="#0A6CDB" font-variant-numeric="tabular-nums">#5238</text>
+<text x="124.0" y="500.0" font-size="12" fill="#1C1D20" font-variant-numeric="tabular-nums">Archived pages: the stale strip says when the rows were read (#5143)</text>
+<text x="676.0" y="500.0" font-size="11" fill="#8A9099" text-anchor="end" font-variant-numeric="tabular-nums">13 Nov</text>
+<text x="68.0" y="534.0" font-size="12" fill="#0A6CDB" font-variant-numeric="tabular-nums">#5213</text>
+<text x="124.0" y="534.0" font-size="12" fill="#1C1D20" font-variant-numeric="tabular-nums">Session cards: one Line shape for the record (#5036)</text>
+<text x="676.0" y="534.0" font-size="11" fill="#8A9099" text-anchor="end" font-variant-numeric="tabular-nums">13 Nov</text>
+<text x="68.0" y="568.0" font-size="12" fill="#0A6CDB" font-variant-numeric="tabular-nums">#5235</text>
+<text x="124.0" y="568.0" font-size="12" fill="#1C1D20" font-variant-numeric="tabular-nums">Mac chat: a drag goes from a paragraph into a code block (#5182)</text>
+<text x="676.0" y="568.0" font-size="11" fill="#8A9099" text-anchor="end" font-variant-numeric="tabular-nums">13 Nov</text>
+<text x="68.0" y="606.0" font-size="12" fill="#0A6CDB" font-variant-numeric="tabular-nums">Show all 544 ›</text>
+<text x="736.0" y="236.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Other machines</text>
+<circle cx="852.0" cy="232.0" r="9" fill="#B35900"/>
+<text x="852.0" y="236.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle" font-variant-numeric="tabular-nums">22</text>
+<text x="736.0" y="266.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">mac-mini (this one)</text>
+<text x="736.0" y="284.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">0.18.1-dev.544 · since 13 Nov, 15:22</text>
+<text x="736.0" y="322.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">linux-server</text>
+<text x="736.0" y="340.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">0.18.0 · since 8 Nov, 11:02</text>
+<text x="736.0" y="356.0" font-size="11" fill="#B35900" font-variant-numeric="tabular-nums">544 changes behind this one ›</text>
+<text x="736.0" y="378.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">cloud-1</text>
+<text x="736.0" y="396.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">0.18.0 · since 8 Nov, 11:40</text>
+<text x="736.0" y="412.0" font-size="11" fill="#B35900" font-variant-numeric="tabular-nums">544 changes behind this one ›</text>
+<text x="736.0" y="444.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">History</text>
+<circle cx="796.0" cy="440.0" r="9" fill="#B35900"/>
+<text x="796.0" y="444.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle" font-variant-numeric="tabular-nums">23</text>
+<text x="736.0" y="470.0" font-size="12" fill="#1C1D20" font-variant-numeric="tabular-nums">0.18.1-dev.544</text>
+<text x="1176.0" y="470.0" font-size="12" fill="#5B616B" text-anchor="end" font-variant-numeric="tabular-nums">13 Nov, 15:22</text>
+<text x="736.0" y="492.0" font-size="12" fill="#1C1D20" font-variant-numeric="tabular-nums">0.18.0</text>
+<text x="1176.0" y="492.0" font-size="12" fill="#5B616B" text-anchor="end" font-variant-numeric="tabular-nums">8 Nov, 10:58</text>
+<text x="736.0" y="514.0" font-size="12" fill="#1C1D20" font-variant-numeric="tabular-nums">0.17.0</text>
+<text x="1176.0" y="514.0" font-size="12" fill="#5B616B" text-anchor="end" font-variant-numeric="tabular-nums">7 Nov, 12:31</text>
+</svg>
