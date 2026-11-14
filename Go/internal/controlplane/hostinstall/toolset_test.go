@@ -159,7 +159,12 @@ exec "$real" "$@"
 func (f *toolsetFake) installer(steps *[]string) *Installer {
 	i := f.fake.installer(&fakeCodes{}, steps)
 	i.ToolsetFolder, i.NodeDist = f.toolsets, f.url
-	i.Log = func(format string, args ...any) { f.logs = append(f.logs, fmt.Sprintf(format, args...)) }
+	i.Log = func(format string, args ...any) {
+		// The browser step's line (#5228) is not a toolset's.
+		if line := fmt.Sprintf(format, args...); !strings.Contains(line, "The agents' browser") {
+			f.logs = append(f.logs, line)
+		}
+	}
 	return i
 }
 

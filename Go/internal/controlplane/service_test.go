@@ -579,6 +579,11 @@ func TestTheInstallScriptIsSwifts(t *testing.T) {
 	if string(theirs) != InstallScript {
 		t.Fatal("install.sh differs from scripts/host-install.sh: copy it again")
 	}
+	// The browser step (#5228) is the ssh install's own text, called once.
+	browser, err := os.ReadFile("hostinstall/browser.sh")
+	if err != nil || !strings.Contains(InstallScript, strings.TrimPrefix(string(browser), "# shellcheck shell=sh\n")+"install_browser || true\n") {
+		t.Fatal("install.sh does not hold hostinstall/browser.sh: copy it again")
+	}
 	if got := InstallCommand("https://a:1/", "68pJOOtmq-dhsJdha_txtRqkMHL-HsskodMb3odpx3s", "CODE"); got !=
 		"curl -fsSL --insecure --pinnedpubkey sha256//68pJOOtmq+dhsJdha/txtRqkMHL+HsskodMb3odpx3s= https://a:1/v1/install.sh | sh -s -- 'CODE'" {
 		t.Fatal(got)

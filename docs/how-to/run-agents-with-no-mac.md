@@ -61,6 +61,11 @@ tablet, use **Add a Browser…** in this one; see
    A codespace has no systemd, so the command starts the host in the background and says
    **Started in the background (no systemd user session here).** (#3366).
 
+   On Debian or Ubuntu x86_64, with root or sudo that asks no password (a codespace has
+   it), the command also installs Google Chrome stable and Xvfb from Google's apt
+   repository, for the agents' browser (#5228). Without them, the browser is Chrome for
+   Testing headless, and the command says why in one line.
+
 Do the same on any other Linux server. See [Add a machine](add-a-machine.md) for folders
 on the machine.
 
