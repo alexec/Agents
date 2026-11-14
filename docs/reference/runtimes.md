@@ -312,6 +312,7 @@ setting below can be set by the app for one agent without touching `~/.claude`.
 | --- | --- | --- | --- | --- | --- |
 | Effort | ACP `effort`; `effortLevel` in settings | default, low, medium, high, xhigh, max | Yes, under the prompt | Yes | Already shown |
 | Fast mode | ACP `fast`; `fastMode` | off | Yes, under the prompt; needs extra usage | Yes | Already shown |
+| Ultracode | ACP `ultracode`; `ultracode` | off | Yes, under the prompt; only on models with xhigh effort | Yes | Already shown |
 | Thinking on, off or budget | `alwaysThinkingEnabled`; `MAX_THINKING_TOKENS` | on, adaptive | Yes | Yes | Leave alone: effort covers it |
 | Fallback model | `fallbackModel` | none | Yes | Yes | Leave alone: overlaps the app's own fallback |
 | Cost and turn limits | `_meta…options.maxBudgetUsd`, `maxTurns` | none | Yes | Yes | Set, planned: an agent's cost ceiling, stopped by Claude itself |
