@@ -19,6 +19,7 @@ import type { SandboxWillNotStart, Store } from "../model/store";
 import { drawable, modeOption, modeStartsOn } from "../model/options";
 import { keep, rememberOptions, rememberedOptions } from "../model/startMemory";
 import { folderKey } from "../model/groups";
+import { newSessionDraftKey } from "../model/drafts";
 import { fromWireDate } from "../protocol/dates";
 import { accountChoices, accountRows, choiceNote, defaultAccountName, formRuntime, newSessionRuntime, ownRow, ownSignInID, runtimeRuns, unavailableReason } from "../model/runtimes";
 import { formFor, keepForm, keepLevels, keptForm, keptLevels } from "../model/startForm";
@@ -192,7 +193,10 @@ export function NewAgent({ store, host, folder, folderName, down }: {
   // A view's agents/start-agent (#834): the form filled in, and nothing started. The person
   // presses Start, or doesn't. A folder that is not a repository keeps its place.
   const offered = store.offeredStart.value;
-  const draftKey = `new|${host}|${folderKey(folder)}`;
+  // The project's draft (#5376): On ▾ moves the form to another machine and the words stay.
+  const project = (store.folders.value[host] ?? []).find((p) => folderKey(p.folder.folder) === folderKey(folder))?.project;
+  const draftKey = newSessionDraftKey(host, folderKey(folder), project);
+  store.drafts.move(newSessionDraftKey(host, folderKey(folder), undefined), draftKey);
   useEffect(() => {
     if (!offered || offered.host !== host || folderKey(offered.folder) !== folderKey(folder)) return;
     store.offeredStart.value = null;

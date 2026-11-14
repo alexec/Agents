@@ -263,4 +263,53 @@ struct DraftStoreTests {
         #expect(given.text == "Half a thought\n\n" + words)
         #expect(given.attachments == [aFile])
     }
+
+    // MARK: New Session's draft is its project's (#5376)
+
+    private func summary(_ path: String, on host: MachineRef, project: String?) -> DaemonAPI.FolderSummary {
+        var summary = DaemonAPI.FolderSummary(folder: Folder(folder: URL(filePath: path)), name: URL(filePath: path).lastPathComponent,
+                                              exists: true, lastActivityAt: Date(), counts: [:])
+        summary.host = host
+        summary.project = project
+        return summary
+    }
+
+    /// On ▾ to the project's folder on another machine keeps the words; a folder in no
+    /// project keeps a draft of its own, under the key it had.
+    @Test func newSessionsDraftIsTheProjectsOnEveryMachine() {
+        let devbox = MachineRef(rawValue: "devbox")
+        let here = summary("/src/Agents", on: .mac, project: "p1")
+        let there = summary("/home/alex/Agents", on: devbox, project: "p1")
+        let loose = summary("/src/www", on: .mac, project: nil)
+        let folders = [here, there, loose]
+        let (store, _) = store()
+        store.save(draft("Fix the sidebar"), for: .newSession(in: here.key, folders: folders))
+
+        #expect(DraftKey.newSession(in: here.key, folders: folders) == .newSession(in: there.key, folders: folders))
+        #expect(store.draft(for: .newSession(in: there.key, folders: folders))?.text == "Fix the sidebar")
+        #expect(DraftKey.newSession(in: loose.key, folders: folders) == .newAgent(folder: loose.key.folder))
+        #expect(store.draft(for: .newSession(in: loose.key, folders: folders)) == nil)
+    }
+
+    /// A draft typed before #5376, under its folder, moves to the project's once.
+    @Test func aFoldersOldDraftMovesToItsProject() {
+        let here = summary("/src/Agents", on: .mac, project: "p1")
+        let key = DraftKey.newSession(in: here.key, folders: [here])
+        let (store, _) = store()
+        store.save(draft("From before"), for: .newAgent(folder: here.key.folder))
+
+        #expect(store.draft(for: key)?.text == "From before")
+        #expect(store.draft(for: .newAgent(folder: here.key.folder)) == nil)
+        #expect(store.draft(for: key)?.text == "From before")
+    }
+
+    /// The thirty-day sweep takes a project's draft as it takes a folder's.
+    @Test func theSweepTakesAnOldProjectDraft() {
+        let here = summary("/src/Agents", on: .mac, project: "p1")
+        let key = DraftKey.newSession(in: here.key, folders: [here])
+        let (store, _) = store()
+        store.save(draft(at: Date(timeIntervalSinceNow: -DraftStore.horizon - 60)), for: key)
+        store.sweep(archived: [], now: Date())
+        #expect(store.draft(for: key) == nil)
+    }
 }

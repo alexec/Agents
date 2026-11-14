@@ -6,6 +6,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { Store } from "../model/store";
 import type { WorktreeSummary } from "../protocol/generated";
 import { folderKey } from "../model/groups";
+import { newSessionDraftKey } from "../model/drafts";
 import {
   cleanUpDraft, folderLine, forCleanup, freedWords, isIdle, measuring, removalMessage, sizeWords, worktreeDetail,
 } from "../model/worktrees";
@@ -19,7 +20,8 @@ export function WorktreesList({ store, host }: { store: Store; host: string }) {
     store.folders.value[host]?.find((p) => folderKey(p.folder.folder) === folderKey(folder))?.name
       ?? decodeURIComponent(folder.replace(/\/$/, "").split("/").pop() ?? folder);
   const cleanUp = (folder: string) => {
-    const key = `new|${host}|${folderKey(folder)}`;
+    const project = store.folders.value[host]?.find((p) => folderKey(p.folder.folder) === folderKey(folder))?.project;
+    const key = newSessionDraftKey(host, folderKey(folder), project);
     store.drafts.set(key, cleanUpDraft(store.drafts.get(key)));
     // The hash the router reads, as Activity's navigate writes one: importing the router here would
     // have it read the location as the module loads.
