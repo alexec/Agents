@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The Docs slot (#3248): with no forge and no connection it reads the folder itself, its

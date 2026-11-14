@@ -303,11 +303,28 @@ struct PaperButtonStyle<Outline: InsettableShape>: ButtonStyle {
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
             .background(configuration.isPressed ? Paper.wash : Paper.raised, in: outline)
-            .overlay(outline.strokeBorder(Paper.rule, lineWidth: 1))
+            .overlay(outline.paperButtonEdge(Paper.rule, lineWidth: 1))
             .contentShape(outline)
             .paperTapTarget()
             .opacity(isEnabled ? 1 : 0.4)
     }
+}
+
+extension InsettableShape {
+    /// A paper button's edge (#5236): the stroke inside the shape, half a point in from it.
+    /// A button often sits on a half point (a centred label, a card's padding), and the
+    /// layer it draws in is cut at whole pixels, so a stroke drawn to the very edge lost
+    /// its outer half pixel on the top and leading sides: a 1.5 pt accent edge showed 1 px
+    /// there and 1.5 px on the others, as if cut off.
+    func paperButtonEdge(_ colour: Color, lineWidth: CGFloat) -> some View {
+        inset(by: Paper.buttonEdgeInset).strokeBorder(colour, lineWidth: lineWidth)
+    }
+}
+
+extension Paper {
+    /// How far a button's edge is drawn in from its shape: half a point, which covers the
+    /// pixel cut on both a 1x and a 2x screen (#5236).
+    static let buttonEdgeInset: CGFloat = 0.5
 }
 
 extension EnvironmentValues {
@@ -369,7 +386,7 @@ struct PaperProminentButtonStyle<Outline: InsettableShape>: ButtonStyle {
             .padding(.horizontal, 12)
             .padding(.vertical, 5)
             .background(configuration.isPressed ? Paper.wash : Paper.raised, in: outline)
-            .overlay(outline.strokeBorder(Paper.accent, lineWidth: 1.5))
+            .overlay(outline.paperButtonEdge(Paper.accent, lineWidth: 1.5))
             .opacity(isEnabled ? 1 : 0.4)
             .contentShape(outline)
             .paperTapTarget()
@@ -416,14 +433,14 @@ extension View {
 /// accent fill.
 struct PaperSelectionRow: View {
     var body: some View {
-        RoundedRectangle(cornerRadius: Paper.Radius.control)
-            .fill(Paper.selection)
+        // The bar is clipped to the row's rounded shape, so its top and bottom follow the
+        // row's corners (#5237). A 3px shape cannot have a 7px corner of its own: SwiftUI
+        // makes its radius 1.5, and the bar was a straight line past the row's curve.
+        Paper.selection
             .overlay(alignment: .leading) {
-                UnevenRoundedRectangle(topLeadingRadius: Paper.Radius.control,
-                                       bottomLeadingRadius: Paper.Radius.control)
-                    .fill(Paper.accent)
-                    .frame(width: 3)
+                Paper.accent.frame(width: 3)
             }
+            .clipShape(RoundedRectangle(cornerRadius: Paper.Radius.control))
             .padding(.horizontal, 10)
     }
 }

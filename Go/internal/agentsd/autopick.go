@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/policylayers"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/policylayers"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Auto (#2658): a runtime choice that is not a runtime. At agents/start the daemon picks the

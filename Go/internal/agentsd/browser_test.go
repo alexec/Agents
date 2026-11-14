@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The machine's browser (#3533): its lease, and the toolset this binary carries.

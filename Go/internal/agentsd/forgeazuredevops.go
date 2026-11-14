@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/azuredevopsmcp"
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/azuredevopsmcp"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Azure Repos on the Work pages (#3803, after Bitbucket's #3786): the pull requests of the

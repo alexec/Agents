@@ -236,6 +236,9 @@ function storedTurnOf(summary: TurnSummary): ChatTurn {
  * The reducer: what each notification does to what is held. Kept apart from the link so the
  * fixtures can drive it, as `AgentsModel` is driven in Swift.
  */
+/** A usage figure whose read a page dates (#5144): Cost, the charts, Time, Velocity and the Multiplier. */
+export type UsageRead = "cost" | "usage" | "time" | "velocity" | "multiplier";
+
 export class Work {
   readonly hosts = signal<ControlMachine[]>([]);
   readonly folders = signal<ByHost<FolderSummary>>({});
@@ -470,6 +473,8 @@ export class Work {
   /** The person's Mac's backups (#1810), for Settings ▸ Backups: null until it has said, or from a
    * host too old to keep backups, which leaves the section out. */
   readonly backups = signal<BackupState | null>(null);
+  /** When `backups` was last read or told (#5146), for its "Last update" line. */
+  readonly backupsAt = signal<number | undefined>(undefined);
   /** Desktop control's own off-by-default switch (#3004, US2), for Settings: null until it has
    * said, or from a host too old to know the method, which leaves the section out. */
   readonly desktopControl = signal<DesktopControlSettings | null>(null);
@@ -506,6 +511,13 @@ export class Work {
   /** Each host's Multiplier (#3990), from multiplier/state and replaced whole by each multiplier/changed. With a
    * control plane the host counts all the person's machines (#3903), so the page asks only the Mac's. */
   readonly multiplier = signal<Record<string, Multiplier>>({});
+  /** When this page last read each host's usage (#5144), for the pages' "Last update" line. */
+  readonly usageReadAt = signal<Record<string, Partial<Record<UsageRead, number>>>>({});
+
+  /** Keeps the time of a read of one of a host's usage figures (#5144). */
+  protected usageRead(host: string, what: UsageRead): void {
+    this.usageReadAt.value = { ...this.usageReadAt.value, [host]: { ...this.usageReadAt.value[host], [what]: Date.now() } };
+  }
   /**
    * The control plane's machine, its home host, and how this Mac's host says its join stands
    * (#666), from `control/status`.
@@ -585,6 +597,8 @@ export class Work {
   readonly people = signal<PeopleList | null>(null);
   /** Why `people` could not be loaded: the failure itself, for each view to word. */
   readonly peopleFailure = signal<unknown>(null);
+  /** When `people` was last read (#5146), for Settings ▸ People's "Last update" line. */
+  readonly peopleAt = signal<number | undefined>(undefined);
   /** Each org provider's name by its id (#1002, FR-028), for People's "Managed by Okta": read once, when a person or group has one. */
   readonly orgProviderNames = signal<Record<string, string>>({});
   protected orgNamesRead = false;
@@ -846,7 +860,7 @@ export class Work {
         this.capacity.value = { ...this.capacity.value, [host]: params as CapacityState };
         return true;
       case "backups/changed":
-        if (this.isMac(host)) this.backups.value = params as BackupState;
+        if (this.isMac(host)) { this.backups.value = params as BackupState; this.backupsAt.value = Date.now(); }
         return true;
       case "worktrees/sized": {
         const held = { ...(this.worktreeSizes.value[host] ?? {}) };
@@ -862,6 +876,7 @@ export class Work {
         return true;
       case "multiplier/changed":
         this.multiplier.value = { ...this.multiplier.value, [host]: params as Multiplier };
+        this.usageRead(host, "multiplier");
         return true;
       case "preferences/changed":
         if (this.isMac(host)) preferencesSaid(params as Record<string, JSONValue>);
@@ -2013,6 +2028,7 @@ export class Store extends Work {
   async loadPeople(): Promise<void> {
     try {
       this.people.value = await this.link.call("people/list", {});
+      this.peopleAt.value = Date.now();
       this.peopleFailure.value = null;
     } catch (error) {
       this.peopleFailure.value = error;
@@ -2213,6 +2229,7 @@ export class Store extends Work {
       this.resuming.value = without(this.resuming.value);
       this.events.value = without(this.events.value);
       this.costs.value = without(this.costs.value);
+      this.usageReadAt.value = without(this.usageReadAt.value);
       this.disk.value = without(this.disk.value);
       this.storeNotes.value = without(this.storeNotes.value);
     });
@@ -2348,7 +2365,7 @@ export class Store extends Work {
       .catch(failed("achievements/state"));
     // A host from before #3903 doesn't know it: the Multiplier page shows — ×.
     void this.link.call("multiplier/state", {}, host)
-      .then((state) => { this.multiplier.value = { ...this.multiplier.value, [host]: state }; })
+      .then((state) => { this.multiplier.value = { ...this.multiplier.value, [host]: state }; this.usageRead(host, "multiplier"); })
       .catch(failed("multiplier/state"));
     const [permissions, elicitations] = await Promise.all([
       this.link.call("permissions/pending", {}, host).catch(failed("permissions/pending")),
@@ -2909,7 +2926,7 @@ export class Store extends Work {
   /** Settings ▸ Backups (#1810), asked when Settings is shown. */
   loadBackups(): void {
     void this.hostBackups(this.macHostID.value).then((state) => {
-      if (state) this.backups.value = state;
+      if (state) { this.backups.value = state; this.backupsAt.value = Date.now(); }
     });
   }
 
@@ -4718,7 +4735,7 @@ export class Store extends Work {
    * The person's bus log (#4732): every machine's events, newest first, for the rows no host here
    * has. Null until read, and on a control plane too old for it. `filter` is what it was read for.
    */
-  readonly busLog = signal<{ events: BusEvent[]; next?: string; filter: EnvelopeFilter } | null>(null);
+  readonly busLog = signal<{ events: BusEvent[]; next?: string; filter: EnvelopeFilter; at: number } | null>(null);
 
   /** The newest page of the bus log, narrowed by the envelope's fields; an older page with `older`. */
   async loadBusLog(filter: EnvelopeFilter, older = false): Promise<void> {
@@ -4731,7 +4748,9 @@ export class Store extends Work {
     if (older && (!now || JSON.stringify(now.filter) !== JSON.stringify(filter))) return;
     const events = older && now ? [...now.events, ...page.events.filter((e: BusEvent) => !now.events.some((n) => n.id === e.id))] : page.events;
     const kept = events.slice(0, eventsPagedMost);
-    this.busLog.value = { events: kept, filter, ...(page.hasMore && page.next !== undefined && kept.length < eventsPagedMost && { next: page.next }) };
+    // `at`: when the newest page was read (#5146), for the page's "Last update" line; an older page leaves it.
+    const at = older && now ? now.at : Date.now();
+    this.busLog.value = { events: kept, filter, at, ...(page.hasMore && page.next !== undefined && kept.length < eventsPagedMost && { next: page.next }) };
   }
 
   /** Events ▸ Waiting now's ✕ (#541): the wait ends and nothing starts the agent again for it. */
@@ -4761,25 +4780,25 @@ export class Store extends Work {
 
   async loadCost(host: string): Promise<void> {
     const state = await this.link.call("cost/state", {}, host).catch(() => null);
-    if (state) this.costs.value = { ...this.costs.value, [host]: state };
+    if (state) { this.costs.value = { ...this.costs.value, [host]: state }; this.usageRead(host, "cost"); }
   }
 
   /** A host too old to know the method leaves the charts out. */
   async loadUsage(host: string): Promise<void> {
     const history = await this.link.call("usage/history", {}, host).catch(() => null);
-    if (history) this.usage.value = { ...this.usage.value, [host]: history };
+    if (history) { this.usage.value = { ...this.usage.value, [host]: history }; this.usageRead(host, "usage"); }
   }
 
   /** A host too old to know the method leaves the Time page loading. */
   async loadTime(host: string): Promise<void> {
     const history = await this.link.call("time/history", {}, host).catch(() => null);
-    if (history) this.time.value = { ...this.time.value, [host]: history };
+    if (history) { this.time.value = { ...this.time.value, [host]: history }; this.usageRead(host, "time"); }
   }
 
   /** A host too old to know the method leaves the Velocity page loading. */
   async loadVelocity(host: string): Promise<void> {
     const history = await this.link.call("velocity/history", {}, host).catch(() => null);
-    if (history) this.velocity.value = { ...this.velocity.value, [host]: history };
+    if (history) { this.velocity.value = { ...this.velocity.value, [host]: history }; this.usageRead(host, "velocity"); }
   }
 }
 

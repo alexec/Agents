@@ -1345,7 +1345,7 @@
         },
         "starter": {
           "type": "string",
-          "description": "The starter, a GitHub template repository: iphone-app (alexec/iphone-app-starter: TestFlight, then the App Store), web-service (alexec/web-service-starter: Cloud Run), or another template repository as owner/name, such as the person's fork. The app takes its default branch."
+          "description": "The starter, a GitHub template repository: iphone-app (agentloops-dev/iphone-app-starter: TestFlight, then the App Store), web-service (agentloops-dev/web-service-starter: Cloud Run), or another template repository as owner/name, such as the person's fork. The app takes its default branch."
         },
         "values": {
           "type": "object",

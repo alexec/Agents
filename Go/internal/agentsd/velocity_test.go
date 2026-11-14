@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #4596: two merged PRs and a merged revert on two days, in two repositories, go in their

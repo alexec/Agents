@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // notCommittedLimit is how many paths folders/notCommitted sends at most; more says the rest.

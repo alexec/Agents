@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/rolllog"
+	"github.com/agentloops-dev/agents/Go/internal/rolllog"
 )
 
 // The flags the install script's systemd unit and its detached start pass.

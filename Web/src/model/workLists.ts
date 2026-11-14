@@ -8,7 +8,7 @@ import { Capability } from "../protocol/capabilities.generated";
 import { CallFailed } from "../wire/link";
 import { describe } from "./errors";
 import { hostAnswers } from "./capabilities";
-import { keepWork, keptWork } from "./localCopy";
+import { keepWork, keptWork, keptWorkRead } from "./localCopy";
 import { mark } from "./marks";
 import {
   anyFilter, defaultSort, filterRows, forgeListRequest, fromForge, lineageRow, mergeBoards, mergeForge, neighbours, projectRepos, sortRows,
@@ -49,6 +49,9 @@ export interface WorkListState {
   read: string | undefined;
   /** The rows on screen came from this device's copy (#4930): the machines are asked again, and the list says so. */
   fromDevice: Signal<boolean>;
+  /** When the rows on screen were read (#5142): this device's copy's time, or the last read; with rows carried over a
+   * failed read, the oldest. The "Last update" line of the strips. */
+  readAt: Signal<number | undefined>;
   /** What the rows on screen were read for, without Refresh (`copyAsk`): the copy is drawn only for another. */
   shownFor: string | undefined;
 }
@@ -68,7 +71,7 @@ export function workList(kind: WorkKind): WorkListState {
     l = {
       kind, filter: signal(anyFilter), projects: signal([]), sort: signal<WorkSort>(defaultSort(kind)), lists: signal(null), loading: signal(false), lineage: signal([]),
       lineageCursor: signal(undefined), problem: signal(null), more: signal(false), moreFailed: signal(null), asked: signal(0), opened: signal(undefined),
-      read: undefined, fromDevice: signal(false), shownFor: undefined,
+      read: undefined, fromDevice: signal(false), readAt: signal(undefined), shownFor: undefined,
     };
     lists.set(kind, l);
   }
@@ -167,8 +170,10 @@ export function copyAsk(l: WorkListState): string {
 export async function drawKept(l: WorkListState): Promise<boolean> {
   const wanted = copyAsk(l);
   if (l.shownFor === wanted) return false;
-  const kept = await keptWork<KeptList>("list", wanted);
-  if (!kept || copyAsk(l) !== wanted || l.shownFor === wanted) return false;
+  const got = await keptWorkRead<KeptList>("list", wanted);
+  if (!got || copyAsk(l) !== wanted || l.shownFor === wanted) return false;
+  const kept = got.value;
+  l.readAt.value = got.at;
   l.lineage.value = kept.lineage;
   l.lineageCursor.value = kept.lineageCursor;
   l.lists.value = kept.lists;
@@ -209,7 +214,7 @@ export async function loadList(store: Store, l: WorkListState): Promise<void> {
     if (!current()) return;
     if (!fromForge(kind)) {
       l.lineage.value = known.nodes; l.lineageCursor.value = known.cursor; l.lists.value = [];
-      l.shownFor = wanted; l.fromDevice.value = false;
+      l.shownFor = wanted; l.fromDevice.value = false; l.readAt.value = Date.now();
       if (!l.problem.peek()) keepWork("list", wanted, { lists: [], lineage: known.nodes, lineageCursor: known.cursor } satisfies KeptList);
       return;
     }
@@ -229,6 +234,9 @@ export async function loadList(store: Store, l: WorkListState): Promise<void> {
     l.lists.value = read;
     l.shownFor = wanted;
     l.fromDevice.value = false;
+    // Rows carried over a failed read keep the time of the read they came from: the oldest on screen.
+    const at = l.readAt.peek();
+    if (!read.some((h) => h.stale?.length) || at === undefined) l.readAt.value = Date.now();
     // Only a read some forge answered is kept, without what was carried from the last one: a failed read would draw
     // an empty list next time.
     if (read.some((h) => h.errors.length === 0)) {

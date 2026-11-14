@@ -5,7 +5,7 @@ import (
 	"embed"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/forgepages"
+	"github.com/agentloops-dev/agents/Go/internal/forgepages"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

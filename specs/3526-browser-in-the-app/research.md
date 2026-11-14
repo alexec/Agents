@@ -7,7 +7,7 @@ has no product code. The stories that build it come from the "Stories" section, 
 
 | Question | Decision |
 |---|---|
-| WebKit or Chrome | **Chromium**, started by `agentsd` on the machine where the agent runs, with no window (`--headless=new`). Not WKWebView, and not the person's own Chrome. Since #5207: on a Mac with Google Chrome installed, that Chrome stable, in its own profile, headed with its window just below the screen, for every site (below). |
+| WebKit or Chrome | **Chromium**, started by `agentsd` on the machine where the agent runs, with no window (`--headless=new`). Not WKWebView, and not the person's own Chrome. Since #5207: on a Mac with Google Chrome installed, that Chrome stable, in its own profile, headed with its window just below the screen, for every site (below); on Linux, the same Chrome, on an Xvfb screen of its own when there is no display (#5227). |
 | How the agent drives it | **The Playwright MCP server** (`@playwright/mcp`), started by `agentsd` and pointed at that Chromium with `--cdp-endpoint`. The `agents` server offers its tools and filters what they send back. Two new tools on the `agents` server: `hand_to_person` and `fill_secret`. |
 | How a client shows the page | **A stream of frames from Chromium** (CDP `Page.startScreencast`), sent by `agentsd` to the client the same way a terminal's output goes today. The client sends the person's clicks and keys back (CDP `Input.*`). The Mac and the web page use the same stream. |
 | Per session or per machine | **One browser per machine** (per person), with **one profile that keeps sign-ins** between sessions. One agent drives it at a time, under the lease `browser:agents`. |
@@ -59,8 +59,11 @@ person's view of a local server.
   installed, the agents' browser is that Chrome, in its own profile, with a window just
   below the screen and no test flags (#5207, built in `Go/internal/browser/browser.go`, `launchChrome`). Chrome for Testing says only "Chromium" and an
   older version in its client hints, and Google refuses its sign-in (#4837); the real
-  Chrome passes. Chrome for Testing stays the fallback when Chrome is not installed, and on
-  Linux until #5209 settles it.
+  Chrome passes. On Linux (spike #5209, built in #5227), it is the same Google Chrome
+  stable, headed, with the same flags: on a machine with no display, on an Xvfb screen
+  that agentsd starts for it alone (`Go/internal/browser/xvfb.go`) and stops with it.
+  Chrome for Testing stays the fallback when Chrome is not installed (Linux arm64 always:
+  Google ships no Chrome there) and when Chrome or Xvfb does not start.
 
 ### CAPTCHA pass rates
 
@@ -82,7 +85,8 @@ we know:
 - A site that refuses a headless browser outright happened (Cloudflare, Microsoft,
   Paddle, Google: #4272, #4304, #4324, #4837). The fix is the headed real Chrome above, with
   its window just below the screen on the Mac (macOS keeps a window 40 px on the screen
-  across, so it cannot go far to the side), and Xvfb on Linux (#5209).
+  across, so it cannot go far to the side), and on an Xvfb screen of its own on Linux
+  (#5209, #5227).
 
 ### Licence and size (AGENTS.md, "Libraries before our own code")
 

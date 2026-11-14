@@ -10,8 +10,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The marketplaces a catalogue sheet can search (Marketplaces): the app's own list, then

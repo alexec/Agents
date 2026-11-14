@@ -15,16 +15,25 @@ struct UsageChartsSection<Refresh: Equatable>: View {
     /// The range, when the page beside the charts needs it too (Cost's Open Reports, #4938);
     /// else the charts keep their own.
     var shown: Binding<UsageChart.Range>?
+    /// When the page's other part was read (Cost's and Tokens' day, #5144): the line says the older.
+    var alsoRead: Date?
 
     @State private var history: UsageHistory?
+    /// When `history` was read (#5144).
+    @State private var read: Date?
     @State private var own: UsageChart.Range = .week
     @State private var picked: Date?
 
     private var rangeBinding: Binding<UsageChart.Range> { shown ?? $own }
     private var range: UsageChart.Range { rangeBinding.wrappedValue }
+    private var pageRead: Date? { [read, alsoRead].compactMap { $0 }.min() }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if let read = pageRead {
+                // How old what the page shows is (#5144): the oldest of its reads, at the top.
+                LastUpdateText(read: read).frame(maxWidth: .infinity, alignment: .trailing)
+            }
             Picker("Range", selection: rangeBinding) {
                 ForEach(UsageChart.Range.allCases) { Text($0.rawValue).tag($0) }
             }
@@ -38,7 +47,10 @@ struct UsageChartsSection<Refresh: Equatable>: View {
         }
         .onChange(of: range) { picked = nil }
         .task(id: refresh) {
-            if let loaded = await load() { history = loaded }
+            if let loaded = await load() {
+                history = loaded
+                read = Date()
+            }
         }
     }
 }

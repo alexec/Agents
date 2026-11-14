@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controlplane/store"
-	"github.com/alexec/agents/Go/internal/hosted/billing"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/hosted/billing"
 )
 
 // Billing (#2225, spec 1003 FR-030..FR-035): with a Stripe key, the account page has

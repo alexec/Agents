@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/machinelock"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/machinelock"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 func lockEntry(t *testing.T, signer *ecdsa.PrivateKey, kind wire.LockEntryKind, added *ecdsa.PrivateKey, previous *wire.LockEntry) wire.LockEntry {

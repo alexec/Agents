@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The host's connections for servers' events (#383, MCPEventClients and MCPEventsWire): the

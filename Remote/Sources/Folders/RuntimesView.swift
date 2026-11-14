@@ -14,6 +14,10 @@ struct RuntimesView: View {
     var body: some View {
         List {
             if let allowances = model.runtimeAllowances {
+                // The line at the top, when StaleBanner does not say it (#5145).
+                if !model.isStale, let read = readAt(allowances) {
+                    LastUpdateText(read: read).listRowBackground(Color.clear)
+                }
                 ForEach(allowances.rows) { row in
                     VStack(alignment: .leading, spacing: 6) {
                         RuntimeAllowanceRow(row: row, at: allowances.at, setBy: setBy(of: row))
@@ -120,6 +124,11 @@ struct RuntimesView: View {
     }
 
     /// The organisation's mark when its policy does not allow the row's runtime (#998).
+    /// The oldest read on the page: the allowances' and the runtimes' last runtimes/list.
+    private func readAt(_ allowances: RuntimeAllowances) -> Date? {
+        (model.runtimes.map(\.checkedAt) + [allowances.at]).min()
+    }
+
     private func setBy(of row: RuntimeAllowances.Row) -> DaemonAPI.PolicySetBy? {
         let runtimeID = row.credentialKey.split(separator: ":").first.map(String.init)
         return model.runtimes.first { $0.id == runtimeID }?.setBy

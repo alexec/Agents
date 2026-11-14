@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // FakeAPNs is Apple's push service as far as a test needs it: HTTP/2 over TLS, and every

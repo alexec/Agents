@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"github.com/alexec/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agents/Go/internal/safe"
 )
 
 // maxWatchedFolders bounds one tree's inotify watches: past it, deeper folders are not

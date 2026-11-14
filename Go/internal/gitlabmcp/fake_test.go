@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // A fake GitLab over HTTP (no account, #1629): the REST API v4 paths the server reads and

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // Pipelines of any trigger and their deploys on Bitbucket Cloud (#4217), in the github

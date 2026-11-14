@@ -16,11 +16,18 @@ struct VelocityChartsSection<Refresh: Equatable>: View {
     let refresh: Refresh
 
     @State private var history: VelocityHistory?
+    /// When `history` was read (#5144).
+    @State private var read: Date?
+    private var pageRead: Date? { read }
     @State private var range: VelocityChart.Range = .week
     @State private var picked: Date?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if let read = pageRead {
+                // How old what the page shows is (#5144): the oldest of its reads, at the top.
+                LastUpdateText(read: read).frame(maxWidth: .infinity, alignment: .trailing)
+            }
             Picker("Range", selection: $range) {
                 ForEach(VelocityChart.Range.allCases) { Text($0.rawValue).tag($0) }
             }
@@ -34,7 +41,10 @@ struct VelocityChartsSection<Refresh: Equatable>: View {
         }
         .onChange(of: range) { picked = nil }
         .task(id: refresh) {
-            if let loaded = await load() { history = loaded }
+            if let loaded = await load() {
+                history = loaded
+                read = Date()
+            }
         }
     }
 }

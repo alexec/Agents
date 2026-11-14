@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Version is ControlAuth.version.

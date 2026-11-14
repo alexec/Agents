@@ -13,6 +13,8 @@ struct RemoteMachinePage: View {
 
     @State private var usage: DaemonAPI.MachineUsageState?
     @State private var failure: String?
+    /// When the last `machine/usage` read worked (#5146): a read that fails then says how old the page is.
+    @State private var readAt: Date?
 
     private var name: String { model.machineName(host) }
     private var offline: Bool { model.machineOffline(host) }
@@ -85,6 +87,7 @@ struct RemoteMachinePage: View {
         .task(id: host) {
             usage = nil
             failure = nil
+            readAt = nil
             guard answersUsage else { return }
             while !Task.isCancelled {
                 if !offline { await read() }
@@ -158,6 +161,12 @@ struct RemoteMachinePage: View {
             if !waits.isEmpty {
                 Text(waits.joined(separator: " · ")).foregroundStyle(Paper.secondary)
             }
+            // A read every 3 s says no age while it works; one that fails says how old this is (#5146).
+            if let failure {
+                LastUpdateTimeline(read: readAt ?? .distantPast) { now in
+                    Text(LastUpdate.banner(failure, read: readAt, now: now)).foregroundStyle(Paper.secondary)
+                }
+            }
         }
         .monospacedDigit()
         .accessibilityElement(children: .combine)
@@ -183,6 +192,7 @@ struct RemoteMachinePage: View {
         do {
             usage = try await model.machineUsage(host)
             failure = nil
+            readAt = Date()
         } catch let error as JSONRPCError {
             failure = error.message
         } catch {

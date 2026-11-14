@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/alexec/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agents/Go/internal/safe"
 )
 
 // loopBook is the loops that run on a timer for as long as the host does: the merged pull

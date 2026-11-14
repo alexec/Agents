@@ -17,7 +17,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Endpoints is where the catalogue and GitHub are (CatalogEndpoints). A walk points all of

@@ -107,16 +107,16 @@ export function firstBuildTasks(starter: Starter): PlanTask[] {
   const app: PlanTask[] = [{ words: runtimeTask, doer: "app" }, { words: githubTask, doer: "app" }];
   const agent = (words: string): PlanTask => ({ words, doer: "agent" });
   return starter === "iphone-app"
-    ? [...app, agent("Make the repository from alexec/iphone-app-starter"), agent("Join the Apple Developer Program"),
+    ? [...app, agent("Make the repository from agentloops-dev/iphone-app-starter"), agent("Join the Apple Developer Program"),
       agent("Put the App Store Connect key in the repository's CI"), agent("Set up Sentry"),
       agent("Send the first build to TestFlight"), agent("Approve the first build")]
-    : [...app, agent("Make the repository from alexec/web-service-starter"), agent("Set up Google Cloud (Cloud Run)"),
+    : [...app, agent("Make the repository from agentloops-dev/web-service-starter"), agent("Set up Google Cloud (Cloud Run)"),
       agent("Set up Sentry"), agent("Deploy the first version"), agent("Approve the first deploy")];
 }
 
 /** The line under the title: what will be built, and from which template. */
 export function starterLine(starter: Starter): string {
-  return starter === "iphone-app" ? "An iPhone app, from alexec/iphone-app-starter" : "A web service, from alexec/web-service-starter";
+  return starter === "iphone-app" ? "An iPhone app, from agentloops-dev/iphone-app-starter" : "A web service, from agentloops-dev/web-service-starter";
 }
 
 /** The choice's own words. */

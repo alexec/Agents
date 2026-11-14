@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/agentsd/acp"
-	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/acp"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The three endings name the runtime's own question tool where the app knows it, and
@@ -354,7 +354,7 @@ func TestTheNewAppSkillKeepsTheFirstBuildTaskList(t *testing.T) {
 		"iphone-app": {
 			"Set up the agent runtime",
 			"Connect GitHub",
-			"Make the repository from alexec/iphone-app-starter",
+			"Make the repository from agentloops-dev/iphone-app-starter",
 			"Join the Apple Developer Program",
 			"Put the App Store Connect key in the repository's CI",
 			"Set up Sentry",
@@ -364,7 +364,7 @@ func TestTheNewAppSkillKeepsTheFirstBuildTaskList(t *testing.T) {
 		"web-service": {
 			"Set up the agent runtime",
 			"Connect GitHub",
-			"Make the repository from alexec/web-service-starter",
+			"Make the repository from agentloops-dev/web-service-starter",
 			"Set up Google Cloud (Cloud Run)",
 			"Set up Sentry",
 			"Deploy the first version",

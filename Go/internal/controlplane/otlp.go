@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The OTLP exporter of the report figures (#2019, #1804 decision 4): off unless

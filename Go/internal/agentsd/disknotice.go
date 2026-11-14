@@ -1,6 +1,6 @@
 package agentsd
 
-import "github.com/alexec/agents/Go/wire"
+import "github.com/agentloops-dev/agents/Go/wire"
 
 // A machine's notice (#3682): a volume became critically low, so agents on it will stop.
 // It belongs to the machine, not to a chat, so it needs no agent, no mute and no chat to

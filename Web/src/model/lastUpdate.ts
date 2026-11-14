@@ -66,3 +66,13 @@ export function pageReadAt(state: { kind: string; heardAt?: number }, copyAt: nu
   if (state.kind === "connecting" || state.kind === "loading") return copyAt;
   return undefined;
 }
+
+/**
+ * The oldest read of a usage page's parts (#5144): each host's figures of each kind it read. A
+ * part not read yet is left out, as it shows nothing; undefined when nothing was read.
+ */
+export function oldestRead<K extends string>(reads: Record<string, Partial<Record<K, number>>>,
+  hosts: readonly string[], kinds: readonly K[]): number | undefined {
+  const times = hosts.flatMap((host) => kinds.map((kind) => reads[host]?.[kind])).filter((at): at is number => at !== undefined);
+  return times.length > 0 ? Math.min(...times) : undefined;
+}

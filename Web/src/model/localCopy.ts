@@ -233,9 +233,14 @@ export class LocalCopy {
 
   /** Work's last answer for what was asked (#4930); undefined with none. */
   async work<T>(group: WorkGroup, asked: string): Promise<T | undefined> {
+    return (await this.workRead<T>(group, asked))?.value;
+  }
+
+  /** Work's last answer for what was asked, with when this page read it from its machine (#5142); undefined with none. */
+  async workRead<T>(group: WorkGroup, asked: string): Promise<{ value: T; at: number } | undefined> {
     try {
       const got = (await this.store.get(workRef(group, asked))) as WorkCopy | undefined;
-      return got?.kind === "work" && got.group === group ? got.value as T : undefined;
+      return got?.kind === "work" && got.group === group ? { value: got.value as T, at: got.at } : undefined;
     } catch {
       return undefined;
     }
@@ -347,6 +352,11 @@ export function setWorkCopy(copy: LocalCopy | undefined): void { pageCopy = copy
 /** Work's last answer this device kept for what was asked (#4930). */
 export function keptWork<T>(group: WorkGroup, asked: string): Promise<T | undefined> {
   return pageCopy ? pageCopy.work<T>(group, asked) : Promise.resolve(undefined);
+}
+
+/** Work's last answer this device kept, with when it was read (#5142): the "Last update" line of a page drawn from it. */
+export function keptWorkRead<T>(group: WorkGroup, asked: string): Promise<{ value: T; at: number } | undefined> {
+  return pageCopy ? pageCopy.workRead<T>(group, asked) : Promise.resolve(undefined);
 }
 
 /** A host's answer to a Work page, kept (#4930). */

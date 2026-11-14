@@ -48,6 +48,9 @@ final class WorkTimelineState {
 
     /// The plot on screen came from this device's copy (#4930), until the machines answer.
     var fromDevice = false
+    /// When the plot on screen was read (#5142): this device's copy's time, or the last read
+    /// that worked. A stale plot says it in the failure strip, not only by its dim.
+    var plotRead: Date?
 
     /// Work ▸ Timeline as this device keeps it (#4930): the plot around now, and the boards.
     struct Kept: Codable, Sendable {
@@ -88,9 +91,10 @@ final class WorkTimelineState {
         if self.project != project.id { self.project = project.id }
         // Seen before: this device's copy at once, until the machines answer (#4930).
         let kept = copyAsk(project.id)
-        if timeline == nil, let copy = await model.keptWork(Kept.self, .timeline, kept), ask == mine, timeline == nil {
+        if timeline == nil, case let (copy, at)? = await model.keptWorkRead(Kept.self, .timeline, kept), ask == mine, timeline == nil {
             timeline = copy.timeline
             boards = copy.boards
+            plotRead = at
             fromDevice = true
         }
         let found = await model.workBoards()
@@ -151,6 +155,7 @@ final class WorkTimelineState {
         guard ask == mine, fromMachines == merged else { return }
         let drawn = WorkTimeline.started(merged, by: sessions)
         timeline = drawn
+        plotRead = Date()
         fromDevice = false
         // Kept for the window around now, read by every machine: a plot scrolled away is not the one a person opens on.
         if failed.isEmpty, abs(anchor.timeIntervalSinceNow) < 3600 {
@@ -297,9 +302,10 @@ struct WorkTimelinePane: View {
             let timeline = state.timeline ?? .init()
             VStack(spacing: 0) {
                 let lines = problems(timeline)
-                WorkFromDeviceStrip(on: state.fromDevice && lines.isEmpty).padding(.horizontal, 16).padding(.vertical, 8)
+                WorkFromDeviceStrip(read: state.fromDevice && lines.isEmpty ? state.plotRead : nil)
+                    .padding(.horizontal, 16).padding(.vertical, 8)
                 if !lines.isEmpty {
-                    WorkErrorStrip(lines: lines) { state.asked += 1 }
+                    WorkErrorStrip(lines: lines, read: state.stale || state.fromDevice ? state.plotRead : nil) { state.asked += 1 }
                         .padding(.horizontal, 16).padding(.vertical, 8)
                 }
                 // Once a minute; while the first read runs, often, so the grey lanes shimmer.

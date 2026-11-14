@@ -149,6 +149,8 @@ struct StartAgentView: View {
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
+                // The Mac's banner, then the host's (#5147), as the chat has them.
+                StaleBanner()
                 HostOfflineStrip(host: model.startHost)
             }
         }

@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
 )
 
 // Rotating the control key (#997, spec 736 FR-043). An admin's control/rotate makes a

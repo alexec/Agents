@@ -492,6 +492,18 @@ func TestARealGoogleChrome(t *testing.T) {
 	defer func() {
 		p.stop()
 		<-p.done
+		if p.display == "" {
+			return
+		}
+		// Its Xvfb stops with it (#5227): the screen's socket goes.
+		socket := "/tmp/.X11-unix/X" + strings.TrimPrefix(p.display, ":")
+		for i := 0; i < 60; i++ {
+			if _, err := os.Stat(socket); err != nil {
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+		t.Errorf("Xvfb %s still runs after Chrome stopped", p.display)
 	}()
 	ctx := p.store.(cdpStore).ctx
 	// userAgentData is only in a secure context, which about:blank is not.
@@ -509,13 +521,16 @@ func TestARealGoogleChrome(t *testing.T) {
 	if !strings.Contains(says[0].(string), "Google Chrome") || says[1] != false || strings.Contains(says[2].(string), "Headless") || says[3] != "undefined" {
 		t.Fatalf("not the Chrome it is, or WebAuthn on: %v", says)
 	}
-	// At most one point across shows, at the screen's left edge, or none below it.
 	where, err := chromedp.Run(ctx, chromedp.Evaluate[[]float64](`[window.screenX, window.screenY, window.outerWidth, screen.availLeft, screen.height]`))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Logf("the window is at %v", where)
-	if len(where) != 5 || where[0]+where[2]-where[3] > 1 && where[1] < where[4] {
+	if p.display != "" {
+		// A Linux machine with no display (#5227): an Xvfb screen of its own, which nobody sees.
+		t.Logf("it runs on the Xvfb screen %s", p.display)
+	} else if len(where) != 5 || where[0]+where[2]-where[3] > 1 && where[1] < where[4] {
+		// At most one point across shows, at the screen's left edge, or none below it.
 		t.Fatalf("the window is on the screen: %v", where)
 	}
 	out, err := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(p.pid)).Output()

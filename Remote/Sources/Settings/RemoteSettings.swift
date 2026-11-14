@@ -42,6 +42,7 @@ struct RemoteSettings: View {
                 Section(PolicyLayersWords.groupTitle) {
                     NavigationLink {
                         PolicyPane(host: model.policyHost, revision: model.policyRevision)
+                            .staleBanner()
                             .navigationTitle(PolicyLayersWords.title)
                             .navigationBarTitleDisplayMode(.inline)
                     } label: {
@@ -64,6 +65,8 @@ struct RemoteSettings: View {
             }
             .scrollContentBackground(.hidden)
             .background(Paper.ground)
+            // A sheet over the page's banner, so it says it too (#5147).
+            .staleBanner()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -85,6 +88,7 @@ private struct RemoteSecretsPage: View {
                         SessionSecretsSection(model: model)
                         LocalSecretsSection(model: model)
                     }
+            .staleBanner()
             .navigationTitle(UserScopeWords.secretsTitle)
             .navigationBarTitleDisplayMode(.inline)
     }
@@ -98,6 +102,7 @@ private struct RemoteAccountsPage: View {
     var body: some View {
         AccountsPane(control: model.controlPlane, state: model.userScope,
                      machineNames: SecretInfoWords.names(model.controlHosts))
+            .staleBanner()
             .navigationTitle(AccountsWords.title)
             .navigationBarTitleDisplayMode(.inline)
     }

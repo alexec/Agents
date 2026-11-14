@@ -62,6 +62,8 @@ struct MCPServersView: View {
                         .textCase(.uppercase)
                         .accessibilityAddTraits(.isHeader)
                     Spacer(minLength: 16)
+                    // The oldest check, in place of a time on each row (#5145).
+                    if let read = MCPHealthWords.readAt(servers) { LastUpdateText(read: read) }
                     // The catalogue writes this Mac's files (#1336 keeps that): a server's
                     // folder gets its connectors from Settings on the Mac it is on.
                     if host == .mac {
