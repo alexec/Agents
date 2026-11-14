@@ -34,8 +34,8 @@ type fakeGitHub struct {
 	// deployments and jobs are the repo's Deployments and its jobs' conclusions (#5240).
 	deployments []Deployment
 	jobs        map[int64]string
-	err        error
-	noRepo     bool
+	err         error
+	noRepo      bool
 	// reviews and assigned are what ask the connection's owner, alexec (#2034).
 	reviews  []OpenPR
 	assigned []Issue

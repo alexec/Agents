@@ -30,10 +30,10 @@ type args struct {
 	repo, branch, label, workflow string
 	// environment, tier and component narrow deploy.* (#5240).
 	environment, tier, component string
-	pr, run                       int
-	issues                        []int
-	fixes                         []string
-	anyone, mine, all             bool
+	pr, run                      int
+	issues                       []int
+	fixes                        []string
+	anyone, mine, all            bool
 }
 
 // wantsIssue is whether the issue numbered n is one asked for: any, when none is.

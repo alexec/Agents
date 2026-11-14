@@ -332,6 +332,6 @@ func deployEvent(name, title, description string) event {
 	}
 	return event{Name: name, Title: title,
 		Description: description + " deploy is the wire's Deploy: the repo is its component, the environment and its tier its target, the sha its version's one artifact, named by the run's v* tag when it ran on one; its ref is github:deploy:<owner>/<repo>#<deployment id>, its url the job's. Every Deployment of the repo, whoever started its run.",
-		Input:   schema{repoProperty, environmentProperty, tierProperty, componentProperty},
-		Payload: object(props)}
+		Input:       schema{repoProperty, environmentProperty, tierProperty, componentProperty},
+		Payload:     object(props)}
 }
