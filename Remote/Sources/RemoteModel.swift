@@ -2760,6 +2760,10 @@ final class RemoteModel {
     /// How many New Machine calls wait for the provider's answer (#4612, as the window's #4610):
     /// a *Making…* row each, until the control plane lists the machine as joining.
     private(set) var machinesBeingMade = 0
+    /// The sign-ins New Machine asked for, until each machine joins (#5204).
+    private(set) var machineSetups = MachineSetups()
+    /// The machines whose sign-in is being waited for now, by name.
+    private var machineSetupsWaiting: Set<String> = []
 
     /// The machines New Machine made that have not joined (#4612): *Making…* while the control
     /// plane waits for them, red with its reason once it gave up. A row each under Machines; and
@@ -2868,10 +2872,13 @@ final class RemoteModel {
             do {
                 let made = try await control.call(
                     DaemonAPI.Method.providersCreate,
-                    DaemonAPI.ProviderCreate(id: draft.provider, name: draft.name, options: .object(draft.values)),
+                    DaemonAPI.ProviderCreate(id: draft.provider, name: draft.name, options: .object(draft.values),
+                                             clones: draft.clones.isEmpty ? nil : draft.clones),
                     returning: DaemonAPI.ProviderCreated.self)
                 if made.workspace.state == "failed" {
                     refused = made.workspace.reason ?? "\(made.workspace.name) could not be made."
+                } else {
+                    machineSetups.made(made.workspace.name, signIn: draft.signIn)
                 }
             } catch {
                 refused = sentence(for: error)
@@ -3243,6 +3250,37 @@ final class RemoteModel {
                 work.replaceAgents([], from: id)
                 serverRuntimes[id] = nil
                 pruneFolderDefaults(of: id, listed: [])
+            }
+        }
+        continueMachineSetups(others)
+    }
+
+    /// The machines New Machine made that have joined (#5204), as the window's: each one's
+    /// runtimes are read until the one to sign in is installed, then its sign-in sheet opens, once.
+    private func continueMachineSetups(_ answering: [DaemonAPI.ControlMachine]) {
+        machineSetups.expire()
+        for (name, runtimeID) in machineSetups.joined(answering.map(\.name)) where !machineSetupsWaiting.contains(name) {
+            guard let host = answering.first(where: { $0.name == name })?.id else { continue }
+            machineSetupsWaiting.insert(name)
+            Task {
+                defer { machineSetupsWaiting.remove(name) }
+                while machineSetups.signIns[name] != nil {
+                    await refreshServerRuntimes(host)
+                    let listed = runtimes(on: host)
+                    let step = listed.isEmpty ? .wait
+                        : MachineSetups.step(runtimeID: runtimeID, runtimes: listed,
+                                             canSignIn: self.host(host, has: Capability.runtimesSignIn1))
+                    switch step {
+                    case .wait:
+                        try? await Task.sleep(for: .seconds(10))
+                        machineSetups.expire()
+                    case .signIn(let runtime):
+                        machineSetups.done(name)
+                        if signingIn == nil { signingIn = RuntimeSignInTarget(host: host, runtime: runtime) }
+                    case .done:
+                        machineSetups.done(name)
+                    }
+                }
             }
         }
     }

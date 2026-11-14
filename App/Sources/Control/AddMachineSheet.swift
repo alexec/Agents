@@ -9,6 +9,7 @@ struct AddMachineSheet: View {
     typealias Words = AddMachine.Words
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppModel.self) private var model
     let control: ControlSettingsModel
 
     enum Step {
@@ -36,11 +37,13 @@ struct AddMachineSheet: View {
             choose
         case .provider(let id):
             if let provider = control.providers.first(where: { $0.id == id }) {
-                NewMachineSheet(providers: [provider], provider: provider.id, showsClones: true,
+                NewMachineSheet(providers: [provider], provider: provider.id,
                                 load: { await control.workspaceOptions($0).mapError { NewMachineRefusal($0.message) } }) { draft in
                     switch await control.makeMachine(draft.provider, name: draft.name, options: .object(draft.values),
                                                      clones: draft.clones) {
                     case .success(let made):
+                        // Its sign-in opens once it joins (#5204), as the sidebar's New Machine's.
+                        if made.joining { model.machineMade(made.workspace.name, signIn: draft.signIn) }
                         // A workspace that can't install on its first boot is added over ssh,
                         // as Add as Host… does.
                         if !made.joining {

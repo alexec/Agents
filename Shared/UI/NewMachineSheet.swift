@@ -12,8 +12,10 @@ struct NewMachineDraft: Equatable, Sendable {
     var provider: ProviderID
     var name: String
     var values: [String: JSONValue]
-    /// Clone these folders (#1122): git URLs. Only Settings' Add a Machine… asks for them.
+    /// Clone these folders (#1122): git URLs, cloned once it joins.
     var clones: [String] = []
+    /// The runtime to sign in once it joins (#5204), nil for Don't sign in.
+    var signIn: String? = MachineSetups.signInRuntimes.first?.id
 }
 
 /// The New Machine sheet up (#4634): for a provider (nil for the default one), or opened
@@ -36,9 +38,9 @@ struct NewMachineSheet: View {
     @Environment(\.dismiss) private var dismiss
     /// The providers New Machine can use: a picker when there are two or more.
     let providers: [DaemonAPI.ProviderSummary]
-    /// Clone these folders: Settings' Add a Machine… has it; the sidebar's New Machine does
-    /// not (you add a folder later, the wireframe).
-    var showsClones = false
+    /// Clone these folders, and the runtime to sign in, with the machine (#5204): every New
+    /// Machine asks for them, so a machine is ready in one step.
+    var showsClones = true
     /// The provider's form, with the values to start with; nil for the default provider.
     let load: @MainActor (ProviderID?) async -> Result<DaemonAPI.ProviderOptions, Refusal>
     /// Makes it: nil when the sheet may close, or the provider's reason, shown in the sheet.
@@ -50,13 +52,14 @@ struct NewMachineSheet: View {
     @State private var name = ""
     @State private var values: [String: JSONValue] = [:]
     @State private var clones = ""
+    @State private var signIn: String? = MachineSetups.signInRuntimes.first?.id
     @State private var working = false
     @State private var problem: String?
     /// A make that failed opens the sheet again on its choices and its reason.
     private let again: NewMachineDraft?
 
     init(providers: [DaemonAPI.ProviderSummary], provider: ProviderID? = nil, again: NewMachineDraft? = nil,
-         problem: String? = nil, showsClones: Bool = false,
+         problem: String? = nil, showsClones: Bool = true,
          load: @escaping @MainActor (ProviderID?) async -> Result<DaemonAPI.ProviderOptions, Refusal>,
          make: @escaping @MainActor (NewMachineDraft) async -> String?) {
         self.providers = providers
@@ -125,9 +128,20 @@ struct NewMachineSheet: View {
                     ForEach(schema) { field in fieldView(field) }
                 }
                 if showsClones {
-                    TextField("Clone these folders", text: $clones,
-                              prompt: Text("https://github.com/you/folder.git"), axis: .vertical)
-                        .lineLimit(1...5)
+                    Picker("Sign in", selection: $signIn) {
+                        ForEach(MachineSetups.signInRuntimes) { Text($0.name).tag(Optional($0.id)) }
+                        Text("Don’t sign in").tag(String?.none)
+                    }
+                    labeled("Clone") {
+                        TextField("Clone these folders", text: $clones,
+                                  prompt: Text("Git addresses, one a line"), axis: .vertical)
+                            .lineLimit(1...5)
+                            .autocorrectionDisabled()
+                            #if os(iOS)
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.URL)
+                            #endif
+                    }
                 }
                 #if os(iOS)
                 // The notes under the form, as a footer, where iOS puts a form's words.
@@ -174,9 +188,7 @@ struct NewMachineSheet: View {
             if let problem {
                 Text(problem).appText(.supporting).tinted(.failure).fixedSize(horizontal: false, vertical: true)
             }
-            Text(showsClones
-                 ? "It joins as a machine by itself once it has started, and is linked to it. Then it clones the folders you list, one a line, with this Mac’s git access when you allow it."
-                 : "It joins as a machine by itself once it has started. The provider charges for it from when it is made.")
+            Text(showsClones ? Self.oneStepNote : "It joins as a machine by itself once it has started. The provider charges for it from when it is made.")
                 .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             #if os(iOS)
             if !cost.isEmpty {
@@ -185,6 +197,9 @@ struct NewMachineSheet: View {
             #endif
         }
     }
+
+    /// What happens once it is made (#5204): it joins, the sign-in opens, the folders clone.
+    static let oneStepNote = "It joins as a machine by itself once it has started. Then its sign-in opens here, and it clones the folders you list, one a line. The provider charges for it from when it is made."
 
     /// A text field with its title beside it: iOS's form shows only a field's prompt.
     @ViewBuilder
@@ -264,6 +279,7 @@ struct NewMachineSheet: View {
                 name = kept.name
                 values = kept.values
                 clones = kept.clones.joined(separator: "\n")
+                signIn = kept.signIn
             } else {
                 // A name typed already stays when the provider changes.
                 if name.isEmpty || name.hasPrefix("machine-") { name = options.name ?? name }
@@ -279,7 +295,8 @@ struct NewMachineSheet: View {
         working = true
         problem = nil
         let urls = clones.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        let draft = NewMachineDraft(provider: provider, name: trimmedName, values: chosen, clones: urls)
+        let draft = NewMachineDraft(provider: provider, name: trimmedName, values: chosen, clones: urls,
+                                    signIn: showsClones ? signIn : nil)
         Task {
             let refused = await make(draft)
             working = false

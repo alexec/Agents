@@ -117,6 +117,12 @@ final class AppModel {
     /// How many New Machine calls wait for the provider's answer (#4610): a *Making…* row
     /// each, until the control plane lists the machine as joining.
     private(set) var machinesBeingMade = 0
+    /// The sign-ins New Machine asked for, until each machine joins (#5204).
+    private(set) var machineSetups = MachineSetups()
+    /// The machines whose sign-in is being waited for now, by name.
+    private var machineSetupsWaiting: Set<String> = []
+    /// A server sign-in to open in its own window, as Sign In… does (#5204): the window opens it.
+    var serverSignInToOpen: ServerSignInKey?
     /// Goes up on each `control/lineageChanged` (#4276): Work ▸ Timeline reads the sessions again.
     private(set) var lineageChanges = 0
     /// A runtime of this Mac's that refused for want of a sign-in: the window answers
@@ -4238,10 +4244,13 @@ final class AppModel {
             do {
                 let made = try await controlRequests.call(
                     DaemonAPI.Method.providersCreate,
-                    DaemonAPI.ProviderCreate(id: draft.provider, name: draft.name, options: .object(draft.values)),
+                    DaemonAPI.ProviderCreate(id: draft.provider, name: draft.name, options: .object(draft.values),
+                                             clones: draft.clones.isEmpty ? nil : draft.clones),
                     returning: DaemonAPI.ProviderCreated.self)
                 if made.workspace.state == "failed" {
                     refused = made.workspace.reason ?? "\(made.workspace.name) could not be made."
+                } else {
+                    machineMade(made.workspace.name, signIn: draft.signIn)
                 }
             } catch let error as JSONRPCError {
                 refused = HostProblem.controlRefusal(error)
@@ -4250,6 +4259,42 @@ final class AppModel {
             }
             if let refused { newMachineAsk = NewMachineAsk(provider: draft.provider, again: draft, problem: refused) }
             await loadMachineProviders()
+        }
+    }
+
+    /// New Machine made `name` (#5204): its sign-in opens by itself once it joins.
+    func machineMade(_ name: String, signIn runtimeID: String?) {
+        machineSetups.made(name, signIn: runtimeID)
+    }
+
+    /// The machines New Machine made that have joined (#5204): each one's runtimes are read until
+    /// the one to sign in is installed, then its sign-in opens in a window of its own, once.
+    private func continueMachineSetups(_ listed: [DaemonAPI.ControlMachine]) {
+        machineSetups.expire()
+        let answering = listed.filter(\.answers)
+        for (name, runtimeID) in machineSetups.joined(answering.map(\.name)) where !machineSetupsWaiting.contains(name) {
+            guard let host = answering.first(where: { $0.name == name })?.id else { continue }
+            machineSetupsWaiting.insert(name)
+            Task {
+                defer { machineSetupsWaiting.remove(name) }
+                while machineSetups.signIns[name] != nil {
+                    await refreshServerRuntimes(host)
+                    let listed = runtimes(on: host)
+                    let step = listed.isEmpty ? .wait
+                        : MachineSetups.step(runtimeID: runtimeID, runtimes: listed,
+                                             canSignIn: self.host(host, has: Capability.runtimesSignIn1))
+                    switch step {
+                    case .wait:
+                        try? await Task.sleep(for: .seconds(10))
+                        machineSetups.expire()
+                    case .signIn(let runtime):
+                        machineSetups.done(name)
+                        serverSignInToOpen = ServerSignInKey(host: host, runtime: runtime)
+                    case .done:
+                        machineSetups.done(name)
+                    }
+                }
+            }
         }
     }
 
@@ -4506,6 +4551,7 @@ final class AppModel {
         for host in others where host.answers {
             await reach(host, through: controlLink)
         }
+        continueMachineSetups(others)
         // One offline or stopped when this window started lists what it last did, greyed, as
         // one that went while it ran (#962).
         for host in others where !host.answers && !work.holdsFolders(of: host.id) {

@@ -44,6 +44,7 @@ import { folderKey, folderPath as agentFolderPath, folderView, type FolderView }
 import { decideMacHostNotice, steadyNotice, type MacHostNotice } from "./macHostNotice";
 import { DisplayBuilder, isPersonsAsk, keepingTurns, storedTurn, turns, type ChatTurn, type Item } from "./turns";
 import { sortedRuntimes } from "./runtimes";
+import { MachineSetups, setupStep } from "./machineSetup";
 import { busLogQuery, type EnvelopeFilter } from "./eventBus";
 import { personPrompts } from "./sessionPrompts";
 import { shownItems } from "./thoughts";
@@ -90,7 +91,11 @@ export { folderKey } from "./groups";
 
 /** DaemonAPI.SandboxWillNotStart, a start's refusal when its runtime's sandbox will not start, with its sentence. */
 /** What New Machine makes, as its sheet has it (#4634). */
-export interface NewMachineDraft { provider: string; name: string; options: Record<string, JSONValue> }
+export interface NewMachineDraft {
+  provider: string; name: string; options: Record<string, JSONValue>;
+  /** Git URLs it clones once it joins (#1122), and the runtime whose sign-in opens then, null for none (#5204). */
+  clones?: string[]; signIn?: string | null;
+}
 /** The New Machine sheet up (#4634): on a provider (none for the default one), or again on a refused make's choices. */
 export interface NewMachineAsk { provider?: string; again?: NewMachineDraft; problem?: string }
 export interface SandboxWillNotStart { runtimeID: string; detail: string; offOffered: boolean; message: string }
@@ -1650,6 +1655,37 @@ export class Store extends Work {
   override takeHosts(hosts: ControlMachine[], now = Date.now()): void {
     super.takeHosts(hosts, now);
     this.providers.linkJoined(hosts);
+    this.continueMachineSetups(hosts, now);
+  }
+
+  /** The sign-ins New Machine asked for, until each machine joins (#5204). */
+  readonly machineSetups = new MachineSetups();
+  private readonly machineSetupsWaiting = new Set<string>();
+
+  /** The machines New Machine made that have joined (#5204), as the window's: each one's runtimes are read until the
+   * one to sign in is installed, then its sign-in panel opens, once. */
+  private continueMachineSetups(hosts: ControlMachine[], now: number): void {
+    const answering = hosts.filter((h) => h.state === "online" || h.state === "needsUpdate");
+    for (const { name, runtimeID } of this.machineSetups.joined(answering.map((h) => h.name), now)) {
+      const host = answering.find((h) => h.name === name)?.id;
+      if (!host || this.machineSetupsWaiting.has(name)) continue;
+      this.machineSetupsWaiting.add(name);
+      const next = async (): Promise<void> => {
+        if (!this.machineSetups.signIns.has(name)) { this.machineSetupsWaiting.delete(name); return; }
+        await this.loadRuntimes(host);
+        const step = setupStep(runtimeID, this.runtimes.peek()[host], this.has(host, Capability.runtimesSignIn1));
+        if ("wait" in step) {
+          setTimeout(() => { this.machineSetups.joined([], Date.now()); void next(); }, 10_000);
+          return;
+        }
+        this.machineSetups.done(name);
+        this.machineSetupsWaiting.delete(name);
+        if ("signIn" in step && !this.runtimeSignIn.peek()) {
+          this.runtimeSignIn.value = { host, runtimeID, runtimeName: step.signIn.runtime.name, machine: name };
+        }
+      };
+      void next();
+    }
   }
 
   async loadUserWorkflows(host: string): Promise<void> {
@@ -3152,12 +3188,16 @@ export class Store extends Work {
     };
     const refused = (problem: string) => { this.newMachineAsk.value = { provider: draft.provider, again: draft, problem }; };
     try {
-      const made = await this.link.call("providers/create", { id: draft.provider as ProviderID, name: draft.name, options: draft.options });
+      const made = await this.link.call("providers/create", {
+        id: draft.provider as ProviderID, name: draft.name, options: draft.options,
+        ...(draft.clones?.length ? { clones: draft.clones } : {}),
+      });
       drop(making);
       if (made.workspace.state === "failed") {
         refused(made.workspace.reason || `Could not make ${made.workspace.name}.`);
         return;
       }
+      this.machineSetups.made(made.workspace.name, draft.signIn ?? null);
       this.machinesMaking.value = [...this.machinesMaking.value, made.workspace.name];
       // A row is drawn for it until a machine of that name joins, or ten minutes at most.
       setTimeout(() => drop(made.workspace.name), 10 * 60_000);

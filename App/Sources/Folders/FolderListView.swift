@@ -12,6 +12,7 @@ import SwiftUI
 /// awake, that a host is not answering. One list keeps all of that in sight.
 struct FolderListView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openWindow) private var openWindow
     @Environment(WindowRequests.self) private var requests
     @Binding var selection: SidebarItem?
 
@@ -466,6 +467,12 @@ struct FolderListView: View {
             // A refused make's ask is new: a sheet of its own, with its reason and choices.
             .id(ask.id)
             .paperSheet()
+        }
+        // The sign-in New Machine asked for, once the machine joined (#5204): its own window.
+        .onChange(of: model.serverSignInToOpen) { _, key in
+            guard let key else { return }
+            model.serverSignInToOpen = nil
+            openWindow(id: ServerSignInScene.id, value: key)
         }
         // The sheet Register a Machine… shows (#503, #2755).
         .sheet(isPresented: Binding(get: { addingMachine != nil }, set: { if !$0 { addingMachine = nil } })) {
