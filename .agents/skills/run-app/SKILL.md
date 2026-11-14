@@ -114,7 +114,7 @@ the same way: open the scratch build with `AGENTS_ROOT=$ROOT` (its plists and jo
 root's, and `stop.sh` boots them out). Make
 more codes with `"$HOSTAPP/Contents/Helpers/agents-control" code --client
 --home $ROOT/control` (add `--browser` for a code the web remote pairs with: a browser's code
-works only through the loopback listener, and any other only over TLS), where `HOSTAPP` is `build/DD/Build/Products/Debug/Agents.app`.
+works only through the loopback listener, and any other only over TLS), where `HOSTAPP` is `build/DD/Build/Products/Debug/Agent Loops.app`.
 
 ## Rules that are not optional
 
@@ -603,7 +603,7 @@ scratch app left on disk is one too: 264 `/tmp/run-*` items and four worktrees' 
    ```
 
 5. After the last walk or screenshot you need, unless you will launch again in this turn,
-   delete the worktree's own build output: the scratch `Agents.app` in
+   delete the worktree's own build output: the scratch `Agent Loops.app` in
    `build/DD`, about 2 GB a worktree, and 17 lanes' of it filled the disk (#2346). Do not
    wait for the lane to end: a rebuild from the shared cache is fast (#234), and a lane
    that must walk again after review rebuilds. Never in the main checkout, whose

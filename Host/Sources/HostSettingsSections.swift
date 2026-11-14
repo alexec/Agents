@@ -18,7 +18,7 @@ struct HostMacSection: View {
                 LabeledContent {
                     Circle().frame(width: 8, height: 8).foregroundStyle(dot)
                 } label: {
-                    Text("Agents on this Mac")
+                    Text("Agent Loops on this Mac")
                     Text(line)
                 }
                 // Why a login item isn't running, as launchd and macOS say it, for as long as
@@ -32,7 +32,7 @@ struct HostMacSection: View {
                         Spacer(minLength: 8)
                         if host.canRepair {
                             Button("Repair") { Task { await host.repair() } }
-                                .help("Registers both login items again from this copy of Agents and starts them.")
+                                .help("Registers both login items again from this copy of Agent Loops and starts them.")
                         } else {
                             Button("Open Login Items") { HostSettingsLinks.openLoginItems() }
                         }
@@ -64,41 +64,41 @@ struct HostMacSection: View {
                 .buttonStyle(.link)
                 .disabled(host.busy != nil)
                 HStack {
-                    Button("Remove Agents from This Mac…", role: .destructive) { confirmingRemove = true }
+                    Button("Remove Agent Loops from This Mac…", role: .destructive) { confirmingRemove = true }
                     Spacer()
                 }
                 .disabled(host.busy != nil)
             }
         } header: {
-            Text("Agents")
+            Text("Agent Loops")
         } footer: {
             if !host.removed {
-                Text("Your agents run in two login items, the control plane and this Mac’s machine, which keep running with the window closed. Remove Agents from This Mac stops them before you move Agents to the Trash.")
+                Text("Your agents run in two login items, the control plane and this Mac’s machine, which keep running with the window closed. Remove Agent Loops from This Mac stops them before you move Agent Loops to the Trash.")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
             }
         }
         .paperListRow()
-        .confirmationDialog("Remove Agents from this Mac?", isPresented: $confirmingRemove, titleVisibility: .visible) {
+        .confirmationDialog("Remove Agent Loops from this Mac?", isPresented: $confirmingRemove, titleVisibility: .visible) {
             Button("Remove", role: .destructive) { Task { await host.removeFromThisMac() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Every agent on this Mac stops, and both login items go. Windows, phones and browsers can’t reach this Mac until you open Agents again. Your sessions and folders are kept.")
+            Text("Every agent on this Mac stops, and both login items go. Windows, phones and browsers can’t reach this Mac until you open Agent Loops again. Your sessions and folders are kept.")
         }
         .hostLooking(host)
     }
 
     @ViewBuilder
     private var removedRows: some View {
-        Label("Agents is removed from this Mac’s login items. Quit Agents, then move it to the Trash.", systemImage: "checkmark.circle")
+        Label("Agent Loops is removed from this Mac’s login items. Quit Agent Loops, then move it to the Trash.", systemImage: "checkmark.circle")
             .fixedSize(horizontal: false, vertical: true)
-        Text("Your sessions are kept in \(host.paths.hostRoot.path) and the control plane’s records in \(host.paths.controlHome.path). Delete those folders too to remove them. Opening Agents again sets it up afresh.")
+        Text("Your sessions are kept in \(host.paths.hostRoot.path) and the control plane’s records in \(host.paths.controlHome.path). Delete those folders too to remove them. Opening Agent Loops again sets it up afresh.")
             .appText(.supporting).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         HStack {
             Spacer()
-            Button("Show Agents in Finder") { NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL]) }
-            Button("Quit Agents") { NSApp.terminate(nil) }
+            Button("Show Agent Loops in Finder") { NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL]) }
+            Button("Quit Agent Loops") { NSApp.terminate(nil) }
                 .keyboardShortcut(.defaultAction)
         }
     }
@@ -252,7 +252,7 @@ struct HostControlPlaneCards: View {
     }
 }
 
-/// Serve Agents to browsers on this Mac (071 FR-002), under the browser card in Settings ▸
+/// Serve Agent Loops to browsers on this Mac (071 FR-002), under the browser card in Settings ▸
 /// Control plane ▸ Overview (#4227): on unless turned off, and only ever on loopback. With
 /// the control plane elsewhere, this Mac's host serves it (#1952). Its line says what the
 /// control plane says: never the address of a page it isn't serving (071 R3).
@@ -263,11 +263,11 @@ struct HostServeCard: View {
         if host.settings.role != .none {
             ControlCard {
                 ControlRow(dot: host.webRemoteFailed ? .attention : .none,
-                           title: "Serve Agents to browsers on this Mac", detail: host.webRemoteLine) {
+                           title: "Serve Agent Loops to browsers on this Mac", detail: host.webRemoteLine) {
                     if host.webRemoteFailed {
                         Button("Try Again") { Task { await host.retryWebRemote() } }.buttonStyle(.paper)
                     }
-                    Toggle("Serve Agents to browsers on this Mac",
+                    Toggle("Serve Agent Loops to browsers on this Mac",
                            isOn: Binding(get: { host.servesWebRemote },
                                          set: { on in Task { await host.setServeWebRemote(on) } }))
                         .labelsHidden()

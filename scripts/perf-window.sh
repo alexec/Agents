@@ -15,7 +15,7 @@ set -euo pipefail
 SLUG=${1:?usage: perf-window.sh SLUG [PROJECT_A PROJECT_B CHAT_A CHAT_B]}
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 # CONFIG=Live times ship-app's optimised build (#220), launched with launch.sh --config Live.
-APP="$REPO/build/DD/Build/Products/${CONFIG:-Debug}/Agents.app"
+APP="$REPO/build/DD/Build/Products/${CONFIG:-Debug}/Agent Loops.app"
 UI_SRC="$REPO/.agents/skills/run-app/scripts/ui.swift"
 WORK="${TMPDIR:-/tmp}/perf-window-$SLUG"
 mkdir -p "$WORK"
@@ -49,7 +49,7 @@ budget() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["nigh
 B_WINDOW=$(budget "cold start: first frame"); B_LIST=$(budget "cold start: first list")
 B_SWITCH=$(budget "project switch"); B_CHAT=$(budget "chat open")
 
-pid_of() { pgrep -f "Agents.app/Contents/MacOS/Agents( Host)? --walk run-$SLUG( |$)" | head -1 || true; }
+pid_of() { pgrep -f "(Agent Loops|Agents)\.app/Contents/MacOS/Agents( Host)? --walk run-$SLUG( |$)" | head -1 || true; }
 perf_lines() { /usr/bin/log show --last "${2:-2m}" --style compact \
   --predicate "processID == $1 AND category == \"perf\"" 2>/dev/null | grep -o 'perf .*' || true; }
 median() { sort -n | awk '{a[NR]=$1} END {if (NR==0) print "-"; else print a[int((NR+1)/2)]}'; }

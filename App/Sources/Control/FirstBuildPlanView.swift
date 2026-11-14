@@ -32,7 +32,7 @@ struct FirstBuildPlanView: View {
         .frame(minWidth: 600, minHeight: 560)
         .paperGround()
         .overlay(alignment: .topTrailing) {
-            Button("Open Agents") { model.openAgentsFromFirstBuild() }
+            Button("Open Agent Loops") { model.openAgentsFromFirstBuild() }
                 .buttonStyle(.paper)
                 .help("The usual window, with this session selected")
                 .padding(16)

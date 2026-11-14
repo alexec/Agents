@@ -90,7 +90,7 @@ the tab with `browser_close` when done.
 
 The `email` server's event `email.received` watches INBOX and the Junk folder (Fastmail's
 **Spam**) when no `folder` is given, so a code the server took for spam still comes, and Mail
-need not run. `scripts/mail-code.py` runs the server (`email-mcp`, in Agents.app) with
+need not run. `scripts/mail-code.py` runs the server (`email-mcp`, in Agent Loops.app) with
 `EMAIL_PASSWORD` from Settings ▸ Secrets, and prints only the code or the link:
 
 1. **Before** you press the button that sends the mail, start the wait:

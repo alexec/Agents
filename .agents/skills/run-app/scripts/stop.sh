@@ -52,7 +52,7 @@ for plist in "$ROOT"/com.alexecollins.agentshost.*.scratch-*.plist "$ROOT"/contr
   fi
 done
 
-for pid in $(pgrep -f "Agents.app/Contents/MacOS/Agents( Host)? --walk $WALK( |$)" || true); do
+for pid in $(pgrep -f "(Agent Loops|Agents)\.app/Contents/MacOS/Agents( Host)? --walk $WALK( |$)" || true); do
   echo "quitting window $pid"
   kill "$pid" 2>/dev/null || true
 done

@@ -33,7 +33,7 @@ struct ConnectLinearSheet: View {
                         Text(ConnectorSetupWords.sheetSubtitle(.linear)).appText(.fine).foregroundStyle(.secondary)
                     }
                 }
-                Text("Agents will be able to").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+                Text("Agent Loops will be able to").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
                     .textCase(.uppercase)
                 VStack(spacing: 0) {
                     ForEach(Array(ConnectorSetupWords.abilities(.linear).enumerated()), id: \.offset) { index, ability in

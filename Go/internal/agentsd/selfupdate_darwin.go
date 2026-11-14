@@ -18,7 +18,7 @@ import (
 )
 
 // registerSelfUpdate serves selfUpdate/status and selfUpdate/set on a Mac whose host runs
-// from an Agents.app (#2178). A test's host serves neither: it is in no bundle a
+// from an Agent Loops.app (#2178). A test's host serves neither: it is in no bundle a
 // release could replace.
 func (d *Daemon) registerSelfUpdate() {
 	if testing.Testing() {
@@ -35,8 +35,8 @@ func (d *Daemon) registerSelfUpdate() {
 	if app == "" {
 		return
 	}
-	// A release's copy of Agents Host takes Agents' name once (#4225); a development
-	// build keeps the name ship.sh gave it. Every job runs from the old path until it
+	// A release's copy of Agents or Agents Host takes Agent Loops' name once (#5297,
+	// #4225); a development build keeps the name ship.sh gave it. Every job runs from the old path until it
 	// restarts, so all of them start again from the new one.
 	if _, release := releaseVersion(buildinfo.Version); release {
 		if _, moved := takeNewName(app, os.Rename); moved {

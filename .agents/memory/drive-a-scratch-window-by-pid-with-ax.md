@@ -9,7 +9,7 @@ metadata:
 Verified 2026-09-24 with Alex active at the Mac (idle 0.2s) and three other `Agents`
 processes running. Nothing was raised, clicked or typed.
 
-1. **Launch behind:** `env -i … open -g -n <Agents.app> --args --root /tmp/<scratch>`
+1. **Launch behind:** `env -i … open -g -n <Agent Loops.app> --args --root /tmp/<scratch>`
    (`-g` keeps it out of front). Scratch root = copies of the live root's `agents/`,
    `projects.json`, `workflows.json`.
 2. **Window id, not coordinates:** a tiny Swift binary calling

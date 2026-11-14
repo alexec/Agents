@@ -20,7 +20,7 @@ enum HostEntry {
         // With no window server to reach (an agent's sandbox, ssh, a launchd job outside
         // the login session), AppKit aborts in _RegisterApplication (#505): say why and stop.
         guard CGSessionCopyCurrentDictionary() != nil else {
-            FileHandle.standardError.write(Data("Agents: no window server to draw on (a sandbox, ssh or no login session); start it from the logged-in desktop.\n".utf8))
+            FileHandle.standardError.write(Data("Agent Loops: no window server to draw on (a sandbox, ssh or no login session); start it from the logged-in desktop.\n".utf8))
             exit(78) // EX_CONFIG
         }
         AgentsApp.main()
@@ -59,7 +59,7 @@ private struct HostMenu: View {
     var body: some View {
         Text(HostMenuWords.counts(working: working, needsYou: app.needsPersonCount))
         Divider()
-        Button("Open Agents") {
+        Button("Open Agent Loops") {
             NSApp.activate()
             app.bringMainWindowForward(opening: openWindow)
         }
@@ -78,7 +78,7 @@ private struct HostMenu: View {
                     guard let why = host.problem else { return }
                     NSApp.activate()
                     let alert = NSAlert()
-                    alert.messageText = "Agents can’t open in a browser"
+                    alert.messageText = "Agent Loops can’t open in a browser"
                     alert.informativeText = why
                     alert.runModal()
                 }
@@ -86,7 +86,7 @@ private struct HostMenu: View {
         }
         Divider()
         Button("Settings…") { showSettings() }
-        Button("Quit Agents") { NSApp.terminate(nil) }
+        Button("Quit Agent Loops") { NSApp.terminate(nil) }
         Text("Your agents keep running after quitting.").font(.caption)
     }
 

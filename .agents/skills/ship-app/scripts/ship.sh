@@ -1,16 +1,17 @@
 #!/bin/zsh
-# Build main and install Agents (the Mac window and this Mac's host, one app since #4225)
+# Build main and install Agent Loops (the Mac window and this Mac's host, one app since #4225)
 # and the Remote.
 #
 # The Mac install runs by default. Pass --no-mac to leave Agents and the login-item jobs
 # alone. A development run and a merge wave do not run this script.
 #
-# Agents is swapped in at ~/Applications/Agents.app, where its Login Items point, and launchd
+# Agent Loops is swapped in at ~/Applications/Agent Loops.app, where its Login Items point, and launchd
 # restarts both jobs from it. It is staged in ~/Applications/AgentsLive/<sha>-<time>/ first,
 # never moved from build/DD-host: every build in the main checkout writes over that. The
 # relaunch is this file detached (`--restart`), because the host it restarts is usually the
-# one running the session that started it. Agents Host's copy (~/Applications/Agents
-# Host.app) and the App Store window's (a live copy) go, the first time.
+# one running the session that started it. The copies under the app's old names
+# (~/Applications/Agents.app, #5297, and ~/Applications/Agents Host.app, #4225) and the App
+# Store window's (a live copy) go, the first time.
 #
 # A device install is detached the same way (`--install-device`), one per device, and does
 # not wait on or delay the Mac relaunch: a locked phone or a flaky connection retries every
@@ -52,9 +53,9 @@
 set -u
 setopt pipefail
 
-HOSTAPP_AT=$HOME/Applications/Agents.app
-# Where Agents Host was installed before it became Agents (#4225).
-OLD_HOSTAPP_AT=$HOME/Applications/"Agents Host.app"
+HOSTAPP_AT=$HOME/Applications/"Agent Loops.app"
+# Where the app was installed under its old names: Agents (#5297), and Agents Host (#4225).
+OLD_HOSTAPPS_AT=($HOME/Applications/Agents.app $HOME/Applications/"Agents Host.app")
 ROOT="$HOME/Library/Application Support/Agents"
 GUI=gui/$(id -u)
 # Agents' two jobs.
@@ -177,20 +178,23 @@ restart() { # live-folder sha delay
     PATH=/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin LANG=en_US.UTF-8)
   local pid cmd j
 
-  # Agents: the new bundle in place of the old, then launchd starts each job again from it,
-  # and the window opens on the new build. Agents Host's copy goes aside as an old one does.
+  # Agent Loops: the new bundle in place of the old, then launchd starts each job again from
+  # it, and the window opens on the new build. A copy under an old name (Agents.app, Agents
+  # Host.app) goes aside as an old one does.
   # By exact command line: a grep for the path would find the grep itself.
+  local -a both=($HOSTAPP_AT $OLD_HOSTAPPS_AT) programs
+  programs=(${^both}/Contents/MacOS/"Agents Host")
   ps -axww -o pid=,command= | while read -r pid cmd; do
-    [[ $cmd == "$HOSTAPP_AT/Contents/MacOS/Agents Host" || $cmd == "$OLD_HOSTAPP_AT/Contents/MacOS/Agents Host" ]] || continue
-    echo "quitting Agents $pid"; kill -TERM $pid
+    (( ${programs[(Ie)$cmd]} )) || continue
+    echo "quitting Agent Loops $pid"; kill -TERM $pid
   done
   mkdir -p $HOME/Applications/AgentsLive
   local before
-  for before in $HOSTAPP_AT $OLD_HOSTAPP_AT; do
+  for before in $HOSTAPP_AT $OLD_HOSTAPPS_AT; do
     [[ -d $before ]] && mv "$before" "$HOME/Applications/AgentsLive/host-before-$SHA-$(date +%H%M%S)-${before:t:r:gs/ /-/}.app"
   done
-  mv "$LIVE/Agents.app" "$HOSTAPP_AT"
-  echo "$(date) Agents $SHA at $HOSTAPP_AT"
+  mv "$LIVE/Agent Loops.app" "$HOSTAPP_AT"
+  echo "$(date) Agent Loops $SHA at $HOSTAPP_AT"
   only_installed_host
   restart_host_jobs
 
@@ -199,7 +203,7 @@ restart() { # live-folder sha delay
     echo "quitting the App Store window $pid"; kill -TERM $pid
     for i in {1..50}; do kill -0 $pid 2>/dev/null || break; sleep 0.2; done
   done
-  echo "$(date) opening Agents $SHA"
+  echo "$(date) opening Agent Loops $SHA"
   $CLEAN open "$HOSTAPP_AT"
 
   sleep 8
@@ -225,8 +229,8 @@ restart() { # live-folder sha delay
     echo "removing $old"; rm -rf "$old"
   done
   if (( wrong )); then
-    echo "$(date) FAILED: Agents' jobs do not run from $HOSTAPP_AT (#3451); see ship.sh --check-host"
-    osascript -e 'display notification "Its jobs run from another copy. See /tmp/main-restart-all-'$SHA'.log" with title "Agents did not restart from the installed app"' 2>/dev/null
+    echo "$(date) FAILED: Agent Loops' jobs do not run from $HOSTAPP_AT (#3451); see ship.sh --check-host"
+    osascript -e 'display notification "Its jobs run from another copy. See /tmp/main-restart-all-'$SHA'.log" with title "Agent Loops did not restart from the installed app"' 2>/dev/null
     exit 1
   fi
   echo "$(date) done"
@@ -353,7 +357,7 @@ fi
 SHA=$(git -C "$REPO" rev-parse --short HEAD)
 LOGS=/tmp/ship-app-$SHA; (( BUILD_ONLY )) && LOGS+=-build-only; mkdir -p $LOGS
 CONFIG=Live
-HOSTAPP=$REPO/build/DD-host/Build/Products/$CONFIG/Agents.app
+HOSTAPP=$REPO/build/DD-host/Build/Products/$CONFIG/"Agent Loops.app"
 IOSAPP=$REPO/build/DD-ios/Build/Products/$CONFIG-iphoneos/Agents.app
 echo "$( (( BUILD_ONLY )) && echo "build only, $REPO" || echo "main, $REPO") $SHA  logs $LOGS"
 if [[ -n $(git -C "$REPO" --no-optional-locks status --porcelain --untracked-files=no) ]]; then
@@ -483,9 +487,9 @@ if (( MAC )); then
   # what a build or a later ship is writing. Agents moves on from here into place.
   LIVE=$HOME/Applications/AgentsLive/$SHA-$(date +%Y%m%d-%H%M%S)
   mkdir -p $LIVE.partial
-  ditto $HOSTAPP $LIVE.partial/Agents.app \
-    && codesign --verify --deep --strict $LIVE.partial/Agents.app 2>/dev/null \
-    && ! codesign -dv "$LIVE.partial/Agents.app/Contents/Helpers/agentsd" 2>&1 | grep -q 'TeamIdentifier=not set' \
+  ditto $HOSTAPP "$LIVE.partial/Agent Loops.app" \
+    && codesign --verify --deep --strict "$LIVE.partial/Agent Loops.app" 2>/dev/null \
+    && ! codesign -dv "$LIVE.partial/Agent Loops.app/Contents/Helpers/agentsd" 2>&1 | grep -q 'TeamIdentifier=not set' \
     || { echo "the Mac builds are not signed by the team (built with CODE_SIGNING_ALLOWED=NO?); rebuild without --no-build" >&2
          rm -rf $LIVE.partial; exit 1; }
   mv $LIVE.partial $LIVE

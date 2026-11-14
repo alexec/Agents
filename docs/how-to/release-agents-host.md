@@ -11,21 +11,23 @@ is not in the Mac App Store. The iPhone and iPad app (the Remote) goes to TestFl
 the App Store. Pushing a version tag on main publishes a release. The tag starts the
 `release` workflow, which:
 
-- builds Agents, with agentsd and agents-control inside it;
-- signs it with Developer ID, notarizes it and staples it, as `Agents-<version>.dmg`;
-- staples the same app and zips it as `Agents-<version>.zip`, for Macs that cannot mount a
-  disk image;
-- zips the same signed app again under its old name, `Agents Host.app`, as
-  `Agents-Host-<version>.zip`. An install of the earlier Agents Host updates itself from
-  this zip. When it runs, agentsd renames it to `Agents.app`, one time (#4225);
+- builds Agent Loops, with agentsd and agents-control inside it;
+- signs it with Developer ID, notarizes it and staples it, as `Agent-Loops-<version>.dmg`;
+- staples the same app and zips it as `Agent-Loops-<version>.zip`, for Macs that cannot
+  mount a disk image;
+- zips the same signed app again under each old name: `Agents.app`, as
+  `Agents-<version>.zip`, and `Agents Host.app`, as `Agents-Host-<version>.zip`. An install
+  of the earlier Agents or Agents Host updates itself from its zip. When it runs, agentsd
+  renames it to `Agent Loops.app`, one time, so no second app stays (#5297, #4225);
 - builds the static Linux agentsd (Go) as `agentsd-linux-<arch>-<version>.tar.gz`;
-- creates the release, titled **Agents <version>**, with these files and a `SHA256SUMS`.
-  Agents on a Mac updates itself from them (#2178): agentsd downloads
-  `v<version>/SHA256SUMS` and `v<version>/Agents-<version>.zip`, checks the sum, then the
-  app's signature (the same team and identifier), its notarisation and its
-  `CFBundleShortVersionString`. Keep these names. Keep the app in `Agents-<version>.zip`
-  stapled and named `Agents.app`, and the app in `Agents-Host-<version>.zip` named
-  `Agents Host.app`;
+- creates the release, titled **Agent Loops <version>**, with these files and a
+  `SHA256SUMS`. Agent Loops on a Mac updates itself from them (#2178): agentsd downloads
+  `v<version>/SHA256SUMS` and `v<version>/Agent-Loops-<version>.zip`, checks the sum, then
+  the app's signature (the same team and identifier), its notarisation and its
+  `CFBundleShortVersionString`. Keep these names. Keep the app in
+  `Agent-Loops-<version>.zip` stapled and named `Agent Loops.app`, the app in
+  `Agents-<version>.zip` named `Agents.app`, and the app in `Agents-Host-<version>.zip`
+  named `Agents Host.app`;
 - in its `image` job, builds the control plane's image for `linux/amd64` and `linux/arm64`
   and pushes it to `ghcr.io/alexec/agents-control` as `<version>`, `<major>.<minor>` and
   `latest`, with an SBOM and provenance, and signs it with cosign, keyless (#2140). It uses
@@ -144,8 +146,8 @@ the **release** workflow by hand and give it the tag. It replaces the release's 
 Developer ID identity in your keychain, and `ASC_KEY_ID`,
 `ASC_ISSUER_ID` and `ASC_KEY_PATH` set. It needs the Linux agentsd in `App/Resources/servers`,
 from `scripts/build-linux-agentsd.sh`, and Go installed (`brew install go`) for the Go
-programs Agents carries. It writes `Agents-0.2.0.dmg`, `Agents-0.2.0.zip`,
-`Agents-Host-0.2.0.zip`, the Linux tarballs and `SHA256SUMS` into `build/release/`.
+programs Agents carries. It writes `Agent-Loops-0.2.0.dmg`, `Agent-Loops-0.2.0.zip`,
+`Agents-0.2.0.zip`, `Agents-Host-0.2.0.zip`, the Linux tarballs and `SHA256SUMS` into `build/release/`.
 
 `scripts/release-host.sh --dry-run 0.2.0` needs none of that. It signs ad hoc and doesn't
 notarize, which proves the build and the packaging. Gatekeeper refuses the result.

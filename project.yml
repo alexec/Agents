@@ -621,9 +621,10 @@ targets:
     info:
       path: Host/Info.plist
       properties:
-        # One app, Agents (#4224): the window, the menu bar item and this Mac's host.
-        CFBundleDisplayName: Agents
-        CFBundleName: Agents
+        # One app, Agent Loops (#4224, #5297): the window, the menu bar item and this Mac's
+        # host. The menu bar, About, the Dock, notifications and Login Items say this name.
+        CFBundleDisplayName: Agent Loops
+        CFBundleName: Agent Loops
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         LSApplicationCategoryType: public.app-category.developer-tools
@@ -648,7 +649,10 @@ targets:
         # Agents Host to this app with no step from the person.
         PRODUCT_BUNDLE_IDENTIFIER: com.alexecollins.agents.host
         CODE_SIGN_ENTITLEMENTS: Host/AgentsHost.entitlements
-        PRODUCT_NAME: Agents
+        # Agent Loops.app (#5297). agentsd's self-update renames an Agents.app or an
+        # Agents Host.app to it (takeNewName). The Swift module keeps its name.
+        PRODUCT_NAME: Agent Loops
+        PRODUCT_MODULE_NAME: Agents
         # Still Agents Host's program name (#4225): each login item was registered with
         # BundleProgram Contents/MacOS/Agents Host, and launchd runs that path in whatever
         # bundle a self-update puts in place. The person sees CFBundleName, never this.

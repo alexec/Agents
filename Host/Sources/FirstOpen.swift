@@ -21,7 +21,7 @@ final class FirstOpen {
     }
 
     let host: HostModel
-    private(set) var step: Step = .working("Setting up Agents on this Mac…")
+    private(set) var step: Step = .working("Setting up Agent Loops on this Mac…")
     /// macOS wants the person to allow Agents in System Settings ▸ General ▸ Login Items.
     var needsApproval: Bool { host.needsApproval }
     private var running = false
@@ -38,7 +38,7 @@ final class FirstOpen {
             step = .elsewhere
             return
         }
-        step = .working("Setting up Agents on this Mac…")
+        step = .working("Setting up Agent Loops on this Mac…")
         await host.refresh()
         // An alpha's Agents Host that runs here already is left as it is: only the window pairs.
         if host.settings.role == .none || !host.controlRunning || !host.daemonRunning {
@@ -46,7 +46,7 @@ final class FirstOpen {
             if let problem = host.problem {
                 // Login Items' own line says what to do; anything else is one line, and the
                 // error itself is under Show Details.
-                return needsApproval ? fail(problem) : fail("Agents could not start on this Mac.", why: problem)
+                return needsApproval ? fail(problem) : fail("Agent Loops could not start on this Mac.", why: problem)
             }
         }
         step = .working("Connecting this window…")

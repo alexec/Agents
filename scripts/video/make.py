@@ -233,7 +233,7 @@ class Video:
         self.client = Client(self.root)
         # Agents call the person by the Mac account's first name; on camera it is a made-up one.
         self.rpc("person/set", {"name": "Sam"})
-        self.host_app = REPO / "build/DD/Build/Products/Debug/Agents.app"
+        self.host_app = REPO / "build/DD/Build/Products/Debug/Agent Loops.app"
         self.stopping = False
         threading.Thread(target=self._permissions, daemon=True).start()
 

@@ -165,7 +165,7 @@ struct ControlProvidersPage: View {
                             .buttonStyle(.paper)
                             .disabled(workspace.ssh == nil || workspace.state != "running")
                             .help(workspace.ssh == nil ? "\(provider.name) gives no ssh destination for it: add it by command, then use Link to Provider… on it."
-                                  : workspace.state == "running" ? "Installs Agents on it over ssh, and links the machine to it."
+                                  : workspace.state == "running" ? "Installs Agent Loops on it over ssh, and links the machine to it."
                                   : "Start it first: it has to be running to be installed.")
                         }
                         .fixedSize()

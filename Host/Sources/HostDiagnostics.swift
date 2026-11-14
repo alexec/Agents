@@ -30,7 +30,7 @@ struct HostDiagnostics {
         var lines: [String] = []
         func section(_ title: String) { lines += ["", "## \(title)"] }
 
-        lines.append("# Agents diagnostics")
+        lines.append("# Agent Loops diagnostics")
         lines.append("Made \(Date().formatted(.iso8601)) on macOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
         section("This copy")
         lines.append("Version: \(info["CFBundleShortVersionString"] as? String ?? "?") (\(info["CFBundleVersion"] as? String ?? "?"))")

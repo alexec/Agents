@@ -8,7 +8,7 @@ enum AppCheckout {
     static let name: String? = locate()
 
     static func windowTitle(_ subject: String?) -> String {
-        let base = subject.flatMap { $0.isEmpty ? nil : $0 } ?? "Agents"
+        let base = subject.flatMap { $0.isEmpty ? nil : $0 } ?? "Agent Loops"
         guard let name else { return base }
         return "\(name) · \(base)"
     }

@@ -30,7 +30,7 @@ plane on this Mac is an option for a person who wants nothing remote.
 1. Download Agents, a free download from us. It is not in the Mac App Store, because it
    runs programs for your agents.
 
-   The release has `Agents-<version>.dmg` and `Agents-<version>.zip`, with the same app in
+   The release has `Agent-Loops-<version>.dmg` and `Agent-Loops-<version>.zip`, with the same app in
    them. Neither needs admin rights. If your Mac does not open a disk image (because of a
    company policy, for example), download the `.zip` instead and double-click it.
 2. Drag Agents into `~/Applications`, the Applications folder in your home folder. You can

@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,7 +30,7 @@ import (
 // release in machine/release at each join. When it is newer than this copy, and the person
 // has not turned updating off (selfUpdate/set, self-update.json in the root), the host:
 //
-//  1. downloads the release's Agents-<version>.zip and SHA256SUMS, and checks the sum;
+//  1. downloads the release's Agent-Loops-<version>.zip and SHA256SUMS, and checks the sum;
 //  2. unpacks it beside this copy, and checks the new copy's signature (the same team and
 //     identifier as this one), its notarisation and its version;
 //  3. waits until no turn runs, then swaps the new copy and this one in one step, and keeps
@@ -44,17 +45,17 @@ import (
 // person cannot change, such as /Applications for a standard user, says so and stays.
 // A development build, or a copy with no team, never updates itself.
 //
-// Agents was Agents Host, with the same bundle ID (#4224). A release's copy that runs from
-// an Agents Host.app takes the new name once (takeNewName), so an install of Agents Host
-// moves across with no step from the person.
+// Agent Loops was Agents, and Agents Host before that, with the same bundle ID (#4224,
+// #5297). A release's copy that runs from an Agents.app or an Agents Host.app takes the new
+// name once (takeNewName), so an earlier install moves across with no step from the person,
+// and no second app stays beside it.
 
 const selfUpdateFile = "self-update.json"
 
-// The app's name, and Agents Host's before it (#4225).
-const (
-	appName    = "Agents.app"
-	oldAppName = "Agents Host.app"
-)
+// The app's name (#5297), and its names before it: Agents (#4225) and Agents Host.
+const appName = "Agent Loops.app"
+
+var oldAppNames = []string{"Agents.app", "Agents Host.app"}
 
 // An update's folder beside the app is updateFolderPrefix and a random end; Agents Host's
 // were oldUpdateFolderPrefix.
@@ -92,7 +93,7 @@ const releaseDownloads = "https://github.com/agentloops-dev/Agents/releases/down
 // selfUpdater is one Mac host's updater; nil on a host that is not in an app.
 type selfUpdater struct {
 	file    string
-	app     string // the Agents.app this host runs from
+	app     string // the app this host runs from (Agent Loops.app)
 	running string // this copy's version
 	tell    func(wire.SelfUpdate)
 	turns   func() int
@@ -368,11 +369,11 @@ func (u *selfUpdater) betweenTurns() error {
 }
 
 // download fetches the release's zip and its sum, checks the one against the other, and
-// unpacks it in work. It is the new Agents.app, which goes where this copy is, whatever
+// unpacks it in work. It is the new Agent Loops.app, which goes where this copy is, whatever
 // that is named.
 func (u *selfUpdater) download(version, work string) (string, error) {
 	base := strings.TrimSuffix(cmp.Or(os.Getenv("AGENTS_RELEASE_DOWNLOADS"), releaseDownloads), "/") + "/v" + version + "/"
-	name := "Agents-" + version + ".zip"
+	name := releaseZip(version)
 	var sums strings.Builder
 	if err := u.fetch(u.ctx, base+"SHA256SUMS", &sums, 1<<16); err != nil {
 		return "", fmt.Errorf("Agents could not download release %s's checksums: %w", version, err)
@@ -406,6 +407,11 @@ func (u *selfUpdater) download(version, work string) (string, error) {
 	}
 	return next, nil
 }
+
+// releaseZip is the release's zip of Agent Loops.app. A release also carries
+// Agents-<version>.zip (Agents.app) and Agents-Host-<version>.zip (Agents Host.app), for
+// the copies that named their zip so before (#5297, #4225).
+func releaseZip(version string) string { return "Agent-Loops-" + version + ".zip" }
 
 // sumFor is the sum SHA256SUMS gives a file ("<hex>  <name>"), or "".
 func sumFor(sums, name string) string {
@@ -564,7 +570,7 @@ func newerRelease(named, running string) bool {
 	return false
 }
 
-// enclosingApp is the outermost-first .app the executable is in: Agents.app for
+// enclosingApp is the outermost-first .app the executable is in: Agent Loops.app for
 // Contents/Helpers/agentsd. "" when it is in none.
 func enclosingApp(executable string) string {
 	for dir := filepath.Dir(executable); dir != "/" && dir != "."; dir = filepath.Dir(dir) {
@@ -575,13 +581,13 @@ func enclosingApp(executable string) string {
 	return ""
 }
 
-// takeNewName is where a release's copy of the app runs from once it has Agents' name
-// (#4225): an Agents Host.app becomes an Agents.app beside it, once. It stays where it is
-// when something else has the name there (the App Store window, in /Applications), or the
-// rename fails. moved is whether it was renamed: what runs from the old path then
-// restarts, from the new one.
+// takeNewName is where a release's copy of the app runs from once it has Agent Loops' name
+// (#5297, #4225): an Agents.app or an Agents Host.app becomes an Agent Loops.app beside it,
+// once, so the old bundle is gone. It stays where it is when something else has the name
+// there, or the rename fails. moved is whether it was renamed: what runs from the old path
+// then restarts, from the new one.
 func takeNewName(app string, rename func(a, b string) error) (now string, moved bool) {
-	if filepath.Base(app) != oldAppName {
+	if !slices.Contains(oldAppNames, filepath.Base(app)) {
 		return app, false
 	}
 	next := filepath.Join(filepath.Dir(app), appName)
