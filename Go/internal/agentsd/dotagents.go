@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
 )
 
 // The ready-made workflows and skills (#1342, #1633, #3307) are not in this binary (#5091): they
