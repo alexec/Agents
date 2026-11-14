@@ -90,6 +90,7 @@ func (d *Daemon) checkRepoAliases(ctx context.Context) int {
 		if r, ok := d.lineageFiles(); ok {
 			r.Realias()
 		}
+		d.realiasCost()
 	}
 	return added
 }
@@ -105,13 +106,14 @@ func (d *Daemon) lineageFiles() (interface{ Realias() }, bool) {
 }
 
 // githubReposNamed is each GitHub repo a folder's origin or a lineage node names, lower case,
-// once, at most repoAliasMostAsked; a repo known to have moved is not asked again.
+// once, at most repoAliasMostAsked. A repo known to have moved is asked by its name now, so a
+// second move (a to b, then b to c; #5332) is found and the chain ends at the name GitHub has.
 func (d *Daemon) githubReposNamed() []string {
 	seen := map[string]bool{}
 	var out []string
 	add := func(repo string) {
-		repo = strings.ToLower(repo)
-		if repo == "" || seen[repo] || !strings.Contains(repo, "/") || repoalias.Topic("github", repo) != repo {
+		repo = repoalias.Topic("github", strings.ToLower(repo))
+		if repo == "" || seen[repo] || !strings.Contains(repo, "/") {
 			return
 		}
 		seen[repo] = true
