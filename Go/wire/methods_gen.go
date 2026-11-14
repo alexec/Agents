@@ -117,6 +117,7 @@ var CallDaemonQuit = Method[QuitRequest, Empty]{"daemon/quit"}
 var CallDaemonStatus = Method[Empty, DaemonStatus]{"daemon/status"}
 var CallDailySummarySetSettings = Method[DailySummarySettings, DailySummarySettings]{"dailySummary/setSettings"}
 var CallDailySummarySettings = Method[Empty, DailySummarySettings]{"dailySummary/settings"}
+var CallDeploysTargets = Method[DeployTargetsRequest, DeployTargets]{"deploys/targets"}
 var CallDesktopControlResume = Method[AgentRequest, Empty]{"desktopControl/resume"}
 var CallDesktopControlSet = Method[DesktopControlSettings, DesktopControlSettings]{"desktopControl/set"}
 var CallDesktopControlState = Method[Empty, DesktopControlSettings]{"desktopControl/state"}

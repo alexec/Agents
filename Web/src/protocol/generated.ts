@@ -3744,6 +3744,19 @@ export interface DeployEvent {
   outcome?: DeployOutcome;
 }
 
+/**
+ * A deploy as deploys/targets says it on its target (#5270): the deploy; release is the lineage ref
+ * of its release when a v* tag names its version, for the release's page. A live one has since (the
+ * first deploy of its newest unbroken run there) and share (its per cent of the traffic, 100 with
+ * no split).
+ */
+export interface DeployOnTarget {
+  deploy: Deploy;
+  release?: string;
+  since?: WireDate;
+  share?: number;
+}
+
 /** How a deploy that did not succeed ended, as deploy.failed says it. */
 export type DeployOutcome =
   | "failed"
@@ -3777,6 +3790,29 @@ export interface DeployTarget {
   id?: string;
   ref?: string;
 }
+
+/**
+ * One target in deploys/targets (#5270): its component, its environment (the environment node's
+ * name, with its tier) and its labels; live are the versions that run there now, the most traffic
+ * first; next are the deploys that wait or run to go there, oldest first (#5246).
+ */
+export interface DeployTargetNow {
+  target: DeployTarget;
+  live: DeployOnTarget[];
+  next: DeployOnTarget[];
+}
+
+/**
+ * deploys/targets (#5270, Work ▸ Deploys): every target this host keeps deploys of, with its live
+ * and next versions, as lineage computes them (#5246). at is when it was read.
+ */
+export interface DeployTargets {
+  targets: DeployTargetNow[];
+  at: WireDate;
+}
+
+/** deploys/targets (#5270): no parameters. */
+export interface DeployTargetsRequest {}
 
 /**
  * The set of artifacts that go out together (#5262); one artifact is the simple case. name is set
@@ -15677,6 +15713,7 @@ export interface Methods {
   "daemon/policyState": { params: Empty; result: PolicyState };
   "dailySummary/setSettings": { params: DailySummarySettings; result: DailySummarySettings };
   "dailySummary/settings": { params: Empty; result: DailySummarySettings };
+  "deploys/targets": { params: DeployTargetsRequest; result: DeployTargets };
   "desktopControl/resume": { params: AgentRequest; result: Empty };
   "desktopControl/set": { params: DesktopControlSettings; result: DesktopControlSettings };
   "desktopControl/state": { params: Empty; result: DesktopControlSettings };
@@ -16127,6 +16164,7 @@ export const MethodTarget = {
   "daemon/policyState": "host",
   "dailySummary/setSettings": "host",
   "dailySummary/settings": "host",
+  "deploys/targets": "host",
   "desktopControl/resume": "host",
   "desktopControl/set": "host",
   "desktopControl/state": "host",
@@ -16801,7 +16839,11 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeployComponent: { required: ["system", "id"], optional: ["kind", "name", "repo"] },
   DeployEnvironment: { required: ["system", "name", "tier"], optional: ["ephemeral", "url"] },
   DeployEvent: { required: ["deploy", "component", "environment", "tier"], optional: ["outcome"] },
+  DeployOnTarget: { required: ["deploy"], optional: ["release", "since", "share"] },
   DeployTarget: { required: ["component", "environment"], optional: ["labels", "system", "id", "ref"] },
+  DeployTargetNow: { required: ["target", "live", "next"], optional: [] },
+  DeployTargets: { required: ["targets", "at"], optional: [] },
+  DeployTargetsRequest: { required: [], optional: [] },
   DeployVersion: { required: ["artifacts"], optional: ["name", "system", "id", "ref"] },
   DesktopControlLiveFrame: { required: ["agentID", "capturedAt"], optional: ["image", "locked", "narration"] },
   DesktopControlPause: { required: ["app", "pausedAt"], optional: [] },

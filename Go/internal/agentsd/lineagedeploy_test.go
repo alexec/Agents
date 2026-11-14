@@ -293,3 +293,41 @@ func TestLineageDeployLiveAndNext(t *testing.T) {
 		"live github:deploy:alexec/agents#5 10:45",
 		"live github:deploy:alexec/agents#6 10:51")
 }
+
+// #5270: deploys/targets says every target, in the environment its job's notice names, with
+// its live versions (the most traffic first), since when, its next deploys, and the release.
+func TestDeployTargets(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	t0 := time.Date(2026, 11, 13, 10, 0, 0, 0, time.UTC)
+	at := func(m int) time.Time { return t0.Add(time.Duration(m) * time.Minute) }
+	d.lineageEvent(deployEvent(t, "deploy.succeeded", 1, "release", "aaa", "v0.18.0", 10, wire.DeployStateSucceeded, at(0), at(1),
+		"testflight=testflight:com.example.remote/812"))
+	d.lineageEvent(deployEvent(t, "deploy.succeeded", 2, "production", "aaa", "v0.18.0", 11, wire.DeployStateSucceeded, at(10), at(11)))
+	canary := deployEvent(t, "deploy.succeeded", 3, "production", "bbb", "v0.19.0", 12, wire.DeployStateSucceeded, at(20), at(21))
+	canary.Details["payload"] = strings.Replace(canary.Details["payload"], `"state":`, `"share":10,"state":`, 1)
+	d.lineageEvent(canary)
+	d.lineageEvent(deployEvent(t, "deploy.waiting", 4, "production", "ccc", "v0.20.0", 13, wire.DeployStateWaiting, at(30), time.Time{}))
+	d.lineageSettle(5 * time.Second)
+
+	got := d.deployTargets()
+	var lines []string
+	for _, tn := range got.Targets {
+		line := tn.Target.Environment.Name + " " + string(tn.Target.Environment.Tier) + ":"
+		for _, l := range tn.Live {
+			line += fmt.Sprintf(" live %s %v%% since %s release %s", *l.Deploy.Version.Name, *l.Share, l.Since.Time().Format("15:04"), *l.Release)
+		}
+		for _, n := range tn.Next {
+			line += " next " + *n.Deploy.Version.Name + " " + string(n.Deploy.State)
+		}
+		lines = append(lines, line)
+	}
+	want := []string{
+		"production other: live v0.18.0 90% since 10:11 release github:release:alexec/agents#v0.18.0" +
+			" live v0.19.0 10% since 10:21 release github:release:alexec/agents#v0.19.0 next v0.20.0 waiting",
+		"testflight other: live v0.18.0 100% since 10:01 release github:release:alexec/agents#v0.18.0",
+	}
+	if !slices.Equal(lines, want) {
+		t.Fatalf("targets\n%s\nwant\n%s", strings.Join(lines, "\n"), strings.Join(want, "\n"))
+	}
+}

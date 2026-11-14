@@ -20,6 +20,9 @@ protocol WorkModel: AnyObject, Sendable {
     /// The machines that draw Work ▸ Timeline (`work/timeline`, #4173), the home one first. None on
     /// the Remote: the Timeline is the Mac's (remote: by design).
     var timelineMachines: [(id: MachineRef, name: String)] { get }
+    /// The machines that say their deploys' targets (`deploys/targets`, #5270), the home one first.
+    /// None on the Remote: Work ▸ Deploys is Mac + web.
+    var deploysMachines: [(id: MachineRef, name: String)] { get }
     /// The machines that give Work ▸ Features in one read (`work/features`, #4586), the home one
     /// first; the others are read with `forge/features`, `forge/issues` and `forge/plan`.
     var featuresMachines: [(id: MachineRef, name: String)] { get }
@@ -111,6 +114,7 @@ extension WorkModel {
         await keptWork([DaemonAPI.ProjectBoard].self, .boards, boardsAsked)
     }
     var timelineMachines: [(id: MachineRef, name: String)] { [] }
+    var deploysMachines: [(id: MachineRef, name: String)] { [] }
     var featuresMachines: [(id: MachineRef, name: String)] { [] }
     func lineageSessionsOn(_ nodes: [DaemonAPI.LineageNode]) async -> DaemonAPI.LineageSessionsOn? { nil }
     var lineageChanges: Int { 0 }

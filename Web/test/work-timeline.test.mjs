@@ -323,8 +323,8 @@ test("a child that closed since the last read lands", () => {
   assert.deepEqual(t.landed(before, after), ["github:alexec/Agents#2"]);
 });
 
-test("Timeline is a row after Releases in Work", () => {
+test("Timeline is a row after Releases and Deploys in Work", () => {
   const ids = nav.navPages.work.map((p) => p.id);
-  assert.deepEqual(ids.slice(-2), ["release", "timeline"]);
+  assert.deepEqual(ids.slice(-3), ["release", "deploys", "timeline"]);
   assert.deepEqual(nav.navPages.work.at(-1).draw, { kind: "timeline" });
 });

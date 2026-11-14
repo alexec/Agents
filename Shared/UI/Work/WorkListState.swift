@@ -266,6 +266,8 @@ final class WorkLists {
     #if os(macOS)
     /// Work ▸ Timeline (#4173): the Mac's alone for now (remote: by design).
     let timeline = WorkTimelineState()
+    /// Work ▸ Deploys (#5270): Mac + web, so not on the Remote.
+    let deploys = WorkDeploysState()
     #endif
     private var byKind: [WorkList.Kind: WorkListState] = [:]
 

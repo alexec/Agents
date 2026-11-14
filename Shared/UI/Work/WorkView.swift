@@ -21,6 +21,10 @@ struct WorkView: View {
                 WorkItemPage(model: model, place: place).id(place)
             } else if place.kind == .feature {
                 WorkFeaturesPane(model: model, state: model.workLists.features)
+            } else if place.kind == .deploy {
+                #if os(macOS)
+                WorkDeploysPane(model: model, state: model.workLists.deploys)
+                #endif
             } else if place.kind == .timeline {
                 #if os(macOS)
                 WorkTimelinePane(model: model, state: model.workLists.timeline)
@@ -85,6 +89,7 @@ extension WorkList.Kind {
         case .pr: "arrow.triangle.pull"
         case .feature: "sparkles"
         case .release: "shippingbox"
+        case .deploy: "server.rack"
         case .timeline: "timeline.selection"
         }
     }
@@ -95,6 +100,7 @@ extension WorkList.Kind {
         case .pr: "Every pull request in your folders’ repos, and what agents spent on each"
         case .feature: "Each feature label on your epics, with its epics and their leads"
         case .release: "The releases lineage knows, and what went into each"
+        case .deploy: "Every component in every environment: what is live, since when, and what goes next"
         case .timeline: "Your epics in time: when each started, what closed, and when it is forecast to close"
         }
     }
