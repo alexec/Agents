@@ -330,6 +330,79 @@
       }
     },
     {
+      "name": "builds/historyAll",
+      "x-capability": "builds.read/1",
+      "description": "builds/history over the control plane's copy (#5232): the runs of every machine in the scope that sends the repository's build timings, one for each ci-run ref and attempt, so a machine that sleeps is still in it.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BuildsHistoryRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BuildsHistory"
+        }
+      }
+    },
+    {
+      "name": "builds/runAll",
+      "x-capability": "builds.read/1",
+      "description": "builds/run over the control plane's copy (#5232), as builds/historyAll reads it.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BuildsRunRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BuildsRunAnswer"
+        }
+      }
+    },
+    {
+      "name": "builds/sync",
+      "x-capability": "builds.copy/1",
+      "description": "A host, on its channel 0 (#5232): one repository's build timings that changed since its last send, a few seconds after a change, for the control plane's copy, so the Builds page works while the machine sleeps. The copy keeps the machine store's bounds.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "daemon.schema.json#/definitions/BuildsSync"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "daemon.schema.json#/definitions/BuildsSyncAnswer"
+        }
+      }
+    },
+    {
       "name": "bus/deliver",
       "x-capability": "events.bus/1",
       "description": "To a machine, on its channel 0, which only the control plane writes (#4729, spec 4724-event-bus): an event on the bus that matched the machine's subscriptions. Best effort: a machine that is not connected misses it.",

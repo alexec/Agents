@@ -1686,7 +1686,8 @@ export interface BuildsHistory {
  * builds/history (#5177): a repository (github:alexec/agents), runs made in [from, to), and the
  * filters: a workflow's file name (ci.yml), a job, and the default branch (no branch and no
  * pullRequests), the pull requests' runs, or one branch. timeZone (an IANA name) says the days; UTC
- * when not said.
+ * when not said. scope is for builds/historyAll (#5232): whose machines' copies the control plane
+ * reads, as reports/value's; a machine leaves it out.
  */
 export interface BuildsHistoryRequest {
   repo: string;
@@ -1697,6 +1698,7 @@ export interface BuildsHistoryRequest {
   job?: string;
   branch?: string;
   pullRequests?: boolean;
+  scope?: ReportScope;
 }
 
 /**
@@ -1778,12 +1780,13 @@ export interface BuildsRunRef {
 
 /**
  * builds/run (#5177): a repository and a run's ci-run ref; its first attempt when attempt is not
- * said.
+ * said. scope is for builds/runAll (#5232), as builds/historyAll's.
  */
 export interface BuildsRunRequest {
   repo: string;
   ref: string;
   attempt?: number;
+  scope?: ReportScope;
 }
 
 /**
@@ -1814,6 +1817,41 @@ export interface BuildsStep {
   started: number;
   ended: number;
   conclusion?: string;
+}
+
+/**
+ * builds/sync (#5232): what changed in one repository's build timings on a machine since its last
+ * send, for the control plane's copy. Each day is a UTC day the runs were made (YYYY-MM-DD) and all
+ * its runs as the machine has them now, so a day with no runs is gone; reset starts the copy of the
+ * repository again from this send, the first of a whole send. defaultBranch, readAt and filledFrom
+ * are as builds/history says them. Only refs, times, attempts, conclusions, runner labels and the
+ * names of workflows, jobs and steps: no titles, no logs (principle 7).
+ */
+export interface BuildsSync {
+  repo: string;
+  reset?: boolean;
+  defaultBranch?: string;
+  readAt?: WireDate;
+  filledFrom?: WireDate;
+  days: BuildsSyncDay[];
+}
+
+/**
+ * builds/sync's answer (#5232). full: the control plane has no copy of this repository from this
+ * machine (a new or moved control plane), so the machine sends all its days again, the first with
+ * reset.
+ */
+export interface BuildsSyncAnswer {
+  full?: boolean;
+}
+
+/**
+ * One UTC day of a repository's build timings (#5232): its date (YYYY-MM-DD) and every run attempt
+ * made on it.
+ */
+export interface BuildsSyncDay {
+  day: string;
+  runs: BuildsRun[];
 }
 
 /**
@@ -15307,7 +15345,9 @@ export interface Methods {
   "browserControl/set": { params: BrowserControlSettings; result: BrowserControlSettings };
   "browserControl/state": { params: Empty; result: BrowserControlSettings };
   "builds/history": { params: BuildsHistoryRequest; result: BuildsHistory };
+  "builds/historyAll": { params: BuildsHistoryRequest; result: BuildsHistory };
   "builds/run": { params: BuildsRunRequest; result: BuildsRunAnswer };
+  "builds/runAll": { params: BuildsRunRequest; result: BuildsRunAnswer };
   "bus/log": { params: BusLogQuery; result: BusLogPage };
   "capacity/state": { params: Empty; result: CapacityState };
   "changes/file": { params: ChangesFileRequest; result: ChangedFileDetail };
@@ -15753,7 +15793,9 @@ export const MethodTarget = {
   "browserControl/set": "host",
   "browserControl/state": "host",
   "builds/history": "host",
+  "builds/historyAll": "control",
   "builds/run": "host",
+  "builds/runAll": "control",
   "bus/log": "control",
   "capacity/state": "host",
   "changes/file": "host",
@@ -16322,16 +16364,19 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BuildsDay: { required: ["day", "figures"], optional: [] },
   BuildsFigures: { required: ["runs", "green", "reruns", "toGreen", "run", "runner", "turn"], optional: [] },
   BuildsHistory: { required: ["repo", "reader", "workflows", "jobs", "branches", "total", "days", "changes"], optional: ["defaultBranch", "longestRunnerWait", "readAt", "filledFrom"] },
-  BuildsHistoryRequest: { required: ["repo", "from", "to"], optional: ["timeZone", "workflow", "job", "branch", "pullRequests"] },
+  BuildsHistoryRequest: { required: ["repo", "from", "to"], optional: ["timeZone", "workflow", "job", "branch", "pullRequests", "scope"] },
   BuildsJob: { required: ["name", "made", "started", "ended", "steps"], optional: ["conclusion", "runner"] },
   BuildsPoint: { required: ["ref", "made", "ran", "queue"], optional: [] },
   BuildsRun: { required: ["ref", "id", "attempt", "workflow", "made", "started", "ended", "turn", "jobs"], optional: ["event", "branch", "headSha", "pr", "url", "default", "tag", "conclusion"] },
   BuildsRunAnswer: { required: ["run", "attempts"], optional: ["before"] },
   BuildsRunRef: { required: ["ref", "id", "attempt", "made"], optional: ["url", "headSha", "branch", "pr", "conclusion"] },
-  BuildsRunRequest: { required: ["repo", "ref"], optional: ["attempt"] },
+  BuildsRunRequest: { required: ["repo", "ref"], optional: ["attempt", "scope"] },
   BuildsRunnerWait: { required: ["run", "job", "wait", "ran"], optional: [] },
   BuildsStat: { required: ["median", "p90", "n"], optional: [] },
   BuildsStep: { required: ["name", "number", "started", "ended"], optional: ["conclusion"] },
+  BuildsSync: { required: ["repo", "days"], optional: ["reset", "defaultBranch", "readAt", "filledFrom"] },
+  BuildsSyncAnswer: { required: [], optional: ["full"] },
+  BuildsSyncDay: { required: ["day", "runs"], optional: [] },
   BusDelivery: { required: ["event", "subscriptions"], optional: [] },
   BusEvent: { required: ["specversion", "id", "type", "provider", "topic", "source", "time", "producer"], optional: ["subject", "sealed", "poll"] },
   BusLease: { required: ["polls"], optional: ["release"] },

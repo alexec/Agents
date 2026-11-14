@@ -295,17 +295,37 @@ func (s *Store) Repos() []Repo {
 	return out
 }
 
-// Sweep applies the bounds to r's runs at now.
-func (s *Store) Sweep(r Repo, now time.Time) error {
+// Sweep applies the bounds to r's runs at now. It says the days it changed or removed.
+func (s *Store) Sweep(r Repo, now time.Time) ([]string, error) {
 	dir, err := s.dir(r)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	days, err := dayFiles(dir)
+	return SweepDays(fileDays(dir), now)
+}
+
+// Days is the day files of one repository's copy, wherever they are kept: the machine's
+// folder, or the control plane's objects (#5232), so both apply the same bounds.
+type Days interface {
+	// List is every day kept, oldest first.
+	List() ([]string, error)
+	// Read is a day's runs; none when it is gone.
+	Read(day string) ([]Run, error)
+	// Write keeps a day's runs in place of what it had.
+	Write(day string, runs []Run) error
+	// Remove deletes a day.
+	Remove(day string) error
+}
+
+// SweepDays applies the bounds at now: a day past KeepDays goes whole; a day past StepDays
+// loses its pull request runs' steps; past MostRuns, the oldest pull request runs go first,
+// then the oldest runs of any kind. It says the days it changed or removed.
+func SweepDays(d Days, now time.Time) ([]string, error) {
+	days, err := d.List()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	oldest, stepsFrom := dayOf(now.AddDate(0, 0, -KeepDays)), dayOf(now.AddDate(0, 0, -StepDays))
 	type held struct {
@@ -315,30 +335,25 @@ func (s *Store) Sweep(r Repo, now time.Time) error {
 		removed bool
 	}
 	var kept []held
+	var changed []string
 	total := 0
 	for _, day := range days {
-		path := filepath.Join(dir, day+".jsonl")
 		if day < oldest {
-			if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
-				return err
+			if err := d.Remove(day); err != nil {
+				return changed, err
 			}
+			changed = append(changed, day)
 			continue
 		}
-		runs, err := readDay(path)
+		runs, err := d.Read(day)
 		if err != nil {
-			return err
+			return changed, err
 		}
-		if day < stepsFrom && slices.ContainsFunc(runs, func(run Run) bool { return run.pullRequest() && run.hasSteps() }) {
-			for i := range runs {
-				if runs[i].pullRequest() {
-					for j := range runs[i].Jobs {
-						runs[i].Jobs[j].Steps = nil
-					}
-				}
+		if stripped, ok := stripSteps(day, stepsFrom, runs); ok {
+			if err := d.Write(day, stripped); err != nil {
+				return changed, err
 			}
-			if err := writeDay(path, runs); err != nil {
-				return err
-			}
+			changed = append(changed, day)
 		}
 		h := held{day: day, n: len(runs)}
 		for _, run := range runs {
@@ -350,22 +365,21 @@ func (s *Store) Sweep(r Repo, now time.Time) error {
 		total += len(runs)
 	}
 	if total <= mostRuns {
-		return nil
+		return changed, nil
 	}
 	// Past the bound: the oldest pull request runs first, then the oldest runs of any kind.
 	over := total - mostRuns
 	for _, onlyPRs := range []bool{true, false} {
 		for i := range kept {
 			if over == 0 {
-				return nil
+				return changed, nil
 			}
 			if kept[i].removed || onlyPRs && kept[i].pr == 0 {
 				continue
 			}
-			path := filepath.Join(dir, kept[i].day+".jsonl")
-			runs, err := readDay(path)
+			runs, err := d.Read(kept[i].day)
 			if err != nil {
-				return err
+				return changed, err
 			}
 			sortRuns(runs)
 			var left []Run
@@ -376,10 +390,13 @@ func (s *Store) Sweep(r Repo, now time.Time) error {
 				}
 				left = append(left, run)
 			}
+			if !slices.Contains(changed, kept[i].day) {
+				changed = append(changed, kept[i].day)
+			}
 			if len(left) == 0 {
 				kept[i].removed = true
-				if err := os.Remove(path); err != nil {
-					return err
+				if err := d.Remove(kept[i].day); err != nil {
+					return changed, err
 				}
 				continue
 			}
@@ -389,12 +406,95 @@ func (s *Store) Sweep(r Repo, now time.Time) error {
 					kept[i].pr++
 				}
 			}
-			if err := writeDay(path, left); err != nil {
-				return err
+			if err := d.Write(kept[i].day, left); err != nil {
+				return changed, err
 			}
 		}
 	}
+	return changed, nil
+}
+
+// BoundDay is a day's runs as the bounds at now keep them: none past KeepDays, and no steps
+// on its pull request runs past StepDays. A copy applies it to each day it is sent.
+func BoundDay(day string, runs []Run, now time.Time) []Run {
+	if day < dayOf(now.AddDate(0, 0, -KeepDays)) {
+		return nil
+	}
+	if stripped, ok := stripSteps(day, dayOf(now.AddDate(0, 0, -StepDays)), runs); ok {
+		return stripped
+	}
+	return runs
+}
+
+// stripSteps is runs without their pull request runs' steps, when day is before stepsFrom and
+// one of them has steps.
+func stripSteps(day, stepsFrom string, runs []Run) ([]Run, bool) {
+	if day >= stepsFrom || !slices.ContainsFunc(runs, func(run Run) bool { return run.pullRequest() && run.hasSteps() }) {
+		return runs, false
+	}
+	for i := range runs {
+		if runs[i].pullRequest() {
+			jobs := slices.Clone(runs[i].Jobs)
+			for j := range jobs {
+				jobs[j].Steps = nil
+			}
+			runs[i].Jobs = jobs
+		}
+	}
+	return runs, true
+}
+
+// DayOK says day is a UTC day as the store names its files, YYYY-MM-DD.
+func DayOK(day string) bool {
+	t, err := time.Parse(time.DateOnly, day)
+	return err == nil && t.Format(time.DateOnly) == day
+}
+
+// DayOf is the UTC day a run made at t is kept under.
+func DayOf(t time.Time) string { return dayOf(t) }
+
+// fileDays is a repository's folder as Days. The caller holds the store's lock.
+type fileDays string
+
+func (f fileDays) List() ([]string, error) { return dayFiles(string(f)) }
+func (f fileDays) Read(day string) ([]Run, error) {
+	return readDay(filepath.Join(string(f), day+".jsonl"))
+}
+func (f fileDays) Write(day string, runs []Run) error {
+	return writeDay(filepath.Join(string(f), day+".jsonl"), runs)
+}
+func (f fileDays) Remove(day string) error {
+	if err := os.Remove(filepath.Join(string(f), day+".jsonl")); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
 	return nil
+}
+
+// DayList is every day r has a file for, oldest first.
+func (s *Store) DayList(r Repo) ([]string, error) {
+	dir, err := s.dir(r)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return dayFiles(dir)
+}
+
+// Day is r's runs made on day; none when it has no file.
+func (s *Store) Day(r Repo, day string) ([]Run, error) {
+	dir, err := s.dir(r)
+	if err != nil {
+		return nil, err
+	}
+	if !DayOK(day) {
+		return nil, fmt.Errorf("not a day: %q", day)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	runs, err := readDay(filepath.Join(dir, day+".jsonl"))
+	sortRuns(runs)
+	return runs, err
 }
 
 func sortRuns(runs []Run) {

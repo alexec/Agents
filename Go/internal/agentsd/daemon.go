@@ -127,6 +127,7 @@ type Daemon struct {
 	lineageBook
 	// The build timings (#5177).
 	ciTimingsBook
+	ciSyncBook
 	// The events this machine publishes on the bus (#4729).
 	busBook
 	// Subscriptions on the bus, and the bursts debounce holds (#4730).

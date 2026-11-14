@@ -150,6 +150,9 @@ public enum DaemonAPI {
         /// (tier web+link), so Swift has no types for them.
         public static let buildsHistory = "builds/history"
         public static let buildsRun = "builds/run"
+        /// The same over the control plane's copy (#5232), while the machine sleeps.
+        public static let buildsHistoryAll = "builds/historyAll"
+        public static let buildsRunAll = "builds/runAll"
         public static let simulatorsList = "simulators/list"
         public static let simulatorsBoot = "simulators/boot"
         public static let simulatorsShutdown = "simulators/shutdown"

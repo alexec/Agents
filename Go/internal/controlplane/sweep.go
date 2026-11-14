@@ -282,6 +282,12 @@ func sweep(ctx context.Context, rs *records.Records, now time.Time, most int, ev
 	if err != nil {
 		return report, err
 	}
+	// The copy of the build timings (#5232): a stopped machine's, and a removed machine's.
+	builds, err := sweepBuildTimings(ctx, s, rs, now, left-report.usage)
+	report.usage += builds
+	if err != nil {
+		return report, err
+	}
 
 	if folder, ok := s.(*store.Folder); ok {
 		report.leftovers = folder.RemoveLeftovers(now.Add(-leftoversKept))

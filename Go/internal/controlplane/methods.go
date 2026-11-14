@@ -123,6 +123,8 @@ var own = methodSet(
 	"machines/update",
 	"lineage/sessionsOn",
 	"lineage/walkAll",
+	"builds/historyAll",
+	"builds/runAll",
 	"links/approve",
 	"links/deny",
 	"links/list",
@@ -417,6 +419,8 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 		return m.busLogMethod(ctx, params, from)
 	case "lineage/walkAll", "lineage/sessionsOn":
 		return m.lineageReadMethod(ctx, method, params, from)
+	case wire.CallBuildsHistoryAll.Name, wire.CallBuildsRunAll.Name:
+		return m.buildsReadMethod(ctx, method, params, from)
 	case "links/list", "links/requests", "links/approve", "links/deny", "links/remove":
 		return m.linksMethod(ctx, method, params, from)
 	case "lock/get", "lock/add", "lock/reset":
@@ -1244,6 +1248,12 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 			prs = *count.PrsPerWeek
 		}
 		return m.s.multiplierCount(ctx, host, zoneOf(count.TimeZone), lineage.BaselineOf(prs, ""), time.Now())
+	case wire.CallBuildsSync.Name:
+		sync, err := require[wire.BuildsSync](params, "BuildsSync")
+		if err != nil {
+			return nil, err
+		}
+		return m.s.keepBuildsSync(ctx, host, sync, time.Now())
 	case "lineage/sync":
 		sync, err := require[wire.LineageSync](params, "LineageSync")
 		if err != nil {

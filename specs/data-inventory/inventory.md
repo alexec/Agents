@@ -78,6 +78,7 @@ from the root (`agentsd/backups.go:69,72`). It holds nothing else.
 | `lineage.jsonl` | SDLC graph links | Ended links 90 days, 20,000 links, rewritten at +2,000 (`lineage/lineage.go:97-107`) | at open and on append growth; **no timer** | no |
 | `lineage-cost.json` | Cost per node | 90 days, 5,000 nodes (`lineagecost.go:35,40`) | on save | no |
 | `lineage-sync.json` | Links and session states unsent to the control plane (#4275) | 2,000 links, 5,000 states saved (25,000 held); past that it saves "send all again" instead (`lineagesync.go:31-40`) | on save | no |
+| `ci-timings/sync.json` | Days of build timings unsent to the control plane, per repository (#5232) | 90 days of at most 20 repositories (`cisync.go`) | on send | no |
 | `lineage-comments.json` | PR cost comments | 500, 30 days (`lineagecomment.go:42-44`) | on save | no |
 | `release-tags.json` | Tags already linked, per repo | **none** (`lineagerelease.go:109`) | never | no |
 | `achievements.json` | Milestones | fixed set | n/a | no |
@@ -225,6 +226,7 @@ handover also leaves out `v1/keys/` (`storecopy.go:21,25`).
 | `v1/usage/hours/`, `v1/usage/days/` | Usage and cost by person, project, folder, machine, runtime | 7 days / 90 days (`reports.go:30-31`) | hourly |
 | `v1/lineage/<host>.json` | Cost per issue, PR and session node | 5,000 nodes, 90 days (`lineagecost.go:25-28`) | on write |
 | `v1/lineage-graph/<host>/links.json`, `states.json` | A machine's lineage links and its sessions' state changes (#4275) | Links by `lineage.Bound` (ended 90 days, 20,000); states as on the machine (90 days, each session's last, `lineage.MostStates`); a removed machine's after a day (`lineagegraph.go:31-36`) | on write, hourly |
+| `v1/build-timings/<host>/<forge>/<path>/<day>.json`, `meta.json` | A machine's CI runs, jobs and steps of a repository: refs, times, conclusions, runner labels, names; no titles or logs (#5232) | As on the machine (`citimings`: 90 days, 20,000 runs a repository, PR steps 14 days), each day bounded on write; a stopped machine's swept once a day; a removed machine's after a day (`builds.go`) | on write, hourly |
 | `v1/runs/<day>/<hash>.json` | Workflow trigger claims | 7 days; **no per-day cap** | hourly |
 | `v1/reports/views/<user>.json` | Saved report views | 50 | person removal |
 | `v1/providers/<id>.json` | Machine providers | **No cap. Tombstones are never swept.** | — |

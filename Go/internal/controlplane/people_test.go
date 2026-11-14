@@ -308,7 +308,7 @@ func TestEveryClientMethodChecksTheOwner(t *testing.T) {
 		"providers/list": true, "providers/refresh": true, "providers/add": true, "providers/update": true,
 		"providers/remove": true, "providers/options": true, "providers/runtimes": true, "providers/draftStart": true,
 		"providers/draftAnswer": true, "providers/draftCancel": true, "providers/draftSigned": true, "providers/create": true, "providers/deleteWorkspace": true, "providers/makeDefault": true, "machines/listKept": true,
-		"machines/retryKept": true, "machines/dropKept": true, "reports/usage": true, "reports/export": true, "reports/value": true, "reports/nodes": true, "lineage/walkAll": true, "lineage/sessionsOn": true, "bus/log": true,
+		"machines/retryKept": true, "machines/dropKept": true, "reports/usage": true, "reports/export": true, "reports/value": true, "reports/nodes": true, "lineage/walkAll": true, "lineage/sessionsOn": true, "builds/historyAll": true, "builds/runAll": true, "bus/log": true,
 		"user/settings": true, "user/setSettings": true, "user/setAgentConfigFile": true, "user/setSecret": true, "user/removeSecret": true,
 		"user/secretNames": true, "groups/list": true, "groups/set": true, "groups/remove": true,
 		"providers/setGroup": true, "bots/make": true, "bots/setCaps": true,

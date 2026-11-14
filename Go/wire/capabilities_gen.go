@@ -24,6 +24,8 @@ const CapBots1 = "bots/1"
 const CapBringBack1 = "bring.back/1"
 const CapBrowser1 = "browser/1"
 const CapBrowser2 = "browser/2"
+const CapBuildsCopy1 = "builds.copy/1"
+const CapBuildsRead1 = "builds.read/1"
 const CapBuildsTrends1 = "builds.trends/1"
 const CapCapacity1 = "capacity/1"
 const CapCatalog1 = "catalog/1"
@@ -770,6 +772,9 @@ var ControlCapabilities = pairs([][2]string{
 	{"bots/make", "bots/1"},
 	{"bots/setCaps", "bots/1"},
 	{"bots/stopRun", "bots/1"},
+	{"builds/historyAll", "builds.read/1"},
+	{"builds/runAll", "builds.read/1"},
+	{"builds/sync", "builds.copy/1"},
 	{"bus/lease", "events.leases/1"},
 	{"bus/log", "events.bus/1"},
 	{"bus/publish", "events.bus/1"},
