@@ -79,6 +79,11 @@ func TestLineageDeployNodesFromDeployEvents(t *testing.T) {
 	if r.Title != "v0.18.0 to testflight" || r.State == nil || *r.State != "succeeded" || r.CreatedAt == nil || *r.CreatedAt != wire.DateOf(t0) {
 		t.Fatalf("resolved %+v", r)
 	}
+	// #5243: the deploy itself, for the Work pages' rows: its environment, times and job.
+	if r.Deploy == nil || r.Deploy.Target.Environment.Name != "release" || r.Deploy.Finished == nil ||
+		*r.Deploy.Finished != wire.DateOf(t0.Add(time.Minute)) || r.Deploy.URL == nil {
+		t.Fatalf("resolved deploy %+v", r.Deploy)
+	}
 	d.deployBookMu.Lock()
 	arts := d.deploysFileLocked().Deploys[deploy.Ref].Deploy.Version.Artifacts
 	d.deployBookMu.Unlock()

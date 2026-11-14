@@ -387,3 +387,22 @@ dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
   .work-plan-mark .wide-line { display: none; }
   .work-plan-mark .short-line { display: inline; }
 }
+/* Deployed on a release's page and Live in on a pull request's (#5243, spec 5239-deploy-model boards 1 to 3): a row for
+   each environment, its tier chip, the component and the state's chip, then what went out and since when. */
+.work-deploys { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.work-deploy { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.work-deploy-head { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.work-deploy-env { font-weight: 600; }
+.work-deploy-tier, .work-deploy-state { flex: none; display: inline-block; padding: 0 7px; border-radius: 99px; font-size: 0.75rem; font-weight: 500;
+  line-height: 1.6; white-space: nowrap; }
+.work-deploy-tier { color: var(--forge-done); background: color-mix(in srgb, var(--forge-done) 12%, transparent); }
+.work-deploy-state { margin-left: auto; color: var(--forge-draft); background: color-mix(in srgb, var(--forge-draft) 14%, transparent); }
+.work-deploy-state.live { color: var(--forge-open); background: color-mix(in srgb, var(--forge-open) 12%, transparent); }
+.work-deploy-state.waiting, .work-deploy-state.rollback { color: var(--forge-waiting); background: var(--forge-waiting-wash); }
+.work-deploy-state.running { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.work-deploy-state.failed { color: var(--forge-closed); background: color-mix(in srgb, var(--forge-closed) 12%, transparent); }
+.work-deploy-line { font-variant-numeric: tabular-nums; }
+.work-deploy-more { font-variant-numeric: tabular-nums; }
+.work-deploy-gate { display: flex; gap: 6px; margin-top: 4px; }
+.work-deploy-problem { color: var(--forge-closed); }
+.work-deploy-none { margin: 0; }

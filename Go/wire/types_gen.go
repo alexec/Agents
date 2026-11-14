@@ -7295,6 +7295,9 @@ type LineageResolved struct {
 
 	// When the forge says the issue or PR was made (#4552): a bug's filing, for the change failure rate.
 	CreatedAt *Date `json:"createdAt,omitzero"`
+
+	// A deploy node's last event (#5243): its target (component, environment and tier), version, times and url, so a Work page's Deployed and Live in rows say them. Only on a deploy node.
+	Deploy *Deploy `json:"deploy,omitzero"`
 }
 
 // A runtime of lineage/figures' sessions, and how many of them it ran (#4427).

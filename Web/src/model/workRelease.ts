@@ -116,4 +116,6 @@ export const notesElsewhere = (ref: string) => `The release notes are on ${forge
 
 export const noPulls = "Lineage links no pull request to this release. The first version tag of a repo links none.";
 export const noPipeline = "No CI run or deploy in lineage yet.";
+/** Pipeline with no CI run, when Deployed has rows (#5243). */
+export const noRun = "No CI run in lineage yet.";
 export const latestWords = "Latest";

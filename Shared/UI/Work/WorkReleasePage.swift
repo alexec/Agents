@@ -21,6 +21,7 @@ struct WorkReleasePage: View {
     /// Opens a place on the web page; the Mac window sets it while it can open the page (#5180).
     @Environment(\.openWebPlace) private var openWebPlace
     @State private var trendsProblem: String?
+    @State private var deploysProblem: String?
 
     @State private var graph: DaemonAPI.LineageGraph?
     @State private var rollup: DaemonAPI.LineageCostRollup?
@@ -345,6 +346,7 @@ struct WorkReleasePage: View {
                 trendsLink
             }
         }
+        deployedSection
         lineageSection
     }
 
@@ -364,6 +366,27 @@ struct WorkReleasePage: View {
                 Button("OK") { trendsProblem = nil }
             } message: {
                 Text(trendsProblem ?? "")
+            }
+        }
+    }
+
+    /// **Deployed ↗** (#5243): where the release is live, on the web page's same page. A Web + Mac link
+    /// (#4937, Lead role, #5290): the Remote sets no `openWebPlace`, so it has no section.
+    @ViewBuilder
+    private var deployedSection: some View {
+        if let openWebPlace, let place = DeploysLink.place(kind: "release", ref: node.ref) {
+            WorkSideSection(title: DeploysLink.title(kind: "release")) {
+                Button("\(DeploysLink.title(kind: "release")) ↗") {
+                    Task { deploysProblem = await openWebPlace.run(place) }
+                }
+                .linkStyle()
+                .help(DeploysLink.help(kind: "release"))
+                .alert(DeploysLink.cannotOpen, isPresented: Binding(get: { deploysProblem != nil },
+                                                                   set: { if !$0 { deploysProblem = nil } })) {
+                    Button("OK") { deploysProblem = nil }
+                } message: {
+                    Text(deploysProblem ?? "")
+                }
             }
         }
     }

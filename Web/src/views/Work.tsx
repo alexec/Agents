@@ -6,7 +6,7 @@ import { effect, useSignal } from "@preact/signals";
 import { Fragment, type ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef } from "preact/hooks";
 import type {
-  ForgeCloseRequest, ForgeComment, ForgeDone, ForgeEvent, ForgeLinked, ForgeItemDetail, ForgeLabel, ForgeLabelRequest, LineageCostRollup, LineageEstimate, LineageForecast,
+  ForgeCloseRequest, ForgeComment, ForgeDone, ForgeEvent, ForgeLinked, ForgeItemDetail, ForgeLabel, ForgeLabelRequest, LineageCostRollup, LineageEstimate, LineageForecast, LineageGraph,
 } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { Capability } from "../protocol/capabilities.generated";
@@ -25,6 +25,8 @@ import { newSessionProjects } from "../model/projects";
 import { orderedFolders } from "./Sidebar";
 import { lineageUrl, sessionHost } from "../model/lineage";
 import { type PipelineStep, pipelineDepth, pipelineSteps } from "../model/pipeline";
+import { liveInRows, notLiveYet } from "../model/deployRows";
+import { DeployRows } from "./WorkDeploys";
 import { buildsRunLinkHelp, buildsRunLinkQuery } from "../model/builds";
 import { costWords, nodeName, spent } from "../model/value";
 import { actualWords, estimateLine, estimateRangeWords, estimateSpentWords, showsEstimate } from "../model/estimate";
@@ -329,6 +331,8 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const estimate = useSignal<LineageEstimate | null>(null);
   const forecast = useSignal<LineageForecast | null>(null);
   const pipeline = useSignal<PipelineStep[]>([]);
+  /** The pipeline's walk, for a pull request's Live in (#5243); null until it comes. */
+  const walked = useSignal<LineageGraph | null>(null);
   const lineageGot = useSignal<{ cost?: LineageCostRollup | undefined; sessions: string[] } | null>(null);
   const said = useSignal<{ words: string; failed: boolean } | null>(null);
   const writing = useSignal(false);
@@ -410,9 +414,10 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   useEffect(() => {
     let current = true;
     pipeline.value = [];
+    walked.value = null;
     if (!lineageHost) return;
     void store.link.call("lineage/walk", { node, depth: pipelineDepth }, lineageHost)
-      .then((g) => { if (current) pipeline.value = pipelineSteps(node, g); }, () => {});
+      .then((g) => { if (current) { pipeline.value = pipelineSteps(node, g); walked.value = g; } }, () => {});
     return () => { current = false; };
   }, [kind, ref, lineageHost, asked.value]);
   // The cost and the sessions of an issue or a pull request (#4402 note 14), from the machine that keeps its links.
@@ -757,6 +762,15 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
               {pipeline.value.length > 0 && <PipelineLine steps={pipeline.value} kind={node.kind} />}
             </SideSection>
           )}
+          {/* Where a merged pull request's change is live (#5243, board 2): a row for each environment it reached. */}
+          {kind === "pr" && got?.item.state === "merged" && walked.value && (() => {
+            const rows = liveInRows(node, walked.value, new Date(), got.item.closedAt !== undefined ? fromWireDate(got.item.closedAt) : undefined);
+            return (
+              <SideSection title="Live in">
+                {rows.length === 0 ? <span class="quiet small">{notLiveYet}</span> : <DeployRows store={store} rows={rows} />}
+              </SideSection>
+            );
+          })()}
           {(kind === "issue" || kind === "pr") && (
             <WorkDocs store={store} itemRef={ref} title={item.title} body={got?.body ?? ""} asked={asked.value} />
           )}

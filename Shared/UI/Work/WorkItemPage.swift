@@ -887,6 +887,10 @@ struct WorkItemPage: View {
         let trends = openWebPlace.flatMap { open in
             BuildTrendsLink.run(in: pipeline.compactMap(\.node)).flatMap(BuildTrendsLink.place(run:)).map { (open, $0) }
         }
+        // Live in ↗ on a merged pull request (#5243): where its change is live, on the web page's same page.
+        let deploys = item?.state == "merged" ? openWebPlace.flatMap { open in
+            DeploysLink.place(kind: node.kind, ref: node.ref).map { (open, $0) }
+        } : nil
         return HStack(alignment: .firstTextBaseline, spacing: 0) {
             text
             if let trends {
@@ -897,6 +901,16 @@ struct WorkItemPage: View {
                 .linkStyle()
                 .appText(.fine)
                 .help(BuildTrendsLink.help(kind: node.kind))
+                .fixedSize()
+            }
+            if let deploys {
+                Text(" · ").appText(.fine).foregroundStyle(.secondary)
+                Button("\(DeploysLink.title(kind: node.kind)) ↗") {
+                    Task { trendsProblem = await deploys.0.run(deploys.1) }
+                }
+                .linkStyle()
+                .appText(.fine)
+                .help(DeploysLink.help(kind: node.kind))
                 .fixedSize()
             }
         }
