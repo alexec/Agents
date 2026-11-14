@@ -3569,7 +3569,7 @@ final class AppModel {
         }
     }
 
-    private func loadKept(_ control: DaemonClient) async {
+    func loadKept(_ control: DaemonClient) async {
         // A control plane without providers keeps nothing.
         kept = (try? await control.call(DaemonAPI.Method.hostsListKept, returning: DaemonAPI.KeptList.self))?.kept ?? []
     }
