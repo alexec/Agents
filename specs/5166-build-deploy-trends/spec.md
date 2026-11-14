@@ -192,6 +192,10 @@ So **all five forge servers have a CI reader** (`run.completed`), and **none rea
 - **Backfill,** when a repository is first watched: the run list in 3-day windows (the list gives at most 1,000 runs for one query), newest first, then one jobs call a run. **Default-branch and tag runs for 90 days, PR runs for 14 days.** For alexec/Agents: about 100 list calls + 6,300 + 1,300 jobs calls ≈ 7,700 calls. **Paced at 10 % of the token's hourly limit** (500 an hour on GitHub), so that the forge's other events never wait: about 15 hours, the page filling from today backwards. The spec's own fetch (3,400 calls) took jobs for only each 4th PR run.
 - A run that the backfill and the live read both see is the same line (same `ci-run` ref and attempt).
 
+### GitLab (#5221)
+
+The daemon reads GitLab pipelines as it reads GitHub's (`Go/internal/citimings/gitlab.go`): the project's finished pipelines (`scope=finished`, windows by `created_after` and `created_before`), and each one's jobs with `include_retried=true`. A pipeline is a run, and a job's nth try is attempt n. A job is made at its `started_at` less its `queued_duration`, so "waiting its turn" is the stages before it and "waiting for a runner" is `queued_duration`. There are no steps. Decided: a pipeline the store has is not read again, so a retry after the first read is not seen, because GitLab's list does not say the attempt. Alex can overrule.
+
 ### Where
 
 **Alex chose (2026-11-13, #5176): the machine reads and keeps the store, and sends a copy to the control plane, as lineage's merged copy does.**
