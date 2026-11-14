@@ -1,0 +1,104 @@
+/* A tool's view in the chat (#187): the row holds its place; the frame is in the layer. */
+.transcript { position: relative; }
+.view-layer { position: absolute; top: 0; left: 0; width: 100%; height: 0; overflow: visible; z-index: 1; }
+.view-box { background: var(--paper-ground); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); overflow: hidden; }
+.view-box iframe { display: block; border: 0; width: 100%; height: 100%; background: transparent; }
+.view-box .view-bar { display: none; }
+.view-box.full { z-index: 20; border: none; border-radius: 0; display: flex; flex-direction: column; }
+.view-box.full .view-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  height: 40px; padding: 0 16px; border-bottom: 1px solid var(--paper-rule); font-size: 0.8125rem; flex: none; }
+.view-box.full iframe { flex: 1; height: auto; }
+.view-box.full .view-bar strong { flex: 1; }
+.app-view { display: flex; flex-direction: column; gap: 6px; }
+.app-view .object-card-preview { display: block; min-height: 0; }
+.app-view .view-frame > p { margin: 0; padding: 12px; }
+.app-view .view-slot { width: 100%; }
+.app-view .view-result { margin: 0; max-width: 100%; overflow-wrap: anywhere; white-space: pre-wrap; }
+button.plain { background: none; border: none; padding: 0; color: inherit; opacity: 0.65; font: inherit; }
+button.plain:hover { opacity: 1; }
+.view-context { font-size: 0.75rem; }
+.view-box[hidden] { display: none !important; }
+/* The Now card (#5033, specs/session-cards/spec.md, family 5), as NowCard.swift: a card on the well
+   with a mark, a bold line and a quiet detail, the meta on the right, a chevron when it has more, and a
+   bar in the accent, never a state colour (#776). At the top: the goal and the plan, two rows. At the
+   foot: what the agent does or waits on now, the last thing before the prompt bar. */
+/* The Strip family (#5034): one at a time at the top, on the well; an orange glyph for a warning, grey for a
+   state the app works through itself; never yellow, which is an Ask's (#5016). */
+.strips { display: flex; flex-direction: column; gap: 6px; padding: 8px 16px 0; }
+.strip { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--paper-well);
+  border-radius: var(--radius-card); font-size: 0.8125rem; color: var(--paper-ink); min-width: 0; }
+.strip-glyph { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 16px; color: var(--paper-secondary); }
+.strip.tone-warning .strip-glyph { color: var(--tint-warning); }
+.strip-glyph.spinner { width: 12px; height: 12px; border: 2px solid var(--paper-rule); border-top-color: var(--paper-secondary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+.strip-words { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strip-words .quiet { color: var(--paper-secondary); }
+.strip-actions { flex: none; display: flex; align-items: center; gap: 8px; }
+.strip-actions button { white-space: nowrap; }
+.strip-actions .elapsed { font-size: 0.75rem; color: var(--paper-secondary); font-variant-numeric: tabular-nums; }
+.strip-more { font-size: 0.75rem; }
+.strip-more-menu .ask-more-menu { top: calc(100% + 4px); bottom: auto; }
+.strip button.prominent { background: var(--paper-raised); color: var(--accent); border-color: var(--accent); font-weight: 650; box-shadow: inset 0 0 0 0.5px var(--accent); }
+@media (max-width: 480px) { .strip { flex-wrap: wrap; } .strip-words { white-space: normal; } .strip-actions { width: 100%; justify-content: flex-end; } }
+.now-card { background: var(--paper-well); border-radius: var(--radius-card); padding: 10px 14px;
+  display: flex; flex-direction: column; gap: 10px; font-size: 0.8125rem; }
+.now-top { padding: 6px 16px; }
+.now-top .now-card { gap: 0; }
+.now-top .plan-row { border-top: 1px solid var(--paper-rule); margin-top: 8px; padding-top: 8px; }
+.now-top .goal-row + .plan-row { margin-top: 8px; }
+.now-top .now-card > .plan-row:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+.now-row, .now-head { display: flex; width: 100%; text-align: left; background: none; border: none; padding: 0;
+  color: inherit; font: inherit; }
+button.now-row, button.now-head { cursor: pointer; }
+.now-row { flex-direction: column; gap: 8px; }
+.now-line, .now-head { align-items: center; gap: 8px; min-width: 0; }
+.now-line { display: flex; }
+.now-mark { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 18px; }
+.now-step, .now-what { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-what strong { font-weight: 600; }
+.now-detail, .now-meta, .now-card .chevron, .now-sub { color: var(--paper-ink); opacity: .68; }
+.now-meta, .now-card .chevron { font-size: 0.75rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.now-sub { font-size: 0.75rem; padding-left: 26px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-variant-numeric: tabular-nums; }
+.goal-row.open .now-step, .goal-row.open .now-sub { white-space: normal; }
+.now-bar { display: block; height: 4px; border-radius: 2px; background: var(--paper-rule); overflow: hidden; }
+.now-bar > span { display: block; height: 100%; border-radius: 2px; background: var(--accent); transition: width .15s linear; }
+.now-top .plan-block { margin-top: 8px; font-size: 0.8125rem; }
+.now-part { display: flex; flex-direction: column; gap: 8px; }
+.now-part p { margin: 0; }
+.now-answers { display: flex; justify-content: flex-end; gap: 10px; }
+.now-rows { display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--paper-rule); padding-top: 8px; }
+.now-rows .background { margin: 0; }
+.now-foot .working-ring { --well: 16px; opacity: 0.6; }
+.plan .in_progress .content { font-weight: 600; }
+.plan-block.withdrawn .plan .in_progress .content { font-weight: inherit; }
+/* With the working line: what the open agent holds and waits for in line (036, #2344). Untinted. */
+/* An export or import on its way (#2437): the line, a bar, and Cancel. */
+.export-import-sheet { min-width: 300px; }
+.export-import-sheet progress { width: 100%; }
+.lease-line { display: flex; flex-direction: column; align-items: flex-start; gap: 0; margin: 0; max-width: 100%; }
+/* A way to Resources, so a chevron and a row's hit area: 24 px, 44 on touch (#2448). */
+.lease-line .link { display: inline-flex; align-items: center; gap: 4px; min-height: 24px; font-size: 0.75rem; color: inherit; max-width: 100%; }
+.lease-line .link .words { opacity: 0.7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lease-line .link .chevron { opacity: 0.45; }
+.lease-line .link:hover .words { opacity: 1; }
+@media (hover: none) { .lease-line .link { min-height: 44px; } }
+/* A queued start the machine holds (#4748): words only, as a lease line's, with no way anywhere. */
+.lease-line > .words { display: inline-flex; align-items: center; min-height: 24px; font-size: 0.75rem; opacity: 0.7; }
+
+/* The new-session page's folder name, a menu of every folder (#495, #499): the browser's own
+   menu over the name, as a pill's. */
+.new-heading .folder-switch { position: relative; cursor: pointer; }
+.new-heading .folder-switch .caret { font-size: 0.8125rem; opacity: 0.5; }
+.new-heading .folder-switch select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; font: inherit; }
+/* On (#3279): the machine of the project's folder, a size smaller, under the project. */
+.new-heading .machine-switch { display: inline-block; margin-bottom: 0.25rem; }
+/* The persona (#913): the folder's control, a size smaller, under it. */
+.new-heading .persona-switch { display: flex; justify-content: center; position: relative; width: 100%; }
+.new-heading .persona-switch.none { opacity: 0.65; }
+/* Where the segments do not fit, a menu in their place, as the folder's (#2795). They stay,
+   hidden, to be measured. */
+.new-heading .persona-switch.menu .persona-segments { position: absolute; visibility: hidden; pointer-events: none; }
+.new-heading .persona-menu { position: relative; cursor: pointer; font-size: 0.9375rem; }
+.new-heading .persona-menu .caret { font-size: 0.8125rem; opacity: 0.5; }
+.new-heading .persona-menu select { position: absolute; inset: 0; opacity: 0; width: 100%; cursor: pointer; font: inherit; }
+

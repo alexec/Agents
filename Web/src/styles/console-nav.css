@@ -1,0 +1,189 @@
+/* The bar of sections (#2141), in place of Workspace | Console | Reports (#1804), and each section but
+   the Overview and Agents as a list of pages beside the page open. The look is #2142's. */
+.nav-bar { display: flex; align-items: center; gap: 12px; padding: 6px 12px; border-bottom: 1px solid var(--paper-rule);
+  background: var(--paper-sidebar); position: relative; }
+.nav-home { border: 0; background: none; font: inherit; font-weight: 700; color: inherit; cursor: pointer; padding: 4px 6px; white-space: nowrap; }
+.nav-items { display: flex; flex-wrap: wrap; gap: 2px; }
+.nav-menu { margin-left: auto; }
+.nav-menu-button { border: 1px solid var(--paper-rule); border-radius: 6px; background: var(--paper-raised); font: inherit; color: inherit;
+  padding: 4px 10px; display: inline-flex; gap: 6px; align-items: center; }
+.nav-menu-list { position: absolute; right: 8px; top: 100%; z-index: 20; display: flex; flex-direction: column; min-width: 200px;
+  padding: 4px; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
+  box-shadow: var(--shadow-floating); }
+/* Only the bar's: the sidebar's rows have a .nav-item of their own (Pins, approvals). */
+:is(.nav-bar, .nav-menu-list) .nav-item { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 6px; background: none;
+  font: inherit; color: inherit; padding: 4px 10px; cursor: pointer; }
+.nav-menu-list .nav-item { justify-content: space-between; padding: 8px 10px; }
+.nav-menu-list .nav-item.on { background: var(--paper-wash); font-weight: 600; }
+.sub-app .back { display: none; }
+@media (max-width: 759px) { .nav-bar .nav-items { display: none; } }
+/* The Overview (#2141): five cards in a grid. */
+.columns.overview-columns { grid-template-columns: minmax(0, 1fr); }
+.overview-card { display: flex; flex-direction: column; border: 1px solid var(--paper-rule); background: var(--paper-raised); min-height: 180px; }
+.overview-card h2 { font-size: 0.9375rem; margin: 0; }
+.overview-card p { margin: 0; }
+.overview-rows { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; flex: 1; }
+.overview-rows li { display: flex; flex-direction: column; gap: 1px; }
+.overview-grid { display: grid; margin-top: 8px; }
+.overview-links { display: flex; gap: 14px; }
+.overview-figure { font-weight: 700; }
+.overview-rows .link, .overview-links .link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-align: left; }
+.overview .attention { color: var(--tint-warning); }
+/* Agents' filters and its pages at the sidebar's foot (#2141). */
+.agent-filters { display: flex; gap: 6px; padding: 4px 10px 2px; }
+.agent-filters select { flex: 1; min-width: 0; font: inherit; font-size: 0.75rem; color: inherit; background: var(--paper-raised);
+  border: 1px solid var(--paper-rule); border-radius: var(--radius-control); padding: 2px 4px; }
+.agents-pages { border-top: 1px solid var(--paper-rule); margin-top: 8px; padding-top: 4px; }
+.all-workflows { margin-bottom: 12px; }
+/* Usage (#2141): Activity's Cost, Tokens and Time, under its own switch. */
+.usage-pane .column-head { display: none; }
+.usage-pane > .chat { display: block; border: 0; }
+.usage-pane > .chat .scroll { overflow: visible; }
+.sub-app-group { display: flex; flex-direction: column; }
+.sub-app-row:disabled { opacity: 0.45; cursor: default; }
+.console-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.console-card { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-card); padding: 10px 12px; background: var(--paper-raised); }
+.fleet { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+/* Console ▸ Projects (#2671): each project's folders, and its Rename… and Remove. */
+.console-projects ul { list-style: none; margin: 0; padding: 0; }
+.console-projects td.actions { white-space: nowrap; text-align: right; }
+.console-projects td.actions button + button { margin-left: 6px; }
+/* The organisation's policy (#998): Settings ▸ Policy and Console ▸ Policy. */
+.policy-rules { margin: 0; display: flex; flex-direction: column; gap: 2px; }
+.policy-rules .setting { display: flex; gap: 12px; justify-content: space-between; }
+.policy-rules dt { opacity: 0.7; }
+.policy-rules dd { margin: 0; text-align: right; }
+/* A choice the policy refuses (#998, FR-020): dimmed, with the line under it (views/OrgPolicyLine.tsx). */
+.org-policy-line { display: block; opacity: 0.75; }
+.org-policy-line strong { font-weight: 600; }
+.set-by-org { opacity: 0.5; }
+/* Agents ▸ Policy (#2957): the banner, a rule's lines, and Where this comes from with the deciding layer lit. */
+.policy-banner { max-width: 596px; box-sizing: border-box; margin: 4px 0 8px; }
+.policy-banner p { margin: 0 0 2px; }
+/* The folders with their own rules (#2957, R13): each opens its layer in the same pane. */
+.policy-folders { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+/* Your rules signed on another Mac (#3230): what they set, and Sign with This Mac’s Key or Don’t Use Them. */
+.policy-untrusted-rules { margin: 4px 0; padding-left: 18px; }
+.policy-untrusted-actions { display: flex; gap: 8px; margin-top: 6px; }
+.policy-rule { max-width: 596px; margin-bottom: 6px; }
+.settings-body .policy-rule .hint { margin: 0; padding: 2px 12px; }
+.policy-source { list-style: none; margin: 4px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.policy-source li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 8px; border-radius: 6px; }
+.policy-source-lit { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.policy-source-value { text-align: right; }
+.policy-kill { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; margin-top: 8px; }
+.org-policy { display: flex; flex-direction: column; gap: 4px; max-width: 520px; }
+.org-policy .sheet-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+.org-policy input[type="text"].wide, .org-policy textarea { width: 100%; box-sizing: border-box; }
+.org-policy .budget-field input { width: 9em; text-align: right; }
+.org-policy .runtime-models { width: 16em; }
+.org-policy .preview { margin: 4px 0; padding-left: 18px; }
+.model-access { display: flex; flex-direction: column; gap: 8px; }
+.model-access .sheet-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; max-width: 520px; }
+.model-access .route-actions { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; white-space: nowrap; }
+.org-policy textarea { font-family: var(--mono, ui-monospace, monospace); font-size: 0.75rem; }
+.policy-routes { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.fleet-state::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: currentColor; opacity: 0.5; vertical-align: 1px; }
+.fleet-state.online::before { background: var(--tint-vouched); opacity: 1; }
+.fleet-state.needsUpdate::before, .fleet-state.failed::before { background: var(--tint-failure); opacity: 1; }
+.console-card .link, .sub-app-page .link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; }
+@media (max-width: 759px) {
+  .columns.sub-app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .sub-app-list { display: flex; flex-wrap: wrap; gap: 4px; border-right: none; border-bottom: 1px solid var(--paper-rule); }
+  .sub-app-group { flex-direction: row; flex-wrap: wrap; }
+  .sub-app-group .section-head { display: none; }
+}
+.triggers { list-style: none; margin: 0; padding: 0; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
+.trigger { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 10px; padding: 10px 14px; align-items: start; }
+.trigger + .trigger { border-top: 1px solid var(--paper-rule); }
+.trigger .glyph { opacity: 0.6; text-align: center; }
+.trigger .what { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.trigger .filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.trigger .filters code { font: 0.6875rem var(--font-mono); padding: 0 6px; border-radius: 5px; background: var(--paper-wash); }
+.trigger .unknown { font-size: 0.6875rem; font-weight: 600; opacity: 0.6; border: 1px solid var(--paper-rule); border-radius: 999px; padding: 0 6px; margin-left: 6px; }
+.trigger .next { text-align: right; max-width: 180px; }
+/* A line for each server a trigger hears (#383), under the triggers. */
+.mcp-triggers { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.mcp-triggers li { display: flex; flex-direction: column; gap: 2px; }
+.mcp-triggers .glyph { opacity: 0.6; }
+.mcp-triggers .attention { color: var(--tint-attention); }
+.workflow-page .last-ran { margin: 2px 0 0; }
+.workflow-page .prompt-text { margin: 0; white-space: pre-wrap; font: 0.78125rem/1.5 var(--font-mono); padding: 12px 14px;
+  background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
+
+/* The page's status card and what it does (#142), the window's order. */
+.workflow-page .archive, .workflow-page .deny { padding: 5px 14px; border-radius: 999px; }
+.status-card { list-style: none; margin: 0; padding: 0; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
+.ready-made-choice { display: flex; gap: 10px; margin-top: 10px; }
+.status-card li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 10px; padding: 10px 14px; align-items: start; }
+.status-card li + li { border-top: 1px solid var(--paper-rule); }
+.status-card .glyph { opacity: 0.6; text-align: center; }
+.status-card .what { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.status-card li.attention { color: var(--tint-attention); }
+.status-card li.failure { color: var(--tint-failure); }
+.workflow-page .link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; white-space: nowrap; }
+.workflow-page .agent-mode { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.workflow-page .agent-mode code { font: 0.71875rem var(--font-mono); }
+.workflow-page .workflow-settings { display: flex; flex-direction: column; gap: 8px; }
+.workflow-page .marked { margin: 0; color: var(--tint-attention); }
+.workflow-page .pill[disabled], .workflow-page .pill:has(select:disabled) { opacity: 0.55; }
+.workflow-page .labels:empty { display: none; }
+.workflow-page .host-pins { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.workflow-page .unknown-keys { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
+.workflow-page .unknown-keys code { font: 0.75rem var(--font-mono); opacity: 0.7; }
+
+/* On its way (#87): a spinner and "telling your Mac", in a row's report line, over the prompt and in a queued row. */
+.telling { display: inline-flex; align-items: center; gap: 6px; font-size: 0.71875rem; opacity: 0.75; }
+.telling .spinner, .send .spinner { width: 10px; height: 10px; }
+.bar > .telling { margin: 0 4px 6px; }
+.send .spinner { --notch: var(--accent); }
+.sessions.greyed .row.session, .sessions.greyed .row.workflow { opacity: 0.55; }
+
+/* Changes as a tree (#63): a changed file's square in its status colour; folders with their totals. */
+.tree-row { display: flex; align-items: center; gap: 6px; }
+.tree-row .title { flex: 1; min-width: 0; }
+.tree-row .chevron { width: 10px; opacity: 0.55; font-size: 0.625rem; }
+.counts { font-size: 0.71875rem; font-variant-numeric: tabular-nums; opacity: 0.7; white-space: nowrap; }
+.change-mark { display: inline-block; width: 14px; text-align: center; font-weight: 600; }
+.state-added { color: var(--tint-vouched); }
+.state-modified, .state-binary { color: var(--tint-warning); }
+.state-deleted { color: var(--tint-failure); }
+.state-renamed { color: var(--accent); }
+.state-untracked { opacity: 0.6; }
+.row.entry { display: flex; align-items: center; gap: 6px; }
+.row.entry .title { flex: 1; min-width: 0; }
+.changes-head { margin: 4px 8px 6px; }
+.changes-note { margin: 0 8px 8px; line-height: 1.35; }
+.diff-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 8px 6px; }
+.diff-choice { display: inline-flex; border: 1px solid var(--paper-rule); border-radius: 999px; overflow: hidden; }
+.diff-choice button { border: 0; background: none; border-radius: 0; padding: 2px 10px; font-size: 0.75rem; }
+.diff-choice button[aria-pressed="true"] { background: var(--paper-selection); }
+.diff-steps { display: inline-flex; gap: 4px; }
+.diff-steps button { font-size: 0.75rem; padding: 2px 8px; }
+.diff-bar .link { margin-left: auto; font-size: 0.75rem; }
+
+/* New folder (#115): the + over the folders column, its menu, and the window's two sheets. */
+.menu-anchor.new-folder { margin-right: 0; }
+.popover [role^=menuitem]:disabled { background: none; }
+.popover hr { border: none; border-top: 1px solid var(--paper-rule); margin: 4px 0; }
+.new-folder-host { display: flex; flex-direction: column; }
+.menu-head { margin: 6px 10px 2px; font-size: 0.6875rem; color: var(--paper-secondary); }
+.empty-folders { display: flex; flex-direction: column; gap: 8px; padding: 12px 8px; }
+.empty-folders .quiet { line-height: 1.45; }
+.empty-runtimes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.empty-runtimes li { display: flex; flex-wrap: wrap; gap: 2px 8px; align-items: baseline; }
+.empty-runtimes a { font-size: 0.75rem; }
+.empty-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.row.cloning { cursor: default; opacity: 0.7; }
+.row.cloning .spinner { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+dialog.sheet {
+  width: min(520px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 20px;
+  color: inherit;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sheet);
+}

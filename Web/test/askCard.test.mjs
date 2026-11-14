@@ -4,9 +4,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { appCss } from "./appCss.mjs";
 
 const read = (path) => readFileSync(new URL(`../src/${path}`, import.meta.url), "utf8");
-const css = read("app.css");
+const css = appCss();
 
 test("every ask to the person is drawn as an Ask", () => {
   for (const file of ["views/Cards.tsx", "views/GuardedChange.tsx", "views/ArchiveCard.tsx", "views/DesktopControlPauseCard.tsx",

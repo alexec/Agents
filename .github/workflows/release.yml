@@ -360,9 +360,10 @@ jobs:
           swift scripts/asc-builds.swift "${TAG#v}" "${{ github.run_number }}" --wait 45
 
       # What this run deployed, for Lineage (#3584): Agents reads the notice from the run, so App
-      # Store Connect's key stays here.
+      # Store Connect's key stays here. It names its environment, testflight= (#5242): this job's
+      # forge environment is `release`, which holds secrets and is not a place.
       - name: Say the deploy
-        run: echo "::notice title=deploy::testflight:com.alexecollins.agents.remote/${{ github.run_number }}"
+        run: echo "::notice title=deploy::testflight=testflight:com.alexecollins.agents.remote/${{ github.run_number }}"
 
       - name: Logs
         if: failure()

@@ -318,6 +318,8 @@ run_checks() {
 	python3 scripts/check-deploy-bounds.py --selftest || status=1
 	python3 scripts/check-deploy-bounds.py || status=1
 	python3 scripts/wire-compat.py --selftest || status=1
+	python3 scripts/docs-parts.py --selftest || status=1
+	python3 scripts/docs-parts.py check || status=1
 	sh scripts/design.sh selftest || status=1
 	sh scripts/design.sh check || status=1
 	python3 scripts/check-colour-tokens.py --selftest || status=1

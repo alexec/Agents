@@ -107,6 +107,12 @@ var events = append([]event{
 			// What the run deployed: its successful deployments (#4217).
 			"deploys": map[string]any{"type": "array", "items": str},
 		})},
+	deployEvent("deploy.started", "Deploy started",
+		"A Bitbucket deployment went IN_PROGRESS: a step with deployment: began to deploy, whatever started its run. One event per deployment."),
+	deployEvent("deploy.succeeded", "Deploy succeeded",
+		"A Bitbucket deployment went COMPLETED, SUCCESSFUL: a step with deployment: deployed. One event per deployment."),
+	deployEvent("deploy.failed", "Deploy failed",
+		"A Bitbucket deployment went COMPLETED, FAILED or STOPPED: a step with deployment: did not deploy. One event per deployment. outcome is cancelled when it was stopped, else failed."),
 	{Name: "pr.opened", Title: "Pull request opened",
 		Description: "A pull request was opened, or a draft was marked ready: a pull request open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownPRs,
 		Input:       prInput(),
@@ -425,6 +431,13 @@ func candidates(ctx context.Context, f Bitbucket, name string, a args, yours *Yo
 				Subject: issueRef(repo, it.Issue.Number), Key: it.ID})
 		}
 		return list, listed, nil
+	}
+	if mcpevents.IsDeployEvent(name) {
+		deploys, err := f.Deployments(ctx, repo)
+		if err != nil {
+			return nil, Listed{}, err
+		}
+		return mcpevents.DeployCandidates(name, a.deploy, deploys), Listed{}, nil
 	}
 	switch name {
 	case "review.comment":

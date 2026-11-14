@@ -13,9 +13,8 @@ import (
 func fakeCapacity(t *testing.T) (set func(capacitySample)) {
 	var mu sync.Mutex
 	var now capacitySample
-	was := capacitySampler
-	capacitySampler = func(context.Context) capacitySample { mu.Lock(); defer mu.Unlock(); return now }
-	t.Cleanup(func() { capacitySampler = was })
+	was := setCapacitySampler(func(context.Context) capacitySample { mu.Lock(); defer mu.Unlock(); return now })
+	t.Cleanup(func() { setCapacitySampler(was) })
 	return func(s capacitySample) { mu.Lock(); now = s; mu.Unlock() }
 }
 

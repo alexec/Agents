@@ -1,0 +1,1 @@
+| Amazon Bedrock (API key, or access key and role by STS on the machine, #3397) | machine; Mac, web | built (Claude only) | 2026-11-04, STS on the machine, SigV4 and the event stream against fakes only | `Go/internal/orgtoken/orgtoken.go`, `Go/internal/agentsd/orgtokens.go`, `Go/internal/agentsd/modelrelay.go` | OpenCode not built; Alex to test with a real account (#3413) |

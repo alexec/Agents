@@ -27,7 +27,7 @@ final class AppModel {
     let work = AgentsModel()
     /// This window's local copy (#4791): sessions and chat ends kept in its root's Caches,
     /// drawn at launch before the host answers. The host always wins.
-    @ObservationIgnored private(set) var localCopy: LocalCopyKeeper?
+    @ObservationIgnored var localCopy: LocalCopyKeeper?
 
     var runtimes: [RuntimeStatus] = []
     /// The start-up sheet offering to install what is missing (048). Raised once per
@@ -91,12 +91,12 @@ final class AppModel {
     @ObservationIgnored private var connectGeneration = 0
     /// Its wait, and the control plane watch's, both cut short by a wake or a network
     /// change (#82).
-    @ObservationIgnored private let backoff = Backoff()
+    @ObservationIgnored let backoff = Backoff()
     /// When this window last asked each session's host to warm it, and why (#183).
     @ObservationIgnored private var prewarmed: [String: Date] = [:]
     /// The control plane's own client: from 2 s, doubling to a minute, not every 2 s for
     /// ever (#172).
-    @ObservationIgnored private let controlBackoff = Backoff(first: .seconds(2), longest: .seconds(60))
+    @ObservationIgnored let controlBackoff = Backoff(first: .seconds(2), longest: .seconds(60))
     @ObservationIgnored private let wakeAndNetwork = WakeAndNetwork()
     @ObservationIgnored private var checkingAfterWake = false
     var problem: String?
@@ -111,14 +111,14 @@ final class AppModel {
     var machineProviders: [DaemonAPI.ProviderSummary] { listedProviders.filter { $0.capabilities.contains("create") } }
     /// Every machine provider this person may use, as the control plane last listed them: the
     /// Machines group shows each one's machines that have not joined (#4978).
-    private(set) var listedProviders: [DaemonAPI.ProviderSummary] = []
+    var listedProviders: [DaemonAPI.ProviderSummary] = []
     /// How each click on a machine that never joined goes (#4978), by its row's id.
-    private(set) var machineJoins: [String: MachineJoin] = [:]
+    var machineJoins: [String: MachineJoin] = [:]
     /// How many New Machine calls wait for the provider's answer (#4610): a *Making…* row
     /// each, until the control plane lists the machine as joining.
-    private(set) var machinesBeingMade = 0
+    var machinesBeingMade = 0
     /// Goes up on each `control/lineageChanged` (#4276): Work ▸ Timeline reads the sessions again.
-    private(set) var lineageChanges = 0
+    var lineageChanges = 0
     /// A runtime of this Mac's that refused for want of a sign-in: the window answers
     /// with its sign-in sheet rather than an error nobody can act on.
     var signInRuntimeID: String?
@@ -864,7 +864,7 @@ final class AppModel {
 
     static let newSessionFolderDefault = "newSessionFolder"
 
-    private func rememberNewSessionFolder(_ key: FolderKey) {
+    func rememberNewSessionFolder(_ key: FolderKey) {
         rememberProjectFolder(key)
         guard rememberedNewSessionFolder != key else { return }
         rememberedNewSessionFolder = key
@@ -1123,34 +1123,34 @@ final class AppModel {
     }
     /// The kinds of session the draft folder offers (#760): the folder's personas and
     /// the home's, as the host lists them.
-    private(set) var draftPersonas: [Persona] = []
+    var draftPersonas: [Persona] = []
     /// The one picked, by id, sent with the start so the agent gets its prompt.
-    private(set) var draftPersona: String?
+    var draftPersona: String?
     /// A persona picked while its runtime's options were still to come: laid over them
     /// when they arrive.
-    private var pendingPersona: Persona?
+    var pendingPersona: Persona?
     /// The live pick (#4559, #4721): always on for a new draft, until a segment is picked
     /// by hand, and the pick it made from the prompt as it is typed.
-    private(set) var draftPersonaAuto = true
-    private(set) var draftAutoPick: Persona.AutoPick?
+    var draftPersonaAuto = true
+    var draftAutoPick: Persona.AutoPick?
     /// The draft's prompt, as the live pick last read it, so new personas are read against it.
-    private var draftPromptWords = ""
+    var draftPromptWords = ""
     /// Where in the folder the next agent works, when not the folder (030).
     /// Deliberately not kept with the rest of the form: a worktree is decided per
     /// agent, so it goes back to the folder after every start (FR-004).
     var draftWorktree: WorktreeChoice?
     /// What the draft folder's repository has, for the Worktree chooser. Not a
     /// repository until the daemon says otherwise, which keeps the chooser hidden.
-    private(set) var draftWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
-    private var draftWorktreesGeneration = 0
+    var draftWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
+    var draftWorktreesGeneration = 0
     /// Each open agent's folder's worktrees, for the Worktree choice on its page (053).
     /// Asked when the page opens and after each move, never polled.
-    private(set) var agentWorktrees: [URL: DaemonAPI.WorktreesListResponse] = [:]
+    var agentWorktrees: [URL: DaemonAPI.WorktreesListResponse] = [:]
     /// Why the last move asked for an agent was refused, shown under its choice until
     /// the next one. A move that fails later, when it is made, says so in the chat.
-    private(set) var moveProblems: [UUID: String] = [:]
-    private(set) var draftOptions: [ConfigOption] = []
-    private(set) var draftCommands: [SlashCommand] = []
+    var moveProblems: [UUID: String] = [:]
+    var draftOptions: [ConfigOption] = []
+    var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
     /// The next agent's own sandbox choice (064). Nil follows its runtime's default.
     var draftSandbox: SandboxChoice? { didSet { draftSandboxRefusal = nil; draftAutoRefusal = nil } }
@@ -1182,7 +1182,7 @@ final class AppModel {
     /// A new agent is on its way to its host (#87): a worktree to make and a runtime to
     /// start can take seconds, and the bar shows it rather than nothing. One at a time,
     /// so a second Return is not a second agent.
-    private(set) var isStarting = false
+    var isStarting = false
     /// Folders beyond the working one, and MCP servers, for the agent about to start.
     var draftFolders: [URL] = []
     var draftServers: [MCPServer] = []
@@ -1198,26 +1198,26 @@ final class AppModel {
     /// folder is this one: the prompt, the labels and the worktree. Starting it is still
     /// the person's move.
     var offeredStart: OfferedStart?
-    private(set) var isLoadingDraftOptions = false
+    var isLoadingDraftOptions = false
     /// Why the last fetch of a runtime's options failed, if it did.
     ///
     /// Its own thing rather than the global `problem` banner: the row under the prompt
     /// has to say this, and offer to try again, and a modal alert can be dismissed
     /// leaving the row looking like a runtime with nothing to adjust.
-    private(set) var draftOptionsFailure: String?
+    var draftOptionsFailure: String?
     /// Which fetch is the current one.
     ///
     /// Changing the folder and then the runtime issues two calls, and without this the
     /// first to answer wins and is shown as settled while the right one is still in
     /// flight.
-    private var draftOptionsGeneration = 0
-    private var draftID: UUID?
+    var draftOptionsGeneration = 0
+    var draftID: UUID?
 
     /// This Mac's host: directly over its local socket when it is there (#1118), else
     /// through the control plane (058). Set once more when first run chooses one.
     var client = DaemonClient(link: UnreachableLink())
     /// The one connection to the control plane every host's client is carried on (058).
-    private var controlLink: ControlLink? = ControlConfig.endpoint.flatMap(ControlConfig.link)
+    var controlLink: ControlLink? = ControlConfig.endpoint.flatMap(ControlConfig.link)
 
     init() {
         userScope.lock = lock
@@ -1285,22 +1285,22 @@ final class AppModel {
     /// The settings and secrets that follow the person to their machines (#1760).
     let userScope = UserScopeState()
     /// Hosts whose Start was pressed here and not answered yet.
-    private(set) var hostsBeingStarted: Set<MachineRef> = []
+    var hostsBeingStarted: Set<MachineRef> = []
     /// Prompts and starts the control plane keeps for stopped workspaces (#691 US3), every host's.
     var kept: [DaemonAPI.KeptRequest] = []
     /// The kept starts the New Agent prompt has shown here: the one that reaches its host opens.
     @ObservationIgnored var keptStartsShown: Set<UUID> = []
-    @ObservationIgnored private var controlWatch: Task<Void, Never>?
+    @ObservationIgnored var controlWatch: Task<Void, Never>?
     /// Every host the control plane last listed, this Mac's included. Nil when the
     /// window is not its client; empty until the first list arrives (058, R11).
-    private(set) var controlPlaneHosts: [DaemonAPI.ControlMachine]? = ControlConfig.endpoint == nil ? nil : []
+    var controlPlaneHosts: [DaemonAPI.ControlMachine]? = ControlConfig.endpoint == nil ? nil : []
     /// The control plane's list has arrived at least once, so an empty one means none.
     private var controlPlaneListed = false
     /// `control/status.thisMacHost` (#303): how this Mac's host says its join stands.
     /// Nil when that process is not writing one, or this plane is not beside it.
-    private(set) var macHostJoin: DaemonAPI.MachineJoinStatus?
+    var macHostJoin: DaemonAPI.MachineJoinStatus?
     /// `control/status.machineID`, so a missing host on this Mac is not a plane elsewhere.
-    private var controlPlaneMachine: String?
+    var controlPlaneMachine: String?
 
     /// Whether this window has a host on this Mac (058, T093a). Always without a control
     /// plane, and until its first list arrives; after that, only if it lists `.mac`. A
@@ -1331,15 +1331,15 @@ final class AppModel {
     private(set) var controlPlaneName: String?
     /// The control plane's own client has answered. Distinct from `isConnected`, which
     /// is this Mac's host: a host can be offline while the control plane is up.
-    private(set) var controlPlaneReachable = false
+    var controlPlaneReachable = false
     /// A try to reach the control plane failed. Stays quiet during the first try.
-    private(set) var controlPlaneMissed = false
+    var controlPlaneMissed = false
     /// When the window last read from the control plane (#5141): it is live until its link
     /// goes, so the time it went, or the first answer. Nil before it answered once.
-    private(set) var controlPlaneReadAt: Date?
+    var controlPlaneReadAt: Date?
     /// The address itself refused the connection (suspended, over a plan's limit,
     /// #2235): its words, shown in the away strip in place of "can't reach".
-    private(set) var controlPlaneRefusalLine: String?
+    var controlPlaneRefusalLine: String?
     /// No control plane and nothing of the old way: the window asks how to work, and
     /// starts nothing until it is told (058, FR-017).
     private(set) var needsFirstRun = ControlConfig.needsFirstRun
@@ -1568,8 +1568,8 @@ final class AppModel {
     var selectedHostClient: DaemonClient { client(for: selectedFolderHost) }
     /// Where a new session's prompt starts it: the folder whose own window it is in
     /// (#1089), or the selected one.
-    private var draftHost: MachineRef { composingWindow?.host ?? selectedFolderHost }
-    private var draftHostClient: DaemonClient { client(for: draftHost) }
+    var draftHost: MachineRef { composingWindow?.host ?? selectedFolderHost }
+    var draftHostClient: DaemonClient { client(for: draftHost) }
     private var listening: Task<Void, Never>?
 
     /// The panes listening for shell output, one per shell in this window: an agent
@@ -1640,214 +1640,19 @@ final class AppModel {
 
     // MARK: Folders
 
-    /// The ones the sidebar lists.
-    var liveFolders: [DaemonAPI.FolderSummary] { work.liveFolders }
-
-    var archivedFolders: [DaemonAPI.FolderSummary] { work.archivedFolders }
-
-    var selectedFolderSummary: DaemonAPI.FolderSummary? { work.folder(selectedFolderKey) }
-
-    /// A folder's agents in one group, newest first.
-    func agents(in key: FolderKey?, group: AgentGroup) -> [Agent] {
-        work.agents(in: key, group: group)
-    }
-
     /// How many archived sessions an Archived fold shows: enough to find last week's; the
     /// rest are on the phone's archive and in Events.
     static let archivedShown = SidebarFolderFold.archivedShown
 
-    /// A folder's newest `limit` archived sessions, for its Archived page when it opens
-    /// (#164): the window holds the live agents, and a page of archived ones per open
-    /// Archived page. Answers whether the host
-    /// did, so the page can tell an empty archive from a silent host (#664).
-    @discardableResult
-    func loadArchived(in key: FolderKey, limit: Int = archivedShown) async -> Bool {
-        let request = DaemonAPI.ListRequest(archivedOnly: true, folder: key.folder,
-                                            limit: limit, lean: true)
-        guard let listed = try? await client(for: key.host).call(DaemonAPI.Method.agentsList, request,
-                                                                  returning: [Agent].self) else { return false }
-        work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })
-        return true
-    }
-
-    /// The archived sessions of a folder that hold `words`, for the Archived Sessions page's
-    /// filter (#4448), so one older than the page held is found too. Let go with the rest
-    /// when the page closes.
-    @discardableResult
-    func searchArchived(in key: FolderKey, words: String) async -> Bool {
-        let request = DaemonAPI.ListRequest(archivedOnly: true, folder: key.folder, limit: Self.searchShown,
-                                            lean: true, query: words)
-        guard let listed = try? await client(for: key.host).call(DaemonAPI.Method.agentsList, request,
-                                                                  returning: [Agent].self) else { return false }
-        work.takeListed(listed.map { var agent = $0; agent.host = key.host; return agent })
-        return true
-    }
-
-    /// Let go of a folder's archived sessions when its Archived fold closes (#165),
-    /// keeping the one being read and any with a window of its own (#2744).
-    func letGoOfArchived(in key: FolderKey) {
-        let held = work.agents(in: key, group: .archived).map(\.id).filter { !isBeingRead($0) }
-        work.forget(held)
-    }
-
-    /// Whether a session is open, in the main window or a window of its own: a let-go
-    /// keeps it, or its window says it was deleted (#2744).
-    private func isBeingRead(_ id: UUID) -> Bool {
-        id == selection || popouts[id] != nil
-    }
-
     /// The most a search brings back from each host, a page at a time.
     static let searchShown = 200
     /// Archived sessions a search brought in, let go when the search ends.
-    @ObservationIgnored private var searched: Set<UUID> = []
+    @ObservationIgnored var searched: Set<UUID> = []
     /// The next page of matches, for each host whose last page was full (#176).
-    private var searchNext: [MachineRef: DaemonAPI.ListRequest] = [:]
-    /// Whether a host has more matches than it has sent: More matches… asks for them.
-    var searchHasMore: Bool { !searchNext.isEmpty }
-
-    /// Ask every host for the sessions matching `words`, archived ones included, a capped
-    /// page each (#165): the sidebar holds the live ones and filters those itself.
-    func searchSessions(_ words: String) async {
-        // Let the last page go before the next is asked, including a refinement.
-        // Forgetting only when the field was cleared left every query's matches held (#285).
-        let earlier = searched.filter { id in
-            !isBeingRead(id) && heldAgent(id)?.state == .archived && !isInOpenArchivedFold(id)
-        }
-        searched = []
-        searchNext = [:]
-        work.forget(earlier)
-        work.saidLines = [:]
-        work.issueSessions = [:]
-        work.issueHeadings = []
-        guard !words.isEmpty else { return }
-        let request = DaemonAPI.ListRequest(archivedCommands: false, limit: Self.searchShown, lean: true, query: words)
-        let hosts: [MachineRef] = (hasMacHost ? [.mac] : []) + self.hosts.servers.filter { !hostUnreachable($0) }
-        let issue = SessionLabelQuery.issue(in: words)
-        for host in hosts {
-            await search(request, on: host)
-            // The sessions on the issue, its sub-issues and their PRs (#3899). A host too old to
-            // say matches the #<n> label only.
-            if let issue, self.host(host, has: Capability.lineageSessions1),
-               let on = try? await client(for: host).call(DaemonAPI.Method.lineageSessions,
-                                                          DaemonAPI.LineageSessionsRequest(number: issue),
-                                                          returning: DaemonAPI.LineageSessions.self),
-               !Task.isCancelled {
-                work.noteIssueSessions(on)
-            }
-            // What was said (#1585): the sessions whose prompts or replies hold the words. Not
-            // asked of a host too old to say (#1748).
-            if self.host(host, has: Capability.agentsSaid1),
-               let said = try? await client(for: host).call(DaemonAPI.Method.agentsSaid,
-                                                            DaemonAPI.SaidSearchRequest(text: words),
-                                                            returning: DaemonAPI.SaidSearchResult.self),
-               !Task.isCancelled {
-                for match in said.matches { work.saidLines[match.agentID] = match.line }
-            }
-        }
-    }
-
-    /// The next page from each host that has more, newest first as the host lists them.
-    func searchMore() async {
-        let next = searchNext
-        searchNext = [:]
-        for (host, request) in next { await search(request, on: host) }
-    }
-
-    private func search(_ request: DaemonAPI.ListRequest, on host: MachineRef) async {
-        guard let page = await ArchiveActions.searchArchived(request, on: host, fetch: {
-            try? await self.client(for: host).call(DaemonAPI.Method.agentsList, request, returning: [Agent].self)
-        }) else { return }
-        let fresh = page.agents.filter { heldAgent($0.id) == nil }.map(\.id)
-        searched.formUnion(fresh)
-        work.takeListed(page.agents)
-        searchNext[host] = page.next
-    }
-
-    /// Whether an archived session is on show in its folder's open Archived fold.
-    /// Held, without making a cell: a search or a history page asking must not leave
-    /// one behind for every id it looked at (#285).
-    private func heldAgent(_ id: UUID) -> Agent? {
-        work.agents.first { $0.id == id }
-    }
-
-    private func isInOpenArchivedFold(_ id: UUID) -> Bool {
-        guard let agent = heldAgent(id) else { return false }
-        // As the sidebar keeps them: in defaults, read here once per search ended.
-        return SidebarFolds().isOpen(FolderKey(host: agent.host, folder: agent.folderPath), .archivedSessions)
-    }
-
-    /// A workflow's newest runs, archived ones included, for its History (#164).
-    /// Archived runs this page brought in are remembered, so a larger page can let go
-    /// of the ones that left it, and closing the page lets go of the rest (#285).
-    func loadRuns(of workflowID: String, in folder: URL, on host: MachineRef, limit: Int) async {
-        let key = RunsKey(host: host, folder: Folder.standardize(folder), workflowID: workflowID)
-        let request = DaemonAPI.ListRequest(archivedCommands: false, folder: folder,
-                                            startedByWorkflow: workflowID, limit: limit, lean: true)
-        guard let listed = try? await client(for: host).call(DaemonAPI.Method.agentsList, request,
-                                                              returning: [Agent].self) else { return }
-        guard !Task.isCancelled else { return }
-        let stamped = listed.map { var agent = $0; agent.host = host; return agent }
-        let previous = runsIntroduced[key] ?? []
-        var introduced = Set<UUID>()
-        for agent in stamped where agent.state == .archived {
-            // Already held by a fold, or live, is not this page's to drop later.
-            if previous.contains(agent.id) || heldAgent(agent.id) == nil {
-                introduced.insert(agent.id)
-            }
-        }
-        let left = previous.subtracting(introduced).filter { id in
-            !isBeingRead(id) && heldAgent(id)?.state == .archived && !isInOpenArchivedFold(id)
-        }
-        work.forget(left)
-        work.takeListed(stamped)
-        runsIntroduced[key] = introduced
-    }
-
-    /// The archived runs one History page brought in, let go when that page closes.
-    func letGoOfRuns(of workflowID: String, in folder: URL, on host: MachineRef) {
-        let key = RunsKey(host: host, folder: Folder.standardize(folder), workflowID: workflowID)
-        guard let ids = runsIntroduced.removeValue(forKey: key) else { return }
-        work.forget(ids.filter { id in
-            !isBeingRead(id) && heldAgent(id)?.state == .archived && !isInOpenArchivedFold(id)
-        })
-    }
-
-    private struct RunsKey: Hashable {
-        var host: MachineRef
-        var folder: URL
-        var workflowID: String
-    }
+    var searchNext: [MachineRef: DaemonAPI.ListRequest] = [:]
 
     /// Archived agents a History page introduced, by the workflow they belong to.
-    @ObservationIgnored private var runsIntroduced: [RunsKey: Set<UUID>] = [:]
-
-    /// This window's own counts for a folder, from the grouping its panel uses.
-    func counts(in key: FolderKey?) -> [AgentGroup: Int] { work.counts(in: key) }
-    func unreadCount(in key: FolderKey?) -> Int { work.unreadCount(in: key) }
-
-    /// How many requests and sessions across every folder need the person: each open
-    /// request (#3864), and the sessions under Needs you and Blocked that asked none; not
-    /// unread finishes (#1565), and a terminal's agents-secret (#4179). Drives the Dock badge.
-    var needsPersonCount: Int {
-        liveFolders.reduce(work.terminalRequests.count) { $0 + work.attentionCount(in: $1.key) + work.requestBadgeShift(in: $1.key.folder) }
-    }
-
-    /// The Blob's mood on the Dock tile (#1317), from the same groups the sidebar shows.
-    var iconMood: IconMood {
-        IconMood(counts: liveFolders.lazy.map { self.work.counts(in: $0.key) })
-    }
-
-    /// Whether the daemon is bringing this chat back by itself after a restart.
-    func isComingBack(_ agent: Agent) -> Bool { work.isComingBack(agent) }
-
-    /// "Started by …" for an agent another agent started, and nil otherwise (028).
-    func startedByAgentLabel(_ agent: Agent) -> String? { work.startedByAgentLabel(agent) }
-
-    /// Whether Stop is offered for this chat, in the toolbar and on the card alike.
-    func canStop(_ agent: Agent) -> Bool { work.canStop(agent) }
-    func blockLines(_ agent: Agent) -> [String] { work.blockLines(agent) }
-    func queuedLine(_ agent: Agent) -> String? { work.queuedLine(agent) }
-    func isBlocked(_ agent: Agent) -> Bool { work.openBlock(agent) != nil }
+    @ObservationIgnored var runsIntroduced: [RunsKey: Set<UUID>] = [:]
 
     // MARK: Workflows
 
@@ -2795,7 +2600,7 @@ final class AppModel {
     }
 
     /// The draft's value for a field put into the named runtime's own options.
-    private func applyDraftLevel(_ field: AutoField) {
+    func applyDraftLevel(_ field: AutoField) {
         guard let runtimeID = draftRuntimeID, !isAutoDraft else { return }
         let level: String? = switch field {
         case .model: draftLevels.model?.rawValue
@@ -3705,462 +3510,11 @@ final class AppModel {
 
     // MARK: Servers (037)
 
-    @ObservationIgnored private var hostsStarted = false
+    @ObservationIgnored var hostsStarted = false
     /// Each server's end of `files/*`, made when first wanted (037).
-    @ObservationIgnored private var serverFilesByHost: [MachineRef: RemoteFiles] = [:]
+    @ObservationIgnored var serverFilesByHost: [MachineRef: RemoteFiles] = [:]
 
-    @ObservationIgnored private var serverPicturesByHost: [MachineRef: ServerPictures] = [:]
-
-    /// A server's pictures for its live pages, kept while the app runs (037).
-    func serverPictures(_ host: MachineRef) -> ServerPictures {
-        if let known = serverPicturesByHost[host] { return known }
-        let made = ServerPictures(files: serverFiles(host))
-        serverPicturesByHost[host] = made
-        return made
-    }
-
-    /// How the files pane reads a server agent's folder: through that server's daemon,
-    /// because the folder is not on this Mac.
-    func serverFiles(_ host: MachineRef) -> RemoteFiles {
-        if let known = serverFilesByHost[host] { return known }
-        let made = RemoteFiles(client: client(for: host))
-        serverFilesByHost[host] = made
-        return made
-    }
-
-    /// Once, after the Mac's own daemon has answered: the servers come after the Mac,
-    /// so a slow server never holds up the window's first list.
-    private func startHosts() {
-        guard !hostsStarted else { return }
-        hostsStarted = true
-        let shown = work.shown
-        hosts.onNotification = { [weak self] host, method, params in
-            // Read off the main actor, as the Mac's own are (#203).
-            let update = await Task.detached { AgentsModel.read(method, params, showing: shown.id, alsoShowing: shown.also) }.value
-            await self?.receivedFromServer(host, method, params, update)
-        }
-        hosts.offerFor = { [weak self] id in self?.credentialOffer(id) }
-        hosts.lenderFor = { [weak self] id in
-            { [weak self] wanted in
-                guard let model = self else { return false }
-                return await model.answerCredentialWanted(wanted, on: id)
-            }
-        }
-        hosts.toolsetWanted = { [weak self] id, runtimeID in
-            guard let self else { return false }
-            // One that works with no sign-in goes wherever this Mac has it (049: OpenCode's free
-            // models); on an "own sign-in only" server too, since nothing is lent to install it.
-            if RuntimeLaunchCatalog.launch(for: runtimeID).lentSignIn != nil { return self.hasOnThisMac(runtimeID) }
-            // No runtime takes a pasted key from Settings now that Gemini is retired (#3043).
-            return false
-        }
-        hosts.onConnected = { [weak self] host in
-            await self?.refreshServer(host)
-            await self?.reattachShells(on: host)
-        }
-        hosts.onReachability = { [weak self] server, online in
-            guard let self else { return }
-            _ = try? await self.client.call(DaemonAPI.Method.eventsServer,
-                                            DaemonAPI.ServerReachabilityChange(server: server, online: online),
-                                            returning: Event.self)
-        }
-        hosts.start()
-    }
-
-    /// Follow the control plane's hosts: a client for each one other than this Mac's,
-    /// listed now and kept as hosts come and go (058, US3).
-    private func watchControlHosts() {
-        guard let controlLink, controlWatch == nil else { return }
-        let backoff = controlBackoff
-        controlWatch = Task { [weak self] in
-            let control = DaemonClient(link: controlLink.controlLink)
-            self?.controlRequests = control
-            while !Task.isCancelled {
-                // Before the list comes, and while the control plane stays away (#1481).
-                await self?.reachKeptHost(controlLink)
-                backoff.trying()
-                let answered: Bool
-                do {
-                    try await control.connect(startIfNeeded: false, timeout: .seconds(3))
-                    answered = true
-                } catch {
-                    // Refused as suspended (#1002): the window shows only that, and dials again.
-                    self?.signIn.refused(error)
-                    // The address itself refused (suspended, over a plan's limit, #2235):
-                    // its words replace "can't reach", and trying again soon is pointless.
-                    // `DaemonClient` keeps only "could not connect", so `ControlLink` kept
-                    // the line on the side as it dialled.
-                    if let line = ControlLink.hostedRefusal.take() {
-                        self?.controlPlaneRefusalLine = line
-                        backoff.holdOff()
-                    }
-                    answered = false
-                }
-                if answered {
-                    backoff.connected()
-                    self?.controlPlaneDidAnswer()
-                    await self?.syncControlHosts(control)
-                    await self?.loadKept(control)
-                    await self?.people.connected(control)
-                    await self?.signIn.connected(control)
-                    // Status ▸ Secrets and Accounts' rows say when the newest operation was (#4161).
-                    await self?.userScope.load(control)
-                    await self?.keepTimeZone()
-                    // A change of this Mac's zone is the person's, while connected (#4818).
-                    let zoneWatch = Task { [weak self] in
-                        for await _ in NotificationCenter.default.notifications(named: .NSSystemTimeZoneDidChange) {
-                            NSTimeZone.resetSystemTimeZone()
-                            await self?.keepTimeZone()
-                        }
-                    }
-                    defer { zoneWatch.cancel() }
-                    if let client = ControlConfig.client { await self?.lock.connected(control, client: client) }
-                    await Self.sealWaiting(on: control, lock: self?.lock)
-                    for await note in control.notifications() {
-                        if note.method == DaemonAPI.Notification.controlSealingWanted {
-                            await Self.sealWaiting(on: control, lock: self?.lock)
-                            continue
-                        }
-                        if await self?.people.heard(note.method, note.params, on: control) == true { continue }
-                        if self?.signIn.heard(note.method, note.params) == true { continue }
-                        if await self?.lock.heard(note.method, note.params, on: control) == true {
-                            // A machine just added to the lock may now be sealed to (#3491, D8).
-                            if note.method == DaemonAPI.Notification.controlLockChanged { await Self.sealWaiting(on: control, lock: self?.lock) }
-                            continue
-                        }
-                        if await self?.userScope.heard(note.method, note.params, on: control) == true {
-                            // The host writes what it is sent a moment later: its panes read again.
-                            try? await Task.sleep(for: .milliseconds(500))
-                            await self?.refreshCostState()
-                            await self?.refreshLeases()
-                            continue
-                        }
-                        switch note.method {
-                        case DaemonAPI.Notification.controlKeptChanged, DaemonAPI.Notification.controlKeptDelivered:
-                            await self?.heardKept(note.method, note.params)
-                        case DaemonAPI.Notification.controlHostChanged:
-                            self?.hostCameOnline(note.params)
-                            await self?.syncControlHosts(control)
-                        case DaemonAPI.Notification.controlProvidersChanged:
-                            // The Machines header's New Machine on ▸ and its default (#3979), and the
-                            // machines that have not joined (#4978).
-                            if let listed = try? note.params?["providers"]?.decode([DaemonAPI.ProviderSummary].self) {
-                                self?.listedProviders = listed.filter(\.usable)
-                            }
-                        case DaemonAPI.Notification.controlInstallProgress:
-                            // A join from the Machines group says its step on its row (#4978).
-                            self?.heardInstallStep(note.params)
-                        case DaemonAPI.Notification.controlLineageChanged:
-                            // Work ▸ Timeline reads the sessions again (#4276).
-                            self?.lineageChanges += 1
-                        case DaemonAPI.Notification.controlThisMacHostChanged:
-                            // The join file changed and the host list may not have (#303).
-                            await self?.refreshMacHostJoin(control)
-                        case DaemonAPI.Notification.controlConnectWanted:
-                            // The page this Mac serves asked for Connect to Another… (#4257).
-                            if let self { Task { await ConnectAnotherWanted.heard(note.params, on: control, model: self) } }
-                        case DaemonAPI.Notification.controlPlaneMoveWanted:
-                            // A page asked for a step of Move to Another Machine… or Run It Here Again… (#4255).
-                            Task { await PlaneMoveWanted.heard(note.params, on: control) }
-                        default:
-                            break
-                        }
-                    }
-                    if !Task.isCancelled { self?.controlPlaneWent() }
-                } else if !Task.isCancelled {
-                    self?.controlPlaneWent()
-                }
-                await backoff.wait()
-            }
-        }
-    }
-
-    /// A host is back, said by the control plane: a window still waiting out its backoff
-    /// goes back now, rather than up to half a minute after the host returned (#172). One
-    /// dial each, when there is something to reach, in place of a dial every 100 ms.
-    private func hostCameOnline(_ params: JSONValue?) {
-        guard !isConnected, DaemonAPI.ControlMachine.answers(params?["state"]?.stringValue) else { return }
-        backoff.nudge()
-    }
-
-    /// Seals what waits for a copy this window can make (#3397): a machine that joined, or a
-    /// client paired, after an org route or one of the person's secrets was sealed.
-    private static func sealWaiting(on control: DaemonClient, lock: LockState?) async {
-        // Only to the machines the lock names (#3491, D8).
-        guard let lock else { return }
-        guard let (key, client) = ControlConfig.sealing() else { return }
-        await ClientSealing.sealWaiting(on: control, key: key, client: client) { await lock.signed($0, on: control) }
-    }
-
-    private func controlPlaneDidAnswer() {
-        controlPlaneReadAt = Date()
-        controlPlaneReachable = true
-        controlPlaneMissed = false
-        controlPlaneRefusalLine = nil
-    }
-
-    private func controlPlaneWent() {
-        guard controlLink != nil else { return }
-        people.went()
-        signIn.went()
-        lock.went()
-        if controlPlaneReachable { controlPlaneReadAt = Date() }
-        controlPlaneReachable = false
-        controlPlaneMissed = true
-    }
-
-    /// The host's own join changed (#303). A host that just connected is dialled now,
-    /// rather than at the end of the window's backoff.
-    private func refreshMacHostJoin(_ control: DaemonClient) async {
-        guard let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self) else { return }
-        let connected = status.thisMacHost?.connected == true
-        OlderPeer.controlVersion = status.version
-        macHostJoin = status.thisMacHost
-        controlPlaneMachine = status.machineID
-        if connected, !isConnected { backoff.nudge() }
-    }
-
-    /// Start on the strip of a host linked to a stopped workspace (#691): the control plane
-    /// asks its provider, and says how it goes as `control/hostChanged`.
-    func startHost(_ host: MachineRef) async {
-        guard let controlRequests, !hostsBeingStarted.contains(host) else { return }
-        hostsBeingStarted.insert(host)
-        defer { hostsBeingStarted.remove(host) }
-        do {
-            _ = try await controlRequests.call(DaemonAPI.Method.hostsStart, DaemonAPI.MachineRequest(host: host))
-        } catch let error as JSONRPCError {
-            problem = HostProblem.controlRefusal(error)
-        } catch {
-            problem = "The control plane can’t be reached, so \(hosts.label(host)) can’t be started."
-        }
-    }
-
-    /// Stop on a machine's row (#3973). Unconfirmed while agents work there, the control plane
-    /// says who they are, and they are returned for the question; nil once it is stopping or refused.
-    func stopHost(_ host: MachineRef, confirmed: Bool = false) async -> [String]? {
-        guard let controlRequests else { return nil }
-        do {
-            _ = try await controlRequests.call(DaemonAPI.Method.hostsStop,
-                                               DaemonAPI.MachineStop(host: host, confirmRunning: confirmed ? true : nil))
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.agentsWorking {
-            let names = error.data?["running"]?.arrayValue?.compactMap(\.stringValue) ?? []
-            if !names.isEmpty { return names }
-            problem = HostProblem.controlRefusal(error)
-        } catch let error as JSONRPCError {
-            problem = HostProblem.controlRefusal(error)
-        } catch {
-            problem = "The control plane can’t be reached, so \(hosts.label(host)) can’t be stopped."
-        }
-        return nil
-    }
-
-    /// Delete… on a machine a provider made (#3973): the provider deletes it, then the host
-    /// goes as Remove does.
-    func deleteMachine(_ host: MachineRef) async {
-        await machineCall(DaemonAPI.Method.hostsDeleteMachine, host)
-    }
-
-    /// Remove… on a registered machine (#3973): Agents forgets it; the computer stays.
-    func removeMachine(_ host: MachineRef) async {
-        await machineCall(DaemonAPI.Method.hostsRemove, host)
-    }
-
-    private func machineCall(_ method: String, _ host: MachineRef) async {
-        await controlCall(method, DaemonAPI.MachineRequest(host: host))
-    }
-
-    private func controlCall(_ method: String, _ params: some Encodable & Sendable) async {
-        guard let controlRequests else { return }
-        do {
-            _ = try await controlRequests.call(method, params)
-            await syncControlHosts(controlRequests)
-        } catch let error as JSONRPCError {
-            problem = HostProblem.controlRefusal(error)
-        } catch {
-            problem = "The control plane can’t be reached."
-        }
-    }
-
-    /// New Machine (#3973, #4634): the sheet, on the default provider or the one New
-    /// Machine on ▸ names, with every field on what New Machine would make (the options
-    /// used last there, else its first choices) and the next `machine-N`. Make confirms it.
-    func newMachine(on provider: ProviderID? = nil) {
-        newMachineAsk = NewMachineAsk(provider: provider)
-    }
-
-    /// The New Machine sheet's form (#4634): the provider's schema and the values to start with.
-    func newMachineForm(_ provider: ProviderID?) async -> Result<DaemonAPI.ProviderOptions, NewMachineRefusal> {
-        guard let controlRequests else { return .failure(.init("The control plane can’t be reached.")) }
-        do {
-            return .success(try await controlRequests.call(DaemonAPI.Method.providersOptions, DaemonAPI.ProviderRequest(id: provider),
-                                                           returning: DaemonAPI.ProviderOptions.self))
-        } catch let error as JSONRPCError {
-            return .failure(.init(HostProblem.controlRefusal(error)))
-        } catch {
-            return .failure(.init("The control plane can’t be reached, so no machine can be made."))
-        }
-    }
-
-    /// Make on the New Machine sheet (#4634): the sheet closes at once and a *Making…* row
-    /// takes over (#4610). A make the provider refuses opens the sheet again on the same
-    /// choices, with the provider's reason, to change one and try again.
-    func makeMachine(_ draft: NewMachineDraft) {
-        guard let controlRequests else { return }
-        machinesBeingMade += 1
-        Task {
-            defer { machinesBeingMade -= 1 }
-            var refused: String?
-            do {
-                let made = try await controlRequests.call(
-                    DaemonAPI.Method.providersCreate,
-                    DaemonAPI.ProviderCreate(id: draft.provider, name: draft.name, options: .object(draft.values)),
-                    returning: DaemonAPI.ProviderCreated.self)
-                if made.workspace.state == "failed" {
-                    refused = made.workspace.reason ?? "\(made.workspace.name) could not be made."
-                }
-            } catch let error as JSONRPCError {
-                refused = HostProblem.controlRefusal(error)
-            } catch {
-                refused = "The control plane can’t be reached, so no machine can be made."
-            }
-            if let refused { newMachineAsk = NewMachineAsk(provider: draft.provider, again: draft, problem: refused) }
-            await loadMachineProviders()
-        }
-    }
-
-    /// The machines New Machine made that have not joined yet (#4610): a *Making…* row each
-    /// under Machines, red with the reason once the control plane gave up on one; and every other
-    /// machine of the person's that has not joined, grey, a click to join it (#4978).
-    var machinesMaking: [MachineMaking] {
-        MachineMaking.rows(listedProviders, hostNames: Set(hosts.controlRows.values.map(\.name)))
-    }
-
-    /// Delete on a row the control plane gave up on (#4610): the provider deletes the workspace.
-    func deleteWorkspace(_ provider: ProviderID, workspace: String) async {
-        guard let controlRequests else { return }
-        do {
-            _ = try await controlRequests.call(DaemonAPI.Method.providersDeleteWorkspace,
-                                               DaemonAPI.ProviderWorkspaceRequest(id: provider, workspace: workspace))
-        } catch let error as JSONRPCError {
-            problem = HostProblem.controlRefusal(error)
-        } catch {
-            problem = "The control plane can’t be reached, so the machine wasn’t deleted."
-        }
-        await loadMachineProviders()
-    }
-
-    /// The providers New Machine can use (#3979), for the Machines header's menu.
-    func loadMachineProviders() async {
-        guard let controlRequests,
-              let answer = try? await controlRequests.call(DaemonAPI.Method.providersList, DaemonAPI.Empty()),
-              let listed = try? answer["providers"]?.decode([DaemonAPI.ProviderSummary].self)
-        else { return }
-        listedProviders = listed.filter(\.usable)
-    }
-
-    /// A click on a machine that never joined (#4978): the control plane installs Agents on it
-    /// over ssh, from the machine that carries its provider for a codespace (`gh codespace ssh`
-    /// starts a stopped one), after starting it with its provider otherwise. The row says each
-    /// step, and why it failed; it leaves when the machine joins. `trust` is a host key the
-    /// person looked at and trusts.
-    func joinMachine(_ row: MachineMaking, trust: String? = nil) async {
-        guard row.canJoin, machineJoins[row.id]?.isJoining != true, let controlRequests, let ssh = row.ssh else { return }
-        machineJoins[row.id] = .joining(step: nil)
-        var params: [String: JSONValue] = ["destination": .string(ssh), "name": .string(row.name),
-                                           "tunnel": .bool(row.tunnel), "provider": .string(row.provider.rawValue),
-                                           "workspace": .string(row.workspace)]
-        if let trust { params["trust"] = .string(trust) }
-        do {
-            let answer = try await controlRequests.call(DaemonAPI.Method.hostsInstall, JSONValue.object(params))
-            if let fingerprint = answer["needsTrust"]?.stringValue {
-                machineJoins[row.id] = .needsTrust(fingerprint)
-            } else {
-                machineJoins[row.id] = .joining(step: "started")
-            }
-        } catch let error as JSONRPCError {
-            machineJoins[row.id] = .failed(HostProblem.controlRefusal(error))
-        } catch {
-            machineJoins[row.id] = .failed("The control plane can’t be reached.")
-        }
-        await loadMachineProviders()
-    }
-
-    /// Forgets a join's host key question: the person did not trust it.
-    func cancelJoin(_ row: MachineMaking) { machineJoins[row.id] = nil }
-
-    /// `control/installProgress`: the step of a join, on the row of its name.
-    private func heardInstallStep(_ params: JSONValue?) {
-        guard let name = params?["name"]?.stringValue, let step = params?["step"]?.stringValue,
-              let row = machinesMaking.first(where: { $0.name == name }), machineJoins[row.id]?.isJoining == true
-        else { return }
-        machineJoins[row.id] = .joining(step: step)
-    }
-
-    /// Delete's question on a machine's row (#3979): the worktrees on it with work not
-    /// pushed. Nil when the control plane can't say (an older one).
-    func deletePreview(_ host: MachineRef) async -> DaemonAPI.StartedMachinePreview? {
-        try? await controlRequests?.call(DaemonAPI.Method.hostsDeletePreview, DaemonAPI.MachineRequest(host: host),
-                                         returning: DaemonAPI.StartedMachinePreview.self)
-    }
-
-    /// Check Again on a machine's row (#3979), as Settings ▸ Machines had it.
-    func checkAgain(_ host: MachineRef) async {
-        await machineCall(DaemonAPI.Method.hostsCheckAgain, host)
-    }
-
-    /// Unlink on a machine's page (#3975): its provider can no longer start or stop it.
-    func unlinkMachine(_ host: MachineRef) async {
-        await machineCall(DaemonAPI.Method.hostsUnlink, host)
-    }
-
-    /// Start when used, Start for scheduled workflows and Stop when idle on a machine's page
-    /// (#3975), as Settings ▸ Machines' menu had them. `stopWhenIdleMinutes` 0 turns it off.
-    func setMachineOptions(_ host: MachineRef, startWhenUsed: Bool? = nil, stopWhenIdleMinutes: Int? = nil,
-                           startForSchedules: Bool? = nil) async {
-        await controlCall(DaemonAPI.Method.hostsSetMachineOptions,
-                          DaemonAPI.MachineOptions(host: host, startWhenUsed: startWhenUsed,
-                                                   stopWhenIdleMinutes: stopWhenIdleMinutes,
-                                                   startForSchedules: startForSchedules))
-    }
-
-    /// Stop Lending on a machine's page (#1122, #3975): it stops using a Mac's git access for one server.
-    func stopLendingGit(_ host: MachineRef, from: MachineRef, server: String) async {
-        await controlCall(DaemonAPI.Method.hostsLendGit,
-                          DaemonAPI.LendGit(host: host, from: from, server: server, allowed: false))
-    }
-
-    /// Approve or Deny on a machine's card (#994): a refusal is the window's alert.
-    func answerJoin(_ request: DaemonAPI.JoinRequest, approve: Bool) async {
-        if let refused = await people.answer(request, approve: approve, on: controlRequests) {
-            problem = refused
-        }
-    }
-
-    /// Approve or Deny on a GitHub sign-in's card (#995): a refusal is the window's alert.
-    func answerSignIn(_ request: DaemonAPI.SignInRequest, approve: Bool, code: String? = nil) async {
-        if let refused = await signIn.answer(request, approve: approve, code: code, on: controlRequests) {
-            problem = refused
-        }
-    }
-
-    /// Compare Digits, Approve or Deny on a lock card, and Ask Again on this window's own (#3490).
-    func compareLock(_ request: DaemonAPI.LockJoinRequest) async { await lock.compare(request, on: controlRequests) }
-    func approveLock(_ request: DaemonAPI.LockJoinRequest) async { await lock.approve(request, on: controlRequests) }
-    func denyLock(_ request: DaemonAPI.LockJoinRequest) async { await lock.deny(request, on: controlRequests) }
-    func askLockAgain() async { await lock.askAgain(on: controlRequests) }
-    /// The recovery key (#3493, D4): Use Recovery Key, Start a New Lock, Make Recovery Key, and
-    /// I Saved It or Skip.
-    func useLockRecovery(_ text: String) async -> String? { await lock.useRecoveryKey(text, on: controlRequests) }
-    func startNewLock() async { await lock.startNewLock(on: controlRequests) }
-    func makeLockRecovery() async { await lock.makeRecoveryKey(on: controlRequests) }
-    func dismissLockRecovery() { lock.dismissRecovery() }
-
-    /// Approve, Deny or Send on a channel link's card (#1762): a refusal is the window's alert.
-    func answerLink(_ request: DaemonAPI.ChannelLinkRequest, approve: Bool, to person: String?) async {
-        if let refused = await people.answerLink(request, approve: approve, to: person, on: controlRequests) {
-            problem = refused
-        }
-    }
+    @ObservationIgnored var serverPicturesByHost: [MachineRef: ServerPictures] = [:]
 
     // MARK: Kept for a stopped workspace (#691 US3)
 
@@ -4193,7 +3547,7 @@ final class AppModel {
 
     /// Sends a prompt or a start for a host whose link is closed while it is stopped, to the
     /// control plane, which keeps it. What was kept, or nil with `problem` saying why not.
-    private func keepThroughControl(_ host: MachineRef, _ method: String, _ params: some Encodable) async -> DaemonAPI.KeptRequest? {
+    func keepThroughControl(_ host: MachineRef, _ method: String, _ params: some Encodable) async -> DaemonAPI.KeptRequest? {
         guard let controlRequests, let params = try? JSONValue.encoding(params) else {
             problem = "Not sent — the control plane can’t be reached."
             return nil
@@ -4215,12 +3569,12 @@ final class AppModel {
         }
     }
 
-    private func loadKept(_ control: DaemonClient) async {
+    func loadKept(_ control: DaemonClient) async {
         // A control plane without providers keeps nothing.
         kept = (try? await control.call(DaemonAPI.Method.hostsListKept, returning: DaemonAPI.KeptList.self))?.kept ?? []
     }
 
-    private func heardKept(_ method: String, _ params: JSONValue?) async {
+    func heardKept(_ method: String, _ params: JSONValue?) async {
         if method == DaemonAPI.Notification.controlKeptChanged {
             kept = (try? params?.decode(DaemonAPI.KeptList.self))?.kept ?? []
             return
@@ -4255,7 +3609,7 @@ final class AppModel {
         }
     }
 
-    private func syncControlHosts(_ control: DaemonClient) async {
+    func syncControlHosts(_ control: DaemonClient) async {
         guard let controlLink,
               let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlMachine].self),
               let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
@@ -4345,7 +3699,7 @@ final class AppModel {
     /// This Mac's host as the control plane last listed it (#1481): reached at launch over
     /// its local socket, before the list comes, so its agents work with the control plane
     /// away. Tried again while the control plane stays away, until it answers.
-    private func reachKeptHost(_ controlLink: ControlLink) async {
+    func reachKeptHost(_ controlLink: ControlLink) async {
         guard !controlPlaneListed, let kept = keptHost else { return }
         if let server = controlHosts[kept.id], await server.isConnected { return }
         if hosts.controlled[kept.id] == nil {
@@ -4364,7 +3718,7 @@ final class AppModel {
         runtimes.first { $0.id == runtimeID }?.availability.isAvailable ?? false
     }
 
-    private func receivedFromServer(_ host: MachineRef, _ method: String, _ params: JSONValue?,
+    func receivedFromServer(_ host: MachineRef, _ method: String, _ params: JSONValue?,
                                     _ update: AgentsModel.Update?) async {
         // The machine's browser is each host's own (#3528).
         if Self.browserNotifications.contains(method) {
@@ -5344,483 +4698,6 @@ final class AppModel {
 
     // MARK: Doing
 
-    /// Where the draft session is made: in a worktree already there when one is chosen,
-    /// so the start can use it (research R2). A new worktree has no folder until the
-    /// start makes it, so its draft is the folder's and the start lets it go.
-    private var draftOptionsFolder: URL? {
-        if case .existing(let root) = draftWorktree { return root }
-        return draftCwd
-    }
-
-    /// Choose where the next agent works, and make the draft there if that moved it.
-    func chooseWorktree(_ choice: WorktreeChoice?) {
-        let before = draftOptionsFolder
-        draftWorktree = choice
-        if draftOptionsFolder != before, draftRuntimeID != nil {
-            Task { await loadDraftOptions() }
-        }
-    }
-
-    /// Every folder's worktrees on a machine, for its page (#790, #3627). Sizes the
-    /// daemon has not measured yet come later, on `worktrees/sized`.
-    func loadWorktrees(on host: MachineRef = .mac) async {
-        guard let listed = try? await worktreeClient(host).call(DaemonAPI.Method.worktreesAll, DaemonAPI.Empty(),
-                                                             returning: [DaemonAPI.FolderWorktrees].self) else { return }
-        work.replaceWorktrees(listed, from: host)
-    }
-
-    /// The machine a worktree is on: this Mac's own host for This Mac (#1496), else the machine's.
-    private func worktreeClient(_ host: MachineRef) -> DaemonClient {
-        host == .mac ? macClient : client(for: host)
-    }
-
-    /// What removing one of a folder's worktrees would lose, or nil when it could
-    /// not be asked (and `problem` says why).
-    func checkWorktreeRemoval(_ root: URL, in folder: URL, on host: MachineRef = .mac) async -> DaemonAPI.RemovalCheck? {
-        do {
-            return try await worktreeClient(host).call(DaemonAPI.Method.worktreesCheck,
-                                         DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root),
-                                         returning: DaemonAPI.RemovalCheck.self)
-        } catch {
-            problem = describe(error)
-            return nil
-        }
-    }
-
-    /// Remove one of a folder's worktrees. `confirmed` is the person having seen
-    /// what would be lost; the daemon checks again either way.
-    func removeWorktree(_ root: URL, in folder: URL, on host: MachineRef = .mac, confirmed: Bool) async {
-        do {
-            _ = try await worktreeClient(host).call(DaemonAPI.Method.worktreesRemove,
-                                      DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root,
-                                                                       confirmed: confirmed),
-                                      returning: DaemonAPI.WorktreeRemoved.self)
-        } catch {
-            problem = describe(error)
-        }
-        await loadWorktrees(on: host)
-        if draftCwd != nil { await loadDraftWorktrees() }
-    }
-
-    /// Delete an idle worktree's build output (#790), and say what it freed; nil when it
-    /// could not (and `problem` says why).
-    func removeBuildOutput(_ root: URL, in folder: URL, on host: MachineRef = .mac) async -> String? {
-        defer { Task { await loadWorktrees(on: host) } }
-        do {
-            let removed = try await worktreeClient(host).call(DaemonAPI.Method.worktreesRemoveBuildOutput,
-                                                DaemonAPI.WorktreeRemovalRequest(folder: folder, root: root),
-                                                returning: DaemonAPI.BuildOutputRemoved.self)
-            return WorktreeTally.freedWords(removed)
-        } catch {
-            problem = describe(error)
-            return nil
-        }
-    }
-
-    /// Clean up worktrees (030): a new session in the folder, offered the words.
-    func offerCleanUp(in folder: URL, on host: MachineRef = .mac) {
-        showFolder(FolderKey(host: host, folder: folder))
-        offeredPrompt = PromptOffer(agentID: nil, words: WorktreeTally.cleanUpPrompt)
-    }
-
-    /// What an agent changed (035). Asked by the Changes pane on its own triggers —
-    /// shown, an edit finished, the turn ended — and never polled.
-    func changes(for agentID: UUID) async throws -> ChangesList {
-        try await client.call(DaemonAPI.Method.changesList,
-                              DaemonAPI.ChangesListRequest(agentID: agentID),
-                              returning: ChangesList.self)
-    }
-
-    /// One file from `changes(for:)`: its edits, and with `whole` the file as it stands.
-    func changeDetail(for agentID: UUID, path: String, whole: Bool = false) async throws -> ChangedFileDetail {
-        try await client.call(DaemonAPI.Method.changesFile,
-                              DaemonAPI.ChangesFileRequest(agentID: agentID, path: path, whole: whole),
-                              returning: ChangedFileDetail.self)
-    }
-
-    /// What the draft folder's repository has. Asked once each time the folder
-    /// changes or an agent starts, never polled; an answer for a folder since left is
-    /// dropped.
-    func loadDraftWorktrees() async {
-        draftWorktreesGeneration += 1
-        let generation = draftWorktreesGeneration
-        guard let folder = draftCwd else { return }
-        // Each of the form's calls with a deadline (#1096): a reply lost on the way from a
-        // server is a failure the form asks again for, not a wait for ever.
-        let answer = (try? await draftHostClient.callWithin(StartPageAsks.patience(for: DaemonAPI.Method.worktreesList),
-                                                            DaemonAPI.Method.worktreesList,
-                                                            DaemonAPI.WorktreesListRequest(folder: folder),
-                                                            returning: DaemonAPI.WorktreesListResponse.self))
-            ?? .notARepository
-        guard generation == draftWorktreesGeneration else { return }
-        draftWorktrees = answer
-        // A worktree chosen before the answer came, as a view's start does (#834), is no
-        // choice in a folder that has none: the chooser is hidden, so it could not be undone.
-        if !answer.isRepository { draftWorktree = nil }
-    }
-
-    /// The personas the draft folder offers (#760). A host too old to know the method
-    /// offers none, and the choice is not drawn.
-    func loadDraftPersonas() async {
-        guard let folder = draftCwd else { return }
-        let listed = (try? await draftHostClient.callWithin(StartPageAsks.patience(for: DaemonAPI.Method.personasList),
-                                                            DaemonAPI.Method.personasList,
-                                                            DaemonAPI.PersonasListRequest(folder: folder),
-                                                            returning: [Persona].self)) ?? []
-        guard folder == draftCwd else { return }
-        draftPersonas = listed
-        if let draftPersona, !listed.contains(where: { $0.id == draftPersona && $0.problem == nil }) {
-            self.draftPersona = nil
-        }
-        draftPromptChanged(draftPromptWords)
-    }
-
-    /// The draft's prompt as it is typed (#4559): while the pick is live, the persona its words
-    /// name is picked as a hand pick is, and none when no word matches.
-    func draftPromptChanged(_ text: String) {
-        draftPromptWords = text
-        guard draftPersonaAuto else { return }
-        let pick = Persona.autoPick(text, among: draftPersonas)
-        draftAutoPick = pick
-        if pick?.persona.id != draftPersona { choosePersona(pick?.persona, auto: true) }
-    }
-
-    func agentConfigEditorFiles(on host: MachineRef, folder: URL?, kind: DaemonAPI.AgentConfigEditorKind)
-        async -> [DaemonAPI.AgentConfigEditorFile]? {
-        let request = DaemonAPI.AgentConfigEditorRequest(folder: folder, kind: kind)
-        return try? await client(for: host).call(DaemonAPI.Method.agentConfigEditorFiles, request,
-                                                 returning: [DaemonAPI.AgentConfigEditorFile].self)
-    }
-
-    func saveAgentConfigEditorFile(on host: MachineRef, folder: URL?, kind: DaemonAPI.AgentConfigEditorKind,
-                                   path: String, content: String, delete: Bool) async -> String? {
-        let request = DaemonAPI.AgentConfigEditorSaveRequest(folder: folder, kind: kind, path: path,
-                                                               content: content, delete: delete)
-        do {
-            try await client(for: host).call(DaemonAPI.Method.agentConfigEditorSave, request)
-            await refreshWorkflows()
-            return nil
-        } catch { return describe(error) }
-    }
-
-    /// Pick a kind of session (#760): every setting it names is set, and every one it
-    /// leaves out stays as the form has it. Nil picks none, and changes nothing else. A
-    /// pick by hand sticks for the draft (#4559): typing no longer moves it.
-    func choosePersona(_ persona: Persona?, auto: Bool = false) {
-        if !auto { draftPersonaAuto = false }
-        draftPersona = persona?.id
-        pendingPersona = nil
-        guard let persona else { return }
-        if let runtimeID = persona.settings.runtimeID, runtimeID != draftRuntimeID,
-           availableRuntimes.contains(where: { $0.runtime.id == runtimeID }) {
-            draftRuntimeID = runtimeID
-            pendingPersona = persona
-            Task { await loadDraftOptions() }
-            return
-        }
-        if draftOptions.isEmpty {
-            pendingPersona = persona
-        } else {
-            draftChosen.merge(persona.choices(against: draftOptions)) { _, new in new }
-        }
-    }
-
-    /// What the open agent's folder has, for the Worktree choice on its page (053).
-    func loadAgentWorktrees(of agent: Agent) async {
-        let folder = agent.folderPath
-        let answer = (try? await client(forAgent: agent.id).call(DaemonAPI.Method.worktreesList,
-                                                                DaemonAPI.WorktreesListRequest(folder: folder),
-                                                                returning: DaemonAPI.WorktreesListResponse.self))
-            ?? .notARepository
-        agentWorktrees[folder] = answer
-    }
-
-    /// Move an agent, or with no target take back the move that is waiting (053). Made
-    /// at once when it is between turns; otherwise when its turn ends.
-    ///
-    /// Drawn at once as the move that waits (#4814): the Worktree choice shows it chosen
-    /// before the host answers, and goes back to where it was when the move is refused.
-    func move(_ agent: Agent, to target: MoveTarget?) async {
-        moveProblems[agent.id] = nil
-        let write = AgentWrite.move(target)
-        let pending = work.beginWrite(write, on: agent.id)
-        do {
-            let answer = try await client(forAgent: agent.id).call(DaemonAPI.Method.agentsMove,
-                                                                   DaemonAPI.MoveRequest(agentID: agent.id, target: target),
-                                                                   returning: DaemonAPI.MoveAnswer.self)
-            // Made now, or nothing to do: the host's record says where it is.
-            work.settleWrite(pending, on: agent.id, failed: false, done: answer.when != .afterTurn)
-            if var moved = answer.agent, answer.when == .now {
-                moved.host = agent.host
-                work.upsert(moved)
-            }
-        } catch let error as JSONRPCError {
-            work.settleWrite(pending, on: agent.id, failed: true)
-            moveProblems[agent.id] = write.failure(error.message)
-        } catch {
-            work.settleWrite(pending, on: agent.id, failed: true)
-            moveProblems[agent.id] = write.failure(error.localizedDescription)
-        }
-        await loadAgentWorktrees(of: agent)
-    }
-
-    /// A session has to exist before its options do, so choosing a folder and a
-    /// runtime starts one. It is kept and used by the start that follows.
-    func loadDraftOptions() async {
-        guard let runtimeID = draftRuntimeID, let cwd = draftOptionsFolder else { return }
-        // Auto has no runtime yet, so no options of its own: what it would pick (#2658).
-        if runtimeID == LevelWords.autoID {
-            draftOptionsGeneration += 1
-            draftOptions = []
-            draftCommands = []
-            draftChosen = [:]
-            draftOptionsFailure = nil
-            isLoadingDraftOptions = false
-            letGo(draft: draftID)
-            draftID = nil
-            await refreshDraftAutoPreview()
-            return
-        }
-        draftOptionsGeneration += 1
-        let generation = draftOptionsGeneration
-        isLoadingDraftOptions = true
-        draftOptionsFailure = nil
-        draftOptions = []
-        draftCommands = []
-        draftChosen = [:]
-        letGo(draft: draftID)
-        draftID = nil
-        do {
-            let response = try await draftHostClient.callWithin(StartPageAsks.patience(for: DaemonAPI.Method.agentsOptions),
-                                                                DaemonAPI.Method.agentsOptions,
-                                                                DaemonAPI.OptionsRequest(runtimeID: runtimeID, cwd: cwd,
-                                                                                         mcpServers: draftServers),
-                                                                returning: DaemonAPI.OptionsResponse.self)
-            // An answer for a folder or runtime the user has since moved away from is
-            // not an answer to the question now being asked — and its runtime is one
-            // nobody will talk to.
-            guard generation == draftOptionsGeneration else { letGo(draft: response.draftID); return }
-            draftID = response.draftID
-            show(options: response.options, commands: response.commands, opening: true)
-        } catch {
-            guard generation == draftOptionsGeneration else { return }
-            // Said in the row rather than only in the banner, because the row is where
-            // the person is looking and where the retry lives.
-            draftOptionsFailure = describe(error)
-        }
-        if generation == draftOptionsGeneration { isLoadingDraftOptions = false }
-    }
-
-    /// A draft this window has replaced is a runtime nobody will talk to. Not waited
-    /// on, and a daemon too old to know the method has nothing to be told (029).
-    private func letGo(draft: UUID?) {
-        guard let draft else { return }
-        Task {
-            _ = try? await draftHostClient.call(DaemonAPI.Method.agentsDiscardDraft,
-                                       DaemonAPI.DiscardDraftRequest(draftID: draft))
-        }
-    }
-
-    /// Draw the form.
-    ///
-    /// The first answer may be what the runtime offered last time, with what it
-    /// actually offers arriving a few seconds later, so this runs more than once for
-    /// one draft and keeps every choice already made that is still on offer.
-    func show(options: [ConfigOption], commands: [SlashCommand], opening: Bool) {
-        draftOptions = PromptControlsState.drawable(agentOptions: nil, draftOptions: options)
-        draftCommands = commands
-        for option in draftOptions {
-            // A choice already made stands, as long as it is still one of the choices.
-            if let chosen = draftChosen[option.id],
-               option.isBoolean || (option.options ?? []).contains(where: { $0.value == chosen }) {
-                continue
-            }
-            draftChosen[option.id] = option.currentValue
-        }
-        // Options that have gone are not choices anybody can unmake.
-        let offered = Set(draftOptions.map(\.id))
-        draftChosen = draftChosen.filter { offered.contains($0.key) }
-        // The mode you chose last time for this runtime, if it still offers it.
-        // Seeding the draft is enough: `startDraft` sends these as `StartOptions`
-        // and the daemon applies each one to the session before the first prompt.
-        //
-        // What the control opens on, so only on the first draw: a correction arriving
-        // behind a form drawn from memory must not undo a mode chosen since.
-        if opening, let runtimeID = draftRuntimeID,
-           let mode = ModeMemory.modeOption(in: draftOptions) {
-            draftChosen[mode.id] = ModeMemory.startingValue(
-                remembered: rememberedMode(for: runtimeID), for: mode)
-        }
-        // The values chosen in the shared words (#2658), kept from the runtime before, over
-        // the mode remembered: the form says the same words on every runtime.
-        if opening {
-            applyDraftLevel(.model)
-            applyDraftLevel(.permission)
-        }
-        // Over the mode remembered, because the persona was picked after it (#760).
-        if let persona = pendingPersona, !draftOptions.isEmpty {
-            draftChosen.merge(persona.choices(against: draftOptions)) { _, new in new }
-            pendingPersona = nil
-        }
-    }
-
-    /// The runtime starting behind a form drawn from memory has answered at last, and
-    /// either offers something else or will not start at all.
-    private func settleDraft(_ notification: DaemonAPI.DraftOptionsNotification) {
-        guard notification.draftID == draftID else { return }
-        if let failure = notification.failure {
-            // Said in the row rather than the banner, the same as a form that failed to
-            // load, because the row is where the person is looking and where the retry
-            // lives. The controls go with it: they were what this runtime offered last
-            // time, and there is no runtime this time.
-            draftOptionsFailure = failure
-            draftOptions = []
-            draftCommands = []
-            draftChosen = [:]
-            draftID = nil
-            return
-        }
-        show(options: notification.options, commands: notification.commands, opening: false)
-    }
-
-    /// Whether the agent was started, so the prompt bar can give back what it sent
-    /// when it was not.
-    @discardableResult
-    /// `voice`: started from voice mode (#2375), so the first reply is short and fit to be
-    /// heard; `started` is told the new agent's id.
-    func startDraft(prompt: String, attachments: [Attachment] = [], labels: [String] = [],
-                    voice: Bool = false, started: (UUID) -> Void = { _ in }) async -> Bool {
-        guard !isStarting, let runtimeID = draftRuntimeID, let cwd = draftCwd else { return false }
-        isStarting = true
-        defer { isStarting = false }
-        let request = DaemonAPI.StartRequest(runtimeID: runtimeID,
-                                             cwd: cwd,
-                                             prompt: prompt,
-                                             attachments: attachments,
-                                             startOptions: StartOptions(values: draftChosen),
-                                             draftID: draftID,
-                                             additionalDirectories: draftFolders,
-                                             mcpServers: draftServers,
-                                             worktree: draftWorktree,
-                                             sandbox: draftSandbox, labels: labels, persona: draftPersona,
-                                             accountID: isAutoDraft ? nil : draftAccountChoices?.sent(draftAccountID),
-                                             voice: voice ? true : nil,
-                                             levels: Levels(model: draftLevels.model, permission: draftLevels.permission,
-                                                            permissionRequests: isAutoDraft ? nil : draftClientPermission))
-        // A stopped workspace that starts when used: kept, and shown under this prompt (#691 US3).
-        if draftHost != .mac, hosts.isOffline(draftHost), startsWhenUsed(draftHost) {
-            var kept = request
-            kept.draftID = nil
-            kept.requestID = UUID()
-            guard let said = await keepThroughControl(draftHost, DaemonAPI.Method.agentsStart, kept) else { return false }
-            keptStartsShown.insert(said.id)
-            return true
-        }
-        do {
-            let id = try await draftHostClient.call(DaemonAPI.Method.agentsStart, request, returning: UUID.self)
-            started(id)
-            draftID = nil
-            // The next draft starts live again (#4559, #4721).
-            draftPersonaAuto = true
-            draftPromptChanged("")
-            // The last folder used is the one a session was started in, from any window (#2160).
-            rememberNewSessionFolder(FolderKey(host: draftHost, folder: cwd))
-            // Back to the folder, and the list fetched again: the start may
-            // have made a worktree, and it has put an agent in one.
-            draftWorktree = nil
-            Task { await loadDraftWorktrees() }
-            if draftHost == .mac {
-                await refreshAgents()
-                await refreshFolders()
-            } else {
-                await refreshServer(draftHost)
-            }
-            // Gone to, as the phone does: what you just asked for is what you want to
-            // see start. Once the list has it, so the chat opens on a row that is there.
-            // Started in a folder's own window, it opens there (#1089).
-            if let window = composingWindow.flatMap({ folderWindows[$0] }) {
-                window.show(started: id)
-            } else {
-                justStarted = id
-                selection = id
-            }
-            draftSandboxRefusal = nil
-            draftAutoRefusal = nil
-            draftClientPermission = nil
-            return true
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.autoNoRuntime {
-            // No runtime Auto may use can take it (FR-011): said over the prompt, which keeps it.
-            draftAutoRefusal = error.message
-            return false
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.kept {
-            // Kept until its stopped workspace is up (#691 US3): shown under this prompt, and
-            // the agent it makes opens once the host is up.
-            if let kept = noteKept(error) { keptStartsShown.insert(kept.id) }
-            draftID = nil
-            return true
-        } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.sandboxWillNotStart {
-            // Said over the prompt, which keeps what was typed, with the way on (064).
-            draftSandboxRefusal = try? error.data?.decode(DaemonAPI.SandboxWillNotStart.self)
-            if draftSandboxRefusal == nil { fail(error, on: draftHost) }
-            return false
-        } catch {
-            fail(error, on: draftHost)
-            return false
-        }
-    }
-
-    /// Sent now if the agent is free, and queued by the daemon if it is not. Either
-    /// way this is the same call: whether there is room for it is not the window's
-    /// question to answer.
-    @discardableResult
-    /// `voice`: sent from voice mode (#2322), so the reply is short and fit to be heard.
-    func send(_ text: String, attachments: [Attachment] = [], to agentID: UUID? = nil, voice: Bool = false) async -> Bool {
-        // In the chat at once, as the person's bubble, until the host's entry lands (#4814).
-        let target = agentID ?? selection
-        let drawn = target.flatMap { work.beginSending(text, to: $0) }
-        let sent = await deliver(text, attachments: attachments, to: agentID, voice: voice)
-        if let target { work.endSending(drawn, to: target, sent: sent) }
-        return sent
-    }
-
-    private func deliver(_ text: String, attachments: [Attachment], to agentID: UUID?, voice: Bool) async -> Bool {
-        // The main window's chat, or the one in a window of its own that sent it (#826).
-        guard let selection = agentID ?? selection, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
-        let host = host(ofAgent: selection)
-        // A stopped workspace that starts when used: kept by the control plane (#691 US3).
-        if host != .mac, hosts.isOffline(host), startsWhenUsed(host) {
-            guard attachments.isEmpty else {
-                problem = "Attachments can’t wait for \(hosts.label(host)) to start. Send the words alone, or start it first."
-                return false
-            }
-            return await keepThroughControl(host, DaemonAPI.Method.agentsPrompt,
-                                            DaemonAPI.PromptRequest(agentID: selection, text: text, sendID: UUID(), voice: voice ? true : nil)) != nil
-        }
-        if host != .mac {
-            guard let carried = await carry(attachments, to: host, for: selection) else { return false }
-            let sendID = UUID()
-            return await sendToServer(host) { client in
-                try await client.call(DaemonAPI.Method.agentsPrompt,
-                                      DaemonAPI.PromptRequest(agentID: selection, text: text,
-                                                              attachments: carried, sendID: sendID,
-                                                              voice: voice ? true : nil))
-            }
-        }
-        return await attempt {
-            do {
-                try await self.client(forAgent: selection).call(DaemonAPI.Method.agentsPrompt,
-                                           DaemonAPI.PromptRequest(agentID: selection, text: text,
-                                                                   attachments: attachments,
-                                                                   voice: voice ? true : nil))
-            } catch let error as JSONRPCError where error.code == DaemonAPI.Failure.folderGone {
-                // The folder's strip says so, with the ways on, carrying what was typed (#119, #5034).
-                self.folderGone = FolderGoneAsk(agentID: selection, message: error.message,
-                                                text: text, attachments: attachments)
-                throw SaidAlready()
-            }
-        }
-    }
-
     // MARK: A folder that has gone (#119)
 
     /// Start a successor in the folder that reads this session and carries on,
@@ -6428,7 +5305,7 @@ final class AppModel {
 
     /// A server's new connection knows none of this window's screens: they attach
     /// again, and are given only what they missed (#401).
-    private func reattachShells(on host: MachineRef) async {
+    func reattachShells(on host: MachineRef) async {
         for shell in shellClients(on: host) {
             shell.lostConnection()
             await shell.reattachIfLost()
@@ -6569,227 +5446,11 @@ final class AppModel {
 
     // MARK: Lineage
 
-    /// What a node is linked to, on a host (#3087): an epic's plan reads its children's links.
-    func lineageWalk(_ node: DaemonAPI.LineageNode, depth: Int, on host: MachineRef) async throws -> DaemonAPI.LineageGraph {
-        try await client(for: host).call(DaemonAPI.Method.lineageWalk,
-                                         DaemonAPI.LineageNodeRequest(node: node, depth: depth),
-                                         returning: DaemonAPI.LineageGraph.self)
-    }
-
     /// A lead's epic progress, "5/7", by session (#3270), for its sidebar row.
-    private(set) var leadProgress: [UUID: String] = [:]
+    var leadProgress: [UUID: String] = [:]
     /// The state and labels each lead was last asked at: asked again when they change, as a lead
     /// wakes for each child.
-    @ObservationIgnored private var leadAsked: [UUID: String] = [:]
-
-    /// Ask a lead's host for its epic's progress when its state or labels changed since. A call
-    /// that fails keeps what the row said: the next wake asks again.
-    func loadLeadProgress(_ agent: Agent) async {
-        guard let turn = LeadProgress.turn(agent), agent.state != .archived, leadAsked[agent.id] != turn,
-              self.agent(agent.id, has: Capability.lineage1), self.agent(agent.id, has: Capability.forge1) else { return }
-        leadAsked[agent.id] = turn
-        let host = host(ofAgent: agent.id)
-        guard let walked = try? await client(for: host).call(
-            DaemonAPI.Method.lineageWalk,
-            DaemonAPI.LineageNodeRequest(node: LineageList.node(ofSession: agent.id), depth: 1),
-            returning: DaemonAPI.LineageGraph.self) else { return }
-        guard let epic = LeadProgress.epic(of: agent.id, in: walked.links) else {
-            leadProgress[agent.id] = nil
-            return
-        }
-        guard let plan = try? await client(for: host).call(DaemonAPI.Method.forgePlan, DaemonAPI.ForgePlanRequest(node: epic),
-                                                           returning: DaemonAPI.ForgePlan.self) else { return }
-        leadProgress[agent.id] = LeadProgress.words(plan)
-    }
-
-    /// An issue's or a PR's cost rolled up, from a host; nil when it will not say.
-    func lineageCost(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageCostRollup? {
-        try? await client(for: host).call(DaemonAPI.Method.lineageCost, DaemonAPI.LineageNodeRequest(node: node),
-                                          returning: DaemonAPI.LineageCostRollup.self)
-    }
-
-    func lineageEstimate(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageEstimate? {
-        try? await client(for: host).call(DaemonAPI.Method.lineageEstimate, DaemonAPI.LineageEstimateRequest(node: node),
-                                          returning: DaemonAPI.LineageEstimate.self)
-    }
-
-    func lineageForecast(_ node: DaemonAPI.LineageNode, on host: MachineRef) async -> DaemonAPI.LineageForecast? {
-        try? await client(for: host).call(DaemonAPI.Method.lineageForecast, DaemonAPI.LineageForecastRequest(node: node),
-                                          returning: DaemonAPI.LineageForecast.self)
-    }
-
-    /// The machines that keep links (#3157), for an Issue page's estimate and an epic's plan: This
-    /// Mac first, then the rest by name. Empty without a control plane, where there is only one.
-    var lineageMachines: [(id: MachineRef, name: String)] {
-        let mine = thisMacHostID
-        return (controlPlaneHosts ?? [])
-            .filter { $0.has(Capability.lineage1) }
-            .map { (id: $0.id, name: $0.id == mine ? "This Mac" : $0.name) }
-            .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
-    }
-
-    /// Work's projects (#3283): New Session's, each folder named by the machine Work's lists
-    /// read it on, this Mac by its control plane id.
-    var workProjects: [WorkList.Project] {
-        let mine = thisMacHostID ?? .mac
-        return newSessionProjects.map { choice in
-            WorkList.Project(id: choice.id, name: choice.name, folders: Set(choice.folders.map {
-                WorkList.folderKey(host: $0.host == .mac ? mine : $0.host, path: $0.folder.path(percentEncoded: false))
-            }))
-        }
-    }
-
-    /// This window's copy (#4791). A walk's window (`--walk`, run-app) keeps its copy in the walk's
-    /// own folder, never the person's: a scratch session must not draw in the person's window, nor
-    /// the person's in a walk's screenshots (#4930).
-    static func windowCopy() -> LocalCopy {
-        guard let walk = ControlConfig.walkFolder else { return .mac() }
-        return LocalCopy(folder: walk.appendingPathComponent("copy", isDirectory: true), cap: LocalCopy.macCap)
-    }
-
-    /// Work's part of this device's copy (#4930).
-    var workCopy: LocalCopy? { localCopy?.copy }
-
-    /// The machines that read their forges (#3119), This Mac first: Work's issues and PRs come from each.
-    var forgeMachines: [(id: MachineRef, name: String)] {
-        let mine = thisMacHostID
-        return (controlPlaneHosts ?? [])
-            .filter { $0.has(Capability.forge1) && $0.state != "offline" }
-            .map { (id: $0.id, name: $0.id == mine ? "This Mac" : $0.name) }
-            .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
-    }
-
-    /// The machines that narrow their forges to a board (#3282), This Mac first.
-    var boardMachines: [(id: MachineRef, name: String)] {
-        let narrows = Set((controlPlaneHosts ?? []).filter { $0.has(Capability.forgeBoards1) }.map(\.id))
-        return forgeMachines.filter { narrows.contains($0.id) }
-    }
-
-    /// The machines that draw Work ▸ Timeline (#4173), This Mac first.
-    var timelineMachines: [(id: MachineRef, name: String)] {
-        let draws = Set((controlPlaneHosts ?? []).filter { $0.has(Capability.workTimeline1) }.map(\.id))
-        return forgeMachines.filter { draws.contains($0.id) }
-    }
-
-    /// The machines that give Work ▸ Features in one read (#4586), This Mac first.
-    var featuresMachines: [(id: MachineRef, name: String)] {
-        let reads = Set((controlPlaneHosts ?? []).filter { $0.has(Capability.workFeatures1) }.map(\.id))
-        return forgeMachines.filter { reads.contains($0.id) }
-    }
-
-    /// The machines that read docs (#3321), this Mac first.
-    var docsMachines: [(id: MachineRef, name: String)] {
-        let mine = thisMacHostID
-        return (controlPlaneHosts ?? [])
-            .filter { $0.has(Capability.docs1) && $0.state != "offline" }
-            .map { (id: $0.id, name: $0.id == mine ? "This Mac" : $0.name) }
-            .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
-    }
-
-    /// The machines that read messages (#4344), this Mac first.
-    var messagesMachines: [(id: MachineRef, name: String)] {
-        let mine = thisMacHostID
-        return (controlPlaneHosts ?? [])
-            .filter { $0.has(Capability.messages1) && $0.state != "offline" }
-            .map { (id: $0.id, name: $0.id == mine ? "This Mac" : $0.name) }
-            .sorted { ($0.id == mine ? 0 : 1, $0.name) < ($1.id == mine ? 0 : 1, $1.name) }
-    }
-
-    /// The machines that mark all their messages read (#5137), in messagesMachines' order.
-    var messagesMarkMachines: [(id: MachineRef, name: String)] {
-        let marks = Set((controlPlaneHosts ?? []).filter { $0.has(Capability.messagesMarkRead1) }.map(\.id))
-        return messagesMachines.filter { marks.contains($0.id) }
-    }
-
-    /// Open in Files on a doc's page (#3321): the file as its folder's own page, as a pinned page
-    /// opens. The folder as this window knows it, so the page finds it; false when it knows none.
-    func showDocFile(_ path: String, folder: String, on host: MachineRef) -> Bool {
-        let wanted = Folder.standardize(URL(fileURLWithPath: folder))
-        guard let known = folders.first(where: { $0.host == host && Folder.standardize($0.folder.folder) == wanted }) else {
-            return false
-        }
-        showPin(path, in: FolderKey(host: host, folder: known.folder.folder))
-        return true
-    }
-
-    /// One of Docs' reads (#3321): `docs/list`, `docs/search` or `docs/read`, on a machine.
-    func docs<R: Decodable & Sendable>(_ method: String, _ params: some Encodable & Sendable, returning: R.Type,
-                                       on host: MachineRef) async throws -> R {
-        try await client(for: host).call(method, params, returning: R.self)
-    }
-
-    /// One of Messages' reads (#4344): `messages/conversations` or `messages/read`, on a machine.
-    func messages<R: Decodable & Sendable>(_ method: String, _ params: some Encodable & Sendable, returning: R.Type,
-                                           on host: MachineRef) async throws -> R {
-        try await client(for: host).call(method, params, returning: R.self)
-    }
-
-    /// A page of a machine's issues or pull requests (#3129), as Work lists them.
-    func forgeList(_ kind: WorkList.Kind, _ request: DaemonAPI.ForgeListRequest,
-                   on host: MachineRef) async throws -> DaemonAPI.ForgeList {
-        try await client(for: host).call(kind == .pr ? DaemonAPI.Method.forgePulls : DaemonAPI.Method.forgeIssues,
-                                         request, returning: DaemonAPI.ForgeList.self)
-    }
-
-    /// One issue or pull request with its body and a page of its comments (#3129), for its Work page.
-    func forgeItem(_ node: DaemonAPI.LineageNode, cursor: String?,
-                   on host: MachineRef) async throws -> DaemonAPI.ForgeItemDetail {
-        try await client(for: host).call(node.kind == "pr" ? DaemonAPI.Method.forgePull : DaemonAPI.Method.forgeIssue,
-                                         DaemonAPI.ForgeItemRequest(node: node, cursor: cursor),
-                                         returning: DaemonAPI.ForgeItemDetail.self)
-    }
-
-    /// Whether a machine takes the Work pages' writes (#3130): comment, labels, close, merge,
-    /// approve, rerun, and a pull request's logs and diff.
-    func forgeWrites(on host: MachineRef) -> Bool {
-        controlPlaneHosts?.first { $0.id == host }?.has(Capability.forgeWrite1) ?? false
-    }
-
-    /// One of the Work pages' writes or reads (#3130), on the machine that read the item.
-    func forge<R: Decodable & Sendable>(_ method: String, _ params: some Encodable & Sendable, returning: R.Type,
-                             on host: MachineRef) async throws -> R {
-        try await client(for: host).call(method, params, returning: R.self)
-    }
-
-    /// A session's title for Work's links (#3256).
-    func workSessionTitle(_ id: UUID) -> String? { work.agent(id)?.title }
-
-    func workSessionState(_ id: UUID) -> AgentState? { work.agent(id)?.state }
-
-    func openWorkSession(_ id: UUID) { openAgent(id) }
-
-    func workLead(of epic: DaemonAPI.LineageNode) -> Agent? { WorkFeatures.lead(of: epic, in: work.agents) }
-
-    var workAgents: [Agent] { work.agents }
-
-    /// A page of the lineage nodes of a kind (#3118), from the control plane: Work's figures; nil
-    /// with no control plane.
-    func reportNodes(_ query: DaemonAPI.ReportNodesQuery) async throws -> DaemonAPI.ReportNodes? {
-        guard let controlRequests else { return nil }
-        return try await controlRequests.call(DaemonAPI.Method.reportsNodes, query, returning: DaemonAPI.ReportNodes.self)
-    }
-
-    /// Every machine's sessions on these nodes, from the control plane's merged copy (#4276): Work ▸
-    /// Timeline's starts; nil with no control plane, or one from before it.
-    func lineageSessionsOn(_ nodes: [DaemonAPI.LineageNode]) async -> DaemonAPI.LineageSessionsOn? {
-        guard let controlRequests, !nodes.isEmpty else { return nil }
-        return try? await controlRequests.call(DaemonAPI.Method.lineageSessionsOn, DaemonAPI.LineageSessionsOnRequest(nodes: nodes),
-                                               returning: DaemonAPI.LineageSessionsOn.self)
-    }
-
-
-    /// Go to a match in the open chat: earlier pages come in until its turn is in hand
-    /// (`AgentsModel.reveal`, bounded), then the chat goes to it, or as near as it can.
-    func reveal(_ match: DaemonAPI.FindMatch) async {
-        await work.reveal(index: match.index) { await self.loadEarlier(turns: $0) }
-        focusEntry(match.entryID, at: match.index)
-    }
-
-    /// What this agent last asked the user to look at, taken rather than read: a file
-    /// that has been put in front of somebody is not still waiting to be.
-    func takeFileToShow(for agentID: UUID) -> ShownFile? {
-        work.takeFileToShow(for: agentID)
-    }
+    @ObservationIgnored var leadAsked: [UUID: String] = [:]
 
 }
 

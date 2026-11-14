@@ -1,0 +1,1 @@
+| AWS EC2 | Mac, web, control plane | built | 2026-10-19, against a fake EC2 API only (#1345); SigV4 against AWS's own test vector | `presets.go` (`aws-ec2-api`, through its API, nothing to install), `aws.go` | a walk on a real account (#3416) |

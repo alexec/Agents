@@ -237,6 +237,8 @@ type Bitbucket interface {
 	CompletedPipelines(ctx context.Context, repo, pipeline, branch string, run int, since string) (pipelines []CompletedPipeline, listed Listed, err error)
 	// PipelineDeploys are what a finished run deployed, as deploy refs.
 	PipelineDeploys(ctx context.Context, repo string, c CompletedPipeline) ([]string, error)
+	// Deployments are the repository's newest deployments, in the deploy model (#5244).
+	Deployments(ctx context.Context, repo string) ([]mcpevents.ForgeDeploy, error)
 	// IssueActivity is what happened to the repository's issues at or after since, of one kind.
 	IssueActivity(ctx context.Context, repo string, kind IssueKind, since string) (items []IssueActivity, listed Listed, err error)
 	// ReviewComments are the comments on pull requests' diffs made at or after since.

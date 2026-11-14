@@ -1,0 +1,1 @@
+| A marketplace that is a file or a folder, personal or a folder's (#2155) | Mac | built | 2026-10-22, tested only (`TestAFileMarketplaceIsSearchedAndAdded`) | `Go/internal/agentsd/mcpcatalog/filemarket.go` | |

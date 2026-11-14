@@ -229,6 +229,11 @@ type AzureDevOps interface {
 	// WaitingDeploys are builds waiting for an environment's approvals (#3820): only
 	// pipeline's and branch's when each is set.
 	WaitingDeploys(ctx context.Context, repo, pipeline, branch string) ([]WaitingDeploy, error)
+	// DeployRecords are the newest deployment records of the project's environments, only
+	// environment's when it is set (#5244).
+	DeployRecords(ctx context.Context, repo, environment string) ([]DeployRecord, error)
+	// DeployBuild is a deployment record's build: whether it is of repo, its commit and its ref.
+	DeployBuild(ctx context.Context, repo string, build int) (ours bool, sha, ref string, err error)
 	// ReviewComments are the comments on pull requests' diffs made at or after since.
 	ReviewComments(ctx context.Context, repo, since string) (comments []ReviewComment, listed Listed, err error)
 	// Yours is what the token's owner has in the repository (#2034).

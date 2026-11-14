@@ -1807,7 +1807,7 @@ type BuildsFigures struct {
 	Turn BuildsStat `json:"turn"`
 }
 
-// builds/history's answer (#5177): the filters' choices in the range (workflows, jobs, branches), the range's figures and each day's, the change points found in the range (on the default branch, whatever the branch filter), and the job that waited longest for a runner. readAt is when this machine last read the forge's runs (Last update); filledFrom is the oldest day the backfill reached, absent before it starts. reader is github or gitlab, or none when Agents does not read CI timings from the repository's forge.
+// builds/history's answer (#5177): the filters' choices in the range (workflows, jobs, branches), the range's figures and each day's, the change points found in the range (on the default branch, whatever the branch filter), and the job that waited longest for a runner. readAt is when this machine last read the forge's runs (Last update); filledFrom is the oldest day the backfill reached, absent before it starts. reader is github, gitlab, azuredevops, bitbucket or forgejo, or none when Agents does not read CI timings from the repository's forge.
 type BuildsHistory struct {
 	Repo string `json:"repo"`
 
@@ -8838,6 +8838,19 @@ type MachineUserSettings struct {
 
 	// The user's secrets that are not sealed to this machine yet (#4167): what list_secrets says of them. Never a value.
 	Waiting []UserSecretAbout `json:"waiting,omitzero"`
+}
+
+// machines/versions (#5272, spec 5239, "Alex's question"): the Agents versions a machine ran, from its machine/hello. version is the one it said last; firstSeen is the first time the control plane heard it at that version, and seen the last. deploys are the changes of version the control plane saw, newest first, at most 20: each an observed deploy (observed: true, state succeeded) of the component agents to the environment machines, its target labelled machine=<host>, from the last time the old version was seen (started) to the first machine/hello at the new one (finished). Each version's artifact is its commit: the tag vX.Y.Z for X.Y.Z, the sha after +g for X.Y.Z-dev.N+g<sha>.
+type MachineVersions struct {
+	Host MachineRef `json:"host"`
+
+	Version string `json:"version"`
+
+	FirstSeen *Date `json:"firstSeen,omitzero"`
+
+	Seen *Date `json:"seen,omitzero"`
+
+	Deploys []Deploy `json:"deploys"`
 }
 
 type MachineWorkspace struct {

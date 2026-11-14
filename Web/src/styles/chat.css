@@ -1,0 +1,236 @@
+/* The chat: entries above, then the cards and the prompt, pinned to the foot. */
+/* Centred without its own display, so the narrow layout can still hide it. */
+.chat.empty { justify-content: center; align-items: center; color: var(--paper-secondary); }
+
+.transcript { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+/* The chat holds the reader's turn itself, in every browser (Chat.tsx, #2310): the browser's own
+   anchoring would move it a second time. */
+.transcript { overflow-anchor: none; }
+
+.bubble {
+  align-self: flex-end;
+  max-width: 70%;
+  background: var(--paper-well);
+  border-radius: var(--radius-card);
+  padding: 7px 12px;
+  margin: 0;
+}
+
+/* Another agent's message (#560): the .bubble's place, with who sent it above. */
+.from-agent {
+  align-self: flex-end;
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+.from-agent .bubble { max-width: 100%; }
+
+.reply { margin: 0; line-height: var(--type-leading-reading); letter-spacing: var(--type-tracking-reading); word-spacing: var(--type-word-spacing-reading); }
+
+/* Copy Message (#519), there only while the message is pointed at or the button focused, and
+   out of the flow so nothing moves when it shows: beside the person's bubble, in the free margin
+   at its left; over the top corner of a reply, on the paper. A touch screen has no pointer, so
+   there it sits under the message, always. */
+.copyable { position: relative; }
+.copyable > .copy-message { position: absolute; display: none; background: var(--paper-ground); padding: 2px 8px; }
+.bubble.copyable > .copy-message { right: 100%; bottom: 0; margin-right: 6px; }
+.reply.copyable > .copy-message, .note.copyable > .copy-message { top: -2px; right: 0; }
+.copyable:hover > .copy-message, .copy-message:focus-visible, .copy-message:focus-within { display: block; }
+.message-actions { white-space: nowrap; }
+.message-actions > .steps-control + .steps-control { margin-left: 8px; }
+@media (hover: none) {
+  .copyable > .copy-message, .bubble.copyable > .copy-message, .reply.copyable > .copy-message, .note.copyable > .copy-message {
+    position: static; display: block; margin: 4px 0 0 auto;
+  }
+}
+
+/* Agent text, through the Markdown renderer. */
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown p, .markdown ul, .markdown ol, .markdown pre, .markdown blockquote { margin: 0 0 8px; }
+.markdown ul, .markdown ol { padding-left: 22px; }
+.markdown pre, .call-detail pre, .note pre {
+  background: var(--paper-well);
+  border-radius: var(--radius-control);
+  padding: 8px 10px;
+  overflow-x: auto;
+  font: 0.75rem/1.45 var(--font-mono);
+  white-space: pre;
+}
+.markdown code { font: 0.92em var(--font-mono); }
+:is(.markdown pre, pre.code) .code-keyword { color: var(--code-keyword); }
+:is(.markdown pre, pre.code) .code-string { color: var(--code-string); }
+:is(.markdown pre, pre.code) .code-number { color: var(--code-number); }
+:is(.markdown pre, pre.code) .code-comment { color: var(--code-comment); font-style: italic; }
+:is(.markdown pre, pre.code) .code-type { color: var(--code-type); }
+:is(.markdown pre, pre.code) :is(.code-operator, .code-punctuation) { color: var(--code-punctuation); }
+.markdown blockquote { border-left: 2px solid var(--paper-rule); padding-left: 10px; opacity: 0.8; }
+.markdown .table-scroll { overflow-x: auto; max-width: 100%; margin: 0 0 8px; }
+.markdown table { border-collapse: collapse; }
+.markdown th, .markdown td { border: 1px solid var(--paper-rule); padding: 3px 8px; }
+/* A long cell wraps, but not to a column of single words: the Mac's TableColumns.floor, so only a table too wide at that scrolls (#3943). */
+.markdown .table-scroll :is(td, th) { vertical-align: top; }
+.markdown .table-scroll :is(td, th).long { min-width: 12em; }
+.image-placeholder { opacity: 0.6; font-style: italic; }
+
+.quiet { color: var(--paper-secondary); margin: 0; }
+.faint { opacity: 0.45; margin: 0; }
+.strong { font-weight: 600; margin: 0; }
+.small { font-size: 0.75rem; }
+.failure { color: var(--tint-failure); margin: 0; }
+.tinted { color: var(--tint-attention); }
+/* A warning, not a request (#5016): a disk that runs low. */
+.warning { color: var(--tint-warning); }
+
+/* A turn (069): the ask, the steps in the turn's margin (no rule, no indent: #148), and the outcome; no control hides them (#2170). */
+/* Its text at the window's reading step (15, sans, as every other step since #326); Load steps and Earlier steps are chrome, at fine (11). */
+.turn { display: flex; flex-direction: column; gap: 10px; font-family: var(--font-text); font-size: 0.9375rem; }
+/* The transcript is windowed (#4789), as the Mac's TranscriptStack: the browser lays out and paints
+   only the turns near the view. A turn never drawn takes 240px; one drawn keeps its own height when
+   it leaves the view (`auto`), so the scroll bar and the held turn stay put. Every turn stays in the
+   page, so Find, a jump to an entry, the held turn (Chat.tsx, #2310) and a screen reader still read it.
+   A turn that grows as it comes into view resizes, and the chat holds the reader's turn as for any growth.
+   The transcript is a flex column: a turn never shrinks, or one not drawn would shrink to nothing. */
+.transcript > .turn { content-visibility: auto; contain-intrinsic-block-size: auto 240px; flex-shrink: 0; }
+/* Nothing else in the transcript shrinks either (#4941): it scrolls. A card at its end (the wait card,
+   Waiting for you) squashed to one line under a long transcript; under .foot a card still shrinks. */
+.transcript > * { flex-shrink: 0; }
+/* Plain text you click, flush with the turn's edge: no capsule, no padding (#758). */
+.steps-control {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+  font-family: var(--font-text);
+  font-size: 0.6875rem;
+  opacity: 0.7;
+}
+.steps-control:hover { opacity: 1; }
+.steps { display: flex; flex-direction: column; gap: 8px; }
+.run { display: flex; flex-direction: column; gap: 3px; }
+.chevron { display: inline-block; width: 12px; opacity: 0.6; }
+.call-detail { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 4px; }
+/* In a turn, code at the window's code step (13, mono) beside the reading text. */
+.turn .call-detail pre { font-size: 0.8125rem; }
+/* An edit in an open call (DiffView): its path at the fine step, the lines in a well capped as
+   the window's are, and Show in Changes under it at the right. */
+.call-detail .edit { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.call-diff { align-self: stretch; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.call-diff .path { font-size: 0.6875rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.call-diff .diff-lines { max-height: 280px; overflow: auto; }
+button.link.reading { font: inherit; cursor: pointer; }
+button.link.reading:hover { text-decoration: underline; }
+/* Where a call did its work, each a link that opens the file, wrapped. */
+.locations { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 0; }
+.locations > * { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note { display: flex; flex-direction: column; gap: 3px; }
+/* What a turn changed, and Undo These Changes (#3437). */
+/* An agent driving the Mac's screen (#3004, US4): the latest still, or "Mac is locked", and its last action. */
+.desktop-tile { display: flex; flex-direction: column; gap: 8px; }
+.desktop-tile p { margin: 0; }
+.desktop-tile-picture { display: block; width: 100%; height: auto; border-radius: var(--radius-control); border: 1px solid var(--paper-rule); }
+.desktop-tile-placeholder { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 120px; padding: 20px; text-align: center; background: var(--paper-well); border-radius: var(--radius-control); }
+.live-tile-head { display: flex; align-items: center; gap: 8px; }
+.live-tile-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-tile-icon { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; }
+.live-tile-switch button { display: inline-flex; align-items: center; padding: 3px 9px; }
+.live-tile .desktop-tile-picture { width: auto; max-width: 100%; max-height: 320px; margin: 0 auto; }
+.wait-card p { margin: 0; }
+.wait-card-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.wait-card-title { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.wait-card-title { font-weight: 600; }
+/* The waiting mark's beacon (#2657), breathing as it does everywhere else, at the title's size,
+   in the same colour. `.waiting-beacon` sets the breath, `--well` undone so the title's size wins. */
+.wait-card-broadcast { color: var(--accent); display: inline-flex; }
+.wait-card-broadcast .beacon { width: 1.15em; height: 1.15em; }
+.wait-card-broadcast.waiting-beacon { width: auto; height: auto; }
+.wait-card-time { color: var(--paper-ink); opacity: .68; font-size: .9em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wait-card-events { display: flex; flex-direction: column; gap: 8px; }
+.wait-card-event { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 5px; }
+.wait-card-source, .wait-card-separator { color: var(--paper-ink); opacity: .68; }
+.wait-card-kind { font-weight: 500; overflow-wrap: anywhere; }
+.wait-card-filters { color: var(--paper-ink); opacity: .68; overflow-wrap: anywhere; }
+/* The PR or issue named in them, as a link (#3077): the accent colour, underlined. */
+a.wait-card-filters { color: var(--accent); opacity: 1; text-decoration: underline; }
+.wait-card-progress { height: 4px; overflow: hidden; border-radius: 2px; background: var(--paper-wash); }
+.wait-card-progress span { display: block; height: 100%; background: var(--accent); transition: width .15s linear; }
+.wait-card .wait-answers { display: flex; justify-content: flex-end; gap: 10px; }
+.note.switch {
+  padding: 10px 12px;
+  border-radius: var(--radius-card);
+  border: 1px solid color-mix(in srgb, var(--tint-warning) 25%, transparent);
+  background: color-mix(in srgb, var(--tint-warning) 7%, transparent);
+}
+.answers {
+  background: var(--paper-well);
+  border-radius: var(--radius-card);
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.answers p { margin: 0; }
+.plan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.plan .mark { opacity: 0.6; }
+.plan .completed { opacity: 0.6; }
+.plan-block.withdrawn .plan .content { text-decoration: line-through; }
+.plan-block .dropped { margin: 2px 0 0; }
+.markdown li.task { list-style: none; margin-left: -1.2em; }
+.markdown .task-box { opacity: 0.45; }
+.markdown .task-box.done { opacity: 0.65; }
+.message-image { display: block; max-width: min(100%, 480px); max-height: 360px; border-radius: var(--radius-card); margin: 4px 0; }
+/* A queued prompt: the .bubble's place and shape, dashed and dimmed, its buttons underneath (#95). */
+.queued {
+  align-self: flex-end;
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.queued-bubble {
+  background: var(--paper-well);
+  border: 1px dashed var(--paper-rule);
+  border-radius: var(--radius-card);
+  padding: 6px 11px;
+  opacity: 0.65;
+}
+.queued p { margin: 0; }
+/* A prompt on its way (#4814): the person's .bubble, dimmed until its host's entry lands. */
+.bubble.sending { opacity: 0.65; }
+.bubble.sending p { margin: 0; white-space: pre-wrap; }
+/* The language server's completions (#844), under the editor while asked for: a class of their own, not the prompt's .completions (#1688). */
+.source-completions { border-top: 1px solid var(--paper-rule); max-height: 180px; overflow-y: auto; }
+.completion { display: block; width: 100%; text-align: left; background: none; border: none; padding: 2px 10px; font-family: var(--code-font, ui-monospace, monospace); font-size: 0.8125rem; color: inherit; cursor: pointer; }
+.completion.chosen, .completion:hover { background: var(--paper-well); }
+/* Why an asked completion brought nothing, for a moment, and the keys that ask (#1688). */
+.completion-note { margin: 2px 10px; }
+/* A source file's problems (#844), under the editor. */
+.problems { border-top: 1px solid var(--paper-rule); max-height: 140px; overflow-y: auto; padding: 4px 0; }
+.problems p { margin: 2px 10px; }
+/* An editor problem row: a class of its own, not the error banner's .problem (#1667). */
+.source-problem { display: block; width: 100%; text-align: left; background: none; border: none; padding: 2px 10px; font: inherit; font-size: 0.8125rem; color: inherit; cursor: pointer; }
+.source-problem:hover { background: var(--paper-well); }
+/* Find in Chat (#1532): one line over the chat, in the chat's column. */
+.find-bar { display: flex; align-items: center; gap: 10px; margin: 6px auto; padding: 4px 12px; width: min(100% - 32px, 760px);
+  box-sizing: border-box; background: var(--paper-well); border-radius: 999px; }
+.find-bar input { flex: 1; min-width: 0; border: none; background: transparent; font: inherit; color: inherit; outline: none; }
+.queued.editing { width: 70%; }
+.queued-editor { width: 100%; box-sizing: border-box; font: inherit; padding: 6px 11px; resize: vertical;
+  background: var(--paper-well); border: 1px solid var(--accent); border-radius: var(--radius-card); color: inherit; }
+.working, .more { margin: 0; }
+/* A quiet chat's foot (#1564): as a row's time, fine and grey. */
+.quiet-line { margin: 0; font-size: 0.75rem; color: var(--paper-tertiary); font-variant-numeric: tabular-nums; }
+.more { text-align: center; }
+.load-failure { display: flex; gap: 8px; align-items: baseline; margin: 0 0 12px; opacity: 0.75; font-size: 0.9em; }
+.spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  vertical-align: middle;
+}

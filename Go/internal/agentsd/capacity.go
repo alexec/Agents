@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/shirou/gopsutil/v4/load"
@@ -47,8 +48,19 @@ type capacitySample struct {
 	swap     float64
 }
 
-// capacitySampler is the look; a test puts a fake here.
-var capacitySampler = sampleCapacity
+// capacitySampler is the look; a test puts a fake here with setCapacitySampler. It is an
+// atomic pointer because a test sets it while another test's daemon still looks (#5329).
+var capacitySampler atomic.Pointer[func(context.Context) capacitySample]
+
+func init() { setCapacitySampler(sampleCapacity) }
+
+// setCapacitySampler puts f as the look and returns the one it replaced.
+func setCapacitySampler(f func(context.Context) capacitySample) (was func(context.Context) capacitySample) {
+	if old := capacitySampler.Swap(&f); old != nil {
+		return *old
+	}
+	return nil
+}
 
 // sampleCapacity reads the load with gopsutil (getloadavg on a Mac, /proc/loadavg on
 // Linux), swap with gopsutil, and the kernel's pressure (kernelPressure). A read that fails
@@ -235,7 +247,7 @@ func (d *Daemon) sampleNow(ctx context.Context) capacitySample {
 			return capacitySample{load1: v, load5: v}
 		}
 	}
-	return capacitySampler(ctx)
+	return (*capacitySampler.Load())(ctx)
 }
 
 // overriddenLoad is the walk's load from root, if it set one.

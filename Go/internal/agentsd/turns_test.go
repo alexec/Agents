@@ -46,12 +46,12 @@ func TestMain(m *testing.M) {
 	// layer turns it on for its daemon (releaseOn).
 	releaseLayerHere = false
 	// The machine's memory pressure does not move a test's warm pool (#4514).
-	pressureNow = func() string { return "" }
+	setPressureNow(func() string { return "" })
 	// The browser is Chrome for Testing, which a test fakes: never the machine's own Google
 	// Chrome, which GitHub's Linux runners have, with Xvfb (#5227).
 	browser.FindChrome = func() string { return "" }
 	// Nor does the load of the machine a test runs on raise machine.busy (#4578).
-	capacitySampler = func(context.Context) capacitySample { return capacitySample{} }
+	setCapacitySampler(func(context.Context) capacitySample { return capacitySample{} })
 	// No test asks the person's gh about merged pull requests unless it says so.
 	findGH = func() string { return "" }
 	// Nor asks the forge for an issue's parent (#3582): a test sets issueLookup.

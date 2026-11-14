@@ -1,10 +1,10 @@
 // Reports ▸ Planning ▸ Builds ▸ one run (#5179, spec 5166, board 3): the Gantt chart of a CI run's jobs and steps,
 // the run before's same jobs as dashed outlines, the steps that changed most, and the range's longest wait for a
-// runner, which is load and not code. The runs are builds/run (#5177) on the machine that answered the page's
-// history. The shapes and words are model/buildsRun.ts.
+// runner, which is load and not code. The runs are asked of who answered the page's history: the control plane's
+// builds/runAll (#5232, #5327), or a machine's builds/run (#5177). The shapes and words are model/buildsRun.ts.
 import { useEffect } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import type { BuildsChange, BuildsHistory, BuildsRun, BuildsRunAnswer, BuildsRunnerWait, MachineRef } from "../protocol/generated";
+import type { BuildsChange, BuildsHistory, BuildsRun, BuildsRunAnswer, BuildsRunnerWait } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { routeHash, type Route } from "../route";
 import { changeTitle, forgeName, pullRef, runName, runWhen, secondsWords, wireMs, type BuildsAsk } from "../model/builds";
@@ -12,29 +12,20 @@ import {
   attemptWords, changeWords, gantt, ganttTicks, onlyWords, ownWaitShort, queuePanelWords, rowWords, runLine, stepChanges, stepsHeading,
   stepsNote, tickWords, type GanttRow,
 } from "../model/buildsRun";
-import { CallFailed } from "../wire/link";
+import { readProblem, readRun, type BuildsFrom } from "../model/buildsRead";
 import { LastUpdate } from "./LastUpdate";
 
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 interface Props {
-  store: Store; host: MachineRef; repo: string; ask: BuildsAsk & { drill: NonNullable<BuildsAsk["drill"]> };
+  store: Store; from: BuildsFrom; repo: string; ask: BuildsAsk & { drill: NonNullable<BuildsAsk["drill"]> };
   history: BuildsHistory; change: BuildsChange | undefined; at: (a: BuildsAsk) => Route;
-}
-
-/** Why a run is not drawn: a machine too old for builds/run, a run the store no longer keeps (past its bounds), or
- * the machine's own words. */
-function problemWords(e: unknown): string {
-  if (!(e instanceof CallFailed)) return "The machine can’t be reached.";
-  if (e.code === -32601) return "This machine does not read build timings. Update it to see them.";
-  if (/no attempt/.test(e.message)) return "This machine no longer keeps this run’s jobs: it keeps 90 days, and a pull request’s steps for 14.";
-  return e.message;
 }
 
 type Got ={ answer: BuildsRunAnswer; before: BuildsRun | undefined } | { problem: string };
 
 /** Board 3: one run. */
-export function RunDrill({ store, host, repo, ask, history: h, change, at }: Props) {
+export function RunDrill({ store, from, repo, ask, history: h, change, at }: Props) {
   const got = useSignal<Got | null>(null);
   const { ref, against, job: picked } = ask.drill;
   useEffect(() => {
@@ -42,18 +33,18 @@ export function RunDrill({ store, host, repo, ask, history: h, change, at }: Pro
     got.value = null;
     void (async () => {
       try {
-        const answer = await store.link.call("builds/run", { repo, ref }, host);
+        const answer = await readRun(store, { repo, ref }, from);
         // Board 2's "Compare the two runs" names the last fast run; else the run before is builds/run's own choice.
         const before = against && against !== answer.before?.ref
-          ? await store.link.call("builds/run", { repo, ref: against }, host).then((r) => r.run, () => answer.before)
+          ? await readRun(store, { repo, ref: against }, from).then((r) => r.run, () => answer.before)
           : answer.before;
         if (live) got.value = { answer, before };
       } catch (e) {
-        if (live) got.value = { problem: problemWords(e) };
+        if (live) got.value = { problem: readProblem(e, from) };
       }
     })();
     return () => { live = false; };
-  }, [ref, against, host]);
+  }, [ref, against, from]);
 
   const trend = at({ ...ask, change: undefined, drill: undefined });
   const fromChange = change ? at({ ...ask, drill: undefined }) : null;
@@ -94,7 +85,7 @@ export function RunDrill({ store, host, repo, ask, history: h, change, at }: Pro
               {g.before ? <Steps run={run} before={g.before} picked={picked} /> : <p class="quiet small">No passed run of this workflow before it, on its branch or the default branch, so nothing to compare.</p>}
             </section>
             {h.longestRunnerWait && h.longestRunnerWait.run.ref !== run.ref && ownWaitShort(run) && (
-              <QueuePanel store={store} host={host} repo={repo} wait={h.longestRunnerWait} open={at({ ...ask, change: undefined, drill: { ref: h.longestRunnerWait.run.ref, job: h.longestRunnerWait.job } })} />
+              <QueuePanel store={store} from={from} repo={repo} wait={h.longestRunnerWait} open={at({ ...ask, change: undefined, drill: { ref: h.longestRunnerWait.run.ref, job: h.longestRunnerWait.job } })} />
             )}
           </div>
         </>
@@ -206,14 +197,14 @@ function Steps({ run, before, picked }: { run: BuildsRun; before: BuildsRun; pic
 }
 
 /** Board 3 note 4: the run of the range whose job waited longest for a runner, its jobs drawn as wait and run. */
-function QueuePanel({ store, host, repo, wait: w, open }: { store: Store; host: MachineRef; repo: string; wait: BuildsRunnerWait; open: Route }) {
+function QueuePanel({ store, from, repo, wait: w, open }: { store: Store; from: BuildsFrom; repo: string; wait: BuildsRunnerWait; open: Route }) {
   const run = useSignal<BuildsRun | null | undefined>(undefined);
   useEffect(() => {
     let live = true;
     run.value = undefined;
-    void store.link.call("builds/run", { repo, ref: w.run.ref }, host).then((r) => r.run, () => null).then((r) => { if (live) run.value = r; });
+    void readRun(store, { repo, ref: w.run.ref }, from).then((r) => r.run, () => null).then((r) => { if (live) run.value = r; });
     return () => { live = false; };
-  }, [w.run.ref, host]);
+  }, [w.run.ref, from]);
   const r = run.value;
   const runner = r?.jobs.find((j) => j.name === w.job)?.runner;
   const end = r ? Math.max(1, ...r.jobs.map((j) => j.ended - j.made)) : 1;

@@ -3,3 +3,7 @@
 # (Web/dist is built, not checked in: .gitignore, #473.)
 Web/src/protocol/generated.ts linguist-generated=true -diff
 Go/wire/*_gen.go linguist-generated=true -diff
+
+# Pages made from per-entry files by scripts/docs-parts.py (#5386). On a merge conflict, run it again.
+docs/reference/integrations.md linguist-generated=true
+specs/071-web-remote/walks/parity.md linguist-generated=true

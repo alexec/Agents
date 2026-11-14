@@ -1,0 +1,1567 @@
+{
+  "openrpc": "1.3.2",
+  "info": {
+    "title": "agentsd: workflows",
+    "version": "0",
+    "description": "The host methods of the workflows group; see daemon.openrpc.json for the rest of the document."
+  },
+  "methods": [
+    {
+      "name": "builds/history",
+      "x-capability": "builds.trends/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/BuildsHistoryRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/BuildsHistory"
+        }
+      }
+    },
+    {
+      "name": "builds/run",
+      "x-capability": "builds.trends/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/BuildsRunRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/BuildsRunAnswer"
+        }
+      }
+    },
+    {
+      "name": "docs/list",
+      "description": "The docs of this machine's folders and their docs connectors (#3319).",
+      "x-capability": "docs/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/DocsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/DocsList"
+        }
+      }
+    },
+    {
+      "name": "docs/read",
+      "description": "A doc's Markdown by its ref, a bounded part at a time (#3319).",
+      "x-capability": "docs/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/DocsReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/DocsReading"
+        }
+      }
+    },
+    {
+      "name": "docs/search",
+      "description": "The docs whose text has the words, with where (#3319).",
+      "x-capability": "docs/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/DocsSearchRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/DocsSearch"
+        }
+      }
+    },
+    {
+      "name": "firstBuild/start",
+      "x-capability": "first-build/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/FirstBuildStartRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
+      "name": "lineage/cost",
+      "x-capability": "lineage/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/lineage.schema.json#/definitions/LineageNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/lineage.schema.json#/definitions/LineageCostRollup"
+        }
+      }
+    },
+    {
+      "name": "lineage/end",
+      "x-capability": "lineage/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/lineage.schema.json#/definitions/LineageEndRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/lineage.schema.json#/definitions/LineageLinks"
+        }
+      }
+    },
+    {
+      "name": "lineage/estimate",
+      "x-capability": "lineage.estimate/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/lineage.schema.json#/definitions/LineageEstimateRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/lineage.schema.json#/definitions/LineageEstimate"
+        }
+      }
+    },
+    {
+      "name": "lineage/figures",
+      "x-capability": "lineage.figures/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/lineage.schema.json#/definitions/LineageNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/lineage.schema.json#/definitions/LineageFigures"
+        }
+      }
+    },
+    {
+      "name": "lineage/forecast",
+      "x-capability": "lineage.forecast/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/lineage.schema.json#/definitions/LineageForecastRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/lineage.schema.json#/definitions/LineageForecast"
+        }
+      }
+    },
+    {
+      "name": "lineage/link",
+      "x-capability": "lineage/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/lineage.schema.json#/definitions/LineageLinkRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/lineage.schema.json#/definitions/LineageLink"
+        }
+      }
+    },
+    {
+      "name": "lineage/links",
+      "x-capability": "lineage/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/lineage.schema.json#/definitions/LineageNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/lineage.schema.json#/definitions/LineageLinks"
+        }
+      }
+    },
+    {
+      "name": "lineage/sessions",
+      "x-capability": "lineage.sessions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/lineage.schema.json#/definitions/LineageSessionsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/lineage.schema.json#/definitions/LineageSessions"
+        }
+      }
+    },
+    {
+      "name": "lineage/walk",
+      "x-capability": "lineage/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/lineage.schema.json#/definitions/LineageNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/lineage.schema.json#/definitions/LineageGraph"
+        }
+      }
+    },
+    {
+      "name": "pins/arrange",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/PinArrangeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "pins/arrangeSessions",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/PinArrangeSessionsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "pins/arrangeWorkflows",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/PinArrangeWorkflowsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "pins/changed",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/PinsChangedNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "pins/hideView",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/PinHideViewRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "pins/list",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/files.schema.json#/definitions/FolderPins"
+          }
+        }
+      }
+    },
+    {
+      "name": "pins/pin",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/PinRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/files.schema.json#/definitions/PinView"
+          }
+        }
+      }
+    },
+    {
+      "name": "pins/pinSession",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/PinSessionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "pins/pinWorkflow",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "pins/read",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/PinReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FileReading"
+        }
+      }
+    },
+    {
+      "name": "pins/unpin",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/PinPathRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "pins/unpinSession",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/PinSessionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "pins/unpinWorkflow",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "pins/write",
+      "x-capability": "pins/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/PinWriteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "reports/features",
+      "x-capability": "features/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/FeatureUsage"
+        }
+      }
+    },
+    {
+      "name": "reports/problem",
+      "x-capability": "reports.problem/1",
+      "description": "Report a Problem (#3718): the person's words with this machine's version, OS and, when asked, recent log lines, made into a GitHub new-issue link. Sends nothing: the client opens the link.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/ProblemReportRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/ProblemReport"
+        }
+      }
+    },
+    {
+      "name": "resources/changed",
+      "x-capability": "resources.leases/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/LeaseSnapshot"
+          }
+        }
+      ]
+    },
+    {
+      "name": "resources/declare",
+      "x-capability": "resources/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/DeclareResourceRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/LeaseSnapshot"
+        }
+      }
+    },
+    {
+      "name": "resources/end",
+      "x-capability": "resources.leases/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/PersonEndRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/LeaseSnapshot"
+        }
+      }
+    },
+    {
+      "name": "resources/lease",
+      "x-capability": "resources.leases/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/LeaseRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/LeaseNote"
+        }
+      }
+    },
+    {
+      "name": "resources/list",
+      "x-capability": "resources.leases/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/LeaseTokenRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/LeaseNote"
+        }
+      }
+    },
+    {
+      "name": "resources/release",
+      "x-capability": "resources.leases/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/LeaseNameRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/LeaseNote"
+        }
+      }
+    },
+    {
+      "name": "resources/remove",
+      "x-capability": "resources/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/RemoveResourceRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/LeaseSnapshot"
+        }
+      }
+    },
+    {
+      "name": "resources/removeWaiter",
+      "x-capability": "resources.leases/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/PersonRemoveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/LeaseSnapshot"
+        }
+      }
+    },
+    {
+      "name": "resources/snapshot",
+      "x-capability": "resources.leases/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/LeaseSnapshot"
+        }
+      }
+    },
+    {
+      "name": "views/call",
+      "x-capability": "views/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ViewCallRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/JSONValue"
+        }
+      }
+    },
+    {
+      "name": "views/context",
+      "x-capability": "views/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ViewContextRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "views/log",
+      "x-capability": "views/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ViewLogRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "views/read",
+      "x-capability": "views/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ViewReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/ViewResource"
+        }
+      }
+    },
+    {
+      "name": "views/show",
+      "x-capability": "views/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ViewShowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "views/toolCall",
+      "x-capability": "views/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ViewToolCallRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/JSONValue"
+        }
+      }
+    },
+    {
+      "name": "work/features",
+      "x-capability": "work.features/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/WorkFeaturesRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/WorkFeatures"
+        }
+      }
+    },
+    {
+      "name": "work/timeline",
+      "x-capability": "work.timeline/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/WorkTimelineRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/WorkTimeline"
+        }
+      }
+    },
+    {
+      "name": "workflow/changed",
+      "x-capability": "workflow/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowSummary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "workflow/removed",
+      "x-capability": "workflow/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowRemovedNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "workflows/approve",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowApproveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/archive",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowArchiveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/delete",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "workflows/deny",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowApproveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/enable",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowEnableRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/limit",
+      "x-capability": "workflows/1",
+      "description": "How many workflows may be turned on at once. No total is the default.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/WorkflowLimitSettings"
+        }
+      }
+    },
+    {
+      "name": "workflows/list",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowSummary"
+          }
+        }
+      }
+    },
+    {
+      "name": "workflows/mcpTrigger/clearMissed",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/WorkflowMCPClearMissedRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/readyMade/keep",
+      "description": "Keep an edited copy of a ready-made workflow as it is (#4075): its page says no more of the newer version, until the next one.",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/readyMade/take",
+      "description": "Write the newer ready-made version over an edited copy of it (#4075). The copy keeps its state keys, and the new version waits for approval as any changed workflow does.",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/run",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/setLimit",
+      "x-capability": "workflows/1",
+      "description": "Set how many approved workflows may be turned on in each folder. The value is from 1 to 100. An unset value means 20.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowLimitSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/WorkflowLimitSettings"
+        }
+      }
+    },
+    {
+      "name": "workflows/setMuted",
+      "x-capability": "mute/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowMuteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/settings",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowSettingsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    },
+    {
+      "name": "workflows/write",
+      "x-capability": "workflows/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/WorkflowWriteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/WorkflowSummary"
+        }
+      }
+    }
+  ]
+}

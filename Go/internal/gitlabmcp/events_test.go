@@ -64,7 +64,7 @@ func same(t *testing.T, got, want []string) {
 }
 
 func TestTheEventsAreTheGitHubServersNames(t *testing.T) {
-	same(t, EventNames(), []string{"checks.failed", "run.completed", "deploy.waiting", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "pr.blocked", "review.requested", "review.comment",
+	same(t, EventNames(), []string{"checks.failed", "run.completed", "deploy.waiting", "deploy.started", "deploy.succeeded", "deploy.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "pr.blocked", "review.requested", "review.comment",
 		"issue.opened", "issue.labelled", "issue.commented", "issue.closed", "issue.assigned"})
 }
 

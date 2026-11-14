@@ -1,0 +1,59 @@
+/* Frame F: the connection lost (Banner.tsx, a message banner): what was shown stays, greyed out, and nothing can be sent. */
+
+/* Greyed, with what was shown still readable and scrollable, and the prompt still typable. */
+.down .columns { opacity: 0.55; }
+.down .columns button, .down .columns select, .down .columns input:not([type=search]) { pointer-events: none; }
+.host-offline .row.folder { opacity: 0.55; }
+/* A host down (OfflineStrip.tsx, a message banner, #83): how long a workspace's start has taken, after the words (#691). */
+.offline-strip .elapsed { font-variant-numeric: tabular-nums; opacity: 0.7; }
+/* An agent whose folder has gone (#119): which, and the ways on, as the window's strip. */
+.missing-folder-strip .what, .account-move-strip .what { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.missing-folder-strip .quiet { color: var(--paper-secondary); }
+.ways-on { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+/* Open File: the file changed on disk under unsaved typing (#1858). */
+.changed-on-disk { padding: 6px 10px; font-size: 0.8rem; background: var(--paper-well); border-bottom: 1px solid var(--paper-rule);
+  display: flex; flex-direction: column; gap: 6px; }
+.changed-on-disk p { margin: 0; }
+.changed-on-disk-diff { max-height: 240px; overflow: auto; }
+.subtitle.missing-folder { opacity: 0.7; }
+/* A chat paused by a spent allowance (#1859): Continue when it is back, or when it continues. */
+.chip.worktree.gone { text-decoration: line-through; }
+/* This Mac's host down, in the folders column (#83): said whole, never cut off. */
+.host-down { padding: 6px 8px 8px; }
+.host-down p { margin: 0 0 3px; }
+.host-down .strong { color: var(--tint-warning); font-size: 0.78125rem; }
+
+/* Shown only at some widths. */
+.narrow-only, .medium-only { display: none; }
+
+.menu-anchor { position: relative; }
+
+.folder-menu { font-weight: 600; white-space: nowrap; }
+.menu-anchor { margin-right: auto; }
+
+.popover {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  z-index: 10;
+  width: 220px;
+  max-height: 70vh;
+  overflow-y: auto;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  border-radius: 12px;
+  box-shadow: var(--shadow-floating);
+  padding: 5px;
+}
+
+/* Below 760: the back control and the heading only a phone's width shows; sidebar.css lays out
+   the list or what it picked (#235). */
+@media (max-width: 759px) {
+  .medium-only, .wide-only { display: none; }
+  .narrow-only { display: block; }
+  /* The header's Turns and Files, in its ··· menu (#981): a tick on the one in use. */
+  .popover [aria-checked=true]::before { content: "✓ "; }
+  button.back.narrow-only { display: inline-block; border: none; background: none; color: var(--accent); padding: 0; }
+  .column-head h1.narrow-only { display: block; text-align: center; }
+}
+

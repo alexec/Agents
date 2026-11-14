@@ -1,0 +1,25 @@
+/* The Huddle (#987): the Blobs' eyes ease to where they look, and blink. */
+.new-heading .huddle { flex: none; margin-bottom: 10px; overflow: visible; }
+.huddle-eyes { transition: transform 0.45s cubic-bezier(0.3, 1.4, 0.5, 1); }
+.huddle-eye { transform-box: fill-box; transform-origin: center; transition: transform 0.08s ease-in; }
+.huddle-eye.shut { transform: scaleY(0.08); }
+@media (prefers-reduced-motion: reduce) { .huddle-eyes, .huddle-eye { transition: none; } }
+.menu-anchor.reach { margin-right: 0; }
+.popover.up { top: auto; bottom: 32px; }
+.reach-popover { width: 300px; display: flex; flex-direction: column; gap: 8px; padding: 10px; }
+.reach-popover p { margin: 0; }
+.reach-folders { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.reach-folders li { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; }
+.reach-folders li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reach-add { display: flex; gap: 6px; }
+.reach-add input { flex: 1; min-width: 0; font: inherit; font-size: 0.75rem; padding: 4px 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground); color: inherit; }
+.menu-anchor.session-menu { margin-right: 0; }
+
+/* Unread (#70): a grey dot and a heavier title; never the attention colour. */
+.session .title { font-weight: 400; }
+.session .title.unread { font-weight: 600; }
+/* Started by a workflow or another agent (028, #251): quiet, after the title, as the window's mark. */
+.session .title .started-by { margin-left: 5px; font-size: 0.6875rem; font-weight: 400; opacity: 0.45; }
+.working.coming-back { opacity: 0.65; padding: 4px 0; }
+.unread-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: middle; }
+

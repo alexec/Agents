@@ -140,7 +140,7 @@ func TestCITimingsReadAndAnswer(t *testing.T) {
 		t.Fatalf("attempt 2: %+v %v", second, err)
 	}
 
-	other, err := d.buildsHistory(wire.BuildsHistoryRequest{Repo: "bitbucket:group/project",
+	other, err := d.buildsHistory(wire.BuildsHistoryRequest{Repo: "circleci:group/project",
 		From: wire.DateOf(now.Add(-time.Hour)), To: wire.DateOf(now)})
 	if err != nil || other.Reader != "none" {
 		t.Fatalf("a forge with no reader: %+v %v", other, err)
@@ -362,5 +362,269 @@ func TestCITimingsSyncSendsWhatChanged(t *testing.T) {
 	defer mu.Unlock()
 	if len(sent) != 1 || len(sent[0].Days) != 1 || sent[0].Days[0].Day != days[0] {
 		t.Fatalf("after a restart %+v", sent)
+	}
+}
+
+// A fake Bitbucket with three completed pipelines: one on main run again by "Rerun failed
+// steps" (run 2), one for a pull request with its steps on two pages, and one on main older
+// than the store keeps.
+func TestCITimingsBitbucket(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	at := func(d time.Duration) string { return now.Add(d).UTC().Format(time.RFC3339) }
+	var srv *httptest.Server
+	repo := "/2.0/repositories/team/app"
+	mux := http.NewServeMux()
+	mux.HandleFunc(repo, func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer test" {
+			t.Errorf("auth %q", r.Header.Get("Authorization"))
+		}
+		fmt.Fprint(w, `{"mainbranch":{"name":"main"}}`)
+	})
+	var lists atomic.Int32
+	mux.HandleFunc(repo+"/pipelines/", func(w http.ResponseWriter, r *http.Request) {
+		lists.Add(1)
+		q := r.URL.Query()
+		if q.Get("status") != "COMPLETED" || q.Get("sort") != "-created_on" {
+			t.Errorf("listed %s", r.URL.RawQuery)
+		}
+		if q.Get("page") != "1" {
+			fmt.Fprint(w, `{"values":[]}`)
+			return
+		}
+		fmt.Fprintf(w, `{"values":[
+		 {"uuid":"{a}","build_number":41,"run_number":2,"created_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"SUCCESSFUL"}},
+		  "target":{"type":"pipeline_ref_target","ref_type":"branch","ref_name":"main","commit":{"hash":"aaa"},"selector":{"type":"branches","pattern":"main"}},"trigger":{"name":"PUSH"}},
+		 {"uuid":"{b}","build_number":42,"created_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"FAILED"}},
+		  "target":{"type":"pipeline_pullrequest_target","source":"feature","destination":"main","commit":{"hash":"bbb"},"selector":{"type":"pull-requests","pattern":"**"},"pullrequest":{"id":9}},"trigger":{"name":"PUSH"}},
+		 {"uuid":"{c}","build_number":7,"created_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"SUCCESSFUL"}},
+		  "target":{"type":"pipeline_ref_target","ref_type":"branch","ref_name":"main","selector":{"type":"default"}},"trigger":{"name":"PUSH"}}]}`,
+			at(-2*time.Hour), at(-time.Hour), at(-30*time.Minute), at(-20*time.Minute), at(-100*24*time.Hour), at(-100*24*time.Hour))
+	})
+	mux.HandleFunc(repo+"/pipelines/41/steps/", func(w http.ResponseWriter, _ *http.Request) {
+		base := -2 * time.Hour
+		fmt.Fprintf(w, `{"values":[
+		 {"name":"Build","run_number":1,"started_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"SUCCESSFUL"}}},
+		 {"name":"Test","run_number":1,"started_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"FAILED"}}},
+		 {"name":"Test","run_number":2,"started_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"SUCCESSFUL"}},"runs_on":["self.hosted","linux"]}]}`,
+			at(base+30*time.Second), at(base+2*time.Minute), at(base+2*time.Minute), at(base+5*time.Minute), at(base+40*time.Minute), at(base+45*time.Minute))
+	})
+	mux.HandleFunc(repo+"/pipelines/42/steps/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("page") == "2" {
+			fmt.Fprintf(w, `{"values":[{"name":"Deploy","state":{"name":"COMPLETED","result":{"name":"NOT_RUN"}},"completed_on":%q}]}`, at(-20*time.Minute))
+			return
+		}
+		fmt.Fprintf(w, `{"values":[{"name":"Test","started_on":%q,"completed_on":%q,"state":{"name":"COMPLETED","result":{"name":"FAILED"}}}],"next":%q}`,
+			at(-29*time.Minute), at(-21*time.Minute), srv.URL+repo+"/pipelines/42/steps/?pagelen=100&page=2")
+	})
+	mux.HandleFunc(repo+"/pipelines/7/steps/", func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("read the steps of a pipeline older than the store keeps")
+	})
+	srv = httptest.NewServer(mux)
+	t.Cleanup(srv.Close)
+
+	d, err := New(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A daemon left running scans on its clock into a later test's AGENTS_PERSONAL_HOME (#5368).
+	t.Cleanup(d.Shutdown)
+	d.ciBitbucketAPI = srv.URL + "/2.0/"
+	h := ciRepoHere{forgeRepo{"bitbucket", "team/app"}, t.TempDir()}
+	if err := d.readCIRepo(context.Background(), h); err != nil {
+		t.Fatal(err)
+	}
+	hist, err := d.buildsHistory(wire.BuildsHistoryRequest{Repo: "bitbucket:team/app",
+		From: wire.DateOf(now.Add(-24 * time.Hour)), To: wire.DateOf(now.Add(time.Hour))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hist.Reader != "bitbucket" || hist.DefaultBranch == nil || *hist.DefaultBranch != "main" || hist.ReadAt == nil {
+		t.Fatalf("history %+v", hist)
+	}
+	// Main's first run failed its Test step; the second is a rerun of it.
+	if hist.Total.Runs != 1 || hist.Total.Reruns != 1 || hist.Total.Green != 0 {
+		t.Fatalf("total %+v", hist.Total)
+	}
+	main, err := d.buildsRun(wire.BuildsRunRequest{Repo: "bitbucket:team/app", Ref: "bitbucket:run:team/app#41", Attempt: new(int64(2))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Run 2 is its rerun steps only; its runner is the first runs-on label.
+	if main.Attempts != 2 || *main.Run.Conclusion != "success" {
+		t.Fatalf("pipeline 41's attempts %+v", main)
+	}
+	if r := main.Run; r.Default == nil || !*r.Default || len(r.Jobs) != 1 || r.Jobs[0].Name != "Test" || r.Jobs[0].Runner == nil ||
+		*r.Jobs[0].Runner != "self.hosted" || r.Started != 2400 || r.Ended != 3600 || r.URL == nil ||
+		*r.URL != "https://bitbucket.org/team/app/pipelines/results/41" || r.Workflow != "main" {
+		t.Fatalf("pipeline 41 %+v", r)
+	}
+	first, err := d.buildsRun(wire.BuildsRunRequest{Repo: "bitbucket:team/app", Ref: "bitbucket:run:team/app#41"})
+	if err != nil || len(first.Run.Jobs) != 2 || *first.Run.Conclusion != "failure" || first.Run.Started != 30 || first.Run.Ended != 300 {
+		t.Fatalf("pipeline 41, run 1 %+v %v", first.Run, err)
+	}
+	pr, err := d.buildsRun(wire.BuildsRunRequest{Repo: "bitbucket:team/app", Ref: "bitbucket:run:team/app#42"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r := pr.Run; r.Pr == nil || *r.Pr != 9 || r.Default != nil || len(r.Jobs) != 2 || *r.Conclusion != "failure" ||
+		*r.Jobs[1].Conclusion != "skipped" || r.Jobs[0].Made != 60 || r.Jobs[0].Ended != 540 {
+		t.Fatalf("pipeline 42 %+v", r)
+	}
+	d.ciMu.Lock()
+	st := *d.ciFileLocked().Repos["bitbucket:team/app"]
+	calls := d.ciFileLocked().BitbucketCalls
+	d.ciMu.Unlock()
+	if !st.Filled || st.FilledFrom == nil || st.BackfillPage != 1 {
+		t.Fatalf("backfill %+v", st)
+	}
+	// The repository, the list twice (live, backfill), and 41's one and 42's two pages of steps.
+	if calls != 6 {
+		t.Fatalf("%d Bitbucket calls", calls)
+	}
+
+	// A second read keeps what it has: no steps again.
+	if err := d.readCIRepo(context.Background(), h); err != nil {
+		t.Fatal(err)
+	}
+	d.ciMu.Lock()
+	again := d.ciFileLocked().BitbucketCalls
+	d.ciMu.Unlock()
+	if again != calls+1 {
+		t.Fatalf("%d Bitbucket calls after a second read", again)
+	}
+}
+
+// A fake Forgejo 17 with three runs: one on main whose test job was run again (its jobs list
+// has no steps, so each job is read), one for a pull request in Gitea's shape, and one still
+// running.
+func TestCITimingsForgejo(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	at := func(d time.Duration) string { return now.Add(d).UTC().Format(time.RFC3339) }
+	repo := "/api/v1/repos/scratch/app"
+	var jobLists atomic.Int32
+	mux := http.NewServeMux()
+	mux.HandleFunc(repo, func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `{"default_branch":"main"}`)
+	})
+	mux.HandleFunc(repo+"/actions/runs", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("page") != "1" {
+			fmt.Fprint(w, `{"total_count":3,"workflow_runs":[]}`)
+			return
+		}
+		fmt.Fprintf(w, `{"total_count":3,"workflow_runs":[
+		 {"id":903,"index_in_repo":7,"workflow_id":"ci.yml","event":"push","prettyref":"main","status":"running","created":%q,"started":%q},
+		 {"id":901,"run_number":6,"run_attempt":1,"path":".gitea/workflows/ci.yml@refs/pull/9/head","event":"pull_request","head_branch":"feature","head_sha":"bbb",
+		  "status":"completed","conclusion":"failure","pull_requests":[{"number":9}],"created_at":%q,"started_at":%q,"completed_at":%q},
+		 {"id":900,"index_in_repo":5,"workflow_id":"ci.yml","event":"push","prettyref":"main","commit_sha":"aaa","status":"success",
+		  "html_url":"https://codeberg.org/scratch/app/actions/runs/5","created":%q,"started":%q,"stopped":%q}]}`,
+			at(-time.Minute), at(-time.Minute), at(-30*time.Minute), at(-29*time.Minute), at(-25*time.Minute),
+			at(-2*time.Hour), at(-2*time.Hour+5*time.Second), at(-2*time.Hour+20*time.Minute))
+	})
+	mux.HandleFunc(repo+"/actions/runs/900/jobs", func(w http.ResponseWriter, _ *http.Request) {
+		jobLists.Add(1)
+		fmt.Fprint(w, `[{"id":1,"name":"build","attempt":1,"status":"success","runs_on":["docker"]},
+		 {"id":2,"name":"test","attempt":2,"needs":["build"],"status":"success","runs_on":["docker"]}]`)
+	})
+	mux.HandleFunc(repo+"/actions/jobs/1", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintf(w, `{"id":1,"name":"build","attempt":1,"status":"success","runs_on":["docker"],"steps":[
+		 {"name":"Build","number":1,"status":"success","started":%q,"stopped":%q}]}`, at(-2*time.Hour+20*time.Second), at(-2*time.Hour+2*time.Minute))
+	})
+	mux.HandleFunc(repo+"/actions/jobs/2", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintf(w, `{"id":2,"name":"test","attempt":2,"needs":["build"],"status":"success","runs_on":["docker"],"steps":[
+		 {"name":"Test","number":1,"status":"success","started":%q,"stopped":%q}]}`, at(-2*time.Hour+15*time.Minute), at(-2*time.Hour+20*time.Minute))
+	})
+	mux.HandleFunc(repo+"/actions/runs/901/jobs", func(w http.ResponseWriter, _ *http.Request) {
+		jobLists.Add(1)
+		fmt.Fprintf(w, `{"total_count":1,"jobs":[{"id":3,"name":"test","run_attempt":1,"status":"completed","conclusion":"failure","labels":["ubuntu-latest"],
+		 "created_at":%q,"started_at":%q,"completed_at":%q,"steps":[]}]}`, at(-30*time.Minute), at(-29*time.Minute), at(-25*time.Minute))
+	})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "token test" {
+			t.Errorf("auth %q", r.Header.Get("Authorization"))
+		}
+		mux.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+
+	d, err := New(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A daemon left running scans on its clock into a later test's AGENTS_PERSONAL_HOME (#5368).
+	t.Cleanup(d.Shutdown)
+	d.ciForgejoAPI = srv.URL + "/"
+	h := ciRepoHere{forgeRepo{"forgejo", "scratch/app"}, t.TempDir()}
+	if err := d.readCIRepo(context.Background(), h); err != nil {
+		t.Fatal(err)
+	}
+	if n := jobLists.Load(); n != 2 {
+		t.Fatalf("jobs read %d times, want once a finished run", n)
+	}
+	// A second read finds nothing new: the runs it has are not read again.
+	if err := d.readCIRepo(context.Background(), h); err != nil || jobLists.Load() != 2 {
+		t.Fatalf("again: %v, jobs read %d times", err, jobLists.Load())
+	}
+	hist, err := d.buildsHistory(wire.BuildsHistoryRequest{Repo: "forgejo:scratch/app",
+		From: wire.DateOf(now.Add(-24 * time.Hour)), To: wire.DateOf(now.Add(time.Hour))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hist.Reader != "forgejo" || hist.DefaultBranch == nil || *hist.DefaultBranch != "main" || hist.ReadAt == nil {
+		t.Fatalf("history %+v", hist)
+	}
+	// Main's run (the default filter), not green: its test job was run again.
+	if hist.Total.Runs != 1 || hist.Total.Reruns != 1 || hist.Total.Green != 0 {
+		t.Fatalf("total %+v", hist.Total)
+	}
+	last, err := d.buildsRun(wire.BuildsRunRequest{Repo: "forgejo:scratch/app", Ref: "forgejo:run:scratch/app#5", Attempt: new(int64(2))})
+	if err != nil || len(last.Run.Jobs) != 2 || len(last.Run.Jobs[1].Steps) != 1 {
+		t.Fatalf("attempt 2 %+v %v", last, err)
+	}
+	if j := last.Run.Jobs[1]; j.Made != 120 || j.Started != 900 || j.Ended != 1200 {
+		t.Fatalf("test job %+v", j)
+	}
+	pr, err := d.buildsRun(wire.BuildsRunRequest{Repo: "forgejo:scratch/app", Ref: "forgejo:run:scratch/app#6"})
+	if err != nil || pr.Run.Pr == nil || *pr.Run.Pr != 9 || (pr.Run.Default != nil && *pr.Run.Default) {
+		t.Fatalf("pull request run %+v %v", pr.Run, err)
+	}
+}
+
+// #5410: at connect the control plane has not said what it can do yet, so the first send finds
+// no builds.copy/1 and sends nothing; once it says, the send goes then, not on the next hour.
+func TestCITimingsSendWhenTheCapabilitiesAreKnown(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	srv, _ := ciFakeGitHub(t, now)
+	d, err := New(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Shutdown()
+	d.ciAPI = srv.URL
+	if err := d.readCIRepo(context.Background(), ciRepoHere{forgeRepo{"github", "alexec/agents"}, t.TempDir()}); err != nil {
+		t.Fatal(err)
+	}
+	var caps atomic.Pointer[[]string]
+	d.SetControlCapabilities(func() []string {
+		if list := caps.Load(); list != nil {
+			return *list
+		}
+		return nil
+	})
+	var sent atomic.Int32
+	d.SetControlAsk(askControl(func(_ context.Context, method string, _ any) (json.RawMessage, error) {
+		if method == wire.CallBuildsSync.Name {
+			sent.Add(1)
+		}
+		return json.RawMessage(`{}`), nil
+	}))
+	// The link is up, the hello answer is not in.
+	d.sendCITimings()
+	if n := sent.Load(); n != 0 {
+		t.Fatalf("sent %d before the capabilities were known", n)
+	}
+	caps.Store(&[]string{wire.CapBuildsCopy1})
+	d.ControlCapabilitiesKnown()
+	if n := sent.Load(); n != 1 {
+		t.Fatalf("sent %d once the capabilities were known, want 1", n)
 	}
 }

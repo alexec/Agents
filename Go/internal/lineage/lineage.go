@@ -77,6 +77,11 @@ const (
 	// RelBrings is a deploy that brings a PR (#5241): the PRs between the last deploy that
 	// succeeded in the same environment and this one. Computed for a walk's answer, never stored.
 	RelBrings = "brings"
+	// RelLive and RelNext are an environment's deploys whose versions run there now (at is
+	// since when), and that wait or run to go there next (at is when they began), as GitOps
+	// Promoter's active and proposed (#5246). Computed for a walk's answer, never stored.
+	RelLive = "live"
+	RelNext = "next"
 	// RelDeployedAs is the old link of a release to a deploy (#3584), and of a TestFlight build to
 	// its App Store version (#3657). Nothing makes it since #5241; it is read until it ages out.
 	RelDeployedAs = "deployed-as"

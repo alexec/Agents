@@ -3,8 +3,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { appCss } from "./appCss.mjs";
 
-const css = readFileSync(new URL("../src/app.css", import.meta.url), "utf8");
+const css = appCss();
 const chat = readFileSync(new URL("../src/views/Chat.tsx", import.meta.url), "utf8");
 
 test("no child of the transcript shrinks", () => {

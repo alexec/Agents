@@ -75,6 +75,26 @@ sets the first job's Deployment `inactive` when the second ends, so it does not 
 A target can also report what it runs (Argo CD's live state, a machine's version when it
 connects). A change in that report is a deploy with `observed: true`.
 
+### A machine's Agents versions
+
+Each host says its version in `machine/hello` on each connect. The control plane keeps each
+change of it as an observed deploy (#5272), so a machine's page can say "this version, with
+these changes, since time X" (#5273):
+
+- **The model:** the component is **Agents** (`agents`: agentsd and, on a Mac, the app that
+  carries it), the environment is `machines`, and each machine is a target with the label
+  `machine=<host>`. The deploy's state is `succeeded`, `rawState` is `observed`.
+- **Since when:** a deploy starts at the last time the old version was seen (its last hello,
+  or the end of its uplink) and ends at the first hello at the new one. An update restarts
+  the host, so the time is known to within seconds.
+- **The commit:** `0.18.0` is the tag `v0.18.0`; `0.18.1-dev.544+g8162a5a06` is the sha
+  after `+g` (`scripts/version.sh`). That is the version's one artifact, so the changes
+  between two versions are the forge's compare of their commits.
+- **Bounded:** one object for each machine, `v1/machine-versions/<host>.json`, with the
+  last 20 deploys. It goes when the machine is removed.
+- **Read:** `machines/versions` gives the version now, when it was first and last seen, and
+  the deploys, newest first, to the machine's own person.
+
 ## Events
 
 The sources send these events, from each system's MCP server:
@@ -165,12 +185,23 @@ The deploy events make the lineage nodes (#5241). The code is
 - **A deploy's details** (its artifacts, state, start and end) are not links. The host
   keeps each deploy's last event in `<root>/lineage-deploys.json`, at most 1,000. A walk
   gives them as the deploy's resolved title (*v0.18.0 to testflight*), state and labels.
-- **Computed, not stored:** a succeeded deploy's state is `replaced` when a newer deploy
-  succeeded in each of its environments. It has the label `rollback` when its release is
+- **Computed, not stored:** a succeeded deploy's state is `replaced` when it is no longer
+  live in any of its environments. It has the label `rollback` when its release is
   older than the release it replaced. **What a deploy brings** is the PRs between the last
   deploy that succeeded in the same environment and this deploy, from the forge's compare
   of their commits. A walk gives them as `brings` links with the source `computed`. The
   host works them out in the background and never stores them.
+- **Live and next versions (#5246),** as GitOps Promoter's active and proposed, are
+  computed too. A target is the environment node with the deploy's target labels. Its
+  live versions are the newest succeeded deploy's, at its `share` (100 % with none), then
+  older succeeded deploys of other versions until the shares make 100 %: a canary is live
+  beside the version it splits with. A live version's "since" is the first deploy of its
+  newest unbroken run. Its next versions are the deploys that wait or run there and began
+  after the newest live deploy began; what one brings is its `brings`. A walk from an
+  environment gives them as `live` links (at: since) and `next` links (at: the start),
+  source `computed`. A live deploy with less than all the traffic has the label
+  `share:<per cent>`, and a succeeded deploy is `replaced` when it is live nowhere. The
+  live version of the target before it in a path comes with promotion order.
 - **Old nodes:** before #5241, a `deploy` node was an artifact (`testflight:deploy:…#812`),
   `part-of` a `target`, and a release was `deployed-as` it. Nothing makes those now. They
   are read until they age out of the store's bounds.

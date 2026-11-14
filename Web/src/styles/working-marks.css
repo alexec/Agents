@@ -1,0 +1,55 @@
+/* The loading spinner on all three clients (#1606): a circle-notch, a ring with a fifth of it open,
+   turning once a second as SpinnerClock does. --notch is its colour, --notch-width the ring's. */
+.spinner {
+  background: conic-gradient(var(--notch, var(--paper-ink)) 0 80%, transparent 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), var(--paper-ink) calc(100% - var(--notch-width, 2px)));
+  mask: radial-gradient(farthest-side, transparent calc(100% - var(--notch-width, 2px) - 0.5px), var(--paper-ink) calc(100% - var(--notch-width, 2px)));
+  /* Nothing for 300 ms, then the spinner (#4795): a wait shorter than that, as most are, shows no flash of one. */
+  opacity: 0;
+  animation: spin 1s linear infinite, spinner-shown 0s linear 300ms forwards;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spinner-shown { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 3s, 0s; } }
+/* A working session's mark on all three clients (#2044, #2332), as WorkingRing: three dots on a ring
+   seen edge on that spins once in 1.8 s while it thinks or replies, and also pivots ±30° once in
+   3.6 s while it runs a tool. The keyframes (ring-think-*, ring-do-*) come from spinnerClock.ts,
+   which keeps every ring on the page in step. In the colour around it. Under Reduce Motion it
+   keeps going, twice as slow, as SpinnerClock.reducedMotionSlowing says. */
+.working-ring { --well: 12px; --ring-period: 3.6s; position: relative; display: inline-block; width: var(--well);
+  height: var(--well); vertical-align: middle; }
+.working-ring i { position: absolute; left: 50%; top: 50%; width: calc(var(--well) * 0.24);
+  height: calc(var(--well) * 0.24); margin: calc(var(--well) * -0.12); border-radius: 50%; background: currentColor;
+  animation-duration: var(--ring-period); animation-timing-function: linear; animation-iteration-count: infinite; }
+.working-ring i:nth-child(1) { animation-name: ring-think-0; }
+.working-ring i:nth-child(2) { animation-name: ring-think-1; }
+.working-ring i:nth-child(3) { animation-name: ring-think-2; }
+.working-ring.doing i:nth-child(1) { animation-name: ring-do-0; }
+.working-ring.doing i:nth-child(2) { animation-name: ring-do-1; }
+.working-ring.doing i:nth-child(3) { animation-name: ring-do-2; }
+@media (prefers-reduced-motion: reduce) { .working-ring { --ring-period: 7.2s; } }
+/* The beacon (#2657), as `dot.radiowaves.left.and.right`: a filled dot, and arcs stroked in the colour around it. */
+.beacon { display: block; width: 100%; height: 100%; overflow: visible; }
+.beacon circle { fill: currentColor; }
+.beacon path, .beacon rect, .beacon circle.ring { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round;
+  stroke-linejoin: round; }
+/* A waiting session's mark on all three clients (#2456, #2657), as WaitingBeacon: the waiting card's beacon,
+   breathing between 0.3 and full once in 4 s. The keyframes (breathe) and --breath-period come from
+   spinnerClock.ts, which keeps every beacon on the page in step and reads `waitingMarkPeriod` from
+   localStorage; Reduce Motion doubles the period there. In the colour around it. */
+.waiting-beacon { --well: 12px; --breath-period: 4s; display: inline-block; width: var(--well);
+  height: var(--well); vertical-align: middle; opacity: 0.3; animation: breathe var(--breath-period) linear infinite; }
+/* At the chat's foot only: .working is also the sidebar mark's and the status mark's class. */
+p.working .working-ring { --well: 16px; opacity: 0.6; }
+.jump {
+  position: relative;
+  align-self: center;
+  margin: -40px auto 8px;
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  box-shadow: var(--shadow-floating);
+}
+.chat .detail { font: inherit; font-size: 0.75rem; background: none; border: 1px solid var(--paper-rule); border-radius: var(--radius-control); }
+

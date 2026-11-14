@@ -1,0 +1,102 @@
+/* A feature with no use in 90 days (#2165), as the window's orange mark. */
+.report-unused { color: var(--tint-warning); }
+/* The Console's pages draw Settings' sections (People, Groups): Settings' rows, as sidebar.css has them under .with-sidebar. */
+.sub-app .settings-body > section { margin-bottom: 12px; }
+.sub-app .settings-body .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  max-width: 420px; padding: 6px 8px; border-bottom: 1px solid var(--paper-rule); }
+.sub-app .settings-body select { font: inherit; color: inherit; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-control); }
+.sub-app .settings-body .hint { max-width: 420px; font-size: 0.75rem; line-height: 1.45; }
+.sub-app .settings-body .join-requests { max-width: 420px; }
+.sub-app .settings-body .people-list { list-style: none; margin: 0 0 8px; padding: 0; max-width: 420px; }
+.sub-app .settings-body .person .badge { margin-left: 6px; padding: 0 6px; font-size: 0.6875rem; border-radius: 8px;
+  border: 1px solid var(--paper-rule); opacity: 0.75; }
+.sub-app .settings-body .person-things { display: flex; flex-direction: column; gap: 2px; padding: 4px 8px 8px; }
+/* What an org provider controls (#1002, FR-028), in grey under the name. */
+.sub-app .settings-body .person-org { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0 8px; }
+.sub-app .settings-body button.invite { margin: 4px 8px; }
+.sub-app .settings-body .hint.attention { color: var(--tint-attention); }
+.sub-app .settings-body .hint.warning { color: var(--tint-warning); }
+/* A secret's last 4 and its not-backed-up line (#4159). */
+.secret-hint { margin-inline-start: 6px; }
+.secret-warning { color: var(--tint-warning); }
+/* Settings ▸ You ▸ Accounts ▸ Details… (#5116): each field, its value, and its Copy (or Reveal) at the end. */
+dialog.sheet:has(.account-details) { width: min(600px, calc(100vw - 32px)); max-height: calc(100vh - 64px); }
+.account-details hr { border: none; border-top: 1px solid var(--paper-rule); width: 100%; margin: 0; }
+.details { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; gap: 6px 12px; margin: 0; align-items: baseline; }
+.detail-row { display: contents; }
+.detail-row dt { color: var(--paper-secondary); }
+.detail-row dd { margin: 0; overflow-wrap: anywhere; }
+.detail-part dt { padding-inline-start: 12px; }
+.detail-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.detail-value { margin: 0; overflow-wrap: anywhere; word-break: break-all; }
+/* A value shown, its line and a problem take the whole row of the grid. */
+.details > p { grid-column: 1 / -1; margin: 0; }
+/* A revealed value can not be selected: Copy is the only way, so each copy is audited (#5112). */
+.no-select { user-select: none; -webkit-user-select: none; }
+/* A secret's value shown (#5115): in a well, wraps at any character, and can not be selected, so Copy is the only way
+   to copy it and each copy is in the audit log. */
+.secret-shown { display: block; margin: 4px 0; padding: 6px 8px; background: var(--paper-well); border-radius: var(--radius-control);
+  font-family: var(--font-mono); font-size: 0.75rem; overflow-wrap: anywhere; user-select: none; -webkit-user-select: none; }
+.secret-shown .card-part { display: flex; align-items: center; gap: 8px; }
+.secret-shown .card-part .part-label { min-width: 96px; font-family: var(--font-text); opacity: 0.7; }
+.secret-shown .card-part .part-value { flex: 1; }
+.sub-app .settings-body .hint.vouched { color: var(--tint-vouched); }
+.sub-app .settings-body .join-command { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.sub-app .settings-body .join-command-line { display: flex; align-items: flex-start; gap: 6px; }
+.sub-app .settings-body .join-command .code-text { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: 0.6875rem;
+  padding: 4px 6px; border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground);
+  user-select: all; overflow-wrap: anywhere; }
+.sub-app .settings-body .settings-scope { margin-bottom: 20px; }
+.sub-app .settings-body .scope-head { font-size: 0.875rem; font-weight: 600; margin: 8px 8px 4px; }
+.sub-app-row { display: flex; justify-content: space-between; align-items: center; }
+/* A machine's need under its row (#3764), and Status ▸ Runtimes' low allowance (#3956), as the window's grey line. */
+.sub-app-row .attention { color: var(--tint-attention); }
+.machine-need, .page-need { padding: 0 20px 6px; margin-top: -6px; font-size: 0.75rem; line-height: 1.35; }
+.machine-need .foot-start { margin-left: 6px; font-size: inherit; }
+/* A machine the control plane gave up waiting for (#4610): its reason in red, as the window's. */
+.machine-need.failure { color: var(--tint-failure); }
+/* A machine's row (#3974), as the window's MachineRow: the icon, ··· on hover, and a swipe on a touch screen. */
+.machine-row { position: relative; overflow: hidden; touch-action: pan-y; }
+.machine-row-body { position: relative; background: var(--paper-sidebar); transition: transform 0.15s ease-out; }
+.machine-row.swiping .machine-row-body { transition: none; }
+.machine-row .sub-app-row { width: 100%; }
+/* A machine that never joined is a button: a click joins it (#4978). */
+.machine-row .machine-join { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left;
+  cursor: pointer; }
+.machine-row.joinable:not(.not-joined) .machine-name { opacity: 0.7; }
+.machine-name { display: inline-flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Its icon (#4113): the kind in its shape, the state in its colour, as the window's MachineIconView. */
+.machine-icon { flex: none; color: var(--accent); }
+.machine-icon.busy { color: var(--tint-attention); animation: machine-pulse 1.2s ease-in-out infinite alternate; }
+.machine-icon.attention { color: var(--tint-attention); }
+.machine-icon.failure { color: var(--tint-failure); }
+.machine-icon.stopped { color: inherit; opacity: 0.5; }
+@keyframes machine-pulse { to { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .machine-icon.busy { animation: none; } }
+.machine-more { position: absolute; right: 6px; top: 4px; border: 0; background: var(--paper-wash); border-radius: var(--radius-control);
+  padding: 0 6px; font: inherit; color: inherit; cursor: pointer; opacity: 0; }
+.machine-row:hover .machine-more, .machine-more:focus-visible { opacity: 1; }
+@media (hover: none) { .machine-more { display: none; } }
+.machine-swipe { position: absolute; inset: 0; display: flex; align-items: center; padding: 0 14px; font-size: 0.8125rem; font-weight: 600; color: var(--paper-on-fill);
+  background: var(--tint-vouched); }
+.machine-swipe.trailing { justify-content: flex-end; }
+.machine-swipe.stop, .machine-swipe.remove { background: var(--paper-rule); color: inherit; }
+.machine-swipe.delete { background: var(--tint-failure); }
+/* + New Machine, the Machines group's last row (#5265): the mark in the accent, as the Remote's. */
+.new-machine-row .new-mark { color: var(--accent); }
+.team-workflows { display: flex; flex-direction: column; gap: 12px; max-width: 720px; }
+.bot-card { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); padding: 10px 12px; background: var(--paper-raised); }
+.bot-card h3 { margin: 0 0 2px; font-size: 0.875rem; }
+.requests { display: flex; flex-direction: column; gap: 8px; max-width: 560px; }
+.request-list { list-style: none; margin: 0; padding: 0; }
+.request { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 8px; border-bottom: 1px solid var(--paper-rule); }
+.request-actions { display: inline-flex; gap: 6px; flex: none; }
+.request-actions .prominent { background: var(--paper-raised); color: var(--accent); border-color: var(--accent); }
+/* Raise for Today's amount (#3262): a short field with its unit before it. */
+.request-actions label.amount { display: inline-flex; align-items: center; gap: 4px; }
+.request-actions label.amount input { width: 7em; }
+.report-policy { display: flex; flex-direction: column; gap: 4px; max-width: 436px; }
+.report-policy .budget-field { display: inline-flex; gap: 4px; align-items: center; }
+.report-policy .budget-field input { width: 7em; text-align: right; }
+.report-policy .sheet-actions { display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+

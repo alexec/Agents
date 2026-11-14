@@ -90,7 +90,7 @@ client offers every feature, and a call that the host does not know fails as it 
 
 ## Where the names come from
 
-The schema owns the names. Each method and notification in `Packages/Wire/*.openrpc.json` has
+The schema owns the names. Each method and notification in `Packages/Wire/*.openrpc.json` and `Packages/Wire/daemon/*.openrpc.json` has
 `x-capability`, and `scripts/wire.sh gen` makes the constants for Go, Swift and TypeScript
 (`Go/wire/capabilities_gen.go`, `Capabilities.generated.swift`,
 `Web/src/protocol/capabilities.generated.ts`). The generator refuses a method without one.

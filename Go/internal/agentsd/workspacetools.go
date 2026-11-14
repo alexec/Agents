@@ -57,6 +57,15 @@ func (d *Daemon) controlHas(capability string) bool {
 	return list != nil && wire.Has((*list)(), capability)
 }
 
+// ControlCapabilitiesKnown is told when the control plane said what it can do on a new link
+// (#5410). That answer comes after the link is up, so the sends that ControlUplinkChanged
+// starts found no capability yet: those that need one go again now.
+func (d *Daemon) ControlCapabilitiesKnown() {
+	d.sendBusSubscriptions(true)
+	d.sendLineage()
+	d.sendCITimings()
+}
+
 // askWorkspaces is one machine/machines call for an agent, named for the control plane's log.
 func (d *Daemon) askWorkspaces(agent wire.UUID, method string, params any) (json.RawMessage, error) {
 	return d.askWorkspacesCtx(d.ctx, agent, method, params)

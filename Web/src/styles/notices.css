@@ -1,0 +1,50 @@
+/* Messages (docs/reference/design-system.md, "Messages"; #4740). The tint is on the icon only: the words
+   are ink, on the well (a banner) or raised (a toast). A message never pushes what the person reads. */
+.message-icon { flex: none; width: 1.1em; text-align: center; font-weight: 600; }
+.message-icon.tone-attention { color: var(--tint-attention); }
+.message-icon.tone-warning { color: var(--tint-warning); }
+.message-icon.tone-failure { color: var(--tint-failure); }
+.message-icon.tone-success { color: var(--tint-vouched); }
+.message-icon.tone-neutral { color: var(--paper-secondary); }
+.message-icon.spinner { width: 8px; height: 8px; }
+.message-words { flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
+/* How old what is shown is (#5141): after a banner's words in its own colour; on its own, ink.secondary at the caption step. */
+.last-update { white-space: nowrap; }
+:not(.message-words) > .last-update { color: var(--paper-secondary); font-size: var(--type-fine); }
+/* At the top of a pane with no banner (#5144), at its trailing end. */
+.page-fresh { margin: 0 0 8px; text-align: end; }
+.multiplier-page > .page-fresh { align-self: stretch; margin: 0; }
+/* A section's heading with the line at its trailing end (#5146). */
+.section-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.section-head-row > .last-update { margin-right: 8px; }
+.message-actions { flex: none; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* A banner: inset at the top of its pane, under the toolbar; it comes and goes with a short animation. */
+.message-banner { display: flex; align-items: center; gap: 8px; margin: 8px 12px; padding: 7px 12px; font-size: 0.8125rem;
+  color: var(--paper-ink); background: var(--paper-raised); border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-card); animation: message-in 150ms ease-out; }
+/* Paper v2 (#4993): a tinted notice has a line in its colour and a 3px bar, as PaneBanner (#4999). */
+.message-banner.tone-attention { border-color: var(--line-attention); box-shadow: inset 3px 0 0 var(--tint-attention); }
+.message-banner.tone-warning { border-color: var(--line-warning); box-shadow: inset 3px 0 0 var(--tint-warning); }
+.message-banner.tone-failure { border-color: var(--line-failure); box-shadow: inset 3px 0 0 var(--tint-failure); }
+.message-banner.tone-success { border-color: var(--line-vouched); box-shadow: inset 3px 0 0 var(--tint-vouched); }
+.message-toast.tone-success .message-icon { color: var(--tint-vouched); }
+@keyframes message-in { from { opacity: 0; transform: translateY(-4px); } }
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
+/* The one toast: fixed at the bottom centre of the viewport, above the prompt bar. */
+.toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; width: max-content;
+  max-width: min(560px, calc(100vw - 32px)); pointer-events: none; }
+.message-toast { display: flex; align-items: center; gap: 10px; padding: 9px 12px 9px 14px; font-size: 0.8125rem;
+  color: var(--paper-ink); background: var(--paper-raised); border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-floating); box-shadow: var(--shadow-floating); pointer-events: auto;
+  animation: toast-in 150ms ease-out; }
+.message-toast button.link { flex: none; }
+.message-close { flex: none; border: none; background: none; color: var(--paper-secondary); padding: 0 2px; font: inherit; cursor: pointer; }
+.message-close:hover { color: var(--paper-ink); }
+@media (prefers-reduced-motion: reduce) { .message-banner, .message-toast { animation: none; } }
+/* An alert: a choice that blocks the work, in place of window.confirm. */
+dialog.message-alert { width: min(420px, calc(100vw - 32px)); }
+.message-alert h2 { margin: 0 0 6px; }
+.message-alert-detail { margin: 0; white-space: pre-line; color: var(--paper-secondary); }
+.message-alert .sheet-actions { margin-top: 16px; }
+.message-alert button.destructive { color: var(--tint-failure); }
+

@@ -1,0 +1,1 @@
+| Turn detail Outcome/Steps/Details; concise turns; trailing reply | 069, concise turns | has | has | `before-chat-outcome.png`, `before-chat-steps.png` | `window/sessions.png` | Prompt, "▸ 7 steps", the reply, then the report. Since #148, "7 steps" with no chevron, and the turn in the window's serif (below). |
