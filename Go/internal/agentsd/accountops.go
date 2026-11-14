@@ -20,7 +20,7 @@ import (
 // account.read (a get, or a list filtered to the account's service) or account.changed (an add
 // that is new, or that took another's place), and tells the control plane, which writes an audit
 // entry for each. A list with no service reads no account. This machine keeps each account's last
-// operation, and the last read of each secret, so an account's lastOp is the newest of its own and
+// operation (none for a removed one, #5253), and the last read of each secret, so an account's lastOp is the newest of its own and
 // a secret.read of the secret or card it names.
 
 // accountOpsMost is how many accounts, and how many secrets, the record keeps: the oldest go first.
@@ -128,7 +128,13 @@ func (d *Daemon) noteAccountOps(agent wire.UUID, ops []wire.AccountOperation) {
 	d.accountOps.mu.Lock()
 	rec := d.accountOpsLocked()
 	for _, op := range ops {
-		rec.Accounts[accountOpKey(op.Service, op.Address)] = wire.AccountLastOp{What: op.What, At: at, Agent: op.Agent}
+		key := accountOpKey(op.Service, op.Address)
+		if op.What == wire.AccountOperationWhatRemoved {
+			// A removed account has no last operation (#5253): one added again starts afresh.
+			delete(rec.Accounts, key)
+			continue
+		}
+		rec.Accounts[key] = wire.AccountLastOp{What: op.What, At: at, Agent: op.Agent}
 	}
 	d.saveAccountOpsLocked()
 	d.accountOps.mu.Unlock()
@@ -142,8 +148,11 @@ func (d *Daemon) noteAccountOps(agent wire.UUID, ops []wire.AccountOperation) {
 		if op.What != wire.AccountOperationWhatRead {
 			name, details["change"] = "account.changed", string(op.What)
 			sentence = who + " added the " + op.Service + " account."
-			if op.What == wire.AccountOperationWhatEdited {
+			switch op.What {
+			case wire.AccountOperationWhatEdited:
 				sentence = who + " changed the " + op.Service + " account."
+			case wire.AccountOperationWhatRemoved:
+				sentence = who + " removed the " + op.Service + " account."
 			}
 		}
 		d.raise(wire.EventDraft{Name: name, At: at, Scope: macScope(), Sentence: sentence, Details: details})

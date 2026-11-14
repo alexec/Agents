@@ -133,6 +133,15 @@ export interface ACPProviderInfo {
   configured?: boolean;
 }
 
+/**
+ * An outside account by what tells it from the others (#5253): its service and address, as the
+ * control plane matches them, case aside.
+ */
+export interface AccountKey {
+  service: string;
+  address?: string;
+}
+
 /** An account's newest operation (#4157), for the time ago its row shows. */
 export interface AccountLastOp {
   what: AccountOperationWhat;
@@ -158,12 +167,14 @@ export interface AccountOperation {
 
 /**
  * What an operation on an account was (#4157): read (by manage_accounts, or a read of its secret or
- * card), added, or edited (it took another's place).
+ * card), added, edited (it took another's place), or removed (#5253). An account's lastOp is never
+ * removed: a removed account has none.
  */
 export type AccountOperationWhat =
   | "read"
   | "added"
-  | "edited";
+  | "edited"
+  | "removed";
 
 /**
  * An account added to a runtime (#840), beside the runtime's own sign-in, which is the Default
@@ -7491,7 +7502,7 @@ export interface MacTerminalRequest {
 
 /**
  * machine/accounts (#3967), for an agent on a machine: its person's outside accounts, after add is
- * added (one with the same service and address goes in its place).
+ * added (one with the same service and address goes in its place) and remove is taken out (#5253).
  */
 export interface MachineAccountsCall {
   add?: OutsideAccount[];
@@ -7500,6 +7511,11 @@ export interface MachineAccountsCall {
    * each.
    */
   ops?: AccountOperation[];
+  /**
+   * The accounts to take out, by service and address (#5253), after add. Needs machine.accounts/2:
+   * an older control plane does not know it.
+   */
+  remove?: AccountKey[];
 }
 
 /** machines/announce, on an enrolment connection. */
@@ -9138,6 +9154,13 @@ export interface OutsideAccount {
   notes?: string;
   /** The projects that use it, by name. Absent or empty: all of them. */
   projects?: string[];
+  /**
+   * The session whose manage_accounts add made it (#5253): an agent may remove such an account with
+   * no card; one with none is the person's, and its removal asks them. The control plane keeps it
+   * from the add that made it, and keeps it through a change by an agent or a client. Absent for
+   * one a person added, or one made before it.
+   */
+  addedBy?: UUID;
   /**
    * Ask before use (#4163): an agent's manage_accounts get of it waits on a person's approval, as a
    * secret's use does (#4015). Absent is on, also for an account an agent adds; false is off, which
@@ -16175,6 +16198,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   ACPAuthMethod: { required: ["id"], optional: ["name", "description", "_meta"] },
   ACPPromptCapabilities: { required: [], optional: ["image", "audio", "embeddedContext"] },
   ACPProviderInfo: { required: ["id"], optional: ["name", "protocol", "configured"] },
+  AccountKey: { required: ["service"], optional: ["address"] },
   AccountLastOp: { required: ["what", "at"], optional: ["agent"] },
   AccountOperation: { required: ["what", "service"], optional: ["address", "agent"] },
   AccountProfile: { required: ["id", "runtimeID", "name", "reach", "addedAt", "signedIn"], optional: ["signedInAs", "signInCommand", "source", "isDefault", "setBy"] },
@@ -16746,7 +16770,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MCPViewsForgetRequest: { required: ["destination", "name"], optional: [] },
   MacPathRequest: { required: ["path"], optional: ["app"] },
   MacTerminalRequest: { required: [], optional: ["path"] },
-  MachineAccountsCall: { required: [], optional: ["add", "ops"] },
+  MachineAccountsCall: { required: [], optional: ["add", "ops", "remove"] },
   MachineAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["implementation"] },
   MachineBotKey: { required: ["host"], optional: ["copy", "drop"] },
   MachineCatalog: { required: ["items"], optional: [] },
@@ -16866,7 +16890,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   OrgRoutesApplied: { required: ["routes"], optional: [] },
   OrgRoutesLeft: { required: ["host", "name", "user", "routes"], optional: [] },
   OrgRoutesMine: { required: ["routes"], optional: [] },
-  OutsideAccount: { required: ["service"], optional: ["description", "address", "username", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "edited", "lastOp", "tokenExpires", "notes", "projects", "askBeforeUse"] },
+  OutsideAccount: { required: ["service"], optional: ["description", "address", "username", "plan", "monthlyCostUsd", "card", "secret", "twoFactor", "issue", "made", "edited", "lastOp", "tokenExpires", "notes", "projects", "addedBy", "askBeforeUse"] },
   OutsideAccounts: { required: ["accounts"], optional: [] },
   PagesChangedNotification: { required: ["folder", "folders"], optional: [] },
   PassThroughName: { required: ["name"], optional: ["runtime", "setBy"] },

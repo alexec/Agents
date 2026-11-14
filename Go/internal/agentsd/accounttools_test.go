@@ -555,3 +555,118 @@ func TestAskAccountsNeedsTheCapability(t *testing.T) {
 		t.Fatal(listed, err, asked)
 	}
 }
+
+// #5253: remove takes an account an agent added out at once; one the person added waits for
+// their Remove on a card, and a Don’t keeps it. An old control plane is told to update.
+func TestRemovingAnAccountAsksForThePersons(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	title := "tidy"
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) {
+		a.State, a.EndedReason, a.RuntimeID, a.Title = wire.AgentStateRunning, nil, "claude", &title
+	})
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	agent := wire.UUID("0e3d0a52-6c0c-4a4e-9a51-9a0c4c4c4c4c")
+	var mu sync.Mutex
+	accounts := []wire.OutsideAccount{
+		{Service: "gitlab.com", Address: new("old@example.com"), Description: new("The agents' old GitLab"), AddedBy: &agent},
+		{Service: "aws.amazon.com", Address: new("old@example.com"), Description: new("Alex's AWS root")},
+		{Service: "slack.com", Address: new("new@example.com"), Description: new("Kept")},
+	}
+	var ops []wire.AccountOperation
+	caps := []string{wire.CapMachineAccounts1}
+	d.SetControlCapabilities(func() []string { mu.Lock(); defer mu.Unlock(); return caps })
+	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
+		if method == wire.CallUserSetPolicy.Name {
+			return json.RawMessage(`{}`), nil
+		}
+		call := params.(wire.MachineAccountsCall)
+		mu.Lock()
+		defer mu.Unlock()
+		ops = append(ops, call.Ops...)
+		for _, k := range call.Remove {
+			accounts = slices.DeleteFunc(accounts, func(h wire.OutsideAccount) bool {
+				return h.Service == k.Service && deref(h.Address) == deref(k.Address)
+			})
+		}
+		return json.Marshal(wire.OutsideAccounts{Accounts: accounts})
+	})
+	l := d.live(a.ID)
+	l.mu.Lock()
+	l.inTurn = true
+	l.mu.Unlock()
+	gitlab, aws := accountID(accounts[0]), accountID(accounts[1])
+	services := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		var out []string
+		for _, h := range accounts {
+			out = append(out, h.Service)
+		}
+		return out
+	}
+
+	if text, isErr := m.tool(2, "manage_accounts", map[string]any{"action": "remove", "ids": []string{gitlab}}); !isErr || !strings.Contains(text, "needs an update") {
+		t.Fatal(text)
+	}
+	mu.Lock()
+	caps = []string{wire.CapMachineAccounts1, wire.CapMachineAccounts2}
+	mu.Unlock()
+	if text, isErr := m.tool(3, "manage_accounts", map[string]any{"action": "remove", "ids": []string{"ffffffff"}}); !isErr || !strings.Contains(text, "no account with the id ffffffff") {
+		t.Fatal(text)
+	}
+	if text, _ := m.tool(4, "manage_accounts", map[string]any{"action": "remove", "id": gitlab}); !strings.HasPrefix(text, "Removed 1. 2 accounts") {
+		t.Fatal(text)
+	}
+	mu.Lock()
+	if len(ops) != 1 || ops[0].What != wire.AccountOperationWhatRemoved || ops[0].Service != "gitlab.com" || ops[0].Agent == nil || *ops[0].Agent != a.ID {
+		t.Fatalf("%+v", ops)
+	}
+	mu.Unlock()
+
+	for i, answer := range []string{"no", "yes"} {
+		answered := make(chan string, 1)
+		go func() {
+			text, _ := m.tool(5+i, "manage_accounts", map[string]any{"action": "remove", "ids": []string{aws}})
+			answered <- text
+		}()
+		var pending []wire.ElicitationRequest
+		waitFor(t, "the card", func() bool {
+			json.Unmarshal(c.call(t, 10+2*i, "elicitations/pending", nil), &pending)
+			return len(pending) == 1
+		})
+		if f := pending[0].Mode.Form.Value; *pending[0].Message != "Claude (tidy) wants to remove an account" ||
+			*f.Properties[0].Title != "Remove this account from Settings ▸ You ▸ Accounts? The account on the service stays; only its record goes.\n\n- aws.amazon.com (old@example.com): Alex's AWS root" {
+			t.Fatalf("%+v", pending[0])
+		}
+		c.call(t, 11+2*i, "elicitations/answer", map[string]any{"requestID": pending[0].ID, "action": "accept", "content": map[string]any{"go": answer}})
+		text := <-answered
+		if answer == "no" && (text != "Removed none: the person did not say Remove." || len(services()) != 2) {
+			t.Fatal(text, services())
+		}
+		if answer == "yes" && (!strings.HasPrefix(text, "Removed 1. 1 accounts") || !slices.Equal(services(), []string{"slack.com"})) {
+			t.Fatal(text, services())
+		}
+	}
+}
+
+// #5253: an agent's add says it added the account, so that an agent may remove it later.
+func TestAnAddSaysWhichAgentAddedIt(t *testing.T) {
+	d, _ := start(t, t.TempDir())
+	defer d.Shutdown()
+	a := seeded(t, d, t.TempDir(), func(a *wire.Agent) { a.State, a.EndedReason, a.RuntimeID = wire.AgentStateRunning, nil, "claude" })
+	m := appClient(t, d, a.ID)
+	m.post("initialize", map[string]any{}, 1)
+	var sent []wire.OutsideAccount
+	d.SetControlCapabilities(func() []string { return []string{wire.CapMachineAccounts1} })
+	d.SetControlAsk(func(_ context.Context, _ string, params any) (json.RawMessage, error) {
+		sent = append(sent, params.(wire.MachineAccountsCall).Add...)
+		return json.Marshal(wire.OutsideAccounts{Accounts: sent})
+	})
+	other := wire.UUID("someone-else")
+	if _, isErr := m.tool(2, "manage_accounts", map[string]any{"action": "add",
+		"account": map[string]any{"service": "gitlab.com", "description": "CI", "addedBy": other}}); isErr || len(sent) != 1 || sent[0].AddedBy == nil || *sent[0].AddedBy != a.ID {
+		t.Fatalf("%+v", sent)
+	}
+}

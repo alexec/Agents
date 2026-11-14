@@ -61,6 +61,22 @@
       ],
       "additionalProperties": false
     },
+    "AccountKey": {
+      "type": "object",
+      "description": "An outside account by what tells it from the others (#5253): its service and address, as the control plane matches them, case aside.",
+      "properties": {
+        "service": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "service"
+      ],
+      "additionalProperties": false
+    },
     "AccountLastOp": {
       "type": "object",
       "description": "An account's newest operation (#4157), for the time ago its row shows.",
@@ -111,9 +127,10 @@
       "enum": [
         "read",
         "added",
-        "edited"
+        "edited",
+        "removed"
       ],
-      "description": "What an operation on an account was (#4157): read (by manage_accounts, or a read of its secret or card), added, or edited (it took another's place)."
+      "description": "What an operation on an account was (#4157): read (by manage_accounts, or a read of its secret or card), added, edited (it took another's place), or removed (#5253). An account's lastOp is never removed: a removed account has none."
     },
     "AccountProfile": {
       "description": "An account added to a runtime (#840), beside the runtime's own sign-in, which is the Default account and is not one of these. The person picks one when they start a session.",
@@ -17803,7 +17820,7 @@
     },
     "MachineAccountsCall": {
       "type": "object",
-      "description": "machine/accounts (#3967), for an agent on a machine: its person's outside accounts, after add is added (one with the same service and address goes in its place).",
+      "description": "machine/accounts (#3967), for an agent on a machine: its person's outside accounts, after add is added (one with the same service and address goes in its place) and remove is taken out (#5253).",
       "properties": {
         "add": {
           "type": "array",
@@ -17817,6 +17834,13 @@
             "$ref": "#/definitions/AccountOperation"
           },
           "description": "What manage_accounts did to the accounts (#4157): the control plane writes an audit entry for each."
+        },
+        "remove": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AccountKey"
+          },
+          "description": "The accounts to take out, by service and address (#5253), after add. Needs machine.accounts/2: an older control plane does not know it."
         }
       },
       "additionalProperties": false
@@ -21201,6 +21225,10 @@
             "type": "string"
           },
           "description": "The projects that use it, by name. Absent or empty: all of them."
+        },
+        "addedBy": {
+          "$ref": "#/definitions/UUID",
+          "description": "The session whose manage_accounts add made it (#5253): an agent may remove such an account with no card; one with none is the person's, and its removal asks them. The control plane keeps it from the add that made it, and keeps it through a change by an agent or a client. Absent for one a person added, or one made before it."
         },
         "askBeforeUse": {
           "type": "boolean",
