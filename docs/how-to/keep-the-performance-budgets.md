@@ -41,8 +41,10 @@ transcript of 100,000 entries, a repository of 40,000 files), launches a scratch
 and measures against the `night` budgets:
 
 - the host's answers, with `scripts/perf-budgets.py`;
-- the Mac window's cold start, first list, project switch and chat open, with
-  `scripts/perf-window.sh`;
+- the Mac window's cold start, first list and chat open (sessions in two folders, so some
+  opens change the folder too; the separate project switch figure was retired, #5427), with
+  `scripts/perf-window.sh`, which opens the sidebar's rows through the window's walk socket
+  (#1172), so a locked screen does not stop it (#5427);
 - the web page's first list, session open, long transcript, send to echo and Work list,
   second open, from the page's own `performance` marks (`agents:first-list`,
   `agents:session-open`, `agents:send` to `agents:echo`, `agents:work-list-read` to
