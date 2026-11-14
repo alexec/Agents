@@ -688,6 +688,20 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, fail(noSuchHost, "No machine is called %s.", host)
 		}
 		return m.s.copies.lastHeard(host), nil
+	case "machines/versions":
+		// The Agents versions it ran (#5272), for its page (#5273).
+		request, err := require[wire.MachineRequest](params, "MachineRequest")
+		if err != nil {
+			return nil, err
+		}
+		host, err := m.ownHostNamed(from, string(request.Host))
+		if err != nil {
+			return nil, err
+		}
+		if m.records.Host(host) == nil || !m.owns(from, host) {
+			return nil, fail(noSuchHost, "No machine is called %s.", host)
+		}
+		return m.s.machineVersions(ctx, host)
 	}
 	if workspaceMethods[method] {
 		if m.s.providers == nil {
@@ -812,6 +826,8 @@ func (m *Methods) removeHost(ctx context.Context, host string, from Caller) (boo
 	_ = m.s.cfg.Store.Delete(ctx, governanceHostKey(host))
 	// Its folders, which no list shows again (#3125); the sweep deletes one this misses.
 	_ = m.s.cfg.Store.Delete(ctx, projectFoldersKey(host))
+	// Its Agents versions (#5272).
+	_ = m.s.cfg.Store.Delete(ctx, machineVersionsKey(host))
 	if m.s.providers != nil && m.s.providers.Kept() != nil {
 		m.s.providers.Kept().Forget(host)
 	}
@@ -1471,6 +1487,11 @@ func (m *Methods) hello(ctx context.Context, host string, hello wire.MachineHell
 		return err
 	}
 	m.noteCapabilities(host, hello.Capabilities, hello.Version)
+	// A new version is an observed deploy (#5272); a store that does not take it costs the
+	// hello nothing.
+	if err := m.s.noteVersion(ctx, host, hello.Version, time.Now()); err != nil {
+		m.s.log("could not keep " + host + "'s version: " + err.Error())
+	}
 	if changed {
 		m.router.BroadcastHost(host, "control/hostChanged", m.router.Described(host))
 	}

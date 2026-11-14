@@ -890,6 +890,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"machines/summaryFacts", "summary.machines/1"},
 	{"machines/unlink", "machines/1"},
 	{"machines/update", "machines/1"},
+	{"machines/versions", "machines/1"},
 	{"multiplier/count", "multiplier/1"},
 	{"notices/take", "notices/1"},
 	{"orgRoutes/check", "org-routes/2"},
