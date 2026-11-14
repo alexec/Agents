@@ -1,0 +1,10 @@
+## Roles (#5290, epic #5288)
+
+A tier says which clients draw a feature. A **role** says who uses it, and the role gives the tier. Alex chose roles on 2026-11-13 (#5206): a new feature gets a role first, and its tier follows from the rule below. Nobody picks a tier by hand.
+
+The roles: **Engineer** directs agents and does the work, on their own machines and folders; **Lead** plans work and sees it done (Work: issues, PRs, epics, Timeline, Releases, Team Workflows, Estimates, Forecast; Velocity and Features); **Admin** manages the estate (People and Groups, Sign-in, Requests, Policy, Model Access, Catalogue, Read API, Audit and Sinks, Backups, Live Now, the fleet's Machines); **Report reader** reads what the organisation used and did (Spend, Outcomes, Time, Adoption, Runtimes, Workflows, Saved Views). The control plane is not a role: it is headless. A role is of the feature, not a permission, and one person can have several.
+
+The surfaces: **Desk** is the Mac window (and the Windows and Linux shells, #4456, #4454); **Hand** is the Remote on iPhone and iPad (and the Android shell, #4466); **Web** is the web page in any browser.
+
+| Role | Cell | Web | Desk (Mac) | Hand (Remote) | Tier |
+|---|---|---|---|---|---|

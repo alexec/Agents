@@ -1,0 +1,1 @@
+| Settings ▸ Control plane: "Couldn't join the control plane: … Trying again…" for this Mac's host (2026-10-02) | #113 | by design | by design | — | — | A Settings row; the page has no Settings. `control/status` carries `thisMacHost` and the page's types have it, unused. |

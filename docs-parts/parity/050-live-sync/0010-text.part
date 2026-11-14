@@ -1,0 +1,7 @@
+## Live sync
+
+#233 asks whether "not in sync" also means one client showing stale state after another acts. From the code:
+- **#238 (fixed):** the Remote sent Mark Read / Unread and prewarm for a server's agent to the Mac; they go to the agent's own host now, and presence already did since #203.
+- **#263:** a server's disk state overwrites the window's.
+- Catch-up and lean changes are #203, #175 and #208; this audit found nothing more there.
+

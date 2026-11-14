@@ -1,0 +1,1 @@
+| Alerts held until their own button closes them | #101 | lacks (a second problem replaced the first) | **has** | — | — | The problem strip stays until its OK; a second waits its turn. Unit-tested. |

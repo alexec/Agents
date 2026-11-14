@@ -1,0 +1,1 @@
+| Org key (Anthropic, OpenAI, xAI) | control plane, machine; Mac, web | built | 2026-10-22, relay against a fake API; Claude, Codex and OpenCode CLIs reach the relay | `Go/internal/controlplane/orgroutes.go`, `Go/internal/agentsd/modelrelay.go` | Alex to test with a real key (#3413) |

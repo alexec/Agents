@@ -1,0 +1,1 @@
+| Sessions column as one list; Archived folds named | sessions column | partly (workflows could not be chosen) | **has** | `before-sessions.png`, `after-workflow-triggering.png` | `window/sessions.png` | "Archived sessions" and "Archived workflows" were already named, and search covered both. A workflow row is now chosen like a session row and opens its page. |

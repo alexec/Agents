@@ -1,0 +1,1 @@
+| Cloudflare DNS for the control plane's names | control plane | tested on a real account | 2026-10-18, `dns.sh` made the A records for control.agentloops.dev and views.agentloops.dev (`specs/058-control-plane/walks/1461.md`) | `deploy/cloudflare/dns.sh` | |

@@ -136,7 +136,7 @@ resolve() {
 is_web_generated() { case $1 in Web/dist/* | Web/src/protocol/generated.ts | Go/wire/*_gen.go) return 0 ;; *) return 1 ;; esac; }
 PARITY=specs/071-web-remote/walks/parity.md
 # Its screens, a file each (#2020), are settled the same way.
-is_parity() { case $1 in "$PARITY" | specs/071-web-remote/walks/parity/*.md) return 0 ;; *) return 1 ;; esac; }
+is_parity() { case $1 in "$PARITY" | specs/071-web-remote/walks/parity/*.md | docs-parts/parity/*) return 0 ;; *) return 1 ;; esac; }
 
 # --- plan -------------------------------------------------------------------------------
 
