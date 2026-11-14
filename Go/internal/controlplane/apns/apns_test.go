@@ -379,7 +379,7 @@ func TestAHeadlineIsCutToItsBudget(t *testing.T) {
 	long := strings.Repeat("ü", 150)
 	h := Truncated(wire.Headline{H1: "  ", H2: long, H3: "ok", Answers: []wire.QuickAnswer{
 		{Kind: wire.QuickAnswerKindReply, ID: "r"}, {Kind: wire.QuickAnswerKindChoice, ID: "allow", Title: long}}})
-	if h.H1 != "Agents" || len([]rune(h.H2)) != Budget || !strings.HasSuffix(h.H2, "…") || h.H3 != "ok" {
+	if h.H1 != "Agent Loops" || len([]rune(h.H2)) != Budget || !strings.HasSuffix(h.H2, "…") || h.H3 != "ok" {
 		t.Fatal(h)
 	}
 	if h.Answers[0].Title != "Reply" || len([]rune(h.Answers[1].Title)) != AnswerBudget {

@@ -173,7 +173,7 @@ func (d *Daemon) registerConnections() {
 	})
 	On(d, wire.CallConnectionsDisconnect, func(ctx context.Context, c *Client, r wire.ConnectionProviderRequest) (wire.ConnectionDisconnectAnswer, error) {
 		if !knownProvider(r.Provider) {
-			return wire.ConnectionDisconnectAnswer{}, invalid("Agents does not connect to " + string(r.Provider) + ".")
+			return wire.ConnectionDisconnectAnswer{}, invalid("Agent Loops does not connect to " + string(r.Provider) + ".")
 		}
 		s, err := d.connectionStore()
 		if err == nil {
@@ -381,7 +381,7 @@ func (d *Daemon) connectionFlowNamed(id wire.UUID) *connectionFlow {
 // clients that hand back the same way: the Mac and the Remote, or one web page's origin.
 func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider, origin, address string) (wire.ConnectionSignIn, error) {
 	if !knownProvider(p) {
-		return wire.ConnectionSignIn{}, invalid("Agents does not connect to " + string(p) + ".")
+		return wire.ConnectionSignIn{}, invalid("Agent Loops does not connect to " + string(p) + ".")
 	}
 	if p == wire.ConnectionProviderEmail {
 		return wire.ConnectionSignIn{}, invalid("Email has no sign-in page: connect it with its IMAP server, user and app password.")
@@ -439,7 +439,7 @@ func (d *Daemon) connectionSignIn(ctx context.Context, p wire.ConnectionProvider
 
 	flow := d.deviceFlow(p)
 	if flow.ClientID == "" {
-		return wire.ConnectionSignIn{}, invalid("This build has no Agents application on " + flow.Name + ": connect with a personal access token.")
+		return wire.ConnectionSignIn{}, invalid("This build has no Agent Loops application on " + flow.Name + ": connect with a personal access token.")
 	}
 	code, err := flow.Start(ctx)
 	if err != nil {
@@ -525,7 +525,7 @@ func (d *Daemon) finishConnection(ctx context.Context, f *connectionFlow, flow *
 func (d *Daemon) startCodeFlow(p wire.ConnectionProvider, origin string, s connections.Store) (wire.ConnectionSignIn, error) {
 	flow := d.codeFlow(p)
 	if flow.ClientID == "" || (p == wire.ConnectionProviderAtlassian && flow.ClientSecret == "") {
-		return wire.ConnectionSignIn{}, invalid("This machine has no Agents app on " + flow.Name + ": connect with an API token, " +
+		return wire.ConnectionSignIn{}, invalid("This machine has no Agent Loops app on " + flow.Name + ": connect with an API token, " +
 			"or set " + connections.AtlassianClientIDName + " and " + connections.AtlassianClientSecretName + " in its secrets.")
 	}
 	pkce, err := connections.NewPKCE(origin)
@@ -649,7 +649,7 @@ func (d *Daemon) connectionSignInToken(ctx context.Context, r wire.ConnectionTok
 		return d.connectionSignInGitHubToken(ctx, r)
 	case wire.ConnectionProviderGitlab:
 	default:
-		return wire.ConnectionTokenAnswer{}, invalid("Agents takes an access token only for GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps and Jira.")
+		return wire.ConnectionTokenAnswer{}, invalid("Agent Loops takes an access token only for GitHub, GitLab, Forgejo, Bitbucket, Azure DevOps and Jira.")
 	}
 	fail := func(why string) (wire.ConnectionTokenAnswer, error) {
 		log.Printf("connections: %s token not taken", r.Provider)
@@ -699,7 +699,7 @@ func (d *Daemon) connectionSignInGitHubToken(ctx context.Context, r wire.Connect
 		return wire.ConnectionTokenAnswer{Error: &why}, nil
 	}
 	if deref(r.URL) != "" {
-		return fail("Agents connects only github.com, not a GitHub Enterprise Server.")
+		return fail("Agent Loops connects only github.com, not a GitHub Enterprise Server.")
 	}
 	token := strings.TrimSpace(r.Token)
 	if token == "" || strings.ContainsAny(token, " \t\r\n") {
@@ -944,7 +944,7 @@ func (d *Daemon) connectionSignInEmail(ctx context.Context, r wire.ConnectionEma
 		return fail("Give the user to sign in as: usually the mail address.")
 	}
 	if password == "" {
-		return fail("Paste the app password you made for Agents.")
+		return fail("Paste the app password you made for Agent Loops.")
 	}
 	address, security, err := emailmcp.ParseServer(r.Server)
 	if err != nil {

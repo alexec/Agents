@@ -162,7 +162,7 @@ func TestQuickAnswersForAForm(t *testing.T) {
 		t.Fatal("a yes or no is not a quick answer")
 	}
 	h := truncating(wire.Headline{H1: " ", H2: "", H3: strings.Repeat("x", 120)})
-	if h.H1 != "Agents" || h.H2 != "An agent" || len([]rune(h.H3)) != 100 || !strings.HasSuffix(h.H3, "…") {
+	if h.H1 != "Agent Loops" || h.H2 != "An agent" || len([]rune(h.H3)) != 100 || !strings.HasSuffix(h.H3, "…") {
 		t.Fatalf("%+v", h)
 	}
 }

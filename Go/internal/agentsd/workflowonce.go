@@ -360,7 +360,7 @@ func alarmPromptWords(fr fireRequest, personZone string, at time.Time) string {
 	}
 	words := "of its one-time alarm, set for " + alarmTimeWords(*fr.dueAt, a, personZone)
 	if late := at.Sub(*fr.dueAt); late >= time.Minute {
-		words += ". It fired " + lateWords(late) + " late, as Agents was off or asleep at that time"
+		words += ". It fired " + lateWords(late) + " late, as Agent Loops was off or asleep at that time"
 	}
 	return words + ". It runs once: the workflow is now archived.)"
 }

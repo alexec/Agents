@@ -512,7 +512,7 @@ type policyFile struct {
 //     ignored), never the person's ~/.grok/config.toml: no image or video generation.
 var toolPolicyFiles = map[string][]policyFile{
 	"grok": {{name: "grok-overlay.toml", variable: "GROK_CONFIG_PATH",
-		contents: "# Written by the Agents app. Do not edit: rebuilt on every launch.\n[features]\nimage_gen = false\nvideo_gen = false\n"}},
+		contents: "# Written by the Agent Loops app. Do not edit: rebuilt on every launch.\n[features]\nimage_gen = false\nvideo_gen = false\n"}},
 }
 
 // grokRemoved is Grok's deny list, a profile's disallowedTools: its scheduler, workflow,
@@ -532,7 +532,7 @@ func sessionMeta(runtimeID string) map[string]any {
 			"EnterWorktree", "ExitWorktree"}}}}
 	case "grok":
 		return map[string]any{"agentProfile": map[string]any{"disallowedTools": grokRemoved, "name": "agents-app",
-			"description": "An agent hosted by the Agents app."}, "rules": grokRules()}
+			"description": "An agent hosted by the Agent Loops app."}, "rules": grokRules()}
 	}
 	return nil
 }

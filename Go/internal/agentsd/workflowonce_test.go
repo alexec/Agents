@@ -177,7 +177,7 @@ func TestAnAgentSetsAnAlarm(t *testing.T) {
 	}
 }
 
-// A time wait that came while Agents was off says how late, and past the grace that it
+// A time wait that came while Agent Loops was off says how late, and past the grace that it
 // passed.
 func TestALateTimeWaitSaysHowLate(t *testing.T) {
 	deadline := wire.DateOf(time.Date(2026, 11, 12, 9, 0, 0, 0, time.Local))
@@ -188,7 +188,7 @@ func TestALateTimeWaitSaysHowLate(t *testing.T) {
 	if s := timedOutWords(w, wire.DateOf(deadline.Time().Add(20*time.Minute))); !strings.Contains(s, "(09:00), 20 minutes late") {
 		t.Fatal(s)
 	}
-	if s := timedOutWords(w, wire.DateOf(deadline.Time().Add(3*time.Hour))); !strings.Contains(s, "passed while Agents was off") || !strings.Contains(s, "3 hours late") {
+	if s := timedOutWords(w, wire.DateOf(deadline.Time().Add(3*time.Hour))); !strings.Contains(s, "passed while Agent Loops was off") || !strings.Contains(s, "3 hours late") {
 		t.Fatal(s)
 	}
 }

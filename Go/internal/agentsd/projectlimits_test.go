@@ -63,7 +63,7 @@ func TestHelperLimitsCountAcrossTheProject(t *testing.T) {
 	d.SetControlAsk(func(_ context.Context, _ string, params any) (json.RawMessage, error) {
 		call, _ := params.(wire.MachineWorkspaceCall)
 		if call.Method != "machines/projectSessions" {
-			return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
+			return nil, &controllink.AskError{Code: -32010, Message: "Agent Loops can’t ask that of the control plane."}
 		}
 		mu.Lock()
 		defer mu.Unlock()

@@ -251,7 +251,7 @@ func (d *Daemon) makeMachine(agent wire.UUID, args map[string]json.RawMessage) (
 		if made.Joining {
 			return "Made " + made.Workspace.Name + ". It joins as the host " + made.Workspace.Name + " on its first boot: wait for server.online.", nil
 		}
-		return "Made " + made.Workspace.Name + ". It can’t install Agents on its first boot, so the person adds it from " +
+		return "Made " + made.Workspace.Name + ". It can’t install Agent Loops on its first boot, so the person adds it from " +
 			"Settings ▸ Machine Providers with Add as Machine….", nil
 	})
 }

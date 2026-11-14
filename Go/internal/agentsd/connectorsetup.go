@@ -1153,7 +1153,7 @@ func forgeSlot(f forge, kind wire.ConnectorSlotKind, connected, skipped bool, re
 		s.State = wire.ConnectorSlotStateNotRead
 	case rec.Refused:
 		s.State = wire.ConnectorSlotStateRefused
-		say(f.name() + " refused: Agents can't see " + f.thing(kind) + " in " + repo + ".")
+		say(f.name() + " refused: Agent Loops can't see " + f.thing(kind) + " in " + repo + ".")
 	case rec.Read:
 		s.State, s.Proof = wire.ConnectorSlotStateRead, rec.Proof
 		at := wire.DateOf(rec.ReadAt)
@@ -1184,7 +1184,7 @@ func (d *Daemon) setupEvents(ctx context.Context, f forge, folder string, rec *s
 		ev.State = wire.ConnectorEventsStateOn
 	case taken:
 		ev.State = wire.ConnectorEventsStateTaken
-		m := "A connector not made by Agents is already called " + ours.NameHere() + " in .agents/mcp.json, so it was left as it is."
+		m := "A connector not made by Agent Loops is already called " + ours.NameHere() + " in .agents/mcp.json, so it was left as it is."
 		ev.Message = &m
 	case turnOn && reads && !rec.EventsAdded:
 		if err := d.addOurConnector(ctx, folder, ours); err != nil {

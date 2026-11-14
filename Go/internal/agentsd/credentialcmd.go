@@ -74,7 +74,7 @@ func CredentialCommand(args []string, getenv func(string) string, in io.Reader, 
 func askCredential(getenv func(string) string, owner, use string) (string, error) {
 	base, grant := getenv(credentialURLEnv), getenv(credentialGrantEnv)
 	if base == "" || grant == "" {
-		return "", fmt.Errorf("%s is not set: this was not started by Agents", credentialURLEnv)
+		return "", fmt.Errorf("%s is not set: this was not started by Agent Loops", credentialURLEnv)
 	}
 	u, err := url.Parse(base)
 	if err != nil {

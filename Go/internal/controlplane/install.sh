@@ -191,7 +191,7 @@ if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1 && systemc
     mkdir -p "$(dirname "$unit")"
     cat > "$unit" <<UNIT
 [Unit]
-Description=Agents host ($name)
+Description=Agent Loops host ($name)
 After=network-online.target
 
 [Service]

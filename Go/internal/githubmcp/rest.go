@@ -1135,7 +1135,7 @@ func issueNumber(path string) int {
 // MARK: The host's connection
 
 // NotConnected is what a call says with no token: the person connects GitHub in Agents.
-const NotConnected = "GitHub is not connected, or its sign-in ended: connect GitHub in Agents (Connectors)"
+const NotConnected = "GitHub is not connected, or its sign-in ended: connect GitHub in Agent Loops (Connectors)"
 
 // Token is the access token of the host's GitHub connection (#1335), read from the host's
 // store (connections.EnvName) again after a minute or once it has ended, so a sign-in or a

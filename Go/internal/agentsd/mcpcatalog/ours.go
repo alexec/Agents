@@ -99,7 +99,7 @@ func OursResult(o Ours, declared Declared) wire.MCPCatalogResult {
 	levels := Levels(declared, o.Tested != "")
 	market := AgentsMarketplace
 	return wire.MCPCatalogResult{ID: o.ID, Title: o.Title, Description: o.Description, Version: "",
-		Publisher: wire.MCPPublisherInfo{Label: "Agents", Namespace: "agents", Known: true}, Known: true,
+		Publisher: wire.MCPPublisherInfo{Label: "Agent Loops", Namespace: "agents", Known: true}, Known: true,
 		Runs: []wire.MCPRunKind{wire.MCPRunKindCommand}, Levels: &levels, Marketplace: &market}
 }
 

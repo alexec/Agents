@@ -72,7 +72,7 @@ func webPushFor(d notices.RelayDelivery, s records.WebPushSubscription) (webpush
 	full := apns.Truncated(*d.Headline)
 	bare := full
 	bare.Answers = nil
-	placeholder := wire.Headline{H1: "Agents", H2: "An agent", H3: "needs you"}
+	placeholder := wire.Headline{H1: "Agent Loops", H2: "An agent", H3: "needs you"}
 	tries := []*wire.Headline{&full, &bare, &placeholder}
 	needID, _ := json.Marshal(d.NeedID)
 	sum := sha256.Sum256(needID)

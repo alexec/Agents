@@ -158,7 +158,7 @@ func (f *fakeControl) serve(w http.ResponseWriter, r *http.Request) {
 		if json.Unmarshal([]byte(line), &ask) == nil && ask.C == 0 && ask.M.Method == "machine/machines" {
 			id := strconv.FormatInt(ask.M.ID, 10)
 			if strings.Contains(string(ask.M.Params), "refuse") {
-				l.Write(ctx, `{"c":0,"m":{"jsonrpc":"2.0","id":`+id+`,"error":{"code":-32010,"message":"Agents can’t ask that of the control plane."}}}`)
+				l.Write(ctx, `{"c":0,"m":{"jsonrpc":"2.0","id":`+id+`,"error":{"code":-32010,"message":"Agent Loops can’t ask that of the control plane."}}}`)
 			} else {
 				l.Write(ctx, `{"c":0,"m":{"jsonrpc":"2.0","id":`+id+`,"result":{"providers":[]}}}`)
 			}
@@ -242,7 +242,7 @@ func TestEnrolThenUplink(t *testing.T) {
 		t.Fatalf("ask %s %v", got, err)
 	}
 	var refused *AskError
-	if _, err := u.Ask(ctx, "machine/machines", map[string]any{"method": "refuse"}); !errors.As(err, &refused) || refused.Code != -32010 || refused.Message != "Agents can’t ask that of the control plane." {
+	if _, err := u.Ask(ctx, "machine/machines", map[string]any{"method": "refuse"}); !errors.As(err, &refused) || refused.Code != -32010 || refused.Message != "Agent Loops can’t ask that of the control plane." {
 		t.Fatalf("refused %v", err)
 	}
 	u.WriteFanOut([]int{1, 3}, nil, `{"jsonrpc":"2.0","method":"agent/changed","params":{}}`)

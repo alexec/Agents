@@ -160,7 +160,7 @@ func TestOlderBuildsAreRefusedOnATeam(t *testing.T) {
 
 	sam := p.invite(owner, "Sam", wire.UserRoleMember)
 	if e := callError(t, window, "", "machines/list", map[string]any{}); !strings.Contains(e, "-32074") ||
-		!strings.Contains(e, "Update Agents to join this team") || !strings.Contains(e, wire.CapClientTeam1) {
+		!strings.Contains(e, "Update Agent Loops to join this team") || !strings.Contains(e, wire.CapClientTeam1) {
 		t.Fatalf("an older client on a team: %s", e)
 	}
 	call(t, window, "", "control/status", map[string]any{})

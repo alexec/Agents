@@ -242,7 +242,7 @@ func TestAdoptedBackgroundEndsAfterARestart(t *testing.T) {
 	}
 	waitFor(t, "the prompt's turn", func() bool {
 		for _, u := range userMessages(d, id) {
-			if strings.HasPrefix(u, "Your background commands ended while Agents restarted") {
+			if strings.HasPrefix(u, "Your background commands ended while Agent Loops restarted") {
 				return d.Store.Agent(id).State == wire.AgentStateFinished
 			}
 		}

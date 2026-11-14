@@ -80,7 +80,7 @@ func NewBotManifest(login string, public bool) BotManifest {
 		perms[k] = v
 	}
 	return BotManifest{Name: BotName(login), URL: "https://agentloops.dev",
-		Description: "The coding agents of @" + login + ", made in Agents. It acts only where " + login + " installs it.",
+		Description: "The coding agents of @" + login + ", made in Agent Loops. It acts only where " + login + " installs it.",
 		RedirectURL: HandBackURL, Public: public, DefaultPermissions: perms, DefaultEvents: []string{}}
 }
 

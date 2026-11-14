@@ -100,7 +100,7 @@ func problemTitle(happened string) string {
 	line, _, _ := strings.Cut(strings.TrimSpace(happened), "\n")
 	line = strings.TrimSpace(line)
 	if line == "" {
-		return "A problem in Agents"
+		return "A problem in Agent Loops"
 	}
 	if utf8.RuneCountInString(line) > 80 {
 		return string([]rune(line)[:79]) + "…"

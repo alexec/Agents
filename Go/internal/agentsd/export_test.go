@@ -253,8 +253,8 @@ func TestImportRefusesWhatIsNotAnExport(t *testing.T) {
 
 func TestExportFileName(t *testing.T) {
 	for in, want := range map[string]string{
-		"":                       "Agents",
-		"  ..  ":                 "Agents",
+		"":                       "Agent Loops",
+		"  ..  ":                 "Agent Loops",
 		"a/b\\c:d":               "a-b-c-d",
 		"line\nbreak\ttab":       "line-break-tab",
 		strings.Repeat("é", 100): strings.Repeat("é", exportNameMost),

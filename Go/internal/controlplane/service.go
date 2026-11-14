@@ -1829,7 +1829,7 @@ func (s *Service) spendCode(id, method string, params json.RawMessage, webOrigin
 		browser := stored.Browser != nil && *stored.Browser
 		if browser != fromPage {
 			if browser {
-				return nil, fail(invalidParams, "That code is for a browser. Paste it in the Agents page.")
+				return nil, fail(invalidParams, "That code is for a browser. Paste it in the Agent Loops page.")
 			}
 			return nil, fail(invalidParams, "That code is for a window or a phone. Get one from Add a Browser….")
 		}

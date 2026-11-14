@@ -570,7 +570,7 @@ func (d *Daemon) hostedStart(h *hostedServer) (json.RawMessage, *Error) {
 		d.hostedExited(h, generation, code)
 	})
 	params, _ := json.Marshal(map[string]any{"protocolVersion": mcpProtocol, "capabilities": map[string]any{},
-		"clientInfo": map[string]any{"name": "Agents", "version": "1"}})
+		"clientInfo": map[string]any{"name": "Agent Loops", "version": "1"}})
 	result, rerr := d.hostedSend(h, "initialize", params, hostedStartTimeout)
 	d.hostedMu.Lock()
 	defer d.hostedMu.Unlock()

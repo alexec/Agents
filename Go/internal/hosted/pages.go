@@ -154,7 +154,7 @@ func origin(at string) string {
 
 // welcome is the sign-up page, with p's invite and problem.
 func (s *Service) welcome(p page) page {
-	p.Title, p.Welcome, p.Providers, p.Open = "Agents", true, s.offered(), s.cfg.SignUp == SignUpOpen
+	p.Title, p.Welcome, p.Providers, p.Open = "Agent Loops", true, s.offered(), s.cfg.SignUp == SignUpOpen
 	if s.turnstile != nil {
 		p.TurnstileKey, p.TurnstileScript = s.turnstile.siteKey, turnstileScript
 	}
@@ -167,7 +167,7 @@ func (s *Service) startSignIn(w http.ResponseWriter, r *http.Request, provider, 
 		provider = signin.GitHub
 	}
 	if !s.offers(provider) {
-		s.page(w, http.StatusServiceUnavailable, page{Title: "Agents", Problem: "Sign-up is not open yet."})
+		s.page(w, http.StatusServiceUnavailable, page{Title: "Agent Loops", Problem: "Sign-up is not open yet."})
 		return
 	}
 	if validInvite(invite) {

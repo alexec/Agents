@@ -827,7 +827,7 @@ func (s *Service) policyGate(host, method string) error {
 	if applied, ok := appliedPolicy(*h); ok && applied >= version {
 		return nil
 	}
-	words := fmt.Sprintf("%s does not follow your organisation's policy yet. Update Agents on it, and connect it to the network.", h.Name)
+	words := fmt.Sprintf("%s does not follow your organisation's policy yet. Update Agent Loops on it, and connect it to the network.", h.Name)
 	data, _ := json.Marshal(wire.PolicyRefusal{Reason: "update", Rule: optional("requireFollowing"), Words: words})
 	return &RPCError{Code: wire.FailurePolicyRefused, Message: words, Data: data}
 }

@@ -87,7 +87,7 @@ func atlassianAccount(ctx context.Context, f *CodeFlow, access string) (Account,
 		return Account{}, errors.New("Atlassian gave no account")
 	}
 	if a.Resource == "" {
-		return Account{}, errors.New("the account reaches no Atlassian site: give Agents a site when Atlassian asks")
+		return Account{}, errors.New("the account reaches no Atlassian site: give Agent Loops a site when Atlassian asks")
 	}
 	return a, nil
 }

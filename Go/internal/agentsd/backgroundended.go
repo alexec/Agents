@@ -324,7 +324,7 @@ func (d *Daemon) adoptedPass() {
 		if wasWaiting || !wakesItself(a.RuntimeID) {
 			continue
 		}
-		text := "Your background commands ended while Agents restarted, so your runtime could not start you again itself: " +
+		text := "Your background commands ended while Agent Loops restarted, so your runtime could not start you again itself: " +
 			commandNames(e.cmds) + ". Read their output and carry on."
 		_ = d.enqueue(e.id, wire.QueuedPrompt{ID: store.NewUUID(), Text: text, QueuedAt: now(), From: wire.PromptOriginApp}, false)
 	}

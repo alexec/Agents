@@ -26,7 +26,7 @@ func (m *Methods) connectAnotherMethod(method string, params json.RawMessage, fr
 		}
 		// Only a control plane that Agents on a Mac started reads its host's join file.
 		if m.s.cfg.HostJoinFile == "" {
-			return nil, fail(notSupported, "This control plane isn’t run by Agents on a Mac, so there is nothing here to connect.")
+			return nil, fail(notSupported, "This control plane isn’t run by Agent Loops on a Mac, so there is nothing here to connect.")
 		}
 		hosted := request.Hosted != nil && *request.Hosted
 		code := ""
@@ -43,7 +43,7 @@ func (m *Methods) connectAnotherMethod(method string, params json.RawMessage, fr
 			want.Code = &code
 		}
 		if m.router.TellPersonClients(person, wire.NotifyControlConnectWanted.Name, want, m.isMacWindow) == 0 {
-			return nil, fail(hostOffline, "Agents isn’t open on this Mac. Open it, then try again.")
+			return nil, fail(hostOffline, "Agent Loops isn’t open on this Mac. Open it, then try again.")
 		}
 		return wire.Empty{}, nil
 	case "control/connectReport":
@@ -52,7 +52,7 @@ func (m *Methods) connectAnotherMethod(method string, params json.RawMessage, fr
 			return nil, err
 		}
 		if !m.isMacWindow(from.Client) {
-			return nil, fail(notPermitted, "Only Agents on a Mac reports a connect.")
+			return nil, fail(notPermitted, "Only Agent Loops on a Mac reports a connect.")
 		}
 		m.router.TellPerson(person, wire.NotifyControlConnectReported.Name, report)
 		return wire.Empty{}, nil

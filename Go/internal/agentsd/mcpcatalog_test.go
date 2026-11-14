@@ -241,7 +241,7 @@ func TestAnMCPServerTypedVerifiedAndAdded(t *testing.T) {
 	}
 }
 
-// Ours are rows of the Agents marketplace, a file inside agentsd, with their levels and no
+// Ours are rows of the Agent Loops marketplace, a file inside agentsd, with their levels and no
 // mark of their own, and added as any connector is: hosted (#1428, #2155).
 func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 	home := t.TempDir()
@@ -280,7 +280,7 @@ func TestOursAreListedAndAddedLikeAnyConnector(t *testing.T) {
 		t.Fatalf("sentry events: %+v", events.Levels)
 	}
 	github, linear := ours.Results[0], ours.Results[1]
-	if github.Publisher.Label != "Agents" || deref(github.Marketplace) != "provided:agents" || *github.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true, Workflows: true, Tested: true}) {
+	if github.Publisher.Label != "Agent Loops" || deref(github.Marketplace) != "provided:agents" || *github.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true, Workflows: true, Tested: true}) {
 		t.Fatalf("github: %+v", github)
 	}
 	if *linear.Levels != (wire.MCPLevels{Tools: true, Events: true, Views: true, Workflows: true, Tested: true}) {

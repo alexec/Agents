@@ -84,7 +84,7 @@ func TestStartSessionSendsTheBranchFirst(t *testing.T) {
 			starts = append(starts, s)
 			return json.RawMessage(`"11111111-2222-3333-4444-555555555555"`), nil
 		}
-		return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
+		return nil, &controllink.AskError{Code: -32010, Message: "Agent Loops can’t ask that of the control plane."}
 	})
 	l := d.live(a.ID)
 	l.mu.Lock()
