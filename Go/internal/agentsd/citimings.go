@@ -105,6 +105,8 @@ type ciRepoState struct {
 	FilledFrom *time.Time `json:"filledFrom,omitempty"`
 	Filled     bool       `json:"filled,omitempty"`
 	SweptAt    time.Time  `json:"sweptAt"`
+	// Slowed is each change ci.slowed was sent for, by its id (#5200, cislowed.go).
+	Slowed map[string]ciSlowedSent `json:"slowed,omitempty"`
 }
 
 func (d *Daemon) ciTimingsDir() string { return filepath.Join(d.Store.Loc.Root, "ci-timings") }
@@ -240,6 +242,7 @@ func (d *Daemon) readCIRepo(ctx context.Context, h ciRepoHere) error {
 		}
 		d.ciChanged(key)
 	}
+	d.ciSendSlowed(citimings.Repo{Forge: h.repo.forge, Path: h.repo.path})
 	return nil
 }
 
@@ -572,7 +575,9 @@ func (d *Daemon) buildsHistory(r wire.BuildsHistoryRequest) (wire.BuildsHistory,
 		if at.Before(from) || !at.Before(to) || f.Workflow != "" && c.Workflow != f.Workflow || f.Job != "" && c.Job != f.Job {
 			continue
 		}
-		out.Changes = append(out.Changes, buildsChange(c))
+		bc := buildsChange(c)
+		bc.SlowedSent = d.ciSlowedSentAt(repo, c)
+		out.Changes = append(out.Changes, bc)
 	}
 	return out, nil
 }
