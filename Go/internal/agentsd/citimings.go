@@ -43,6 +43,7 @@ import (
 // wait subscribes to it. An event still makes the next read sooner. Alex can overrule.
 //
 // Bitbucket Pipelines are read the same way (citimings_bitbucket.go, #5223).
+// Forgejo and Gitea Actions are read the same way (citimings_forgejo.go, #5224).
 //
 // The control plane keeps a copy (#5232, cisync.go): each day of runs that changes goes to it
 // a few seconds later (builds/sync), and it answers builds/historyAll and builds/runAll from
@@ -83,9 +84,9 @@ type ciTimingsBook struct {
 	ciGen     map[string]int
 	ciChanges map[string]ciChangesFound
 	// ciAPI is GitHub's API; "" is api.github.com. A test sets it. ciGitLabAPI and
-	// ciBitbucketAPI are the same for GitLab's root and Bitbucket's API, with no connection
-	// needed.
-	ciAPI, ciGitLabAPI, ciBitbucketAPI string
+	// ciBitbucketAPI and ciForgejoAPI are the same for GitLab's root, Bitbucket's API and
+	// Forgejo's root, with no connection needed.
+	ciAPI, ciGitLabAPI, ciBitbucketAPI, ciForgejoAPI string
 }
 
 type ciChangesFound struct {
@@ -117,7 +118,7 @@ type ciRepoState struct {
 	BackfillTo time.Time  `json:"backfillTo"`
 	FilledFrom *time.Time `json:"filledFrom,omitempty"`
 	Filled     bool       `json:"filled,omitempty"`
-	// BackfillPage is the last page of a paged list the backfill read (Bitbucket's).
+	// BackfillPage is the last page of a paged list the backfill read (Bitbucket's, Forgejo's).
 	BackfillPage int       `json:"backfillPage,omitempty"`
 	SweptAt      time.Time `json:"sweptAt"`
 	// Slowed is each change ci.slowed was sent for, by its id (#5200, cislowed.go).
@@ -203,9 +204,9 @@ type ciRepoHere struct {
 	folder string
 }
 
-// ciReposHere is the GitHub, GitLab, Azure DevOps and Bitbucket repositories the folders push
-// to, at most ciMostRepos. A GitLab one counts when the person's GitLab connection is on its
-// root, a Bitbucket one when this machine has a Bitbucket token.
+// ciReposHere is the GitHub, GitLab, Azure DevOps, Bitbucket and Forgejo repositories the
+// folders push to, at most ciMostRepos. A GitLab or Forgejo one counts when the person's
+// connection is on its root, a Bitbucket one when this machine has a Bitbucket token.
 func (d *Daemon) ciReposHere(ctx context.Context) []ciRepoHere {
 	seen := map[string]bool{}
 	var out []ciRepoHere
@@ -215,6 +216,13 @@ func (d *Daemon) ciReposHere(ctx context.Context) []ciRepoHere {
 		if r.forge == "gitlab" {
 			if root, project := d.ciGitLabAt(ctx, f); root != "" {
 				r.path = project
+			} else {
+				continue
+			}
+		}
+		if r.forge == "forgejo" {
+			if root, repo := d.ciForgejoAt(ctx, f); root != "" {
+				r.path = repo
 			} else {
 				continue
 			}
@@ -343,6 +351,9 @@ func (d *Daemon) ciLive(ctx context.Context, h ciRepoHere, key, def string) erro
 	if h.repo.forge == "bitbucket" {
 		return d.ciBitbucketLive(ctx, h, key, def)
 	}
+	if h.repo.forge == "forgejo" {
+		return d.ciForgejoLive(ctx, h, key, def)
+	}
 	for page := 1; page <= ciLivePages; page++ {
 		listed, added, err := d.ciPage(ctx, h, def, page, nil, nowFunc())
 		if err != nil {
@@ -365,6 +376,9 @@ func (d *Daemon) ciLive(ctx context.Context, h ciRepoHere, key, def string) erro
 func (d *Daemon) ciBackfill(ctx context.Context, h ciRepoHere, key, def string) error {
 	if h.repo.forge == "bitbucket" {
 		return d.ciBitbucketBackfill(ctx, h, key, def)
+	}
+	if h.repo.forge == "forgejo" {
+		return d.ciForgejoBackfill(ctx, h, key, def)
 	}
 	for ctx.Err() == nil && d.ciBudgetLeft() {
 		d.ciMu.Lock()
@@ -588,6 +602,8 @@ func (d *Daemon) ciGet(ctx context.Context, h ciRepoHere, path string) ([]byte, 
 		return d.ciGetGitLab(ctx, h, path)
 	case "bitbucket":
 		return d.ciGetBitbucket(ctx, path)
+	case "forgejo":
+		return d.ciGetForgejo(ctx, path)
 	}
 	owner, _, _ := strings.Cut(h.repo.path, "/")
 	token, _ := d.githubTokenFor(ctx, owner)
@@ -688,6 +704,8 @@ func ciForgeName(h ciRepoHere) string {
 		return "GitLab"
 	case "bitbucket":
 		return "Bitbucket"
+	case "forgejo":
+		return "Forgejo"
 	}
 	return "GitHub"
 }

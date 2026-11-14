@@ -1807,7 +1807,7 @@ type BuildsFigures struct {
 	Turn BuildsStat `json:"turn"`
 }
 
-// builds/history's answer (#5177): the filters' choices in the range (workflows, jobs, branches), the range's figures and each day's, the change points found in the range (on the default branch, whatever the branch filter), and the job that waited longest for a runner. readAt is when this machine last read the forge's runs (Last update); filledFrom is the oldest day the backfill reached, absent before it starts. reader is github, gitlab, azuredevops or bitbucket, or none when Agents does not read CI timings from the repository's forge.
+// builds/history's answer (#5177): the filters' choices in the range (workflows, jobs, branches), the range's figures and each day's, the change points found in the range (on the default branch, whatever the branch filter), and the job that waited longest for a runner. readAt is when this machine last read the forge's runs (Last update); filledFrom is the oldest day the backfill reached, absent before it starts. reader is github, gitlab, azuredevops, bitbucket or forgejo, or none when Agents does not read CI timings from the repository's forge.
 type BuildsHistory struct {
 	Repo string `json:"repo"`
 
