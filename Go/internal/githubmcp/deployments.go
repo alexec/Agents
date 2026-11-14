@@ -290,8 +290,9 @@ func deployCandidates(ctx context.Context, gh GitHub, name string, a args, since
 			list = append(list, candidate{EventID: ref.String() + "@" + name, Time: at, Subject: ref,
 				Data: func() (map[string]any, error) {
 					outcome := wire.DeployOutcomeFailed
+					job := jobOf(c.Status.URL)
 					// GitHub has no cancelled status: a cancelled job's Deployment says failure.
-					if job := jobOf(c.Status.URL); c.State == wire.DeployStateFailed && job != 0 {
+					if c.State == wire.DeployStateFailed && job != 0 {
 						conclusion, err := gh.JobConclusion(ctx, repo, job)
 						if err != nil {
 							return nil, err
@@ -300,7 +301,20 @@ func deployCandidates(ctx context.Context, gh GitHub, name string, a args, since
 							outcome = wire.DeployOutcomeCancelled
 						}
 					}
-					return deployData(repo, d, c, outcome)
+					data, err := deployData(repo, d, c, outcome)
+					if err != nil || c.State == wire.DeployStateRunning || job == 0 {
+						return data, err
+					}
+					// What the job says it deployed, and where (#5241): its notices are written by
+					// the time it ends.
+					notices, err := gh.JobDeploys(ctx, repo, job)
+					if err != nil {
+						return nil, err
+					}
+					if len(notices) > 0 {
+						data["notices"] = notices
+					}
+					return data, nil
 				}})
 		}
 	}
@@ -327,11 +341,16 @@ func deployEvent(name, title, description string) event {
 		"deploy":    map[string]any{"type": "object"},
 		"component": str, "environment": str, "tier": tierSchema,
 	}
+	if name != "deploy.started" {
+		// The job's deploy notices (#5241), each <environment>=<target>:<id>/<version> or
+		// <target>:<id>/<version>.
+		props["notices"] = map[string]any{"type": "array", "items": str}
+	}
 	if name == "deploy.failed" {
 		props["outcome"] = map[string]any{"type": "string", "enum": []string{"failed", "cancelled"}}
 	}
 	return event{Name: name, Title: title,
-		Description: description + " deploy is the wire's Deploy: the repo is its component, the environment and its tier its target, the sha its version's one artifact, named by the run's v* tag when it ran on one; its ref is github:deploy:<owner>/<repo>#<deployment id>, its url the job's. Every Deployment of the repo, whoever started its run.",
+		Description: description + " deploy is the wire's Deploy: the repo is its component, the environment and its tier its target, the sha its version's one artifact, named by the run's v* tag when it ran on one; its ref is github:deploy:<owner>/<repo>#<deployment id>, its url the job's. notices, once the job ended, are the deploy notices it wrote (::notice title=deploy::<environment>=<target>:<id>/<version>, as testflight=testflight:com.example.app/42, or the old <target>:<id>/<version>): what it deployed, and to which environment. Every Deployment of the repo, whoever started its run.",
 		Input:       schema{repoProperty, environmentProperty, tierProperty, componentProperty},
 		Payload:     object(props)}
 }

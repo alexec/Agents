@@ -47,11 +47,15 @@ const (
 	KindCIRun = "ci-run"
 	// KindHealth is a health signal (#3585): a Sentry issue, sentry:<org>/<issue id>.
 	KindHealth = "health"
-	// KindDeploy is a build or a version put on a deploy target (#3584), as a TestFlight build:
-	// testflight:<bundle id>/<build>, or a version submitted for App Review (#3657):
-	// appstore:<bundle id>/<version>. KindTarget is where it went: target:testflight:<bundle id>.
-	KindDeploy = "deploy"
-	KindTarget = "target"
+	// KindDeploy is one try to put a version into an environment (#5241, spec 5239-deploy-model):
+	// github:deploy:<owner>/<repo>#<deployment id>, from the deploy.* events. Its artifact, state,
+	// start and end are details, not links. KindEnvironment is where it went:
+	// github:environment:<owner>/<repo>#<name>. Before #5241 a deploy node was an artifact
+	// (testflight:<bundle id>/<build>, appstore:<bundle id>/<version>, #3584, #3657), part-of a
+	// KindTarget, target:testflight:<bundle id>; those are still read until they age out.
+	KindDeploy      = "deploy"
+	KindEnvironment = "environment"
+	KindTarget      = "target"
 
 	RelWorksOn = "works-on"
 	RelOpens   = "opens"
@@ -67,8 +71,14 @@ const (
 	RelBuilds = "builds"
 	// RelSeenIn is a health signal seen in a release or a deploy (#3585).
 	RelSeenIn = "seen-in"
-	// RelDeployedAs is a release deployed as a deploy (#3584); the deploy is part-of its target.
-	// A TestFlight build is deployed-as the App Store version it was submitted as (#3657).
+	// RelDeploys is a deploy that puts out a release, or a commit when no v* tag names it (#5241).
+	// The deploy is part-of its environment, and the CI run that ran it builds it.
+	RelDeploys = "deploys"
+	// RelBrings is a deploy that brings a PR (#5241): the PRs between the last deploy that
+	// succeeded in the same environment and this one. Computed for a walk's answer, never stored.
+	RelBrings = "brings"
+	// RelDeployedAs is the old link of a release to a deploy (#3584), and of a TestFlight build to
+	// its App Store version (#3657). Nothing makes it since #5241; it is read until it ages out.
 	RelDeployedAs = "deployed-as"
 	// RelReports is an issue filed for a health signal, or commented on for it (#3586).
 	RelReports = "reports"
@@ -83,6 +93,8 @@ const (
 	SourceForge = "forge"
 	// SourceHealth is a link a health source says, such as Sentry's release of an issue (#3585).
 	SourceHealth = "health"
+	// SourceComputed is a link the host works out for an answer and never stores (#5241).
+	SourceComputed = "computed"
 )
 
 // The bounds (#2348; "Bound data, not concurrency"). An ended link is kept KeepEnded after

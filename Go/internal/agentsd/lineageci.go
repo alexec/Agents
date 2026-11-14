@@ -27,14 +27,8 @@ import (
 //     pass (notePRCI), for lineage.DeliveryOf.
 //   - A PR keeps at most ciRunsPerPR active runs: an older run's link ends, and the store's
 //     own bounds (KeepEnded, MostLinks) let it go.
-//   - Deploys (#3584): what run.completed on a version tag says the run deployed (each a
-//     job's ::notice title=deploy::<target>:<id>/<version>, as testflight:<bundle id>/<build>)
-//     is a deploy node. The release is deployed-as it, and it is part-of its target,
-//     target:<target>:<id>. The run says it; App Store Connect's key stays in the customer's CI
-//     (direction.md, principles 6 and 7).
-//   - The App Store (#3657): a run that submits a version for App Review says
-//     appstore:<bundle id>/<version>, and the TestFlight build it submitted,
-//     testflight:<bundle id>/<build>. That build is deployed-as the App Store version.
+//   - Deploys (#3584, #5241): a run's deploy notices no longer make nodes here. The deploy.*
+//     events do (lineagedeploy.go), and the run builds each deploy it ran.
 
 // ciRunsPerPR is how many runs a PR keeps active.
 const ciRunsPerPR = 20
@@ -59,8 +53,7 @@ type ciRunPayload struct {
 		// CreatedAt is when the run was made, by its push; a rerun keeps it (#4554).
 		CreatedAt string `json:"createdAt"`
 	} `json:"run"`
-	CompletedAt string   `json:"completedAt"`
-	Deploys     []string `json:"deploys"`
+	CompletedAt string `json:"completedAt"`
 }
 
 // lineageCIEvent links the run a checks.* or run.completed event names.
@@ -79,19 +72,7 @@ func (d *Daemon) lineageCIEvent(e wire.Event) {
 			at = t
 		}
 		run, release := repo.ciRun(p.Run.ID), repo.release(p.Run.Branch)
-		deploys := p.Deploys[:min(len(p.Deploys), mostDeploys)]
-		d.lineageDo(func() {
-			d.linkAt(run, release, lineage.RelBuilds, lineage.SourceForge, at)
-			for _, ref := range deploys {
-				if deploy, target, ok := deployNodes(ref); ok {
-					d.linkAt(release, deploy, lineage.RelDeployedAs, lineage.SourceForge, at)
-					d.linkAt(deploy, target, lineage.RelPartOf, lineage.SourceForge, at)
-				}
-			}
-			for _, pair := range submittedBuilds(deploys) {
-				d.linkAt(pair[0], pair[1], lineage.RelDeployedAs, lineage.SourceForge, at)
-			}
-		})
+		d.lineageDo(func() { d.linkAt(run, release, lineage.RelBuilds, lineage.SourceForge, at) })
 		return
 	}
 	repo, n, ok := d.prOfURLHere(p.PR.URL)
@@ -151,44 +132,6 @@ func (d *Daemon) boundCIRuns(pr wire.LineageNode) {
 		kept++
 		return kept > ciRunsPerPR
 	})
-}
-
-// mostDeploys bounds the deploys one run may link.
-const mostDeploys = 10
-
-// deployNodes are a deploy's node and its target's, from what a run says, <target>:<id>/<version>
-// (#4800): <target>:deploy:<id>#<version>, and <target>:target:#<id>.
-func deployNodes(said string) (deploy, target wire.LineageNode, ok bool) {
-	where, _, ok := strings.Cut(said, "/")
-	if !ok || strings.ContainsAny(said, " \t\n") || !strings.Contains(where, ":") {
-		return deploy, target, false
-	}
-	r, ok := wire.RefFromLineage(lineage.KindDeploy, said, wire.RefContext{})
-	if !ok || r.Type != "deploy" {
-		return deploy, target, false
-	}
-	return lineage.NodeOf(lineage.KindDeploy, r),
-		lineage.NodeOf(lineage.KindTarget, wire.Ref{Provider: r.Provider, Type: "target", ID: r.Topic}), true
-}
-
-// submittedBuilds pairs each TestFlight build one run says with each App Store version of the
-// same bundle id that run says (#3657): the build it submitted for App Review.
-func submittedBuilds(refs []string) [][2]wire.LineageNode {
-	var pairs [][2]wire.LineageNode
-	for _, store := range refs {
-		storeDeploy, storeTarget, ok := deployNodes(store)
-		st, _ := lineage.RefOf(storeTarget)
-		if !ok || st.Provider != "appstore" {
-			continue
-		}
-		testflight := lineage.NodeOf(lineage.KindTarget, wire.Ref{Provider: "testflight", Type: "target", ID: st.ID})
-		for _, build := range refs {
-			if deploy, target, ok := deployNodes(build); ok && target == testflight {
-				pairs = append(pairs, [2]wire.LineageNode{deploy, storeDeploy})
-			}
-		}
-	}
-	return pairs
 }
 
 // repoOfRunURL is the repo of a GitHub Actions run's web address,

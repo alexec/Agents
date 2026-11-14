@@ -746,7 +746,8 @@ func (d *Daemon) lineagePRStarted(e wire.Event, session wire.UUID) {
 }
 
 // lineageEvent makes the links a raised event says: pr.opened, pr.merged and pr.closed,
-// the CI runs of checks.* and run.completed (lineageci.go), the health signals of
+// the CI runs of checks.* and run.completed (lineageci.go), the deploys of deploy.*
+// (lineagedeploy.go), the health signals of
 // health.* (lineagehealth.go), and the approval wait of pr.labelled, pr.reviewed and
 // pr.commented (lineageapproval.go).
 func (d *Daemon) lineageEvent(e wire.Event) {
@@ -755,6 +756,9 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 		d.lineageCIEvent(e)
 		// A run finished: the build timings read it soon (#5177).
 		d.kickCITimings()
+	case "deploy.started", "deploy.succeeded", "deploy.failed":
+		d.lineageDeployEvent(e)
+		return
 	case "health.issue_new", "health.issue_regressed":
 		d.lineageHealthEvent(e)
 		return

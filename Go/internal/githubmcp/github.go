@@ -301,6 +301,9 @@ type GitHub interface {
 	Deployments(ctx context.Context, repo, environment, since string) ([]Deployment, error)
 	// JobConclusion is an Actions job's conclusion, as cancelled: what a failed deploy's job ended as.
 	JobConclusion(ctx context.Context, repo string, job int64) (string, error)
+	// JobDeploys are the deploy notices one Actions job wrote (#5241), as RunDeploys reads a run's:
+	// what an ended deploy's job says it deployed, and where.
+	JobDeploys(ctx context.Context, repo string, job int64) ([]string, error)
 	// PRBranch is the head branch of PR number pr. checks.failed and checks.passed with a pr and
 	// no branch list only that branch's runs, not the whole repo's (#3107).
 	PRBranch(ctx context.Context, repo string, pr int) (string, error)

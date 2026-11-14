@@ -13,8 +13,8 @@ GitHub Actions, never on the control plane, and Agent Loops only watches it
 - A version tag (`v1.2.0`) starts your deploy workflow.
 - A GitHub environment with required reviewers holds the deploy. It shows in **Needs You** as
   a **Deploy** row, and you approve or reject it from there (#3587).
-- The workflow says what it deployed with one notice. Agent Loops reads it when the run ends and
-  links the release `deployed-as` the Cloud Run revision. The Work page of an issue, a pull
+- The workflow says what it deployed with one notice. Agent Loops reads it when the deploy's
+  job ends and adds the Cloud Run revision to the deploy, which deploys the release (#5241). The Work page of an issue, a pull
   request or a release then shows **Cloud Run web-42**, a link to the service's revisions in
   the Google Cloud console (#3588).
 

@@ -93,6 +93,7 @@ func TestDeployEventsOncePerStateChange(t *testing.T) {
 		deployment(7639582617, "github-pages", "main", false, status(7, "waiting", h.at(2), 51), status(8, "failure", h.at(5), 51)),
 	}
 	h.fake.jobs = map[int64]string{51: "cancelled"}
+	h.fake.jobDeploys = map[int64][]string{50: {"app-store=testflight:com.example.app/812"}}
 	h.fake.mu.Unlock()
 
 	store := "github:deploy:" + repo + "#7639582616"
@@ -113,6 +114,11 @@ func TestDeployEventsOncePerStateChange(t *testing.T) {
 	equal(t, data["tier"], "production", "tier")
 	_, hasOutcome := data["outcome"]
 	equal(t, hasOutcome, false, "outcome is deploy.failed's")
+	equal(t, data["notices"], []any{"app-store=testflight:com.example.app/812"}, "the job's deploy notices (#5241)")
+	_, startNotices := eventsOf(started)[0]["data"].(map[string]any)["notices"]
+	equal(t, startNotices, false, "a running job's notices are not read")
+	_, pagesNotices := eventsOf(failed)[0]["data"].(map[string]any)["notices"]
+	equal(t, pagesNotices, false, "a job with no notices says none")
 	d := data["deploy"].(map[string]any)
 	equal(t, d["system"], "github", "system")
 	equal(t, d["id"], "7639582616", "id")
@@ -150,4 +156,31 @@ func TestTierOf(t *testing.T) {
 		equal(t, tierOf(name, false), want, name)
 	}
 	equal(t, tierOf("app-store", true), wire.EnvironmentTierProduction, "GitHub's production environment")
+}
+
+// #5241: a deploy notice says its artifact, and may say the environment it went to first.
+func TestDeployPatternTakesTheEnvironmentForm(t *testing.T) {
+	for ref, want := range map[string]bool{
+		"testflight:com.example.app/42":             true,
+		"testflight=testflight:com.example.app/42":  true,
+		"app-store=appstore:com.example.app/0.18.0": true,
+		"=testflight:com.example.app/42":            false,
+		"a b=testflight:com.example.app/42":         false,
+		"testflight=":                               false,
+		"not a ref":                                 false,
+	} {
+		equal(t, deployPattern.MatchString(ref), want, ref)
+	}
+}
+
+// #5241: a job's deploy notices are its check run's annotations.
+func TestJobDeploysAreTheJobsNotices(t *testing.T) {
+	api := newFakeAPI(t, map[string]string{
+		"repos/" + repo + "/check-runs/50/annotations": `[
+			{"annotation_level": "notice", "title": "deploy", "message": "testflight=testflight:com.example.app/42"},
+			{"annotation_level": "notice", "title": "other", "message": "testflight:com.example.app/1"}]`,
+	})
+	got, err := api.github().JobDeploys(context.Background(), repo, 50)
+	equal(t, err, error(nil), "no error")
+	equal(t, got, []string{"testflight=testflight:com.example.app/42"}, "the deploy notice")
 }
