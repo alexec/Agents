@@ -370,7 +370,7 @@ extension RemoteModel {
             kept.draftID = nil
             guard let said = await keepThroughControl(host, DaemonAPI.Method.agentsStart, kept) else { return false }
             keptStartsShown.insert(said.id)
-            StartDraftKeeper.shared.clear(in: request.cwd)
+            StartDraftKeeper.shared.clear(in: FolderKey(host: host, folder: request.cwd), folders: folders)
             return true
         }
         unsettledStart = request
@@ -408,13 +408,12 @@ extension RemoteModel {
     ///   when a lost answer is settled later, perhaps while they read something else,
     ///   and taking the screen from them would be the surprise.
     func started(_ id: UUID, in key: FolderKey, open: Bool = true) async {
-        let folder = key.folder
         // The last folder used is the one a session was started in, from any window (#2160).
         rememberNewSessionFolder(key)
         unsettledStart = nil
         startWorktree = nil
         // Only now: a draft is kept until the agent it was typed for exists (FR-017).
-        StartDraftKeeper.shared.clear(in: folder)
+        StartDraftKeeper.shared.clear(in: key, folders: folders)
         guard open else { return }
         await loadWholeAgent(id)
         // The page that started it goes; one still on screen under it is opened again.
