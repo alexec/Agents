@@ -16,7 +16,7 @@ Agent Loops
 ## Subtitle (30)
 
 ```text
-Run your coding agents
+Let's build it
 ```
 
 ## Promotional text (170)
@@ -83,7 +83,7 @@ Upload them in the order of their numbers.
 
 ## TestFlight
 
-The beta app description (4000), for testers. Each build's "What to Test" is that release's
+The beta app description (4000), for testers. It is not saved in App Store Connect yet: Alex did not choose it (#5302). Each build's "What to Test" is that release's
 notes, the tag's message.
 
 ```text
