@@ -166,8 +166,6 @@ extension RemoteModel {
         return chosen?.key
     }
 
-        UserDefaults.standard.string(forKey: RemoteModel.newSessionFolderDefault).flatMap(FolderKey.init(stored:))
-
     /// Every way into a folder's New session calls this, and a start in it (#2160).
     func rememberNewSessionFolder(_ key: FolderKey) {
         rememberProjectFolder(key)
@@ -190,8 +188,6 @@ extension RemoteModel {
         guard let key = NewSessionProject.folder(in: choice, isHere: { _ in false }, remembered: remembered) else { return }
         sidebarItem = .folder(key)
     }
-
-        UserDefaults.standard.dictionary(forKey: RemoteModel.newSessionProjectFoldersDefault) as? [String: String] ?? [:]
 
     /// A machine listed its folders, or left the control plane (`listed` empty): what the
     /// Remote keeps by folder there goes for each folder it no longer has (#3750). An offline

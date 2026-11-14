@@ -542,11 +542,13 @@ final class RemoteModel {
     @ObservationIgnored var saidNewSessionFolder: NewSessionFolder?
 
     var rememberedNewSessionFolder: FolderKey? =
+        UserDefaults.standard.string(forKey: RemoteModel.newSessionFolderDefault).flatMap(FolderKey.init(stored:))
 
     static let newSessionFolderDefault = "newSessionFolder"
 
     /// The folder last used in each project, by the project's id (#3279).
     var rememberedProjectFolders: [String: String] =
+        UserDefaults.standard.dictionary(forKey: RemoteModel.newSessionProjectFoldersDefault) as? [String: String] ?? [:]
 
     static let newSessionProjectFoldersDefault = "newSessionProjectFolders"
 
