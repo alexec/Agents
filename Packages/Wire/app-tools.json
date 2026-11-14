@@ -771,7 +771,7 @@
         },
         "where": {
           "type": "object",
-          "description": "Narrow them: agent on agent.ended (the sessions, by id or exact title), branch on branch.moved, why on person.away and person.back. A list means any. For an MCP event, its own keys."
+          "description": "Narrow them: agent on agent.ended (the sessions, by id or exact title), branch on branch.moved, why on person.away and person.back. A list means any. For an MCP event, its own keys; a forge's pr takes a list too, as pr: [5317, 5318]."
         },
         "until_minutes": {
           "type": "integer",

@@ -489,7 +489,7 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 				equal(t, props[filter].(map[string]any)["type"], "string", name+" "+filter)
 			}
 		} else {
-			equal(t, props["pr"].(map[string]any)["type"], "integer", name+" pr")
+			equal(t, props["pr"].(map[string]any)["type"], []any{"integer", "array"}, name+" pr")
 		}
 	}
 	sort.Strings(names)
@@ -740,6 +740,30 @@ func TestPRAndBranchNarrow(t *testing.T) {
 	equal(t, ids(h.poll("checks.failed", crossed, c["cursor"])), []string{}, "crossed")
 }
 
+// pr takes a list (#5436): a lane waits on its own PR and a fix for main in one wait.
+func TestPRTakesAList(t *testing.T) {
+	h := newHarness(t)
+	for _, n := range []int{403, 404, 405} {
+		h.fake.addPR(n, fmt.Sprintf("agents/pr-%d", n), nil)
+	}
+	two := map[string]any{"repo": repo, "pr": []any{403, 404}}
+	checks, merged := h.poll("checks.failed", two, nil), h.poll("pr.merged", two, nil)
+	for _, n := range []int{403, 404, 405} {
+		h.fake.addRun(9000+n, fmt.Sprintf("agents/pr-%d", n), h.at(5), n, true)
+		h.fake.edit(n, func(p *fakePR) { p.state, p.mergedAt = "merged", h.at(6) })
+	}
+	equal(t, ids(h.poll("checks.failed", two, checks["cursor"])),
+		[]string{"checks.failed:" + repo + ":9403:1", "checks.failed:" + repo + ":9404:1"}, "checks.failed")
+	equal(t, ids(h.poll("pr.merged", two, merged["cursor"])),
+		[]string{"pr.merged:" + repo + ":403", "pr.merged:" + repo + ":404"}, "pr.merged")
+	for _, bad := range []any{[]any{}, []any{403, "404"}, []any{0}} {
+		_, err := h.rpc(map[string]any{"name": "pr.merged", "arguments": map[string]any{"repo": repo, "pr": bad}, "cursor": nil})
+		if err == nil || err.Code != -32602 || err.Message != "pr must be a positive integer or a list of them" {
+			t.Fatalf("%v: %v", bad, err)
+		}
+	}
+}
+
 func TestIssueEventsLabelsAndReasons(t *testing.T) {
 	h := newHarness(t)
 	issue := func(n int, labels ...string) Issue {
@@ -906,7 +930,7 @@ func TestBadArgumentsAreInvalidParamsAnUnknownEventIsItsOwnCode(t *testing.T) {
 	for _, name := range []string{"checks.failed", "pr.merged"} {
 		for _, pr := range []any{"551", 0, -1, 1.5} {
 			check(map[string]any{"name": name, "arguments": map[string]any{"repo": repo, "pr": pr}, "cursor": nil}, -32602,
-				"pr must be a positive integer")
+				"pr must be a positive integer or a list of them")
 		}
 	}
 	check(map[string]any{"name": "checks.failed", "arguments": map[string]any{"repo": "not a repo"}, "cursor": nil}, -32602,

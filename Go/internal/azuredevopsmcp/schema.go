@@ -28,7 +28,8 @@ type args struct {
 	repo, branch, pipeline string
 	// deploy narrows deploy.* by environment, tier and component (#5244).
 	deploy            mcpevents.DeployFilter
-	pr, run           int
+	run               int
+	prs               []int
 	fixes             []string
 	anyone, mine, all bool
 }
@@ -67,6 +68,10 @@ func check(s schema, raw json.RawMessage) (args, *rpcError) {
 	}
 	return args{repo: v.String("repo"), branch: v.String("branch"), pipeline: v.String("pipeline"),
 		deploy: mcpevents.DeployFilterOf(v),
-		pr:     v.Int("pr"), run: v.Int("run"), fixes: v.Strings("fixes"),
+		prs:    v.Ints("pr"), run: v.Int("run"), fixes: v.Strings("fixes"),
 		anyone: v.Bool("anyone"), mine: v.Bool("mine"), all: v.Bool("any")}, nil
 }
+
+// wantsPR is whether the pull request numbered n is one pr asks for (#5436): any, when pr is
+// not given.
+func (a args) wantsPR(n int) bool { return mcpevents.Wants(a.prs, n) }
