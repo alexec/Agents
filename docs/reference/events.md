@@ -553,6 +553,22 @@ iPhone and iPad and the web page: when it was last asked and when the last event
 why not (**Can't reach github**, the server no longer offers the event, refused it, or doesn't
 take the filters).
 
+### Deploys
+
+The `github` server sends `deploy.started`, `deploy.succeeded` and `deploy.failed` (#5240)
+from GitHub's Deployments: GitHub records one for each job with `environment:`, so no CI
+change is needed. Each event is a Deployment's change of state, once for each Deployment:
+`queued` or `in_progress` is started, `success` is succeeded, `failure` or `error` is failed.
+GitHub's `waiting` is `deploy.waiting`'s, and its `inactive` is not read: in a repo whose jobs
+share an environment, it does not mean "replaced". The details are the wire's `DeployEvent`
+(`docs/explanation/deploys.md`): the repo is the component, the environment and its tier the
+target, the sha the version's one artifact, named by the run's `v*` tag when it ran on one, and
+the url the job's. `deploy.failed`'s `outcome` is `cancelled` when its job was cancelled, else
+`failed`. `environment`, `tier` (`production` for GitHub's production environment, or one named
+`production` or `prod`) and `component` (the repo) filter them. The id is the deploy's ref and
+the event, `github:deploy:<owner/repo>#<deployment id>@deploy.succeeded`, from GitHub's data
+only, so two machines make the same id.
+
 ### Subjects and keys
 
 What each of this folder's MCP servers says of its events' envelope (#4728). The topic is
@@ -566,6 +582,7 @@ it, so two machines can make two ids for one change.
 | `github` | `pr.labelled`, `pr.unlabelled`, `pr.commented`, `pr.reviewed`, `review.comment` | `github:pr:<owner/repo>#<n>` | the label activity's, comment's or review's id |
 | `github` | `checks.failed`, `checks.passed` | the run's PR, or the run (`github:run:…#<run id>`) when it names none | the head commit, or the run's attempt |
 | `github` | `run.completed`, `deploy.waiting` | `github:run:<owner/repo>#<run id>` | the attempt (and the environments) |
+| `github` | `deploy.started`, `deploy.succeeded`, `deploy.failed` | `github:deploy:<owner/repo>#<deployment id>` | none: each is sent once for a Deployment |
 | `github` | `pr.merged` / `pr.closed` | the PR | none / the close time |
 | `github` | `pr.conflicted` and the other states | the PR, or the issue for `issue.assigned` | the review for `review.posted`, else the poll time |
 | `gitlab` | `issue.*`, `review.comment`, `pr.merged`, `pr.closed`, states | `gitlab:issue:` or `gitlab:mr:<group/project>#<n>` | as `github` |

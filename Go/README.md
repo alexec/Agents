@@ -113,6 +113,10 @@ request for the run's check suite, and one for each job that has annotations.
 `environment: production`), once per run, attempt and set of environments, with the
 reviewers and `canApprove` (whether the connected account is one of them); `workflow` and
 `branch` filter it. Agents Host reads the same waits for Needs You (`agentsd/deploys.go`).
+`deploy.started`, `deploy.succeeded` and `deploy.failed` (#5240) are a GitHub Deployment's
+changes of state, read from `deployments` and each one's `statuses`, with the wire's
+`DeployEvent` as their details; `environment`, `tier` and `component` filter them
+(`githubmcp/deployments.go`, `docs/reference/events.md`, "Deploys").
 CodeRabbit's events are new here (#1344): `review.posted` (once per review of the head
 commit: each time its `CodeRabbit` status on it goes to success, or its review with no status) and `review.comment` (each
 review comment by it). Its tools `coderabbit_review`, `coderabbit_reply` and

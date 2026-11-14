@@ -114,6 +114,12 @@ var events = append([]event{
 			"canApprove":   map[string]any{"type": "boolean"},
 			"waitingSince": str,
 		})},
+	deployEvent("deploy.started", "Deploy started",
+		"A GitHub Deployment went running (queued or in_progress): a job with environment: began to deploy, whatever started its run. One event per Deployment, so a queued after in_progress is no new one."),
+	deployEvent("deploy.succeeded", "Deploy succeeded",
+		"A GitHub Deployment went succeeded (success): a job with environment: deployed. One event per Deployment. GitHub's later inactive is not read: in a repo whose jobs share an environment, it does not mean replaced."),
+	deployEvent("deploy.failed", "Deploy failed",
+		"A GitHub Deployment went failed (failure or error): a job with environment: did not deploy. One event per Deployment. outcome is cancelled when its job was cancelled, else failed."),
 	{Name: "pr.opened", Title: "Pull request opened",
 		Description: "A pull request was opened, or a draft was marked ready for review: a PR open and not a draft now that was not at the last poll. Drafts never count. Reopened, it is raised again." + ownPRs,
 		Input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, anyoneProperty},
@@ -571,6 +577,9 @@ func candidates(ctx context.Context, gh GitHub, name string, a args, yours *Your
 				Subject: prRef(repo, r.PR.Number), Key: fmt.Sprint(r.ID)})
 		}
 		return list, false, nil
+	}
+	if name == "deploy.started" || name == "deploy.succeeded" || name == "deploy.failed" {
+		return deployCandidates(ctx, gh, name, a, since)
 	}
 	if name == "deploy.waiting" {
 		waiting, err := gh.WaitingDeploys(ctx, repo, a.workflow, a.branch)
