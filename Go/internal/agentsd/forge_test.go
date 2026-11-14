@@ -15,11 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/connections"
-	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
-	"github.com/agentloops-dev/agents/Go/internal/gitlabmcp"
-	"github.com/agentloops-dev/agents/Go/internal/linearmcp"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/connections"
+	"github.com/agentloops-dev/agent-loops/Go/internal/githubmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/gitlabmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/linearmcp"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // fakeForgeGitHub is GitHub's search and item reads, and what each was asked.

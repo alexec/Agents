@@ -3,7 +3,7 @@
 site_name: Agent Loops
 site_description: Run coding agents on your Mac, and follow them from your iPhone and iPad.
 site_url: https://docs.agentloops.dev/
-repo_url: https://github.com/agentloops-dev/Agents
+repo_url: https://github.com/agentloops-dev/agent-loops
 docs_dir: docs
 # The footer on every page: the privacy and terms pages (#1856).
 copyright: <a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a>

@@ -47,7 +47,7 @@ tmp=$(mktemp -d "$root/Go/out/helpers/.build.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
 for arch in arm64 amd64; do
 	if ! GOOS=darwin GOARCH=$arch "$root/Go/scripts/go.sh" build -trimpath \
-		-ldflags "-s -w -X github.com/agentloops-dev/agents/Go/internal/buildinfo.Version=$version" \
+		-ldflags "-s -w -X github.com/agentloops-dev/agent-loops/Go/internal/buildinfo.Version=$version" \
 		-o "out/helpers/$(basename "$tmp")/agents-control-$arch" ./cmd/agents-control; then
 		echo "error: go-control.sh: agents-control did not build for $arch." >&2
 		exit 1

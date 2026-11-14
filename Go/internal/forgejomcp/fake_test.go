@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // A fake Forgejo over HTTP (no account, #1753): the REST API v1 paths the server reads and

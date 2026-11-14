@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // #4179: agents-secret NAME with no session's grant (a terminal) asks a person over

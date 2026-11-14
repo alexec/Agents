@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 const testSimulator = "6E7A7E1C-9A35-4D87-8E0B-5E0F7F2A0B12"

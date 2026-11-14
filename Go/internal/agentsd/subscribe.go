@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/repoalias"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/repoalias"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Subscriptions by provider, type, topic and subject, with debounce (#4730, spec

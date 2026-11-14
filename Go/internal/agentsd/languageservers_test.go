@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // TestLanguageServerHelper is a fake language server when AGENTS_FAKE_LSP is set: each line

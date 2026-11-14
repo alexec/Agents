@@ -3,7 +3,7 @@ package lineage
 import (
 	"sort"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // An epic's overrun (#4529): what an open epic has spent so far against the estimate kept on

@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/lineage"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/lineage"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Lineage asks Bitbucket Cloud (#3879) what it asks Forgejo (lineageforgejo.go), by the

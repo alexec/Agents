@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // #4158: the last 4 only for a value of 16 characters or more, and a card's is the last 4 of

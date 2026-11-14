@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 func past(n int, typ, level string, usd, cycle float64) Past {

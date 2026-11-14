@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/connections"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/connections"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The check before a session gets the App's token (#4079): can the token write code to the

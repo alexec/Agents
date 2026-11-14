@@ -10,9 +10,9 @@ import (
 	"slices"
 	"sync"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/locks"
-	"github.com/agentloops-dev/agents/Go/internal/machinelock"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/locks"
+	"github.com/agentloops-dev/agent-loops/Go/internal/machinelock"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The machine lock (#3399, specs/3399-machine-lock): the control plane keeps each person's

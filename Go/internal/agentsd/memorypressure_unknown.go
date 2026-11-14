@@ -2,7 +2,7 @@
 
 package agentsd
 
-import "github.com/agentloops-dev/agents/Go/wire"
+import "github.com/agentloops-dev/agent-loops/Go/wire"
 
 // kernelPressure is unknown where the kernel has no word for it.
 func kernelPressure() wire.MemoryPressure { return "" }

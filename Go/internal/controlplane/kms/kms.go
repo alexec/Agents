@@ -29,7 +29,7 @@ import (
 	_ "gocloud.dev/secrets/hashivault"
 	_ "gocloud.dev/secrets/localsecrets"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
 )
 
 // Timeout bounds the keeper calls at start. A test can make it shorter.

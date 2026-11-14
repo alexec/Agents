@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // The forge reads and writes (#3815) against the fake Azure DevOps: the organization's WIQL and

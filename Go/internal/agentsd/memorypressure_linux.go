@@ -3,7 +3,7 @@ package agentsd
 import (
 	"os"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // kernelPressure is Linux's PSI for memory (#4578), /proc/pressure/memory: "" when the

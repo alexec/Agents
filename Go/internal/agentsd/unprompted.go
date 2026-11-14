@@ -7,7 +7,7 @@ import (
 
 	sdk "github.com/coder/acp-go-sdk"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // An unprompted turn (#4323) is a runtime working after its prompt was answered. Claude's

@@ -7,7 +7,7 @@ import (
 
 	"github.com/shirou/gopsutil/v4/mem"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Memory pressure (#4514): each warm runtime holds 90 to 200 MB (#4504), the wrong trade

@@ -8,10 +8,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/skillcatalog"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/usersettings"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/skillcatalog"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/usersettings"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // list_secrets (#4167): the person's secrets and the calling session's own, each with its name,

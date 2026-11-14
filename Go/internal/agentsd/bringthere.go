@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // bring_back (#2947), the reverse of start_session with send (sendthere.go, #2929): a

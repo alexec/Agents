@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // PSI's lines (#4578): the share of the last 10 s in which some task, or every task

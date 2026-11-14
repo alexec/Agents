@@ -3,7 +3,7 @@ package agentsd
 import (
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A session's turn as its Live Activity says it (#1744): the control plane hears each move

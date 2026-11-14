@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // sessions is a fake keepAwakeSession: each session's codespace and token, and how many run.

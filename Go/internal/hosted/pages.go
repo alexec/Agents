@@ -9,8 +9,8 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/signin"
-	"github.com/agentloops-dev/agents/Go/internal/paperpage"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/signin"
+	"github.com/agentloops-dev/agent-loops/Go/internal/paperpage"
 )
 
 // The pages at the service's own domain (#1807):

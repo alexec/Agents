@@ -12,8 +12,8 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/cdproto/webauthn"
 
-	"github.com/agentloops-dev/agents/Go/internal/browser"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/browser"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // browser_passkey (#4085): a software passkey for an agent's own account on a site that

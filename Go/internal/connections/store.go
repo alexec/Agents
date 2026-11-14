@@ -28,7 +28,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
 )
 
 // GitHub is the first provider (#1335). Linear is in linear.go, GitLab in gitlab.go, Email in

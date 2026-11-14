@@ -17,8 +17,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/connections"
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/connections"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // RealAzureDevOps reads Azure DevOps's REST API (7.1) as the person, with the personal access

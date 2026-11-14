@@ -4,8 +4,8 @@ import (
 	"context"
 	"sort"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Projects (#2317, specs/2317-projects): what people work on, the record that folders

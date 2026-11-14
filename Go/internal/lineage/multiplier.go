@@ -4,7 +4,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The Multiplier (#3901, #3903; specs/3901-multiplier/spec.md): the PRs the person's

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"slices"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/acp"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/acp"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A runtime's command sandbox (064, SandboxCatalog): on, off or the runtime's own say, for

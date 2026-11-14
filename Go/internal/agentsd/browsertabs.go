@@ -12,8 +12,8 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/agentloops-dev/agents/Go/internal/browser"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/browser"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Each session's tabs in the machine's browser (#3916). There is one Chromium and one

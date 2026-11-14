@@ -6,7 +6,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 func refuseWrites(t *testing.T) func() {

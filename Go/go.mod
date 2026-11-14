@@ -1,4 +1,4 @@
-module github.com/agentloops-dev/agents/Go
+module github.com/agentloops-dev/agent-loops/Go
 
 go 1.26.9
 

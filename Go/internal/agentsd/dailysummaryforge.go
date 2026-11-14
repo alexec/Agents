@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The daily summary's facts from GitHub (#3720), read with the person's gh for the

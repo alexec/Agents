@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/s3store/s3fake"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/s3store/s3fake"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
 )
 
 var ctx = context.Background()

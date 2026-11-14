@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"unicode/utf8"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/yamlnode"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/yamlnode"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A workflow's file, as WorkflowFile, WorkflowFolder and FrontMatter read it on the Swift

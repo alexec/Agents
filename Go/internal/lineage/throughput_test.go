@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // landed is an issue of github:o/r that landed at with a merged PR costing usd, under parent

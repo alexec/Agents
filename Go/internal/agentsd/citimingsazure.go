@@ -8,8 +8,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/azuredevopsmcp"
-	"github.com/agentloops-dev/agents/Go/internal/citimings"
+	"github.com/agentloops-dev/agent-loops/Go/internal/azuredevopsmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/citimings"
 )
 
 // Build timings from Azure Pipelines (#5222), as citimings.go reads GitHub's: the same store,

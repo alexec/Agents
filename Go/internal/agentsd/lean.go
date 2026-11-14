@@ -5,7 +5,7 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Lean records, as DaemonCore.tellChanged and record send them: an agent's whole record

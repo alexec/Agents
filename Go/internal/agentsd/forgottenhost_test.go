@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // #4985: a host that its control plane forgot starts no agent and runs no workflow, and a

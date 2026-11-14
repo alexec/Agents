@@ -10,11 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/codespacessh"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/hostinstall"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/providers"
-	"github.com/agentloops-dev/agents/Go/internal/workspacecommands"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/codespacessh"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/hostinstall"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/providers"
+	"github.com/agentloops-dev/agent-loops/Go/internal/workspacecommands"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // carriedProviders are the machine providers this machine carries (#3398): the control

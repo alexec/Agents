@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -14,9 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controllink"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/hosttunnels"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controllink"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/hosttunnels"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/records"
 )
 
 // Ports HostInstallTests: how machines/install runs ssh, with a key and without one (#413).

@@ -4,9 +4,9 @@ import (
 	"context"
 	"os"
 
-	"github.com/agentloops-dev/agents/Go/internal/buildinfo"
-	"github.com/agentloops-dev/agents/Go/internal/mac/signin"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/buildinfo"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mac/signin"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // macState is what a Mac's host keeps that a server's does not.

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // Pipelines of any trigger and their deploys on GitLab (#4217), in the github server's shapes

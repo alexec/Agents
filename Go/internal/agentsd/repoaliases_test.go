@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/repoalias"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/repoalias"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 func noAliases(t *testing.T) {
@@ -30,21 +30,21 @@ func noAliases(t *testing.T) {
 func TestAMovedRepoMatchesByEitherName(t *testing.T) {
 	noAliases(t)
 	oldPR := wire.Ref{Provider: "github", Type: "pr", Topic: "alexec/agents", ID: "4702"}
-	newPR := wire.Ref{Provider: "github", Type: "pr", Topic: "agentloops-dev/agents", ID: "4702"}
-	provider, topic := "github", "agentloops-dev/Agents"
+	newPR := wire.Ref{Provider: "github", Type: "pr", Topic: "agentloops-dev/agent-loops", ID: "4702"}
+	provider, topic := "github", "agentloops-dev/agent-loops"
 	e := wire.Event{Name: "pr.merged", Provider: &provider, Topic: &topic, Subject: &newPR,
-		Details: map[string]string{"repo": "agentloops-dev/Agents", "pr": "4702"}}
+		Details: map[string]string{"repo": "agentloops-dev/agent-loops", "pr": "4702"}}
 	byOld := waitPattern{name: "pr.merged", filters: map[string][]string{"repo": {"alexec/Agents"}, "pr": {"4702"}},
 		bus: busFilter{topics: []string{"alexec/agents"}, subject: &oldPR}}
 	if byOld.matches(e) {
 		t.Fatal("matched by the old name before the alias")
 	}
-	repoalias.Add("github", "alexec/Agents", "agentloops-dev/Agents", nowFunc())
+	repoalias.Add("github", "alexec/Agents", "agentloops-dev/agent-loops", nowFunc())
 	if !byOld.matches(e) {
 		t.Fatal("the old name does not hear the new one's event")
 	}
 	old := wire.Event{Name: "pr.merged", Provider: &provider, Subject: &oldPR, Details: map[string]string{"repo": "alexec/Agents", "pr": "4702"}}
-	byNew := waitPattern{name: "pr.merged", filters: map[string][]string{"repo": {"agentloops-dev/Agents"}}, bus: busFilter{subject: &newPR}}
+	byNew := waitPattern{name: "pr.merged", filters: map[string][]string{"repo": {"agentloops-dev/agent-loops"}}, bus: busFilter{subject: &newPR}}
 	if !byNew.matches(old) {
 		t.Fatal("the new name does not hear the old one's event")
 	}
@@ -63,7 +63,7 @@ func TestTheCheckLearnsAMoveFromGitHub(t *testing.T) {
 		http.Redirect(w, r, "/repositories/1", http.StatusMovedPermanently)
 	})
 	mux.HandleFunc("/repositories/1", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"full_name":"agentloops-dev/Agents"}`))
+		_, _ = w.Write([]byte(`{"full_name":"agentloops-dev/agent-loops"}`))
 	})
 	mux.HandleFunc("/repos/alexec/stays", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte(`{"full_name":"alexec/stays"}`))
@@ -85,13 +85,13 @@ func TestTheCheckLearnsAMoveFromGitHub(t *testing.T) {
 	if n := d.checkRepoAliases(context.Background()); n != 1 {
 		t.Fatalf("added %d, want 1: %+v", n, repoalias.All())
 	}
-	if got := repoalias.Topic("github", "alexec/agents"); got != "agentloops-dev/agents" {
+	if got := repoalias.Topic("github", "alexec/agents"); got != "agentloops-dev/agent-loops" {
 		t.Fatalf("alias: %q", got)
 	}
 	if _, err := os.Stat(d.repoAliasesPath()); err != nil {
 		t.Fatal(err)
 	}
-	if got := d.lineage().Links(wire.LineageNode{Kind: "pr", Ref: "github:pr:agentloops-dev/agents#12"}); len(got.Links) != 2 {
+	if got := d.lineage().Links(wire.LineageNode{Kind: "pr", Ref: "github:pr:agentloops-dev/agent-loops#12"}); len(got.Links) != 2 {
 		t.Fatalf("the PR by its new name: %+v", got)
 	}
 	if n := d.checkRepoAliases(context.Background()); n != 0 {

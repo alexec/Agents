@@ -7,9 +7,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/lineage"
-	"github.com/agentloops-dev/agents/Go/internal/linearmcp"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/lineage"
+	"github.com/agentloops-dev/agent-loops/Go/internal/linearmcp"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // linearNoPRs is why a Linear issue has no merge, approval, run or diff: Linear has no pull

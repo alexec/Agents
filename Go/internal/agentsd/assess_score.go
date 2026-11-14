@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The score of a runtime assessment from the daemon's own record (RuntimeAssessmentVerifier),

@@ -1,6 +1,6 @@
 package policylayers
 
-import "github.com/agentloops-dev/agents/Go/wire"
+import "github.com/agentloops-dev/agent-loops/Go/wire"
 
 // Looser reports whether next sets any rule looser than approved, by that rule's order
 // (research R10): a folder's layer uses this to decide whether an outside change to

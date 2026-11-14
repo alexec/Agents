@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Requests checked end to end (#3492, specs/3399-machine-lock D6, D7). A machine takes a

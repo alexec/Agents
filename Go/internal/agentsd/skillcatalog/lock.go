@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
 )
 
 // The `skills` CLI's two lock files, read and written in the CLI's own shape (SkillLock),

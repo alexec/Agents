@@ -20,9 +20,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/internal/safe"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/safe"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 	"golang.org/x/sys/unix"
 )
 
@@ -88,7 +88,7 @@ type selfUpdateMarkFile struct {
 
 // releaseDownloads is where a release's files are, by tag. AGENTS_RELEASE_DOWNLOADS
 // replaces it, for a test or a mirror.
-const releaseDownloads = "https://github.com/agentloops-dev/Agents/releases/download"
+const releaseDownloads = "https://github.com/agentloops-dev/agent-loops/releases/download"
 
 // selfUpdater is one Mac host's updater; nil on a host that is not in an app.
 type selfUpdater struct {

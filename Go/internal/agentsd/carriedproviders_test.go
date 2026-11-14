@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/codespacessh"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/providers"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/codespacessh"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/providers"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 func carriedDaemon(t *testing.T) (*Daemon, string) {

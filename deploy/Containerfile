@@ -45,7 +45,7 @@ ARG TARGETOS TARGETARCH
 ARG VERSION=dev
 RUN for cmd in agents-control workspace-commands agents-hosted; do \
       CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
-        -ldflags "-s -w -X github.com/agentloops-dev/agents/Go/internal/buildinfo.Version=$VERSION" \
+        -ldflags "-s -w -X github.com/agentloops-dev/agent-loops/Go/internal/buildinfo.Version=$VERSION" \
         -o /out/$cmd ./cmd/$cmd || exit 1; \
     done
 
@@ -57,7 +57,7 @@ RUN mkdir -p /out/servers && for arch in x86_64:amd64 aarch64:arm64; do \
       for cmd in agentsd github-mcp linear-mcp gitlab-mcp email-mcp jira-mcp slack-mcp googlechat-mcp whatsapp-mcp sentry-mcp betterstack-mcp forgejo-mcp bitbucket-mcp azuredevops-mcp azureboards-mcp; do \
         out=/out/servers/$cmd-linux-${arch%%:*}; \
         CGO_ENABLED=0 GOOS=linux GOARCH=${arch##*:} go build -trimpath \
-          -ldflags "-s -w -X github.com/agentloops-dev/agents/Go/internal/buildinfo.Version=$VERSION" \
+          -ldflags "-s -w -X github.com/agentloops-dev/agent-loops/Go/internal/buildinfo.Version=$VERSION" \
           -o $out ./cmd/$cmd || exit 1; \
         sha256sum $out | cut -d' ' -f1 > $out.sha256; \
       done; \

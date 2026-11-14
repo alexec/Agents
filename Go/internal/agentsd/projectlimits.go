@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The helper limits count across the project (#3281, specs/3273-project-unit "Lane limits

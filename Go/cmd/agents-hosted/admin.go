@@ -11,8 +11,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane"
-	"github.com/agentloops-dev/agents/Go/internal/hosted"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane"
+	"github.com/agentloops-dev/agent-loops/Go/internal/hosted"
 )
 
 const adminUsage = `usage: agents-hosted admin <verb> …

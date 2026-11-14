@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/citimings"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/citimings"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The control plane's copy of the build timings (#5232, spec 5166, "Where"): this machine

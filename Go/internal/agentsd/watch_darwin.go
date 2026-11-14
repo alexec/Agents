@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agent-loops/Go/internal/safe"
 )
 
 // folderWatch is FolderWatch on a Mac (#1138): FSEvents, through agents-watch beside this

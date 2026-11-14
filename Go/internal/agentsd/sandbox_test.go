@@ -7,8 +7,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/acp"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/acp"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Ports SandboxCatalogTests and DaemonSandboxTests: each runtime's sandbox is set as it

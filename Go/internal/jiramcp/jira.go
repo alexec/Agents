@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // What the events and the view read from Jira (#3247). RealJira reads it over Jira's REST API

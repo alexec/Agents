@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/connections"
+	"github.com/agentloops-dev/agent-loops/Go/internal/connections"
 )
 
 // The bot's writes name the person it acts for (#3858): a body ends in the footer, a commit

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // run.completed (#4217): a Forgejo Actions run that finished, whatever started it (a push, a

@@ -24,7 +24,7 @@ Rules from Alex that are not in AGENTS.md:
   `needs-approval`, and never message its lane about one: it fixes nothing until Alex
   reviews or comments on the PR. Its stuck checks are not stuck. Report the waiting ones
   to Alex in your table, with the list
-  https://github.com/agentloops-dev/Agents/pulls?q=is%3Aopen+label%3Aneeds-approval.
+  https://github.com/agentloops-dev/agent-loops/pulls?q=is%3Aopen+label%3Aneeds-approval.
 - **One agent per issue (#2504).** Never message a running lane to take another issue:
   a message to the agent that owns a branch is for its stuck PR only (conflicts, failing
   checks, behind, auto-merge off), never to widen its work. A stack (#1777) is still one

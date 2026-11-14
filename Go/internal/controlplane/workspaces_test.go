@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/hostinstall"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/hosttunnels"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/hostinstall"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/hosttunnels"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
 )
 
 // A provider gives its ssh as a person types it, agents@127.0.0.1 -p 2224 (the Docker

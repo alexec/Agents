@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"slices"
 
-	"github.com/agentloops-dev/agents/Go/internal/repoalias"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/repoalias"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A cost ledger names a repo that moved by its name now (#5332), as Files does its nodes

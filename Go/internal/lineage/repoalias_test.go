@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/repoalias"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/repoalias"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 func movedPR(n string) wire.LineageNode {
-	return wire.LineageNode{Kind: KindPR, Ref: "github:pr:agentloops-dev/agents#" + n}
+	return wire.LineageNode{Kind: KindPR, Ref: "github:pr:agentloops-dev/agent-loops#" + n}
 }
 
 // #4957: a PR linked before its repo's owner moved and named by the new owner after it is
@@ -27,7 +27,7 @@ func TestARepoThatMovedIsOneNode(t *testing.T) {
 	_ = f.Close()
 	before, _ := os.ReadFile(path)
 
-	repoalias.Add("github", "alexec/agents", "agentloops-dev/agents", t0)
+	repoalias.Add("github", "alexec/agents", "agentloops-dev/agent-loops", t0)
 	g := openAt(t, path, t0.Add(time.Minute))
 	if got := g.Links(movedPR("2")); len(got.Links) != 2 {
 		t.Fatalf("the new name's links: %+v", got)
@@ -56,7 +56,7 @@ func TestRealiasWhileOpen(t *testing.T) {
 	if got := f.Links(pr("2")); len(got.Links) != 1 {
 		t.Fatalf("before the alias: %+v", got)
 	}
-	repoalias.Add("github", "alexec/agents", "agentloops-dev/agents", t0)
+	repoalias.Add("github", "alexec/agents", "agentloops-dev/agent-loops", t0)
 	f.Realias()
 	if got := f.Links(pr("2")); len(got.Links) != 1 || got.Links[0].To != movedPR("2") {
 		t.Fatalf("after the alias: %+v", got)

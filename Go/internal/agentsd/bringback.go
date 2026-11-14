@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Bring back from ‹host›… (#1473), the reverse of Send to ‹host›… (#1123): the host packs

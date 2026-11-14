@@ -7,8 +7,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/lineage"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/lineage"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Plans in Work (#3265, #3267): work has one hierarchy. A feature is the label feature:<name>; an

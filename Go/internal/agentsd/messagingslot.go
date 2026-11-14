@@ -13,7 +13,7 @@ import (
 
 	sdk "github.com/coder/acp-go-sdk"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The Messaging slot (#1787): where agents reach the person. Slack, email and Google Chat are

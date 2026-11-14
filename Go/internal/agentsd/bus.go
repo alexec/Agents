@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The event bus (#4729, spec 4724-event-bus, "The bus"). This machine publishes each new

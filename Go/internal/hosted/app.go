@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controllink"
 )
 
 // The Mac app's way in (#4228): Settings ▸ Control plane ▸ Connect to Another… opens

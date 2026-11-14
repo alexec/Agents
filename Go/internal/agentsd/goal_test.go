@@ -3,7 +3,7 @@ package agentsd
 import (
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The goal on a session_info_update (#2742): Codex's snapshot and Claude's, a cleared
