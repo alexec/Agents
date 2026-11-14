@@ -29,6 +29,8 @@ const browserToolsetID = "browser"
 func (d *Daemon) startBrowser() {
 	d.browser = browser.New(d.Store.Loc.Cache, d.Store.Loc.Root, d.installBrowserToolset, d.browserBusy, loginEnvironment)
 	d.browser.Changed = d.browserChanged
+	// A Chrome the last host left running goes now, not at the first browser tool (#5313).
+	go d.browser.EndLeftover()
 }
 
 // installBrowserToolset installs the pinned toolset, unless it is whole already.
