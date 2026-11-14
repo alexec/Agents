@@ -53,16 +53,25 @@ case "$1 $2" in
 esac
 `
 
-// fakeSignInTools puts fake claude and codex in a fresh home's ~/.local/bin, which
-// searchPaths looks in, and gives back the home.
+// fakeSignInTools puts fake claude and codex in a fresh home's ~/.local/bin and gives
+// back the home. That folder is the whole login shell PATH, so searchPaths finds the fakes
+// before any folder a real claude or codex is in: the real login shell keeps this
+// process's PATH, the person's ~/.local/bin among it, and a test that took the real codex
+// started its device sign-in from the person's home (#5341).
 func fakeSignInTools(t *testing.T) string {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	bin := filepath.Join(home, ".local", "bin")
+	t.Setenv("PATH", bin+":/usr/bin:/bin:/usr/sbin:/sbin")
+	oldShell := loginShellPath
+	loginShellPath = func(string) []string { return []string{bin} }
+	resetShellPath := func() { shellPath.Lock(); shellPath.key = ""; shellPath.Unlock() }
+	resetShellPath()
+	t.Cleanup(func() { loginShellPath = oldShell; resetShellPath() })
 	t.Setenv("CODEX_HOME", "")
 	for _, v := range []string{"CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY", "OPENAI_API_KEY"} {
 		t.Setenv(v, "")
 	}
-	bin := filepath.Join(home, ".local", "bin")
 	os.MkdirAll(bin, 0o755)
 	os.WriteFile(filepath.Join(bin, "claude"), []byte(fakeClaudeTool), 0o755)
 	os.WriteFile(filepath.Join(bin, "codex"), []byte(fakeCodexTool), 0o755)
@@ -256,5 +265,21 @@ func TestOnlyClaudeAndCodexSignInThisWay(t *testing.T) {
 	asAServer(t)
 	if e := c.callError(t, 1, "runtimes/signInStart", map[string]any{"runtimeID": "grok"}); e.Code != CodeNotSupported {
 		t.Fatalf("%+v", e)
+	}
+}
+
+// The sign-in tests run only the fakes in their scratch home, never a real claude or
+// codex from the person's own home (#5341).
+func TestSignInTestsRunOnlyTheFakes(t *testing.T) {
+	home := fakeSignInTools(t)
+	asAServer(t)
+	for _, id := range []string{"claude", "codex"} {
+		cmd, err := runtimeTool(id, (&Daemon{}).signInEnvironment(runtimeByID(id)), "login")
+		if err != nil {
+			t.Fatalf("%s: %v", id, err)
+		}
+		if want := filepath.Join(home, ".local", "bin", id); cmd.Path != want || cmd.Dir != home {
+			t.Fatalf("%s runs %s in %s, not the fake %s in %s", id, cmd.Path, cmd.Dir, want, home)
+		}
 	}
 }

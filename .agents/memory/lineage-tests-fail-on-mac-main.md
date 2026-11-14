@@ -7,9 +7,10 @@ metadata:
 
 On this Mac, `TestLineageHealth*`, `TestLineageABugReportsTheHealthThatStartedIt`,
 `TestLineageIncidentSeenInTheReleaseOut`, `TestLineageSessionsOnAnEpic`, `TestListQueryForAnIssue`,
-`TestLineageSessionsIssuesInTheEpicsOrder` and `TestSigning*InOnAServer` in `Go/internal/agentsd`
+and `TestLineageSessionsIssuesInTheEpicsOrder` in `Go/internal/agentsd`
 fail on `main` too (seen 2026-11-11, #4800); a changed `TMPDIR` does not help. CI's Linux `go` job
-runs them.
+runs them. `TestSigning*InOnAServer` failed for another cause: they ran the person's real codex
+from the login shell's PATH; #5341 fixed that, and they pass on the Mac.
 
 **Why:** a lane that sees them fail can lose time looking for its own bug.
 
