@@ -27,7 +27,12 @@ struct AutoSettingsView: View {
                     Task { await model.setAutoSettings(s) }
                 }
             } header: {
-                Text(LevelWords.runtimesTitle)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(LevelWords.runtimesTitle)
+                    Spacer(minLength: 16)
+                    // The states are from the last runtimes/list (#5145).
+                    if let read = model.runtimes.map(\.checkedAt).min() { LastUpdateText(read: read) }
+                }
             } footer: {
                 Text(LevelWords.runtimesFooter)
             }
