@@ -183,6 +183,8 @@ type Service struct {
 	pushes *pushes
 	// This copy's Web Push to browsers (#1486); nil with no VAPID key.
 	webPush *webPushes
+	// The compares of two Agents versions' commits (#5273).
+	agentsCompares agentsCompareBook
 	// What each host last listed (#962), for machines/lastHeard.
 	copies *hostCopies
 	// The reverse tunnels this copy holds for servers behind a bastion (#435): a single

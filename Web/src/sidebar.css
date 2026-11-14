@@ -254,6 +254,15 @@
 :is(.with-sidebar, .sub-app) .settings-body :is(.machine-runtimes, .resources) li p { margin: 0; }
 :is(.with-sidebar, .sub-app) .settings-body .machine-runtimes li { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 8px; }
 :is(.with-sidebar, .sub-app) .settings-body .machine-runtimes .row-actions { display: flex; gap: 8px; }
+/* A machine's Agent Loops section (#5273): the version, its changes newest first, the other machines. */
+:is(.with-sidebar, .sub-app) .settings-body :is(.agents-changes, .agents-others) { list-style: none; margin: 0; padding: 0; max-width: 640px; }
+:is(.with-sidebar, .sub-app) .settings-body .agents-others > li { padding: 6px 0; border-bottom: 1px solid var(--paper-rule); }
+:is(.with-sidebar, .sub-app) .settings-body .agents-others p { margin: 0; }
+:is(.with-sidebar, .sub-app) .settings-body .agents-others .link.warning { color: var(--tint-warning); }
+:is(.with-sidebar, .sub-app) .settings-body .agents-change { display: flex; align-items: baseline; gap: 8px; padding: 4px 0; font-variant-numeric: tabular-nums; }
+:is(.with-sidebar, .sub-app) .settings-body .agents-change > a { flex: none; min-width: 3.5em; }
+:is(.with-sidebar, .sub-app) .settings-body .agents-change-title { flex: 1; min-width: 0; }
+:is(.with-sidebar, .sub-app) .settings-body .agents-version { margin: 0 0 2px; font-size: 1.25em; font-variant-numeric: tabular-nums; }
 
 /* A machine's worktrees (#3627): the page's rows, a section per folder, in its column. */
 :is(.with-sidebar, .sub-app) .settings-body .worktrees { max-width: 420px; }

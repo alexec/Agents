@@ -1,7 +1,8 @@
 // Machines ▸ <machine> (#3626): one machine's page, the place to go for its status, as the window's MachinePage.
 // A summary first (#3743): its CPU, load and capacity (#4582), memory and worst disk on one line. Then the detail, most of it closed until the
 // person opens it: the disk that matters with the others folded, a row per folder's worktrees (#3627), the runtimes
-// installed there (#3629), resources only when one is declared or held, and its processes (#3453). Read with
+// installed there (#3629), resources only when one is declared or held, and its processes (#3453). The Agent Loops version
+// it runs, since when and with what changes, after the summary (#5273). Read with
 // machine/usage when it opens and every few seconds while it is open and the tab is seen. A read that fails says when
 // the last one worked (#5146): the page reads every 3 s, so it shows no line while they work.
 import { useEffect, useState } from "preact/hooks";
@@ -16,6 +17,7 @@ import { go } from "../route";
 import { MachineProcesses } from "./settings/Processes";
 import { chooseSettingsMachine } from "./settings/SettingsMachine";
 import { WorktreesList } from "./Worktrees";
+import { MachineAgents } from "./MachineAgents";
 import { LastUpdate } from "./LastUpdate";
 import { Resources } from "./Resources";
 import { signInRuntime } from "./RuntimeSignInDialog";
@@ -115,6 +117,8 @@ export function MachinePage({ store, host }: { store: Store; host: string }) {
             )}
           </>
         )}
+      {/* What it runs, from the control plane, offline or not (#5273). */}
+      <MachineAgents store={store} host={host} />
       {answers && <MachineWorktrees store={store} host={host} />}
       {answers && <MachineRuntimes store={store} host={host} name={name} />}
       {answers && <Resources store={store} host={host} />}

@@ -1417,5 +1417,14 @@
       { "reading": { "volume": "Macintosh HD", "mount": "/", "freeBytes": 9000000000, "totalBytes": 500000000000 },
         "level": "low", "threshold": 20000000000, "worktrees": [] }
     ]
-  }
+  },
+  "AgentsChange": {"number": 5250, "title": "toolsets: bump codex-acp", "sha": "8162a5a06", "date": 812345678.5},
+  "AgentsChanges": {"base": "0.18.0", "head": "0.18.1-dev.544+g8162a5a06", "ahead": 544, "behind": 0,
+    "changes": [{"number": 5250, "title": "toolsets: bump codex-acp", "sha": "8162a5a06", "date": 812345678.5}], "complete": false},
+  "AgentsChangesRequest": {"base": "0.18.0", "head": "0.18.1-dev.544+g8162a5a06", "limit": 6},
+  "MachineAgents": {"host": "host", "version": "0.18.1-dev.544+g8162a5a06", "since": 812345678.5, "previous": "0.18.0",
+    "changes": {"base": "0.18.0", "head": "0.18.1-dev.544+g8162a5a06", "ahead": 544, "behind": 0,
+      "changes": [{"number": 5250, "title": "toolsets: bump codex-acp", "sha": "8162a5a06"}], "complete": false},
+    "changesError": "changesError", "history": [{"version": "0.18.0", "since": 812345678.5}],
+    "others": [{"host": "other", "name": "linux-server", "version": "0.18.0", "since": 812345678.5, "ahead": 0, "behind": 544}]}
 }

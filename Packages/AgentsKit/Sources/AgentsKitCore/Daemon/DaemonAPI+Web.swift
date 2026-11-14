@@ -543,6 +543,10 @@ public extension DaemonAPI {
                 Row(Method.hostsRetryKept, params: KeptRequestID.self, result: Empty.self, kind: .controlRequest),
                 // What an offline host last listed (#962).
                 Row(Method.hostsLastHeard, params: MachineRequest.self, result: MachineLastHeard.self, kind: .controlRequest),
+                // A machine page's Agent Loops section (#5273).
+                Row(Method.machinesAgents, params: MachineRequest.self, result: MachineAgents.self, kind: .controlRequest),
+                Row(Method.machinesAgentsChanges, params: AgentsChangesRequest.self, result: AgentsChanges.self,
+                    kind: .controlRequest),
                 // Every machine's events (#4732): the Events page.
                 Row(Method.busLog, params: BusLogQuery.self, result: BusLogPage.self, kind: .controlRequest),
                 // Who did what (#996): Events ▸ Audit.

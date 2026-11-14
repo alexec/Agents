@@ -793,6 +793,8 @@ public enum Capability {
         "machine/secretOps": "machine/1",
         "machine/secretRelease": "host.secret-release/1",
         "machine/status": "machine/1",
+        "machines/agents": "machines/1",
+        "machines/agentsChanges": "machines/1",
         "machines/announce": "machines/1",
         "machines/approveJoin": "hosts.join/1",
         "machines/botKey": "connections.botkey/1",

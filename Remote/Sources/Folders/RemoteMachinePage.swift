@@ -4,6 +4,7 @@ import SwiftUI
 /// One machine's page (#4034), as the window's (#3626) and the web page's: a summary first,
 /// its CPU, load and capacity (#4582), memory and worst disk (#3743), then its disks, then the runtimes
 /// installed there (#3629), with Sign In… and Update (#4035), and This Mac's resources (#4027).
+/// The Agent Loops version it runs, since when and with what changes, comes after its disks (#5273).
 /// Read with `machine/usage` as it opens and every few seconds while it is open, never
 /// otherwise. Its worktrees and processes, its settings, and another machine's resources,
 /// stay on the Mac and the web page.
@@ -58,6 +59,8 @@ struct RemoteMachinePage: View {
                         }
                     }
                 }
+                // What it runs, from the control plane, offline or not (#5273).
+                MachineAgentsSections(host: host, read: model.machineAgentsReader, changes: model.agentsChanges)
                 if !offline {
                     Section("Runtimes") {
                         let runtimes = model.runtimes(on: host).filter(\.isInstalled)
