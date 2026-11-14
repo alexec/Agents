@@ -141,6 +141,11 @@ func (s *Service) noteAccountOps(user string, ops []wire.AccountOperation, at wi
 	}
 	for _, op := range ops {
 		key := accountKey(op.Service, op.Address)
+		if op.What == wire.AccountOperationWhatRemoved {
+			// A removed account has no last operation (#5253): one added again starts afresh.
+			delete(last, key)
+			continue
+		}
 		if _, ok := last[key]; !ok && len(last) >= secretInfoMost {
 			continue
 		}

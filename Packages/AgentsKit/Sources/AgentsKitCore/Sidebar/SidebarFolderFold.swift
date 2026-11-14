@@ -93,6 +93,11 @@ public struct SidebarFolderFold {
     /// Whether the fold says it has no sessions yet: unfolded, with none that is live.
     public var showsNoSessions: Bool { isUnfolded && !isSearching && !hasLive }
 
+    /// Whether its Sessions fold starts with a New Session row (#5267), as the Remote's
+    /// Machines group has New Machine: unfolded, and not while searching, since the search is
+    /// for sessions. With the row, a folder with no live sessions still has its Sessions fold.
+    public var showsNewSession: Bool { isUnfolded && !isSearching }
+
     /// The archived rows to draw: a page with no search, the first few matches until Show
     /// all with one.
     public func archivedShown(showingAll: Bool) -> ArraySlice<Agent> {

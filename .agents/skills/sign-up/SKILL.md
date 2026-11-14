@@ -152,6 +152,9 @@ agentloops@fastmail.com where the site lets you, or ask Alex with `ask_question`
   plane refuses one that looks like a token, a key or a card number.
   To change an account, give all its fields again: an add that replaces one asks the person
   first (#4001), and a field left out is lost.
+  When a new account replaces an old one (a new address, a closed account), remove the old
+  record: `manage_accounts` with action `remove` and its `ids` (#5253). One an agent added
+  goes at once; one the person added asks them on a card first.
 - **Tracker:** the account's row in Settings ▸ You ▸ Accounts (`manage_accounts`) and its notes.
   No secrets.
 

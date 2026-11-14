@@ -195,6 +195,12 @@ func partKind(part wire.UserSettingsPartName) (string, bool) {
 // SetPart sets one part of a person's settings, or with a null value removes it from the
 // user scope. It says whether anything changed.
 func (b *Book) SetPart(ctx context.Context, user string, part wire.UserSettingsPartName, value json.RawMessage) (bool, error) {
+	return b.setPart(ctx, user, part, value, false)
+}
+
+// setPart is SetPart; byMachine is a machine's manage_accounts (#5253), which says who added a
+// new account, where a client's set does not.
+func (b *Book) setPart(ctx context.Context, user string, part wire.UserSettingsPartName, value json.RawMessage, byMachine bool) (bool, error) {
 	if err := checkUser(user); err != nil {
 		return false, err
 	}
@@ -232,7 +238,7 @@ func (b *Book) SetPart(ctx context.Context, user string, part wire.UserSettingsP
 		s.AgentConfigFiles = nil
 		slot := partOf(&s, part)
 		if part == wire.UserSettingsPartNameAccounts && !removing {
-			parsed = canonical(stampAccounts(*slot, parsed, b.now()))
+			parsed = canonical(stampAccounts(*slot, parsed, b.now(), byMachine))
 		}
 		if string(canonical(*slot)) == string(parsed) {
 			return nil, nil

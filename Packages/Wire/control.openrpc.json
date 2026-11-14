@@ -20,6 +20,11 @@
       "name": "attention/1",
       "by": "control",
       "description": "The control plane still reads attention/need as 0.18.0 sent it. attention/2 (#4095): a host may send the NeedKind `request`, which an older control plane does not know."
+    },
+    {
+      "name": "machine.accounts/1",
+      "by": "control",
+      "description": "The control plane still answers machine/accounts with add and ops (#3967). machine.accounts/2 (#5253): it also takes remove, which an older control plane does not know."
     }
   ],
   "methods": [
@@ -2700,8 +2705,8 @@
     },
     {
       "name": "machine/accounts",
-      "x-capability": "machine.accounts/1",
-      "description": "A host, for an agent there (#3967): its person's outside accounts, with add added.",
+      "x-capability": "machine.accounts/2",
+      "description": "A host, for an agent there (#3967): its person's outside accounts, with add added and remove taken out (#5253).",
       "paramStructure": "by-name",
       "params": [
         {

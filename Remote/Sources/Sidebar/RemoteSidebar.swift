@@ -2,11 +2,11 @@ import AgentsKitCore
 import SwiftUI
 import UIKit
 
-/// The Mac's one sidebar, on an iPad or an iPhone (#226, #498): New Session at the top,
-/// then Status, then what wants the person across every folder — Pinned, Needs You,
+/// The Mac's one sidebar, on an iPad or an iPhone (#226, #498): Work, then Status, then what wants the person across every folder — Pinned, Needs You,
 /// Working, Unread — then a group per folder, its sessions newest first with their state
 /// the row's mark, its workflows, and one Archived row opening a page; then the archived
 /// folders, folded, each with Unarchive (#343). Never more than two levels deep (#495).
+/// A folder's Sessions starts with New Session (#5267).
 ///
 /// The rules are the Mac's own, from `SidebarFolderFold`, `SidebarSmartRow`,
 /// `SidebarOrder` and `SidebarFolds` in AgentsKitCore: the same groups, order, pins and
@@ -155,12 +155,10 @@ struct RemoteSidebar: View {
             }
 
             if !model.folders.isEmpty {
-                // One way to start a session (#495), in the folder last started in.
-                // A folder's long press starts one in it.
-                Section {
-                    NewSessionTopRow()
-                    // The daily summary's page (#3721), while the daily summary is on.
-                    if model.dailySummarySettings?.mode.writesPages == true {
+                // The daily summary's page (#3721), while the daily summary is on. New Session is
+                // the first row of each folder's Sessions (#5267), and a folder's long press.
+                if model.dailySummarySettings?.mode.writesPages == true {
+                    Section {
                         SummaryRowLabel(newest: model.summaryPages.first)
                             .accessibilityHint("Opens your daily summary")
                             .activityIcon(SummaryRowLabel.systemImage).appText(.supporting).paperTag(SidebarItem.summary)
@@ -935,12 +933,18 @@ struct RemoteFolderFold: View {
     /// only layout (#2381); not in a folder's own scene, whose group is Sessions already.
     @ViewBuilder
     private func sessionsFold(_ fold: SidebarFolderFold) -> some View {
-        let grouped = !inScene && !fold.sessions.isEmpty
+        // With New Session in it (#5267), a folder with no live session has the fold too.
+        let grouped = !inScene && (!fold.sessions.isEmpty || fold.showsNewSession)
         let isOpen = !grouped || fold.isSearching || folds.isOpen(key, .sessions)
         if grouped {
             SidebarFoldRow(title: "Sessions", count: fold.sessions.count, isOpen: isOpen) {
                 folds.set(key, .sessions, open: !isOpen)
             }
+        }
+        // New Session, the fold's first row (#5267), as Machines has New Machine. In a
+        // folder's own scene, the Sessions group's first row.
+        if isOpen && fold.showsNewSession {
+            NewSessionRow(folder: key, isNested: grouped)
         }
         // A closed fold has no rows at all (#237).
         ForEach(isOpen ? SidebarTree.rows(fold.sessions, in: model.work, folds: folds) : []) { row in
@@ -1199,15 +1203,18 @@ struct NewSessionButton: View {
     }
 }
 
-/// The first row of the sidebar (#495, #498): a new session, in the folder the last one
-/// was started in, as the window's. It carries that folder's own item, which the list
-/// lights while that form is open. A folder's long press starts one in that folder
-/// instead.
-private struct NewSessionTopRow: View {
+/// The first row of a folder's Sessions (#5267; was the sidebar's first row, #495, #498): a
+/// new session in that folder, drawn as Machines' New Machine row. It carries the folder's
+/// own item, which the list lights while that form is open.
+private struct NewSessionRow: View {
     @Environment(RemoteModel.self) private var model
+    let folder: FolderKey
+    /// In its folder's Sessions fold: one level in, as a session's row (#2312).
+    var isNested = false
+    /// The sessions' mark well, as `SidebarSessionRow` scales it.
+    @ScaledMetric private var scale: CGFloat = 1
 
     var body: some View {
-        let folder = model.newSessionFolder
         HStack(spacing: 8) {
             Image(icon: "square.and.pencil")
                 .sidebarMark(Paper.accent)
@@ -1217,25 +1224,14 @@ private struct NewSessionTopRow: View {
                 .lineLimit(1)
             Spacer(minLength: 0)
         }
+        .padding(.leading, isNested ? 20 * scale + 10 : 0)
         .appText(.supporting)
-        .foregroundStyle(model.isStale || folder == nil ? .secondary : .primary)
+        .foregroundStyle(model.isStale ? .secondary : .primary)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("New Session")
-        .modifier(NewSessionTag(folder: folder))
-        .selectionDisabled(model.isStale || folder == nil)
-    }
-}
-
-/// The row's item while there is a folder to start in; none while there is not.
-private struct NewSessionTag: ViewModifier {
-    let folder: FolderKey?
-
-    func body(content: Content) -> some View {
-        if let folder {
-            content.paperTag(SidebarItem.folder(folder))
-        } else {
-            content
-        }
+        .accessibilityHint("Starts a new session in this folder")
+        .paperTag(SidebarItem.folder(folder))
+        .selectionDisabled(model.isStale)
     }
 }
 

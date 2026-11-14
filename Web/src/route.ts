@@ -6,7 +6,7 @@
 // The page is by section (#2141): #/ is the Overview, #/agents the sidebar with nothing chosen, and
 // #/<section>/<page> a page of another section (#/status/runtimes, #/reports/spend, #/settings/policy),
 // and #/<section>/<page>/<item> one item on it: #/work/pr/github%3Aalexec%2FAgents%2399 is PR #99 (#3119),
-// and #/docs/<ref> a doc's page (#3321).
+// and #/work/docs/<ref> a doc's page (#3321, #5267).
 // The addresses before it, #/console/<page> (#1804) and #/a/<page> (#151), are read as their new place.
 // A tab holding one folder alone (#1089) starts #/o/1/…: Open in New Tab on its heading. It keeps
 // to that folder until ‹ All.
@@ -83,6 +83,11 @@ export function parseRoute(hash: string): Route {
     const page = section === undefined ? undefined : decodeURIComponent(section);
     return page === "mcp" || page === "secrets" || page === "accounts" ? { nav: "settings", section: page } : { nav: "status", section: "runtimes" };
   }
+  // Docs and Messages went into Work (#5267): #/docs/<ref> and #/messages/<key> are Work's pages now.
+  if (first === "docs" || first === "messages") {
+    if (!section || section === first) return item ? { nav: "work", section: first, item: decodeURIComponent(item) } : { nav: "work", section: first };
+    return { nav: "work", section: first, item: decodeURIComponent(section) };
+  }
   if (first && first !== "overview" && (navSections as readonly string[]).includes(first)) {
     const nav = first as Exclude<NavSection, "overview">;
     if (!section) return { nav };
@@ -94,11 +99,9 @@ export function parseRoute(hash: string): Route {
     if (nav === "reports" && section === "events") return { nav: "status", section };
     // The Multiplier page took the Achievements page's place (#3990): an old link opens it.
     if (nav === "reports" && section === "achievements") return { nav, section: "multiplier" };
-    // A doc's page is #/docs/<ref> (spec 3319): Docs has one page, so the ref takes its place.
-    if (nav === "docs" && !item && section !== "docs") return { nav, section: "docs", item: decodeURIComponent(section) };
-    // A conversation's page is #/messages/<key> (#4344), the same way.
-    if (nav === "messages" && !item && section !== "messages") return { nav, section: "messages", item: decodeURIComponent(section) };
-    if (item) return { nav, section: decodeURIComponent(section), item: decodeURIComponent(item) };
+    // An item keeps its own state after the "?" too: #/reports/value/builds?repo=… (#5178).
+    if (item) return query ? { nav, section: decodeURIComponent(section), item: decodeURIComponent(item), query }
+      : { nav, section: decodeURIComponent(section), item: decodeURIComponent(item) };
     return query ? { nav, section: decodeURIComponent(section), query } : { nav, section: decodeURIComponent(section) };
   }
   const parts = path.split("/").map((part) => decodeURIComponent(part));
@@ -163,16 +166,16 @@ export function aloneFolder(r: Route): AloneFolder | undefined {
 /** A section's page's address: #/reports/spend; #/ for the Overview. */
 function sectionHash(r: Route): string {
   if (!r.nav) return "#/";
-  if (r.nav === "docs" && r.item) return `#/docs/${encodeURIComponent(r.item)}`;
-  if (r.nav === "messages" && r.item) return `#/messages/${encodeURIComponent(r.item)}`;
-  return `#/${r.nav}` + (r.section ? "/" + encodeURIComponent(r.section) + (r.item ? "/" + encodeURIComponent(r.item) : r.query ? `?${r.query}` : "") : "");
+  return `#/${r.nav}` + (r.section ? "/" + encodeURIComponent(r.section) + (r.item ? "/" + encodeURIComponent(r.item) : "")
+    // A list's filters stay off an item's page, but Reports' pages under another keep theirs: #/reports/value/builds?… (#5178).
+    + (r.query && (!r.item || r.nav === "reports") ? `?${r.query}` : "") : "");
 }
 
 /** Whether an address is one from before #2141, or Machines ▸ Runtimes or Connectors from before #3631 and #3632, which the page writes
  * again as its new place. */
 export function isOldAddress(hash: string): boolean {
   return /^#\/?(console|a|setup)(\/|$)/.test(hash) || /^#\/?machines\/(runtimes|mcp)$/.test(hash)
-    || /^#\/?reports\/events$/.test(hash);
+    || /^#\/?reports\/events$/.test(hash) || /^#\/?(docs|messages)(\/|$)/.test(hash);
 }
 
 /** The section a route is in: Agents for a host's places, the Overview for none. */

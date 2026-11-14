@@ -23,7 +23,8 @@ import (
 // files of the old registry in ~/.agents/accounts/ (#3909) once. An account that would replace one
 // with the same service and address waits for the person's yes (#4001); a new one goes in at once,
 // with Ask before use on. A get of an account with Ask before use waits on a person (#4163,
-// accountuse.go).
+// accountuse.go). remove takes accounts out (#5253): at once when an agent added each one, else
+// only after the person's yes.
 func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage) (string, error) {
 	var call wire.MachineAccountsCall
 	action := strings.TrimSpace(argString(args, "action"))
@@ -62,6 +63,8 @@ func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage
 			return "", Invalid("Nothing was done: give the account a description, so that another agent can tell it from the other accounts of %s.", a.Service)
 		}
 		call.Add = []wire.OutsideAccount{a}
+	case "remove":
+		return d.removeAccounts(agent, args)
 	case "import":
 		found, err := oldAccounts(filepath.Join(d.personalHome(), ".agents", "accounts"))
 		if err != nil {
@@ -69,7 +72,7 @@ func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage
 		}
 		call.Add = found
 	default:
-		return "", Invalid("Nothing was done: action is list, get, add or import.")
+		return "", Invalid("Nothing was done: action is list, get, add, remove or import.")
 	}
 	if len(call.Add) == 0 {
 		listed, err := d.askAccounts(call)
@@ -88,8 +91,11 @@ func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage
 		return "", err
 	}
 	// An agent never turns Ask before use off (#4163): a new account asks, a replaced one keeps its own.
+	// A new one is this agent's (#5253), so an agent may remove it later; a replaced one keeps who
+	// added it, on the control plane.
 	for i := range call.Add {
 		call.Add[i].AskBeforeUse = nil
+		call.Add[i].AddedBy = agentRef(agent)
 	}
 	plan := planAccounts(have.Accounts, call.Add)
 	if len(plan.changed) > 0 {
@@ -102,6 +108,96 @@ func (d *Daemon) manageAccounts(agent wire.UUID, args map[string]json.RawMessage
 		})
 	}
 	return d.addAccounts(agent, have, plan, false, args)
+}
+
+// removeAccounts is manage_accounts remove (#5253): the accounts with the ids go. One the person
+// added (no addedBy) is theirs, so when any is, the whole call waits for their yes on a card.
+func (d *Daemon) removeAccounts(agent wire.UUID, args map[string]json.RawMessage) (string, error) {
+	var ids []string
+	if raw, ok := args["ids"]; ok && json.Unmarshal(raw, &ids) != nil {
+		return "", Invalid("Nothing was done: ids is a list of the accounts' ids, as list gives them.")
+	}
+	if id := argString(args, "id"); strings.TrimSpace(id) != "" {
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return "", Invalid("Nothing was done: give the ids of the accounts to remove, as list gives them.")
+	}
+	if d.askControl.Load() != nil && !d.controlHas(wire.CapMachineAccounts2) {
+		return "", &Error{Code: wire.FailureNotSupported, Message: "Nothing was done: the control plane needs an update to remove an account."}
+	}
+	have, err := d.askAccounts(wire.MachineAccountsCall{})
+	if err != nil {
+		return "", err
+	}
+	var gone []wire.OutsideAccount
+	persons := 0
+	for _, id := range ids {
+		id = strings.ToLower(strings.TrimSpace(id))
+		i := slices.IndexFunc(have.Accounts, func(a wire.OutsideAccount) bool { return accountID(a) == id })
+		if i < 0 {
+			return "", Invalid("Nothing was done: there is no account with the id %s. list gives the ids.", id)
+		}
+		if slices.ContainsFunc(gone, func(a wire.OutsideAccount) bool { return accountID(a) == id }) {
+			continue
+		}
+		gone = append(gone, have.Accounts[i])
+		if have.Accounts[i].AddedBy == nil {
+			persons++
+		}
+	}
+	remove := func() (string, error) {
+		var keys []wire.AccountKey
+		var ops []wire.AccountOperation
+		for _, a := range gone {
+			keys = append(keys, wire.AccountKey{Service: a.Service, Address: a.Address})
+			ops = append(ops, wire.AccountOperation{What: wire.AccountOperationWhatRemoved, Service: a.Service, Address: a.Address})
+		}
+		ops = byAgent(agent, ops)
+		listed, err := d.askAccounts(wire.MachineAccountsCall{Remove: keys, Ops: ops})
+		if err != nil {
+			return "", err
+		}
+		d.noteAccountOps(agent, ops)
+		return fmt.Sprintf("Removed %d. ", len(gone)) + accountsNote(listed.Accounts, "", ""), nil
+	}
+	if persons == 0 {
+		return remove()
+	}
+	title := d.agentWho(agent) + " wants to remove an account"
+	if len(gone) > 1 {
+		title = fmt.Sprintf("%s wants to remove %d accounts", d.agentWho(agent), len(gone))
+	}
+	return d.personSaysYes(agent, title, removeQuestion(gone), "Remove", func(yes bool) (string, error) {
+		if !yes {
+			return "Removed none: the person did not say Remove.", nil
+		}
+		return remove()
+	})
+}
+
+// removeQuestion is the card's question: each account, by its service, address and description.
+func removeQuestion(gone []wire.OutsideAccount) string {
+	var b strings.Builder
+	if len(gone) == 1 {
+		b.WriteString("Remove this account from Settings ▸ You ▸ Accounts?")
+	} else {
+		fmt.Fprintf(&b, "Remove these %d accounts from Settings ▸ You ▸ Accounts?", len(gone))
+	}
+	b.WriteString(" The account on the service stays; only its record goes.\n")
+	for _, a := range gone {
+		b.WriteString("\n- " + a.Service)
+		if a.Address != nil && *a.Address != "" {
+			b.WriteString(" (" + *a.Address + ")")
+		}
+		if a.Description != nil && strings.TrimSpace(*a.Description) != "" {
+			b.WriteString(": " + strings.TrimSpace(*a.Description))
+		}
+		if a.AddedBy != nil {
+			b.WriteString(" (an agent added it)")
+		}
+	}
+	return b.String()
 }
 
 // addAccounts sends what an add or import adds, with the accounts it replaces when replace (#4261:

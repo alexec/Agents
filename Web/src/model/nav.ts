@@ -6,12 +6,12 @@ import type { ActivityPage } from "../route";
 import { reportSections, type Section } from "./console";
 import { workKinds, workKindTitle, type WorkKind } from "./work";
 
-export type NavSection = "overview" | "agents" | "work" | "docs" | "messages" | "machines" | "workflows" | "reports" | "requests" | "people" | "status" | "settings";
+export type NavSection = "overview" | "agents" | "work" | "machines" | "workflows" | "reports" | "requests" | "people" | "status" | "settings";
 
-export const navSections: readonly NavSection[] = ["overview", "agents", "work", "docs", "messages", "machines", "workflows", "reports", "requests", "people", "status", "settings"];
+export const navSections: readonly NavSection[] = ["overview", "agents", "work", "machines", "workflows", "reports", "requests", "people", "status", "settings"];
 
 export const navTitle: Record<NavSection, string> = {
-  overview: "Overview", agents: "Agents", work: "Work", docs: "Docs", messages: "Messages", machines: "Machines", workflows: "Workflows", reports: "Reports",
+  overview: "Overview", agents: "Agents", work: "Work", machines: "Machines", workflows: "Workflows", reports: "Reports",
   requests: "Requests", people: "People", status: "Status", settings: "Settings",
 };
 
@@ -23,6 +23,7 @@ export type PageDraw =
   | { kind: "activity"; page: ActivityPage }
   | { kind: "console"; id: string }
   | { kind: "report"; section: Section }
+  | { kind: "builds" }
   | { kind: "work"; work: WorkKind }
   | { kind: "features" }
   | { kind: "timeline" }
@@ -42,6 +43,9 @@ export interface NavPage {
   group: string;
   /** Only an admin sees it in the list; a member who opens it by its address is told why. */
   admin?: boolean;
+  /** A page under another of the list (#5178): its row is indented under that page's, and its address is the
+   * other page's item, #/reports/value/builds. */
+  under?: string;
   draw: PageDraw;
 }
 
@@ -59,15 +63,18 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   // (#3119). The page's id is the lineage kind, so #/work/pr/<ref> is a PR's page.
   // Features (#3269) after Pull requests: the feature:<name> labels on the epics, not a lineage kind.
   // Timeline (#4206) after Releases: the epics in time, from work/timeline.
-  work: workKinds.flatMap((k): NavPage[] => [
-    { id: k, title: workKindTitle[k], group: "Work", draw: { kind: "work", work: k } },
-    ...k === "pr" ? [{ id: "features", title: "Features", group: "Work", draw: { kind: "features" } } satisfies NavPage] : [],
-    ...k === "release" ? [{ id: "timeline", title: "Timeline", group: "Work", draw: { kind: "timeline" } } satisfies NavPage] : [],
-  ]),
-  // The folders' docs and the docs connectors' (#3321, spec 3319), one page; #/docs/<ref> is a doc's page.
-  docs: [{ id: "docs", title: "Docs", group: "Docs", draw: { kind: "docs" } }],
-  // The messaging connectors' conversations (#4344), with a reply (#4345), one page; #/messages/<key> is a conversation's.
-  messages: [{ id: "messages", title: "Messages", group: "Messages", draw: { kind: "messages" } }],
+  // Docs and Messages first (#5267), as the window's Work group has them; were sections of their own.
+  work: [
+    // The folders' docs and the docs connectors' (#3321, spec 3319); #/work/docs/<ref> is a doc's page.
+    { id: "docs", title: "Docs", group: "Work", draw: { kind: "docs" } },
+    // The messaging connectors' conversations (#4344), with a reply (#4345); #/work/messages/<key> is a conversation's.
+    { id: "messages", title: "Messages", group: "Work", draw: { kind: "messages" } },
+    ...workKinds.flatMap((k): NavPage[] => [
+      { id: k, title: workKindTitle[k], group: "Work", draw: { kind: "work", work: k } },
+      ...k === "pr" ? [{ id: "features", title: "Features", group: "Work", draw: { kind: "features" } } satisfies NavPage] : [],
+      ...k === "release" ? [{ id: "timeline", title: "Timeline", group: "Work", draw: { kind: "timeline" } } satisfies NavPage] : [],
+    ]),
+  ],
   machines: [
     { id: "machines", title: "Machines", group: "Machines", draw: { kind: "machines" } },
   ],
@@ -76,7 +83,11 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
     adminPage("team", "Team Workflows", "Workflows", "workflows"),
   ],
   reports: [
-    ...reportSections.map((s): NavPage => ({ id: s.id, title: s.title, group: s.group, draw: { kind: "report", section: s } })),
+    ...reportSections.flatMap((s): NavPage[] => [
+      { id: s.id, title: s.title, group: s.group, draw: { kind: "report", section: s } },
+      // Build trends (#5178, spec 5166) under Planning: #/reports/value/builds.
+      ...s.id === "value" ? [{ id: "builds", title: "Builds", group: s.group, under: "value", draw: { kind: "builds" } } satisfies NavPage] : [],
+    ]),
     // The Multiplier page first (#3990), as the window's first row under Usage; it took the Achievements page's place.
     { id: "multiplier", title: "Multiplier", group: "Yours", draw: { kind: "multiplier" } },
     { id: "usage", title: "Usage", group: "Yours", draw: { kind: "usage" } },
@@ -133,6 +144,16 @@ export function pagesShown(section: NavSection, admin: boolean | null, open?: st
   return withPages(section, more).filter((p) => admin === true || !p.admin || p.id === open);
 }
 
+/** The id of the page a route names: a page under another (#5178) is that page's item. */
+export function routePageID(section: NavSection, r: { section?: string | undefined; item?: string | undefined }): string | undefined {
+  return r.item && navPages[section].some((p) => p.under === r.section && p.id === r.item) ? r.item : r.section;
+}
+
+/** Where a page's row goes: its own address, or its parent's item. */
+export function pageRoute(section: Exclude<NavSection, "overview">, p: NavPage): { nav: Exclude<NavSection, "overview">; section: string; item?: string } {
+  return p.under ? { nav: section, section: p.under, item: p.id } : { nav: section, section: p.id };
+}
+
 /** The page a route opens: the one named, or the section's first that this person may use. */
 export function openPage(section: NavSection, id: string | undefined, admin: boolean | null,
                          more: readonly NavPage[] = []): NavPage | undefined {
@@ -141,8 +162,9 @@ export function openPage(section: NavSection, id: string | undefined, admin: boo
     ?? list.find((p) => admin === true || !p.admin) ?? list[0];
 }
 
-/** The page a section opens on when it is not its first: Settings, below the You group (#3998). */
-const sectionHome: Partial<Record<NavSection, string>> = { settings: "settings" };
+/** The page a section opens on when it is not its first: Settings, below the You group (#3998); Work's Issues, after Docs and
+ * Messages (#5267). */
+const sectionHome: Partial<Record<NavSection, string>> = { settings: "settings", work: "issue" };
 
 /** Whether a page is for admins only and this person is not one (or not known yet). */
 export function gated(page: NavPage, admin: boolean | null): boolean {
@@ -191,5 +213,5 @@ export function movedPage(app: "console" | "a", page: string | undefined): { nav
 
 /** The g-then-letter key for each section. */
 export const sectionKeys: Record<string, NavSection> = {
-  o: "overview", a: "agents", i: "work", d: "docs", m: "machines", w: "workflows", r: "reports", q: "requests", p: "people", t: "status", s: "settings",
+  o: "overview", a: "agents", i: "work", m: "machines", w: "workflows", r: "reports", q: "requests", p: "people", t: "status", s: "settings",
 };

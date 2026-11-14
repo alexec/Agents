@@ -128,6 +128,7 @@ const CapLockReset1 = "lock-reset/1"
 const CapLock1 = "lock/1"
 const CapMac1 = "mac/1"
 const CapMachineAccounts1 = "machine.accounts/1"
+const CapMachineAccounts2 = "machine.accounts/2"
 const CapMachineUsage1 = "machine.usage/1"
 const CapMachine1 = "machine/1"
 const CapMachines1 = "machines/1"
@@ -832,7 +833,7 @@ var ControlCapabilities = pairs([][2]string{
 	{"lock/joinRequests", "lock-join/1"},
 	{"lock/joinReveal", "lock-join/1"},
 	{"lock/reset", "lock-reset/1"},
-	{"machine/accounts", "machine.accounts/1"},
+	{"machine/accounts", "machine.accounts/2"},
 	{"machine/hello", "machine/1"},
 	{"machine/lockAdd", "host.lock/2"},
 	{"machine/lockAgain", "host.lock/4"},
@@ -1114,6 +1115,7 @@ var DeclaredCapabilities = map[string][]string{
 	},
 	"control": {
 		"attention/1",
+		"machine.accounts/1",
 	},
 	"host": {
 		"host.wire/1",

@@ -62,11 +62,12 @@ public extension DocsList {
     static let relatedMost = 3
 
     /// The docs an issue's or a PR's body names, in its order, each once: a doc's ref, its address
-    /// (`#/docs/<ref>`, `agents://docs/<ref>`), and a `specs/` or `docs/` Markdown path, which is a doc
+    /// (`#/work/docs/<ref>`, before #5267 `#/docs/<ref>`; `agents://docs/<ref>`), and a `specs/` or `docs/` Markdown path, which is a doc
     /// of the item's own repo.
     static func linkedRefs(body: String, itemRef: String) -> [String] {
-        // `#/docs/<ref>` (the web page's, its ref encoded) or `agents://docs/<ref>` (the Mac window's).
-        let addressPattern = /(?:#\/docs\/|agents:\/\/docs\/)([^\s)\]>`'"]+)/
+        // `#/work/docs/<ref>` or `#/docs/<ref>` (the web page's, its ref encoded) or `agents://docs/<ref>`
+        // (the Mac window's).
+        let addressPattern = /(?:#\/(?:work\/)?docs\/|agents:\/\/docs\/)([^\s)\]>`'"]+)/
         // A folder doc's ref (`<scheme>:doc:<repo or machine/folder>#<path>`, #4800; before it
         // `<scheme>:<repo or machine/folder>/doc/<path>`), or a connector doc's.
         let refPattern =
