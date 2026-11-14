@@ -17,6 +17,9 @@ struct AgentRuntimesSettingsView: View {
                     // A runtime the organisation does not allow here: shown, with why (#998).
                     if let mark = status.setBy { OrgPolicyLine(mark: mark) }
                     RuntimeInstallRow(status: status)
+                } header: {
+                    // Its state is from the last runtimes/list (#5145).
+                    HStack { Spacer(); LastUpdateText(read: status.checkedAt) }
                 } footer: {
                     // Where its allowance stands is on the Runtimes page under Activity, not
                     // here (065). This is where a runtime is changed; that is where its state

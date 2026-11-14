@@ -276,6 +276,15 @@ export interface SetupRuntime {
   machines: { host: string; status?: RuntimeStatus }[];
 }
 
+/**
+ * The oldest read on a runtimes page (#5145), in ms since 1970: each machine's last runtimes/list (an
+ * offline one's kept from before it went) and the allowances'. Undefined before any was read.
+ */
+export function runtimesReadAt(lists: readonly (readonly RuntimeStatus[])[], allowances: readonly RuntimeAllowances[] = []): number | undefined {
+  const times = [...lists.flat().map((s) => s.checkedAt), ...allowances.map((a) => a.at)].map((at) => fromWireDate(at).getTime());
+  return times.length ? Math.min(...times) : undefined;
+}
+
 export function setupRuntimes(hosts: readonly { id: string; name: string }[], macID: string,
                               lists: Readonly<Record<string, readonly RuntimeStatus[] | undefined>>): SetupRuntime[] {
   const ordered = [...hosts].sort((a, b) => Number(b.id === macID) - Number(a.id === macID) || a.name.localeCompare(b.name));

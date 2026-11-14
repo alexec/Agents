@@ -560,6 +560,20 @@ struct AgentsModelTests {
         #expect(model.costState?.dayIsCloseToFull == true)
     }
 
+    @Test("the usage pages keep when they last read or heard their figures (#5144)")
+    func usageKeepsTheTimeOfItsRead() throws {
+        let model = AgentsModel()
+        #expect(model.costStateReadAt == nil && model.multiplierReadAt == nil, "nothing read, no line")
+        let read = Date(timeIntervalSince1970: 1_800_000_000)
+        model.replaceCostState(DaemonAPI.CostState(limits: CostLimits(), today: [:], day: "2026-11-13"), at: read)
+        #expect(model.costStateReadAt == read)
+
+        let before = Date()
+        let update = try notification(DaemonAPI.CostState(limits: CostLimits(), today: ["USD": 1], day: "2026-11-13"))
+        #expect(model.apply(DaemonAPI.Notification.costChanged, update))
+        #expect((model.costStateReadAt ?? .distantPast) >= before, "a change heard is a read")
+    }
+
     @Test("Cost warns near the money limit and Tokens near the token limit, each on its own (#956)")
     func eachRowWarnsOnItsOwnLimit() {
         let tokensNearFull = DaemonAPI.CostState(
