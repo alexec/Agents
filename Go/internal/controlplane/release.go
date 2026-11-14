@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // sendRelease is machine/release, at each join of a machine that says host.update/1 (#2178):

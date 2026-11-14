@@ -8,9 +8,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/safe"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Bring Back from ‹machine›… from a client (#4640), as Send to ‹machine›… is (foldersend.go,

@@ -4,8 +4,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Who did it (#1751, spec 736 FR-040): the control plane gives each channel the actor of

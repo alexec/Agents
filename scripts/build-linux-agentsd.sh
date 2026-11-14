@@ -46,7 +46,7 @@ for arch goarch in x86_64 amd64 aarch64 arm64; do
     for product cmd in agentsd agentsd github-mcp github-mcp linear-mcp linear-mcp gitlab-mcp gitlab-mcp email-mcp email-mcp jira-mcp jira-mcp slack-mcp slack-mcp googlechat-mcp googlechat-mcp whatsapp-mcp whatsapp-mcp sentry-mcp sentry-mcp betterstack-mcp betterstack-mcp forgejo-mcp forgejo-mcp bitbucket-mcp bitbucket-mcp azuredevops-mcp azuredevops-mcp azureboards-mcp azureboards-mcp; do
         print "building $product for $arch-linux…"
         GOOS=linux GOARCH=$goarch $root/Go/scripts/go.sh build -trimpath \
-            -ldflags "-s -w -X github.com/alexec/agents/Go/internal/buildinfo.Version=$version" \
+            -ldflags "-s -w -X github.com/agentloops-dev/agents/Go/internal/buildinfo.Version=$version" \
             -o out/servers/$product-linux-$arch ./cmd/$cmd
         print "  $work/$product-linux-$arch ($(( $(wc -c < $work/$product-linux-$arch) / 1048576 )) MB)"
     done

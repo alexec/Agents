@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The MCP events message.received and question.answered (#1016), polled only: `events/list` and

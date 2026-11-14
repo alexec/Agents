@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/internal/repoalias"
-	"github.com/alexec/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/internal/repoalias"
+	"github.com/agentloops-dev/agents/Go/internal/safe"
 )
 
 // Repo aliases (#4957, spec 4929-github-organisation): when a repo's owner moves, such as

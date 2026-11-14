@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Ports ElicitationTests and ElicitationSchemaTests: a form is held, answered from any

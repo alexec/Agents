@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // CIWatcherTests.swift's event cases, over a fake GitHub held in memory.

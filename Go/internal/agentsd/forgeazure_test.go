@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/azureboardsmcp"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/azureboardsmcp"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // fakeForgeBoards is Azure Boards' lists, item reads and writes, and what each was asked (#3815).

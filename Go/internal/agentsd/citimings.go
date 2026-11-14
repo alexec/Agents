@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/citimings"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/citimings"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Build timings (#5177, specs/5166-build-deploy-trends/spec.md, "The data spike"): this

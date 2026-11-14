@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Client sealing (#3397, specs/3397-client-sealing): an admin's client seals each of an

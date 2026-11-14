@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The sessions an agent started (028, #940), as DaemonCore+Helpers keeps them on the Swift

@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A node's title, state and labels from its connector (#3089): github:owner/repo#12 becomes

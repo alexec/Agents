@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/githubmcp"
-	"github.com/alexec/agents/Go/internal/gitlabmcp"
-	"github.com/alexec/agents/Go/internal/linearmcp"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
+	"github.com/agentloops-dev/agents/Go/internal/gitlabmcp"
+	"github.com/agentloops-dev/agents/Go/internal/linearmcp"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 func (f *fakeForgeGitHub) Plan(_ context.Context, repo string, number int) (githubmcp.Plan, error) {

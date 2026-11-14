@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Language servers for the file editor (#844): files/diagnostics asks the language server

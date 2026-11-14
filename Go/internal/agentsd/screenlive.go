@@ -1,8 +1,8 @@
 package agentsd
 
 import (
-	"github.com/alexec/agents/Go/internal/safe"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The live tile (#3004, US4, research R7): while an agent holds the "screen" lease, every

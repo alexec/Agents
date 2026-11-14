@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/diskjson"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The archived records' summaries (#4653). An archived record is held without its

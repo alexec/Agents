@@ -8,8 +8,8 @@ import (
 	"errors"
 	"os"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
 )
 
 // Source is where the control plane keeps its key (#1458). There are two kinds:

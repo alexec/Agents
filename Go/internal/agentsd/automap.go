@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The shared words (#2658): Fast, Balanced and Smart; Plan, Ask and Approve for me; Request

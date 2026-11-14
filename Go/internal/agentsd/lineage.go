@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The lineage graph (#2348): typed links between issues, sessions, PRs and the rest, in

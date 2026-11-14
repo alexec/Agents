@@ -11,9 +11,9 @@ import (
 	// on every host (#4818).
 	_ "time/tzdata"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/agentsd/yamlnode"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/yamlnode"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Workflow hours (#4818): `hours:` says when a workflow may start, for every trigger.

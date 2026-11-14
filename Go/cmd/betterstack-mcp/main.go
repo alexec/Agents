@@ -24,8 +24,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/alexec/agents/Go/internal/betterstackmcp"
-	"github.com/alexec/agents/Go/internal/buildinfo"
+	"github.com/agentloops-dev/agents/Go/internal/betterstackmcp"
+	"github.com/agentloops-dev/agents/Go/internal/buildinfo"
 )
 
 func main() {

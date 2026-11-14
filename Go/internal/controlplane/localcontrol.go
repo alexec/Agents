@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/alexec/agents/Go/internal/controlplane/web"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/web"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The controls of a control plane that runs on a person's Mac (#4252): the web page's

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/agentsd/yamlnode"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/yamlnode"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // An alarm (#4966): a one-time workflow trigger, `on: - once: {at: 2026-11-13T09:15}`.

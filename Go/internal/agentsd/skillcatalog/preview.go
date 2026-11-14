@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Staged is a skill fetched at one commit into a folder the daemon owns and nowhere an

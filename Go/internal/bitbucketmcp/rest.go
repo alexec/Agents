@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // RealBitbucket reads Bitbucket Cloud's REST API 2.0 as the person, with the token Token

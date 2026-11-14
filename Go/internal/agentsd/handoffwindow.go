@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The hand-off in the real window (#5208, spike #5127). When the agents' browser is Google

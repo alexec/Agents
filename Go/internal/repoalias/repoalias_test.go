@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 var t0 = time.Date(2026, 11, 12, 12, 0, 0, 0, time.UTC)

@@ -8,10 +8,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/controlplane/records"
-	"github.com/alexec/agents/Go/internal/controlplane/s3store"
-	"github.com/alexec/agents/Go/internal/controlplane/s3store/s3fake"
-	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/s3store"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/s3store/s3fake"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
 )
 
 // A store of a build before #2316 keeps machines in v1/hosts: it opens with them (#2662).

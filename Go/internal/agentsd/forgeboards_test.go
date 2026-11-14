@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/jiramcp"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/jiramcp"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // board is a project's board as the control plane keeps it.
