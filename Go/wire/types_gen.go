@@ -1775,6 +1775,9 @@ type BuildsChange struct {
 
 	Runner *string `json:"runner,omitzero"`
 
+	// When this machine sent ci.slowed for the change (#5200); absent when it sent none (a speed-up, or a change found too long after its first slow run).
+	SlowedSent *Date `json:"slowedSent,omitzero"`
+
 	Between []BuildsBetween `json:"between"`
 
 	Points []BuildsPoint `json:"points"`

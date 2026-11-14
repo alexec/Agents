@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/agentloops-dev/agent-loops/Go/internal/repoalias"
 	"github.com/agentloops-dev/agent-loops/Go/wire"
@@ -200,5 +202,48 @@ func TestTheCheckFollowsASecondMove(t *testing.T) {
 	}
 	if got := d.lineage().Links(wire.LineageNode{Kind: "pr", Ref: "github:pr:agentloops-dev/agent-loops#12"}); len(got.Links) != 1 {
 		t.Fatalf("the PR by its name now: %+v", got)
+	}
+}
+
+// #5335: the daemon reads a folder's origin again when it changes, so Work searches the new
+// name after `git remote set-url`, not the one it read at the start.
+func TestAFolderRepoFollowsANewOrigin(t *testing.T) {
+	d, err := New(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	folder := gitFolder(t, "https://github.com/alexec/Agents.git")
+	if got := d.folderRepo(folder).path; !strings.EqualFold(got, "alexec/agents") {
+		t.Fatalf("before: %q", got)
+	}
+	if out, err := exec.Command("git", "-C", folder, "remote", "set-url", "origin", "https://github.com/agentloops-dev/agent-loops.git").CombinedOutput(); err != nil {
+		t.Fatalf("set-url: %v %s", err, out)
+	}
+	// A file system with coarse times would show no change in the same second.
+	later := time.Now().Add(2 * time.Second)
+	if err := os.Chtimes(filepath.Join(folder, ".git", "config"), later, later); err != nil {
+		t.Fatal(err)
+	}
+	if got := d.folderRepo(folder).path; !strings.EqualFold(got, "agentloops-dev/agent-loops") {
+		t.Fatalf("after: %q", got)
+	}
+	if got := d.folderTopic(folder); !strings.EqualFold(got, "agentloops-dev/agent-loops") {
+		t.Fatalf("topic after: %q", got)
+	}
+}
+
+// #5335: GitHub's search answers 422 for a repo's old name, so Work searches the name now.
+func TestWorkSearchesAMovedRepoByItsNameNow(t *testing.T) {
+	noAliases(t)
+	d, err := New(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	folder := gitFolder(t, "https://github.com/alexec/Agents.git")
+	repoalias.Add("github", "alexec/agents", "agentloops-dev/agents", nowFunc())
+	repoalias.Add("github", "agentloops-dev/agents", "agentloops-dev/agent-loops", nowFunc())
+	s := githubForge{d: d}.scopeOf([]string{folder})
+	if !slices.Equal(s.repos, []string{"agentloops-dev/agent-loops"}) || s.folderOf["agentloops-dev/agent-loops"] != folder {
+		t.Fatalf("scope %+v", s)
 	}
 }
