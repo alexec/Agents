@@ -571,6 +571,43 @@ export interface AgentWorktree {
 }
 
 /**
+ * One change in Agents between two versions (#5273): a commit of agentloops-dev/agent-loops, its
+ * PR's number when its squash title says one, its title (the first line of its message) and when it
+ * was made.
+ */
+export interface AgentsChange {
+  number?: number;
+  title: string;
+  sha: string;
+  date?: WireDate;
+}
+
+/**
+ * The changes in Agents from version base to version head (#5273), from GitHub's compare of their
+ * commits: ahead is how many commits head has that base has not, behind how many base has that head
+ * has not (a machine behind another). changes are head's new commits, newest first, at most the
+ * request's limit (all, up to 1,000, with none); complete is false when there were more.
+ */
+export interface AgentsChanges {
+  base: string;
+  head: string;
+  ahead: number;
+  behind: number;
+  changes: AgentsChange[];
+  complete: boolean;
+}
+
+/**
+ * machines/agentsChanges (#5273): the changes from one Agents version to another, as a machine says
+ * them (0.18.0, 0.18.1-dev.544+g8162a5a06). limit bounds the changes; with none, all, up to 1,000.
+ */
+export interface AgentsChangesRequest {
+  base: string;
+  head: string;
+  limit?: number;
+}
+
+/**
  * What agents/export made (#1001): a .tar.gz in the backup format, read in parts with
  * agents/exportRead. `name` is a file name to save it as.
  */
@@ -7743,6 +7780,45 @@ export interface MachineAccountsCall {
   remove?: AccountKey[];
 }
 
+/**
+ * machines/agents (#5273, spec 5239 board 6): a machine page's Agents section. version is what the
+ * machine runs, since the first machine/hello at it; previous is the version before. changes are
+ * the changes since previous, the newest few (machines/agentsChanges gives all); absent when there
+ * is no previous or GitHub could not say, and changesError says why in the second case. history is
+ * the versions it ran, newest first, at most 20. others are the person's other machines, each with
+ * its version.
+ */
+export interface MachineAgents {
+  host: MachineRef;
+  version: string;
+  since?: WireDate;
+  previous?: string;
+  changes?: AgentsChanges;
+  changesError?: string;
+  history: MachineAgentsVersion[];
+  others: MachineAgentsOther[];
+}
+
+/**
+ * Another of the person's machines on a machine's page (#5273): its version, since when, and how
+ * many changes it is ahead of and behind the page's machine. ahead and behind are absent when
+ * GitHub could not say (a version with no commit, GitHub not answering).
+ */
+export interface MachineAgentsOther {
+  host: MachineRef;
+  name: string;
+  version: string;
+  since?: WireDate;
+  ahead?: number;
+  behind?: number;
+}
+
+/** One version a machine ran (#5273) and when it came: the first machine/hello at it. */
+export interface MachineAgentsVersion {
+  version: string;
+  since?: WireDate;
+}
+
 /** machines/announce, on an enrolment connection. */
 export interface MachineAnnounce {
   publicKey: Base64;
@@ -8202,13 +8278,15 @@ export interface MachineUserSettings {
  * component agents to the environment machines, its target labelled machine=<host>, from the last
  * time the old version was seen (started) to the first machine/hello at the new one (finished).
  * Each version's artifact is its commit: the tag vX.Y.Z for X.Y.Z, the sha after +g for
- * X.Y.Z-dev.N+g<sha>.
+ * X.Y.Z-dev.N+g<sha>. previous is the version it ran before version, when the control plane saw the
+ * change.
  */
 export interface MachineVersions {
   host: MachineRef;
   version: string;
   firstSeen?: WireDate;
   seen?: WireDate;
+  previous?: string;
   deploys: Deploy[];
 }
 
@@ -15691,6 +15769,8 @@ export interface Methods {
   "lock/joinReveal": { params: LockJoinNonce; result: Empty };
   "lock/reset": { params: Empty; result: Empty };
   "machine/usage": { params: Empty; result: MachineUsageState };
+  "machines/agents": { params: MachineRequest; result: MachineAgents };
+  "machines/agentsChanges": { params: AgentsChangesRequest; result: AgentsChanges };
   "machines/approveJoin": { params: JoinRequestDecide; result: JoinApproved };
   "machines/checkAgain": { params: MachineRequest; result: Empty };
   "machines/deleteMachine": { params: MachineRequest; result: Empty };
@@ -16139,6 +16219,8 @@ export const MethodTarget = {
   "lock/joinReveal": "control",
   "lock/reset": "control",
   "machine/usage": "host",
+  "machines/agents": "control",
+  "machines/agentsChanges": "control",
   "machines/approveJoin": "control",
   "machines/checkAgain": "control",
   "machines/deleteMachine": "control",
@@ -16472,6 +16554,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   AgentRequest: { required: ["agentID"], optional: [] },
   AgentStopRequest: { required: ["agentID"], optional: ["byAdmin"] },
   AgentWorktree: { required: ["name", "root", "madeByApp", "folder"], optional: ["branch", "base"] },
+  AgentsChange: { required: ["title", "sha"], optional: ["number", "date"] },
+  AgentsChanges: { required: ["base", "head", "ahead", "behind", "changes", "complete"], optional: [] },
+  AgentsChangesRequest: { required: ["base", "head"], optional: ["limit"] },
   AgentsExport: { required: ["file", "agents", "name"], optional: [] },
   AgentsExportRequest: { required: [], optional: ["agentID", "folder"] },
   AgentsImportRequest: { required: ["upload"], optional: ["folder"] },
@@ -17030,6 +17115,9 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MacPathRequest: { required: ["path"], optional: ["app"] },
   MacTerminalRequest: { required: [], optional: ["path"] },
   MachineAccountsCall: { required: [], optional: ["add", "ops", "remove"] },
+  MachineAgents: { required: ["host", "version", "history", "others"], optional: ["since", "previous", "changes", "changesError"] },
+  MachineAgentsOther: { required: ["host", "name", "version"], optional: ["since", "ahead", "behind"] },
+  MachineAgentsVersion: { required: ["version"], optional: ["since"] },
   MachineAnnounce: { required: ["publicKey", "name", "platform", "version", "machineID"], optional: ["implementation"] },
   MachineBotKey: { required: ["host"], optional: ["copy", "drop"] },
   MachineCatalog: { required: ["items"], optional: [] },
@@ -17069,7 +17157,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineUsageState: { required: ["machine", "disks"], optional: [] },
   MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   MachineUserSettings: { required: ["user", "settings", "secrets"], optional: ["waiting"] },
-  MachineVersions: { required: ["host", "version", "deploys"], optional: ["firstSeen", "seen"] },
+  MachineVersions: { required: ["host", "version", "deploys"], optional: ["firstSeen", "seen", "previous"] },
   MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "idleTimeoutMinutes", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
   MachineWorkspaceCall: { required: ["agent", "method", "params"], optional: ["deliver"] },
   MachinesSummaryFacts: { required: ["machines"], optional: [] },

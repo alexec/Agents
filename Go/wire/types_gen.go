@@ -550,6 +550,41 @@ type AgentWorktree struct {
 	Folder URL `json:"folder"`
 }
 
+// One change in Agents between two versions (#5273): a commit of agentloops-dev/agent-loops, its PR's number when its squash title says one, its title (the first line of its message) and when it was made.
+type AgentsChange struct {
+	Number *int64 `json:"number,omitzero"`
+
+	Title string `json:"title"`
+
+	Sha string `json:"sha"`
+
+	Date *Date `json:"date,omitzero"`
+}
+
+// The changes in Agents from version base to version head (#5273), from GitHub's compare of their commits: ahead is how many commits head has that base has not, behind how many base has that head has not (a machine behind another). changes are head's new commits, newest first, at most the request's limit (all, up to 1,000, with none); complete is false when there were more.
+type AgentsChanges struct {
+	Base string `json:"base"`
+
+	Head string `json:"head"`
+
+	Ahead int64 `json:"ahead"`
+
+	Behind int64 `json:"behind"`
+
+	Changes []AgentsChange `json:"changes"`
+
+	Complete bool `json:"complete"`
+}
+
+// machines/agentsChanges (#5273): the changes from one Agents version to another, as a machine says them (0.18.0, 0.18.1-dev.544+g8162a5a06). limit bounds the changes; with none, all, up to 1,000.
+type AgentsChangesRequest struct {
+	Base string `json:"base"`
+
+	Head string `json:"head"`
+
+	Limit *int64 `json:"limit,omitzero"`
+}
+
 // What agents/export made (#1001): a .tar.gz in the backup format, read in parts with agents/exportRead. `name` is a file name to save it as.
 type AgentsExport struct {
 	File SendFile `json:"file"`
@@ -8405,6 +8440,47 @@ type MachineAccountsCall struct {
 	Remove []AccountKey `json:"remove,omitzero"`
 }
 
+// machines/agents (#5273, spec 5239 board 6): a machine page's Agents section. version is what the machine runs, since the first machine/hello at it; previous is the version before. changes are the changes since previous, the newest few (machines/agentsChanges gives all); absent when there is no previous or GitHub could not say, and changesError says why in the second case. history is the versions it ran, newest first, at most 20. others are the person's other machines, each with its version.
+type MachineAgents struct {
+	Host MachineRef `json:"host"`
+
+	Version string `json:"version"`
+
+	Since *Date `json:"since,omitzero"`
+
+	Previous *string `json:"previous,omitzero"`
+
+	Changes *AgentsChanges `json:"changes,omitzero"`
+
+	ChangesError *string `json:"changesError,omitzero"`
+
+	History []MachineAgentsVersion `json:"history"`
+
+	Others []MachineAgentsOther `json:"others"`
+}
+
+// Another of the person's machines on a machine's page (#5273): its version, since when, and how many changes it is ahead of and behind the page's machine. ahead and behind are absent when GitHub could not say (a version with no commit, GitHub not answering).
+type MachineAgentsOther struct {
+	Host MachineRef `json:"host"`
+
+	Name string `json:"name"`
+
+	Version string `json:"version"`
+
+	Since *Date `json:"since,omitzero"`
+
+	Ahead *int64 `json:"ahead,omitzero"`
+
+	Behind *int64 `json:"behind,omitzero"`
+}
+
+// One version a machine ran (#5273) and when it came: the first machine/hello at it.
+type MachineAgentsVersion struct {
+	Version string `json:"version"`
+
+	Since *Date `json:"since,omitzero"`
+}
+
 // machines/announce, on an enrolment connection.
 type MachineAnnounce struct {
 	PublicKey Data `json:"publicKey"`
@@ -8840,7 +8916,7 @@ type MachineUserSettings struct {
 	Waiting []UserSecretAbout `json:"waiting,omitzero"`
 }
 
-// machines/versions (#5272, spec 5239, "Alex's question"): the Agents versions a machine ran, from its machine/hello. version is the one it said last; firstSeen is the first time the control plane heard it at that version, and seen the last. deploys are the changes of version the control plane saw, newest first, at most 20: each an observed deploy (observed: true, state succeeded) of the component agents to the environment machines, its target labelled machine=<host>, from the last time the old version was seen (started) to the first machine/hello at the new one (finished). Each version's artifact is its commit: the tag vX.Y.Z for X.Y.Z, the sha after +g for X.Y.Z-dev.N+g<sha>.
+// machines/versions (#5272, spec 5239, "Alex's question"): the Agents versions a machine ran, from its machine/hello. version is the one it said last; firstSeen is the first time the control plane heard it at that version, and seen the last. deploys are the changes of version the control plane saw, newest first, at most 20: each an observed deploy (observed: true, state succeeded) of the component agents to the environment machines, its target labelled machine=<host>, from the last time the old version was seen (started) to the first machine/hello at the new one (finished). Each version's artifact is its commit: the tag vX.Y.Z for X.Y.Z, the sha after +g for X.Y.Z-dev.N+g<sha>. previous is the version it ran before version, when the control plane saw the change.
 type MachineVersions struct {
 	Host MachineRef `json:"host"`
 
@@ -8849,6 +8925,8 @@ type MachineVersions struct {
 	FirstSeen *Date `json:"firstSeen,omitzero"`
 
 	Seen *Date `json:"seen,omitzero"`
+
+	Previous *string `json:"previous,omitzero"`
 
 	Deploys []Deploy `json:"deploys"`
 }

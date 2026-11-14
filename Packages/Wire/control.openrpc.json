@@ -3294,6 +3294,58 @@
       ]
     },
     {
+      "name": "machines/agents",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A machine page's Agents section (#5273): its version, since when, the changes since the version before, its history and the person's other machines.",
+      "x-capability": "machines/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/MachineRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/MachineAgents"
+        }
+      }
+    },
+    {
+      "name": "machines/agentsChanges",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The changes in Agents from one version to another (#5273), newest first, from GitHub's compare of their commits.",
+      "x-capability": "machines/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/AgentsChangesRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/AgentsChanges"
+        }
+      }
+    },
+    {
       "name": "machines/announce",
       "x-capability": "machines/1",
       "description": "On an enrolment connection, before any other.",

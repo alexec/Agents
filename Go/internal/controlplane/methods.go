@@ -702,6 +702,31 @@ func (m *Methods) Handle(method string, params json.RawMessage, from Caller) (an
 			return nil, fail(noSuchHost, "No machine is called %s.", host)
 		}
 		return m.s.machineVersions(ctx, host)
+	case "machines/agents":
+		// A machine page's Agents section (#5273).
+		request, err := require[wire.MachineRequest](params, "MachineRequest")
+		if err != nil {
+			return nil, err
+		}
+		host, err := m.ownHostNamed(from, string(request.Host))
+		if err != nil {
+			return nil, err
+		}
+		if m.records.Host(host) == nil || !m.owns(from, host) {
+			return nil, fail(noSuchHost, "No machine is called %s.", host)
+		}
+		return m.machineAgents(ctx, host, from)
+	case "machines/agentsChanges":
+		// The changes between two Agents versions (#5273): public, from GitHub.
+		request, err := require[wire.AgentsChangesRequest](params, "AgentsChangesRequest")
+		if err != nil {
+			return nil, err
+		}
+		limit := 0
+		if request.Limit != nil {
+			limit = max(int(*request.Limit), 0)
+		}
+		return m.s.agentsChanges(ctx, request.Base, request.Head, limit)
 	}
 	if workspaceMethods[method] {
 		if m.s.providers == nil {

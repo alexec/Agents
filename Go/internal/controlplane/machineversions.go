@@ -34,7 +34,9 @@ const (
 
 // storedMachineVersions is one machine's object.
 type storedMachineVersions struct {
-	Version   string        `json:"version"`
+	Version string `json:"version"`
+	// Previous is the version before Version (#5273), when a change was seen.
+	Previous  string        `json:"previous,omitempty"`
 	FirstSeen time.Time     `json:"firstSeen"`
 	Seen      time.Time     `json:"seen"`
 	Deploys   []wire.Deploy `json:"deploys"`
@@ -101,7 +103,7 @@ func (s *Service) noteVersion(ctx context.Context, host, version string, now tim
 			if len(m.Deploys) > mostMachineVersions {
 				m.Deploys = m.Deploys[:mostMachineVersions]
 			}
-			m.FirstSeen = now
+			m.FirstSeen, m.Previous = now, m.Version
 		}
 		m.Version, m.Seen = version, now
 		return true
@@ -143,6 +145,12 @@ func (s *Service) machineVersions(ctx context.Context, host string) (wire.Machin
 	}
 	out.Version = stored.Version
 	out.FirstSeen, out.Seen = optional(wire.DateOf(stored.FirstSeen)), optional(wire.DateOf(stored.Seen))
+	// An object kept before #5273 has no previous: the deploy before the newest names it.
+	previous := stored.Previous
+	if previous == "" && len(stored.Deploys) > 1 && stored.Deploys[1].Version.Name != nil {
+		previous = *stored.Deploys[1].Version.Name
+	}
+	out.Previous = optional(previous)
 	if stored.Deploys != nil {
 		out.Deploys = stored.Deploys
 	}

@@ -94,6 +94,12 @@ these changes, since time X" (#5273):
   last 20 deploys. It goes when the machine is removed.
 - **Read:** `machines/versions` gives the version now, when it was first and last seen, and
   the deploys, newest first, to the machine's own person.
+- **The page (#5273):** `machines/agents` gives a machine page's **Agent Loops** section: the
+  version, since when, the version before and the newest changes since it, the history, and the
+  person's other machines with how many changes each is ahead or behind. `machines/agentsChanges`
+  gives every change between two versions (up to 1,000), newest first. Both come from GitHub's
+  compare of the two commits in `agentloops-dev/agent-loops`, asked with no token (the repo is
+  public) and kept in memory, at most 256 compares, as two commits' compare never changes.
 
 ## Events
 
