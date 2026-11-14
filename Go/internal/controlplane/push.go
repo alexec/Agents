@@ -145,7 +145,7 @@ func sealPush(d notices.RelayDelivery, publicKey []byte, token records.PushToken
 		full := apns.Truncated(*d.Headline)
 		bare := full
 		bare.Answers = nil
-		placeholder := wire.Headline{H1: "Agents", H2: "An agent", H3: "needs you"}
+		placeholder := wire.Headline{H1: "Agent Loops", H2: "An agent", H3: "needs you"}
 		tries = []*wire.Headline{&full, &bare, &placeholder}
 	} else {
 		tries = []*wire.Headline{nil}

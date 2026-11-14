@@ -162,6 +162,6 @@ func (d *Daemon) reconcileLineWaits() {
 }
 
 func lostPlaceWords(name wire.ResourceName) string {
-	return "Your wait for your turn with " + string(name) + " ended: when Agents started again, you were no longer in its line. " +
+	return "Your wait for your turn with " + string(name) + " ended: when Agent Loops started again, you were no longer in its line. " +
 		"Call lease_resource again if you still need it: you keep your place in its line."
 }

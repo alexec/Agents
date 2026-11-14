@@ -496,7 +496,7 @@ func callMessagingTools(ctx context.Context, s sdk.McpServer, cwd string, first 
 		return docsSearchError(mcpFailureOf(err).sentence(timeout))
 	}
 	if _, err := c.call(ctx, 1, "initialize", map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{},
-		"clientInfo": map[string]any{"name": "Agents", "version": "1"}}); err != nil {
+		"clientInfo": map[string]any{"name": "Agent Loops", "version": "1"}}); err != nil {
 		return nil, nil, nil, failed(err)
 	}
 	if err := c.notify(ctx, "notifications/initialized"); err != nil {

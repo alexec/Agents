@@ -246,7 +246,7 @@ When a repository has all of its names, skip to step 5.
    Then read the organization's slug from the address (`https://<org>.sentry.io/…`).
 2. **Sentry's MCP server.** When you have no Sentry tools (no `find_organizations`),
    `ask_question` with the options **Done** and **Can't do it**: `Add Sentry in Settings ▸
-   Agent Configuration ▸ Connectors (Add Connector…, the Agents marketplace), then choose
+   Agent Configuration ▸ Connectors (Add Connector…, the Agent Loops marketplace), then choose
    Sign in… and choose the organization <org>. Done?`
 3. **The project and its DSN.** A connector added during a session reaches only agents
    that start after it. So when you have no Sentry tools, start a helper in the new folder
@@ -267,12 +267,12 @@ When a repository has all of its names, skip to step 5.
    (`SENTRY_ORG` is set), this part is done. Else go to
    `https://<org>.sentry.io/settings/account/api/auth-tokens/` and call `hand_to_person`:
    - step: `Make a personal token with event:read, org:read and project:read, and copy it`;
-   - reason: `Agents reads the new crashes and errors with it, so that a workflow can start on one. An organization token cannot read issues.`
+   - reason: `Agent Loops reads the new crashes and errors with it, so that a workflow can start on one. An organization token cannot read issues.`
 
    Then `ask_secret` `SENTRY_AUTH_TOKEN`, and say in its `reason` to leave **For this
    session only** off: the events server reads it from the secrets file. Then
    `ask_question` with **Done** and **Can't do it**: `Add Sentry events in Settings ▸ Agent Configuration ▸ Connectors (Add Connector…, the
-   Agents marketplace). SENTRY_AUTH_TOKEN is set already; type <org> as SENTRY_ORG. Done?`
+   Agent Loops marketplace). SENTRY_AUTH_TOKEN is set already; type <org> as SENTRY_ORG. Done?`
    Tell the person that the workflow **File a bug from Sentry** is on the folder's
    **Workflows** page, off, for them to turn on.
 

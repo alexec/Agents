@@ -271,7 +271,7 @@ func (p *mcpEventConns) connect(key string, c *mcpEventConn, es eventServer) err
 		return &mcpEventsError{kind: "serverError", message: "It uses the old sse transport."}
 	}
 	raw, err := c.call(p.timeout, "initialize", map[string]any{"protocolVersion": mcpEventProtocol,
-		"capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "Agents", "version": "1"}})
+		"capabilities": map[string]any{}, "clientInfo": map[string]any{"name": "Agent Loops", "version": "1"}})
 	if err == nil {
 		var init struct {
 			Capabilities map[string]json.RawMessage `json:"capabilities"`

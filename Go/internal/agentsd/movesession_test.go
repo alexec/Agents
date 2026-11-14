@@ -39,7 +39,7 @@ func movingPairHeld(t *testing.T, hold chan struct{}) (here, there *Daemon, c *c
 		call, ok := params.(wire.MachineWorkspaceCall)
 		b, _ := json.Marshal(call.Params)
 		if !ok || call.Method != "machines/sendFolder" {
-			return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
+			return nil, &controllink.AskError{Code: -32010, Message: "Agent Loops can’t ask that of the control plane."}
 		}
 		var s wire.MachineFolderSend
 		json.Unmarshal(b, &s)

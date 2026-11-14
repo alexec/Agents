@@ -333,7 +333,7 @@ func TestAContractServerOrTheShippedMapNeedsNoAgent(t *testing.T) {
 	}
 	do := newWorld([]string{"droplet-list", "power-on-droplet", "power-off-droplet", "droplet-delete"}, nil)
 	shipped, _ := newDraftHarness(do, quickDraftTiming(), true, "", nil).start(mapForm, nil, "claude")
-	if shipped.Answered == nil || shipped.Answered.Note != "Agents ships this map." || !jsonEqual(shipped.Answered.Map, ShippedDigitalOceanMap) {
+	if shipped.Answered == nil || shipped.Answered.Note != "Agent Loops ships this map." || !jsonEqual(shipped.Answered.Map, ShippedDigitalOceanMap) {
 		t.Errorf("%+v", shipped)
 	}
 }
@@ -681,7 +681,7 @@ func cliWorld() *world {
 func TestAPresetsCLIOrOneNotInstalledStartsNoAgent(t *testing.T) {
 	w := cliWorld()
 	preset, err := newDraftHarness(w, quickDraftTiming(), true, "", nil).start(ProviderAdd{Name: "D", Kind: KindCommands, CLI: ptr("doctl")}, nil, "claude")
-	if err != nil || preset.Answered == nil || deref(preset.Answered.Preset) != "doctl" || preset.Answered.Note != "Agents has a preset for doctl: use DigitalOcean Droplets." {
+	if err != nil || preset.Answered == nil || deref(preset.Answered.Preset) != "doctl" || preset.Answered.Note != "Agent Loops has a preset for doctl: use DigitalOcean Droplets." {
 		t.Errorf("%v %+v", err, preset)
 	}
 	w.notInstalled = true

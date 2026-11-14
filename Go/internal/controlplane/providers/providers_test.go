@@ -407,7 +407,7 @@ func TestAnIdleHostIsStoppedAndSaysSo(t *testing.T) {
 	}
 	h.router.setOnline(devbox, false)
 	r := h.waitFor("stopped", devbox, 5, func(r row) bool { return deref(r.Workspace.StoppedBy) != "" })
-	if deref(r.Workspace.StoppedBy) != "Stopped by Agents after 2 minutes idle" {
+	if deref(r.Workspace.StoppedBy) != "Stopped by Agent Loops after 2 minutes idle" {
 		t.Errorf("%q", deref(r.Workspace.StoppedBy))
 	}
 }

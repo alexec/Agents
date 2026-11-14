@@ -259,7 +259,7 @@ func truncating(h wire.Headline) wire.Headline {
 		}
 		return cut(s, headlineBudget)
 	}
-	h.H1, h.H2, h.H3 = field(h.H1, "Agents"), field(h.H2, "An agent"), field(h.H3, "needs you")
+	h.H1, h.H2, h.H3 = field(h.H1, "Agent Loops"), field(h.H2, "An agent"), field(h.H3, "needs you")
 	for i, a := range h.Answers {
 		title := strings.TrimSpace(a.Title)
 		if title == "" {

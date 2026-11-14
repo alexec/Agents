@@ -68,7 +68,7 @@ func TestARestartIsSaidAndAWaitOpenOverItIsTold(t *testing.T) {
 	d.SayRestarted()
 	e := lastEvent(d, "system.restarted")
 	if e == nil || e.Details["reason"] != "stopped" || e.Details["down_for"] != "180" || e.Details["down_for_text"] != "3 min" ||
-		e.Details["down_since"] == "" || e.Sentence != "Agents restarted after a clean stop. It was down for 3 min." || e.Scope.Mac == nil {
+		e.Details["down_since"] == "" || e.Sentence != "Agent Loops restarted after a clean stop. It was down for 3 min." || e.Scope.Mac == nil {
 		t.Fatalf("%+v", e)
 	}
 
@@ -76,7 +76,7 @@ func TestARestartIsSaidAndAWaitOpenOverItIsTold(t *testing.T) {
 	d.raise(wire.EventDraft{Name: "lease.granted", At: now(), Scope: macScope(), Sentence: "x was given build.", Details: map[string]string{"resource": "build"}})
 	waitFor(t, "the wake with the notice", func() bool {
 		for _, u := range userMessages(d, id) {
-			if strings.HasPrefix(u, "The event you were waiting for happened.") && strings.Contains(u, "\nAgents restarted at ") &&
+			if strings.HasPrefix(u, "The event you were waiting for happened.") && strings.Contains(u, "\nAgent Loops restarted at ") &&
 				strings.Contains(u, " while you waited. It was down for about 3 min (from ") &&
 				strings.HasSuffix(u, "Events in that time may be missing: lease.granted. Check the state yourself (for example the branch or the PR).") {
 				return true
@@ -100,7 +100,7 @@ func TestACrashAndAFirstStart(t *testing.T) {
 	d, _ := start(t, root)
 	d.SayRestarted()
 	if e := lastEvent(d, "system.restarted"); e == nil || e.Details["reason"] != "first_start" || e.Details["down_for_text"] != "unknown" ||
-		e.Details["down_since"] != "" || e.Sentence != "Agents started." {
+		e.Details["down_since"] != "" || e.Sentence != "Agent Loops started." {
 		t.Fatalf("%+v", e)
 	}
 	d.Shutdown()
@@ -111,7 +111,7 @@ func TestACrashAndAFirstStart(t *testing.T) {
 	defer d.Shutdown()
 	d.SayRestarted()
 	if e := lastEvent(d, "system.restarted"); e == nil || e.Details["reason"] != "crashed" ||
-		e.Sentence != "Agents restarted after it stopped unexpectedly. It was down for about 2 min." {
+		e.Sentence != "Agent Loops restarted after it stopped unexpectedly. It was down for about 2 min." {
 		t.Fatalf("%+v", e)
 	}
 	// The first disk look after it has had its notice; a look marked so says it once.
@@ -145,7 +145,7 @@ func TestRestartWords(t *testing.T) {
 	}
 	w := &wire.EventWait{Patterns: []wire.EventPattern{{Name: "branch.moved"}}}
 	got := restartNoticeWords([]restartGap{{At: at, Reason: "first_start"}}, w)
-	if !strings.HasPrefix(got, "\n\nAgents restarted at ") || !strings.Contains(got, "How long it was down is unknown: nothing was recorded before it went.") ||
+	if !strings.HasPrefix(got, "\n\nAgent Loops restarted at ") || !strings.Contains(got, "How long it was down is unknown: nothing was recorded before it went.") ||
 		!strings.HasSuffix(got, "What you wait on was caught up after it: branch.moved.") {
 		t.Fatal(got)
 	}

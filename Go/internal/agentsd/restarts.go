@@ -137,11 +137,11 @@ func (g restartGap) details() map[string]string {
 func restartedSentence(g restartGap) string {
 	switch g.Reason {
 	case "stopped":
-		return "Agents restarted after a clean stop. It was down for " + g.downForWords() + "."
+		return "Agent Loops restarted after a clean stop. It was down for " + g.downForWords() + "."
 	case "crashed":
-		return "Agents restarted after it stopped unexpectedly. It was down for about " + g.downForWords() + "."
+		return "Agent Loops restarted after it stopped unexpectedly. It was down for about " + g.downForWords() + "."
 	}
-	return "Agents started."
+	return "Agent Loops started."
 }
 
 // caughtUpAfterRestart is whether what a pattern names is had again after a restart: a
@@ -167,7 +167,7 @@ func restartNoticeWords(gaps []restartGap, w *wire.EventWait) string {
 		if g.DownSince != nil {
 			down = "It was down for about " + g.downForWords() + " (from " + clock(*g.DownSince) + ")."
 		}
-		lines = append(lines, "Agents restarted at "+clock(g.At)+" while you waited. "+down)
+		lines = append(lines, "Agent Loops restarted at "+clock(g.At)+" while you waited. "+down)
 	}
 	var names, missing []string
 	for _, p := range w.Patterns {

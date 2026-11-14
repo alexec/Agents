@@ -64,7 +64,7 @@ const AnswerBudget = 40
 // Truncated is Headline.truncating: every field cut to the budget before it is sealed,
 // and an empty one given the placeholder's word.
 func Truncated(h wire.Headline) wire.Headline {
-	out := wire.Headline{H1: cut(h.H1, "Agents"), H2: cut(h.H2, "An agent"), H3: cut(h.H3, "needs you")}
+	out := wire.Headline{H1: cut(h.H1, "Agent Loops"), H2: cut(h.H2, "An agent"), H3: cut(h.H3, "needs you")}
 	for _, a := range h.Answers {
 		fallback := a.ID
 		if a.Kind == wire.QuickAnswerKindReply {

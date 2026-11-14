@@ -527,7 +527,7 @@ func withViewSession(ctx context.Context, s viewServer, body func(*viewSession) 
 		return err
 	}
 	init, err := m.call("initialize", map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{},
-		"clientInfo": map[string]any{"name": "Agents", "version": "1"}})
+		"clientInfo": map[string]any{"name": "Agent Loops", "version": "1"}})
 	if err != nil {
 		return timedOut(err)
 	}

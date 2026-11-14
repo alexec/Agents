@@ -183,7 +183,7 @@ func TestABitbucketFoldersConnectorSetUp(t *testing.T) {
 		review.State != wire.ConnectorSlotStateRead || ci.Choice != "Bitbucket checks" {
 		t.Fatalf("tasks %+v review %+v", tasks, review)
 	}
-	if ci.State != wire.ConnectorSlotStateRefused || ci.Message == nil || *ci.Message != "Bitbucket refused: Agents can't see checks in agentstest/agents-walk." {
+	if ci.State != wire.ConnectorSlotStateRefused || ci.Message == nil || *ci.Message != "Bitbucket refused: Agent Loops can't see checks in agentstest/agents-walk." {
 		t.Fatalf("ci: %+v", ci)
 	}
 	if setup.Connection == nil || setup.Connection.Provider != wire.ConnectionProviderBitbucket {

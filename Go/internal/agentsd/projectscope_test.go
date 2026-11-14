@@ -100,7 +100,7 @@ func TestSessionToolsReachTheProjectOnOtherMachines(t *testing.T) {
 			mu.Unlock()
 			return json.Marshal(wire.SessionCallReply{Said: s.Call.Op + " said", Title: lane.Title})
 		}
-		return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
+		return nil, &controllink.AskError{Code: -32010, Message: "Agent Loops can’t ask that of the control plane."}
 	})
 	last := func() wire.MachineSessionCall {
 		mu.Lock()

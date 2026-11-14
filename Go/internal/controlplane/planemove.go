@@ -26,7 +26,7 @@ func (m *Methods) planeMoveMethod(method string, params json.RawMessage, from Ca
 			return nil, fail(notPermitted, "Only an admin can move the control plane.")
 		}
 		if m.router.TellPersonClients(person, wire.NotifyControlPlaneMoveWanted.Name, ask, m.isMacWindow) == 0 {
-			return nil, fail(hostOffline, "Agents isn’t open on the Mac that moves the control plane. Open it, then try again.")
+			return nil, fail(hostOffline, "Agent Loops isn’t open on the Mac that moves the control plane. Open it, then try again.")
 		}
 		return wire.Empty{}, nil
 	case "control/planeMoveReport":
@@ -35,7 +35,7 @@ func (m *Methods) planeMoveMethod(method string, params json.RawMessage, from Ca
 			return nil, err
 		}
 		if !m.isMacWindow(from.Client) {
-			return nil, fail(notPermitted, "Only Agents on a Mac reports a move of the control plane.")
+			return nil, fail(notPermitted, "Only Agent Loops on a Mac reports a move of the control plane.")
 		}
 		m.router.TellPerson(person, wire.NotifyControlPlaneMoveReported.Name, report)
 		return wire.Empty{}, nil

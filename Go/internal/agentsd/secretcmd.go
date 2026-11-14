@@ -46,7 +46,7 @@ const (
 func SecretCommand(args []string, getenv func(string) string, socket string, out, errOut io.Writer) int {
 	if len(args) != 1 || args[0] == "" || strings.HasPrefix(args[0], "-") {
 		fmt.Fprintln(errOut, "usage: agents-secret NAME\n"+
-			"Prints the value of a secret with Ask before use off, for a session of Agents; from a terminal, once a person allows it. agentsd records each read.")
+			"Prints the value of a secret with Ask before use off, for a session of Agent Loops; from a terminal, once a person allows it. agentsd records each read.")
 		return 2
 	}
 	name := args[0]
@@ -188,7 +188,7 @@ func writeSecretShim(bin, agentsd string) error {
 		return err
 	}
 	script := "#!/bin/sh\n" +
-		"# agents-secret NAME (#4178): Agents writes this file. agentsd gives the value of a secret with Ask before use off, and records the read.\n" +
+		"# agents-secret NAME (#4178): Agent Loops writes this file. agentsd gives the value of a secret with Ask before use off, and records the read.\n" +
 		"exec " + shellQuote(agentsd) + " secret \"$@\"\n"
 	path := filepath.Join(bin, "agents-secret")
 	if old, err := os.ReadFile(path); err == nil && string(old) == script {

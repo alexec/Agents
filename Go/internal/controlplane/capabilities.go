@@ -60,7 +60,7 @@ func clientRefusal(list []string, version string, team bool) *RPCError {
 		}
 	}
 	if team && !slices.Contains(list, wire.CapClientTeam1) {
-		return joinTeamRefusal("Update Agents to join this team.", version, []string{wire.CapClientTeam1})
+		return joinTeamRefusal("Update Agent Loops to join this team.", version, []string{wire.CapClientTeam1})
 	}
 	return nil
 }

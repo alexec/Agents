@@ -768,12 +768,12 @@ func timedOutWords(w *wire.EventWait, at wire.Date) string {
 		if w.Deadline != nil {
 			late := at.Time().Sub(w.Deadline.Time())
 			if late > onceGrace {
-				return "The time you asked for (" + clock(*w.Deadline) + ") passed while Agents was off or the Mac was asleep: it is now " +
+				return "The time you asked for (" + clock(*w.Deadline) + ") passed while Agent Loops was off or the Mac was asleep: it is now " +
 					clock(at) + ", " + lateWords(late) + " late. Check the state of what you were waiting for now: what you meant to do " +
 					"at that time may no longer fit, so carry on, wait again, or tell the person."
 			}
 			if late >= time.Minute {
-				return "The time you asked for has come (" + clock(*w.Deadline) + "), " + lateWords(late) + " late, as Agents was off or the Mac " +
+				return "The time you asked for has come (" + clock(*w.Deadline) + "), " + lateWords(late) + " late, as Agent Loops was off or the Mac " +
 					"was asleep. Check the state of what you were waiting for now, then carry on or wait again."
 			}
 		}

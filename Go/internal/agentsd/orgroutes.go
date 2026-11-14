@@ -643,7 +643,7 @@ func (d *Daemon) reachWordsFor(runtimeID string) *string {
 func orgRouteMissingError(waiting string) error {
 	if waiting != "" {
 		return &Error{Code: wire.FailureOrgRouteMissing,
-			Message: "Your organisation's " + waiting + " is waiting for an admin's app to seal its key for this machine. It comes when an admin opens Agents."}
+			Message: "Your organisation's " + waiting + " is waiting for an admin's app to seal its key for this machine. It comes when an admin opens Agent Loops."}
 	}
 	return &Error{Code: wire.FailureOrgRouteMissing,
 		Message: "Your organisation's way to this model has not reached this machine. Connect to the network."}

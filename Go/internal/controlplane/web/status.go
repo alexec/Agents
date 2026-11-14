@@ -42,11 +42,11 @@ func Summary(s Status) string {
 	}
 	switch reason {
 	case ReasonOff:
-		return fmt.Sprintf("Off. Turn it on to use Agents at %s, in a browser on this Mac only.", Address(s))
+		return fmt.Sprintf("Off. Turn it on to use Agent Loops at %s, in a browser on this Mac only.", Address(s))
 	case ReasonPortInUse:
 		return fmt.Sprintf("Not serving: port %d is in use by another app.", s.Port)
 	case ReasonBuild:
-		return "Not serving: this copy of the Agents web app is damaged or missing."
+		return "Not serving: this copy of the Agent Loops web app is damaged or missing."
 	default:
 		detail := ""
 		if s.Detail != nil && *s.Detail != "" {

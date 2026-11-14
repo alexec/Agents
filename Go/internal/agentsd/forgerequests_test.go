@@ -107,15 +107,15 @@ func TestForgeItemsBecomeRequestsAndTheChecklistGoesBack(t *testing.T) {
 	}
 	w := gh.writes()
 	if len(w) != 5 || !slices.Contains(w, "labels alexec/agents#5 + -alex-todo") || !slices.Contains(w, "unassign alexec/agents#5 [alexec]") ||
-		!slices.Contains(w, "comment alexec/agents#5 Done in Agents: every step is ticked.") {
+		!slices.Contains(w, "comment alexec/agents#5 Done in Agent Loops: every step is ticked.") {
 		t.Fatalf("%q", w)
 	}
 	// The approval: the person's comment, approved on and needs-approval off.
 	json.Unmarshal(c.call(t, 4, "requests/answer", map[string]any{"id": review.ID, "answer": map[string]any{"approval": map[string]any{"action": "approve"}}}), &u)
-	if u.Request.State != wire.RequestStateAnswered || deref(u.Request.Answer) != "approve: Approved in Agents." {
+	if u.Request.State != wire.RequestStateAnswered || deref(u.Request.Answer) != "approve: Approved in Agent Loops." {
 		t.Fatalf("%+v", u.Request)
 	}
-	if w := gh.writes(); !slices.Contains(w, "comment alexec/agents#12 Approved in Agents.") || !slices.Contains(w, "labels alexec/agents#12 +approved -needs-approval") {
+	if w := gh.writes(); !slices.Contains(w, "comment alexec/agents#12 Approved in Agent Loops.") || !slices.Contains(w, "labels alexec/agents#12 +approved -needs-approval") {
 		t.Fatalf("%q", w)
 	}
 	var answered *wire.Event
@@ -124,7 +124,7 @@ func TestForgeItemsBecomeRequestsAndTheChecklistGoesBack(t *testing.T) {
 			answered = &e
 		}
 	}
-	if answered == nil || answered.Details["answer"] != "approve: Approved in Agents." {
+	if answered == nil || answered.Details["answer"] != "approve: Approved in Agent Loops." {
 		t.Fatalf("no request.answered with pr 12: %v", names(d))
 	}
 }

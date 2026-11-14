@@ -57,7 +57,7 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 		case "providers/create":
 			return json.RawMessage(`{"workspace":{"id":"w2","name":"second"},"joining":true}`), nil
 		}
-		return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
+		return nil, &controllink.AskError{Code: -32010, Message: "Agent Loops can’t ask that of the control plane."}
 	})
 
 	text, isErr := m.tool(3, "list_machines", map[string]any{})
@@ -67,7 +67,7 @@ func TestAnAgentsWorkspaceTools(t *testing.T) {
 	if text, _ := m.tool(4, "start_machine", map[string]any{"host": "devbox"}); text != "devbox is running already." {
 		t.Fatal(text)
 	}
-	if text, isErr := m.tool(5, "stop_machine", map[string]any{"host": "devbox"}); !isErr || text != "Agents can’t ask that of the control plane." {
+	if text, isErr := m.tool(5, "stop_machine", map[string]any{"host": "devbox"}); !isErr || text != "Agent Loops can’t ask that of the control plane." {
 		t.Fatal(text)
 	}
 	if text, isErr := m.tool(6, "make_machine", map[string]any{"provider": "Nobody", "name": "x"}); !isErr ||
@@ -183,7 +183,7 @@ func TestAYesAfterTheHoldStillMakesTheMachine(t *testing.T) {
 		mu.Lock()
 		done = append(done, call.Method)
 		mu.Unlock()
-		return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
+		return nil, &controllink.AskError{Code: -32010, Message: "Agent Loops can’t ask that of the control plane."}
 	})
 	did := func() []string {
 		mu.Lock()
@@ -283,7 +283,7 @@ func TestASlowListLeavesTheCardTheRestOfTheHold(t *testing.T) {
 			b, _ := json.Marshal(listed)
 			return b, nil
 		}
-		return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
+		return nil, &controllink.AskError{Code: -32010, Message: "Agent Loops can’t ask that of the control plane."}
 	})
 	l := d.live(a.ID)
 	l.mu.Lock()

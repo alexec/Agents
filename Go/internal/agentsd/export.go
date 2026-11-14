@@ -121,7 +121,7 @@ func exportFileName(s string) string {
 	}
 	out := strings.Trim(strings.TrimSpace(b.String()), ".")
 	if out == "" {
-		return "Agents"
+		return "Agent Loops"
 	}
 	return out
 }
@@ -156,7 +156,7 @@ func (d *Daemon) importExport(r wire.AgentsImportRequest) (wire.BackupRestoreRes
 // begin with.
 func readExportManifest(path string) (backupManifest, error) {
 	var m backupManifest
-	notOne := Invalid("That file is not an export of Agents.")
+	notOne := Invalid("That file is not an export of Agent Loops.")
 	f, err := os.Open(path)
 	if err != nil {
 		return m, Invalid("The upload is gone. Import again.")
@@ -176,7 +176,7 @@ func readExportManifest(path string) (backupManifest, error) {
 		return m, notOne
 	}
 	if m.Format != backupFormat {
-		return m, Invalid("That export was made by a newer version of Agents. Update Agents and import again.")
+		return m, Invalid("That export was made by a newer version of Agent Loops. Update Agent Loops and import again.")
 	}
 	return m, nil
 }

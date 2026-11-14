@@ -213,7 +213,7 @@ func (d *Daemon) docsServerFor(name, folder string, secrets map[string]string) (
 	case "missingSecret":
 		return sdk.McpServer{}, "", docsSearchError("It needs a secret that isn't set.")
 	case "oldTransport":
-		return sdk.McpServer{}, "", docsSearchError("It speaks SSE, which Agents doesn't.")
+		return sdk.McpServer{}, "", docsSearchError("It speaks SSE, which Agent Loops doesn't.")
 	case "notSetUp":
 		return sdk.McpServer{}, "", docsSearchError("It isn't in mcp.json.")
 	}
@@ -265,7 +265,7 @@ func callDocsTool(ctx context.Context, s sdk.McpServer, cwd string, m docsMap, t
 		return docsSearchError(mcpFailureOf(err).sentence(timeout))
 	}
 	if _, err := c.call(ctx, 1, "initialize", map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{},
-		"clientInfo": map[string]any{"name": "Agents", "version": "1"}}); err != nil {
+		"clientInfo": map[string]any{"name": "Agent Loops", "version": "1"}}); err != nil {
 		return nil, failed(err)
 	}
 	if err := c.notify(ctx, "notifications/initialized"); err != nil {
