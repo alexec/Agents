@@ -62,7 +62,7 @@ struct StartAgentView: View {
             focused = true
         }
         .onChange(of: model.offeredStart) { takeOffer() }
-        // Share ▸ Agents while this page is already on screen (#4915).
+        // Share ▸ Agent Loops while this page is already on screen (#4915).
         .onChange(of: model.sharedArrivals) { takeShared() }
         // Voice mode turned on in a chat (another window on an iPad): one listener (#2445).
         .onChange(of: VoiceMode.shared.isOn) { _, isOn in

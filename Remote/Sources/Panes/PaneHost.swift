@@ -132,7 +132,7 @@ struct PaneView: View {
     private var content: some View {
         if model.macLacksPanes {
             VStack(spacing: 0) {
-                Text("Update Agents on your Mac to read files and use the terminal here.")
+                Text("Update Agent Loops on your Mac to read files and use the terminal here.")
                     .appText(.fine)
                     .foregroundStyle(Paper.secondary)
                     .padding(12)

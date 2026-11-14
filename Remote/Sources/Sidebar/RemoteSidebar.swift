@@ -310,7 +310,7 @@ struct RemoteSidebar: View {
         .scrollContentBackground(.hidden)
         .background(Paper.sidebar)
         .toolbarBackground(Paper.sidebar, for: .navigationBar)
-        .navigationTitle("Agents")
+        .navigationTitle("Agent Loops")
         // Add Folder… and Clone Git URL… on a machine (#4036), as the window's File menu.
         .toolbar {
             if !model.needsPairing {

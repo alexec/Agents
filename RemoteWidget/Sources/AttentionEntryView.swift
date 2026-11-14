@@ -53,7 +53,7 @@ private struct Small: View {
         VStack(alignment: .leading, spacing: 0) {
             if entry.isUnknown {
                 Spacer(minLength: 0)
-                Text("Open Agents")
+                Text("Open Agent Loops")
                     .appText(.supporting)
                     .foregroundStyle(.secondary)
                 Text("to see what needs you")
@@ -87,7 +87,7 @@ private struct Small: View {
     }
 
     private var accessibilityLabel: String {
-        if entry.isUnknown { return "Agents. Open the app to see what needs you" }
+        if entry.isUnknown { return "Agent Loops. Open the app to see what needs you" }
         let said = entry.isEmpty ? "Nothing is waiting for you"
             : "\(entry.count) \(entry.count == 1 ? "session needs" : "sessions need") you"
         return [said, Updated.spoken(entry)].compactMap { $0 }.joined(separator: ". ")
@@ -368,7 +368,7 @@ private struct Unknown: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Spacer(minLength: 0)
-            Text("Open Agents")
+            Text("Open Agent Loops")
                 .appText(.reading)
                 .fontWeight(.semibold)
             Text("This widget shows what needs you once the app has been open.")

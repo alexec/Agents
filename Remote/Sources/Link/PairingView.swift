@@ -69,8 +69,8 @@ struct PairingView: View {
 
     @ViewBuilder private var code: some View {
         Text(noneOn ? SignInWords.noneOn
-             : "On your Mac, choose Pair a Phone or iPad… in Agents’ menu bar item, or Pair a Device in "
-               + "Agents ▸ Settings. Then scan the code it shows.")
+             : "On your Mac, choose Pair a Phone or iPad… in Agent Loops’ menu bar item, or Pair a Device in "
+               + "Agent Loops ▸ Settings. Then scan the code it shows.")
             .appText(.fine)
             .foregroundStyle(Paper.secondary)
             .multilineTextAlignment(.center)
@@ -127,7 +127,7 @@ private struct ScanSheet: View {
                 } else {
                     ContentUnavailableView("Can't use the camera",
                                            icon: "camera",
-                                           description: Text("Allow Agents to use the camera in Settings, "
+                                           description: Text("Allow Agent Loops to use the camera in Settings, "
                                                              + "then try again."))
                 }
             }

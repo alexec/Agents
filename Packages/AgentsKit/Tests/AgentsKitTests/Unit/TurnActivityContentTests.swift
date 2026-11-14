@@ -107,7 +107,7 @@ struct TurnActivityContentTests {
         let json = #"{"phase":"needs_you","startedAt":800000000,"endedAt":800000300}"#
         let pushed = try JSONDecoder().decode(TurnActivityContent.self, from: Data(json.utf8))
         #expect(pushed.phase == .needsYou && pushed.isOver)
-        #expect(pushed.line(isStale: false) == "Open Agents to see what it needs")
+        #expect(pushed.line(isStale: false) == "Open Agent Loops to see what it needs")
     }
 
     @Test func anEndForAReasonIsAFailureThatSaysIt() throws {
@@ -180,7 +180,7 @@ struct TurnActivityContentTests {
         #expect(pushed.title == nil && pushed.place == nil && pushed.line == nil && pushed.endedAt == nil)
         #expect(pushed.shownTitle == "3 sessions")
         #expect(pushed.others == "+2 working")
-        #expect(pushed.line(isStale: false) == "Open Agents to decide")
+        #expect(pushed.line(isStale: false) == "Open Agent Loops to decide")
 
         let before = try JSONDecoder().decode(TurnActivityContent.self,
                                               from: Data(#"{"phase":"working","startedAt":800000000}"#.utf8))
@@ -201,7 +201,7 @@ struct TurnActivityContentTests {
         #expect(asking.line(isStale: false) == nil)
         let working = TurnActivityContent(phase: .working, title: "t", line: "Write the view", startedAt: sent)
         #expect(working.line(isStale: false) == "Write the view")
-        #expect(working.line(isStale: true) == "Open Agents to see where it is")
+        #expect(working.line(isStale: true) == "Open Agent Loops to see where it is")
     }
 
     // MARK: One activity in total (#2991)

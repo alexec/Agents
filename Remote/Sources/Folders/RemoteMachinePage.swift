@@ -31,7 +31,7 @@ struct RemoteMachinePage: View {
                     if offline {
                         Text("\(name) is offline, so it can’t say how it is doing now.").foregroundStyle(Paper.secondary)
                     } else if !answersUsage {
-                        Text("Update Agents on \(name) to see its CPU, memory and disks here.").foregroundStyle(Paper.secondary)
+                        Text("Update Agent Loops on \(name) to see its CPU, memory and disks here.").foregroundStyle(Paper.secondary)
                     } else if let usage {
                         summary(usage)
                     } else if let failure {
