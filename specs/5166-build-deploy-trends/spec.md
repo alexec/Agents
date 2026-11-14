@@ -196,6 +196,10 @@ So **all five forge servers have a CI reader** (`run.completed`), and **none rea
 
 The daemon reads GitLab pipelines as it reads GitHub's (`Go/internal/citimings/gitlab.go`): the project's finished pipelines (`scope=finished`, windows by `created_after` and `created_before`), and each one's jobs with `include_retried=true`. A pipeline is a run, and a job's nth try is attempt n. A job is made at its `started_at` less its `queued_duration`, so "waiting its turn" is the stages before it and "waiting for a runner" is `queued_duration`. There are no steps. Decided: a pipeline the store has is not read again, so a retry after the first read is not seen, because GitLab's list does not say the attempt. Alex can overrule.
 
+### Bitbucket (#5223)
+
+The daemon reads Bitbucket Pipelines as it reads GitHub's (`Go/internal/citimings/bitbucket.go`, `Go/internal/agentsd/citimings_bitbucket.go`): the repository's completed pipelines, newest first, and each one's steps. A pipeline is a run, named by its build number; a Bitbucket step is a job, and there are no steps below it. "Rerun failed steps" is attempt n of the same pipeline, by each step's `run_number`; "Run again" is a new pipeline. Bitbucket says no time a step waited for a runner, so a step is made when it started. The runner is a self-hosted step's first `runs-on` label. The backfill takes a tenth of Bitbucket's 1,000 calls an hour. Decided: Bitbucket's list is paged and not windowed by time, so the backfill keeps the next page's number; a new pipeline moves the pages on, so a page is read again, never missed. Alex can overrule.
+
 ### Where
 
 **Alex chose (2026-11-13, #5176): the machine reads and keeps the store, and sends a copy to the control plane, as lineage's merged copy does.**
