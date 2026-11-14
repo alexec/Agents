@@ -25,6 +25,7 @@ import {
 import { labelKey } from "../model/labels";
 import { OptionControl } from "./PromptMenus";
 import { LabelField } from "./Labels";
+import { Icon } from "./Icon";
 
 type Change = Parameters<Store["setWorkflowSettings"]>[2];
 
@@ -73,7 +74,7 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
   return (
     <div class="workflow-settings">
       <p class="quiet small">{runs.line}</p>
-      {runs.unknown && <p class="marked small">⚠︎ {runs.unknown}</p>}
+      {runs.unknown && <p class="marked small"><Icon name="triangle-alert" /> {runs.unknown}</p>}
       {triggering && <p class="quiet small">This workflow resumes the agent that triggered it, so these do not apply.</p>}
       {workflow.mode === "standing" && <p class="quiet small">Applied when its standing agent is started, and again if it has to be replaced.</p>}
       {runs.isAuto ? <AutoMenus settings={settings} disabled={off} set={set} /> : <>
@@ -102,14 +103,14 @@ export function WorkflowSettingsForm({ store, host, summary, disabled, problem, 
         </span>
       </div>
       {(!mode || !model) && notKnownYet}
-      {marks.map((line) => <p key={line} class="marked small">⚠︎ {line}</p>)}
+      {marks.map((line) => <p key={line} class="marked small"><Icon name="triangle-alert" /> {line}</p>)}
       </>}
       <LabelField store={store} host={host} folder={workflow.folder} disabled={disabled}
         listID={`workflow-labels-${workflow.workflowID}`}
         labels={settings.labels.map((value) => ({ value, owner: "person" as const }))}
         add={(values) => change({ labels: (held) => [...held, ...values.filter((v) => !held.some((l) => labelKey(l) === labelKey(v)))] })}
         remove={(value) => change({ labels: (held) => held.filter((l) => labelKey(l) !== labelKey(value)) })} />
-      {problem && <p class="marked small" role="alert">⚠︎ {problem}</p>}
+      {problem && <p class="marked small" role="alert"><Icon name="triangle-alert" /> {problem}</p>}
     </div>
   );
 }

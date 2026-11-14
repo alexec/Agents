@@ -8,6 +8,7 @@ import type { ForgeLabel } from "../protocol/generated";
 import { LastUpdate } from "./LastUpdate";
 import { MessageBanner } from "./MessageKinds";
 import { avatarHue, chipColours, labelScope, stateGlyph, stateGlyphWords, type StateGlyph } from "../model/work";
+import { Icon } from "./Icon";
 
 const glyphPaths: Record<StateGlyph, ComponentChildren> = {
   "issue-open": <><circle cx="8" cy="8" r="6.25" /><circle cx="8" cy="8" r="1.5" class="fill" /></>,
@@ -164,7 +165,7 @@ export function FilterMenu({ label, value, choices, any, always, standard, onPic
     <span class="work-menu" ref={anchor}>
       <button type="button" class={`work-menu-button${set ? " set" : ""}`} aria-haspopup="menu" aria-expanded={open.value !== null}
         aria-label={`${label}: ${chosen?.words ?? any ?? label}`} onClick={toggle}>
-        {words}<span class="chevron" aria-hidden="true">▾</span>
+        {words}<Icon name="chevron-down" class="chevron" />
       </button>
       {open.value && (
         <div class="popover work-menu-list" role="menu" aria-label={label} ref={menu} onKeyDown={keys}

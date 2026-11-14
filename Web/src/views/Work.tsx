@@ -51,6 +51,7 @@ import {
   allRows, askKey, boardHosts, boards, forgeHosts, fromList, hasMore, listProjects, loadBoards, loadList, loadMore, nextAfter, pageNeighbours,
   placeKey, shownRows, workList,
 } from "../model/workLists";
+import { Glyph, Icon } from "./Icon";
 
 /** The person's projects (#3283), New Session's, for the Project filter and an item's page: each folder by the
  * machine Work's lists read it on. */
@@ -199,7 +200,7 @@ export function WorkList({ store, kind }: { store: Store; kind: WorkKind }) {
           )}
           {narrowed && (
             <button type="button" class="work-menu-button work-clear" title="Clear the filters but State" onClick={clear}>
-              <span aria-hidden="true">✕</span>Clear</button>
+              <Icon name="x" />Clear</button>
           )}
           <span class="work-sort">
             <FilterMenu label="Sort" standard={defaultSort(kind)} value={sort.value} choices={sortChoices} onPick={(v) => { sort.value = v as WorkSort; }} />
@@ -292,7 +293,7 @@ export function WorkRowView({ row, several, dim, pick, read, open, latest: isLat
           </span>
         </span>
         <span class="work-row-end small">
-          {checks && <span class={`work-checks ${checks.tone}`} title={checks.words} aria-label={checks.words}>{checks.mark}</span>}
+          {checks && <span class={`work-checks ${checks.tone}`} title={checks.words} aria-label={checks.words}><Glyph of={checks.mark} /></span>}
           {review && <span class={`work-review${row.review === "changes_requested" ? " bad" : ""}`}>{review}</span>}
           {comments > 0 && <span class="work-count" aria-label={`${comments} comment${comments === 1 ? "" : "s"}`}>
             <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" /></svg>{comments}</span>}
@@ -554,7 +555,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
   const loading = fromForge(kind) && !detail.value && !forgeProblem.value;
   const narrowStart = start ? (
     <button type="button" class="prominent work-start" disabled={writing.value} onClick={startAgent}
-      title="The new-agent form in this issue's folder, filled in for it"><span aria-hidden="true">✦</span>Start Agent</button>
+      title="The new-agent form in this issue's folder, filled in for it"><Icon name="sparkles" />Start Agent</button>
   ) : lead ? (
     // Open lead (bordered), with a dot for the lead's state: green while it works, the attention colour when it needs you.
     <button type="button" class="work-start work-open-lead" title="The lead's chat" aria-label={`Open lead, ${leadWords(lead.state)}`}
@@ -563,7 +564,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
     </button>
   ) : startsLead && (
     <button type="button" class="prominent work-start" onClick={startLead}
-      title="The new-session form in this epic's folder, filled in for a lead with the lead skill"><span aria-hidden="true">✦</span>Start lead</button>
+      title="The new-session form in this epic's folder, filled in for a lead with the lead skill"><Icon name="sparkles" />Start lead</button>
   );
 
   // The Checks page (note 17), pushed from the checks row of a page under 700 px.
@@ -585,7 +586,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
         <nav class="work-place" aria-label="Place">
           <a href={routeHash({ nav: "work", section: kind })} title={`All ${workKindTitle[kind].toLowerCase()}`}
             onClick={(e) => { if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); go({ nav: "work", section: kind }); }}>
-            <span class="back" aria-hidden="true">‹ </span>{workKindTitle[kind]}</a>
+            <Icon name="chevron-left" class="back" />{workKindTitle[kind]}</a>
           <span class="sep" aria-hidden="true">/</span>
           <span class="here">{shortRef(ref)}</span>
         </nav>
@@ -595,7 +596,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
       </div>
       {nothingRead ? (
         <div class="work-could-not" role="alert">
-          <span class="mark" aria-hidden="true">⚠</span>
+          <span class="mark" aria-hidden="true"><Icon name="triangle-alert" /></span>
           <p class="strong">Could not read {shortRef(ref)}</p>
           <p class="quiet">{forgeProblem.value}</p>
           <p class="buttons">
@@ -700,7 +701,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
               got.item.stateReason === "not_planned"
                 ? <div class="work-event"><span class="mark not-planned" aria-hidden="true"><StateIcon kind="issue" state="closed" stateReason="not_planned" size={12} /></span>
                   <span class="quiet small">Closed as not planned{atWords(got.item.closedAt)}</span></div>
-                : <div class="work-event"><span class="mark closed" aria-hidden="true">✓</span><span class="quiet small">Closed{atWords(got.item.closedAt)}</span></div>
+                : <div class="work-event"><span class="mark closed" aria-hidden="true"><Icon name="check" /></span><span class="quiet small">Closed{atWords(got.item.closedAt)}</span></div>
             )}
             {kind === "pr" && got.item.state === "merged" && (
               <>
@@ -713,7 +714,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
               </>
             )}
             {kind === "pr" && got.item.state === "closed" && (
-              <div class="work-event"><span class="mark pr-closed" aria-hidden="true">✕</span><span class="quiet small">Closed with unmerged commits{atWords(got.item.closedAt)}</span></div>
+              <div class="work-event"><span class="mark pr-closed" aria-hidden="true"><Icon name="x" /></span><span class="quiet small">Closed with unmerged commits{atWords(got.item.closedAt)}</span></div>
             )}
             {box && <div class="work-wide-only work-merge-end">{writeBox(false)}</div>}
           </section>
@@ -818,7 +819,7 @@ function atWords(at: number | undefined) {
 function TimelineEvent({ event: e, words, stateReason }: { event: ForgeEvent; words: string; stateReason: string | undefined }) {
   const dropped = e.kind === "closed" && stateReason === "not_planned";
   const mark = e.kind === "closed" ? <span class={`mark ${dropped ? "not-planned" : "closed"}`} aria-hidden="true">
-      {dropped ? <StateIcon kind="issue" state="closed" stateReason="not_planned" size={12} /> : "✓"}</span>
+      {dropped ? <StateIcon kind="issue" state="closed" stateReason="not_planned" size={12} /> : <Icon name="check" />}</span>
     : e.kind === "reopened" ? <span class="mark" aria-hidden="true"><StateIcon kind="issue" state="open" size={12} /></span>
     : e.kind === "assigned" || e.kind === "unassigned" ? <span class="mark" aria-hidden="true"><PersonGlyph /></span>
     : e.kind === "labeled" || e.kind === "unlabeled" ? <span class="mark" aria-hidden="true"><TagGlyph /></span>

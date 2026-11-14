@@ -2398,7 +2398,7 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-menus { flex: 1 1 auto; min-width: 0; }
 .work-sort { margin-left: auto; }
 .work-clear { gap: 5px; opacity: 0.8; }
-.work-clear span { font-size: 0.8em; }
+.work-clear svg.lucide { width: 1em; height: 1em; }
 .work-filters .work-refresh { margin-left: 4px; }
 /* The end of the list: Loading more…, Load more, Could not load more. with Try again, or the count. */
 .work-list-end { display: flex; gap: 10px; align-items: center; justify-content: center; padding: 12px 8px; }
@@ -2579,6 +2579,9 @@ a.work-row { box-sizing: border-box; text-decoration: none; color: inherit; }
 .work-event .mark.closed { background: var(--forge-fill-done); color: var(--paper-on-fill); }
 .work-event .mark.not-planned { background: var(--forge-fill-draft); color: var(--paper-on-fill); }
 .work-event .mark .work-state-icon { --state: currentColor; }
+/* An icon in a mark's filled circle sits inside it, with room round it (#5164). */
+.work-event .mark svg.lucide { width: 14px; height: 14px; vertical-align: 0; }
+.work-plan-lead-mark svg.lucide { width: 12px; height: 12px; vertical-align: 0; }
 /* The comment box (note 11): the person's glyph on the timeline's column, the field, then Close issue and Comment. */
 .work-comment-box { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; margin-top: 16px; }
 .work-comment-me svg { display: block; fill: var(--paper-wash); }

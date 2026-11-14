@@ -28,10 +28,11 @@ import { isMenuKey, openContextMenu, type MenuItem } from "./ContextMenu";
 import { go, routeHash } from "../route";
 import { ForgeTitle } from "../render/ForgeTitle";
 import { ErrorStrip, LabelChip, PlaceholderRows, StateIcon } from "./WorkParts";
+import { Icon, type IconName } from "./Icon";
 
 const holdsRuntime = (s: AgentState) => s === "starting" || s === "running" || s === "waitingOnUser";
-/** The mark's glyph before line 2's words; a closed child's state icon says it is done. */
-const markGlyph: Record<PlanMark, string | undefined> = { done: undefined, working: "●", attention: "⚠", waiting: "○", blocked: "⊘" };
+/** The mark's icon before line 2's words; a closed child's state icon says it is done. */
+const markIcon: Record<PlanMark, IconName | undefined> = { done: undefined, working: "dot", attention: "triangle-alert", waiting: "circle", blocked: "ban" };
 
 export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = [], writes, waiting = false, wrote, fromCopy }: {
   store: Store; host: string; lineageHost: string | undefined; detail: ForgeItemDetail; asked: number;
@@ -186,7 +187,7 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
     const ref = shortRef(c.item.node.ref);
     const levelLabel = c.item.level ? c.item.labels.find((x) => x.name.toLowerCase() === c.item.level) ?? { name: c.item.level } : undefined;
     const items = () => menu(c, pl);
-    const glyph = markGlyph[mark];
+    const icon = markIcon[mark];
     return (
       <li key={c.item.node.ref} class="work-plan-item" onContextMenu={(e) => openContextMenu(e, items())}>
         {/* A link: a click opens the page here, a middle-click or ⌘-click in a new tab. */}
@@ -208,7 +209,7 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
               {words && <>
                 <span class="quiet" aria-hidden="true">·</span>
                 <span class={`work-plan-mark is-${mark}`} aria-label={mark === "done" ? words : `${markWords[mark]}: ${words}`}>
-                  {glyph && <span aria-hidden="true">{glyph} </span>}<span class="wide-line">{words}</span><span class="short-line">{short}</span>
+                  {icon && <><Icon name={icon} /> </>}<span class="wide-line">{words}</span><span class="short-line">{short}</span>
                 </span>
               </>}
               <span class="work-plan-end">
@@ -232,7 +233,7 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
     return (
       <button type="button" class="work-plan-band" aria-expanded={!isFolded} title={isFolded ? `Show ${title}` : `Fold ${title}`}
         onClick={() => { folded.value = { ...folded.value, [s.step]: !isFolded }; }}>
-        <span class="chevron" aria-hidden="true">{isFolded ? "▸" : "▾"}</span>
+        <Icon name={isFolded ? "chevron-right" : "chevron-down"} class="chevron" />
         <span><span class="strong">{head}</span>{rest.length > 0 && ` · ${rest.join(" · ")}`}</span>
         <span class="end">{words}</span>
       </button>
@@ -301,7 +302,7 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
         <>
           <div class="work-plan-head"><PlanTitle standing={detail.item.standing === true} /></div>
           <div class="work-plan-could-not" role="alert">
-            <span class="mark" aria-hidden="true">⚠</span>
+            <span class="mark" aria-hidden="true"><Icon name="triangle-alert" /></span>
             <p class="strong">Could not read the plan</p>
             <p class="quiet small">{problem.value}</p>
             <button type="button" onClick={() => { changed.value++; }}>Try again</button>
@@ -361,7 +362,7 @@ function LeadLine({ store, plan, open }: { store: Store; plan: ForgePlan; open: 
   const title = chat?.title ?? lead.title;
   return (
     <p class="work-plan-lead small">
-      <span class="work-plan-lead-mark" aria-hidden="true">✦</span>
+      <span class="work-plan-lead-mark" aria-hidden="true"><Icon name="sparkles" /></span>
       <span>Lead</span>
       <button type="button" class="link" disabled={!chat} title="The lead's chat" onClick={() => open(id)}>{title ? `“${title}”` : "A session"}</button>
       <LeadState state={state} />
@@ -381,7 +382,7 @@ function Query({ plan, standing, running, rollups }: { plan: ForgePlan; standing
   if (standing.error) {
     return (
       <div class="work-plan-query-error small" role="status">
-        <span aria-hidden="true">⊘</span><span class="words">{standing.error}</span>
+        <Icon name="ban" /><span class="words">{standing.error}</span>
         {plan.item.url && <a href={plan.item.url} target="_blank" rel="noopener noreferrer">Edit on {forgeName(plan.item.node.ref)}</a>}
       </div>
     );
