@@ -1,12 +1,12 @@
 ---
 diataxis: reference
-description: Which apps for running several coding agents have which features, Agents included, as found by the competitor check, run once per release.
+description: Which apps for running several coding agents have which features, Agent Loops included, as found by the competitor check, run once per release.
 ---
 
 # Feature matrix of coding-agent apps
 
 This page lists every app the competitor check has found that runs several coding
-agents at once, against the full set of features found across them. Agents is in bold,
+agents at once, against the full set of features found across them. Agent Loops is in bold,
 wherever its score puts it.
 
 - ● the app has it, in full.
@@ -19,13 +19,13 @@ Each table has a **Score** column, and its rows are sorted by it: ● counts 1, 
 and ○ and ?⃝ count 0, as a percentage of the table's features. An unknown counts as
 missing, so an app with thin docs scores low. Two features are shown but not scored:
 **Browser or preview**, since every agent already has a full browser on the computer, and
-**Switch when allowance runs out**, which Agents left out on purpose in favour of a new
+**Switch when allowance runs out**, which Agent Loops left out on purpose in favour of a new
 agent reading another's work.
 
 A feature that comes from an MCP server is counted the same way for every app:
 
 - ● when the app itself shows it, including through a view drawn from the app's own
-  server, such as Agents' own test view.
+  server, such as Agent Loops' own test view.
 - ◐ when a server from the app's own MCP catalogue gives the agent the feature, with
   nothing shown in the app. Every catalogue here carries Playwright, Linear, Jira and
   GitLab servers, as the official MCP registry does, so an app with a catalogue has at
@@ -38,7 +38,7 @@ down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
-releases and, where open, source. Agents' row was last brought up to date on 2026-11-12. Every app is held to the same bar, Agents included: a ●
+releases and, where open, source. Agent Loops' row was last brought up to date on 2026-11-12. Every app is held to the same bar, Agent Loops included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
 app that ships for macOS alone having no Android app. Once per release, after the
 Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
@@ -50,9 +50,9 @@ gives them for the four features added on 2026-10-15, and
 [Sources for from an idea to a first deploy](#sources-for-from-an-idea-to-a-first-deploy) for the one added on 2026-11-12. Apps change every week, so check a row against the app before relying
 on it.
 
-## Where Agents falls short
+## Where Agent Loops falls short
 
-Agents' ◐ cells, and why:
+Agent Loops' ◐ cells, and why:
 
 - **Spending limits:** in money or in tokens (#838), so only for runtimes that report a
   price or tokens. Cursor, Antigravity and Grok report neither, and run past every
@@ -61,7 +61,7 @@ Agents' ◐ cells, and why:
   the account when a session starts. See
   [More than one account](runtimes.md#more-than-one-account).
 
-Agents has none of these at all:
+Agent Loops has none of these at all:
 
 - Android app (#810), Windows or Linux desktop (#811).
 - Open source: the source is visible on GitHub, but all rights are reserved (#2110).
@@ -133,7 +133,7 @@ Agents has none of these at all:
 | App | Several agents at once | A git worktree per agent | Several runtimes | ACP | Runs with the computer off | Sandboxed tools | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
 | Agentastic | ● | ● | ● | ● | ● | ● | 100% |
-| **Agents** | ● | ● | ● | ● | ● | ● | 100% |
+| **Agent Loops** | ● | ● | ● | ● | ● | ● | 100% |
 | Codeg | ● | ● | ● | ● | ● | ● | 100% |
 | Paseo | ● | ● | ● | ● | ● | ● | 100% |
 | GitHub Copilot | ● | ● | ● | ◐ | ● | ● | 92% |
@@ -188,7 +188,7 @@ Agents has none of these at all:
 | CodeAgentSwarm | ● | ◐ | ◐ | ◐ | ?⃝ | ● | 58% |
 | Nuphos | ● | ● | ◐ | ?⃝ | ○ | ● | 58% |
 | Warp | ● | ○ | ○ | ● | ◐ | ● | 58% |
-| **Agents** | ○ | ● | ○ | ● | ○ | ● | 50% |
+| **Agent Loops** | ○ | ● | ○ | ● | ○ | ● | 50% |
 | Maestro | ● | ○ | ○ | ● | ○ | ● | 50% |
 | Roamgate | ◐ | ○ | ○ | ● | ◐ | ● | 50% |
 | Vibe Kanban | ● | ○ | ○ | ● | ?⃝ | ● | 50% |
@@ -210,7 +210,7 @@ Agents has none of these at all:
 
 | App | Shows who needs you | Sessions side by side | Sessions as a tree | Send while it works | Voice or dictation | Rich cards in replies | Live documents | Session goal | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|--:|
-| **Agents** | ● | ● | ● | ● | ● | ● | ● | ● | 100% |
+| **Agent Loops** | ● | ● | ● | ● | ● | ● | ● | ● | 100% |
 | GitHub Copilot | ● | ● | ● | ● | ● | ● | ● | ● | 100% |
 | Claude Code | ● | ● | ● | ● | ● | ◐ | ?⃝ | ● | 81% |
 | Cursor | ● | ● | ?⃝ | ● | ● | ● | ● | ◐ | 81% |
@@ -249,7 +249,7 @@ Agents has none of these at all:
 
 | App | Diff review | Pull requests | Git hosts beyond GitHub | CI checks | A second agent reviews | Score |
 |---|:-:|:-:|:-:|:-:|:-:|--:|
-| **Agents** | ● | ● | ● | ● | ● | 100% |
+| **Agent Loops** | ● | ● | ● | ● | ● | 100% |
 | Cursor | ● | ● | ● | ● | ● | 100% |
 | GitHub Copilot | ● | ● | ● | ● | ● | 100% |
 | Threadlines | ● | ● | ● | ● | ● | 100% |
@@ -288,7 +288,7 @@ Agents has none of these at all:
 
 | App | Terminal | Browser or preview (not scored) | A browser the agent drives | Simulator or emulator panes | File editor | Language servers in the editor | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
-| **Agents** | ● | ● | ● | ● | ● | ● | 100% |
+| **Agent Loops** | ● | ● | ● | ● | ● | ● | 100% |
 | Agentastic | ● | ● | ● | ?⃝ | ● | ● | 80% |
 | Cursor | ● | ● | ● | ?⃝ | ● | ● | 80% |
 | GitHub Copilot | ● | ● | ● | ?⃝ | ● | ● | 80% |
@@ -327,7 +327,7 @@ Agents has none of these at all:
 
 | App | Task board | Starts agents from issues | Trackers beyond GitHub | Scheduled or triggered runs | Agents start agents | The app's own tools for agents | Leases on shared resources | Wait for an event without polling | Workflows as files in the repository | From an idea to a first deploy | Score |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|--:|
-| **Agents** | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | 100% |
+| **Agent Loops** | ● | ● | ● | ● | ● | ● | ● | ● | ● | ● | 100% |
 | Codeg | ● | ● | ● | ● | ● | ● | ○ | ○ | ○ | ◐ | 65% |
 | Cursor | ?⃝ | ● | ● | ● | ● | ● | ?⃝ | ?⃝ | ● | ◐ | 65% |
 | OpenAI Codex | ?⃝ | ● | ● | ● | ● | ● | ?⃝ | ?⃝ | ● | ◐ | 65% |
@@ -368,7 +368,7 @@ Agents has none of these at all:
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
 | GitHub Copilot | ● | ● | ● | ● | ● | ?⃝ | 100% |
 | Agentastic | ● | ● | ● | ?⃝ | ● | ?⃝ | 80% |
-| **Agents** | ● | ● | ● | ◐ | ◐ | ◐ | 80% |
+| **Agent Loops** | ● | ● | ● | ◐ | ◐ | ◐ | 80% |
 | Claude Code | ● | ● | ● | ● | ?⃝ | ?⃝ | 80% |
 | CodeAgentSwarm | ● | ?⃝ | ● | ● | ● | ◐ | 80% |
 | Cursor | ● | ● | ● | ● | ?⃝ | ?⃝ | 80% |
@@ -407,7 +407,7 @@ Agents has none of these at all:
 |---|:-:|:-:|:-:|:-:|:-:|:-:|--:|
 | Paradev (was Superset) | ● | ● | ● | ● | ● | ● | 100% |
 | Paseo | ● | ● | ● | ● | ● | ● | 100% |
-| **Agents** | ● | ● | ● | ● | ○ | ● | 83% |
+| **Agent Loops** | ● | ● | ● | ● | ○ | ● | 83% |
 | Codeg | ● | ● | ?⃝ | ● | ● | ● | 83% |
 | Nimbalyst | ● | ● | ● | ◐ | ● | ◐ | 83% |
 | Nuphos | ?⃝ | ● | ● | ● | ● | ● | 83% |
@@ -446,7 +446,7 @@ Each app's score in every table, and overall: its points over the 51 scored feat
 
 | Rank | App | Running | Reach | Following | Reviewing | Tools | Tasks | Extensions | Organising | Overall |
 |--:|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|
-| 1 | **Agents** | 100% | 50% | 100% | 100% | 100% | 100% | 80% | 83% | **90%** |
+| 1 | **Agent Loops** | 100% | 50% | 100% | 100% | 100% | 100% | 80% | 83% | **90%** |
 | 2 | GitHub Copilot | 92% | 83% | 100% | 100% | 80% | 60% | 100% | 50% | **81%** |
 | 3 | Paseo | 100% | 100% | 69% | 90% | 60% | 55% | 60% | 100% | **77%** |
 | 4 | Cursor | 83% | 67% | 81% | 100% | 80% | 65% | 80% | 50% | **75%** |
@@ -488,7 +488,7 @@ docs, changelog, README and, where open, code (a search of a shallow clone of th
 branch). A link on a ○ for an open-source app is the repository whose code has no such
 thing. A ?⃝ has no link: the app's docs did not say.
 
-- **Agents:** Leases ● ([source](../explanation/leases.md)); Waits ● ([source](../how-to/wait-for-something.md)); Workflows in the repository ● ([source](../how-to/set-up-a-workflow.md)); Live documents ● ([source](../how-to/follow-a-live-document.md)).
+- **Agent Loops:** Leases ● ([source](../explanation/leases.md)); Waits ● ([source](../how-to/wait-for-something.md)); Workflows in the repository ● ([source](../how-to/set-up-a-workflow.md)); Live documents ● ([source](../how-to/follow-a-live-document.md)).
 - **Agentastic:** Leases ?⃝; Waits ?⃝; Workflows in the repository ○ ([source](https://www.agentastic.com/docs/advanced/task-scheduler)); Live documents ?⃝.
 - **Ace:** Leases ?⃝; Waits ◐, an agent's own background build or test run wakes it when the job ends ([source](https://github.com/flazouh/ace-releases/releases/tag/v0.1.99)); Workflows in the repository ?⃝; Live documents ?⃝.
 - **Atelier (was Acepe):** Leases ○ ([source](https://github.com/flazouh/atelier)); Waits ○ ([source](https://github.com/flazouh/atelier)); Workflows in the repository ○ ([source](https://github.com/flazouh/atelier)); Live documents ◐ ([source](https://github.com/flazouh/atelier/blob/HEAD/docs/app.md)).
@@ -529,7 +529,7 @@ This feature was added on 2026-10-29, at Alex's request, from each app's own doc
 changelog, releases and, where open, code (a shallow clone of the default branch). A ?⃝
 has the page that did not say.
 
-- **Agents:** ● for Codex and Claude, the runtimes that report a goal (#2861; [source](runtimes.md)).
+- **Agent Loops:** ● for Codex and Claude, the runtimes that report a goal (#2861; [source](runtimes.md)).
 - **Ace:** ● `/goal` with a progress card, and the goal on the session row ([source](https://github.com/flazouh/ace-releases/releases/tag/v0.1.67)).
 - **Agentastic:** ?⃝ ([source](https://www.agentastic.dev/whats-new)).
 - **Atelier (was Acepe):** ?⃝; its repository is gone ([source](https://github.com/flazouh/atelier)).
@@ -569,7 +569,7 @@ has the page that did not say.
 This feature was added on 2026-11-12, at Alex's request (#5055), from each app's own docs,
 changelog, releases and README. A ?⃝ has the page that did not say.
 
-- **Agents:** ● the first open, **Let's build your idea.**, and its plan page, on the Mac and the web page (#5048; [source](../how-to/build-your-first-app.md)).
+- **Agent Loops:** ● the first open, **Let's build your idea.**, and its plan page, on the Mac and the web page (#5048; [source](../how-to/build-your-first-app.md)).
 - **Agentastic:** ○ work starts from a prompt, spec or issue in an existing repository ([source](https://www.agentastic.dev/)).
 - **Ace:** ○ no new project, template or deploy in its release notes ([source](https://github.com/flazouh/ace-releases/releases)).
 - **Atelier (was Acepe):** ?⃝; its repository is gone ([source](https://github.com/flazouh/atelier)).
@@ -606,7 +606,7 @@ changelog, releases and README. A ?⃝ has the page that did not say.
 
 ## The apps
 
-- **Agents:** this project. Mac window, Remote on iPhone and iPad, web page, and agentsd hosts.
+- **Agent Loops:** this project. Mac window, Remote on iPhone and iPad, web page, and agentsd hosts.
 - **[Agentastic](https://www.agentastic.dev/):** A closed-source native Mac IDE for many agents, with an iPhone companion and cloud agents.
 - **[Ace](https://useace.dev):** A closed-source native app for Claude Code, Cursor and its own agent, on Mac, Windows and Linux, from the maker of Atelier. Its row is filled from its release notes ([flazouh/ace-releases](https://github.com/flazouh/ace-releases/releases)). Since 0.1.53 it is Sessions and Code only: the Browser, Git, Tasks, Usage and Marketplace pages are gone "for now".
 - **[Atelier (was Acepe)](https://github.com/flazouh/atelier):** A young native editor for coding agents over ACP, Mac and Linux.
@@ -615,7 +615,7 @@ changelog, releases and README. A ?⃝ has the page that did not say.
 - **[CodeAgentSwarm](https://www.codeagentswarm.com/en):** A closed-source desktop app supervising agent CLIs in grid panes, with a task board and budgets.
 - **[Codeg](https://github.com/spacering-net/codeg):** An ACP-based desktop and web workspace with a self-hosted server.
 - **[Conductor](https://www.conductor.build):** A Mac app running Claude Code and Codex in parallel workspaces, with cloud workspaces and an iOS app.
-- **[Cursor](https://cursor.com/docs):** An editor with an Agents Window, cloud agents, Projects and an iOS app.
+- **[Cursor](https://cursor.com/docs):** An editor with an Agent Loops Window, cloud agents, Projects and an iOS app.
 - **[DockTerm](https://github.com/munvard/dockterm):** An Electron terminal workspace around the claude CLI only.
 - **[Emdash](https://github.com/generalaction/emdash):** An open-source desktop app, a worktree per task, locally or on your own SSH hosts.
 - **[GitHub Copilot](https://github.com/github/app/releases):** The Copilot app, coding agent, Agent HQ and VS Code sessions.

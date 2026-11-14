@@ -119,7 +119,7 @@ costs one refused turn, and it is marked out again.
 ## On servers
 
 A server's Codex and Claude sign in through this Mac, so they spend this Mac's plans. When a
-plan runs out on either side, the other knows while the Agents window is open.
+plan runs out on either side, the other knows while the Agent Loops window is open.
 
 ## See also
 

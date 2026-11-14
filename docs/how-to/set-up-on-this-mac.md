@@ -1,14 +1,14 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Install Agents on this Mac. It runs your agents and the control plane here, and the window pairs itself.
+description: Install Agent Loops on this Mac. It runs your agents and the control plane here, and the window pairs itself.
 ---
 
-# Set up Agents on this Mac
+# Set up Agent Loops on this Mac
 
 Your agents run on a host, and every window and phone reaches them through a control plane
 you own (see [The control plane](../explanation/control-plane.md)). On a Mac, one app,
-**Agents**, has all three: the window, this Mac's host (`agentsd`) and a control plane.
+**Agent Loops**, has all three: the window, this Mac's host (`agentsd`) and a control plane.
 The first time you open it, it sets them up by itself, while it asks for your idea for an
 app.
 
@@ -20,33 +20,33 @@ plane on this Mac is an option for a person who wants nothing remote.
 ## Before you start
 
 - A Mac on which you can install apps in your home folder.
-- Agents is a free download from us. It is not in the Mac App Store, because it runs
+- Agent Loops is a free download from us. It is not in the Mac App Store, because it runs
   programs for your agents. The iPhone and iPad app is in the App Store and on TestFlight.
 
 ## Steps
 
-### Install Agents
+### Install Agent Loops
 
-1. Download Agents, a free download from us. It is not in the Mac App Store, because it
+1. Download Agent Loops, a free download from us. It is not in the Mac App Store, because it
    runs programs for your agents.
 
    The release has `Agent-Loops-<version>.dmg` and `Agent-Loops-<version>.zip`, with the same app in
    them. Neither needs admin rights. If your Mac does not open a disk image (because of a
    company policy, for example), download the `.zip` instead and double-click it.
-2. Drag Agents into `~/Applications`, the Applications folder in your home folder. You can
+2. Drag Agent Loops into `~/Applications`, the Applications folder in your home folder. You can
    always write to it. `/Applications` asks for an admin's password.
 
-   In `~/Applications`, Agents updates itself to the release your control plane runs, with
+   In `~/Applications`, Agent Loops updates itself to the release your control plane runs, with
    no admin password (#2178). It restarts only when no agent is in a turn.
    **Settings ▸ Machines ▸ This Mac ▸ Updates** shows the update, and
-   **Update Agents automatically** turns it off.
+   **Update Agent Loops automatically** turns it off.
 
 ### Open it
 
-1. Open Agents.
+1. Open Agent Loops.
 
-   The window shows **Let's build your idea.** with one box, and sets Agents up behind it.
-   In these steps, Agents:
+   The window shows **Let's build your idea.** with one box, and sets Agent Loops up behind it.
+   In these steps, Agent Loops:
 
    - makes the control plane's key;
    - registers two login items with macOS, the control plane and this Mac's host, and
@@ -58,16 +58,16 @@ plane on this Mac is an option for a person who wants nothing remote.
    when a step is slow or fails.
 2. Type an idea for an app and press **Submit**. The plan page shows the tasks to your first
    deploy, and an agent does them with you; see
-   [Build your first app](build-your-first-app.md). **Open Agents**, at the top right of the
+   [Build your first app](build-your-first-app.md). **Open Agent Loops**, at the top right of the
    plan page, shows the session list.
 
-If macOS asks you to allow Agents in **Login Items**, the window says so and shows
-**Open Login Items**. Click it, turn on **Agents** under **Allow in the Background**, and
-come back. Agents sees the change and continues by itself.
+If macOS asks you to allow Agent Loops in **Login Items**, the window says so and shows
+**Open Login Items**. Click it, turn on **Agent Loops** under **Allow in the Background**, and
+come back. Agent Loops sees the change and continues by itself.
 
 If a step fails, the window shows one line that says what went wrong, with **Try Again**
 and **Show Details**. See
-[Fix Agents when it won't start](fix-agents-host-not-starting.md).
+[Fix Agent Loops when it won't start](fix-agents-host-not-starting.md).
 
 ### Join a hosted account
 
@@ -80,13 +80,13 @@ folders of all your machines. See
 
 ### The menu bar item
 
-Agents also has an item in the menu bar. It shows how many agents work and how many need
-you, also when no window is open. It has **Open Agents**, **Pair a Phone or iPad…**,
-**Open in Browser**, **Settings…** and **Quit Agents**.
+Agent Loops also has an item in the menu bar. It shows how many agents work and how many need
+you, also when no window is open. It has **Open Agent Loops**, **Pair a Phone or iPad…**,
+**Open in Browser**, **Settings…** and **Quit Agent Loops**.
 
 ## What to know
 
-- **Quit Agents** closes the window and the menu bar item. It does not stop the control
+- **Quit Agent Loops** closes the window and the menu bar item. It does not stop the control
   plane or your agents. At login, macOS starts them and the menu bar item, but not the
   window.
 - The control plane keeps what it remembers (paired windows and devices, and your
@@ -110,9 +110,9 @@ you, also when no window is open. It has **Open Agents**, **Pair a Phone or iPad
   notifications on your devices, run the control plane in the cloud. See
   [Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md) and
   [Phone and iPad](../explanation/phone-and-ipad.md).
-- To remove Agents, open **Settings ▸ Machines ▸ This Mac** and click
-  **Remove Agents from This Mac…** first. It stops both login items and removes them. Then
-  quit Agents and move it to the Trash. If you only move it to the Trash, the login items
+- To remove Agent Loops, open **Settings ▸ Machines ▸ This Mac** and click
+  **Remove Agent Loops from This Mac…** first. It stops both login items and removes them. Then
+  quit Agent Loops and move it to the Trash. If you only move it to the Trash, the login items
   stay, and macOS keeps them in **Login Items**.
 
 ## Related

@@ -114,7 +114,7 @@ the request failed.
 ## Which language servers
 
 The language servers run on the agent's host, the Mac or server where the agent works,
-not on the device you type on. Agents does not install them. It looks for each one in
+not on the device you type on. Agent Loops does not install them. It looks for each one in
 the folders of the host's login shell:
 
 | Files | Language server |

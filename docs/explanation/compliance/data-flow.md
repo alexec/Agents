@@ -1,12 +1,12 @@
 ---
 diataxis: explanation
 devices: [mac, iphone, ipad, web, server]
-description: "A diagram of every part of Agents and every outside service, with the data on each line and whether it is encrypted in transit and at rest."
+description: "A diagram of every part of Agent Loops and every outside service, with the data on each line and whether it is encrypted in transit and at rest."
 ---
 
 # Data flow
 
-This page shows where data goes when you use Agents. The diagram has every part of Agents
+This page shows where data goes when you use Agent Loops. The diagram has every part of Agent Loops
 and every outside service. The tables after it give the data on each line, and whether it
 is encrypted in transit and at rest.
 
@@ -59,10 +59,10 @@ drawn as C4 diagrams in [Architecture](../architecture.md).
 | The Mac window to this Mac's machine | The same as above, for this Mac's agents | A local socket, so it never leaves the Mac. Only a window of the same macOS user is let in. |
 | A browser to the control plane on the same Mac | The same as above | Plain HTTP and WebSocket on `localhost` only. It never leaves the Mac. |
 | A machine to the runtime | Prompts, tool calls and answers, over ACP | stdio between processes on the same machine. |
-| A runtime to its vendor | Your prompts, the files and command output the runtime reads, and its answers | HTTPS, made by the runtime. Agents does not keep or copy this traffic. |
+| A runtime to its vendor | Your prompts, the files and command output the runtime reads, and its answers | HTTPS, made by the runtime. Agent Loops does not keep or copy this traffic. |
 | A runtime to the app's own tools | Calls to `mcp__agents__*` | HTTP on `127.0.0.1` only, with a token for each session. |
 | A machine to GitHub, GitLab, Linear and MCP servers | Issues, pull requests, checks, events; what an agent sends to a tool | HTTPS. A stdio MCP server runs on the machine. |
-| A machine to a mail server | One mailbox, read over IMAP | As the mail server allows. Agents never sends mail. |
+| A machine to a mail server | One mailbox, read over IMAP | As the mail server allows. Agent Loops never sends mail. |
 | A server to the control plane, for a backup | The backup, in parts of 8 MiB | Inside the machine's connection (TLS, as above). The control plane seals each part when it arrives. |
 | The control plane to Apple Push Notification service | A notification, and Live Activity updates | HTTPS to Apple. The words of a notification are sealed with the device's own key (HPKE: P-256, HKDF-SHA256, AES-256-GCM), and the visible alert says only "An agent needs you". A Live Activity update is not sealed. It carries only the turn's phase and times. |
 | The control plane to a machine provider | Calls that start, stop and make machines | Sent to the machine that carries the provider, which runs its MCP server or CLI with the credentials it keeps (#3398), over HTTPS. |

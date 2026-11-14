@@ -1,6 +1,6 @@
 # The docs site (044). Built by Zensical, which reads this file; Material for MkDocs reads it too.
 # Preview: scripts/docs.sh serve   Check: scripts/docs.sh check
-site_name: Agents
+site_name: Agent Loops
 site_description: Run coding agents on your Mac, and follow them from your iPhone and iPad.
 site_url: https://docs.agentloops.dev/
 repo_url: https://github.com/agentloops-dev/agent-loops

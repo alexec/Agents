@@ -54,7 +54,7 @@ control plane, also when it starts with no network. So a machine on a plane keep
 policy.
 
 A machine that had a policy and has none that it can trust starts no agent, turn, helper or
-workflow run. It says: "Agents has no policy from your organisation. Connect to the
+workflow run. It says: "Agent Loops has no policy from your organisation. Connect to the
 network." This occurs when:
 
 - the file is deleted;
@@ -87,7 +87,7 @@ can allow one by name in `allowUnmetered`.
 
 ## What the policy does not protect against
 
-Agents and `agentsd` run as the user of the machine, and never ask for admin rights. A
+Agent Loops and `agentsd` run as the user of the machine, and never ask for admin rights. A
 user who changes the program can avoid the rules. The policy stops mistakes and ordinary
 use. The signature makes an edit to the policy file useless, but it is not a security
 boundary against the user of the machine.

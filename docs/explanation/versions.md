@@ -47,13 +47,13 @@ and greyed for a folder on another.
 
 The control plane keeps a **required set**: the capabilities that it needs to route. A host
 without one of them is still connected and serves what its list says, but its row says
-**Needs an update**, with a second line: "Update this host to Agents 0.9.0. It does not have
+**Needs an update**, with a second line: "Update this host to Agent Loops 0.9.0. It does not have
 …", and the names it is missing, and **Update…** in its menu updates it over ssh (#1766). A
 Mac does not wait for that: at each join the control plane names its own version as the
-release (`machine/release`, to a host that says `host.update/1`), and Agents updates itself
+release (`machine/release`, to a host that says `host.update/1`), and Agent Loops updates itself
 to it when it is newer, between turns and with no admin password (#2178). On the Mac this is in **Settings ▸ Control plane**, on the
 host's row. On the Remote and the web page it is in **Settings ▸ Versions**, which also gives
-the control plane's version and each host's, such as **Agents 0.9.0 (Go)** for a host written
+the control plane's version and each host's, such as **Agent Loops 0.9.0 (Go)** for a host written
 in Go.
 
 ### An app too old for the control plane
@@ -61,7 +61,7 @@ in Go.
 A client without the control plane's required set is refused, as
 [Where each part sends its list](#where-each-part-sends-its-list) says, with the error "This
 app needs an update to work with this control plane." The client says what to do: "Update
-this app to Agents 0.9.0 to use this control plane. It does not have …", with the missing
+this app to Agent Loops 0.9.0 to use this control plane. It does not have …", with the missing
 names. On the Mac this is under the control plane's row
 in **Settings ▸ Control plane**; on the Remote it is in **Settings ▸ Versions**. The web page
 says "Update this page …" in the same place. The control plane serves the web page, so a
@@ -74,9 +74,9 @@ A newer client can send a method or a field that an older control plane or host 
 know. Then it gets `-32601` (method not found) or `-32602` (invalid params), with the
 part's own words, such as "Those parameters are not a ProviderCreate." When that part is
 older than the client, the client says **The control plane needs an update to do this. It
-runs Agents 0.17.0; this app is 0.18.0.** instead (#4096), and the Mac and the Remote keep
+runs Agent Loops 0.17.0; this app is 0.18.0.** instead (#4096), and the Mac and the Remote keep
 the part's words in the log. For a host older than the client, each client says **This
-machine needs an update to do this. It runs Agents ‹theirs›; this app is ‹ours›.** (#4101):
+machine needs an update to do this. It runs Agent Loops ‹theirs›; this app is ‹ours›.** (#4101):
 the Mac and the Remote by the host each call goes to, with that host's version from
 `machines/list`; the web page by the call's route, and it says "this page". The control
 plane serves the page, so on the web it is never older.
@@ -121,7 +121,7 @@ and the version to update to.
 On a control plane with more than one person (a team), the required sets also have
 `host.team/1` and `client.team/1` (#1763). A build from before the team tier cannot tell
 people apart, so it is refused. A client without `client.team/1`, or with no list, gets
-`-32074` (`updateToJoinTeam`, "Update Agents to join this team") on every call except
+`-32074` (`updateToJoinTeam`, "Update Agent Loops to join this team") on every call except
 `control/status`. A host without `host.team/1` is "Needs an update", and each call to it
 gets `-32074`. When only one person is left, they work again.
 

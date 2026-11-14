@@ -31,7 +31,7 @@ address of its own, and two browsers paired with it.
 
 1. Open the address of the hosted service in your browser.
 
-   The page says **Agents**, and under it: "Sign up and you get a control plane of your
+   The page says **Agent Loops**, and under it: "Sign up and you get a control plane of your
    own. You type no command and hold no key."
 2. Click **Sign Up with GitHub**.
 
@@ -129,7 +129,7 @@ new address.
 
 ## Where next
 
-- [Use Agents in a browser](../how-to/use-agents-in-a-browser.md): what the web page can
+- [Use Agent Loops in a browser](../how-to/use-agents-in-a-browser.md): what the web page can
   do.
 - [The control plane](../explanation/control-plane.md): what your control plane does, and
   why every client is trusted alike.

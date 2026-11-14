@@ -1,6 +1,6 @@
 ---
 diataxis: explanation
-description: How the app draws a tool's ui:// view (MCP Apps) on the Mac, the iPhone and iPad, and the web page, what a view may reach, and what its messages do in Agents.
+description: How the app draws a tool's ui:// view (MCP Apps) on the Mac, the iPhone and iPad, and the web page, what a view may reach, and what its messages do in Agent Loops.
 ---
 
 # Views in a conversation
@@ -56,7 +56,7 @@ How each client enforces it:
 | Mac, iPhone, iPad | A web view of its own with nothing kept. The view is in a `sandbox="allow-scripts"` frame inside a page of the app's. The policy is on that page and again at the top of the view. A WebKit content-blocking list blocks every load except the declared origins. The bridge runs in a script world of the app's own, which the view cannot see. |
 | Web page | The spec's sandbox proxy. The page is at `localhost`; the proxy is served only at `127.0.0.1` on the same port, so it has a different origin. The proxy is drawn under the view's own policy (the control plane rebuilds that policy from the domains in its address, using the same rules) and can be framed only by the page. It holds the view in a `sandbox="allow-scripts"` frame of its own. |
 
-## What its messages do in Agents
+## What its messages do in Agent Loops
 
 | Message | What the app does |
 |---|---|
@@ -94,7 +94,7 @@ at all: Work lists the Linear issues too, of the whole workspace when no folder 
 
 - **Where.** In the folder's group, after its pinned pages and before its sessions.
 - **Its name.** The service, then the view: **GitHub · Pull requests**, **GitHub · Issues**,
-  **Jira · Issues**. The service is the catalogue's title for a connector Agents makes, else
+  **Jira · Issues**. The service is the catalogue's title for a connector Agent Loops makes, else
   the server's own (`serverInfo.title`), else its name in `mcp.json`. A view title that
   starts with the service's ("Linear issues") loses it.
 - **Which servers.** Each server set up and approved for the folder that can show views

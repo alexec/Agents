@@ -16,7 +16,7 @@ See [People and machines](../explanation/people-and-machines.md) for why.
 ## Before you start
 
 - A client paired with your control plane, as an admin. The local owner is an admin.
-- The other person has Agents on a Mac, an iPhone or an iPad.
+- The other person has Agent Loops on a Mac, an iPhone or an iPad.
 
 A person joins with an invite code. After that, they can add a Google, Apple or GitHub
 sign-in to themselves, and pair more clients by signing in (see [Sign in with Google, Apple
@@ -28,7 +28,7 @@ or GitHub](sign-in-with-google-apple-or-github.md)):
 - **GitHub organisations:** when an admin allows organisations, only a member of one of
   them can sign in with GitHub. This does not let a person join with no invite.
 
-A build of Agents from source needs its own ids for these: see [Set up Google, Apple and
+A build of Agent Loops from source needs its own ids for these: see [Set up Google, Apple and
 GitHub sign-in for your own build](set-up-sign-in-for-your-own-build.md).
 
 ## Invite a person
@@ -41,7 +41,7 @@ GitHub sign-in for your own build](set-up-sign-in-for-your-own-build.md).
 4. Click **Invite**. The sheet shows a code. Click **Copy**, and send the code to the person.
 
    The code works **once**, for **7 days**.
-5. The person pastes the code where Agents asks for a code: in the Mac window when it
+5. The person pastes the code where Agent Loops asks for a code: in the Mac window when it
    starts, or on the Remote's pairing screen. That client is their first one. They are
    now in People.
 

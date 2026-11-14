@@ -5,7 +5,7 @@ description: Take main to a new version with nobody watching (#914), started by 
 
 # Release
 
-A release takes `main` to a new version on the GitHub release page (Agents Host, the Linux
+A release takes `main` to a new version on the GitHub release page (Agent Loops, the Linux
 agentsd) and on TestFlight (the Mac window and the Remote, one Universal app). The tag does
 the publishing: `.github/workflows/release.yml` builds, signs and uploads when a `v*` tag
 is pushed. This skill decides when the tag is pushed, and what it says.
@@ -345,7 +345,7 @@ A tag that already exists for this version means another release ran: end with
    A job that no runner took is not a failure: look and run it again once, as in step 5,
    item 4 (#3445). Only a job that ran and failed goes to items 2–4.
 2. **GitHub:** `gh release view v<version> --json assets` has the `.dmg`, the `.zip`,
-   both `agentsd-linux-*.tar.gz` and `SHA256SUMS`. Macs update Agents Host from the `.zip`
+   both `agentsd-linux-*.tar.gz` and `SHA256SUMS`. Macs update Agent Loops from the `.zip`
    and `SHA256SUMS` by these names (#2178): a release without them updates no Mac.
    **The image** (#2140): the `image` job passed, and
    `docker buildx imagetools inspect ghcr.io/agentloops-dev/agents-control:<version>` lists

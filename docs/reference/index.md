@@ -58,4 +58,4 @@ something up, not for reading through.
   menu in the iPhone and iPad app.
 - [Keyboard shortcuts](keyboard-shortcuts.md): every shortcut and menu command on the Mac.
 - [Feature matrix of coding-agent apps](feature-matrix.md): which apps for running several
-  coding agents have which features, Agents included.
+  coding agents have which features, Agent Loops included.

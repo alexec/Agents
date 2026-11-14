@@ -1,17 +1,17 @@
 ---
 diataxis: explanation
 devices: [mac, iphone, ipad, web, server]
-description: "Every outside company that gets data when you use Agents, what it gets, and whether a self-hosted set-up can leave it out."
+description: "Every outside company that gets data when you use Agent Loops, what it gets, and whether a self-hosted set-up can leave it out."
 ---
 
 # Sub-processors
 
-A sub-processor here is an outside company that gets your data when you use Agents. The
-people who make Agents run none of these for you, except the hosted service. In a
+A sub-processor here is an outside company that gets your data when you use Agent Loops. The
+people who make Agent Loops run none of these for you, except the hosted service. In a
 self-hosted set-up, your organisation holds the account with each one, under that
 company's own terms.
 
-Agents itself has no analytics, no tracking and no advertising ([Privacy](../../privacy.md)).
+Agent Loops itself has no analytics, no tracking and no advertising ([Privacy](../../privacy.md)).
 
 ## Always
 
@@ -23,7 +23,7 @@ At least one runtime is needed to run agents.
 
 ## Runtime vendors
 
-Each runtime runs on your machine and talks to its own company. Agents does not see that
+Each runtime runs on your machine and talks to its own company. Agent Loops does not see that
 traffic and does not copy it ([Privacy](../../privacy.md)).
 
 | Runtime | Company | Notes |
@@ -51,14 +51,14 @@ gateway that the organisation sets (#999) sends the data to that provider or gat
 | GitHub | The github server, GitHub sign-in, git | Issues, pull requests, checks and code of the folders you connect; your git pushes | Yes, if you do not connect GitHub. |
 | GitLab (gitlab.com or your own) | The gitlab server, GitLab sign-in | Issues, merge requests and pipelines of the folders you connect | Yes. A self-managed GitLab keeps it in your organisation. |
 | Linear | The linear server, Linear sign-in | The issues you read and change | Yes, if you do not connect Linear. |
-| Your mail provider | Email over IMAP | Reads one mailbox. Agents never sends mail. | Yes, if you do not connect a mailbox. |
+| Your mail provider | Email over IMAP | Reads one mailbox. Agent Loops never sends mail. | Yes, if you do not connect a mailbox. |
 | Each MCP server's maker | Connectors | What your agents send to its tools | Yes. Add only the servers your organisation allows. |
 | Docker, AWS, Google Cloud, DigitalOcean, GitHub Codespaces, Coder | Machine providers | The calls that start, stop and make machines, with the credentials you give | Yes. A control plane with no provider calls none. |
 | Google, Apple, GitHub | Sign-in of a person to the control plane | An ID token or a device-flow token, once per sign-in | Yes. The local owner signs in with codes and needs no outside account. |
 | nodejs.org, npm, GitHub releases, Google, each runtime's maker | Downloads of runtimes | The download requests | Partly. A machine downloads only the runtimes you install. |
 | skills.sh, the MCP registries, GitHub | Marketplaces and catalogues | Search and download requests | Partly. An organisation's policy will allow only some marketplaces (T5, #998). |
 
-## A control plane that the makers of Agents run
+## A control plane that the makers of Agent Loops run
 
 A self-hosted control plane uses none of these.
 
@@ -94,15 +94,15 @@ it calls neither:
 - **YouTube.** The web site at `agentloops.dev` embeds no video yet: its frames are only
   comments in `www/index.html`. When a video goes in, it uses the
   `youtube-nocookie.com` frame, which your browser loads from Google only when the page
-  shows it. That frame then goes in the table above. The videos that the Agents folder
+  shows it. That frame then goes in the table above. The videos that the Agent Loops folder
   uploads are under [Privacy](../../privacy.md#videos-on-youtube).
 
 ## Delivering the apps
 
 | Company | Service | What it gets |
 | --- | --- | --- |
-| Apple | TestFlight, and the App Store | Delivers the Mac window and the Remote. What Apple keeps about a tester or a buyer is under Apple's terms. Agents adds nothing to it. |
-| GitHub | Releases | Delivers Agents for the Mac. |
+| Apple | TestFlight, and the App Store | Delivers the Mac window and the Remote. What Apple keeps about a tester or a buyer is under Apple's terms. Agent Loops adds nothing to it. |
+| GitHub | Releases | Delivers Agent Loops for the Mac. |
 | GitHub | Pages | Serves this docs site. |
 
 ## Related

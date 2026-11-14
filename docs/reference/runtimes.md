@@ -38,7 +38,7 @@ In every column:
   needs signing in** or **Not asked yet**.
 - **App tools available**: the tools on [Tools the app gives agents](agent-tools.md).
 - **On a server**: an agent in a server folder is offered only the runtimes on that
-  server. Claude, Codex and OpenCode are the exceptions: Agents installs them on the
+  server. Claude, Codex and OpenCode are the exceptions: Agent Loops installs them on the
   server itself. Claude and Codex sign in there through this Mac's own sign-ins, and OpenCode
   borrows the provider keys it is signed in with on this Mac, for each run. With no Mac,
   the web page signs Claude and Codex in on the server itself, with a link and a code or

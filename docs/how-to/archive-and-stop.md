@@ -152,7 +152,7 @@ it. An event or a chat that named it just says "another agent".
 - To change how long, or to keep archived chats until you delete them, see **Settings ▸
   General ▸ Archived agents** in the [settings reference](../reference/settings.md).
 
-Deleting removes only what Agents keeps. It never touches your files, your commits, or the
+Deleting removes only what Agent Loops keeps. It never touches your files, your commits, or the
 runtime's own copy of the conversation.
 
 To put a whole folder away, see [Add a folder](add-a-folder.md).

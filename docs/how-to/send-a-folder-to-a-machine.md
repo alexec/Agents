@@ -99,7 +99,7 @@ touched for an hour. A send or a bring back that stops at a check removes its fi
 
 An agent can make the same send, with `start_session` and `send`, before it starts a
 session on the server (#2929; see
-[Start machines from Agents](start-machines-from-agents.md)). Then no window takes part:
+[Start machines from Agent Loops](start-machines-from-agents.md)). Then no window takes part:
 the agent's host makes the bundle and the patch, and sends them to the server in parts of
 4 MB, through the control plane (`machines/sendFolder`). You say yes on the agent's
 question card first.

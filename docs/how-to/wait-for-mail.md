@@ -8,7 +8,7 @@ description: Connect a mailbox for agents, see it on the Mail page, let an agent
 
 Agents often wait for a mail: a sign-in code from gitlab.com, the code that confirms an AWS
 sign-up, a token from DigitalOcean. The `email` connector lets them wait for mail and read
-it. It is `email-mcp`, a small server that Agents ships. It reads one mailbox over IMAP and
+it. It is `email-mcp`, a small server that Agent Loops ships. It reads one mailbox over IMAP and
 **never sends mail**.
 
 - **The event** `email.received`: mail came into a folder. A workflow or a wait can use it.
@@ -20,12 +20,12 @@ it. It is `email-mcp`, a small server that Agents ships. It reads one mailbox ov
 - **The Mail page** (`show_mail`): the folders, a folder's newest messages, and a message's
   text, with **Mark Read** and **Move**.
 
-Agents on the Mac carries `email-mcp`, and every Linux host installs it beside agentsd.
+Agent Loops on the Mac carries `email-mcp`, and every Linux host installs it beside agentsd.
 
 ## Before you start
 
 - A mailbox for the agents, not your own: agents can read every message in it.
-- Its IMAP server, such as `imap.fastmail.com`, and an **app password** made for Agents at
+- Its IMAP server, such as `imap.fastmail.com`, and an **app password** made for Agent Loops at
   the mail provider. Most providers need IMAP turned on first.
 - **Fastmail:** a trial account makes no app password until it passes a phone check (a
   code by SMS) or is paid; the Basic plan has no IMAP at all. In **Settings ▸ Privacy &
@@ -49,7 +49,7 @@ You can use variables in place of the connection: set `EMAIL_IMAP_URL`, `EMAIL_U
 
 ## Add the page and the event
 
-1. Add **Email** from the **Agents** marketplace in the catalogue, or by hand in the folder's
+1. Add **Email** from the **Agent Loops** marketplace in the catalogue, or by hand in the folder's
    `.agents/mcp.json`:
 
    ```json

@@ -1,12 +1,12 @@
 ---
 diataxis: tutorial
 devices: [mac, iphone]
-description: Put Agents on your iPhone, see the agents on your Mac, and start another from the phone.
+description: Put Agent Loops on your iPhone, see the agents on your Mac, and start another from the phone.
 ---
 
 # Follow your agents from your iPhone
 
-In this tutorial you put Agents on your iPhone, find the agent you started in
+In this tutorial you put Agent Loops on your iPhone, find the agent you started in
 [Your first agent](first-agent.md), and start a second one from the phone. It takes about
 ten minutes. The same steps work on an iPad.
 
@@ -19,30 +19,30 @@ agent started and finished from the phone without going back to the Mac.
 
 - You have finished [Your first agent](first-agent.md), so your Mac has a folder with an
   agent in it.
-- Agents runs on your Mac. See
-  [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md).
+- Agent Loops runs on your Mac. See
+  [Set up Agent Loops on this Mac](../how-to/set-up-on-this-mac.md).
 - Your iPhone and your Mac are on the same Wi-Fi network.
-- Your invitation to the Agents alpha on TestFlight, and the **TestFlight** app on your
+- Your invitation to the Agent Loops alpha on TestFlight, and the **TestFlight** app on your
   iPhone.
 
-## 1. Put Agents on your iPhone
+## 1. Put Agent Loops on your iPhone
 
-On the iPhone and iPad, the Agents alpha is on TestFlight. On the Mac, Agents is a
+On the iPhone and iPad, the Agent Loops alpha is on TestFlight. On the Mac, Agent Loops is a
 download of its own, which you installed in the first tutorial.
 
-1. On your iPhone, open **TestFlight**, choose **Agents**, and tap **Install**.
-2. Open Agents.
+1. On your iPhone, open **TestFlight**, choose **Agent Loops**, and tap **Install**.
+2. Open Agent Loops.
 
-You should see Agents open on your phone and say **Connect to your agents**.
+You should see Agent Loops open on your phone and say **Connect to your agents**.
 
 ## 2. Show a code on your Mac
 
-The phone reaches your agents through your control plane, the one Agents runs on your
+The phone reaches your agents through your control plane, the one Agent Loops runs on your
 Mac. Only a device you have paired can reach it, and you pair it once, by scanning a
 code.
 
-In the Agents window on your Mac, open **Settings ▸ Control plane**, click **Show** beside
-**Clients**, and click **Pair a Device…**. **Pair a Phone or iPad…** in the Agents menu bar
+In the Agent Loops window on your Mac, open **Settings ▸ Control plane**, click **Show** beside
+**Clients**, and click **Pair a Device…**. **Pair a Phone or iPad…** in the Agent Loops menu bar
 item opens the same code.
 
 You should see a code to scan, good for five minutes.

@@ -20,7 +20,7 @@ own everything that was there before people came. How they are made depends on t
   person on their own is a hosted account with this one person. See
   [Run the hosted service](../how-to/run-the-hosted-service.md).
 - **A control plane on a Mac or on your own hosting:** the local owner signs in with the
-  control plane's own key: the codes Agents and `agents-control` make are theirs. A control
+  control plane's own key: the codes Agent Loops and `agents-control` make are theirs. A control
   plane with one person works as it did. Nothing asks them to sign in anywhere, and no
   account outside is needed.
 
@@ -72,7 +72,7 @@ is then stopped and deleted through its provider.
 ## Older builds
 
 A build from before people came cannot tell people apart. With one person it works as
-it did. When a second person joins, the control plane refuses it with "Update Agents to
+it did. When a second person joins, the control plane refuses it with "Update Agent Loops to
 join this team" (`docs/explanation/versions.md`).
 
 ## How a machine becomes someone's

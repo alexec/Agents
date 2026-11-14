@@ -13,7 +13,7 @@ the Mac's screen, so you can watch from your iPhone, your iPad or the web page.
 
 ## Before you start
 
-- A Mac with Agents. Desktop control is only on a Mac: an agent on a Linux server
+- A Mac with Agent Loops. Desktop control is only on a Mac: an agent on a Linux server
   does not get the tool.
 - Desktop control is **off** until you turn it on. Until then, no agent can click, type or
   read the screen of another app.
@@ -24,7 +24,7 @@ the Mac's screen, so you can watch from your iPhone, your iPad or the web page.
    - **Mac**: **Settings ▸ Machines ▸ This Mac**.
    - **Web page**: **Settings ▸ Machines**.
 2. Turn on **Let an agent drive apps on this Mac**, under **Desktop control**.
-3. The first time an agent tries, macOS asks you to grant **Agents** the
+3. The first time an agent tries, macOS asks you to grant **Agent Loops** the
    **Accessibility** permission. Grant it in **System Settings ▸ Privacy & Security ▸
    Accessibility**. Until you do, the agent is told what to grant, and nothing is driven.
 4. The first picture of the screen asks for **Screen Recording** in the same place. Until
@@ -73,7 +73,7 @@ is written to disk or put in the chat's history.
 
 ## Related
 
-- [Use Agents in a browser](use-agents-in-a-browser.md): the web page, where the tile
+- [Use Agent Loops in a browser](use-agents-in-a-browser.md): the web page, where the tile
   shows too
 - [Watch background work](watch-background-work.md)
 - [Agent tools](../reference/agent-tools.md): `drive_screen`

@@ -15,19 +15,19 @@ for a permission, or stopped with something it could not finish.
 
 ## Before you start
 
-- Agents on your Mac, and the iPhone or iPad app installed and paired with it (see
+- Agent Loops on your Mac, and the iPhone or iPad app installed and paired with it (see
   [Answer a question or a permission request](answer-a-question.md)).
 
 ## Steps
 
 1. On your iPhone or iPad, press and hold an empty part of the Home screen, tap **Edit**,
    then **Add Widget**.
-2. Search for **Agents** and tap it.
+2. Search for **Agent Loops** and tap it.
 3. Choose the size: **Small** for the number, **Medium** for the number and the sessions
    behind it. Tap **Add Widget**, then **Done**.
 
 The widget fills in as soon as the app has been open since you installed it. Until then it
-says **Open Agents**, because it has nothing to report and a zero would be a claim it
+says **Open Agent Loops**, because it has nothing to report and a zero would be a claim it
 cannot back.
 
 **Read it**
@@ -55,7 +55,7 @@ updated underneath.
 
 ## If it doesn't work
 
-- **The widget says Open Agents.** The app has not been opened on this device yet, or the
+- **The widget says Open Agent Loops.** The app has not been opened on this device yet, or the
   count has never been written here. Open the app once.
 - **The number is one or more behind the Mac.** The app has not heard from your Mac. Open
   it: it refreshes, and the widget follows.
