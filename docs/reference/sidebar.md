@@ -14,7 +14,7 @@ iPhone, and on a narrow web page, it is the first screen, and what you open goes
 
 | Part | What it is |
 | --- | --- |
-| **New Session** | Starts a session in the folder you last started one in. The page it opens can change the folder. |
+| **Work** | **Docs**, **Messages**, then a row for each list: **Issues**, **Pull Requests** and the rest. On the web page, Work is a section of the bar, with the same pages. |
 | **Status** | What is going on, and no settings: **Runtimes** (each runtime once, with your accounts and a line per machine) and **Events**. Your connectors, secrets and outside accounts are in **Settings ▸ You**. |
 | **Machines** | A page for each machine: its disks, CPU and memory, **Runtimes** installed, **Resources** and **Worktrees**. |
 | **Usage** | Pages about past work: **Cost**, **Tokens**, **Time**, and **Milestones** until you have done every first step. |
@@ -96,8 +96,12 @@ fold counts the sessions. A folder starts folded. Click or tap its
 heading to open it. In order, an open folder holds:
 
 - **Its pinned pages,** when it has some.
-- **Its sessions,** newest started first. Its pinned sessions are in **Pinned** instead.
-  Each row's mark says its state. See [Statuses and groups](statuses.md).
+- **Sessions,** a fold with a grey count of the folder's live sessions. Its first row is
+  **New Session**, which starts a session in this folder and puts the cursor in the prompt.
+  A folder with no live session still has the fold, with only **New Session** in it. A
+  search hides **New Session**. Then its sessions, newest started first. Its pinned
+  sessions are in **Pinned** instead. Each row's mark says its state. See
+  [Statuses and groups](statuses.md).
 - **Workflows,** a fold with a grey count of the folder's workflows. It is closed at
   first, and each folder keeps its own fold. A search opens it to show what matched. It
   shows only when the folder has a workflow that is not archived and not pinned. Pinned

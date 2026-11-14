@@ -173,30 +173,21 @@ struct FolderListView: View {
                 }
             }
 
-            // What wants the person, across every folder and host (#495): Things'
-            // Inbox and Today, Mail's smart mailboxes, each drawn only with something in
-            // it (#507).
-            Section {
-                // One way to start a session (#495), in the folder last started in; the
-                // page it opens can switch folder.
-                NewSessionTopRow()
-                // Docs (#3321): the folders' docs and the docs connectors', beside New Session,
-                // so the rows with no header stay together (#4004).
+            // Work (#3119): a row per list (#4004), as the web's Work section has them; an item's
+            // page keeps its list's row picked. New Session is the first row of each folder's
+            // Sessions (#5267), so the rows with no header went: Docs and Messages are Work's first.
+            Section(isExpanded: $showsWorkLists) {
+                // Docs (#3321): the folders' docs and the docs connectors'.
                 HStack { Text("Docs").foregroundStyle(.primary); Spacer() }
                     .help("Every folder’s Markdown docs and your docs connectors’ pages, read only")
                     .activityIcon("doc.text")
                     .appText(.supporting).sidebarInk(.docs).tag(SidebarItem.docs)
-                // Messages (#4344): the messaging connectors' conversations, the last row above Work.
-                // Under it in grey, the unread count and what the last message woke (#4934).
+                // Messages (#4344): the messaging connectors' conversations. Under it in grey, the
+                // unread count and what the last message woke (#4934).
                 MessagesRow()
                     .help(MessagesList.sidebarHelp)
                     .activityIcon("bubble.left.and.bubble.right")
                     .appText(.supporting).sidebarInk(.messages).tag(SidebarItem.messages)
-            }
-
-            // Work (#3119): a row per list (#4004), as the web's Work section has them; an item's
-            // page keeps its list's row picked.
-            Section(isExpanded: $showsWorkLists) {
                 ForEach(WorkList.Kind.allCases) { kind in
                     HStack { Text(kind.title).foregroundStyle(.primary); Spacer() }
                         .help(kind.sidebarHelp)
@@ -673,7 +664,7 @@ struct FolderFold: View {
                 get: { isOpen },
                 set: { folds.set(key, open: $0) })) {
                 // Folded, nothing at all is under the heading (#356): see `isUnfolded`.
-                // A session starts from New Session at the top (#495), or the menu.
+                // A session starts from New Session, the first row of Sessions (#5267), or the menu.
                 // The folder's pinned pages (#159), before its sessions. Not while
                 // searching: the search is for sessions.
                 if fold.showsPinnedPages {
@@ -687,12 +678,18 @@ struct FolderFold: View {
                 // started it, folded (#835). Under a Sessions row, as the workflows are
                 // under theirs (#2312), the only layout (#2381); not in a folder's own
                 // window, whose group is headed Sessions already.
-                let grouped = !inWindow && !fold.sessions.isEmpty
+                // With New Session in it (#5267), a folder with no live session has the fold too.
+                let grouped = !inWindow && (!fold.sessions.isEmpty || fold.showsNewSession)
                 let sessionsOpen = !grouped || fold.isSearching || folds.isOpen(key, .sessions)
                 if grouped {
                     SidebarFoldRow(title: "Sessions", count: fold.sessions.count, isOpen: Binding(
                         get: { sessionsOpen },
                         set: { folds.set(key, .sessions, open: $0) }))
+                }
+                // New Session, the fold's first row (#5267), as the Remote's Machines group has New
+                // Machine. In a folder's own window, the Sessions group's first row.
+                if sessionsOpen && fold.showsNewSession {
+                    NewSessionRow(folder: key, isNested: grouped)
                 }
                 // A closed fold has no rows at all (#237).
                 ForEach(FoldedRow.rows(sessionsOpen ? SidebarTree.rows(fold.sessions, in: model.work, folds: folds) : [],
@@ -835,15 +832,17 @@ private struct ConnectorsRead: Equatable {
     var folders: [FolderKey]
 }
 
-/// The first row of the sidebar (#495): a new session, in the folder the last one was
-/// started in, as ⌘N starts one. The page it opens can switch folder. It carries that
+/// The first row of a folder's Sessions (#5267; was the sidebar's first row, #495): a new
+/// session in that folder, as ⌘N starts one, with the keyboard in the prompt. It carries the
 /// folder's own item, which the sidebar lights while its new session is open.
-private struct NewSessionTopRow: View {
+private struct NewSessionRow: View {
     @Environment(AppModel.self) private var model
     @Environment(WindowRequests.self) private var requests
+    let folder: FolderKey
+    /// In its folder's Sessions fold: one level in, under the word Sessions, as a session's row.
+    var isNested = false
 
     var body: some View {
-        let folder = model.newSessionFolder
         HStack(spacing: 6) {
             Image(icon: "square.and.pencil")
                 .sidebarMark(Paper.accent)
@@ -853,32 +852,19 @@ private struct NewSessionTopRow: View {
                 .lineLimit(1)
             Spacer(minLength: 0)
         }
+        .padding(.leading, isNested ? 22 : 0)
         .appText(.supporting)
         .contentShape(Rectangle())
+        .help("Start a new session in this folder")
         // Every click, not only a changed selection: the row may already be the lit one
         // while the prompt has lost the keyboard. See `FolderRow` before #375.
         .simultaneousGesture(TapGesture().onEnded {
-            guard let folder else { return }
             model.showFolder(folder)
             requests.focusPrompt()
         })
-        .disabled(folder == nil)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("New Session")
-        .modifier(NewSessionTag(folder: folder))
-    }
-}
-
-/// The row's item while there is a folder to start in; none while there is not.
-private struct NewSessionTag: ViewModifier {
-    let folder: FolderKey?
-
-    func body(content: Content) -> some View {
-        if let folder {
-            content.sidebarInk(.folder(folder)).tag(SidebarItem.folder(folder))
-        } else {
-            content
-        }
+        .sidebarInk(.folder(folder)).tag(SidebarItem.folder(folder))
     }
 }
 

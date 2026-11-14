@@ -1,9 +1,9 @@
 // The page's one sidebar (#151), as the window's (#145, FolderListView.swift) and the Remote's
 // (RemoteSidebar.swift), and below 760 the root list, as the iPhone Remote's (#226, #235).
-// Things-style since #495 (#499): New Session at the top, in the folder last started in, and Agents'
+// Things-style since #495 (#499): Agents'
 // filters, a machine and a state (#2141); then what wants the person across every folder — Pinned, Needs You, Working, Unread — each drawn
 // only with something in it (#507), Needs You with what waits for an OK after its sessions (#773); then a group per folder, its sessions newest started first
-// with their state the row's mark, its Workflows fold (#885), and one Archived row opening a page; then the
+// with their state the row's mark under a Sessions fold that starts with New Session (#5267), its Workflows fold (#885), and one Archived row opening a page; then the
 // archived folders, Live Now (an admin's) and Projects (#2141); and at the foot what the hosts and
 // this browser are doing. The Activity pages are in Machines and Reports since #2141. Never more than three
 // levels deep: a folder's Workflows fold (#885) is the third. No host headings: a server's folder reads `host:Folder`. A folder's row only
@@ -191,7 +191,7 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       .find((g) => [g.main, ...g.others].some((p) => placeKey(p.host.id, p.folder.folder.folder) === at))?.main;
     folds.set(owner?.host.id ?? r.host, owner?.folder.folder.folder ?? r.folder, true);
   }, [r.host, r.folder, r.session, r.workflow, r.page, r.archive, r.mcp]);
-  // The next New Session at the top starts here too (#495).
+  // The next New Session in the + menu starts here too (#495, #628).
   useEffect(() => {
     if (r.host && r.folder && r.compose) rememberFolder(storage, { host: r.host, folder: r.folder });
   }, [r.host, r.folder, r.compose]);
@@ -247,7 +247,6 @@ export function Sidebar({ session, store, linkDown }: { session: Session; store:
       </header>
       {!held && <AgentFilters store={store} />}
       <div class="scroll" onKeyDown={(e) => moveWithKeys(e)}>
-        {folders.length > 0 && <NewSessionTopRow store={store} folders={folders} linkDown={linkDown} />}
         {/* The daily summary's page (#3721), above the smart groups, while the daily summary is on. */}
         {!held && <SummaryRow store={store} />}
         {/* A machine asking to join (#994): at the top, whatever groups are on, and with no folder yet. */}
@@ -448,35 +447,12 @@ function newSessionStart(store: Store, folders: Placed[], linkDown: boolean): ((
   return () => go({ host: target.host, folder: target.folder, compose: true });
 }
 
-/** The folder New Session starts in, at the top of the sidebar and in the + menu (#628). */
+/** The folder New Session in the + menu starts in (#628). */
 function newSessionTarget(folders: Placed[]): FolderKey | undefined {
   const r = route.value;
   const live = folders.map(({ host, folder }) => ({ host: host.id, folder: folder.folder.folder }));
   const open = r.host && r.folder ? { host: r.host, folder: r.folder } : undefined;
   return newSessionFolder(live, rememberedFolder(storage), open);
-}
-
-/**
- * The first row of the sidebar (#495): a new session, in the folder the last one was started in,
- * as the window's and the Remote's. Lit while that form is open. A folder's menu starts one in
- * that folder instead, and the form's folder name switches to another.
- */
-function NewSessionTopRow({ store, folders, linkDown }: { store: Store; folders: Placed[]; linkDown: boolean }) {
-  const r = route.value;
-  const target = newSessionTarget(folders);
-  const chosen = !!r.compose && !!target && r.host === target.host && r.folder !== undefined
-    && folderKey(r.folder) === folderKey(target.folder);
-  return (
-    <div class="nav-item new-session-top">
-      <div class={`row new-session${chosen ? " chosen" : ""}`}>
-        <button class="pick" aria-current={chosen} disabled={linkDown || !target || !store.hostIsOnline(target.host)}
-          onClick={() => target && go({ host: target.host, folder: target.folder, compose: true })}>
-          <Icon name="square-pen" class="pin-mark" />
-          <span class="title">New Session</span>
-        </button>
-      </div>
-    </div>
-  );
 }
 
 /** A row under a group at the top: a session or a pinned workflow, with the folder it is in. */
@@ -777,13 +753,26 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
   const workflowsOpen = searching || folds.isWorkflowsOpen(host.id, folder);
   // Under a Sessions row, as the workflows are under theirs (#2312), the only layout (#2381); not in a
   // tab of the folder alone, whose group is headed Sessions already. A search holds it open.
-  const groupsSessions = !isAlone && sessions.length > 0;
+  const here = r.host === host.id && r.folder !== undefined && folderKey(r.folder) === folderKey(folder);
+  // With New Session first in it (#5267), a folder with no live session has the fold too; a search, for sessions, hides the row.
+  const groupsSessions = !isAlone && (sessions.length > 0 || !searching);
+  const composing = here && !!r.compose && !r.session && !r.workflow && !r.page && !r.archive && !r.mcp;
+  const newSession = !searching && (
+    <div class="nav-item new-session-item">
+      <div class={`row new-session${composing ? " chosen" : ""}`}>
+        <button class="pick" aria-current={composing} disabled={down} title="Start a new session in this folder"
+          onClick={() => go({ host: host.id, folder, compose: true })}>
+          <Icon name="square-pen" class="pin-mark" />
+          <span class="title">New Session</span>
+        </button>
+      </div>
+    </div>
+  );
   const sessionsOpen = searching || folds.isSessionsOpen(host.id, folder);
   const nameMatches = label.toLowerCase().includes(query.toLowerCase());
   if (searching && sessions.length === 0 && archived.length === 0 && byIssue.length === 0 && workflows.length === 0
     && archivedWorkflows.length === 0 && !nameMatches) return null;
 
-  const here = r.host === host.id && r.folder !== undefined && folderKey(r.folder) === folderKey(folder);
   const archivedSessionCount = summary.counts.archived ?? 0;
   const pageRow = (page: ArchiveRoute, mark: string, title: string, count: string) => (
     <div class="nav-item">
@@ -893,8 +882,8 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
           tabIndex={-1} disabled={searching} onClick={() => fold(!unfolded)}><Icon name={unfolded ? "chevron-down" : "chevron-right"} /></button>
         <button class="pick" aria-expanded={unfolded} data-fold="folder" title={folderPath(folder)}
           onClick={(e) => {
-            // The row folds or unfolds, and nothing else (#375): a session starts from New Session
-            // at the top. Not when the arrow keys land here (a click with no detail): moving
+            // The row folds or unfolds, and nothing else (#375): a session starts from New Session,
+            // the first row of its Sessions (#5267). Not when the arrow keys land here (a click with no detail): moving
             // through the list folds nothing.
             if (e.detail > 0 && !searching) fold(!unfolded);
           }}
@@ -923,9 +912,9 @@ const FolderFold = memo(function FolderFold({ store, host, folder: summary, quer
               <summary data-fold="sessions" aria-label={`Sessions, ${sessions.length}`}>
                 Sessions<span class="count">{sessions.length}</span>
               </summary>
-              {sessionsOpen && sessionRows.map((tree) => row(tree.agent, tree))}
+              {sessionsOpen && <>{newSession}{sessionRows.map((tree) => row(tree.agent, tree))}</>}
             </details>
-          ) : sessionRows.map((tree) => row(tree.agent, tree))}
+          ) : <>{newSession}{sessionRows.map((tree) => row(tree.agent, tree))}</>}
           {/* A search for an epic (#3900): a heading for each issue, the epic's own first, held open as a search holds Sessions. */}
           {byIssue.map((group) => (
             <div class="issue-group" role="group" key={group.issue.node.ref} aria-label={`${group.title}, ${group.sessions.length}`}>
@@ -1148,7 +1137,7 @@ function folderPath(folder: string): string {
 /** Every row the keys move through, in the order shown. */
 function navRows(list: HTMLElement): HTMLElement[] {
   return [...list.querySelectorAll<HTMLElement>(
-    ".new-session-top .pick, .activity .row, details.smart > summary, details.sessions > summary, details.workflows > summary, .folder-fold > .row.folder .pick, .nav-item .row.pin .pick, .nav-item .row.session, .nav-item .row.workflow .pick, .nav-item .row.page-row .pick, details.archived > summary",
+    ".nav-item .row.new-session .pick, .activity .row, details.smart > summary, details.sessions > summary, details.workflows > summary, .folder-fold > .row.folder .pick, .nav-item .row.pin .pick, .nav-item .row.session, .nav-item .row.workflow .pick, .nav-item .row.page-row .pick, details.archived > summary",
   )].filter((el) => el.offsetParent !== null);
 }
 

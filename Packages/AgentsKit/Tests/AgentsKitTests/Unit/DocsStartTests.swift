@@ -53,6 +53,8 @@ struct DocsStartTests {
         ])
         // An item of no repo (a Linear issue) finds no paths, only refs.
         #expect(DocsList.linkedRefs(body: "specs/a.md and notion:9", itemRef: "linear:ENG-4") == ["notion:9"])
+        // The web page's address since Docs went into Work (#5267).
+        #expect(DocsList.linkedRefs(body: "See #/work/docs/notion%3A9 now", itemRef: "linear:ENG-4") == ["notion:9"])
         #expect(DocsList.repoPrefix("gitlab:acme/web!12") == "gitlab:acme/web/doc/")
     }
 

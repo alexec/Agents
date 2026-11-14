@@ -182,7 +182,7 @@ function ConversationRow({ row }: { row: MessagesRow }) {
   return (
     <li data-key={row.key}>
       <button type="button" class={`work-row messages-row${unread ? " unread" : ""}`}
-        onClick={() => go({ nav: "messages", section: "messages", item: row.key })}>
+        onClick={() => go({ nav: "work", section: "messages", item: row.key })}>
         <span class="work-row-head">
           <span class="messages-source" title={channelName(c.source)} aria-label={channelName(c.source)}>{sourceGlyph(c.source)}</span>
           {c.sender && <span class="messages-sender" title={c.sender.identity}>{senderName(c.sender)}</span>}
@@ -212,7 +212,7 @@ export function ConversationPage({ store, conversationKey }: { store: Store; con
   const row = l ? mergeConversations(l).find((r) => r.key === conversationKey) : undefined;
   // Next (#5137): the next conversation in the list as it is filtered and sorted now.
   const next = l ? nextRow(mergeConversations(l, source.value), conversationKey) : undefined;
-  const goNext = () => { if (next) go({ nav: "messages", section: "messages", item: next.key }); };
+  const goNext = () => { if (next) go({ nav: "work", section: "messages", item: next.key }); };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "ArrowDown" && e.altKey && (e.metaKey || e.ctrlKey) && !e.shiftKey) { e.preventDefault(); goNext(); }
@@ -260,14 +260,14 @@ export function ConversationPage({ store, conversationKey }: { store: Store; con
   useEffect(() => { messages.value = null; problem.value = null; void read(false); }, [row?.key, row?.host]);
 
   if (l === null) return <PlaceholderRows count={4} />;
-  if (!row) return <p class="hint">This conversation is not in the list any more. <button type="button" class="link" onClick={() => go({ nav: "messages" })}>Messages</button></p>;
+  if (!row) return <p class="hint">This conversation is not in the list any more. <button type="button" class="link" onClick={() => go({ nav: "work", section: "messages" })}>Messages</button></p>;
   const c = row.item.conversation;
   return (
     <article class="work-page messages-page">
       <div class="work-page-bar">
         <button type="button" title="Back" aria-label="Back" onClick={() => history.back()}>‹</button>
         <button type="button" title="Forward" aria-label="Forward" onClick={() => history.forward()}>›</button>
-        <button type="button" class="link" onClick={() => go({ nav: "messages" })}>All messages</button>
+        <button type="button" class="link" onClick={() => go({ nav: "work", section: "messages" })}>All messages</button>
         <button type="button" class="link" title={nextHelp} disabled={!next} onClick={goNext}>{nextConversation} ↓</button>
       </div>
       <header class="work-page-head">

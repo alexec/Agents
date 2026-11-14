@@ -6,12 +6,12 @@ import { load } from "./load.mjs";
 
 const n = await load("src/model/nav.ts");
 
-test("a member's bar has ten sections, an admin's twelve", () => {
+test("a member's bar has eight sections, an admin's ten (Docs and Messages are in Work, #5267)", () => {
   assert.deepEqual(n.sectionsShown(false, "overview").map((s) => n.navTitle[s]),
-    ["Overview", "Agents", "Work", "Docs", "Messages", "Machines", "Workflows", "Reports", "Status", "Settings"]);
+    ["Overview", "Agents", "Work", "Machines", "Workflows", "Reports", "Status", "Settings"]);
   assert.deepEqual(n.sectionsShown(null, "agents"), n.sectionsShown(false, "agents"), "not known yet is a member's");
   assert.deepEqual(n.sectionsShown(true, "overview").map((s) => n.navTitle[s]),
-    ["Overview", "Agents", "Work", "Docs", "Messages", "Machines", "Workflows", "Reports", "Requests", "People", "Status", "Settings"]);
+    ["Overview", "Agents", "Work", "Machines", "Workflows", "Reports", "Requests", "People", "Status", "Settings"]);
   assert.ok(n.sectionsShown(false, "people").includes("people"), "a member who opens People by its address sees where they are");
 });
 
