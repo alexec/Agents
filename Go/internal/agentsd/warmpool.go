@@ -58,9 +58,18 @@ var (
 	warmAskedAgain = 15 * time.Second
 	// warmFailedRetry is how long a runtime that failed a prewarm is not tried again.
 	warmFailedRetry = 5 * time.Minute
-	// warmNow is the pool's clock; a test moves it.
-	warmNow = time.Now
+	// warmClock is the pool's clock when a test moves it (setWarmClock); nil is time.Now.
+	// Atomic: the loop of a daemon that an earlier test left running reads it (#5306).
+	warmClock atomic.Pointer[func() time.Time]
 )
+
+// warmNow is the pool's clock.
+func warmNow() time.Time {
+	if f := warmClock.Load(); f != nil {
+		return (*f)()
+	}
+	return time.Now()
+}
 
 // warmStart is what a live runtime started with: its warmKey, and the processes that were
 // its own once it was up, which are not background processes.
