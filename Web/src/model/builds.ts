@@ -4,6 +4,7 @@
 // shapes of its charts. Run time points to a commit; waiting for a runner and waiting its turn are load.
 import type { BuildsBetween, BuildsChange, BuildsDay, BuildsFigures, BuildsHistory, BuildsRunRef, BuildsStat, ReportRange, WireDate } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
+import { formatRef, refFromLineage } from "../protocol/ref";
 import { rangeSpan, ranges } from "./reports";
 
 /** The page's filters and what is picked, as the address keeps them after "?" (spec 5166 board 1 note 1). */
@@ -92,6 +93,19 @@ export function forgeName(repo: string): string {
 /** The Delivery row's CI card link (board 4 note 5): the page with the card's repository and the range. */
 export function buildsLinkQuery(deliveryRepo: string, range: ReportRange): string {
   return buildsQuery({ repo: buildsRepo(deliveryRepo), range, branch: "", p90: false });
+}
+
+/** Build trends' address from a CI run on a Work page's Pipeline line (#5180, board 5): the run's drill-down, whose own
+ * link goes back to the trend. Undefined for a run whose ref names no repository. As BuildTrendsLink on the window. */
+export function buildsRunLinkQuery(runRef: string): string | undefined {
+  const r = refFromLineage("ci-run", runRef);
+  if (!r || r.type !== "run" || !r.topic) return undefined;
+  return buildsQuery({ repo: `${r.provider}:${r.topic}`, range: "month", branch: "", p90: false, drill: { ref: formatRef(r) } });
+}
+
+/** The link's help, as the window's (board 5 note 1). */
+export function buildsRunLinkHelp(kind: string): string {
+  return kind === "release" ? "Build trends at this release’s CI run" : "Build trends at this pull request’s last run on main";
 }
 
 const rangeDays: Record<ReportRange, number> = { day: 1, week: 7, month: 30, threeMonths: 90 };

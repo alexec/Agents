@@ -138,7 +138,8 @@ struct ContentView: View {
         } else if model.showsVelocity {
             VelocityView().paperGround()
         } else if model.showsWork {
-            WorkView(model: model).paperGround()
+            // Build trends ↗ on the Pipeline line opens the web page (#5180).
+            WorkView(model: model).webPlaceLinks().paperGround()
         } else if model.showsDocs {
             DocsView().paperGround()
         } else if model.showsMessages {

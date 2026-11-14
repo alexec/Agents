@@ -21,6 +21,8 @@ struct WorkItemPage: View {
     private let compact = false
     #endif
     @Environment(\.openURL) private var openURL
+    /// Opens a place on the web page; the Mac window sets it while it can open the page (#5180).
+    @Environment(\.openWebPlace) private var openWebPlace
     let place: WorkPlace
 
     @State private var detail: (host: MachineRef, got: DaemonAPI.ForgeItemDetail)?
@@ -46,6 +48,7 @@ struct WorkItemPage: View {
     @State private var forecast: DaemonAPI.LineageForecast?
     @State private var forecastHelp = false
     @State private var pipeline: [Pipeline.Step] = []
+    @State private var trendsProblem: String?
     @State private var lineage: (cost: DaemonAPI.LineageCostRollup?, sessions: [UUID])?
     @State private var said: (words: String, failed: Bool)?
     @State private var writing = false
@@ -869,7 +872,9 @@ struct WorkItemPage: View {
         #endif
     }
 
-    /// "Release v1.2.0 · CI run · TestFlight 42 · Sentry issue 4321", each a link out (#3588).
+    /// "Release v1.2.0 · CI run · TestFlight 42 · Sentry issue 4321", each a link out (#3588), then
+    /// **Build trends ↗** on the web page when the line has a CI run and this Mac can open the page
+    /// (#5180): a Web + Mac link (#4937), so the Remote, which sets no `openWebPlace`, has none.
     private var pipelineLine: some View {
         var line = AttributedString()
         for (i, step) in pipeline.enumerated() {
@@ -878,7 +883,29 @@ struct WorkItemPage: View {
             words.link = step.url
             line += words
         }
-        return Text(line).appText(.fine).foregroundStyle(.secondary).monospacedDigit()
+        let text = Text(line).appText(.fine).foregroundStyle(.secondary).monospacedDigit()
+        let trends = openWebPlace.flatMap { open in
+            BuildTrendsLink.run(in: pipeline.compactMap(\.node)).flatMap(BuildTrendsLink.place(run:)).map { (open, $0) }
+        }
+        return HStack(alignment: .firstTextBaseline, spacing: 0) {
+            text
+            if let trends {
+                Text(" · ").appText(.fine).foregroundStyle(.secondary)
+                Button("\(BuildTrendsLink.title) ↗") {
+                    Task { trendsProblem = await trends.0.run(trends.1) }
+                }
+                .linkStyle()
+                .appText(.fine)
+                .help(BuildTrendsLink.help(kind: node.kind))
+                .fixedSize()
+            }
+        }
+        .alert(BuildTrendsLink.cannotOpen, isPresented: Binding(get: { trendsProblem != nil },
+                                                                set: { if !$0 { trendsProblem = nil } })) {
+            Button("OK") { trendsProblem = nil }
+        } message: {
+            Text(trendsProblem ?? "")
+        }
     }
 
     // MARK: Writing
