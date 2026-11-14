@@ -1,12 +1,12 @@
 ---
 diataxis: how-to
 devices: [mac, web]
-description: Open Agents in Safari or Chrome on the Mac that runs Agents, pair the browser once, and forget it when you are done.
+description: Open Agent Loops in Safari or Chrome on the Mac that runs Agent Loops, pair the browser once, and forget it when you are done.
 ---
 
-# Use Agents in a browser
+# Use Agent Loops in a browser
 
-Agents on a Mac serves Agents as a web page, for a browser on the same Mac. The page is another
+Agent Loops on a Mac serves Agent Loops as a web page, for a browser on the same Mac. The page is another
 screen onto your agents, like the window and the phone. You can read and answer agents,
 start and steer them, open their files and run workflows from a browser tab, without the
 window open. Safari and Chrome are tested.
@@ -16,19 +16,19 @@ serving it at a public address (issue #61).
 
 ## Before you start
 
-- Agents on this Mac, with the control plane here or connected to one elsewhere. See
-  [Set up Agents on this Mac](set-up-on-this-mac.md).
-- The Agents window, to get a code from.
+- Agent Loops on this Mac, with the control plane here or connected to one elsewhere. See
+  [Set up Agent Loops on this Mac](set-up-on-this-mac.md).
+- The Agent Loops window, to get a code from.
 
 ## Steps
 
 ### Open the page and pair the browser
 
-1. Turn on **Serve Agents to browsers on this Mac** in **Settings ▸ Control plane**. It is
+1. Turn on **Serve Agent Loops to browsers on this Mac** in **Settings ▸ Control plane**. It is
    off by default.
 2. In the window, choose **View ▸ Open in Browser**. The same button is first on
-   **Settings ▸ Control plane**, beside **Use Agents in Safari or Chrome on this Mac**, and
-   in the Agents menu bar item.
+   **Settings ▸ Control plane**, beside **Use Agent Loops in Safari or Chrome on this Mac**, and
+   in the Agent Loops menu bar item.
 
    The page, **http://localhost:8792**, opens in your default browser. The first time, it
    pairs that browser in the same step: there is nothing to copy or paste.
@@ -59,7 +59,7 @@ address, it connects with that key, and nothing needs pasting.
 ### With the control plane elsewhere
 
 When this Mac reports to a control plane that runs somewhere else, such as in the cloud, this
-Mac's host serves the page at the same address, **http://localhost:8792**. **Serve Agents to
+Mac's host serves the page at the same address, **http://localhost:8792**. **Serve Agent Loops to
 browsers on this Mac**, in **Settings ▸ Control plane**, turns it on and off, as before. It is
 off by default.
 
@@ -112,7 +112,7 @@ and iPad show, on every host:
   groups show), **Finished chats**, **Machine providers**, **Git access**, **Versions**,
   **Backups** and **People**.
 
-The tab's title counts the sessions that need you, as **(2) Agents**.
+The tab's title counts the sessions that need you, as **(2) Agent Loops**.
 
 A folder can't be dragged in from Finder to add a folder. Signing runtimes in, pairing a
 window or a phone, and adding a server by ssh have no screens on the page yet, so do them in
@@ -169,14 +169,14 @@ GitHub](sign-in-with-google-apple-or-github.md#sign-in-with-your-organisations-p
 - **This code has been used. Ask for a new one.** A code works once.
   An address with `#code=` in it, from the browser's history, is one of these: choose **Open in
   Browser** again instead.
-- **That isn't an Agents code. It starts agents-control:2:c:** Something else was pasted, or a
+- **That isn't an Agent Loops code. It starts agents-control:2:c:** Something else was pasted, or a
   code for a host. Copy the code again from **Add a Browser…**.
 - **This code is for another control plane.** The code came from a different set-up from the
   one serving this page.
 - **That code is for a window or a phone. Get one from Add a Browser….** A code from **Pair a
   Device…** or **Pair a Mac…** works only for those. Get one made for a browser. It works the
   other way too: a browser's code pasted into a phone or a window says **That code is for a
-  browser. Paste it in the Agents page.**
+  browser. Paste it in the Agent Loops page.**
 - **Can't reach the control plane at localhost:8792. Trying again.** The control plane on
   this Mac has stopped. The page shows what it last knew, and catches up by itself when the
   control plane is back, with no reload.
@@ -187,7 +187,7 @@ GitHub](sign-in-with-google-apple-or-github.md#sign-in-with-your-organisations-p
   again in this browser.
 - **This browser isn't supported.** The browser can't keep a key that can't be copied out of
   it. Use the current Safari or Chrome.
-- **The page doesn't load at all.** Check that **Serve Agents to browsers on this Mac** is on
+- **The page doesn't load at all.** Check that **Serve Agent Loops to browsers on this Mac** is on
   in **Settings ▸ Control plane**, and that the address is `localhost`, not this Mac's network name. A page
   that says only **Connecting…** has a key and is waiting for the control plane to answer.
 - **Chrome's console reports a Content Security Policy violation for
@@ -195,11 +195,11 @@ GitHub](sign-in-with-google-apple-or-github.md#sign-in-with-your-organisations-p
   itself while it is open, and the page's policy lets it talk only to its own WebSocket. The
   page answers it with a 404. It is harmless and doesn't stop the page.
 - **Not serving: port 8792 is in use by another app.** **Settings ▸ Control plane** says
-  this under **Serve Agents to browsers on this Mac**, when something else had the port
-  first. Whatever answers at that address isn't Agents: don't paste a code into it. Quit what holds the port
+  this under **Serve Agent Loops to browsers on this Mac**, when something else had the port
+  first. Whatever answers at that address isn't Agent Loops: don't paste a code into it. Quit what holds the port
   (`lsof -nP -iTCP:8792`) and press **Try Again**.
-- **That isn't allowed from this browser. The Mac's Agents may need updating.** An older
-  Agents (then named Agents Host) still judges the browser by a grant. Update it.
+- **That isn't allowed from this browser. The Mac's Agent Loops may need updating.** An older
+  Agent Loops (then named Agents Host) still judges the browser by a grant. Update it.
 - **That host can't do that yet. It may need updating.** The host is older than the page.
 
 ## Related

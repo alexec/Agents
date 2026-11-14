@@ -147,7 +147,7 @@ control plane:
   client keeps its key, and it is refused with `suspended` while the suspension lasts;
 - their keys stop renewing, and their org sign-ins are refused with `personSuspended`;
 - each of their machines is told `user/suspended`. A machine that cannot hear it
-  (an older Agents) is closed, and refused at hello until it is updated.
+  (an older Agent Loops) is closed, and refused at hello until it is updated.
 
 Nothing is deleted: their machines, agents, conversations and branches stay. `active: true`
 ends the suspension, and their clients connect again.

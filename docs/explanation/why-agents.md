@@ -1,24 +1,24 @@
 ---
 diataxis: explanation
 devices: [mac, iphone, ipad, server]
-description: Why you would run your coding agents in Agents, alongside the editor and tools you already use, and when something else is the better choice.
+description: Why you would run your coding agents in Agent Loops, alongside the editor and tools you already use, and when something else is the better choice.
 ---
 
-# Why Agents
+# Why Agent Loops
 
-**Keep your editor and your coding agent. Agents is where you run several of them at once,
+**Keep your editor and your coding agent. Agent Loops is where you run several of them at once,
 see which one needs you, let them work together and on their own, and answer them from
 your phone.**
 
 ## It is not an editor
 
 An editor with an agent in it is built for one task at a time: you ask, you watch, you
-accept. Agents is built for five agents on five tasks while you are in a meeting. It has no
+accept. Agent Loops is built for five agents on five tasks while you are in a meeting. It has no
 editor of its own. Open the same folder in yours whenever you like.
 
 ## It runs the agents you already have
 
-Agents starts the coding tools you already use (Claude, Codex, Antigravity, Grok,
+Agent Loops starts the coding tools you already use (Claude, Codex, Antigravity, Grok,
 Copilot and Cursor), each signed in with your own account and plan. The ones it can
 install, it installs in a folder of its own. It brings no model and no bill of its own. You can choose a different runtime, model and permission mode for each agent.
 
@@ -108,13 +108,13 @@ You can set a limit per agent and per day. See [Settings](../reference/settings.
 ## Compared with what you use now
 
 **An agent in your editor** (Cursor, VS Code with Copilot, Windsurf, Zed).
-You keep your editor. Agents adds many agents at once, live documents, watched pull
+You keep your editor. Agent Loops adds many agents at once, live documents, watched pull
 requests and everything above. You give up
 editing and chatting in one window.
 
 **An agent in a terminal** (Claude Code, Grok, Cursor's agent).
-You keep the same tool, because Agents runs it, and adds a window over all your sessions.
-In the conversations Agents starts, the tool's own scheduling, notifications and reports go
+You keep the same tool, because Agent Loops runs it, and adds a window over all your sessions.
+In the conversations Agent Loops starts, the tool's own scheduling, notifications and reports go
 through the app instead; from Terminal it is unchanged. Its sub-agents are left alone — the
 agent runs them itself, and Claude's and Codex's are drawn over the prompt so you can watch
 them. See [Why agents' own tools are taken away](scoped-tools.md).
@@ -131,13 +131,13 @@ Compare on the runtimes you already use, leases, events, workflows, the phone an
 
 - **You want one assistant beside the file you are editing.** Your editor's agent is
   closer to hand.
-- **You are not on a Mac.** Agents needs a Mac. Servers and phones hang off one.
-- **You want to download and go.** Today Agents is an alpha, on TestFlight by invitation.
-- **You want to reach your agents with the Mac asleep.** Agents on your Mac stop being
+- **You are not on a Mac.** Agent Loops needs a Mac. Servers and phones hang off one.
+- **You want to download and go.** Today Agent Loops is an alpha, on TestFlight by invitation.
+- **You want to reach your agents with the Mac asleep.** Agent Loops on your Mac stop being
   reachable while it sleeps, and so does everything else if the control plane runs on it.
   To work with the Mac asleep, put the work on a server and run the control plane as
   copies elsewhere (see [The control plane](control-plane.md)).
-- **Your machine should be off while the work happens.** A cloud agent does that; Agents
+- **Your machine should be off while the work happens.** A cloud agent does that; Agent Loops
   does not.
 
 [Start here: your first agent](../tutorials/first-agent.md){ .md-button .md-button--primary }

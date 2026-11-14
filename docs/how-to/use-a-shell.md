@@ -103,8 +103,8 @@ instead, click out of the shell, or use the menu.
 ## If it doesn't work
 
 - **The folder shell says There is no such agent.** The folder is on a server with an
-  older version of Agents. The server updates when nothing is mid-turn there.
+  older version of Agent Loops. The server updates when nothing is mid-turn there.
 - **The shell is no longer running.** It exited, for example after `exit`. Click **New
   shell** to open another.
-- **+ is greyed out.** On a server with an older version of Agents, which holds one shell
+- **+ is greyed out.** On a server with an older version of Agent Loops, which holds one shell
   per agent. The server updates when nothing is mid-turn there.

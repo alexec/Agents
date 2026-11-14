@@ -8,11 +8,11 @@ description: Why the app works the way it does.
 Why the app works the way it does: the ideas behind it and the trade-offs it makes.
 Nothing here needs doing; it is for understanding.
 
-- [Direction](direction.md): what Agents is for, the three ways to run it, how one
+- [Direction](direction.md): what Agent Loops is for, the three ways to run it, how one
   organisation's data is kept apart, and where data lives and is backed up.
 - [Planning](planning.md): what to do next, what it will cost and when it lands, and what
   it delivered, and how estimates and forecasts earn trust.
-- [Why Agents](why-agents.md): why you would run your coding agents here, alongside the
+- [Why Agent Loops](why-agents.md): why you would run your coding agents here, alongside the
   editor you already use, and when something else is better.
 - [The control plane](control-plane.md): hosts, clients, copies and the store, where to
   run it, and what happens when it is down.
@@ -38,7 +38,7 @@ Nothing here needs doing; it is for understanding.
 - [Versions and capabilities](versions.md): how the clients, the hosts and the control
   plane work together at different versions, and what a version number means.
 - [Connector levels](connector-levels.md): what Tools, Events, Views, Workflows and Tested
-  mean, why they exist, where the connectors that Agents makes come from, and when a page reads
+  mean, why they exist, where the connectors that Agent Loops makes come from, and when a page reads
   them by a contract over MCP or in-process.
 - [Folders, hosts and worktrees](folders-machines-worktrees.md): a folder is a directory on
   one machine, and an agent can have a worktree of its own.

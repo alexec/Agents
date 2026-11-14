@@ -1,13 +1,13 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, web]
-description: Set up a WhatsApp Business number for Agents, so that a person can start an agent from WhatsApp, see what needs them there, and answer an agent's question with a button.
+description: Set up a WhatsApp Business number for Agent Loops, so that a person can start an agent from WhatsApp, see what needs them there, and answer an agent's question with a button.
 ---
 
 # Use WhatsApp
 
 The `whatsapp` connector brings a WhatsApp Business number to your agents (#1352). It is
-`whatsapp-mcp`, a small server that Agents ships. Agents on the Mac carries it, and every Linux
+`whatsapp-mcp`, a small server that Agent Loops ships. Agent Loops on the Mac carries it, and every Linux
 host installs it beside agentsd.
 
 - **The events:** `message.received`, a person wrote to the number, with the text; and
@@ -79,7 +79,7 @@ admins, who send the request on to the person. See [Channels](../reference/chann
    user's token), `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET` and
    `WHATSAPP_VERIFY_TOKEN`. When the webhook is not to listen on `127.0.0.1:8797`, also set
    `WHATSAPP_WEBHOOK_ADDR`.
-2. Add **WhatsApp** from the **Agents** marketplace in the catalogue, or by hand in the
+2. Add **WhatsApp** from the **Agent Loops** marketplace in the catalogue, or by hand in the
    folder's `.agents/mcp.json`:
 
    ```json

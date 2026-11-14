@@ -6,16 +6,16 @@ description: Add the azureboards connector with a personal access token, so that
 
 # Use Azure Boards work items
 
-Agents talks to Azure Boards through its own `azureboards` connector (#3804), an MCP server
+Agent Loops talks to Azure Boards through its own `azureboards` connector (#3804), an MCP server
 in the shape of the jira and linear ones: Azure Boards is a tracker. It works with Azure
-DevOps Services (`dev.azure.com`) and with your own Azure DevOps Server. Agents on the Mac carries
+DevOps Services (`dev.azure.com`) and with your own Azure DevOps Server. Agent Loops on the Mac carries
 it, and every Linux host installs it beside agentsd.
 
 It is a connector of its own, not part of the azuredevops one, so you can use Azure Boards
 with a repository on GitHub, or Azure DevOps Repos with Jira. Pull requests and builds are
 the [azuredevops connector](use-azure-devops.md)'s.
 
-A work item is an issue to Agents: its tags are the issue's labels, and its id is the
+A work item is an issue to Agent Loops: its tags are the issue's labels, and its id is the
 issue's key.
 
 ## Before you start
@@ -28,9 +28,9 @@ issue's key.
 1. In Azure DevOps, open **User settings ▸ Personal access tokens** and make a token for
    your organization with **Work Items: Read & write**. If you use the azuredevops connector
    too, add Work Items to its token: the two connectors share `AZURE_DEVOPS_TOKEN`.
-2. In Agents, open **Settings ▸ Agent Configuration ▸ Connectors** (or a folder's
+2. In Agent Loops, open **Settings ▸ Agent Configuration ▸ Connectors** (or a folder's
    **Connectors** page) and choose **Add Connector…**.
-3. Choose the **Agents** marketplace, then **Azure Boards**, and add it.
+3. Choose the **Agent Loops** marketplace, then **Azure Boards**, and add it.
 4. Fill in:
    - `AZURE_DEVOPS_TOKEN`: the token.
    - `AZURE_DEVOPS_URL`: leave it out for Azure DevOps Services. For your own server, give

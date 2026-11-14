@@ -1,6 +1,6 @@
 ---
 name: drive-a-scratch-window-by-pid-with-ax
-description: "How to open chats and files in a scratch Agents instance and screenshot it while Alex is using the Mac, with no clicks and no focus change: a Swift AXUIElement helper addressed by pid, and screencapture -l by window id."
+description: "How to open chats and files in a scratch Agent Loops instance and screenshot it while Alex is using the Mac, with no clicks and no focus change: a Swift AXUIElement helper addressed by pid, and screencapture -l by window id."
 metadata: 
   type: project
   modified: 2026-09-26T02:58:32.436Z

@@ -1,13 +1,13 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, web]
-description: Set up a Google Chat app for Agents, so that a person can start an agent from Google Chat, see what needs them there, and answer an agent's question with a button.
+description: Set up a Google Chat app for Agent Loops, so that a person can start an agent from Google Chat, see what needs them there, and answer an agent's question with a button.
 ---
 
 # Use Google Chat
 
 The `googlechat` connector brings a Google Chat app to your agents (#1016). It is
-`googlechat-mcp`, a small server that Agents ships. Agents on the Mac carries it, and every Linux
+`googlechat-mcp`, a small server that Agent Loops ships. Agent Loops on the Mac carries it, and every Linux
 host installs it beside agentsd.
 
 - **The events:** `message.received`, a person wrote to the app (a direct message, or a message
@@ -85,7 +85,7 @@ is the user's email to approve the link. See [Channels](../reference/channels.md
    key file's JSON, or its path on the machine. When the subscription is not
    `agents-chat` in the key's project, also set `GOOGLE_CHAT_SUBSCRIPTION`, as
    `projects/<project>/subscriptions/<name>` or a name in the key's project.
-2. Add **Google Chat** from the **Agents** marketplace in the catalogue, or by hand in the
+2. Add **Google Chat** from the **Agent Loops** marketplace in the catalogue, or by hand in the
    folder's `.agents/mcp.json`:
 
    ```json

@@ -6,7 +6,7 @@ metadata:
   modified: 2026-11-02T15:43:23.715Z
 ---
 
-A wait that clears with "stopped with the daemon" does not mean the lane is gone: after Agents restarts, the lane starts again by itself in its worktree.
+A wait that clears with "stopped with the daemon" does not mean the lane is gone: after Agent Loops restarts, the lane starts again by itself in its worktree.
 
 **Why:** 2026-11-02, #3256: the Scrum Master started a second lane in the same worktree; it committed, rebased and stopped the first lane's scratch app and fixture server before it saw the first lane, and a build failed on the shared build.db lock.
 

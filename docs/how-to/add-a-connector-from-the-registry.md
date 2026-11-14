@@ -21,7 +21,7 @@ never committed and never shown again.
 ## Add a connector for yourself
 
 1. Open **Settings ▸ Agent Configuration ▸ Connectors** and choose **Add Connector…**.
-   The connectors that Agents makes (GitHub, Linear, GitLab and Email) are in the **Agents**
+   The connectors that Agent Loops makes (GitHub, Linear, GitLab and Email) are in the **Agents**
    marketplace: choose it in the **Marketplace** menu. They run hosted, one copy for each host,
    so their events come in when no agent runs.
 2. Type what you are looking for. Results come from the marketplace chosen in the

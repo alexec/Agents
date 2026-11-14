@@ -7,7 +7,7 @@ description: Make anything that can start and stop a machine a machine provider 
 # Add a machine provider
 
 A machine provider is an MCP server that lists machines, starts them and stops them.
-Agents talks to every provider in the same way, so it has no code for any one cloud. There
+Agent Loops talks to every provider in the same way, so it has no code for any one cloud. There
 are three ways to make one, and only the last needs any code.
 
 ## Where a provider runs
@@ -36,7 +36,7 @@ command provider and an MCP server can run on a machine of yours.
 
 ## A preset, or your own commands
 
-Agents ships one provider, the **command provider**. Each of its machines is a few
+Agent Loops ships one provider, the **command provider**. Each of its machines is a few
 shell commands or web requests, and its presets fill those in for the common tools.
 
 DigitalOcean, GitHub Codespaces and Coder can be reached in two ways. Add Provider shows
@@ -57,7 +57,7 @@ sent in a request's header, never in an address, a log or an error. A codespace 
 machine have no ssh port of their own, so ssh to them still goes through `gh` or `coder`, as
 the ssh ProxyCommand. A codespace's agentsd is started over ssh from the machine that
 carries its provider, with the token there, so that machine needs `gh`. **Add as Machine…**
-on a codespace installs Agents in it from that machine too (#3497): the control plane makes a
+on a codespace installs Agent Loops in it from that machine too (#3497): the control plane makes a
 host code and sends it there, and the codespace runs the control plane's `install.sh` with
 it, as its join command would. The steps show as the install goes. The control plane has no
 token, so it keeps no tunnel to a codespace: the codespace joins over the control plane's own
@@ -89,22 +89,22 @@ The preset makes and deletes no instances.
 For anything else, choose **Your commands** and give:
 
 - **Start** and **Stop**: the commands you would type, such as `cws start devstack-1`.
-- **Status** (optional): a command that prints `running` or `stopped`. Without it, Agents
+- **Status** (optional): a command that prints `running` or `stopped`. Without it, Agent Loops
   goes by what it last did.
 - **ssh**: how the control plane's machine reaches it, such as `devstack-1.cws` or
-  `alex@devbox.example -p 2222`. Agents uses it to add the machine as a server, and to start
+  `alex@devbox.example -p 2222`. Agent Loops uses it to add the machine as a server, and to start
   agentsd if it doesn't start on boot.
 
 The commands run with `/bin/sh` on the machine that carries the provider, as you, never as
 root. A secret you add goes to them as an environment variable of the same name: write
 `$TOKEN` in a command to use it.
 
-To make and delete machines from Agents as well, configure the command provider with a
+To make and delete machines from Agent Loops as well, configure the command provider with a
 `list` command and add:
 
 - **`create`**: the command that makes one. `${name}`, `${firstBoot}` and each option's
   key are filled in, each as one shell word. With `${firstBoot}` in it, the new machine
-  installs Agents on its first boot. Without it, you add it over ssh once it is made.
+  installs Agent Loops on its first boot. Without it, you add it over ssh once it is made.
 - **`delete`**: the command that deletes one, with `${id}` and its list's columns.
 - **`options`**: the New Machine form, as a JSON Schema object. A property's `default`
   fills in a choice the form leaves empty.
@@ -118,7 +118,7 @@ the container's anonymous volumes.
 DigitalOcean through its API makes droplets too. New Machine… makes a droplet with the
 tag, in the region, size and image you choose (an image with systemd, such as
 `ubuntu-24-04-x64`). Its first boot makes a user, `agents`, with root's ssh keys, and
-installs Agents as that user, never as root. The host starts with the droplet. Delete
+installs Agent Loops as that user, never as root. The host starts with the droplet. Delete
 Machine… deletes the droplet. Any other preset needs **An MCP server** or a provider
 configured by hand to make machines.
 
@@ -133,7 +133,7 @@ Some providers have an MCP server of their own, with tools named their own way. 
 **MCP server**, give its command or address, and write a **tool map**. The map says which of
 its tools lists, starts and stops, and where the machines are in what it answers.
 
-Agents ships one for DigitalOcean's server: choose **Use DigitalOcean's** under the tool map.
+Agent Loops ships one for DigitalOcean's server: choose **Use DigitalOcean's** under the tool map.
 It fills in `npx -y @digitalocean/mcp`, the map below, and a `DIGITALOCEAN_API_TOKEN`
 secret for your token. It needs Node on the machine that carries it.
 
@@ -168,7 +168,7 @@ first boot, so use the DigitalOcean preset through its API to make droplets.
 - `states` turns the provider's words into running, starting, stopping or stopped.
 
 The tool names in this example show the shape. Check the server's own tool list for the
-real ones. When you add it, Agents checks every tool the map names is there, and names any
+real ones. When you add it, Agent Loops checks every tool the map names is there, and names any
 that isn't.
 
 For a server at an address, its one secret is sent as `Authorization: Bearer` and the
@@ -245,7 +245,7 @@ provider as it is. It needs no map. The tools, their arguments and their answers
 
 ## Related
 
-- [Start machines from Agents](start-machines-from-agents.md): link a server and press
+- [Start machines from Agent Loops](start-machines-from-agents.md): link a server and press
   Start.
 - [Add a connector by hand](add-a-connector-by-hand.md): connectors (MCP servers) for agents, which are
   set up per folder, not on the control plane.

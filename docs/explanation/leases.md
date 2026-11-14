@@ -108,12 +108,12 @@ The wait shows as the wait card at the end of the agent's chat: "Waiting for bui
 “Fix login” until 14:12 · 2nd in line". **End Wait** on the card, or `cancel_wait`, takes
 the agent out of the line. If the agent waits for something else instead, it keeps its place,
 and the app starts it again when its turn comes. The line and the wait both outlive a restart
-of Agents.
+of Agent Loops.
 
 The line stays first come, first served, but an agent that loses its place through no act of
 its own keeps the time it first asked (#4041):
 
-- **A restart.** If the line and the agent's wait do not agree after Agents starts again, the
+- **A restart.** If the line and the agent's wait do not agree after Agent Loops starts again, the
   app ends the wait and tells the agent to ask again. When it asks again for the same
   resource, it goes back into the line at the time its wait began, ahead of the agents that
   asked after it. The place is kept as long as the wait would have lasted.

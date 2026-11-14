@@ -1,15 +1,15 @@
 ---
 diataxis: index
-description: Agents runs the coding agents you already have — Claude, Codex, Antigravity, Grok, Copilot, Cursor — on your Mac, and lets you follow them from your iPhone and iPad.
+description: Agent Loops runs the coding agents you already have — Claude, Codex, Antigravity, Grok, Copilot, Cursor — on your Mac, and lets you follow them from your iPhone and iPad.
 ---
 
-# Agents
+# Agent Loops
 
-**Keep your editor and your coding agent. Agents runs several agents at once, shows which
+**Keep your editor and your coding agent. Agent Loops runs several agents at once, shows which
 one needs you, lets them work together and on their own, and lets you answer them from
-your phone.** [Why Agents](explanation/why-agents.md)
+your phone.** [Why Agent Loops](explanation/why-agents.md)
 
-Agents is a Mac app for working with coding agents. You give it the folders you work in,
+Agent Loops is a Mac app for working with coding agents. You give it the folders you work in,
 start an agent in one with a sentence of what you want done, and it keeps every agent in
 view: which ones need you, which are working, and which have finished.
 
@@ -46,6 +46,6 @@ them from your iPhone or iPad.
 - **Mac**: the app itself. Your agents run here.
 - **iPhone and iPad**: follow, answer and start agents on your Mac from anywhere.
 - **A browser on your Mac**: Safari or Chrome, at `http://localhost:8792`. See
-  [Use Agents in a browser](how-to/use-agents-in-a-browser.md).
+  [Use Agent Loops in a browser](how-to/use-agents-in-a-browser.md).
 - **Linux servers**: run agents on a machine of your own, which joins your control plane
   and is seen from every window and phone. See [The control plane](explanation/control-plane.md).

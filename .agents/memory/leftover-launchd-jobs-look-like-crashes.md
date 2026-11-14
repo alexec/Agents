@@ -5,7 +5,7 @@ metadata:
   type: feedback
 ---
 
-When the Agents app or `agentsd` appears to die on a timer, check `launchctl list | grep -i agents`
+When the Agent Loops app or `agentsd` appears to die on a timer, check `launchctl list | grep -i agents`
 before reading any code. On 2026-09-19 a job `com.alexecollins.agents-restart` running
 `/tmp/agents-restart.sh` quit the app, TERMed the daemon from `daemon.lock` and reopened the app —
 once a minute, for hours. `launchctl remove <label>` ended it.

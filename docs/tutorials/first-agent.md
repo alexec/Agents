@@ -1,12 +1,12 @@
 ---
 diataxis: tutorial
 devices: [mac]
-description: Install Agents, add a folder, and have an agent find and fix a failing test.
+description: Install Agent Loops, add a folder, and have an agent find and fix a failing test.
 ---
 
 # Your first agent
 
-In this tutorial you install Agents on your Mac, give it a small folder with a failing
+In this tutorial you install Agent Loops on your Mac, give it a small folder with a failing
 test, and ask an agent to fix it. You answer the agent's questions as it works, and at the
 end you read what it changed. It takes about fifteen minutes.
 
@@ -24,26 +24,26 @@ how every agent in the app works.
   step 1. Codex, Antigravity, Grok, Copilot and Cursor work too; see
   [Runtimes](../reference/runtimes.md) for what each needs.
 
-## 1. Install and open Agents
+## 1. Install and open Agent Loops
 
-On a Mac, Agents is one app. The window you work in and the part that runs your agents
+On a Mac, Agent Loops is one app. The window you work in and the part that runs your agents
 are in it.
 
-1. Download Agents, a free download from us.
+1. Download Agent Loops, a free download from us.
    Open `Agent-Loops-<version>.dmg`, and drag Agent Loops into `~/Applications`.
-   [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md) says more about this step.
-2. Open Agents. It shows **Let's build your idea.** with one box. Behind it, Agents
+   [Set up Agent Loops on this Mac](../how-to/set-up-on-this-mac.md) says more about this step.
+2. Open Agent Loops. It shows **Let's build your idea.** with one box. Behind it, Agent Loops
    starts this Mac's host and its control plane, and pairs the window. They keep running when you
-   close the window or quit Agents.
+   close the window or quit Agent Loops.
 
-   If macOS asks you to allow Agents in **Login Items**, click **Open Login Items**, turn
-   Agents on, and come back. Agents continues by itself.
+   If macOS asks you to allow Agent Loops in **Login Items**, click **Open Login Items**, turn
+   Agent Loops on, and come back. Agent Loops continues by itself.
 
 3. This tutorial does not build an app, so type a few words, such as *A web page for my
-   tests*, and press **Submit**. On the plan page, choose **Open Agents**, at the top right.
+   tests*, and press **Submit**. On the plan page, choose **Open Agent Loops**, at the top right.
    To build an app instead, see [Build your first app](../how-to/build-your-first-app.md).
 
-You should see the Agents window.
+You should see the Agent Loops window.
 
 If Claude is not on this Mac, open **Settings ▸ Agent Runtimes**. It lists every runtime
 the app knows and whether it is on this Mac. If Claude's row says **Not on this Mac**,
@@ -106,9 +106,9 @@ EOF
 git init -q && git add -A && git commit -qm "First version"
 ```
 
-## 3. Add it to Agents
+## 3. Add it to Agent Loops
 
-In the Agents window, click **Add Folder…** in the empty folder list (once you have folders, it is **File ▸ Add Folder…**), and pick
+In the Agent Loops window, click **Add Folder…** in the empty folder list (once you have folders, it is **File ▸ Add Folder…**), and pick
 `weather-app` in your `Demo` folder.
 
 You should see `weather-app` in the list on the left, and beside it an empty new session:

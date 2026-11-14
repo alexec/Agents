@@ -8,7 +8,7 @@ description: Pick up a conversation a runtime already holds, such as one you sta
 
 A runtime keeps its own list of conversations, including ones you started in Terminal or
 in another app. From a new session you can see what a runtime holds in a folder, pick one
-up so it carries on in Agents, or delete one you no longer want.
+up so it carries on in Agent Loops, or delete one you no longer want.
 
 ## Before you start
 
@@ -24,7 +24,7 @@ up so it carries on in Agents, or delete one you no longer want.
    holding here**).
 
    A sheet opens, **Conversations in** the folder's name, listing each conversation with
-   its title and when it last changed. One already in Agents says **already here**.
+   its title and when it last changed. One already in Agent Loops says **already here**.
 4. Click **Pick up** beside the one you want.
 
    The sheet closes and the conversation opens as an agent in the folder, with what was

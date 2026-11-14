@@ -1,16 +1,16 @@
 ---
 diataxis: explanation
 devices: [mac, iphone, ipad, web, server]
-description: "The compliance pack for an organisation's IT and security team, to sign off Agents: where data goes, who gets it, how it is kept safe, and how long it is kept."
+description: "The compliance pack for an organisation's IT and security team, to sign off Agent Loops: where data goes, who gets it, how it is kept safe, and how long it is kept."
 ---
 
 # Compliance pack
 
 These pages are for an organisation's IT and security team, to decide whether they can
-sign off Agents. Each page says what Agents does today. When something is not built yet,
+sign off Agent Loops. Each page says what Agent Loops does today. When something is not built yet,
 the page says so and names its issue.
 
-- [Data flow](data-flow.md): every part of Agents and every outside service, what data
+- [Data flow](data-flow.md): every part of Agent Loops and every outside service, what data
   goes on each line between them, and whether it is encrypted in transit and at rest.
 - [Sub-processors](sub-processors.md): each outside company that gets data, what it gets,
   and whether a self-hosted set-up can leave it out.
@@ -25,15 +25,15 @@ the page says so and names its issue.
 ## In short
 
 - **Self-hosted first.** Your organisation runs its own control plane, on its own machine
-  or in its own cloud account. The people who make Agents run no service in the path,
+  or in its own cloud account. The people who make Agent Loops run no service in the path,
   unless you choose the hosted service.
-- **Agents talks to no model itself.** Each runtime (Claude Code, Codex and the others)
-  runs on a machine of yours and sends prompts and files to its own vendor. Agents does not
+- **Agent Loops talks to no model itself.** Each runtime (Claude Code, Codex and the others)
+  runs on a machine of yours and sends prompts and files to its own vendor. Agent Loops does not
   see or copy that traffic.
 - **Conversations stay on the machine that ran them.** The control plane's store holds who
   is paired and which machines there are, not conversations. A server's backups in the
   store are sealed.
-- **Agents has no analytics, no tracking and no advertising** ([Privacy](../../privacy.md)).
+- **Agent Loops has no analytics, no tracking and no advertising** ([Privacy](../../privacy.md)).
 
 ## Not built yet
 

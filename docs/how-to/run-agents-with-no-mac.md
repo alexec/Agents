@@ -1,12 +1,12 @@
 ---
 diataxis: how-to
 devices: [web, server]
-description: Run Agents with no Mac at all, from a control plane in the cloud, the web page and a GitHub Codespace that runs your agents.
+description: Run Agent Loops with no Mac at all, from a control plane in the cloud, the web page and a GitHub Codespace that runs your agents.
 ---
 
-# Run Agents with no Mac
+# Run Agent Loops with no Mac
 
-You can use Agents with no Mac. A control plane runs on a Linux machine you rent, the web
+You can use Agent Loops with no Mac. A control plane runs on a Linux machine you rent, the web
 page is your window, and a GitHub Codespace (or any Linux server) runs your agents. You do
 each step in a browser or in a terminal on a Linux machine.
 
@@ -43,7 +43,7 @@ The first code comes from the control plane's machine.
 
 The browser is paired. It can do all that a window can. To pair another browser, phone or
 tablet, use **Add a Browser…** in this one; see
-[Use Agents in a browser](use-agents-in-a-browser.md).
+[Use Agent Loops in a browser](use-agents-in-a-browser.md).
 
 ### Add the codespace as a machine
 
@@ -72,7 +72,7 @@ on the machine.
 Or, with a GitHub Codespaces machine provider (see
 [Set up a cloud machine provider](set-up-a-cloud-machine-provider.md)): on the web page, open
 **Settings ▸ Machine providers**, find the codespace and click **Add as Machine…**. The
-codespace must be running. The control plane installs Agents on it over `gh`'s ssh and links
+codespace must be running. The control plane installs Agent Loops on it over `gh`'s ssh and links
 the machine to the codespace. The first time, the dialog shows the codespace's host key:
 click **Trust and Install**. You do not need a terminal in the codespace.
 
@@ -105,7 +105,7 @@ timeout, or **Stop**). When the codespace's machine is linked to a Codespaces ma
 provider, the control plane starts the host over ssh:
 
 - **Start** on the machine starts the codespace, then the host.
-- A codespace started from GitHub, not from Agents, has its host started when the control
+- A codespace started from GitHub, not from Agent Loops, has its host started when the control
   plane next lists the provider's codespaces, within 5 minutes.
 
 A machine with no link to a provider (added with the command from **Add a Machine…** only)
@@ -116,13 +116,13 @@ that command again in the codespace's terminal, with a new code.
 ## What is missing for now
 
 - **Not yet walked by a person:** finishing Claude's sign-in with a real account, a turn, and
-  **Start** from Agents with the control plane outside the codespace (#1781). Agents walked the
+  **Start** from Agent Loops with the control plane outside the codespace (#1781). Agents walked the
   rest on a real codespace (#3384's walk).
 
 ## Related
 
 - [Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md).
-- [Use Agents in a browser](use-agents-in-a-browser.md).
+- [Use Agent Loops in a browser](use-agents-in-a-browser.md).
 - [Add a machine](add-a-machine.md).
 - [Set up a cloud machine provider](set-up-a-cloud-machine-provider.md): GitHub Codespaces
   as a provider.

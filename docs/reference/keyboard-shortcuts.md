@@ -1,12 +1,12 @@
 ---
 diataxis: reference
 devices: [mac]
-description: Every keyboard shortcut and menu command Agents adds on the Mac.
+description: Every keyboard shortcut and menu command Agent Loops adds on the Mac.
 ---
 
 # Keyboard shortcuts
 
-This page lists every keyboard shortcut and menu command Agents has on the Mac, beyond the
+This page lists every keyboard shortcut and menu command Agent Loops has on the Mac, beyond the
 ones every Mac app has.
 
 | Keys | Where | What it does |
@@ -56,7 +56,7 @@ ones every Mac app has.
 | Option-Command-F | **View ▸ Find Session** | With a chat open, puts the keyboard in the sessions column's search field. |
 | Command-P | **Go ▸ Open File…** | Finds a file in the open session's folders by name, to read or edit. |
 | Command-? | **Help ▸ Agents Help** | Opens these docs. |
-| Command-, | **Agents ▸ Settings…** | Opens [Settings and the Resources page](settings.md). |
+| Command-, | **Agent Loops ▸ Settings…** | Opens [Settings and the Resources page](settings.md). |
 | Return, Escape | In a sheet or dialog | Takes the highlighted button, or cancels. |
 | Return | On a permission or question card | Takes the first allowing answer, or **Submit** on a multi-step form. |
 | Command-1 to Command-9 | On a permission or question card | Picks that option by position. |

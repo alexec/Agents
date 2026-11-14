@@ -1,20 +1,20 @@
 ---
 diataxis: how-to
 devices: [mac, web]
-description: The first time you open Agents, it asks for your idea under "Let's build your idea." An agent then takes you from the idea to the first deploy of an iPhone app or a web service.
+description: The first time you open Agent Loops, it asks for your idea under "Let's build your idea." An agent then takes you from the idea to the first deploy of an iPhone app or a web service.
 ---
 
 # Build your first app
 
-The first time you open Agents, it shows one question: **Let's build your idea.** You type
+The first time you open Agent Loops, it shows one question: **Let's build your idea.** You type
 an idea for an app and press **Submit**. Then a plan page shows the tasks from your idea to
 your first app, deployed, and an agent does them with you (#5048).
 
 ## Before you start
 
-- Agents on this Mac, opened for the first time. See
-  [Set up Agents on this Mac](set-up-on-this-mac.md). Or, in a browser, a hosted account
-  with one machine. See [Use Agents in a browser](use-agents-in-a-browser.md).
+- Agent Loops on this Mac, opened for the first time. See
+  [Set up Agent Loops on this Mac](set-up-on-this-mac.md). Or, in a browser, a hosted account
+  with one machine. See [Use Agent Loops in a browser](use-agents-in-a-browser.md).
 - A GitHub account. You connect it on the plan page.
 - For an iPhone app, an Apple Developer Program membership, or the time to join it. For a
   web service, a Google Cloud account. The agent asks for each one when it needs it, on a
@@ -24,7 +24,7 @@ your first app, deployed, and an agent does them with you (#5048).
 
 On its own, only a newcomer: a control plane with no folder, on which no agent ever ran. A
 new Mac that joins a control plane with work on it, a second browser, and a person who chose
-**Open Agents** on the plan page do not see it.
+**Open Agent Loops** on the plan page do not see it.
 
 A person who is set up already opens it with **New App…** (#5132):
 
@@ -40,14 +40,14 @@ Then the question page shows.
 
 ## 1. Type your idea
 
-1. Open Agents. The window shows the Huddle, the text **Let's build your idea.** and one
+1. Open Agent Loops. The window shows the Huddle, the text **Let's build your idea.** and one
    box. The box has no Skip: this is how a first open starts.
 
-   On the Mac, Agents sets itself up behind the page: the control plane, this Mac's host
+   On the Mac, Agent Loops sets itself up behind the page: the control plane, this Mac's host
    and the window's pairing. You can type at once. A line shows under the box only when the
    set-up is slow or fails, with **Try Again** and **Show Details** (and
    **Open Login Items** when macOS wants your approval). See
-   [Fix Agents when it won't start](fix-agents-host-not-starting.md).
+   [Fix Agent Loops when it won't start](fix-agents-host-not-starting.md).
 2. Type your idea. The box shows an example idea, which changes every 4 seconds. Press
    **Tab** to put the example in the box, then change it as you want.
 
@@ -63,7 +63,7 @@ Then the question page shows.
    | A web service that emails me a daily summary of my GitHub | Web service |
 
 3. Press **Submit**, or Return. Shift-Return makes a new line. While the set-up is not done
-   yet, the page says **Setting up Agents on this Mac…** and goes on when it is done.
+   yet, the page says **Setting up Agent Loops on this Mac…** and goes on when it is done.
 
 ## 2. Check what will be built
 
@@ -77,8 +77,8 @@ agentloops-dev/web-service-starter*.
 - To make the other kind, choose **Change**. You can do this until the agent starts.
 - When no word matches, the page asks **What kind of app is it?**, with **iPhone app** and
   **Web service**. Choose one.
-- When the idea names a kind that Agents does not make (a Mac, Android or Windows app, or
-  a game), the page says that Agents can start with an iPhone app or a web service. Choose
+- When the idea names a kind that Agent Loops does not make (a Mac, Android or Windows app, or
+  a game), the page says that Agent Loops can start with an iPhone app or a web service. Choose
   one, and the agent builds your idea on it as far as it goes. Or choose **Back** to change
   your idea: your words stay in the box.
 
@@ -125,7 +125,7 @@ ready-made skill `start-a-new-app`, and ticks each task as it does it. See
 
 ## 5. Go to the usual window
 
-Choose **Open Agents**, at the top right of the plan page, at any time. The usual window
+Choose **Open Agent Loops**, at the top right of the plan page, at any time. The usual window
 (or page) opens, with the first-build session selected. Its plan strip shows the same task
 list. The plan page does not come back by itself. It also goes when you archive the
 first-build session.

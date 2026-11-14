@@ -6,11 +6,11 @@ description: Every achievement, when each is ticked, where each shows, and how t
 
 # Achievements
 
-The **Achievements** list, on every client, names the next main things to try in Agents.
+The **Achievements** list, on every client, names the next main things to try in Agent Loops.
 Each item is ticked from what is really so, never from a box you tick yourself. Thus a
 tick always means the step is done.
 
-An achievement is a first step in Agents. The host awards it the first time you do it, and
+An achievement is a first step in Agent Loops. The host awards it the first time you do it, and
 keeps it with its date in `achievements.json`. Every client reads the same file, so they
 all show the same list. The achievements you have not earned yet are the checklist.
 
@@ -75,7 +75,7 @@ charts on the **Time** page. See [See usage, cost and time](../how-to/see-usage-
 | iPhone | No card. The achievement has a **New** mark on the **Achievements** page until you leave the page. |
 
 **See Achievements** opens the page (on the Mac, the **Multiplier** page). Each card shows once: it goes when you close it or open
-it. Agents never sends a notification for an achievement. On the first look from a device or
+it. Agent Loops never sends a notification for an achievement. On the first look from a device or
 a browser, the achievements earned before are not news, so they show no card.
 
 ## Hide it
