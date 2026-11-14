@@ -3,6 +3,7 @@ package agentsd
 import (
 	"context"
 	"log"
+	"maps"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -93,8 +94,75 @@ func (d *Daemon) costLedgerLocked() *costLedgerFile {
 			d.workLedger.Unsent = map[string]int64{}
 		}
 		d.fullLedgerRefsLocked(d.workLedger)
+		if d.realiasLedgerLocked(d.workLedger) {
+			d.costChangedLocked()
+		}
 	}
 	return d.workLedger
+}
+
+// realiasLedgerLocked names every node of the ledger, and every ref on it, by its repo's name
+// now (#5332), as the lineage names its links (#4957): a PR banked as alexec/agents#n and its
+// links as agentloops-dev/agent-loops#n are one node, so its sessions and its merge count. Two
+// nodes that are then one are merged, and each node renamed is marked unsent, for the control
+// plane. It says whether the ledger changed; the Multiplier's merges are counted again then.
+func (d *Daemon) realiasLedgerLocked(f *costLedgerFile) bool {
+	rekey := map[string]string{}
+	changed := map[string]bool{}
+	nodes := make(map[string]wire.LineageCostNode, len(f.Nodes))
+	for k, c := range f.Nodes {
+		a := lineage.AliasCostNode(c, d.lineage().Canon)
+		nk := costKey(a.Node)
+		if nk != k {
+			rekey[k] = nk
+			changed[nk] = true
+		} else if !reflect.DeepEqual(a, c) {
+			changed[nk] = true
+		}
+		if prev, ok := nodes[nk]; ok {
+			a = lineage.MergeCostNodes(prev, a)
+			a.Sessions = a.Sessions[:min(len(a.Sessions), costSessionsSent)]
+		}
+		nodes[nk] = a
+	}
+	if len(changed) == 0 {
+		return false
+	}
+	f.Nodes = nodes
+	moved := func(k string) string {
+		if nk, ok := rekey[k]; ok {
+			return nk
+		}
+		return k
+	}
+	unsent := make(map[string]int64, len(f.Unsent))
+	for k, v := range f.Unsent {
+		unsent[moved(k)] = max(unsent[moved(k)], v)
+	}
+	f.Unsent = unsent
+	if f.Overruns != nil {
+		overruns := make(map[string]int64, len(f.Overruns))
+		for k, v := range f.Overruns {
+			overruns[moved(k)] = max(overruns[moved(k)], v)
+		}
+		f.Overruns = overruns
+	}
+	for _, k := range slices.Sorted(maps.Keys(changed)) {
+		f.Seq++
+		f.Unsent[k] = f.Seq
+	}
+	d.multiplierMerges = nil
+	return true
+}
+
+// realiasCost names the ledger's nodes again after the book of moved repos changed (#5332).
+func (d *Daemon) realiasCost() {
+	d.workMu.Lock()
+	defer d.workMu.Unlock()
+	if d.realiasLedgerLocked(d.costLedgerLocked()) {
+		d.refreshCostLinksLocked()
+		d.costChangedLocked()
+	}
 }
 
 // fullLedgerRefsLocked reads a ledger written before #4800 in the full ref form: each node's
@@ -286,6 +354,7 @@ func turnStart(states []wire.LineageSessionState) (wire.Date, bool) {
 // noteCostLocked changes a node's total, made when it is new, and marks it unsent.
 func (d *Daemon) noteCostLocked(n wire.LineageNode, at time.Time, change func(*wire.LineageCostNode)) {
 	f := d.costLedgerLocked()
+	n = d.lineage().Canon(n)
 	k := costKey(n)
 	c, ok := f.Nodes[k]
 	if !ok {
@@ -308,6 +377,7 @@ func (d *Daemon) noteCostLocked(n wire.LineageNode, at time.Time, change func(*w
 func (d *Daemon) notePROutcome(pr wire.LineageNode, event, title string) {
 	d.workMu.Lock()
 	defer d.workMu.Unlock()
+	pr = d.lineage().Canon(pr)
 	now := nowFunc()
 	ended := wire.DateOf(now)
 	d.noteCostLocked(pr, now, func(c *wire.LineageCostNode) {
