@@ -3,6 +3,8 @@ package agentsd
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -191,4 +193,98 @@ func TestDeployNotice(t *testing.T) {
 			t.Errorf("deployNotice(%q) = %q, want %q", notice, got, want)
 		}
 	}
+}
+
+// #5246: an environment's live and next versions, as GitOps Promoter's active and proposed,
+// computed from its deploys: a walk from the environment gives them as live and next links.
+// A canary is live beside the version it splits with, each at its share; a redeploy of the live
+// version keeps its since; a waiting deploy older than the live one is not next; and the next
+// deploy brings the PRs since the live version.
+func TestLineageDeployLiveAndNext(t *testing.T) {
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	c.call(t, 1, "folders/add", map[string]any{"folder": "file://" + gitFolder(t, "git@github.com:alexec/agents.git")})
+	forge := &fakeReleases{
+		compares:  map[string][]compareCommit{"bbb..ccc": {{SHA: "s1", Message: "Deploys: live and next (#5246)"}}},
+		commitPRs: map[string]int{},
+		asked:     map[string]int{},
+	}
+	d.releaseCompare, d.releaseCommitPR = forge.compare, forge.commitPR
+	t0 := time.Date(2026, 11, 13, 10, 0, 0, 0, time.UTC)
+	env := wire.LineageNode{Kind: lineage.KindEnvironment, Ref: "github:environment:alexec/agents#production"}
+	walk := func() (map[string]bool, wire.LineageGraph) {
+		t.Helper()
+		g := d.deployGraph(d.lineage().Walk(env, 1))
+		got := map[string]bool{}
+		for _, l := range g.Links {
+			if l.From == env && (l.Rel == lineage.RelLive || l.Rel == lineage.RelNext) {
+				got[l.Rel+" "+l.To.Ref+" "+l.At.Time().Format("15:04")] = true
+			}
+		}
+		return got, g
+	}
+	at := func(m int) time.Time { return t0.Add(time.Duration(m) * time.Minute) }
+
+	// A deploy that waits from before v0.18.0 went out is never approved: it is not next.
+	d.lineageEvent(deployEvent(t, "deploy.waiting", 1, "production", "zzz", "v0.17.0", 9, wire.DeployStateWaiting, at(0), time.Time{}))
+	d.lineageEvent(deployEvent(t, "deploy.succeeded", 2, "production", "aaa", "v0.18.0", 10, wire.DeployStateSucceeded, at(10), at(11)))
+	d.lineageEvent(deployEvent(t, "deploy.succeeded", 3, "production", "aaa", "v0.18.0", 11, wire.DeployStateSucceeded, at(20), at(21)))
+	d.lineageSettle(5 * time.Second)
+	got, _ := walk()
+	wantLinks(t, got, "live github:deploy:alexec/agents#3 10:11")
+
+	// v0.19.0 goes out as a canary at 10 %: both are live.
+	canary := deployEvent(t, "deploy.succeeded", 4, "production", "bbb", "v0.19.0", 12, wire.DeployStateSucceeded, at(30), at(31))
+	canary.Details["payload"] = strings.Replace(canary.Details["payload"], `"state":`, `"share":10,"state":`, 1)
+	d.lineageEvent(canary)
+	// v0.20.0 waits for its approval: next.
+	d.lineageEvent(deployEvent(t, "deploy.waiting", 5, "production", "ccc", "v0.20.0", 13, wire.DeployStateWaiting, at(40), time.Time{}))
+	d.lineageSettle(5 * time.Second)
+	got, g := walk()
+	wantLinks(t, got,
+		"live github:deploy:alexec/agents#4 10:31",
+		"live github:deploy:alexec/agents#3 10:11",
+		"next github:deploy:alexec/agents#5 10:40")
+	if l := g.Resolved["github:deploy:alexec/agents#4"].Labels; !slices.Equal(l, []string{"share:10"}) {
+		t.Fatalf("canary labels %v, want share:10", l)
+	}
+	if l := g.Resolved["github:deploy:alexec/agents#3"].Labels; !slices.Equal(l, []string{"share:90"}) {
+		t.Fatalf("stable labels %v, want share:90", l)
+	}
+	if s := g.Resolved["github:deploy:alexec/agents#3"].State; s == nil || *s != "succeeded" {
+		t.Fatalf("stable state %v: live at 90 %% is not replaced", s)
+	}
+
+	// What the next version brings: the PRs since the live version before it.
+	d.deploySettle(5 * time.Second)
+	_, g = walk()
+	brings := map[string]bool{}
+	for _, l := range g.Links {
+		if l.Rel == lineage.RelBrings && l.From.Ref == "github:deploy:alexec/agents#5" {
+			brings[l.To.Ref] = true
+		}
+	}
+	wantLinks(t, brings, "github:pr:alexec/agents#5246")
+
+	// v0.20.0 goes out at 100 %: it alone is live, nothing is next, and the others are replaced.
+	d.lineageEvent(deployEvent(t, "deploy.succeeded", 5, "production", "ccc", "v0.20.0", 13, wire.DeployStateSucceeded, at(40), at(45)))
+	d.lineageSettle(5 * time.Second)
+	got, g = walk()
+	wantLinks(t, got, "live github:deploy:alexec/agents#5 10:45")
+	for _, ref := range []string{"github:deploy:alexec/agents#3", "github:deploy:alexec/agents#4"} {
+		if s := g.Resolved[ref].State; s != nil && *s != "replaced" {
+			t.Fatalf("%s state %s, want replaced", ref, *s)
+		}
+	}
+
+	// Another target of the same environment node, told apart by its labels, has its own live
+	// version.
+	eu := deployEvent(t, "deploy.succeeded", 6, "production", "bbb", "v0.19.0", 14, wire.DeployStateSucceeded, at(50), at(51))
+	eu.Details["payload"] = strings.Replace(eu.Details["payload"], `"environment":{`, `"labels":{"region":"eu"},"environment":{`, 1)
+	d.lineageEvent(eu)
+	d.lineageSettle(5 * time.Second)
+	got, _ = walk()
+	wantLinks(t, got,
+		"live github:deploy:alexec/agents#5 10:45",
+		"live github:deploy:alexec/agents#6 10:51")
 }
