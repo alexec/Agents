@@ -18,7 +18,7 @@ import (
 
 // Instructions are the server's words.
 const Instructions = "This project's merge requests, their pipelines, and its issues on GitLab, as events polled as the person who connected GitLab: " +
-	"checks.failed (a failed pipeline), run.completed (a pipeline of any trigger, as main's or a tag's, with what it deployed), deploy.waiting (a deploy held for a protected environment's approval), pr.opened, pr.merged, pr.closed, pr.conflicted, review.comment (a comment on a line of a merge request's diff), " +
+	"checks.failed (a failed pipeline), run.completed (a pipeline of any trigger, as main's or a tag's, with what it deployed), deploy.waiting (a deploy held for a protected environment's approval), pr.opened, pr.merged, pr.closed, pr.conflicted, pr.blocked (a pull request that cannot merge until its author acts), review.comment (a comment on a line of a merge request's diff), " +
 	"issue.opened, issue.labelled, issue.commented, issue.closed. A merge request is a pr in their names and data, and its number is its iid (!12). " +
 	"list_merge_requests, get_merge_request, list_pipelines, get_pipeline, list_issues and get_issue read them; " +
 	"comment_on_merge_request and comment_on_issue comment; failed_log reads a failed pipeline's jobs' logs, retry_pipeline runs them again. " +

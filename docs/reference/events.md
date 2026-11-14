@@ -523,7 +523,7 @@ trigger is:
 
   | Event | Names it with | `any: true` |
   | --- | --- | --- |
-  | `pr.merged`, `pr.closed`, `pr.conflicted`, `pr.commented`, `pr.reviewed`, `pr.labelled`, `pr.unlabelled`, `review.posted`, `review.comment` | `pr`, `branch`, `fixes` or `mine` | yes |
+  | `pr.merged`, `pr.closed`, `pr.conflicted`, `pr.blocked`, `pr.commented`, `pr.reviewed`, `pr.labelled`, `pr.unlabelled`, `review.posted`, `review.comment` | `pr`, `branch`, `fixes` or `mine` | yes |
   | `checks.failed`, `checks.passed` | `pr`, `branch`, `fixes` or `mine` | yes |
   | `run.completed` | `run`, `branch`, `workflow` or `pipeline` (Azure DevOps) | yes |
   | `issue.closed`, `issue.commented`, `issue.labelled` | `issue` or `label` | yes |
@@ -552,6 +552,41 @@ Each workflow page shows a line for each server its event triggers hear, on the 
 iPhone and iPad and the web page: when it was last asked and when the last event came, or
 why not (**Can't reach github**, the server no longer offers the event, refused it, or doesn't
 take the filters).
+
+### Blocked pull requests
+
+`pr.blocked` (#5321) fires when an open pull request goes into a state where it cannot
+merge until its author does something. A lane or a lead can wait on `pr.blocked`,
+`pr.merged` and `pr.closed`, and that covers every case. `checks.failed`, `pr.conflicted`
+and `pr.reviewed` stay as they are.
+
+- **When.** The PR goes from not blocked to blocked, or its head commit or its set of
+  reasons changes. It never fires twice for the same head and the same reasons: a rerun that
+  fails again on the same head is not a new event, and neither is a forge that is still
+  working out whether the PR can merge.
+- **Not a reason.** A check that still runs; a draft; a PR labelled `needs-approval`, or one
+  that waits for a person's review (GitHub's rule for changes not made by a person). These
+  need a person or time, not the author.
+- **Payload.** `pr`, `headSha`, `blockedAt`, and `reasons`, in this order, one or more of:
+
+  | Reason | What it means | More data |
+  | --- | --- | --- |
+  | `conflict` | The PR conflicts with its base. | |
+  | `required_check_failed` | A check that the base's rule requires failed on the head. A check that is not required (as `go-darwin`) is not counted. | `failedChecks`: each one's `name` and `url` |
+  | `changes_requested` | A reviewer asked for changes. | `reviewUrl` |
+  | `automerge_disabled` | The forge turned auto-merge off. A PR that never had it on is not blocked. | |
+  | `behind` | The base's rule wants the branch up to date with its base, and it is not. Only under that rule. | |
+- **Filters.** The same as `pr.conflicted`: `repo` (`project` on GitLab), `branch`, `pr`,
+  `fixes`, `anyone`, `mine`, `any`.
+- **What each forge reads.** Each forge reads the reasons it can see in its list of open
+  pull requests:
+
+  | Server | Reasons it reads | From |
+  | --- | --- | --- |
+  | `github` | all five | `mergeable`, `mergeStateStatus` (`BEHIND`), `reviewDecision`, the last auto-merge event of the timeline, and the head's checks against the required checks of the base's rulesets and branch protection, in one GraphQL query |
+  | `gitlab` | `conflict`, `required_check_failed` (the head pipeline), `changes_requested`, `behind` | `detailed_merge_status`, one reason at a time |
+  | `azuredevops` | `conflict`, `changes_requested` | `mergeStatus`, and a reviewer's vote of *waiting for author* or *rejected* |
+  | `forgejo`, `bitbucket` | `conflict` | the same read as `pr.conflicted` |
 
 ### Deploys
 
@@ -599,6 +634,7 @@ it, so two machines can make two ids for one change.
 | `github` | `run.completed`, `deploy.waiting` | `github:run:<owner/repo>#<run id>` | the attempt (and the environments) |
 | `github` | `deploy.started`, `deploy.succeeded`, `deploy.failed` | `github:deploy:<owner/repo>#<deployment id>` | none: each is sent once for a Deployment |
 | `github` | `pr.merged` / `pr.closed` | the PR | none / the close time |
+| `github`, `gitlab`, `forgejo`, `bitbucket`, `azuredevops` | `pr.blocked` | the PR (the merge request on GitLab) | the head commit and the reasons, as `<sha>:conflict,behind` |
 | `github` | `pr.conflicted` and the other states | the PR, or the issue for `issue.assigned` | the review for `review.posted`, else the poll time |
 | `gitlab` | `issue.*`, `review.comment`, `pr.merged`, `pr.closed`, states | `gitlab:issue:` or `gitlab:mr:<group/project>#<n>` | as `github` |
 | `gitlab` | `checks.failed` | `gitlab:pipeline:<group/project>#<pipeline id>` | the pipeline's update time |

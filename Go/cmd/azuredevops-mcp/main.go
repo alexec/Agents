@@ -1,6 +1,6 @@
 // azuredevops-mcp: the `azuredevops` MCP server (#2829), on stdio, in the gitlab server's
 // shape (Go/cmd/gitlab-mcp): polled events of an Azure DevOps folder's pull requests and their
-// Azure Pipelines builds (checks.failed, pr.opened, pr.merged, pr.closed, pr.conflicted,
+// Azure Pipelines builds (checks.failed, pr.opened, pr.merged, pr.closed, pr.conflicted, pr.blocked,
 // review.requested, review.comment), and tools that read them and comment, over Azure
 // DevOps's REST API. For dev.azure.com and an Azure DevOps Server alike. As the person who
 // connected Azure DevOps (#3802, in the store connections.EnvName names), or whose personal

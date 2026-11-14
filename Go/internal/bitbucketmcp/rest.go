@@ -704,7 +704,7 @@ func (b *RealBitbucket) OpenPRs(ctx context.Context, repo string, withConflicts 
 		if err != nil {
 			return nil, err
 		}
-		o := OpenPR{PR: p.pr(), Author: p.Author.name(), Draft: p.Draft, HeadSHA: p.Source.hash(), Trusted: trusted}
+		o := OpenPR{PR: p.pr(), Author: p.Author.name(), Draft: p.Draft, HeadSHA: p.Source.hash(), Trusted: trusted, SkipsBlocked: p.Draft}
 		if withConflicts && i < maxChecked {
 			c, err := b.conflicts(ctx, repo, p)
 			if err != nil {

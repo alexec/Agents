@@ -1,6 +1,7 @@
 package azuredevopsmcp
 
 import (
+	"slices"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -395,6 +396,11 @@ func (p pullJSON) labels() []string {
 	return out
 }
 
+// changesRequested: a reviewer voted waiting for author (-5) or rejected (-10).
+func (p pullJSON) changesRequested() bool {
+	return slices.ContainsFunc(p.Reviewers, func(r reviewerJSON) bool { return r.Vote <= -5 })
+}
+
 // fork says whether its branch is in another repository.
 func (p pullJSON) fork() bool { return p.ForkSource != nil }
 
@@ -613,7 +619,8 @@ func (f *RealAzureDevOps) OpenPRs(ctx context.Context, repo string) ([]OpenPR, e
 	out := make([]OpenPR, 0, len(list))
 	for _, p := range list {
 		out = append(out, OpenPR{PR: f.pr(repo, p), Author: p.CreatedBy.name(), Draft: p.IsDraft, Conflicts: conflicts(p),
-			HeadSHA: p.head(), Trusted: trustedPR(p)})
+			HeadSHA: p.head(), Trusted: trustedPR(p),
+			SkipsBlocked: mcpevents.SkipsBlocked(p.IsDraft, p.labels()), ChangesRequested: p.changesRequested()})
 	}
 	return out, nil
 }

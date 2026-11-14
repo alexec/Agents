@@ -635,7 +635,7 @@ func (f *RealForgejo) OpenPRs(ctx context.Context, repo string) ([]OpenPR, error
 			return nil, err
 		}
 		out = append(out, OpenPR{PR: p.pr(), Author: p.User.Login, Draft: p.draft(), Conflicts: f.conflicts(repo, p),
-			HeadSHA: p.Head.SHA, Trusted: trusted})
+			HeadSHA: p.Head.SHA, Trusted: trusted, SkipsBlocked: mcpevents.SkipsBlocked(p.draft(), labelNames(p.Labels))})
 	}
 	return out, nil
 }

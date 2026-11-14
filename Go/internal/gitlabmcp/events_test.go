@@ -64,7 +64,7 @@ func same(t *testing.T, got, want []string) {
 }
 
 func TestTheEventsAreTheGitHubServersNames(t *testing.T) {
-	same(t, EventNames(), []string{"checks.failed", "run.completed", "deploy.waiting", "deploy.started", "deploy.succeeded", "deploy.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "review.requested", "review.comment",
+	same(t, EventNames(), []string{"checks.failed", "run.completed", "deploy.waiting", "deploy.started", "deploy.succeeded", "deploy.failed", "pr.opened", "pr.merged", "pr.closed", "pr.conflicted", "pr.blocked", "review.requested", "review.comment",
 		"issue.opened", "issue.labelled", "issue.commented", "issue.closed", "issue.assigned"})
 }
 
@@ -129,6 +129,37 @@ func TestConflictedWaitsForGitLabToKnow(t *testing.T) {
 	f.set(func() { f.mrs[0]["detailed_merge_status"] = "conflict" })
 	ids, _ = p.poll()
 	same(t, ids, nil)
+}
+
+func TestBlockedIsRaisedOncePerHeadAndReason(t *testing.T) {
+	f := newFake(t)
+	f.addMembers()
+	f.mrs = []obj{mrJSON(1, "a", alex, nil), mrJSON(2, "b", alex, obj{"labels": []string{"needs-approval"}})}
+	p := newPoller(t, f, "pr.blocked", map[string]any{"any": true})
+	p.poll()
+	f.set(func() {
+		f.mrs[0]["detailed_merge_status"] = "ci_must_pass"
+		f.mrs[1]["detailed_merge_status"] = "need_rebase"
+	})
+	ids, result := p.poll()
+	if len(ids) != 1 || !strings.HasPrefix(ids[0], "pr.blocked:group/app:1:head1:required_check_failed:") {
+		t.Fatalf("failed: %v", ids)
+	}
+	d := data(t, result, 0)
+	if d["blockedAt"] == nil || fmt.Sprint(d["reasons"]) != "[required_check_failed]" || d["headSha"] != "head1" {
+		t.Fatalf("data: %v", d)
+	}
+	// Its pipeline run again, failed again, and GitLab working it out: not raised twice.
+	for _, status := range []string{"ci_still_running", "ci_must_pass", "checking"} {
+		f.set(func() { f.mrs[0]["detailed_merge_status"] = status })
+		if ids, _ = p.poll(); len(ids) != 0 {
+			t.Fatalf("%s: %v", status, ids)
+		}
+	}
+	f.set(func() { f.mrs[0]["detailed_merge_status"] = "requested_changes" })
+	if ids, _ = p.poll(); len(ids) != 1 || !strings.Contains(ids[0], ":changes_requested:") {
+		t.Fatalf("a new reason: %v", ids)
+	}
 }
 
 func TestMergedAndClosedSinceTheCursor(t *testing.T) {
@@ -584,7 +615,7 @@ func TestClosingRefs(t *testing.T) {
 // #3797: every event about one merge request names it by pr, branch, fixes or mine, or takes
 // any; an issue event takes one issue or a list of them.
 func TestEventsListGivesWhichArgumentsNameOne(t *testing.T) {
-	named := map[string]bool{"checks.failed": true, "pr.merged": true, "pr.closed": true, "pr.conflicted": true, "review.comment": true}
+	named := map[string]bool{"checks.failed": true, "pr.merged": true, "pr.closed": true, "pr.conflicted": true, "pr.blocked": true, "review.comment": true}
 	for _, e := range eventsList()["events"].([]any) {
 		e := e.(map[string]any)
 		name := e["name"].(string)

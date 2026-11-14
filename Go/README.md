@@ -101,7 +101,7 @@ server's (`github.com/github/github-mcp-server/v2`, a library): by default the
 (`HiddenTools`) never offered to the model. The events are the ones the ci server raised
 (CIWatcher.swift, #383, removed in #1231), with the same names, arguments, data and eventIds, and the same cursor, paging and
 trust filter (#728), polled only: `checks.failed`, `pr.opened`, `pr.merged`, `pr.closed`,
-`pr.conflicted`, `issue.opened`, `issue.labelled`, `issue.commented`, `issue.closed`.
+`pr.conflicted`, `pr.blocked` (#5321), `issue.opened`, `issue.labelled`, `issue.commented`, `issue.closed`.
 `run.completed` is new here (#3444): a workflow run that finished, whatever started it and
 whatever its conclusion, for the runs no pull request owns (a tag's `release.yml`, a
 `workflow_dispatch` dry run); `workflow`, `branch` (a branch or a tag) and `run` filter it.

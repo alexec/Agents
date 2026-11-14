@@ -166,6 +166,7 @@ var namedEvents = map[string]struct {
 	"pr.merged":       {"PR", "every PR in the repo", prNamingKeys},
 	"pr.closed":       {"PR", "every PR in the repo", prNamingKeys},
 	"pr.conflicted":   {"PR", "every PR in the repo", prNamingKeys},
+	"pr.blocked":      {"PR", "every PR in the repo", prNamingKeys},
 	"pr.commented":    {"PR", "every PR in the repo", prNamingKeys},
 	"pr.reviewed":     {"PR", "every PR in the repo", prNamingKeys},
 	"pr.labelled":     {"PR", "every PR in the repo", prNamingKeys},

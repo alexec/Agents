@@ -363,7 +363,7 @@ func TestBaseURL(t *testing.T) {
 // #3797: every event about one pull request names it by pr, branch, fixes or mine, or takes
 // any; an issue event takes one issue or a list of them.
 func TestEventsListGivesWhichArgumentsNameOne(t *testing.T) {
-	named := map[string]bool{"checks.failed": true, "pr.merged": true, "pr.closed": true, "pr.conflicted": true, "review.comment": true}
+	named := map[string]bool{"checks.failed": true, "pr.merged": true, "pr.closed": true, "pr.conflicted": true, "pr.blocked": true, "review.comment": true}
 	for _, e := range eventsList()["events"].([]any) {
 		e := e.(map[string]any)
 		name := e["name"].(string)
