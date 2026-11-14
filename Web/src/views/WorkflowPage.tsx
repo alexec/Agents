@@ -28,6 +28,7 @@ import { WorkflowFileModal } from "./AgentConfigEditor";
 import { PageTitle } from "./TopBar";
 import { navTitle } from "../model/nav";
 import { ask } from "./MessageKinds";
+import { Glyph } from "./Icon";
 
 export function WorkflowPage({ store, host, folder, folderName, workflowID, down }: {
   store: Store; host: string; folder: string; folderName: string; workflowID: string; down: boolean;
@@ -188,7 +189,7 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
             <ul class="status-card">
               {status.map((line) => (
                 <li key={line.glyph + line.text} class={line.tint ? `tinted ${line.tint}` : undefined}>
-                  <span class="glyph" aria-hidden="true">{line.glyph}</span>
+                  <span class="glyph" aria-hidden="true"><Glyph of={line.glyph} /></span>
                   <span class="what">
                     <span>{line.text}</span>
                     {line.detail && <span class="quiet small">{line.detail}</span>}
@@ -245,7 +246,7 @@ export function WorkflowPage({ store, host, folder, folderName, workflowID, down
                   const scope = scopeLine(trigger, folderName, hostName);
                   return (
                     <li key={index} class="trigger">
-                      <span class="glyph" aria-hidden="true">{triggerGlyph(trigger)}</span>
+                      <span class="glyph" aria-hidden="true"><Glyph of={triggerGlyph(trigger)} /></span>
                       <span class="what">
                         <span>{triggerSummary(trigger)}
                           {!isSupportedTrigger(trigger) && (

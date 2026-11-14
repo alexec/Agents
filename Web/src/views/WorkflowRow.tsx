@@ -16,6 +16,7 @@ import { shortAgo } from "../model/activity";
 import { isWorkflowMuted, muteLabel, muteMark, mutedHelp, mutedWords, unmuteLabel, workflowMuteHelp } from "../model/mute";
 import { Capability } from "../protocol/capabilities.generated";
 import { ask } from "./MessageKinds";
+import { Glyph } from "./Icon";
 
 export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pinnedAt, place }: {
   store: Store; host: string; summary: WorkflowSummary; disabled: boolean; chosen: boolean; onPick: () => void;
@@ -35,7 +36,7 @@ export function WorkflowRow({ store, host, summary, disabled, chosen, onPick, pi
       onKeyDown={(e) => { if (isMenuKey(e)) openContextMenu(e, menu()); }} {...holdForMenu(menu)}>
       <button class="pick" aria-current={chosen} onClick={onPick}
         title={[pickWords, scope, hoursRowSentence(summary), readyMadeUpdatedSentence(summary)].filter(Boolean).join(". ")}>
-        <span class={`workflow-mark${status.tinted ? " tinted" : ""}`} role="img" aria-label={status.words} title={status.words}>{status.mark}</span>
+        <span class={`workflow-mark${status.tinted ? " tinted" : ""}`} role="img" aria-label={status.words} title={status.words}><Glyph of={status.mark} /></span>
         {/* Heavier only while it waits for an OK (#520), as a session's title is while unread. */}
         <span class={`title${summary.awaitingApproval && !summary.isArchived ? " needs-ok" : ""}${place ? " placed" : ""}`}>
           {/* The name gives way before its folder's, which is whole (#587). */}

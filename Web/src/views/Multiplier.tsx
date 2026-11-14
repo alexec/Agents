@@ -15,6 +15,7 @@ import {
 } from "../model/multiplier";
 import { BlobParts } from "./Huddle";
 import { LastUpdate } from "./LastUpdate";
+import { Glyph } from "./Icon";
 
 function reducedMotion(): boolean {
   return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -176,7 +177,7 @@ function EarnedBadges({ achievements }: { achievements: Parameters<typeof earned
             const words = `${b.title}, ${achievementDay(b.at)}`;
             return (
               <span key={b.id} class={`badge${first.current?.has(b.id) ? "" : " new"}`} title={words} aria-label={words} role="img">
-                {badgeGlyph[b.id]}
+                <Glyph of={badgeGlyph[b.id]} />
               </span>
             );
           })}

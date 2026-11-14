@@ -21,6 +21,7 @@ import {
 import { go } from "../route";
 import { PlaceholderRows } from "./WorkParts";
 import { renderMarkdown } from "../render/markdown";
+import { Glyph } from "./Icon";
 
 /** The list's state, for the tab: a conversation's page goes back to it as it was left. */
 const lists = signal<HostConversations[] | null>(null);
@@ -184,7 +185,7 @@ function ConversationRow({ row }: { row: MessagesRow }) {
       <button type="button" class={`work-row messages-row${unread ? " unread" : ""}`}
         onClick={() => go({ nav: "work", section: "messages", item: row.key })}>
         <span class="work-row-head">
-          <span class="messages-source" title={channelName(c.source)} aria-label={channelName(c.source)}>{sourceGlyph(c.source)}</span>
+          <span class="messages-source" title={channelName(c.source)} aria-label={channelName(c.source)}><Glyph of={sourceGlyph(c.source)} /></span>
           {c.sender && <span class="messages-sender" title={c.sender.identity}>{senderName(c.sender)}</span>}
           <span class={`work-title messages-title${c.sender ? " quiet" : ""}`}>{c.title}</span>
           {unread && <span class="messages-unread small">{unread}</span>}
@@ -273,7 +274,7 @@ export function ConversationPage({ store, conversationKey }: { store: Store; con
       <header class="work-page-head">
         <h2><span class="work-title">{c.title}</span></h2>
         <p class="quiet small">
-          {sourceGlyph(c.source)} {channelName(c.source)} ▸ {row.item.server}
+          <Glyph of={sourceGlyph(c.source)} /> {channelName(c.source)} ▸ {row.item.server}
           {c.link && <> · <a href={c.link} target="_blank" rel="noopener noreferrer">Open in {channelName(c.source)}</a></>}
         </p>
       </header>

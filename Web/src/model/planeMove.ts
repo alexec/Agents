@@ -63,9 +63,9 @@ export const showsNote = (line: PlaneMoveLine) => !!line.note && line.state !== 
 /** Whether a line is shown as a problem. */
 export const isBad = (line: PlaneMoveLine) => line.state === "no" || line.state === "failed";
 
-/** A member's state, in the sheet's words. */
+/** A member's state, in the sheet's words; the view draws a tick before Knows. */
 export function memberState(member: PlaneMoveMember): string {
-  return member.state === "knows" ? "✓ Knows" : member.state === "cantFollow" ? "Can't follow" : "Not yet";
+  return member.state === "knows" ? "Knows" : member.state === "cantFollow" ? "Can't follow" : "Not yet";
 }
 
 export type FlowButton = { label: string; action: "cancel" | "close" | "continue" | "back" | "check" | "announce" | "withdraw" | "moveNow"; prominent?: boolean; disabled?: boolean; left?: boolean };

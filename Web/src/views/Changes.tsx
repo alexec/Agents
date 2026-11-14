@@ -12,12 +12,12 @@ import { describe } from "../model/errors";
 import { canOpenInFiles, changeStep, changeStops, lineDiff, markWords, offersDiffChoice, otherAgentsNote, shownDiff, unavailableNote, type DiffShown } from "../model/diff";
 import { nameOf, paneOf, setPane } from "./files/paneState";
 import { build, lines, sameFile, statusGlyph, statusPhrase, totals, type Totals } from "../model/changeTree";
-import { Icon } from "./Icon";
+import { Glyph, Icon } from "./Icon";
 
 /** A changed file's square, in its status colour, with the status in words for a reader (#63). */
 export function StatusSquare({ file }: { file: ChangedFile }) {
   const words = statusPhrase(file);
-  return <span class={`change-mark state-${file.state}`} role="img" aria-label={words} title={words[0]!.toUpperCase() + words.slice(1)}>{statusGlyph(file.state)}</span>;
+  return <span class={`change-mark state-${file.state}`} role="img" aria-label={words} title={words[0]!.toUpperCase() + words.slice(1)}><Glyph of={statusGlyph(file.state)} /></span>;
 }
 
 /** "+3 −1", for a file or a folder's total. */

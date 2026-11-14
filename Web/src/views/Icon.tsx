@@ -79,6 +79,20 @@ import messageCircleQuestionMark from "lucide:message-circle-question-mark";
 import undo2 from "lucide:undo-2";
 import clockFading from "lucide:clock-fading";
 import circleAlert from "lucide:circle-alert";
+import gitBranch from "lucide:git-branch";
+import gitMerge from "lucide:git-merge";
+import cloud from "lucide:cloud";
+import hash from "lucide:hash";
+import squareDot from "lucide:square-dot";
+import squarePlus from "lucide:square-plus";
+import squareMinus from "lucide:square-minus";
+import arrowRight from "lucide:arrow-right";
+import shieldCheck from "lucide:shield-check";
+import hourglass from "lucide:hourglass";
+import pointer from "lucide:pointer";
+import calendar from "lucide:calendar";
+import loaderCircle from "lucide:loader-circle";
+import cornerDownRight from "lucide:corner-down-right";
 
 type Node = [string, Record<string, string>];
 
@@ -95,6 +109,7 @@ const icons = {
   "square-terminal": squareTerminal, sun, target, "trash-2": trash2, "triangle-alert": triangleAlert, workflow, x, zap,
   "wifi-off": wifiOff, "folder-search": folderSearch, "user-x": userX, history, coins, "building-2": building2,
   pencil, search, brain, hammer, "square-arrow-right": squareArrowRight, "scroll-text": scrollText, "message-circle-question-mark": messageCircleQuestionMark, "undo-2": undo2, "clock-fading": clockFading, "circle-alert": circleAlert,
+  "git-branch": gitBranch, "git-merge": gitMerge, cloud, hash, "square-dot": squareDot, "square-plus": squarePlus, "square-minus": squareMinus, "arrow-right": arrowRight, "shield-check": shieldCheck, hourglass, pointer, calendar, "corner-down-right": cornerDownRight, "loader-circle": loaderCircle,
 } satisfies Record<string, Node[]>;
 
 export type IconName = keyof typeof icons;
@@ -130,6 +145,9 @@ const byGlyph: Record<string, IconName> = {
   "📊": "chart-column", "🔀": "workflow", "✉": "mail", "✆": "phone", "💬": "messages-square", "⚡": "zap",
   "☀": "sun", "↑": "arrow-up", "↓": "arrow-down", "⤒": "arrow-up-to-line", "▾": "chevron-down", "⌄": "chevron-down",
   "▸": "chevron-right", "›": "chevron-right", "‹": "chevron-left", "▴": "chevron-up", "⌁": "audio-waveform",
+  "⎇": "git-branch", "⑂": "git-merge", "☁": "cloud", "#": "hash", "⊡": "square-dot", "⊞": "square-plus",
+  "⊟": "square-minus", "⇥": "arrow-right", "↺": "undo-2", "🛡": "shield-check", "⧗": "hourglass", "☝": "pointer",
+  "📅": "calendar", "❞": "corner-down-right", "⧉": "clock", "…": "ellipsis",
 };
 
 export function iconForGlyph(glyph: string): IconName | undefined {
