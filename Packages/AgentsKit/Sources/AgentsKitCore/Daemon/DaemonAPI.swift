@@ -153,6 +153,9 @@ public enum DaemonAPI {
         /// The same over the control plane's copy (#5232), while the machine sleeps.
         public static let buildsHistoryAll = "builds/historyAll"
         public static let buildsRunAll = "builds/runAll"
+        /// The DORA figures of each environment (#5245, spec 5239 board 5), for Reports ▸ Planning ▸
+        /// Delivery on the web page; tier web+link, so Swift has no types for it.
+        public static let deploysDelivery = "deploys/delivery"
         public static let simulatorsList = "simulators/list"
         public static let simulatorsBoot = "simulators/boot"
         public static let simulatorsShutdown = "simulators/shutdown"
