@@ -50,7 +50,7 @@ func TestThePageAsksTheMacWindowToConnectAnother(t *testing.T) {
 	if want.Code == nil || *want.Code != "agents://pair#code" || want.Hosted != nil {
 		t.Fatalf("the window was told %+v", want)
 	}
-	if got := callError(t, page, "", "control/connectReport", map[string]any{"step": "Pairing…"}); !strings.Contains(got, "Only Agents on a Mac") {
+	if got := callError(t, page, "", "control/connectReport", map[string]any{"step": "Pairing…"}); !strings.Contains(got, "Only Agent Loops on a Mac") {
 		t.Fatalf("a browser reports: %s", got)
 	}
 	call(t, window, "", "control/connectReport", map[string]any{"step": "Pairing…"})
@@ -69,7 +69,7 @@ func TestOnlyAControlPlaneOnAMacConnectsAnother(t *testing.T) {
 	p := startPlane(t, store.NewMemory(), controllink.NewPrivateKey())
 	page := p.clientOfKind("browser", records.KindBrowser)
 	p.clientOfKind("Mac", records.KindMac)
-	if got := callError(t, page, "", "control/connectAnother", map[string]any{"hosted": true}); !strings.Contains(got, "isn’t run by Agents on a Mac") {
+	if got := callError(t, page, "", "control/connectAnother", map[string]any{"hosted": true}); !strings.Contains(got, "isn’t run by Agent Loops on a Mac") {
 		t.Fatal(got)
 	}
 }

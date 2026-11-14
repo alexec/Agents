@@ -219,7 +219,7 @@ export function heldWords(r: OrgRoute): string {
 export function waitingWords(r: OrgRoute): string {
   const n = r.waiting ?? 0;
   const who = n === 1 ? "1 machine waits" : `${n} machines wait`;
-  return `${who} for an admin’s app to seal the key for it. This happens when an admin opens Agents.`;
+  return `${who} for an admin’s app to seal the key for it. This happens when an admin opens Agent Loops.`;
 }
 
 export const modelAccessFoot = "A key is sealed in this browser to each machine that may use it, and to each admin’s app: the control plane keeps only what it cannot open. A machine that joins later waits until an admin’s app is open to seal the key for it. No client shows a key again, admins included: compare the fingerprint. The runtime gets a stand-in and reaches the model through a relay on its machine.";

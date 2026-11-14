@@ -305,7 +305,7 @@ func (d *Daemon) answerForgeRequest(ctx context.Context, rec wire.Request, a wir
 				log.Printf("requests: %s: unassign: %v", f.URL, err)
 			}
 		}
-		if _, err := gh.CommentOnPR(ctx, f.Repo, number, "Done in Agents: every step is ticked."); err != nil {
+		if _, err := gh.CommentOnPR(ctx, f.Repo, number, "Done in Agent Loops: every step is ticked."); err != nil {
 			log.Printf("requests: %s: comment: %v", f.URL, err)
 		}
 		d.requests.mu.Lock()
@@ -322,7 +322,7 @@ func (d *Daemon) answerForgeRequest(ctx context.Context, rec wire.Request, a wir
 		switch action {
 		case "approve":
 			if note == "" {
-				note = "Approved in Agents."
+				note = "Approved in Agent Loops."
 			}
 		case "changes":
 			if note == "" {

@@ -41,7 +41,7 @@ func (d *Daemon) registerSelfUpdate() {
 	if _, release := releaseVersion(buildinfo.Version); release {
 		if _, moved := takeNewName(app, os.Rename); moved {
 			if err := restartLaunchAgents(); err != nil {
-				log.Printf("self-update: Agents has its new name; quit and open Agents to run it: %v", err)
+				log.Printf("self-update: Agent Loops has its new name; quit and open Agent Loops to run it: %v", err)
 			}
 			return
 		}
@@ -50,7 +50,7 @@ func (d *Daemon) registerSelfUpdate() {
 	keep, back := settleSelfUpdates(app, buildinfo.Version, file, exchangePaths)
 	if back {
 		if err := restartLaunchAgents(); err != nil {
-			log.Printf("self-update: the old copy is back; quit and open Agents to run it: %v", err)
+			log.Printf("self-update: the old copy is back; quit and open Agent Loops to run it: %v", err)
 		}
 		return
 	}
@@ -69,7 +69,7 @@ func (d *Daemon) registerSelfUpdate() {
 	u.unpack, u.verify, u.version, u.restart = dittoUnpack, verifyRelease, bundleVersion, restartLaunchAgents
 	if u.status.State != wire.SelfUpdateStateCannot {
 		if team, _ := signingOf(app); team == "" {
-			why := "This copy of Agents is not signed by a team, so it does not update itself."
+			why := "This copy of Agent Loops is not signed by a team, so it does not update itself."
 			u.status.State, u.status.Message = wire.SelfUpdateStateCannot, &why
 		}
 	}

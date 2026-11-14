@@ -13,5 +13,5 @@ export const prCostCommentWords: Record<PRCostComment, string> = {
 export const prCostCommentTitle = "Cost on Pull Requests";
 
 export const prCostCommentHelp = "When a pull request of this folder's repository merges, "
-  + "Agents comments on it with what its work cost, and edits that comment when more comes in. "
+  + "Agent Loops comments on it with what its work cost, and edits that comment when more comes in. "
   + "A public repository's comment is public.";

@@ -397,7 +397,7 @@ func (s *Drafts) Start(request ProviderDraftStart, owner Caller, existing *Exist
 		program := path.Base(cli)
 		if preset, ok := presets[program]; ok {
 			return ProviderDraftStarted{Draft: wire.UUID(id), Answered: &DraftAnswered{
-				Note: "Agents has a preset for " + program + ": use " + preset[1] + ".", Preset: optional(preset[0])}}, nil
+				Note: "Agent Loops has a preset for " + program + ": use " + preset[1] + ".", Preset: optional(preset[0])}}, nil
 		}
 		help := s.hooks.Help(cli, []string{}, secrets)
 		if help.NotInstalled() {
@@ -430,7 +430,7 @@ func (s *Drafts) Start(request ProviderDraftStart, owner Caller, existing *Exist
 			return ProviderDraftStarted{Draft: wire.UUID(id), Answered: &DraftAnswered{Note: "It follows the contract: it needs no map."}}, nil
 		}
 		if shipped, err := MapFrom(ShippedDigitalOceanMap); err == nil && shipped.Missing(names) == "" {
-			return ProviderDraftStarted{Draft: wire.UUID(id), Answered: &DraftAnswered{Note: "Agents ships this map.", Map: jsonValue(ShippedDigitalOceanMap)}}, nil
+			return ProviderDraftStarted{Draft: wire.UUID(id), Answered: &DraftAnswered{Note: "Agent Loops ships this map.", Map: jsonValue(ShippedDigitalOceanMap)}}, nil
 		}
 		d.tools = tools
 		seed = toolsText(tools, d.redact)
@@ -1405,12 +1405,12 @@ type oldDraft struct {
 }
 
 func prompt(d *draft, seed string, existing *oldDraft) string {
-	what, goal, tool := "tool map", "Write a tool map, so this MCP server's own tools can list, start and stop the machines Agents runs agents on.", "read_tools"
+	what, goal, tool := "tool map", "Write a tool map, so this MCP server's own tools can list, start and stop the machines Agent Loops runs agents on.", "read_tools"
 	if d.isCommands() {
 		what, tool = "command-provider config", "read_help"
-		goal = "Write a config for Agents' command provider, so the CLI `" + d.cli() + "` can list, start and stop the machines it runs agents on."
+		goal = "Write a config for Agent Loops' command provider, so the CLI `" + d.cli() + "` can list, start and stop the machines it runs agents on."
 	}
-	parts := []string{fmt.Sprintf(`You write one %s for Agents' Add Provider sheet. %s A person reads what you send and adds it.
+	parts := []string{fmt.Sprintf(`You write one %s for Agent Loops' Add Provider sheet. %s A person reads what you send and adds it.
 
 You have only these tools: %s, check_draft, prove_start, prove_stop, send_draft and give_up. You can't run commands, read files or reach the network: the control plane does all of that for you.
 

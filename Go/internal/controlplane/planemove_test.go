@@ -32,7 +32,7 @@ func TestThePageAsksTheMacWindowToMoveTheControlPlane(t *testing.T) {
 		t.Fatalf("the window was told %+v", want)
 	}
 	report := map[string]any{"mac": "Alex's Mac", "rows": []map[string]any{{"kind": "move", "title": "Move to Another Machine", "detail": "To a server you run."}}}
-	if got := callError(t, page, "", "control/planeMoveReport", report); !strings.Contains(got, "Only Agents on a Mac") {
+	if got := callError(t, page, "", "control/planeMoveReport", report); !strings.Contains(got, "Only Agent Loops on a Mac") {
 		t.Fatalf("a browser reports: %s", got)
 	}
 	call(t, window, "", "control/planeMoveReport", report)

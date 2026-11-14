@@ -231,7 +231,7 @@ func (d *Daemon) askConnectors(ctx context.Context, cs []docsConnector, words st
 		}
 		if asked >= docsSearchLimit {
 			out[i].source.State = wire.DocsSourceStateFailed
-			out[i].source.Message = new("Agents asks at most 6 docs connectors at once.")
+			out[i].source.Message = new("Agent Loops asks at most 6 docs connectors at once.")
 			continue
 		}
 		asked++

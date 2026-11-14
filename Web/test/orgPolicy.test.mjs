@@ -203,9 +203,9 @@ test("the warnings say what the policy refuses before it is saved", () => {
   assert.deepEqual(o.warnings(policy({ budgets: { daily: 5, allowUnmetered: ["grok"], raises: [] } }), []),
     ["The budget refuses Antigravity and Cursor: their turns report neither a cost nor tokens. Allow them by name to keep them."]);
   assert.deepEqual(o.warnings(policy(), [machine("Sam’s Mac", ["host.policy/1"]), machine("old-box", [])]),
-    ["1 machine does not follow policy: old-box. Update Agents on it."]);
+    ["1 machine does not follow policy: old-box. Update Agent Loops on it."]);
   assert.deepEqual(o.warnings(policy({ requireFollowing: true }), [machine("a", []), machine("b", undefined)]),
-    ["2 machines do not follow policy and will start no agent: a, b. Update Agents on them."]);
+    ["2 machines do not follow policy and will start no agent: a, b. Update Agent Loops on them."]);
 });
 
 test("Console ▸ Machines says whether each machine follows the policy", () => {

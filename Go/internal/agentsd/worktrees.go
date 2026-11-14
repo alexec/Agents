@@ -121,7 +121,7 @@ type sizedAt struct {
 
 // ensureExcluded keeps the worktrees folder out of the repository's view of the folder.
 func ensureExcluded(commonDir string) error {
-	if err := excludeLine(commonDir, "# Worktrees the Agents app makes for its agents.", "/.agents/worktrees/"); err != nil {
+	if err := excludeLine(commonDir, "# Worktrees the Agent Loops app makes for its agents.", "/.agents/worktrees/"); err != nil {
 		return worktreeFailed("Could not keep the worktrees out of the folder: " + err.Error())
 	}
 	return nil

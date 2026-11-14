@@ -7,7 +7,7 @@ import { load } from "./load.mjs";
 const p = await load("src/model/problemReport.ts");
 
 test("the client line names the host that serves the page", () => {
-  assert.equal(p.webClient("0.17.0"), "Web page (served by Agents 0.17.0)");
+  assert.equal(p.webClient("0.17.0"), "Web page (served by Agent Loops 0.17.0)");
   assert.equal(p.webClient(undefined), "Web page");
 });
 

@@ -8,13 +8,13 @@ export const connectAnotherWords = {
   title: "Connect to another control plane",
   lead: "This Mac’s agents report to the control plane on this Mac. They can report to Hosted at agentloops.dev, or to a control plane that you run.",
   signIn: "Sign In to agentloops.dev",
-  signInNote: "In Agents on this Mac, with Apple, Google or GitHub. A new account gets a control plane of its own.",
+  signInNote: "In Agent Loops on this Mac, with Apple, Google or GitHub. A new account gets a control plane of its own.",
   useCode: "Use a Code…",
   useCodeNote: "From a control plane that you run: Settings ▸ Clients ▸ Pair a Mac there.",
   codeNote: "Paste the code. It works once, for five minutes.",
   notACode: "That isn’t a control plane’s code. It starts with agents-control:.",
-  machineCode: "This is a code for a machine. Use a code from Pair a Mac on that control plane: Agents on this Mac makes this Mac’s machine code itself.",
-  asking: "Asking Agents on this Mac…",
+  machineCode: "This is a code for a machine. Use a code from Pair a Mac on that control plane: Agent Loops on this Mac makes this Mac’s machine code itself.",
+  asking: "Asking Agent Loops on this Mac…",
   hosted: "agentloops.dev",
 } as const;
 
@@ -25,7 +25,7 @@ export function connectBefore(place: string): string {
 
 /** The page once this control plane has stopped: it served the page, so the page goes too. */
 export function connectDone(place: string): string {
-  return `This Mac’s agents now report to ${place}, and the control plane on this Mac has stopped, so this page has too. Use Agents in a browser there, and pair this browser again.`;
+  return `This Mac’s agents now report to ${place}, and the control plane on this Mac has stopped, so this page has too. Use Agent Loops in a browser there, and pair this browser again.`;
 }
 
 /** A pasted client code, with the control plane it is for, or why it will not do. */

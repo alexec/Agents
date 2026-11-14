@@ -290,7 +290,7 @@ func TestAnAzureDevOpsFoldersConnectorSetUp(t *testing.T) {
 		review.State != wire.ConnectorSlotStateRead || review.Choice != "Azure Repos pull requests" || ci.Choice != "Azure Pipelines" {
 		t.Fatalf("tasks %+v review %+v", tasks, review)
 	}
-	if ci.State != wire.ConnectorSlotStateRefused || ci.Message == nil || *ci.Message != "Azure DevOps refused: Agents can't see builds in acme/Web/app." {
+	if ci.State != wire.ConnectorSlotStateRefused || ci.Message == nil || *ci.Message != "Azure DevOps refused: Agent Loops can't see builds in acme/Web/app." {
 		t.Fatalf("ci: %+v", ci)
 	}
 	if setup.Connection == nil || setup.Connection.Provider != wire.ConnectionProviderAzuredevops {

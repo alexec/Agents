@@ -40,10 +40,10 @@ export const pairingWords: Record<RefusalReason | "notACode" | "otherControlPlan
   "wrong-control-plane": "This code is for another control plane.",
   suspended: "Your organisation's sign-in turned your access off.",
   // As the banner says it, for a tab one too many (#2194).
-  crowded: "Too many Agents tabs are open in this browser. Close one to use this one.",
-  notACode: "That isn't an Agents code. It starts agents-control:2:c:",
+  crowded: "Too many Agent Loops tabs are open in this browser. Close one to use this one.",
+  notACode: "That isn't an Agent Loops code. It starts agents-control:2:c:",
   otherControlPlane: "This code is for another control plane.",
-  unreachable: "Can't reach the control plane. Is Agents running on this Mac?",
+  unreachable: "Can't reach the control plane. Is Agent Loops running on this Mac?",
   unsupported: "This browser can't keep a key that can't be copied out of it. Use the current Safari or Chrome.",
   badProof: "That isn't a code from this control plane.",
 };

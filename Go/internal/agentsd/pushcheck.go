@@ -74,7 +74,7 @@ func (d *Daemon) checkAppPush(ctx context.Context, agent wire.UUID, owner, token
 	d.credMu.Unlock()
 	d.attentionMu.Lock()
 	d.notices = append(d.notices, postedNotice{id: pushNoticePrefix + key, agentID: agent, raised: now(),
-		h3: "Agents cannot push to " + owner + " as the App. To fix it, " + grant + "."})
+		h3: "Agent Loops cannot push to " + owner + " as the App. To fix it, " + grant + "."})
 	d.attentionMu.Unlock()
 	d.reconsider()
 }

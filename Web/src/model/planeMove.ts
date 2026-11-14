@@ -10,7 +10,7 @@ export const planeMoveWords = {
   keyStep: "1 · Give the other machine this control plane's key",
   keySave: "Save the key. Before the control plane there first starts, seal the key in its store. The key goes in over ssh, so it's never written on that machine:",
   saveKey: "Save Key…",
-  saveKeyNote: "Agents on the Mac asks where to save it.",
+  saveKeyNote: "Agent Loops on the Mac asks where to save it.",
   sealCommand: `ssh you@agents.example.com 'cd agents && docker compose \\
   -f deploy/compose.public.yaml build control'
 ssh you@agents.example.com 'cd agents && docker compose \\
@@ -32,7 +32,7 @@ ssh you@agents.example.com 'cd agents && docker compose \\
   run --rm -T control key export --key-fd 1' > control-key)`,
   useKeyNote: "Give it to the Mac, then delete the file. The Mac keeps its own key aside.",
   useKey: "Use Key…",
-  asking: "Asking Agents on the Mac…",
+  asking: "Asking Agent Loops on the Mac…",
   confirmTitle: "Stop forwarding?",
 } as const;
 

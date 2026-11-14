@@ -65,10 +65,10 @@ func TestWaitingDeploysAndTheirAnswer(t *testing.T) {
 	if only, _ := g.WaitingDeploys(ctx, "o/r", "nightly.yml", ""); len(only) != 0 {
 		t.Fatalf("by workflow: %+v", only)
 	}
-	if err := g.ReviewDeployments(ctx, "o/r", 1, []int64{11}, true, "Approved in Agents"); err != nil {
+	if err := g.ReviewDeployments(ctx, "o/r", 1, []int64{11}, true, "Approved in Agent Loops"); err != nil {
 		t.Fatal(err)
 	}
-	if err := g.ReviewDeployments(ctx, "o/r", 1, []int64{11}, false, "Rejected in Agents"); err != nil {
+	if err := g.ReviewDeployments(ctx, "o/r", 1, []int64{11}, false, "Rejected in Agent Loops"); err != nil {
 		t.Fatal(err)
 	}
 	if err := g.ReviewDeployments(ctx, "o/r", 1, nil, true, ""); err == nil {
@@ -84,8 +84,8 @@ func TestWaitingDeploysAndTheirAnswer(t *testing.T) {
 	defer mu.Unlock()
 	posts := slices.DeleteFunc(slices.Clone(got), func(s string) bool { return !strings.HasPrefix(s, "POST") })
 	if !slices.Equal(posts, []string{
-		`POST /repos/o/r/actions/runs/1/pending_deployments {"comment":"Approved in Agents","environment_ids":[11],"state":"approved"}`,
-		`POST /repos/o/r/actions/runs/1/pending_deployments {"comment":"Rejected in Agents","environment_ids":[11],"state":"rejected"}`,
+		`POST /repos/o/r/actions/runs/1/pending_deployments {"comment":"Approved in Agent Loops","environment_ids":[11],"state":"approved"}`,
+		`POST /repos/o/r/actions/runs/1/pending_deployments {"comment":"Rejected in Agent Loops","environment_ids":[11],"state":"rejected"}`,
 	}) {
 		t.Fatalf("posts: %q", posts)
 	}

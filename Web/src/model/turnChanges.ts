@@ -63,6 +63,6 @@ export function undoneWords(undo: TurnUndo): string {
 }
 
 export function undoRefusal(error: unknown): string {
-  if (error instanceof CallFailed) return error.code === -32601 ? "This Mac’s Agents is too old to undo. Update it." : error.message;
+  if (error instanceof CallFailed) return error.code === -32601 ? "This Mac’s Agent Loops is too old to undo. Update it." : error.message;
   return "The Mac can’t be reached. Try again when it is.";
 }

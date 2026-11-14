@@ -132,7 +132,7 @@ func (c *mcpClient) connect() error {
 			"protocolVersion": mcpProtocolVersion,
 			"capabilities": map[string]any{"extensions": map[string]any{
 				"io.modelcontextprotocol/ui": map[string]any{"mimeTypes": []string{"text/html;profile=mcp-app"}}}},
-			"clientInfo": map[string]any{"name": "Agents", "version": "1"},
+			"clientInfo": map[string]any{"name": "Agent Loops", "version": "1"},
 		}
 		result, err := c.request("initialize", params, false, 0)
 		if err != nil {

@@ -94,7 +94,7 @@ func (t toolset) shimLines() []string {
 	}
 	entry := "lib/node_modules/" + t.manifest.Package + "/" + t.manifest.Entry
 	return []string{"#!/bin/sh",
-		"# Agents: runs the " + t.manifest.Package + " this toolset was installed with.",
+		"# Agent Loops: runs the " + t.manifest.Package + " this toolset was installed with.",
 		`d=$(cd "$(dirname "$0")/.." && pwd -P)`,
 		`PATH="$d/node/bin:$PATH" exec "$d/node/bin/node" "$d/` + entry + `"` + forwards}
 }

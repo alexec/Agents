@@ -205,7 +205,7 @@ func probeSignIn(ctx context.Context, server string, headers []sdk.HttpHeader, t
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	body := request(1, "initialize", map[string]any{"protocolVersion": "2025-06-18", "capabilities": map[string]any{},
-		"clientInfo": map[string]any{"name": "Agents", "version": "1"}})
+		"clientInfo": map[string]any{"name": "Agent Loops", "version": "1"}})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, server, bytes.NewReader(body))
 	if err != nil {
 		return false, ""
@@ -381,7 +381,7 @@ func (d *Daemon) finishSignIn(flow *signInFlow, redirect *loopback, plan mcpcata
 	if given != nil {
 		st.signIns.KeepClient(*given, plan.Server)
 	}
-	redirect.finish("Signed in to "+name, "The next agent you start has it. You can close this tab and go back to Agents.")
+	redirect.finish("Signed in to "+name, "The next agent you start has it. You can close this tab and go back to Agent Loops.")
 	return wire.MCPSignInStatus{SignedIn: &struct{}{}}
 }
 
@@ -551,7 +551,7 @@ func (lb *loopback) serve(w http.ResponseWriter, r *http.Request) {
 	if query["state"] != lb.state {
 		h.Set("Content-Type", "text/plain")
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("This isn't the sign-in Agents is waiting for."))
+		w.Write([]byte("This isn't the sign-in Agent Loops is waiting for."))
 		return
 	}
 	first := false

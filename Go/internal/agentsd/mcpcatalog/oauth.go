@@ -296,7 +296,7 @@ func Challenge(verifier string) string {
 
 // Register is RFC 7591, as a public client of the loopback redirect.
 func (o OAuth) Register(ctx context.Context, endpoint, redirect string) (Client, error) {
-	body, _ := json.Marshal(map[string]any{"client_name": "Agents", "redirect_uris": []string{redirect},
+	body, _ := json.Marshal(map[string]any{"client_name": "Agent Loops", "redirect_uris": []string{redirect},
 		"grant_types": []string{"authorization_code", "refresh_token"}, "response_types": []string{"code"},
 		"token_endpoint_auth_method": "none"})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))

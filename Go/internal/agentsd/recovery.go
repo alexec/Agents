@@ -20,7 +20,7 @@ import (
 const pickUpsBeforeLeavingAlone = 3
 
 // importedNote is RuntimeNote.imported.
-const importedNote = "This agent was made under another Agents set-up and copied here, so it is shown but never run here: its conversation and its folder belong to that set-up."
+const importedNote = "This agent was made under another Agent Loops set-up and copied here, so it is shown but never run here: its conversation and its folder belong to that set-up."
 
 // refuseToRun is DaemonCore.refuseToRun: an agent copied in from another set-up is never run.
 func (d *Daemon) refuseToRun(a *wire.Agent) error {

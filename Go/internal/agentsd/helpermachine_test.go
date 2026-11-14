@@ -53,7 +53,7 @@ func TestAnAgentStartsASessionOnAnotherMachine(t *testing.T) {
 			}
 			return json.RawMessage(`"11111111-2222-3333-4444-555555555555"`), nil
 		}
-		return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
+		return nil, &controllink.AskError{Code: -32010, Message: "Agent Loops can’t ask that of the control plane."}
 	})
 
 	if text, _ := m.tool(3, "list_machines", map[string]any{}); !strings.HasSuffix(text,
@@ -173,7 +173,7 @@ func TestTheFolderSwitchStartsOnAnotherMachineWithoutAsking(t *testing.T) {
 			mu.Unlock()
 			return json.RawMessage(`"11111111-2222-3333-4444-555555555555"`), nil
 		}
-		return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
+		return nil, &controllink.AskError{Code: -32010, Message: "Agent Loops can’t ask that of the control plane."}
 	})
 	c.call(t, 2, "folders/setHelperLimits", map[string]any{"folder": "file://" + dir + "/", "limits": map[string]any{"agentsMayStartOnMachines": true}})
 	if b, _ := os.ReadFile(filepath.Join(dir, ".agents", "folder.json")); !strings.Contains(string(b), `"agentsMayStartOnMachines" : true`) {

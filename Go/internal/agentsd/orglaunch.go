@@ -143,7 +143,7 @@ func (d *Daemon) withOrgAccount(env []string, runtimeID string, account *wire.Ac
 		if err != nil {
 			return nil, err
 		}
-		config := "# Written by the Agents app for an org account. Do not edit: rebuilt on every launch.\n" +
+		config := "# Written by the Agent Loops app for an org account. Do not edit: rebuilt on every launch.\n" +
 			"model_provider = \"org\"\n\n[model_providers.org]\nname = " + tomlString(r.Name) + "\nbase_url = " +
 			tomlString(base+"/v1") + "\nenv_key = " + tomlString(orgStandInVariable) + "\nwire_api = \"responses\"\n"
 		if err := writeOrgFile(filepath.Join(folder, "config.toml"), []byte(config)); err != nil {

@@ -59,7 +59,7 @@ func page(w http.ResponseWriter, status int, text string) {
 	// On Paper (#4617): the style is inline, and the policy lets in only its hash.
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src "+paperpage.StyleSource)
 	w.WriteHeader(status)
-	w.Write([]byte("<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width, initial-scale=1\"><title>Agents</title><style>" +
+	w.Write([]byte("<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width, initial-scale=1\"><title>Agent Loops</title><style>" +
 		paperpage.Style + "</style><p>" + html.EscapeString(text) + "</p>\n"))
 }
 
@@ -95,7 +95,7 @@ func (si *signIns) openState(ctx context.Context, s *orgState, key string) (*sta
 func (si *signIns) serveStart(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	s, key := si.readState(ctx, r.URL.Query().Get("s"))
 	if s == nil || !si.clock().Before(s.Ends.Time) {
-		page(w, http.StatusBadRequest, "This sign-in has ended. Start it again from Agents.")
+		page(w, http.StatusBadRequest, "This sign-in has ended. Start it again from Agent Loops.")
 		return
 	}
 	p, err := si.orgProviderOn(ctx, s.Provider)
@@ -168,12 +168,12 @@ func (si *signIns) serveCallback(ctx context.Context, w http.ResponseWriter, r *
 	q := r.URL.Query()
 	s, key := si.readState(ctx, q.Get("state"))
 	if s == nil {
-		page(w, http.StatusBadRequest, "This sign-in is not known here, or has ended. Start it again from Agents.")
+		page(w, http.StatusBadRequest, "This sign-in is not known here, or has ended. Start it again from Agent Loops.")
 		return
 	}
 	// One use (FR-005): of two callbacks for one state, at any copies, one goes on.
 	if err := si.spend(ctx, key); err != nil {
-		page(w, http.StatusBadRequest, "This sign-in was finished already. Start it again from Agents.")
+		page(w, http.StatusBadRequest, "This sign-in was finished already. Start it again from Agent Loops.")
 		return
 	}
 	refuse := func(code, message string) {

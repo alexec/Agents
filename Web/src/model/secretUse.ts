@@ -11,7 +11,7 @@ export const secretUseWords: Record<SecretUseAction, string> = {
 };
 
 /** The known gap (#4179), as agentsd's banner and NeedRequest.SecretUse.terminalCaveat say it. */
-export const terminalCaveat = "Agents cannot tell a terminal from an agent outside its session.";
+export const terminalCaveat = "Agent Loops cannot tell a terminal from an agent outside its session.";
 
 /** A terminal's agents-secret NAME (#4179): a secret's use that no session asked. */
 export function isTerminalRequest(request: PersonRequest): boolean {

@@ -24,9 +24,9 @@ test("Connect Again on an ended GitLab connection opens the way it was made (#18
 });
 
 test("Make a Token opens the right GitLab with the api scope", () => {
-  assert.equal(c.newGitLabTokenURL(""), "https://gitlab.com/-/user_settings/personal_access_tokens?name=Agents&scopes=api");
+  assert.equal(c.newGitLabTokenURL(""), "https://gitlab.com/-/user_settings/personal_access_tokens?name=Agent%20Loops&scopes=api");
   assert.equal(c.newGitLabTokenURL("gitlab.example.com/api/v4/"),
-    "https://gitlab.example.com/-/user_settings/personal_access_tokens?name=Agents&scopes=api");
+    "https://gitlab.example.com/-/user_settings/personal_access_tokens?name=Agent%20Loops&scopes=api");
 });
 
 test("GitLab is the third provider, and its device page is gitlab.com", () => {

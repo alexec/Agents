@@ -451,7 +451,7 @@ func (p *Providers) HostSaid(host, method string, params json.RawMessage) (any, 
 			return nil, err
 		}
 		if !AgentWorkspaceMethods[call.Method] {
-			return nil, fail(CodeNotPermitted, "Agents can’t ask that of the control plane.")
+			return nil, fail(CodeNotPermitted, "Agent Loops can’t ask that of the control plane.")
 		}
 		return p.AgentCall(host, call.Agent, call.Method, call.Params, call.Deliver)
 	case MethodHostProviderDraft:
@@ -1673,7 +1673,7 @@ func (p *Providers) run(kind activityKind, host string, link WorkspaceLink, who 
 		p.mu.Lock()
 		if minutes, ok := p.idleStopping[host]; ok {
 			delete(p.idleStopping, host)
-			p.stoppedBy[host] = "Stopped by Agents after " + minuteWords(minutes) + " idle"
+			p.stoppedBy[host] = "Stopped by Agent Loops after " + minuteWords(minutes) + " idle"
 		}
 		delete(p.statuses, host)
 		p.mu.Unlock()

@@ -718,7 +718,7 @@ func (t *macToolset) installNode(progress func(string)) error {
 		}
 		entry := "lib/node_modules/" + t.manifest.Package + "/" + t.manifest.Entry
 		return writeShim(part, t.shimName(), []string{"#!/bin/sh",
-			"# Agents: runs the " + t.manifest.Package + " this toolset was installed with.",
+			"# Agent Loops: runs the " + t.manifest.Package + " this toolset was installed with.",
 			`d=$(cd "$(dirname "$0")/.." && pwd -P)`,
 			`PATH="$d/node/bin:$PATH" exec "$d/node/bin/node" "$d/` + entry + `"` + forwards})
 	})
@@ -867,7 +867,7 @@ func (t *macToolset) installArchive(progress func(string)) error {
 			args += ` "` + a + `"`
 		}
 		return writeShim(part, t.shimName(), []string{"#!/bin/sh",
-			"# Agents: runs the " + t.runtimeID + " " + t.manifest.Version + " this toolset was installed with.",
+			"# Agent Loops: runs the " + t.runtimeID + " " + t.manifest.Version + " this toolset was installed with.",
 			`d=$(cd "$(dirname "$0")/.." && pwd -P)`,
 			`exec "$d/` + p.Command + `"` + args + ` "$@"`})
 	})

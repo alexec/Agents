@@ -124,7 +124,7 @@ func TestWaitingDeployIsAnApprovalAnsweredOnGitHub(t *testing.T) {
 	var s wire.FolderSummary
 	json.Unmarshal(c.call(t, 4, "approvals/answer", wire.ApprovalAnswer{Folder: url, Kind: wire.ApprovalKindDeploy, Key: a.Key,
 		Digest: a.Digest, Action: wire.ApprovalActionApprove}), &s)
-	if w := gh.writes(); !slices.Equal(w, []string{"deploy alexec/agents 77 [11] true Approved in Agents"}) {
+	if w := gh.writes(); !slices.Equal(w, []string{"deploy alexec/agents 77 [11] true Approved in Agent Loops"}) {
 		t.Fatalf("writes: %q", w)
 	}
 	for _, x := range s.Approvals {

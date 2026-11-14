@@ -160,10 +160,10 @@ func newSelfUpdater(file, app, running string) *selfUpdater {
 // cannot is why this copy never updates itself, or "".
 func (u *selfUpdater) cannot() string {
 	if _, ok := releaseVersion(u.running); !ok {
-		return "This copy of Agents is a development build, so it does not update itself."
+		return "This copy of Agent Loops is a development build, so it does not update itself."
 	}
 	if strings.Contains(u.app, "/AppTranslocation/") {
-		return "macOS runs this copy of Agents from a temporary place. Move it to Applications in your home folder, then open it again, so it can update itself."
+		return "macOS runs this copy of Agent Loops from a temporary place. Move it to Applications in your home folder, then open it again, so it can update itself."
 	}
 	return ""
 }
@@ -232,13 +232,13 @@ func (u *selfUpdater) Named(version string) {
 		return
 	}
 	if version == u.rolledBack {
-		why := "Agents " + version + " did not stay running here, so this Mac went back to " + u.running +
+		why := "Agent Loops " + version + " did not stay running here, so this Mac went back to " + u.running +
 			". It waits for the next release."
 		u.set(func(s *wire.SelfUpdate) { s.State, s.Message = wire.SelfUpdateStateFailed, &why })
 		return
 	}
 	if err := u.writable(u.app); err != nil {
-		why := "Agents is in a folder you can change only as an administrator (" + filepath.Dir(u.app) +
+		why := "Agent Loops is in a folder you can change only as an administrator (" + filepath.Dir(u.app) +
 			"). Move it to Applications in your home folder, then open it again, so it can update itself."
 		u.set(func(s *wire.SelfUpdate) { s.State, s.Message = wire.SelfUpdateStateCannot, &why })
 		return
@@ -271,7 +271,7 @@ func (u *selfUpdater) update(version string) error {
 	u.set(func(s *wire.SelfUpdate) { s.State, s.Message = wire.SelfUpdateStateDownloading, nil })
 	work, err := os.MkdirTemp(filepath.Dir(u.app), updateFolderPrefix)
 	if err != nil {
-		return fmt.Errorf("Agents could not make a folder beside itself for the update: %w", err)
+		return fmt.Errorf("Agent Loops could not make a folder beside itself for the update: %w", err)
 	}
 	swapped := false
 	defer func() {
@@ -286,7 +286,7 @@ func (u *selfUpdater) update(version string) error {
 		return err
 	}
 	if v, err := u.version(next); err != nil || v != version {
-		return fmt.Errorf("The download is not Agents %s (it says %q), so it was not installed.", version, v)
+		return fmt.Errorf("The download is not Agent Loops %s (it says %q), so it was not installed.", version, v)
 	}
 	if err := u.verify(next, u.app); err != nil {
 		return fmt.Errorf("The download's signature or notarisation did not check out, so it was not installed: %v", err)
@@ -299,14 +299,14 @@ func (u *selfUpdater) update(version string) error {
 		return err
 	}
 	swapped = true
-	log.Printf("self-update: Agents %s is in place of %s", version, u.running)
+	log.Printf("self-update: Agent Loops %s is in place of %s", version, u.running)
 	u.set(func(s *wire.SelfUpdate) { s.State, s.Message = wire.SelfUpdateStateRestarting, nil })
 	// A turn that started since is not cut: the restart waits for it too.
 	if err := u.betweenTurns(); err != nil && !errors.Is(err, errTurnedOff) {
 		return err
 	}
 	if err := u.restart(); err != nil {
-		return fmt.Errorf("Agents %s is installed. Quit and open Agents to finish: %v", version, err)
+		return fmt.Errorf("Agent Loops %s is installed. Quit and open Agent Loops to finish: %v", version, err)
 	}
 	return nil
 }
@@ -318,7 +318,7 @@ func (u *selfUpdater) update(version string) error {
 func (u *selfUpdater) putInPlace(version, work, next string) error {
 	mark := selfUpdateMarkFile{From: u.running, To: version, Old: strings.TrimPrefix(next, work+string(filepath.Separator))}
 	if err := writeSelfUpdateMark(work, mark); err != nil {
-		return fmt.Errorf("Agents could not keep a note of the update: %w", err)
+		return fmt.Errorf("Agent Loops could not keep a note of the update: %w", err)
 	}
 	err := u.swap(u.app, next)
 	if err == nil {
@@ -327,15 +327,15 @@ func (u *selfUpdater) putInPlace(version, work, next string) error {
 	log.Printf("self-update: no swap in one step (%v): two renames", err)
 	mark.Old = "old.app"
 	if err := writeSelfUpdateMark(work, mark); err != nil {
-		return fmt.Errorf("Agents could not keep a note of the update: %w", err)
+		return fmt.Errorf("Agent Loops could not keep a note of the update: %w", err)
 	}
 	old := filepath.Join(work, mark.Old)
 	if err := os.Rename(u.app, old); err != nil {
-		return fmt.Errorf("Agents could not move itself aside: %w", err)
+		return fmt.Errorf("Agent Loops could not move itself aside: %w", err)
 	}
 	if err := os.Rename(next, u.app); err != nil {
 		os.Rename(old, u.app)
-		return fmt.Errorf("Agents could not put the new copy in its place: %w", err)
+		return fmt.Errorf("Agent Loops could not put the new copy in its place: %w", err)
 	}
 	return nil
 }
@@ -375,7 +375,7 @@ func (u *selfUpdater) download(version, work string) (string, error) {
 	name := "Agents-" + version + ".zip"
 	var sums strings.Builder
 	if err := u.fetch(u.ctx, base+"SHA256SUMS", &sums, 1<<16); err != nil {
-		return "", fmt.Errorf("Agents could not download release %s's checksums: %w", version, err)
+		return "", fmt.Errorf("Agent Loops could not download release %s's checksums: %w", version, err)
 	}
 	want := sumFor(sums.String(), name)
 	if want == "" {
@@ -390,14 +390,14 @@ func (u *selfUpdater) download(version, work string) (string, error) {
 	err = u.fetch(u.ctx, base+name, io.MultiWriter(f, h), selfUpdateLimit)
 	f.Close()
 	if err != nil {
-		return "", fmt.Errorf("Agents could not download release %s: %w", version, err)
+		return "", fmt.Errorf("Agent Loops could not download release %s: %w", version, err)
 	}
 	if got := hex.EncodeToString(h.Sum(nil)); got != want {
 		return "", fmt.Errorf("The download of release %s does not match its checksum, so it was not installed.", version)
 	}
 	out := filepath.Join(work, "new")
 	if err := u.unpack(zip, out); err != nil {
-		return "", fmt.Errorf("Agents could not unpack release %s: %w", version, err)
+		return "", fmt.Errorf("Agent Loops could not unpack release %s: %w", version, err)
 	}
 	os.Remove(zip)
 	next := filepath.Join(out, appName)
@@ -481,7 +481,7 @@ func settleSelfUpdates(app, running, settingsFile string, swap func(a, b string)
 				log.Printf("self-update: no app at %s, and the old copy did not go back: %v", app, err)
 				continue
 			}
-			log.Printf("self-update: no app at %s: Agents %s went back", app, mark.From)
+			log.Printf("self-update: no app at %s: Agent Loops %s went back", app, mark.From)
 			os.RemoveAll(work)
 			back = true
 			continue
@@ -499,11 +499,11 @@ func settleSelfUpdates(app, running, settingsFile string, swap func(a, b string)
 			continue
 		}
 		if err := swapBack(app, old, swap); err != nil {
-			log.Printf("self-update: Agents %s did not stay up, and %s did not go back: %v", mark.To, mark.From, err)
+			log.Printf("self-update: Agent Loops %s did not stay up, and %s did not go back: %v", mark.To, mark.From, err)
 			keep = append(keep, work)
 			continue
 		}
-		log.Printf("self-update: Agents %s started %d times without staying up: %s went back", mark.To, selfUpdateTries, mark.From)
+		log.Printf("self-update: Agent Loops %s started %d times without staying up: %s went back", mark.To, selfUpdateTries, mark.From)
 		settings := readSelfUpdateSettings(settingsFile)
 		settings.RolledBack = mark.To
 		if err := writeSelfUpdateSettings(settingsFile, settings); err != nil {

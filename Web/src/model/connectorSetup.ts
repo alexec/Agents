@@ -6,14 +6,14 @@ import type {
 import { fromWireDate } from "../protocol/dates";
 
 export const connectTitle = "Connect GitHub once: issues, pull requests and Actions.";
-export const connectNote = "Your connection, for every folder. You choose on github.com which repositories Agents can see.";
+export const connectNote = "Your connection, for every folder. You choose on github.com which repositories Agent Loops can see.";
 export const abilities = [
   "Read and write issues",
   "Read and write pull requests and reviews",
   "Read checks and Actions runs",
   "Read and push code",
 ];
-export const sheetSubtitle = "For you, in every folder. Agents talks to GitHub's API directly.";
+export const sheetSubtitle = "For you, in every folder. Agent Loops talks to GitHub's API directly.";
 export const sheetChoose = "On github.com you choose which repositories. You can take it back there, or with Disconnect on Connectors.";
 export const sheetFoot = "The token is kept by the machine, never in a log.";
 export const continueButton = "Continue on github.com";
@@ -42,7 +42,7 @@ export function unknownForgeOf(setup: ConnectorSetup): string | undefined {
 
 /** The card in place of Connect for a forge this page can't connect: the Mac's ConnectorSetupWords.unknownForge. */
 export function unknownForge(setup: ConnectorSetup): string {
-  return `${setup.site ?? "github.com"} is on a forge this version of Agents can't connect (${unknownForgeOf(setup) ?? "unknown"}). Update Agents to set it up here.`;
+  return `${setup.site ?? "github.com"} is on a forge this version of Agent Loops can't connect (${unknownForgeOf(setup) ?? "unknown"}). Update Agent Loops to set it up here.`;
 }
 
 export function connectTitleFor(forge: ConnectionProvider): string {
@@ -86,7 +86,7 @@ export function connectedNote(setup: ConnectorSetup): string {
 }
 
 export function notInstalled(repository: string): string {
-  return `The Agents app is not installed on ${repository}, so agents can't write there.`;
+  return `The Agent Loops app is not installed on ${repository}, so agents can't write there.`;
 }
 
 export function setUpHeading(setup: ConnectorSetup): string {
@@ -323,7 +323,7 @@ export const githubTokens = {
   tokenPrompt: "ghp_… or github_pat_…",
   newTokenButton: "Make a Token on GitHub",
   /** A classic token with the scopes for what the sheet lists: repositories and Codespaces. */
-  newTokenURL: "https://github.com/settings/tokens/new?description=Agents&scopes=repo,codespace",
+  newTokenURL: "https://github.com/settings/tokens/new?description=Agent%20Loops&scopes=repo,codespace",
   checking: "Checking the token with GitHub…",
 };
 
@@ -399,7 +399,7 @@ export function disconnectNoteFor(p: ConnectionProvider): string {
   if (p === "forgejo") return forgejo.disconnectNote;
   if (p === "bitbucket") return bitbucket.disconnectNote;
   if (p === "azuredevops") return azureDevOps.disconnectNote;
-  return "Disconnect deletes the machine's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agents too, go to linear.app ▸ Settings ▸ Security & access.";
+  return "Disconnect deletes the machine's tokens. Linear's events stop until you connect again or set LINEAR_API_KEY. To revoke Agent Loops too, go to linear.app ▸ Settings ▸ Security & access.";
 }
 
 /** Connect Linear (#1343, frame H): the same sheet, its own list. */
@@ -409,10 +409,10 @@ export const linear = {
     "Read folders and cycles",
     "Comment as you",
   ],
-  subtitle: "For you, in every folder. Agents talks to Linear's API directly.",
+  subtitle: "For you, in every folder. Agent Loops talks to Linear's API directly.",
   choose: "On linear.app you choose the workspace. You can take it back there, or with Disconnect on Connectors.",
   continueButton: "Continue on linear.app",
-  waiting: "Waiting for linear.app… Approve there, and Agents comes back by itself.",
+  waiting: "Waiting for linear.app… Approve there, and Agent Loops comes back by itself.",
   finishing: "Finishing the sign-in…",
 };
 
@@ -426,7 +426,7 @@ export const gitlab = {
     "Read pipelines and jobs",
     "Read and write issues",
   ],
-  subtitle: "For you, in every folder. Agents talks to GitLab's API directly.",
+  subtitle: "For you, in every folder. Agent Loops talks to GitLab's API directly.",
   choose: "GitLab asks for the api scope. You can take it back on GitLab ▸ Preferences ▸ Applications, or with Disconnect on Connectors.",
   continueButton: "Continue on gitlab.com",
   signInWay: "gitlab.com",
@@ -463,7 +463,7 @@ export function newGitLabTokenURL(address: string): string {
     }
   }
   const path = root.pathname.replace(/\/+$/, "").replace(/\/api\/v4$/, "");
-  return `${root.origin}${path}/-/user_settings/personal_access_tokens?name=Agents&scopes=api`;
+  return `${root.origin}${path}/-/user_settings/personal_access_tokens?name=Agent%20Loops&scopes=api`;
 }
 
 /** codeberg.org: the field's example, and where Make a Token goes with no address. */
@@ -479,7 +479,7 @@ export const forgejo = {
   title: "Connect Forgejo",
   connectTitle: "Connect Forgejo once: issues, pull requests and checks.",
   notConnectedNote: "Pull requests, checks and issues on Codeberg or your own Forgejo or Gitea.",
-  subtitle: "For you, in every folder. Agents talks to Forgejo's API directly.",
+  subtitle: "For you, in every folder. Agent Loops talks to Forgejo's API directly.",
   abilities: [
     "Read and write pull requests and their comments",
     "Read checks (commit statuses)",
@@ -529,7 +529,7 @@ export const bitbucket = {
   title: "Connect Bitbucket",
   connectTitle: "Connect Bitbucket once: issues, pull requests and checks.",
   notConnectedNote: "Pull requests, checks and issues on Bitbucket Cloud.",
-  subtitle: "For you, in every folder. Agents talks to Bitbucket Cloud's API directly.",
+  subtitle: "For you, in every folder. Agent Loops talks to Bitbucket Cloud's API directly.",
   abilities: [
     "Read and write pull requests and their comments",
     "Read checks (Pipelines and other commit statuses)",
@@ -561,7 +561,7 @@ export const azureDevOps = {
   title: "Connect Azure DevOps",
   connectTitle: "Connect Azure DevOps once: work items, pull requests and pipelines.",
   notConnectedNote: "Pull requests, pipelines and work items on dev.azure.com or your own Azure DevOps Server.",
-  subtitle: "For you, in every folder. Agents talks to Azure DevOps's API directly.",
+  subtitle: "For you, in every folder. Agent Loops talks to Azure DevOps's API directly.",
   abilities: [
     "Read and write pull requests and their comments",
     "Read Azure Pipelines builds",
@@ -582,8 +582,8 @@ export const azureDevOps = {
   /** The dialog's two ways in (#3921): a token first, Microsoft Entra second. */
   tokenWay: "Personal access token",
   signInWay: "Microsoft Entra",
-  signInIntro: "Sign in with your work or school Microsoft account. Give the organization, then type the code that Agents shows on Microsoft's sign-in page. Microsoft Entra is for dev.azure.com only.",
-  signInChoose: "Agents renews the sign-in by itself. You can take it back with Disconnect on Connectors.",
+  signInIntro: "Sign in with your work or school Microsoft account. Give the organization, then type the code that Agent Loops shows on Microsoft's sign-in page. Microsoft Entra is for dev.azure.com only.",
+  signInChoose: "Agent Loops renews the sign-in by itself. You can take it back with Disconnect on Connectors.",
   signInButton: "Sign In with Microsoft",
   starting: "Asking Microsoft for a code…",
   openAgain: "Open the Microsoft Page Again",
@@ -681,8 +681,8 @@ export const email = {
     "List, search and read messages",
     "Mark messages read and move them to another folder",
   ],
-  subtitle: "For you, in every folder. Agents reads the mailbox over IMAP and never sends mail.",
-  intro: "Use a mailbox made for agents, not your own. Make an app password for Agents at your mail provider, and give its IMAP server.",
+  subtitle: "For you, in every folder. Agent Loops reads the mailbox over IMAP and never sends mail.",
+  intro: "Use a mailbox made for agents, not your own. Make an app password for Agent Loops at your mail provider, and give its IMAP server.",
   serverLabel: "IMAP server",
   serverPrompt: "imap.fastmail.com",
   userLabel: "User",
@@ -691,7 +691,7 @@ export const email = {
   passwordPrompt: "App password",
   button: "Connect",
   checking: "Signing in to the mail server…",
-  choose: "Agents can read every message in this mailbox. It never sends, answers or deletes mail. Take the app password back at your mail provider, or with Disconnect on Connectors.",
+  choose: "Agent Loops can read every message in this mailbox. It never sends, answers or deletes mail. Take the app password back at your mail provider, or with Disconnect on Connectors.",
   disconnectNote: "Disconnect deletes the machine's app password. The email server's events stop until you connect again or set EMAIL_PASSWORD. To revoke it too, delete the app password at your mail provider.",
   failed: "The mail server did not take the sign-in.",
 };
@@ -715,7 +715,7 @@ export const jira = {
   ],
   choose: "On atlassian.com you choose the site. You can take it back at id.atlassian.com ▸ Connected apps, or with Disconnect on Connectors.",
   continueButton: "Continue on atlassian.com",
-  waiting: "Waiting for atlassian.com… Approve there, and Agents comes back by itself.",
+  waiting: "Waiting for atlassian.com… Approve there, and Agent Loops comes back by itself.",
   signInWay: "Atlassian Cloud",
   tokenWay: "API token",
   tokenIntro: "For Jira Data Center, or Jira Cloud without the sign-in. On Jira Cloud, make an API token at id.atlassian.com and give your email. On Data Center, make a personal access token and leave the email empty.",
@@ -729,7 +729,7 @@ export const jira = {
   newTokenURL: "https://id.atlassian.com/manage-profile/security/api-tokens",
   newTokenButton: "Make an API Token on Atlassian",
   checking: "Checking the token with Jira…",
-  disconnectNote: "Disconnect deletes the machine's tokens. Jira's events stop until you connect again or set JIRA_API_TOKEN. To revoke Agents too, go to id.atlassian.com ▸ Connected apps.",
+  disconnectNote: "Disconnect deletes the machine's tokens. Jira's events stop until you connect again or set JIRA_API_TOKEN. To revoke Agent Loops too, go to id.atlassian.com ▸ Connected apps.",
   tasksNote: (hasMac: boolean): string => hasMac ? "Connect Jira, then add its connector on the Mac."
     : "Connect Jira. The web page cannot add its connector yet.",
   done: "Done",
@@ -839,9 +839,9 @@ export const botWords = {
   never: "Never: change workflows, secrets, environments, settings or members. Those stay yours.",
   publicToggle: "Organisations can install it",
   publicHelp: "Turn on to use the bot on an organisation's repositories. The organisation's owner approves the install.",
-  keyNote: "GitHub gives the bot's key to this machine. It goes to your other machines sealed to each one, and Agents' servers cannot read it.",
+  keyNote: "GitHub gives the bot's key to this machine. It goes to your other machines sealed to each one, and Agent Loops' servers cannot read it.",
   continueButton: "Continue on github.com",
-  waiting: "Waiting for github.com… Choose Create GitHub App there, and Agents comes back by itself.",
+  waiting: "Waiting for github.com… Choose Create GitHub App there, and Agent Loops comes back by itself.",
   finishing: "Taking the bot's key on this machine…",
   installButton: "Install on Repositories…",
   removeButton: "Forget the Bot…",

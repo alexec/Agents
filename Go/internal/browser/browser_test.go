@@ -533,6 +533,16 @@ func TestARealGoogleChrome(t *testing.T) {
 		// At most one point across shows, at the screen's left edge, or none below it.
 		t.Fatalf("the window is on the screen: %v", where)
 	}
+	// Below the screen, macOS says the window is occluded. The page must still be visible
+	// and draw frames: a hidden page runs no requestAnimationFrame, so Playwright's clicks
+	// wait for ever and a sign-in page stops after its first step (#5230).
+	drawn, err := chromedp.Run(ctx, chromedp.Evaluate[[]any](`new Promise(r => { const t = setTimeout(() => r([document.visibilityState, false]), 2000); requestAnimationFrame(() => { clearTimeout(t); r([document.visibilityState, true]); }); })`, chromedp.EvalAwaitPromise))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(drawn) != 2 || drawn[0] != "visible" || drawn[1] != true {
+		t.Fatalf("the page below the screen is not visible, or draws no frame: %v", drawn)
+	}
 	out, err := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(p.pid)).Output()
 	if err != nil {
 		t.Fatal(err)
@@ -541,6 +551,9 @@ func TestARealGoogleChrome(t *testing.T) {
 		if strings.Contains(string(out), flag) {
 			t.Errorf("it has the test flag %s: %s", flag, out)
 		}
+	}
+	if !strings.Contains(string(out), "--disable-backgrounding-occluded-windows") {
+		t.Errorf("a covered window's pages would be hidden: %s", out)
 	}
 	// The chat tile's screencast (#4138) paints from below the screen while the page changes.
 	frames := chromedp.Events(ctx, page.ScreencastFrame)

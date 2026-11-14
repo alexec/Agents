@@ -45,7 +45,7 @@ scope.addEventListener("push", (event) => {
   } catch {
     item = undefined;
   }
-  const { title, options } = item ? notificationFor(item) : { title: "Agents", options: { body: "An agent needs you" } };
+  const { title, options } = item ? notificationFor(item) : { title: "Agent Loops", options: { body: "An agent needs you" } };
   event.waitUntil(scope.registration.showNotification(title, options));
 });
 

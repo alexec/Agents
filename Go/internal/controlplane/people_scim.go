@@ -635,7 +635,7 @@ func (s *Service) refuseSuspendedHost(host string, capabilities []string) error 
 	if !s.suspended(s.ownerOf(host)) || slices.Contains(capabilities, wire.CapHostSuspend1) {
 		return nil
 	}
-	return fail(personSuspended, "This machine's person was suspended by their organisation, and this machine cannot stop their work. Update Agents on it.")
+	return fail(personSuspended, "This machine's person was suspended by their organisation, and this machine cannot stop their work. Update Agent Loops on it.")
 }
 
 // MARK: Remove requests (D13, FR-017)

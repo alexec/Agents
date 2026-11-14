@@ -29,7 +29,7 @@ export const addMachineWords = {
   repositoryOptional: "Clone a repository (optional)",
   nameNote: "Letters, digits and dashes, starting with a letter.",
   serverTitle: "Add a Machine",
-  serverNote: "Run this on the machine. It installs Agents and joins as your machine. It works once.",
+  serverNote: "Run this on the machine. It installs Agent Loops and joins as your machine. It works once.",
   codeTitle: "Add a Machine by Code",
   codeNote: "On the other machine, start its agents with agentsd --control-code and this code. It works once.",
   makingCode: "Making a code…",
@@ -37,7 +37,7 @@ export const addMachineWords = {
   /** Remove… on a machine, asked as the window's Machines pane asks it (#3381). */
   removeTitle: (name: string) => `Remove ${name}?`,
   removeNote: "It stops connecting, and every window and device stops seeing it. Its agents are left running where they are.",
-  started: (name: string) => `${name} is starting. It installs Agents and joins on its first boot.`,
+  started: (name: string) => `${name} is starting. It installs Agent Loops and joins on its first boot.`,
 };
 
 export const whereAgentsRun = {

@@ -18,7 +18,7 @@ test("a device code counts down, then says it ran out", () => {
 
 test("a Mac's code says where to paste it and for how long", () => {
   assert.equal(p.codeInstructions("mac", now + 65_000, now, undefined, undefined),
-    "On the other Mac, open Agents, choose Connect to a control plane and paste this. That Mac can then do all this page can. It works once, for 1:05.");
+    "On the other Mac, open Agent Loops, choose Connect to a control plane and paste this. That Mac can then do all this page can. It works once, for 1:05.");
   assert.match(p.codeInstructions("mac", now, now, undefined, undefined), /It has run out; close this and ask again\.$/);
 });
 
@@ -30,7 +30,7 @@ test("a browser's code names the page anywhere, and the page on the Mac while it
   assert.match(p.codeInstructions("browser", later, now, served, "https://agents.example.org"),
     /^In any browser, open https:\/\/agents\.example\.org and paste it in\. On this Mac, open localhost:8792/);
   assert.match(p.codeInstructions("browser", later, now, { port: 8792, served: false, reason: "off" }, undefined),
-    /^Turn on Serve Agents to browsers on this Mac in Settings ▸ Control plane first\./);
+    /^Turn on Serve Agent Loops to browsers on this Mac in Settings ▸ Control plane first\./);
   assert.match(p.codeInstructions("browser", later, now, { port: 8792, served: false, reason: "portInUse" }, undefined),
     /^Not serving: port 8792 is in use by another app\. Press Try Again/);
 });

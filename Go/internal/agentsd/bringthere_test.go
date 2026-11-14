@@ -46,7 +46,7 @@ func TestBringBackBringsTheBranchHere(t *testing.T) {
 	d.SetControlAsk(func(_ context.Context, method string, params any) (json.RawMessage, error) {
 		call, ok := params.(wire.MachineWorkspaceCall)
 		if !ok || call.Method != "machines/sendFolder" {
-			return nil, &controllink.AskError{Code: -32010, Message: "Agents can’t ask that of the control plane."}
+			return nil, &controllink.AskError{Code: -32010, Message: "Agent Loops can’t ask that of the control plane."}
 		}
 		mu.Lock()
 		defer mu.Unlock()

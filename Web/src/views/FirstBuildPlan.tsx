@@ -167,7 +167,7 @@ export function PlanPage({ store, down }: { store: Store; down: boolean }) {
   return (
     <main class="first-build-plan">
       <button type="button" class="first-build-open" title="The usual page, with this session open" onClick={openAgents}>
-        Open Agents
+        Open Agent Loops
       </button>
       <section class="first-build-plan-head" aria-label="What will be built">
         <h1>{idea}</h1>
