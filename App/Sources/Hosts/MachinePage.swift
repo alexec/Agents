@@ -54,7 +54,7 @@ struct MachinePage: View {
                         }
                     } else if !answersUsage {
                         Section {
-                            Text("Update Agents on \(name) to see its CPU, memory and disks here.")
+                            Text("Update Agent Loops on \(name) to see its CPU, memory and disks here.")
                                 .foregroundStyle(.secondary)
                         }
                     } else {

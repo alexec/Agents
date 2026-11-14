@@ -36,7 +36,7 @@ struct InstallAgentsSheet: View {
     /// ones already here, ticked.
     private var summary: String {
         let missing = model.missingRuntimes.map(\.runtime.name)
-        let lead = "Agents runs the coding CLIs on this Mac."
+        let lead = "Agent Loops runs the coding CLIs on this Mac."
         guard let names = ListFormatter.localizedString(byJoining: missing).nilIfEmpty else {
             return "\(lead) Everything it knows is here."
         }
@@ -121,7 +121,7 @@ struct RuntimeInstallRow: View {
             // This app carries a newer pin than the one installed (047). Agents already
             // running keep the old one until they end.
             Button("Update") { install() }
-                .help("Install the \(status.runtime.name) this version of Agents carries. Agents already running keep theirs.")
+                .help("Install the \(status.runtime.name) this version of Agent Loops carries. Agents already running keep theirs.")
         default:
             EmptyView()
         }

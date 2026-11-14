@@ -235,7 +235,7 @@ struct ControlBrowserCard: View {
     var body: some View {
         ControlCard {
             ControlRow(dot: web?.served == false ? .attention : .none,
-                       title: "Use Agents in Safari or Chrome on this Mac", detail: detail) {
+                       title: "Use Agent Loops in Safari or Chrome on this Mac", detail: detail) {
                 if web?.served == true {
                     Button("Open in Browser") {
                         opening = true
@@ -257,7 +257,7 @@ struct ControlBrowserCard: View {
 
     private var detail: String {
         guard let web, !web.isOff else { return BrowserOpening.offWords }
-        return web.served ? "\(web.summary) The first time, it pairs that browser too." : "\(web.summary) Try Again is beside Serve Agents to browsers on this Mac."
+        return web.served ? "\(web.summary) The first time, it pairs that browser too." : "\(web.summary) Try Again is beside Serve Agent Loops to browsers on this Mac."
     }
 }
 
@@ -414,7 +414,7 @@ struct CodeSheet: View {
         let time = left == 0 ? "It has run out; close this and ask again." : "It works once, for \(left / 60):\(String(format: "%02d", left % 60))."
         switch purpose {
         case .mac:
-            return "On the other Mac, open Agents, choose Connect to a control plane and paste this. That Mac can then do all this window can. \(time)"
+            return "On the other Mac, open Agent Loops, choose Connect to a control plane and paste this. That Mac can then do all this window can. \(time)"
         case .browser:
             return "\(browserWhere) That browser can then do all this window can. \(time)"
         case .host:
@@ -429,10 +429,10 @@ struct CodeSheet: View {
         let anywhere = control.status?.publicWeb
         guard let web = control.status?.web else {
             if let anywhere { return "In any browser, open \(anywhere) and paste it in." }
-            return "Turn on Serve Agents to browsers on this Mac in Settings ▸ Control plane first."
+            return "Turn on Serve Agent Loops to browsers on this Mac in Settings ▸ Control plane first."
         }
         let here = web.served ? "On this Mac, open \(web.address) and paste it in."
-            : "\(web.summary) Press Try Again beside Serve Agents to browsers on this Mac in Settings ▸ Control plane, then open \(web.address) on this Mac and paste it in."
+            : "\(web.summary) Press Try Again beside Serve Agent Loops to browsers on this Mac in Settings ▸ Control plane, then open \(web.address) on this Mac and paste it in."
         guard let anywhere else { return here }
         return "In any browser, open \(anywhere) and paste it in. \(here)"
     }

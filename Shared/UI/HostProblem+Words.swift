@@ -13,17 +13,17 @@ extension HostProblem {
         case .keyLocked:
             "Your key needs its passphrase. Run ssh-add in Terminal, then try again."
         case .hostKeyChanged:
-            "\(label)’s host key has changed since you last connected. Agents won’t connect until you check it."
+            "\(label)’s host key has changed since you last connected. Agent Loops won’t connect until you check it."
         case .hostKeyUnknown:
             "\(label)’s host key isn’t in your known_hosts. Add the server again to see its key and trust it."
         case .unsupportedSystem(let system, let architecture):
-            "\(label) is \(system == "Darwin" ? "macOS" : system) on \(architecture). Agents servers need Linux on x86-64 or ARM64."
+            "\(label) is \(system == "Darwin" ? "macOS" : system) on \(architecture). Agent Loops servers need Linux on x86-64 or ARM64."
         case .noStreamLocalForwarding:
-            "\(label) doesn’t allow forwarding a socket over ssh (AllowStreamLocalForwarding), which Agents needs."
+            "\(label) doesn’t allow forwarding a socket over ssh (AllowStreamLocalForwarding), which Agent Loops needs."
         case .diskFull:
-            "There isn’t room on \(label) to set up Agents."
+            "There isn’t room on \(label) to set up Agent Loops."
         case .serverNewer:
-            "\(label) runs a newer Agents. Update this app."
+            "\(label) runs a newer Agent Loops. Update this app."
         case .installFailed(let detail):
             detail.isEmpty ? "Setting up \(label) failed." : "Setting up \(label) failed: \(detail)"
         case .timedOut:

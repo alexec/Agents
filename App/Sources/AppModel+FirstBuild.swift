@@ -140,7 +140,7 @@ extension AppModel {
         } catch let error as JSONRPCError {
             firstBuildProblem = error.message
         } catch {
-            firstBuildProblem = "Agents on this Mac did not answer, so the agent did not start."
+            firstBuildProblem = "Agent Loops on this Mac did not answer, so the agent did not start."
         }
         await refreshAgents()
     }

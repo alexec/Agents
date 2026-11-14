@@ -44,7 +44,7 @@ struct ConnectTokenSheet: View {
                         Text(ConnectorSetupWords.sheetSubtitle(words.provider)).appText(.fine).foregroundStyle(.secondary)
                     }
                 }
-                Text("Agents will be able to").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+                Text("Agent Loops will be able to").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
                     .textCase(.uppercase)
                 VStack(spacing: 0) {
                     ForEach(Array(ConnectorSetupWords.abilities(words.provider).enumerated()), id: \.offset) { index, ability in

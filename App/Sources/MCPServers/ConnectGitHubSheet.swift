@@ -59,7 +59,7 @@ struct ConnectGitHubSheet: View {
                 }
                 .pickerStyle(.segmented).labelsHidden().fixedSize()
                 .disabled(isBusy)
-                Text("Agents will be able to").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
+                Text("Agent Loops will be able to").appText(.fine).fontWeight(.semibold).foregroundStyle(.secondary)
                     .textCase(.uppercase)
                 VStack(spacing: 0) {
                     ForEach(Array(ConnectorSetupWords.abilities.enumerated()), id: \.offset) { index, ability in

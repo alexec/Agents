@@ -159,7 +159,7 @@ struct FirstBuildQuestionView: View {
                 if submitted != nil || slow {
                     HStack(spacing: 8) {
                         ProgressView().controlSize(.small)
-                        Text(submitted != nil ? "Setting up Agents on this Mac…" : words)
+                        Text(submitted != nil ? "Setting up Agent Loops on this Mac…" : words)
                             .appText(.supporting).foregroundStyle(.secondary)
                     }
                 }

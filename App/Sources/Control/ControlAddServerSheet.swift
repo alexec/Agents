@@ -243,7 +243,7 @@ struct ControlAddServerSheet: View {
         .task { configHosts = control.isOnThisMac ? await control.sshHosts() : [] }
         .task(id: destination) { await resolveTyped() }
         if let updating {
-            Text("The machine \(updating.name) runs on, as you reach it over ssh. The control plane checks it is \(updating.name), copies its version of Agents there and starts it again. Its agents and folders stay. The key is used for this update only and not kept.")
+            Text("The machine \(updating.name) runs on, as you reach it over ssh. The control plane checks it is \(updating.name), copies its version of Agent Loops there and starts it again. Its agents and folders stay. The key is used for this update only and not kept.")
                 .appText(.supporting).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         } else {
@@ -420,7 +420,7 @@ struct ControlAddServerSheet: View {
         switch step {
         case "connect": "Connecting…"
         case "checkSystem": "Checking the system…"
-        case "setUp": "Installing Agents…"
+        case "setUp": "Installing Agent Loops…"
         case "started": "Starting it…"
         default: "Working…"
         }

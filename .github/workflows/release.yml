@@ -1,11 +1,13 @@
-# Publishes Agents on GitHub when a version tag is pushed (#669, #4225): `git tag v0.2.0 &&
+# Publishes Agent Loops on GitHub when a version tag is pushed (#669, #4225): `git tag v0.2.0 &&
 # git push origin v0.2.0` makes the release at releases/latest.
 #
 # The release carries:
-#   Agents-<version>.dmg                   signed with Developer ID, notarized, stapled
-#   Agents-<version>.zip                   the same app, stapled, for Macs that can't mount a .dmg
-#   Agents-Host-<version>.zip              the same app as Agents Host.app, for an Agents Host's
-#                                          self-update, which renames it Agents.app (#4225)
+#   Agent-Loops-<version>.dmg              signed with Developer ID, notarized, stapled
+#   Agent-Loops-<version>.zip              the same app, stapled, for Macs that can't mount a .dmg
+#   Agents-<version>.zip                   the same app as Agents.app, and
+#   Agents-Host-<version>.zip              as Agents Host.app, for the self-update of an Agents
+#                                          or an Agents Host, which renames it Agent Loops.app
+#                                          (#5297, #4225)
 #   agentsd-linux-<arch>-<version>.tar.gz  the Linux agentsd (Go, #1136), with the MCP
 #                                          servers Agents ships (#700)
 #   SHA256SUMS
@@ -246,7 +248,7 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" *.dmg *.zip *.tar.gz SHA256SUMS --clobber
           else
-            gh release create "$TAG" *.dmg *.zip *.tar.gz SHA256SUMS --title "Agents ${TAG#v}" \
+            gh release create "$TAG" *.dmg *.zip *.tar.gz SHA256SUMS --title "Agent Loops ${TAG#v}" \
               "${notes[@]}" --verify-tag
           fi
 

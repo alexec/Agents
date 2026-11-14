@@ -57,7 +57,7 @@ struct SpendingView: View {
                 control?.stop()
                 control = nil
             }
-            .alert("Agents can’t open Reports", isPresented: Binding(get: { reportsProblem != nil },
+            .alert("Agent Loops can’t open Reports", isPresented: Binding(get: { reportsProblem != nil },
                                                                       set: { if !$0 { reportsProblem = nil } })) {
                 Button("OK") { reportsProblem = nil }
             } message: {

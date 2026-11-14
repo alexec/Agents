@@ -52,7 +52,7 @@ while [ $# -gt 0 ]; do
 done
 
 # One app since #4225: the window, and the helpers this script runs as its launch agents would.
-APP="$REPO/build/DD/Build/Products/$CONFIG/Agents.app"
+APP="$REPO/build/DD/Build/Products/$CONFIG/Agent Loops.app"
 HOSTAPP="$APP"
 
 [ -n "$SLUG" ] || SLUG="$(printf '%04x' $((RANDOM % 65536)))"
@@ -260,12 +260,12 @@ if [ "$WINDOW" = 1 ]; then
   [ -n "${PERSON:-}" ] && OPEN_FLAGS+=(--env AGENTS_PERSON_NAME="$PERSON")
   if [ "${OUTSIDE:-0}" = 1 ]; then
     # A window inside a checkout puts the worktree's name in its title (AppCheckout).
-    ditto "$APP" "$ROOT/app/Agents.app"
-    APP="$ROOT/app/Agents.app"
+    ditto "$APP" "$ROOT/app/Agent Loops.app"
+    APP="$ROOT/app/Agent Loops.app"
   fi
   "${CLEAN[@]}" open "${OPEN_FLAGS[@]}" "$APP" --args --walk "run-$SLUG" -ApplePersistenceIgnoreState YES ${APP_ARGS[@]+"${APP_ARGS[@]}"}
   for _ in $(seq 1 100); do
-    APP_PID="$(pgrep -f "Agents.app/Contents/MacOS/Agents( Host)? --walk run-$SLUG( |$)" | head -1 || true)"
+    APP_PID="$(pgrep -f "(Agent Loops|Agents)\.app/Contents/MacOS/Agents( Host)? --walk run-$SLUG( |$)" | head -1 || true)"
     [ -n "$APP_PID" ] && break
     sleep 0.1
   done

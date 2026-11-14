@@ -12,7 +12,7 @@ struct SelfUpdateSection: View {
     var body: some View {
         if let update = model.selfUpdate {
             Section {
-                Toggle("Update Agents automatically", isOn: Binding(
+                Toggle("Update Agent Loops automatically", isOn: Binding(
                     get: { model.selfUpdate?.autoUpdate ?? false },
                     set: { on in Task { await model.setAutoUpdate(on) } }))
                 .disabled(update.state == .cannot)
@@ -23,7 +23,7 @@ struct SelfUpdateSection: View {
             } header: {
                 Text("Updates")
             } footer: {
-                Text("Agents updates to the release your control plane runs. It never asks for an administrator password, and it restarts only when no agent is in a turn.")
+                Text("Agent Loops updates to the release your control plane runs. It never asks for an administrator password, and it restarts only when no agent is in a turn.")
                     .appText(.fine)
                     .foregroundStyle(.secondary)
             }
@@ -39,7 +39,7 @@ struct SelfUpdateSection: View {
         case .downloading: return "Downloading \(release)…"
         case .waiting: return "\(release) is ready. It installs when no agent is in a turn."
         case .restarting: return "Installed \(release). Restarting…"
-        case .failed, .cannot: return update.message ?? "Agents cannot update itself."
+        case .failed, .cannot: return update.message ?? "Agent Loops cannot update itself."
         }
     }
 }

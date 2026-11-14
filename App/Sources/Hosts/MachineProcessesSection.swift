@@ -25,7 +25,7 @@ struct MachineProcessesSection: View {
     @State private var failure: String?
     @State private var open = false
 
-    private static let footer = "Agents’ own processes only. Stop a session to stop its processes."
+    private static let footer = "Agent Loops’ own processes only. Stop a session to stop its processes."
 
     var body: some View {
         Group {
@@ -82,7 +82,7 @@ struct MachineProcessesSection: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(process.name).lineLimit(1)
                 if process.depth == 0 {
-                    Text("Agents’ daemon").appText(.supporting).foregroundStyle(.secondary)
+                    Text("Agent Loops’ daemon").appText(.supporting).foregroundStyle(.secondary)
                 } else if let agent = process.agentId, process.isSessionsOwn(in: state?.processes ?? []) {
                     Button(process.title ?? "Untitled session") {
                         opened()

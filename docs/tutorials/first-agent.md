@@ -30,7 +30,7 @@ On a Mac, Agents is one app. The window you work in and the part that runs your 
 are in it.
 
 1. Download Agents, a free download from us.
-   Open `Agents-<version>.dmg`, and drag Agents into `~/Applications`.
+   Open `Agent-Loops-<version>.dmg`, and drag Agent Loops into `~/Applications`.
    [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md) says more about this step.
 2. Open Agents. It shows **Let's build your idea.** with one box. Behind it, Agents
    starts this Mac's host and its control plane, and pairs the window. They keep running when you

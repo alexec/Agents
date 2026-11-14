@@ -32,7 +32,7 @@ type selfUpdateRig struct {
 	told     []wire.SelfUpdate
 }
 
-// newSelfUpdateRig is an Agents.app at 0.11.0 in a folder of its own, and a release
+// newSelfUpdateRig is an Agent Loops.app at 0.11.0 in a folder of its own, and a release
 // 0.12.0 served as GitHub serves one.
 func newSelfUpdateRig(t *testing.T, zip []byte) *selfUpdateRig {
 	t.Helper()
@@ -44,8 +44,8 @@ func newSelfUpdateRig(t *testing.T, zip []byte) *selfUpdateRig {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch req.URL.Path {
 		case "/v0.12.0/SHA256SUMS":
-			w.Write([]byte(hex.EncodeToString(sum[:]) + "  Agents-0.12.0.zip\n"))
-		case "/v0.12.0/Agents-0.12.0.zip":
+			w.Write([]byte(hex.EncodeToString(sum[:]) + "  Agent-Loops-0.12.0.zip\n"))
+		case "/v0.12.0/Agent-Loops-0.12.0.zip":
 			w.Write(zip)
 		default:
 			http.NotFound(w, req)
@@ -337,7 +337,7 @@ func TestSelfUpdateNeverAsksForAnAdministrator(t *testing.T) {
 }
 
 func TestEnclosingApp(t *testing.T) {
-	if got := enclosingApp("/Users/a/Applications/Agents.app/Contents/Helpers/agentsd"); got != "/Users/a/Applications/Agents.app" {
+	if got := enclosingApp("/Users/a/Applications/Agent Loops.app/Contents/Helpers/agentsd"); got != "/Users/a/Applications/Agent Loops.app" {
 		t.Fatal(got)
 	}
 	if got := enclosingApp("/usr/local/bin/agentsd"); got != "" {
@@ -348,30 +348,40 @@ func TestEnclosingApp(t *testing.T) {
 	}
 }
 
-// Agents Host's copy takes Agents' name once (#4225), and only when nothing else has it.
+// Agents' and Agents Host's copies take Agent Loops' name once (#5297, #4225), and only
+// when nothing else has it.
 func TestTakeNewName(t *testing.T) {
-	dir := t.TempDir()
-	old := filepath.Join(dir, oldAppName)
-	os.MkdirAll(old, 0o755)
-	now, moved := takeNewName(old, os.Rename)
-	if !moved || now != filepath.Join(dir, appName) {
-		t.Fatalf("not renamed: %s %v", now, moved)
+	for _, oldName := range oldAppNames {
+		t.Run(oldName, func(t *testing.T) {
+			dir := t.TempDir()
+			old := filepath.Join(dir, oldName)
+			os.MkdirAll(old, 0o755)
+			now, moved := takeNewName(old, os.Rename)
+			if !moved || now != filepath.Join(dir, appName) {
+				t.Fatalf("not renamed: %s %v", now, moved)
+			}
+			if _, err := os.Stat(old); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("the old name is still there, so the person has two apps")
+			}
+			// The new name: nothing to do.
+			if again, moved := takeNewName(now, os.Rename); moved || again != now {
+				t.Fatalf("renamed again: %s", again)
+			}
+			// Another Agent Loops.app beside it: it keeps its name.
+			os.MkdirAll(old, 0o755)
+			if kept, moved := takeNewName(old, os.Rename); moved || kept != old {
+				t.Fatalf("took the name of the app beside it: %s", kept)
+			}
+			// A rename that fails leaves it where it is.
+			os.RemoveAll(now)
+			if kept, moved := takeNewName(old, func(a, b string) error { return errors.New("busy") }); moved || kept != old {
+				t.Fatalf("%s %v", kept, moved)
+			}
+		})
 	}
-	if _, err := os.Stat(old); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal("the old name is still there")
-	}
-	// The new name: nothing to do.
-	if again, moved := takeNewName(now, os.Rename); moved || again != now {
-		t.Fatalf("renamed again: %s", again)
-	}
-	// Another Agents.app beside it, such as the App Store window: it keeps its name.
-	os.MkdirAll(old, 0o755)
-	if kept, moved := takeNewName(old, os.Rename); moved || kept != old {
-		t.Fatalf("took the name of the app beside it: %s", kept)
-	}
-	// A rename that fails leaves it where it is.
-	os.RemoveAll(now)
-	if kept, moved := takeNewName(old, func(a, b string) error { return errors.New("busy") }); moved || kept != old {
+	// Another app's bundle keeps its name.
+	other := filepath.Join(t.TempDir(), "Loops.app")
+	if kept, moved := takeNewName(other, os.Rename); moved || kept != other {
 		t.Fatalf("%s %v", kept, moved)
 	}
 }
@@ -382,7 +392,7 @@ func TestSelfUpdateSettlesAgentsHostsUpdateFolder(t *testing.T) {
 	r := newSelfUpdateRig(t, []byte("zip"))
 	work := filepath.Join(filepath.Dir(r.app), oldUpdateFolderPrefix+"x")
 	os.MkdirAll(filepath.Join(work, "new"), 0o755)
-	if err := writeSelfUpdateMark(work, selfUpdateMarkFile{From: "0.11.0", To: "0.12.0", Old: filepath.Join("new", oldAppName)}); err != nil {
+	if err := writeSelfUpdateMark(work, selfUpdateMarkFile{From: "0.11.0", To: "0.12.0", Old: filepath.Join("new", "Agents Host.app")}); err != nil {
 		t.Fatal(err)
 	}
 	if keep, back := r.settle("0.12.0"); len(keep) != 1 || keep[0] != work || back {

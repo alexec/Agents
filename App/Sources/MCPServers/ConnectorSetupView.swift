@@ -740,7 +740,7 @@ private struct CodespacesSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("GitHub Codespaces").appText(.title).fontWeight(.semibold)
-            Text("Use a Codespace for this folder, or create one from \(repository). Connect over SSH; Agents installs on the Codespace.")
+            Text("Use a Codespace for this folder, or create one from \(repository). Connect over SSH; Agent Loops installs on the Codespace.")
                 .appText(.supporting).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Text("Connect prepares the Codespaces entries in ~/.ssh/config with GitHub CLI.")
                 .appText(.fine).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

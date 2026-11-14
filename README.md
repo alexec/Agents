@@ -59,7 +59,7 @@ The schemes:
 
 | Scheme | What it builds |
 |---|---|
-| `AgentsHost` | the Mac app, Agents (`Agents.app`): the window, with `agentsd` and `agents-control` (Go, built from `Go/`) |
+| `AgentsHost` | the Mac app, Agent Loops (`Agent Loops.app`): the window, with `agentsd` and `agents-control` (Go, built from `Go/`) |
 | `Remote` | the iPhone and iPad app |
 
 The web page lives in `Web/`: Preact and TypeScript, bundled by esbuild. Its build,
@@ -137,7 +137,7 @@ ls ~/Library/Logs/Agents/
 ls ~/Library/Caches/com.alexecollins.agents/
 
 # By hand, as a host of a control plane, on a root of its own
-AGENTS_ROOT=/tmp/agents-branch "./build/DD-machine/Build/Products/Debug/Agents.app/Contents/Helpers/agentsd" \
+AGENTS_ROOT=/tmp/agents-branch "./build/DD-machine/Build/Products/Debug/Agent Loops.app/Contents/Helpers/agentsd" \
   --control-code '<host code>'
 ```
 

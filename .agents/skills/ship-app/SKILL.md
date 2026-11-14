@@ -75,7 +75,7 @@ walks (run-app), merge-wave's checks and the tests stay on Debug.
 This section runs by default. Use `--no-mac` to skip it.
 
 Since 058 the Mac runs:
-- **Agents Host**, at `~/Applications/Agents Host.app`. Its two launch agents
+- **Agent Loops** (was Agents, and Agents Host), at `~/Applications/Agent Loops.app`. Its two launch agents
   (`com.alexecollins.agentshost.control` and `.daemon`) are the control plane and this
   Mac's host, registered under Login Items. The script swaps the new bundle in and
   `launchctl kickstart -k`s both jobs. The jobs name their app by bundle id only, so
@@ -107,7 +107,7 @@ The Mac half runs detached (`--restart`), because restarting the host ends this
 session's turn. Its log is `/tmp/main-restart-all-<sha>.log`. When the session comes
 back, the log must show:
 - both `com.alexecollins.agentshost.*` jobs with pids, programs in
-  `~/Applications/Agents Host.app`, and `CLAUDE vars: 0`;
+  `~/Applications/Agent Loops.app`, and `CLAUDE vars: 0`;
 - a `window:` line;
 - no `FAILED:` line. That line, and a notification, mean the jobs still run from
   another copy: run `ship.sh --check-host`.

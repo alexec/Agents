@@ -335,7 +335,7 @@ struct AgentsCommands: Commands {
         // The main window, and a folder's own (#1089). The windows open are listed
         // below these by the system, by title.
         CommandGroup(before: .windowList) {
-            Button("Agents (All Folders)") { model.bringMainWindowForward(opening: openWindow) }
+            Button("Agent Loops (All Folders)") { model.bringMainWindowForward(opening: openWindow) }
                 .keyboardShortcut(pageZoom == nil ? KeyboardShortcut("0") : nil)
             Button("Open Folder in New Window") {
                 guard let key = model.selectedFolderKey else { return }
@@ -411,7 +411,7 @@ struct AgentsCommands: Commands {
         CommandGroup(replacing: .printItem) {}
 
         CommandGroup(replacing: .help) {
-            Button("Agents Help") { NSWorkspace.shared.open(HelpSite.url) }
+            Button("Agent Loops Help") { NSWorkspace.shared.open(HelpSite.url) }
                 .keyboardShortcut("?")
             Divider()
             Button("Report a Problem…") { requests.showsReportProblem = true }
@@ -437,7 +437,7 @@ struct AgentsCommands: Commands {
             control.stop()
             guard let why else { return }
             let alert = NSAlert()
-            alert.messageText = "Agents can’t open in a browser"
+            alert.messageText = "Agent Loops can’t open in a browser"
             alert.informativeText = why
             alert.runModal()
         }

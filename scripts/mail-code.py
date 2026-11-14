@@ -17,7 +17,7 @@ Only mail whose sender the mail server authenticated (DMARC or aligned DKIM) cou
 --unauthenticated drops that. --subject narrows by subject (a glob). The mailbox is
 EMAIL_IMAP_URL, EMAIL_USER and EMAIL_PASSWORD (from `agents-secret EMAIL_PASSWORD` when
 unset); by default agentloops@fastmail.com on imaps://imap.fastmail.com (#1780).
-EMAIL_MCP names the server when it is not on PATH or in Agents.app.
+EMAIL_MCP names the server when it is not on PATH or in Agent Loops.app (or Agents.app).
 """
 
 import argparse
@@ -34,7 +34,8 @@ import time
 import urllib.parse
 
 STATE = os.path.expanduser("~/.agents/tmp/mail-code")
-APPS = ("~/Applications/Agents.app", "/Applications/Agents.app")
+APPS = ("~/Applications/Agent Loops.app", "/Applications/Agent Loops.app",
+        "~/Applications/Agents.app", "/Applications/Agents.app")
 # A one-time code: 4 to 12 letters, digits or dashes with a digit in it, after a word that
 # says it is one. The workflow's skill (answer-a-sign-up-code) takes the same shape.
 KEYWORDS = re.compile(r"code|verif|confirm|one-time|passcode|\bpin\b|sign[- ]?in|security", re.I)

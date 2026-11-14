@@ -39,7 +39,7 @@ a server's `--serve` daemon is not confined.
 ```sh
 S=.claude/skills/run-app/scripts
 T=.claude/skills/test-servers/scripts
-CONTROL="build/DD/Build/Products/Debug/Agents.app/Contents/Helpers/agents-control"
+CONTROL="build/DD/Build/Products/Debug/Agent Loops.app/Contents/Helpers/agents-control"
 ```
 
 ## 1. The box

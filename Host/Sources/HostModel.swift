@@ -252,7 +252,7 @@ final class HostModel {
         var said = reasons.joined(separator: " ")
         if !otherCopies.isEmpty {
             let places = otherCopies.map { $0.deletingLastPathComponent().path }.joined(separator: ", ")
-            said += " Agents is also in \(places): keep one copy, so its login items are this one’s."
+            said += " Agent Loops is also in \(places): keep one copy, so its login items are this one’s."
         }
         return said
     }
@@ -356,7 +356,7 @@ final class HostModel {
         guard busy == nil else { return }
         problem = nil
         repaired = nil
-        busy = "Removing Agents from this Mac…"
+        busy = "Removing Agent Loops from this Mac…"
         defer { busy = nil }
         await services.remove()
         for job in [LocalServices.Job.control, .daemon] {
@@ -366,7 +366,7 @@ final class HostModel {
         settings.save(paths)
         await refresh()
         if controlJob?.loaded == true || daemonJob?.loaded == true {
-            problem = "macOS still has a login item for Agents. Turn it off in System Settings ▸ General ▸ Login Items."
+            problem = "macOS still has a login item for Agent Loops. Turn it off in System Settings ▸ General ▸ Login Items."
         } else {
             removed = true
         }
@@ -679,7 +679,7 @@ final class HostModel {
     /// and while it's off, that it's off, never an address as if the page were there (R3).
     var webRemoteLine: String {
         guard servesWebRemote else {
-            return "Off. Turn it on to use Agents at \(webRemoteAddress), in a browser on this Mac only."
+            return "Off. Turn it on to use Agent Loops at \(webRemoteAddress), in a browser on this Mac only."
         }
         guard controlRunning, let webRemote else {
             return "At \(webRemoteAddress), for a browser on this Mac only."
@@ -751,7 +751,7 @@ final class HostModel {
             return true
         case .needsApproval:
             needsApproval = true
-            problem = "Allow Agents in System Settings ▸ General ▸ Login Items."
+            problem = "Allow Agent Loops in System Settings ▸ General ▸ Login Items."
             return false
         case .failed(let why):
             problem = why

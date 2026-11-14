@@ -56,6 +56,10 @@ LIVE_GLOBS = [
     # One app since #4225, whose program keeps Agents Host's name.
     f"{HOME}/Applications/Agents.app/Contents/MacOS/Agents Host",
     f"{HOME}/Applications/Agents.app/Contents/Helpers/*",
+    # Agent Loops.app since #5297, the same program.
+    f"{HOME}/Applications/AgentsLive/*/Agent Loops.app/Contents/MacOS/Agents Host",
+    f"{HOME}/Applications/Agent Loops.app/Contents/MacOS/Agents Host",
+    f"{HOME}/Applications/Agent Loops.app/Contents/Helpers/*",
 ]
 # Process name → what the issue calls it. The Remote's process is also "Agents", told
 # apart by its platform and bundle id.

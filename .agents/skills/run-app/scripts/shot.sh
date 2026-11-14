@@ -14,7 +14,7 @@ ROOT="${1:?usage: shot.sh ROOT OUT.png [--front]}"
 OUT="${2:?usage: shot.sh ROOT OUT.png [--front]}"
 FRONT="${3:-}"
 
-PID="$(pgrep -f "Agents.app/Contents/MacOS/Agents( Host)? --walk ${ROOT#/tmp/}( |$)" | head -1)"
+PID="$(pgrep -f "(Agent Loops|Agents)\.app/Contents/MacOS/Agents( Host)? --walk ${ROOT#/tmp/}( |$)" | head -1)"
 [ -n "$PID" ] || { echo "no window running on $ROOT" >&2; exit 1; }
 
 if [ "$FRONT" = "--front" ]; then

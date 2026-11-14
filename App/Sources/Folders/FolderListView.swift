@@ -1242,7 +1242,7 @@ private struct EmptyFolderList: View {
             if model.macRuntimesAvailable.isEmpty {
                 Text("No agent runtime found")
                     .appText(.reading).fontWeight(.semibold)
-                Text("Agents runs the coding CLIs on this Mac. Install one here, or from its own page.")
+                Text("Agent Loops runs the coding CLIs on this Mac. Install one here, or from its own page.")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 ForEach(model.runtimes) { status in
