@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // machine/status (#691 US4, #1387), as DaemonCore+MachineStatus: whether this host is idle, what

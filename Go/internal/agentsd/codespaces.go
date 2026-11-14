@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/codespacessh"
-	"github.com/alexec/agents/Go/internal/workspacecommands"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/codespacessh"
+	"github.com/agentloops-dev/agents/Go/internal/workspacecommands"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 const codespacesAPI = "https://api.github.com"

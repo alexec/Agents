@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // What the events and the tools read from Azure Boards (#3804). RealBoards reads it over Azure

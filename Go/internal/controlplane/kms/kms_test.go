@@ -15,7 +15,7 @@ import (
 	"gocloud.dev/secrets"
 	"gocloud.dev/secrets/driver"
 
-	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
 )
 
 var ctx = context.Background()

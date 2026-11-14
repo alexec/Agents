@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agents/Go/internal/safe"
 )
 
 // StartMachineWatch hears the Mac (#1368) through agents-watch --machine, beside this

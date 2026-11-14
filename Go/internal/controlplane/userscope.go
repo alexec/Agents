@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane/kms"
-	"github.com/alexec/agents/Go/internal/controlplane/usersettings"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/kms"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/usersettings"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The user scope (#1760, spec 736 US4): each person's settings and secrets, kept here and

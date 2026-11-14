@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Ports SpendLedgerTests, LimitStoreTests and UsageLedgerTests: a session's running cost

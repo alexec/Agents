@@ -4,7 +4,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/agentloops-dev/agents/Go/internal/connections"
 )
 
 // Connected is the Azure DevOps a server reads and the token it reads it with, for the

@@ -30,6 +30,8 @@ struct MultiplierRow: View {
 struct MultiplierPage: View {
     /// The host's Multiplier; nil until it has said, or from a host too old to know it.
     let multiplier: DaemonAPI.Multiplier?
+    /// When `multiplier` was last read or heard (#5144); nil until then, and no line.
+    var read: Date?
     let achievements: Achievements?
     /// The agents with a turn starting or running, so "agents now" moves as they do, with
     /// no wait for a merge.
@@ -66,6 +68,10 @@ struct MultiplierPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            if let read {
+                // How old the figures are (#5144), at the top of the page.
+                LastUpdateText(read: read).frame(maxWidth: .infinity, alignment: .trailing)
+            }
             Spacer()
             Crowd(multiplier: multiplier?.multiplier == nil ? nil : shown.multiplier)
                 .frame(maxWidth: 820)

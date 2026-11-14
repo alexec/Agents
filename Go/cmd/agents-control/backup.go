@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/controlplane"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane"
 )
 
 // homeParts is where this control plane keeps what a restore needs besides the store

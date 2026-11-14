@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // chain makes a person's lock entry by entry, as their clients would.

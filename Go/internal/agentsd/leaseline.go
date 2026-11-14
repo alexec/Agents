@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A lease's line (#4268): a wait can say `by`, when its step stops mattering, which puts

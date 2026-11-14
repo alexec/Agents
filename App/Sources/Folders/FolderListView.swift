@@ -251,6 +251,10 @@ struct FolderListView: View {
                     ForEach(model.machinesMaking) { making in
                         MakingMachineRow(making: making).appText(.supporting)
                     }
+                    // + New Machine, the group's last row, as the Remote's (#4034, #5265).
+                    if ControlConfig.endpoint != nil {
+                        NewMachineRow().appText(.supporting)
+                    }
                 } header: {
                     MachinesHeader()
                 }
@@ -1098,47 +1102,23 @@ private extension FolderMenu {
     }
 }
 
-/// The sidebar's foot: the connection, then why the Mac is awake. Nothing at all when
-/// both have nothing to say.
-/// The Machines group's header (#3973): `+` on hover opens New Machine's sheet (#4634), and
-/// its menu has New Machine, Register a Machine… and Machine Providers….
+/// The Machines group's header (#3973): its menu has New Machine, Register a Machine… and
+/// Machine Providers…. New Machine itself is the group's last row (#5265), not a `+` here.
 private struct MachinesHeader: View {
     @Environment(AppModel.self) private var model
     @Environment(WindowRequests.self) private var requests
     @Environment(\.openSettings) private var openSettings
-    @State private var hovering = false
 
     var body: some View {
         HStack {
             Text("Machines").appText(.supporting)
             Spacer()
-            if hovering, ControlConfig.endpoint != nil {
-                Button { model.newMachine() } label: { Image(icon: "plus") }
-                    .buttonStyle(.borderless)
-                    .help("New Machine: choose what the provider makes, starting from the options used last")
-                    .accessibilityLabel("New Machine")
-            }
         }
         .contentShape(Rectangle())
-        .onHover { hovering = $0 }
         .task { await model.loadMachineProviders() }
         .contextMenu {
             if ControlConfig.endpoint != nil {
-                let providers = model.machineProviders
-                // With two or more providers, New Machine names the default, and New Machine
-                // on ▸ picks another, which is then the default (#3979).
-                if providers.count > 1 {
-                    let chosen = providers.first { $0.default == true } ?? providers[0]
-                    Button("New Machine (\(chosen.name))…") { model.newMachine() }
-                    Menu("New Machine on") {
-                        ForEach(providers) { provider in
-                            Toggle(provider.name, isOn: Binding(get: { provider.id == chosen.id },
-                                                                set: { _ in model.newMachine(on: provider.id) }))
-                        }
-                    }
-                } else {
-                    Button("New Machine…") { model.newMachine() }
-                }
+                NewMachineItems()
                 Divider()
                 Button("Register a Machine…") { requests.folderSheet = .addMachine }
                 Button("Machine Providers…") {
@@ -1150,6 +1130,57 @@ private struct MachinesHeader: View {
     }
 }
 
+/// New Machine's menu items (#3979): with two or more providers, New Machine names the
+/// default, and New Machine on ▸ picks another, which is then the default.
+private struct NewMachineItems: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        let providers = model.machineProviders
+        if providers.count > 1 {
+            let chosen = providers.first { $0.default == true } ?? providers[0]
+            Button("New Machine (\(chosen.name))…") { model.newMachine() }
+            Menu("New Machine on") {
+                ForEach(providers) { provider in
+                    Toggle(provider.name, isOn: Binding(get: { provider.id == chosen.id },
+                                                        set: { _ in model.newMachine(on: provider.id) }))
+                }
+            }
+        } else {
+            Button("New Machine…") { model.newMachine() }
+        }
+    }
+}
+
+/// + New Machine, the Machines group's last row (#5265), as the Remote's (#4034): a click
+/// opens New Machine's sheet on the default provider (#4634), with the options used last;
+/// its menu offers New Machine on ▸ when there are two or more providers.
+private struct NewMachineRow: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Button { model.newMachine() } label: {
+            HStack(spacing: 6) {
+                Image(icon: "plus")
+                    .sidebarMark(Paper.accent)
+                    .frame(width: 16)
+                    .accessibilityHidden(true)
+                // Primary ink: a row with no tag in the sidebar's list draws grey, as if disabled.
+                Text("New Machine")
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("New Machine: choose what the provider makes, starting from the options used last")
+        .contextMenu { NewMachineItems() }
+    }
+}
+
+/// The sidebar's foot: the connection, then why the Mac is awake. Nothing at all when
+/// both have nothing to say.
 private struct SidebarFoot: View {
     @Environment(AppModel.self) private var model
     /// Machines' group open: its rows say why a server is quiet, so the foot does not (#3764).

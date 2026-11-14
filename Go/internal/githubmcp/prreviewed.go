@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // PRReview is a person's review of a pull request (#3860): Approve, Request changes, or a

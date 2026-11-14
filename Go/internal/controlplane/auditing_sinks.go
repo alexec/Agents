@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controlplane/audit"
-	"github.com/alexec/agents/Go/internal/controlplane/kms"
-	"github.com/alexec/agents/Go/internal/controlplane/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/audit"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/kms"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The audit's sinks (#1001, T8 slice d2), as an admin sets them: syslog or HTTP places

@@ -372,6 +372,8 @@ public final class AgentsModel {
     /// consult its own clock: it may be in a different time zone from the daemon's,
     /// and the daemon's is the one the limit uses.
     public private(set) var costState: DaemonAPI.CostState?
+    /// When `costState` was last read or heard (#5144), for Cost's and Tokens' "Last update".
+    public private(set) var costStateReadAt: Date?
     /// How long archived agents are kept and what the archive holds (051). Nil until the
     /// daemon has said, which leaves the settings section out.
     /// Every runtime's state on the Mac (065, US4): Agent Runtimes, the prompt bar's
@@ -467,6 +469,8 @@ public final class AgentsModel {
     /// The Multiplier (#3903), for the hero page (#3904); nil until the host has said, or
     /// from a host that predates it.
     public private(set) var multiplier: DaemonAPI.Multiplier?
+    /// When `multiplier` was last read or heard (#5144), for the Multiplier page's "Last update".
+    public private(set) var multiplierReadAt: Date?
 
     /// What each command the agent on screen ran has printed (033, #203).
     ///
@@ -863,7 +867,7 @@ public final class AgentsModel {
             replacePlugins(list)
 
         case .costChanged(let state):
-            costState = state
+            replaceCostState(state)
 
         case .retentionChanged(let state):
             retentionState = state
@@ -917,7 +921,7 @@ public final class AgentsModel {
             self.achievements = achievements
 
         case .multiplierChanged(let multiplier):
-            self.multiplier = multiplier
+            replaceMultiplier(multiplier)
 
         case .showFile(let notification):
             filesToShow[notification.agentID] = notification.file
@@ -1381,7 +1385,10 @@ public final class AgentsModel {
         }
     }
 
-    public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
+    public func replaceCostState(_ state: DaemonAPI.CostState, at read: Date = Date()) {
+        costState = state
+        costStateReadAt = read
+    }
     public func replaceRetentionState(_ state: DaemonAPI.RetentionState) { retentionState = state }
     public func replaceBackupState(_ state: DaemonAPI.BackupState) {
         backupState = state
@@ -1612,7 +1619,10 @@ public final class AgentsModel {
     public func replaceWakeState(_ state: DaemonAPI.WakeState) { wakeState = state }
     public func replaceStoreNotes(_ notes: DaemonAPI.StoreNotes) { storeNotes = notes.notes }
     public func replaceAchievements(_ achievements: Achievements) { self.achievements = achievements }
-    public func replaceMultiplier(_ multiplier: DaemonAPI.Multiplier) { self.multiplier = multiplier }
+    public func replaceMultiplier(_ multiplier: DaemonAPI.Multiplier, at read: Date = Date()) {
+        self.multiplier = multiplier
+        multiplierReadAt = read
+    }
 
     // MARK: Choices in flight
 

@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controlplane/signin"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/signin"
 )
 
 // Sign up with Apple and Google (#3386): the browser goes to the provider by the OIDC code

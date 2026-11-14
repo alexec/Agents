@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // What the person's machines say of each of their secrets (#4158): each copy's hint, the

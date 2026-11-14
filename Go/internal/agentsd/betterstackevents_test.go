@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/betterstackmcp"
+	"github.com/agentloops-dev/agents/Go/internal/betterstackmcp"
 )
 
 // #3655: a new incident on a scratch Better Stack monitor raises health.incident_started

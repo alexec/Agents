@@ -12,7 +12,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // fakeDocsMCP is a docs server over streamable HTTP whose name says nothing about docs: kb_find

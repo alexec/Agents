@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/safe"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // mac.sleep, mac.wake, person.away and person.back (042 US5, #1368), as

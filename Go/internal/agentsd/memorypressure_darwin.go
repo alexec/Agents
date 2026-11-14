@@ -3,7 +3,7 @@ package agentsd
 import (
 	"golang.org/x/sys/unix"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // kernelPressure is macOS's memory pressure, as the kernel says it to memory_pressure(1)

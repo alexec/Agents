@@ -9,8 +9,8 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
-	"github.com/alexec/agents/Go/internal/browser"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/browser"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Each session's own tab in the machine's browser (#3916): a tab that opens while an agent

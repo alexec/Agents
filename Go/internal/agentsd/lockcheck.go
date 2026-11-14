@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/machinelock"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/machinelock"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Each request checked end to end (#3492, specs/3399-machine-lock D6, D7). Once this machine

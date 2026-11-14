@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/githubmcp"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A GitHub repository's CI settings as app tools (#3706, spec 3656): set_ci_secret,

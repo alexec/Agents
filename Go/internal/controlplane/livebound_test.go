@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
 )
 
 // One Live Now tab on 100 machines for 5 minutes (#2432): a poll each 15 s asks the

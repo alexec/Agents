@@ -1384,9 +1384,8 @@ dialog.sheet:has(.account-details) { width: min(600px, calc(100vw - 32px)); max-
 .machine-swipe.trailing { justify-content: flex-end; }
 .machine-swipe.stop, .machine-swipe.remove { background: var(--paper-rule); color: inherit; }
 .machine-swipe.delete { background: var(--tint-failure); }
-.section-head.with-add { display: flex; justify-content: space-between; align-items: center; }
-.section-head .head-add { border: 0; background: none; padding: 0 4px; font: inherit; font-size: 0.9375rem; line-height: 1; color: inherit; cursor: pointer; opacity: 0.6; }
-.section-head .head-add:hover { opacity: 1; }
+/* + New Machine, the Machines group's last row (#5265): the mark in the accent, as the Remote's. */
+.new-machine-row .new-mark { color: var(--accent); }
 .team-workflows { display: flex; flex-direction: column; gap: 12px; max-width: 720px; }
 .bot-card { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); padding: 10px 12px; background: var(--paper-raised); }
 .bot-card h3 { margin: 0 0 2px; font-size: 0.875rem; }
@@ -1498,7 +1497,6 @@ dialog.sheet:has(.account-details) { width: min(600px, calc(100vw - 32px)); max-
   .sub-app-list { display: flex; flex-wrap: wrap; gap: 4px; border-right: none; border-bottom: 1px solid var(--paper-rule); }
   .sub-app-group { flex-direction: row; flex-wrap: wrap; }
   .sub-app-group .section-head { display: none; }
-  .sub-app-group .section-head.with-add { display: flex; width: 100%; }
 }
 .triggers { list-style: none; margin: 0; padding: 0; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
 .trigger { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 10px; padding: 10px 14px; align-items: start; }
@@ -3015,6 +3013,9 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 /* How old what is shown is (#5141): after a banner's words in its own colour; on its own, ink.secondary at the caption step. */
 .last-update { white-space: nowrap; }
 :not(.message-words) > .last-update { color: var(--paper-secondary); font-size: var(--type-fine); }
+/* At the top of a pane with no banner (#5144), at its trailing end. */
+.page-fresh { margin: 0 0 8px; text-align: end; }
+.multiplier-page > .page-fresh { align-self: stretch; margin: 0; }
 /* A section's heading with the line at its trailing end (#5146). */
 .section-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .section-head-row > .last-update { margin-right: 8px; }

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // The MCP events (#3804) of an Azure Boards project's work items, in the jira and linear

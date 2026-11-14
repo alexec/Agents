@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alexec/agents/Go/internal/browser"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/browser"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The browser and the screen ask on a machine a person uses (#4264, epic #4262). Browser and

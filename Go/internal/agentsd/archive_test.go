@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // An archive during a turn (#1611): the runtime that only a SIGTERM ends is not taken for

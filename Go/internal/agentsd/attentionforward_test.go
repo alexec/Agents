@@ -7,7 +7,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Ports AttentionTests' forwarding cases (#1367): a host of a control plane offers a need

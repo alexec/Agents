@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The approval wait per PR (#4553, epic #4551): how long work waits on the person. A PR's

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 func multiplierNodes(now time.Time, merged, reverted int) []wire.LineageCostNode {

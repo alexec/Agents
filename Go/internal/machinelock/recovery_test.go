@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The recovery vectors (#3493): a secret and its text, the ways a person may type it, and a

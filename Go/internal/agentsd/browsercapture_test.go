@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/skillcatalog"
 )
 
 // capture_secret (#4028): the shown value is saved and hidden, and never said.

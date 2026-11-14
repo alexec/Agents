@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/slack-go/slack"
 )

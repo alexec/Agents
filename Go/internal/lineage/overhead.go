@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The overhead (#4524): the cost that no issue, PR or release carries (a Scrum Master's turn

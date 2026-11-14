@@ -8,9 +8,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/mac"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/mac"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Keeping the Mac awake while agents work (024, #992), as DaemonCore+Wakefulness: the

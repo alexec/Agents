@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane"
-	"github.com/alexec/agents/Go/internal/controlplane/kms"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/kms"
 )
 
 // Each account's control plane is a copy in this process, on a port of its own on

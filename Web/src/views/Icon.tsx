@@ -49,6 +49,7 @@ import paperclip from "lucide:paperclip";
 import phone from "lucide:phone";
 import play from "lucide:play";
 import plug from "lucide:plug";
+import plus from "lucide:plus";
 import radio from "lucide:radio";
 import rotateCw from "lucide:rotate-cw";
 import sparkles from "lucide:sparkles";
@@ -90,7 +91,7 @@ const icons = {
   "file-question-mark": fileQuestionMark, "file-text": fileText, folder, "git-pull-request": gitPullRequest, globe, hand,
   image, info, layers, "layout-grid": layoutGrid, "list-ordered": listOrdered, lock, mail,
   "message-circle": messageCircle, "messages-square": messagesSquare, "octagon-alert": octagonAlert, paperclip,
-  phone, play, plug, radio, "rotate-cw": rotateCw, sparkles, "square-check": squareCheck, "square-pen": squarePen,
+  phone, play, plug, plus, radio, "rotate-cw": rotateCw, sparkles, "square-check": squareCheck, "square-pen": squarePen,
   "square-terminal": squareTerminal, sun, target, "trash-2": trash2, "triangle-alert": triangleAlert, workflow, x, zap,
   "wifi-off": wifiOff, "folder-search": folderSearch, "user-x": userX, history, coins, "building-2": building2,
   pencil, search, brain, hammer, "square-arrow-right": squareArrowRight, "scroll-text": scrollText, "message-circle-question-mark": messageCircleQuestionMark, "undo-2": undo2, "clock-fading": clockFading, "circle-alert": circleAlert,

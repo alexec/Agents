@@ -12,8 +12,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Secrets for this session only (#3548): a secret set from the ask_secret card or Settings ▸

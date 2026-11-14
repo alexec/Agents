@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 func diskNotices(t *testing.T, c *conn, id int) []wire.Need {

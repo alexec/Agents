@@ -13,7 +13,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
 )
 
 // A machine pinned to one control plane (#998, spec 998 slice 4, US7, FR-025–FR-029). An

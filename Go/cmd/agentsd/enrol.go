@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd"
-	"github.com/alexec/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
 )
 
 // enrolEvery is how often a host that could not enrol tries again, or looks for a new code.

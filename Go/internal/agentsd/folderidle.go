@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/safe"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // folder.idle (#360, #1368), as DaemonCore+FolderIdle: every agent in a folder has
