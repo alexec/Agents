@@ -433,14 +433,14 @@ extension View {
 /// accent fill.
 struct PaperSelectionRow: View {
     var body: some View {
-        RoundedRectangle(cornerRadius: Paper.Radius.control)
-            .fill(Paper.selection)
+        // The bar is clipped to the row's rounded shape, so its top and bottom follow the
+        // row's corners (#5237). A 3px shape cannot have a 7px corner of its own: SwiftUI
+        // makes its radius 1.5, and the bar was a straight line past the row's curve.
+        Paper.selection
             .overlay(alignment: .leading) {
-                UnevenRoundedRectangle(topLeadingRadius: Paper.Radius.control,
-                                       bottomLeadingRadius: Paper.Radius.control)
-                    .fill(Paper.accent)
-                    .frame(width: 3)
+                Paper.accent.frame(width: 3)
             }
+            .clipShape(RoundedRectangle(cornerRadius: Paper.Radius.control))
             .padding(.horizontal, 10)
     }
 }
