@@ -6,8 +6,9 @@
 It signs in to Microsoft Graph with the device flow of Microsoft Graph Command Line Tools,
 Microsoft's own public client for scripts, so no app is needed to make the app. The user
 code goes to --code-file (mode 600, default ~/.agents/scratch/entra-device-code), never to
-the output: an agent types it on https://microsoft.com/devicelogin in the agents' real Chrome
-(`chrome-profile-microsoft`) with `cdp.mjs keys … env:…`, and signs in there.
+the output: an agent types it on https://microsoft.com/devicelogin in the agents' browser
+(the `browser_*` tools, Google Chrome since #5207, signed in to Microsoft since #5230), and
+signs in there.
 
 Then it finds the app by its name, or makes it, and sets what the sign-in needs:
 - signInAudience AzureADMultipleOrgs: any work or school account;

@@ -1,7 +1,6 @@
 package agentsd
 
 import (
-	"context"
 	"encoding/json"
 	"strings"
 
@@ -28,14 +27,12 @@ var handToPersonTool = json.RawMessage(`{"name":"hand_to_person","title":"Hand a
 	`"description":"Ask the person to do one step on the browser's current page that you cannot or must not do: solve a CAPTCHA, sign in, approve a sign-in on their phone, or click something only a person should. ` +
 	`Use it only when no tool or secret can do the step: fill a password with fill_secret, not this. ` +
 	`Every client shows a card with the step; the person does it and answers Done or Can't do it. When the app's browser is Google Chrome on a Mac the person is at, its window comes to the front for the step and goes back on Done; otherwise the card has Open the page. ` +
-	`When the step is in one of the agents' own Chrome windows (a real Chrome over DevTools, as for a site that refuses the app's browser), give its cdp_port: the card names that window. ` +
 	`Never do a human check (a CAPTCHA, a press-and-hold, a slider) yourself with synthetic input: hand it over. ` +
 	`You get their answer; then call browser_snapshot to see where the page is now, and carry on from it. ` +
 	`Your other browser calls are refused until they answer. Hand over one step at a time.",` +
 	`"inputSchema":{"type":"object","properties":{` +
 	`"step":{"type":"string","description":"What the person does, as a short instruction: e.g. \"Solve the CAPTCHA\", \"Sign in to GitLab\"."},` +
-	`"reason":{"type":"string","description":"Why you need them, in one sentence: e.g. \"The sign-up form needs a person to pass its check.\""},` +
-	`"cdp_port":{"type":"integer","minimum":1024,"maximum":65535,"description":"Only when the step is in one of the agents' own Chrome windows on this machine, not the app's browser: that Chrome's DevTools port (e.g. 9233 for the profile chrome-profile-microsoft that .agents/signups/cdp.mjs drives). Its page tab comes to the front, and the card names that window."}},` +
+	`"reason":{"type":"string","description":"Why you need them, in one sentence: e.g. \"The sign-up form needs a person to pass its check.\""}},` +
 	`"required":["step","reason"],"additionalProperties":false},` +
 	`"annotations":{"title":"Hand to the person","readOnlyHint":true,"openWorldHint":false}}`)
 
@@ -60,9 +57,8 @@ func handOffSchema(reason string) wire.ElicitationSchema {
 	}}
 }
 
-// handToPerson is hand_to_person, called by an agent that holds browser:agents, or, with
-// cdp_port, by any agent whose step is in one of the agents' own Chrome windows (#5095).
-func (d *Daemon) handToPerson(ctx context.Context, agent wire.UUID, args map[string]json.RawMessage) (string, bool) {
+// handToPerson is hand_to_person, called by an agent that holds browser:agents.
+func (d *Daemon) handToPerson(agent wire.UUID, args map[string]json.RawMessage) (string, bool) {
 	step, reason := strings.TrimSpace(argString(args, "step")), strings.TrimSpace(argString(args, "reason"))
 	if step == "" {
 		return "Nothing was handed over: say in `step` what the person does, e.g. \"Solve the CAPTCHA\".", true
@@ -78,20 +74,11 @@ func (d *Daemon) handToPerson(ctx context.Context, agent wire.UUID, args map[str
 		return browserWords(err), true
 	}
 	handOff := &wire.ElicitationHandOff{Step: step, Reason: &reason}
-	if port, ok := handOffPort(args); ok {
-		window, err := frontChromeTab(ctx, port)
-		if err != nil {
-			return "Nothing was handed over: " + err.Error(), true
-		}
-		handOff.Window = &window
-	}
 	id := store.NewUUID()
-	if handOff.Window == nil {
-		// The agents' browser is Google Chrome (#5207): the person gets its real window
-		// (#5208), which comes down again with the card (formDown).
-		if window, ok := d.showHandOffWindow(agent, id); ok {
-			handOff.Window = &window
-		}
+	// The agents' browser is Google Chrome (#5207): the person gets its real window
+	// (#5208), which comes down again with the card (formDown).
+	if window, ok := d.showHandOffWindow(agent, id); ok {
+		handOff.Window = &window
 	}
 	req := wire.ElicitationRequest{ID: id, AgentID: agent, Message: &step, HandOff: handOff,
 		Mode:  wire.ElicitationRequestMode{Form: &wire.ElicitationRequestModeForm{Value: handOffSchema(reason)}},

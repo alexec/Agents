@@ -410,10 +410,9 @@ lines in under a minute. U1 stays public in Heart's voice until Alex says to rep
 
 1. **The channel:** answered (Alex, 2026-11-11, changed 2026-11-12): a new channel for the
    product, **Loops**, on a Google account of the agents' own (Loops Agents,
-   agentloops@fastmail.com, #4837), not under Alex's Google account. Google refuses sign-up
-   and sign-in in the app's browser (Chrome for Testing), so its pages open in the agents'
-   own Chrome profile (`.agents/signups/cdp.mjs`, not incognito, profile
-   `chrome-profile-google`).
+   agentloops@fastmail.com, #4837), not under Alex's Google account. Google refused sign-up
+   and sign-in in Chrome for Testing; since #5207 the app's browser is Google Chrome, and
+   it is signed in to that account (#5230).
 2. **Public videos** need the YouTube API audit (Google's compliance review) before uploads
    by the API can be public, or Alex makes each one public by hand. Not needed for the
    rehearsal; decided before the first public video.
