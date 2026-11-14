@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/controlplane/records"
-	"github.com/alexec/agents/Go/internal/controlplane/scim"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/scim"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // SCIM groups as groups (#1002, spec 1002 slice 2a, D14, FR-019 to FR-021): a group the

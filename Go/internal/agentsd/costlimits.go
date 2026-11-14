@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The spending limits, as the Swift host holds agents to them: a new agent is refused when

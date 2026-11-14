@@ -3,7 +3,7 @@ package agentsd
 import (
 	"sort"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The person's own pass-through list (#727, #998 FR-011a; #2957): your layer's

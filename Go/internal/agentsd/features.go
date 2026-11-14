@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Which features are used (#2165, specs/2165-feature-counts): a count per day, method and

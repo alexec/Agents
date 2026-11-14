@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane/store"
-	"github.com/alexec/agents/Go/internal/controlplane/usersettings"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/usersettings"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Sealing again (#3397, specs/3397-client-sealing). An org route's secrets are sealed to

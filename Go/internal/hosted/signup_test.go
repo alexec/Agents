@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
 )
 
 // madeAccount says whether a sign-in made an account and sent the browser to it.

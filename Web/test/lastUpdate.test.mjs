@@ -44,3 +44,11 @@ test("the time of the page's read", () => {
   assert.equal(m.pageReadAt({ kind: "connecting" }, 5), 5);
   assert.equal(m.pageReadAt({ kind: "loading" }, undefined), undefined);
 });
+
+test("a usage page says its oldest read (#5144)", () => {
+  const reads = { mac: { cost: 300, usage: 200 }, server: { cost: 100 } };
+  assert.equal(m.oldestRead(reads, ["mac", "server"], ["cost", "usage"]), 100);
+  assert.equal(m.oldestRead(reads, ["mac"], ["cost", "usage"]), 200);
+  assert.equal(m.oldestRead(reads, ["mac"], ["time"]), undefined, "nothing read yet");
+  assert.equal(m.oldestRead(reads, ["gone"], ["cost"]), undefined);
+});

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/safe"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The app's workspace tools for agents (#691 US6, #1444), as DaemonCore+WorkspaceTools: list,

@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
 )
 
 var update = flag.Bool("update", false, "write testdata/wire.golden from what the control plane says now")

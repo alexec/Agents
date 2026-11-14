@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controlplane/audit"
-	"github.com/alexec/agents/Go/internal/controlplane/records"
-	"github.com/alexec/agents/Go/internal/controlplane/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/audit"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Catalogue governance (#2019, M5): a person asks for an MCP server or a skill, an admin

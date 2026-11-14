@@ -22,8 +22,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/alexec/agents/Go/internal/buildinfo"
-	"github.com/alexec/agents/Go/internal/slackmcp"
+	"github.com/agentloops-dev/agents/Go/internal/buildinfo"
+	"github.com/agentloops-dev/agents/Go/internal/slackmcp"
 )
 
 func main() {

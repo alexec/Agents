@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Ports AppToolsEndpointTests and what AppServiceTests hold of the tools this host does:

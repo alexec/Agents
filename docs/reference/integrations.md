@@ -248,7 +248,7 @@ Where these pages are published. Open issues: `is:open label:integration docs`.
 | Integration | Clients that show it | State | Last checked | Where | Gaps |
 | --- | --- | --- | --- | --- | --- |
 | GitHub Pages for the docs site at docs.agentloops.dev (#1549): built and published by `docs-publish` from `main`, with a Let's Encrypt certificate and HTTPS enforced; old `alexec.github.io/Agents/<path>` links go to the same path with a 301; the Mac's **Help ▸ Agents Help**, the Remote's **Help** in Settings and the web page's **Help** open it | Mac, Remote, web | tested on a real account | 2026-10-21, served at `https://docs.agentloops.dev/` with its certificate, and the old links redirect (`.agents/reviews/docs-site-poc-2026-10-21.md`) | `.github/workflows/docs-publish.yml`, `scripts/docs.sh`, `docs/CNAME`, `Shared/UI/HelpSite.swift`, `Web/src/views/Sidebar.tsx` | |
-| Cloudflare DNS for the docs site: the CNAME `docs` to `alexec.github.io`, DNS only | — | tested on a real account | 2026-10-21, made by `dns.sh --names docs --cname alexec.github.io` (#1914) | `deploy/cloudflare/dns.sh` | |
+| Cloudflare DNS for the docs site: the CNAME `docs` to `agentloops-dev.github.io`, DNS only | — | tested on a real account | 2026-11-13, changed from `alexec.github.io` by `dns.sh --names docs --cname agentloops-dev.github.io` after the move to agentloops-dev (#4959); the site serves with HTTPS (2026-10-21: made, #1914) | `deploy/cloudflare/dns.sh` | |
 
 ## Model gateways
 

@@ -1,6 +1,6 @@
 package policylayers
 
-import "github.com/alexec/agents/Go/wire"
+import "github.com/agentloops-dev/agents/Go/wire"
 
 // This file is FR-004's table, as code: one order per rule, tighter ranked higher, so
 // Resolve can pick the tightest of every layer that sets a rule with a plain comparison.

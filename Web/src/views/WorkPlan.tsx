@@ -10,7 +10,7 @@
 // Blocked by. Start lead and Open lead are the page header's. Under 700 px (note 19) the bar takes the width with the
 // words under it, and a child is the phone row: its title on up to two lines, no level chip or pull request, a short
 // line 2.
-import { keepWork, keptWork } from "../model/localCopy";
+import { keepWork, keptWorkRead } from "../model/localCopy";
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import type { AgentState, ForgeDone, ForgeItemDetail, ForgePlan, ForgePlanChild, ForgePlanStep, ForgeStanding, LineageCostRollup, LineageEstimate, LineageLink } from "../protocol/generated";
@@ -33,16 +33,21 @@ const holdsRuntime = (s: AgentState) => s === "starting" || s === "running" || s
 /** The mark's glyph before line 2's words; a closed child's state icon says it is done. */
 const markGlyph: Record<PlanMark, string | undefined> = { done: undefined, working: "●", attention: "⚠", waiting: "○", blocked: "⊘" };
 
-export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = [], writes, waiting = false, wrote }: {
+export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = [], writes, waiting = false, wrote, fromCopy }: {
   store: Store; host: string; lineageHost: string | undefined; detail: ForgeItemDetail; asked: number;
   estimates?: readonly LineageEstimate[]; writes: boolean;
   /** The page is this device's copy (#4930): no changes, and no words on why, until the machine answers. */
   waiting?: boolean; wrote: () => void;
+  /** Told when the plan drawn from this device's copy was read, until its machine answers, and undefined after (#5142):
+   * the page's one "From this device" strip says the oldest of it and the item's. */
+  fromCopy?: (at: number | undefined) => void;
 }) {
   const plan = useSignal<ForgePlan | null>(null);
   const problem = useSignal<string | null>(null);
   /** The plan on screen came from this device's copy (#4930): no changes until its machine answers. */
   const fromDevice = useSignal(false);
+  /** When the plan on screen was read (#5142): this device's copy's time, or the last read that worked. */
+  const planAt = useSignal<number | undefined>(undefined);
   const rollups = useSignal<Record<string, LineageCostRollup>>({});
   const links = useSignal<Record<string, LineageLink[]>>({});
   const said = useSignal<{ words: string; failed: boolean } | null>(null);
@@ -58,6 +63,10 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
   const field = useRef<HTMLInputElement>(null);
   const node = detail.item.node;
   useEffect(() => { folded.value = {}; }, [node.ref, asked]);
+  // The page's strip says when a plan from the copy was read, until the machine answers (#5142).
+  const copyAt = fromDevice.value && !problem.value ? planAt.value : undefined;
+  useEffect(() => { fromCopy?.(copyAt); }, [copyAt]);
+  useEffect(() => () => fromCopy?.(undefined), []);
   useEffect(() => {
     let current = true;
     // After a write the plan stays up while it is read again, and its line says what was done.
@@ -65,8 +74,8 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
     void (async () => {
       // Seen before: this device's copy at once, until the machine answers (#4930).
       if (!plan.peek()) {
-        const kept = await keptWork<ForgePlan>("plan", node.ref);
-        if (current && kept && !plan.peek()) { plan.value = kept; fromDevice.value = true; }
+        const kept = await keptWorkRead<ForgePlan>("plan", node.ref);
+        if (current && kept && !plan.peek()) { plan.value = kept.value; planAt.value = kept.at; fromDevice.value = true; }
       }
       let got: ForgePlan;
       try {
@@ -78,6 +87,7 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
       }
       if (!current) return;
       plan.value = got;
+      planAt.value = Date.now();
       fromDevice.value = false;
       problem.value = null;
       keepWork("plan", node.ref, got);
@@ -235,7 +245,7 @@ export function WorkPlan({ store, host, lineageHost, detail, asked, estimates = 
         <>
           <Header plan={p} running={running} rollups={Object.values(rollups.value)} estimates={estimates} />
           <LeadLine store={store} plan={p} open={openSession} />
-          {problem.value && <div class="work-plan-strip"><ErrorStrip lines={[problem.value]} retry={() => { changed.value++; }} /></div>}
+          {problem.value && <div class="work-plan-strip"><ErrorStrip lines={[problem.value]} retry={() => { changed.value++; }} at={planAt.value} /></div>}
           <div class={`work-plan-body${problem.value ? " stale" : ""}`}>
             {p.standing && <Query plan={p} standing={p.standing} running={running} rollups={Object.values(rollups.value)} />}
             {p.children.length === 0 ? !p.standing?.error && (

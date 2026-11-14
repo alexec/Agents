@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/machinelock"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/machinelock"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 func signingKey(t *testing.T) *ecdsa.PrivateKey {

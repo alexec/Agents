@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A server's Claude and Codex signed in from a client (#3349), with fakes of their own

@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/bitbucketmcp"
-	"github.com/alexec/agents/Go/internal/connections"
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/bitbucketmcp"
+	"github.com/agentloops-dev/agents/Go/internal/connections"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Bitbucket Cloud on the Work pages (#3786, after Forgejo's #3753): the issues and pull

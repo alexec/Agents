@@ -68,7 +68,7 @@ struct FirstBuildTests {
         let plan = [
             PlanEntry(content: "Set up the agent runtime", priority: .medium, status: .completed),
             PlanEntry(content: "Connect GitHub", priority: .medium, status: .completed),
-            PlanEntry(content: "Make the repository from alexec/web-service-starter", priority: .medium, status: .completed),
+            PlanEntry(content: "Make the repository from agentloops-dev/web-service-starter", priority: .medium, status: .completed),
             PlanEntry(content: "Set up Google Cloud (Cloud Run).", priority: .medium, status: .inProgress),
             PlanEntry(content: "Set up Sentry", priority: .medium, status: .pending),
         ]

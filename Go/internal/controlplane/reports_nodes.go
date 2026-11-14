@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // reports/nodes (#3118): the lineage nodes of one kind in a scope, as Work ▸ Issues, Pull

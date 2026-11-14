@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/agentsd/skillcatalog"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/skillcatalog"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A secret for this session only (#3548): set on the ask_secret card, it is the asking

@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // RealForgejo reads Forgejo's REST API v1 (Gitea's too: they share it) as the person, with the

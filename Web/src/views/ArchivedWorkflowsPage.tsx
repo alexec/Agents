@@ -11,8 +11,10 @@ import { ArchivedFooter, ArchivedFrame } from "./ArchivedParts";
 import { workflowMatches } from "./Sidebar";
 import { WorkflowRow } from "./WorkflowRow";
 
-export function ArchivedWorkflowsPage({ store, host, folder, folderName, down }: {
+export function ArchivedWorkflowsPage({ store, host, folder, folderName, down, liveUntil }: {
   store: Store; host: string; folder: string; folderName: string; down: boolean;
+  /** When the rows were last live with their host while it, or the link, is down (#5143). */
+  liveUntil: number | undefined;
 }) {
   const online = store.hostIsOnline(host);
   const [filter, setFilter] = useState("");
@@ -29,7 +31,7 @@ export function ArchivedWorkflowsPage({ store, host, folder, folderName, down }:
   const state = archivedState(shown.length, !!words, true, !online || down);
   return (
     <ArchivedFrame kind="workflows" title={workflowsWords.title} folderName={folderName} filterLabel={workflowsWords.filter}
-      filter={filter} onFilter={setFilter} state={state} noMatch={workflowsWords.noMatch}
+      filter={filter} onFilter={setFilter} state={state} readAt={liveUntil} noMatch={workflowsWords.noMatch}
       empty={{ mark: "◷", title: workflowsWords.emptyTitle, line: workflowsWords.emptyLine }}>
       {shown.map((summary) => (
         <div class="nav-item" key={summary.workflow.workflowID}>

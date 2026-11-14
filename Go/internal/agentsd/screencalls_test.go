@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // fakeDriveSource answers every request with {"ok":true}, never touching a real screen:

@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/machine"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/machine"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Ports WorkflowFireTests and WorkflowQueueTests: Run now starts the workflow's agent and

@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/buildinfo"
-	"github.com/alexec/agents/Go/internal/safe"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/buildinfo"
+	"github.com/agentloops-dev/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agents/Go/wire"
 	"golang.org/x/sys/unix"
 )
 

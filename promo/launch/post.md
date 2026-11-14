@@ -61,6 +61,6 @@ Agents does not. Agents needs a Mac.
 - The site: [agentloops.dev](https://agentloops.dev/)
 - The docs, starting with [your first agent](https://docs.agentloops.dev/tutorials/first-agent/):
   [docs.agentloops.dev](https://docs.agentloops.dev/)
-- The source, visible for reference (all rights reserved): [github.com/alexec/Agents](https://github.com/alexec/Agents)
+- The source, visible for reference (all rights reserved): [github.com/agentloops-dev/Agents](https://github.com/agentloops-dev/Agents)
 
 If something does not work, open an issue on GitHub. I read every one.

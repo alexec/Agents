@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/repoalias"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/repoalias"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 func movedPR(n string) wire.LineageNode {

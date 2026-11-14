@@ -1732,6 +1732,253 @@ type BuildOutputRemoved struct {
 	Freed WorktreeSize `json:"freed"`
 }
 
+// A default-branch run of the workflow after a change's last fast run, up to its first slow one (#5177, board 2): whether its run started the job (a run whose paths did not select it did not), and how long the job ran, in seconds.
+type BuildsBetween struct {
+	Run BuildsRunRef `json:"run"`
+
+	Ran bool `json:"ran"`
+
+	JobRun *float64 `json:"jobRun,omitzero"`
+}
+
+// A change point in one job's run time on the default branch (#5177): the runs either side of the step, the medians of its run time and of its wait (for a runner and its turn) on each side, in seconds, and the score. slower says the run time went up. between is each run in between; points are the job's runs around the change. The finder does not blame: firstSlow is the first run to look at.
+type BuildsChange struct {
+	Workflow string `json:"workflow"`
+
+	Job string `json:"job"`
+
+	Slower bool `json:"slower"`
+
+	At Date `json:"at"`
+
+	LastFast BuildsRunRef `json:"lastFast"`
+
+	FirstSlow BuildsRunRef `json:"firstSlow"`
+
+	MedianBefore float64 `json:"medianBefore"`
+
+	MedianAfter float64 `json:"medianAfter"`
+
+	QueueBefore float64 `json:"queueBefore"`
+
+	QueueAfter float64 `json:"queueAfter"`
+
+	Score float64 `json:"score"`
+
+	Runner *string `json:"runner,omitzero"`
+
+	Between []BuildsBetween `json:"between"`
+
+	Points []BuildsPoint `json:"points"`
+}
+
+// One day of a build trend (#5177), the day (YYYY-MM-DD) in the request's time zone.
+type BuildsDay struct {
+	Day string `json:"day"`
+
+	Figures BuildsFigures `json:"figures"`
+}
+
+// A set of CI runs' figures (#5177, spec 5166): runs is the first attempts, green those that passed, reruns the later attempts, counted apart and out of the time figures. Each time figure is of the runs that passed, in seconds: toGreen (made to the last job's end), run (the time a job ran), runner (waiting for a runner) and turn (waiting its turn: made to the first job made); run + runner + turn = toGreen. With a job picked, the job's own run and runner wait.
+type BuildsFigures struct {
+	Runs int64 `json:"runs"`
+
+	Green int64 `json:"green"`
+
+	Reruns int64 `json:"reruns"`
+
+	ToGreen BuildsStat `json:"toGreen"`
+
+	Run BuildsStat `json:"run"`
+
+	Runner BuildsStat `json:"runner"`
+
+	Turn BuildsStat `json:"turn"`
+}
+
+// builds/history's answer (#5177): the filters' choices in the range (workflows, jobs, branches), the range's figures and each day's, the change points found in the range (on the default branch, whatever the branch filter), and the job that waited longest for a runner. readAt is when this machine last read the forge's runs (Last update); filledFrom is the oldest day the backfill reached, absent before it starts. reader is none when Agents does not read CI timings from the repository's forge.
+type BuildsHistory struct {
+	Repo string `json:"repo"`
+
+	DefaultBranch *string `json:"defaultBranch,omitzero"`
+
+	Reader string `json:"reader"`
+
+	Workflows []string `json:"workflows"`
+
+	Jobs []string `json:"jobs"`
+
+	Branches []string `json:"branches"`
+
+	Total BuildsFigures `json:"total"`
+
+	Days []BuildsDay `json:"days"`
+
+	Changes []BuildsChange `json:"changes"`
+
+	LongestRunnerWait *BuildsRunnerWait `json:"longestRunnerWait,omitzero"`
+
+	ReadAt *Date `json:"readAt,omitzero"`
+
+	FilledFrom *Date `json:"filledFrom,omitzero"`
+}
+
+// builds/history (#5177): a repository (github:alexec/agents), runs made in [from, to), and the filters: a workflow's file name (ci.yml), a job, and the default branch (no branch and no pullRequests), the pull requests' runs, or one branch. timeZone (an IANA name) says the days; UTC when not said.
+type BuildsHistoryRequest struct {
+	Repo string `json:"repo"`
+
+	From Date `json:"from"`
+
+	To Date `json:"to"`
+
+	TimeZone *string `json:"timeZone,omitzero"`
+
+	Workflow *string `json:"workflow,omitzero"`
+
+	Job *string `json:"job,omitzero"`
+
+	Branch *string `json:"branch,omitzero"`
+
+	PullRequests *bool `json:"pullRequests,omitzero"`
+}
+
+// One job of a CI run attempt (#5177): made (waiting for a runner from then), started and ended, in seconds from the run's made time; runner is its first runner label. A forge with no steps has none.
+type BuildsJob struct {
+	Name string `json:"name"`
+
+	Made float64 `json:"made"`
+
+	Started float64 `json:"started"`
+
+	Ended float64 `json:"ended"`
+
+	Conclusion *string `json:"conclusion,omitzero"`
+
+	Runner *string `json:"runner,omitzero"`
+
+	Steps []BuildsStep `json:"steps"`
+}
+
+// One run of a job around a change (#5177, board 2): its ci-run ref, when it was made, the job's run time and its wait (for a runner and its turn), in seconds.
+type BuildsPoint struct {
+	Ref string `json:"ref"`
+
+	Made Date `json:"made"`
+
+	Ran float64 `json:"ran"`
+
+	Queue float64 `json:"queue"`
+}
+
+// One CI run attempt, with its jobs and their steps (#5177, board 3): times in seconds from made; started is the attempt's start, ended its last job's end, turn its wait for its turn.
+type BuildsRun struct {
+	Ref string `json:"ref"`
+
+	ID int64 `json:"id"`
+
+	Attempt int64 `json:"attempt"`
+
+	Workflow string `json:"workflow"`
+
+	Event *string `json:"event,omitzero"`
+
+	Branch *string `json:"branch,omitzero"`
+
+	HeadSha *string `json:"headSha,omitzero"`
+
+	Pr *int64 `json:"pr,omitzero"`
+
+	URL *string `json:"url,omitzero"`
+
+	Default *bool `json:"default,omitzero"`
+
+	Tag *bool `json:"tag,omitzero"`
+
+	Made Date `json:"made"`
+
+	Started float64 `json:"started"`
+
+	Ended float64 `json:"ended"`
+
+	Turn float64 `json:"turn"`
+
+	Conclusion *string `json:"conclusion,omitzero"`
+
+	Jobs []BuildsJob `json:"jobs"`
+}
+
+// builds/run's answer (#5177): the run attempt, and the run to compare it with (the newest passed first attempt of its workflow before it on its branch, or on the default branch when its branch has none). attempts is how many attempts the store has of the run.
+type BuildsRunAnswer struct {
+	Run BuildsRun `json:"run"`
+
+	Before *BuildsRun `json:"before,omitzero"`
+
+	Attempts int64 `json:"attempts"`
+}
+
+// A CI run attempt, named (#5177): its ci-run ref (github:run:alexec/agents#123), id, attempt and when it was made; its address, head commit, branch, pull request and conclusion when known.
+type BuildsRunRef struct {
+	Ref string `json:"ref"`
+
+	ID int64 `json:"id"`
+
+	Attempt int64 `json:"attempt"`
+
+	Made Date `json:"made"`
+
+	URL *string `json:"url,omitzero"`
+
+	HeadSha *string `json:"headSha,omitzero"`
+
+	Branch *string `json:"branch,omitzero"`
+
+	Pr *int64 `json:"pr,omitzero"`
+
+	Conclusion *string `json:"conclusion,omitzero"`
+}
+
+// builds/run (#5177): a repository and a run's ci-run ref; its first attempt when attempt is not said.
+type BuildsRunRequest struct {
+	Repo string `json:"repo"`
+
+	Ref string `json:"ref"`
+
+	Attempt *int64 `json:"attempt,omitzero"`
+}
+
+// The job of a range's passed runs that waited longest for a runner (#5177, board 3 note 4): its run, its name, the wait and its run time, in seconds.
+type BuildsRunnerWait struct {
+	Run BuildsRunRef `json:"run"`
+
+	Job string `json:"job"`
+
+	Wait float64 `json:"wait"`
+
+	Ran float64 `json:"ran"`
+}
+
+// A median and a 90th percentile of n values, in seconds (#5177); 0 and 0 when n is 0.
+type BuildsStat struct {
+	Median float64 `json:"median"`
+
+	P90 float64 `json:"p90"`
+
+	N int64 `json:"n"`
+}
+
+// One step of a job (#5177), started and ended in seconds from the run's made time, as the forge says them.
+type BuildsStep struct {
+	Name string `json:"name"`
+
+	Number int64 `json:"number"`
+
+	Started float64 `json:"started"`
+
+	Ended float64 `json:"ended"`
+
+	Conclusion *string `json:"conclusion,omitzero"`
+}
+
 // bus/deliver (#4729): one event on the bus that matched subscriptions of this machine, and which ones. Best effort: usually once, sometimes never, rarely twice.
 type BusDelivery struct {
 	Event BusEvent `json:"event"`
@@ -4757,7 +5004,7 @@ type FirstBuildStartRequest struct {
 	Another *bool `json:"another,omitzero"`
 }
 
-// The starter that a first build begins from (#5048): iphone-app is alexec/iphone-app-starter, web-service is alexec/web-service-starter, as make_app_repository names them.
+// The starter that a first build begins from (#5048): iphone-app is agentloops-dev/iphone-app-starter, web-service is agentloops-dev/web-service-starter, as make_app_repository names them.
 type FirstBuildStarter string
 
 const FirstBuildStarterIphoneApp FirstBuildStarter = "iphone-app"

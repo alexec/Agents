@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/mac"
+	"github.com/agentloops-dev/agents/Go/internal/mac"
 )
 
 // scratchHostKeys is a scratch root's Keychain store, its item deleted after the test: a

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The Summary row and page (#3721): summaries/list has the saved pages newest first, with

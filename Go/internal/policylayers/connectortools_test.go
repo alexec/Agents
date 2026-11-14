@@ -3,7 +3,7 @@ package policylayers
 import (
 	"testing"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 func toolLevel(v wire.ConnectorToolLevel) *wire.ConnectorToolLevel { return &v }

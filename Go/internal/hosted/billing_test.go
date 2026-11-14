@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controlplane/store"
-	"github.com/alexec/agents/Go/internal/hosted/billing"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/hosted/billing"
 )
 
 const webhookSecret = "whsec_test"

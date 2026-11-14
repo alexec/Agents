@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/secretrelease"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/secretrelease"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The release layer on Linux (#4058, the spike #4013). Every session runs as the same user,

@@ -300,10 +300,10 @@ private struct WorkListPane: View {
         return ScrollViewReader { reader in
             selectable {
                 if list.fromDevice {
-                    WorkFromDeviceStrip(on: true).listRowSeparator(.hidden).selectionDisabled()
+                    WorkFromDeviceStrip(read: list.fromDeviceRead).listRowSeparator(.hidden).selectionDisabled()
                 }
                 if !lines.isEmpty {
-                    WorkErrorStrip(lines: lines) { list.asked += 1 }.listRowSeparator(.hidden).selectionDisabled()
+                    WorkErrorStrip(lines: lines, read: list.keptRead) { list.asked += 1 }.listRowSeparator(.hidden).selectionDisabled()
                 }
                 ForEach(shown) { row in
                     Button { open(row.id) } label: {

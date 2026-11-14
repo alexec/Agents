@@ -27,6 +27,14 @@ export function archivedState(held: number, filtering: boolean, answered: boolea
 
 /** The strip over what was last read, and alone when nothing was. */
 export const staleStrip = "Its machine isn’t answering. Showing what was last read.";
+
+/**
+ * The time for the strip's "Last update" line (#5143): when the rows were last live with their host
+ * (the time it, or the link to it, went), else when the page's own ask was last answered.
+ */
+export function readAt(liveUntil: number | undefined, answeredAt: number | undefined): number | undefined {
+  return liveUntil ?? answeredAt;
+}
 export const loadingMore = "Loading more…";
 
 export const sessionsWords = {

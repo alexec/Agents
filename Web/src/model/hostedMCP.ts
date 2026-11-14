@@ -86,20 +86,28 @@ export function healthKind(server: MCPServerHealth): string {
 /** How it is doing, in a line. */
 export function healthLine(server: MCPServerHealth): string {
   if (server.hosted) return server.live ? hostedLine(server.live) : "Hosted · starts on the first call";
-  const checked = server.checkedAt != null ? ` · checked ${clock(server.checkedAt)}` : "";
   switch (server.check) {
     case "unchecked": return "Not checked yet";
     case "checking": return "Checking…";
     case "answered": {
       const tools = server.tools == null ? "" : server.tools === 1 ? " · 1 tool" : ` · ${server.tools} tools`;
-      return "Answered" + tools + checked;
+      return "Answered" + tools;
     }
-    case "failed": return "Didn't answer" + checked;
+    case "failed": return "Didn't answer";
     case "waiting": return "Waiting for approval in this folder's settings, so it is not started";
     case "missingSecret": return "Needs a secret that isn't set here, so it is not started";
     case "signIn": return "Wants a sign-in first, in Settings";
     case "oldTransport": return "Uses the old sse transport, which isn't checked";
   }
+}
+
+/**
+ * When the oldest of these servers was last checked, in ms since 1970: the page's "Last update"
+ * (#5145), in place of a clock time on each row, as MCPHealthWords.readAt. Undefined when none was checked yet.
+ */
+export function healthReadAt(servers: readonly MCPServerHealth[]): number | undefined {
+  const times = servers.flatMap((s) => (s.checkedAt == null ? [] : [fromWireDate(s.checkedAt).getTime()]));
+  return times.length ? Math.min(...times) : undefined;
 }
 
 /** Why it last failed, when it has: shown under the line. */

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The wake message says an MCP event's payload as YAML, not one line of JSON (#3569).

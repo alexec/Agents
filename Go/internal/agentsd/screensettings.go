@@ -3,7 +3,7 @@ package agentsd
 import (
 	"context"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Desktop control (#3004, US2, FR-004, T020; #4264): <settings>/desktop-control.json,

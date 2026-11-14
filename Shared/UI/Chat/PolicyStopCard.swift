@@ -1,12 +1,13 @@
 import AgentsKitCore
 import SwiftUI
 
-/// A rule of the policy stopped this agent (#2957, FR-025, frame E): **Stopped by a policy**,
-/// the rule, the layer that decides and its value, and why. **Change** opens that layer's
-/// pane where the person can edit it (your layer, a folder's); an organisation's rule offers
-/// Spending for a budget, or Organisation Policy. At the organisation's budget, **Ask for
-/// More** asks an admin to raise it for today (#3262), as an Ask at the end of the chat while
-/// it can be raised (`PolicyStopAsk`, #5031), and this record then says where the request stands. The web page's is `Web/src/views/chat/PolicyStopCard.tsx`.
+/// A rule of the policy stopped this agent (#2957, FR-025, frame E), on the record as a Line
+/// (#5036): **Stopped by a policy**, the rule, and one link to where it can be changed (your
+/// layer, a folder's; Spending for an organisation's budget, or Organisation Policy). It opens
+/// to the layer that decides, its value, and why. At the organisation's budget, **Ask for More**
+/// asks an admin to raise it for today (#3262), as an Ask at the end of the chat while it can be
+/// raised (`PolicyStopAsk`, #5031), and this line then says where the request stands. The web
+/// page's is `Web/src/views/chat/PolicyStopCard.tsx`.
 struct PolicyStopCard: View {
     let refusal: DaemonAPI.PolicyRefusal
     let entryID: UUID
@@ -16,38 +17,26 @@ struct PolicyStopCard: View {
     private var asked: DaemonAPI.BudgetRequest? { PolicyStopAsks.shared.asked[entryID] }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(PolicyLayersWords.stopTitle, icon: PolicyLayersWords.stopSymbol)
-                .appText(.reading).fontWeight(.semibold)
-                .tinted(.warning)
-            if let rule = refusal.rule {
-                Text(PolicyLayersWords.ruleTitle(rule)).appText(.reading)
-            }
-            if let line = PolicyLayersWords.stopLine(refusal) {
-                Label(line, icon: "lock.fill")
-                    .appText(.fine).foregroundStyle(.secondary)
-            }
-            Text(refusal.words)
-                .appText(.reading)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            if let asked {
-                Text(PolicyLayersWords.asked(asked))
-                    .appText(.fine).foregroundStyle(.secondary)
+        RecordLine(icon: PolicyLayersWords.stopSymbol, head: PolicyLayersWords.stopTitle,
+                   detail: asked.map(PolicyLayersWords.asked) ?? refusal.rule.map(PolicyLayersWords.ruleTitle),
+                   action: actions.openPolicy.map { open in
+                       StripButton(title: PolicyLayersWords.stopActionTitle(action)) { open(action) }
+                   },
+                   openHelp: ("Show why", "Hide why")) {
+            VStack(alignment: .leading, spacing: 4) {
+                if asked != nil, let rule = refusal.rule {
+                    Text(PolicyLayersWords.ruleTitle(rule)).appText(.reading)
+                }
+                if let line = PolicyLayersWords.stopLine(refusal) {
+                    Label(line, icon: "lock.fill")
+                        .appText(.fine).foregroundStyle(.secondary)
+                }
+                Text(refusal.words)
+                    .appText(.reading)
+                    .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            if let open = actions.openPolicy {
-                HStack {
-                    Spacer()
-                    AskDecline(PolicyLayersWords.stopActionTitle(action)) { open(action) }
-                }
-            }
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(StateTint.warning.color?.opacity(0.05) ?? .clear, in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder((StateTint.warning.color ?? .secondary).opacity(0.25)))
-        .accessibilityElement(children: .contain)
     }
 }
 

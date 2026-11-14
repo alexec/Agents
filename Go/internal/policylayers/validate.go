@@ -6,7 +6,7 @@ import (
 	"log"
 	"sync"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 const maxLayerBytes = 16 * 1024

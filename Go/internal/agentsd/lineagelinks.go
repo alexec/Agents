@@ -12,11 +12,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/bitbucketmcp"
-	"github.com/alexec/agents/Go/internal/gitlabmcp"
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/internal/safe"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/bitbucketmcp"
+	"github.com/agentloops-dev/agents/Go/internal/gitlabmcp"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The links the host makes on its own (#2349), so agents and people seldom have to:
@@ -704,6 +704,8 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 	switch e.Name {
 	case "checks.failed", "checks.passed", "run.completed":
 		d.lineageCIEvent(e)
+		// A run finished: the build timings read it soon (#5177).
+		d.kickCITimings()
 	case "health.issue_new", "health.issue_regressed":
 		d.lineageHealthEvent(e)
 		return

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #4167: ask_secret carries the agent's description to the card, the person's changed one is

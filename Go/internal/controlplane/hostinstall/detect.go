@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // DetectedServer is DaemonAPI.DetectedServer: one host in the ssh config (its Host name,

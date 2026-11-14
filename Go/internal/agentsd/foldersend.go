@@ -7,9 +7,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/safe"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Send to ‹machine›… from a client (#4613): this host sends the folder itself, through the

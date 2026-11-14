@@ -74,12 +74,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/buildinfo"
-	"github.com/alexec/agents/Go/internal/connections"
-	"github.com/alexec/agents/Go/internal/controlplane"
-	"github.com/alexec/agents/Go/internal/controlplane/kms"
-	"github.com/alexec/agents/Go/internal/controlplane/webpush"
-	"github.com/alexec/agents/Go/internal/hosted"
+	"github.com/agentloops-dev/agents/Go/internal/buildinfo"
+	"github.com/agentloops-dev/agents/Go/internal/connections"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/kms"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/webpush"
+	"github.com/agentloops-dev/agents/Go/internal/hosted"
 )
 
 func main() {

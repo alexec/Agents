@@ -38,7 +38,10 @@ struct RemoteApp: App {
     static func link() -> any DaemonLink {
         // The canned daemon speaks bare JSON-RPC; the Remote wraps its lines for a control
         // plane (#3234), so one is put in front of it (#4126).
-        if ProcessInfo.processInfo.arguments.contains("-fake") { return OneHostPlane(FakeDaemon()) }
+        let arguments = ProcessInfo.processInfo.arguments
+        // The same, gone quiet after its first read, for a walk of the stale pages (#5147).
+        if arguments.contains("-fake-drop") { return OneHostPlane(DroppingLink(FakeDaemon())) }
+        if arguments.contains("-fake") { return OneHostPlane(FakeDaemon()) }
         return RemoteControl.link() ?? NotPairedLink()
     }
 
@@ -446,21 +449,22 @@ struct RemoteView: View {
     @ViewBuilder
     private func activityPage(_ item: SidebarItem) -> some View {
         switch item {
-        case .events: EventsListView().paperGround()
+        case .events: EventsListView().staleBanner().paperGround()
         // Resources are a section of This Mac's page (#4027).
-        case .resources: RemoteMachinePage(host: .mac).paperGround()
+        case .resources: RemoteMachinePage(host: .mac).staleBanner().paperGround()
         case .runtimes: RuntimesView().paperGround()
-        case .secretsStatus: RemoteStatusSecretsPage(kind: .secrets).paperGround()
-        case .accountsStatus: RemoteStatusSecretsPage(kind: .accounts).paperGround()
-        case .machine(let host): RemoteMachinePage(host: host).paperGround()
+        case .secretsStatus: RemoteStatusSecretsPage(kind: .secrets).staleBanner().paperGround()
+        case .accountsStatus: RemoteStatusSecretsPage(kind: .accounts).staleBanner().paperGround()
+        case .machine(let host): RemoteMachinePage(host: host).staleBanner().paperGround()
         case .multiplier: RemoteMultiplierPage().paperGround()
         case .velocity: RemoteVelocityPage().paperGround()
-        case .work: WorkView(model: model).paperGround()
+        case .work: WorkView(model: model).staleBanner().paperGround()
         case .summary:
             SummaryPageView(pages: model.summaryPages, settings: model.dailySummarySettings,
                             read: { await model.readSummaryPage($0) },
                             setSettings: { changed in Task { _ = await model.setDailySummarySettings(changed) } },
                             openAgent: { model.open($0) })
+                .staleBanner()
                 .paperGround()
         // Cost, Tokens, Time and connectors are Mac + web (#2798): nothing opens them here.
         default: NothingPickedPage()
@@ -579,6 +583,7 @@ struct RemoteVelocityPage: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(sizeClass == .compact ? 16 : 24)
         }
+        .staleBanner()
         .navigationTitle("Velocity")
         .toolbarTitleDisplayMode(.inline)
     }
@@ -589,8 +594,9 @@ struct RemoteMultiplierPage: View {
     @Environment(RemoteModel.self) private var model
 
     var body: some View {
-        MultiplierPage(multiplier: model.work.multiplier, achievements: model.work.achievements,
+        MultiplierPage(multiplier: model.work.multiplier, read: model.work.multiplierReadAt, achievements: model.work.achievements,
                        agentsWorking: model.agentsWorking, refresh: { await model.refreshMultiplier() })
+            .staleBanner()
             .navigationTitle("Multiplier")
             .toolbarTitleDisplayMode(.inline)
     }

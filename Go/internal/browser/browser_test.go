@@ -1,6 +1,9 @@
 package browser
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -569,5 +572,75 @@ func mustStart(t *testing.T, m *Machine) {
 	t.Helper()
 	if _, err := m.Endpoint(nil); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestARealWindowForThePerson (#5208) shows a real Google Chrome's window on the screen and
+// brings it to the front with agents-drive's "front", then puts both back. It moves a window
+// on this machine's screen: take the "screen" lease. AGENTS_TEST_GOOGLE_CHROME is Google
+// Chrome, AGENTS_TEST_DRIVE an agents-drive built from Host/AgentsDrive.
+func TestARealWindowForThePerson(t *testing.T) {
+	exe, drive := os.Getenv("AGENTS_TEST_GOOGLE_CHROME"), os.Getenv("AGENTS_TEST_DRIVE")
+	if exe == "" || drive == "" {
+		t.Skip("set AGENTS_TEST_GOOGLE_CHROME and AGENTS_TEST_DRIVE to move a real window")
+	}
+	p, err := launchChromium(exe, t.TempDir(), os.Environ(), mode{chrome: true, headed: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		p.stop()
+		<-p.done
+	}()
+	m := &Machine{running: p}
+	ctx := p.store.(cdpStore).ctx
+	where := func() []float64 {
+		at, err := chromedp.Run(ctx, chromedp.Evaluate[[]float64](`[window.screenX, window.screenY, screen.height]`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		return at
+	}
+	front := func(pid int) int {
+		cmd := exec.Command(drive)
+		cmd.Stdin = strings.NewReader(`{"action":"front","pid":` + strconv.Itoa(pid) + "}\x00")
+		out, err := cmd.Output()
+		if err != nil {
+			t.Fatal(err)
+		}
+		var a struct {
+			OK       bool   `json:"ok"`
+			Error    string `json:"error"`
+			Previous int    `json:"previous"`
+		}
+		if err := json.Unmarshal(bytes.TrimRight(out, "\x00"), &a); err != nil || !a.OK {
+			t.Fatalf("%s %v", out, err)
+		}
+		return a.Previous
+	}
+	t.Logf("below the screen: %v", where())
+	pid, err := m.ShowWindow(context.Background(), "")
+	if err != nil || pid != p.pid {
+		t.Fatal(pid, err)
+	}
+	if at := where(); at[0] != onScreen || at[1] < 0 || at[1] > at[2] {
+		t.Fatalf("not on the screen: %v", at)
+	}
+	before := front(pid)
+	t.Logf("in front of pid %d", before)
+	if again := front(pid); again != pid {
+		t.Fatalf("Chrome is not in front: pid %d is", again)
+	}
+	if err := m.HideWindow(context.Background(), ""); err != nil {
+		t.Fatal(err)
+	}
+	if back := front(before); back != pid {
+		t.Fatalf("pid %d was in front, not Chrome", back)
+	}
+	if now := front(before); now != before {
+		t.Fatalf("pid %d did not come back: %d is in front", before, now)
+	}
+	if at := where(); at[0] > -1000 && at[1] < at[2] {
+		t.Fatalf("still on the screen: %v", at)
 	}
 }

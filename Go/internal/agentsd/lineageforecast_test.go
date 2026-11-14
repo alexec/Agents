@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #4526: a weekly allowance at its reading's pace: half used two days into the week runs out

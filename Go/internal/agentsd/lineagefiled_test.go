@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #3582: a session that files an epic and its children opens each of them, and once the

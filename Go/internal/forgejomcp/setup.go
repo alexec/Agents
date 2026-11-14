@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // The reads that prove a repository's set-up on Forgejo (#3752), as the gitlab server's

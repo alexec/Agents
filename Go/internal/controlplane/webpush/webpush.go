@@ -93,7 +93,7 @@ func KnownService(endpoint string) bool {
 }
 
 // Subject is the address a push service is given when none is configured.
-const Subject = "https://github.com/alexec/Agents"
+const Subject = "https://github.com/agentloops-dev/Agents"
 
 // ttl is how long a push service keeps a push for a browser that is not running.
 const ttl = 24 * time.Hour

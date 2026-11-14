@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/githubmcp"
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 func (f *fakeForgeGitHub) Timeline(_ context.Context, repo, _ string) (githubmcp.Timeline, error) {

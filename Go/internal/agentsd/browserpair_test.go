@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // pair_web_page (#4214): the agent's tab opens the web page with the control plane's code,

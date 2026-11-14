@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Cost on the link (#2350): each turn's cost, tokens and time are banked under the links

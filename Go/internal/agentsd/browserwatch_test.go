@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/browser"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/browser"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Watching the machine's browser (#3528): watching starts nothing, frames go only to the

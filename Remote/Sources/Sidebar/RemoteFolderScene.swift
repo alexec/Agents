@@ -188,6 +188,7 @@ private struct RemoteFolderSidebar: View {
     let back: (() -> Void)?
     /// Its own folds: Sessions folded here leaves the main sidebar's folder open.
     @State private var folds = SidebarFolds(scope: ".folderScene")
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     /// Pinned and Needs You, as Settings ▸ Sidebar has them on: Working and Unread are
     /// this folder's sessions, so they stay in its list.
@@ -235,6 +236,11 @@ private struct RemoteFolderSidebar: View {
             }
         }
         .shows([.workflows, .pins, .leases])
+        // On an iPhone the folder covers every folder's list and its banner (#5147); beside
+        // the detail on an iPad, the detail says it, as `RemoteSidebar`'s.
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if sizeClass == .compact { StaleBanner() }
+        }
         .onAppear { folds.set(summary.key, open: true) }
     }
 }

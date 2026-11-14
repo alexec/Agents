@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/connections"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/connections"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #4072: a folder added before its forge was connected lists that forge's pull requests once

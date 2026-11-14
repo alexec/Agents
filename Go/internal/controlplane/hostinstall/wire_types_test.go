@@ -4,7 +4,7 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/wiretest"
+	"github.com/agentloops-dev/agents/Go/internal/wiretest"
 )
 
 var update = flag.Bool("update", false, "write testdata/wire-types.golden from today's types")

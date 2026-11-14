@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/internal/safe"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Devices (021 US5, 046), as DaemonCore+Devices: the paired devices in devices.json. A

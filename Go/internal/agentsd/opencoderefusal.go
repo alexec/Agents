@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A refused OpenCode turn (#3736): when its model provider refuses (a spent free allowance,

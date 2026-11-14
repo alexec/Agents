@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Ports WorkspaceToolsTests (#1444): an agent's workspace tools go to the control plane as

@@ -13,11 +13,18 @@ struct TimeChartsSection: View {
     let load: () async -> TimeHistory?
 
     @State private var history: TimeHistory?
+    /// When `history` was read (#5144): a minute ago at most while the host answers.
+    @State private var read: Date?
+    private var pageRead: Date? { read }
     @State private var range: TimeChart.Range = .week
     @State private var picked: Date?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if let read = pageRead {
+                // How old what the page shows is (#5144): the oldest of its reads, at the top.
+                LastUpdateText(read: read).frame(maxWidth: .infinity, alignment: .trailing)
+            }
             Picker("Range", selection: $range) {
                 ForEach(TimeChart.Range.allCases) { Text($0.rawValue).tag($0) }
             }
@@ -36,7 +43,10 @@ struct TimeChartsSection: View {
         .onChange(of: range) { picked = nil }
         .task {
             while !Task.isCancelled {
-                if let loaded = await load() { history = loaded }
+                if let loaded = await load() {
+                    history = loaded
+                    read = Date()
+                }
                 try? await Task.sleep(for: .seconds(60))
             }
         }

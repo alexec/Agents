@@ -3,7 +3,7 @@ package controlplane
 import (
 	"encoding/json"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Move to Another Machine… and Run It Here Again… from any client of the person (#4255).

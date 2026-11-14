@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // docs_search and docs_read (#3317): the app's tools over docs/search and docs/read (#3320), for
