@@ -31,7 +31,7 @@ var (
 	repoProperty = property{Name: "repo", Kind: "string",
 		Description: "The repository on Azure DevOps, as organization/project/name (collection/project/name on Azure DevOps Server). Left out, the repository this folder pushes to.",
 		Pattern:     repoPattern, LooksLike: "organization/project/name"}
-	prProperty = property{Name: "pr", Kind: "integer", Description: "Only this pull request, by number."}
+	prProperty = property{Name: "pr", Kind: "integers", Description: "Only this pull request, or these, by number."}
 	// anyoneProperty opts into anyone's comment or pull request (#728); left out, only the project's own people.
 	anyoneProperty = property{Name: "anyone", Kind: "boolean",
 		Description: "true: from anyone, bots and forks too. Left out, never a bot (a build service) and for a pull request never one from a fork. Only a project's members can write to it on Azure DevOps."}
@@ -328,7 +328,7 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 		all, err := states()
 		var out []mcpevents.State
 		for _, st := range all {
-			if (a.pr != 0 && st.mr.Number != a.pr) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
+			if !a.wantsPR(st.mr.Number) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
 				continue
 			}
 			id := fmt.Sprintf("%s:%s:%d", name, a.repo, st.mr.Number)
@@ -363,7 +363,7 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 	// mine: the owner's own pull request, active or completed or abandoned, trusted or not;
 	// else the trust filter (#728, #3797). fixes narrows every one by the work items it closes.
 	wanted := func(m PR, trusted bool) bool {
-		return (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) && a.closesOne(m) &&
+		return a.wantsPR(m.Number) && (a.branch == "" || m.Branch == a.branch) && a.closesOne(m) &&
 			(a.mine && a.byMe(m, yours) || !a.mine && (a.anyone || trusted))
 	}
 	if mcpevents.IsDeployEvent(name) {
@@ -415,7 +415,7 @@ func candidates(ctx context.Context, f AzureDevOps, name string, a args, yours *
 		for _, c := range comments {
 			// Trust is the commenter's; mine only narrows the pull request (#3797).
 			m := c.PR
-			if at := mcpevents.Normalized(c.At); at != "" && (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) &&
+			if at := mcpevents.Normalized(c.At); at != "" && a.wantsPR(m.Number) && (a.branch == "" || m.Branch == a.branch) &&
 				a.closesOne(m) && a.byMe(m, yours) && (a.anyone || c.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d:%d:%d", repo, c.PR.Number, c.ThreadID, c.ID), Time: at,
 					Data:    func() (map[string]any, error) { return c.data(), nil },

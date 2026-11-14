@@ -30,7 +30,8 @@ type args struct {
 	repo, branch, label, workflow string
 	// environment, tier and component narrow deploy.* (#5240).
 	environment, tier, component string
-	pr, run                      int
+	run                          int
+	prs                          []int
 	issues                       []int
 	fixes                        []string
 	anyone, mine, all            bool
@@ -88,6 +89,14 @@ func check(s schema, raw json.RawMessage) (args, *rpcError) {
 	}
 	return args{repo: v.String("repo"), branch: v.String("branch"), label: v.String("label"), workflow: v.String("workflow"),
 		environment: v.String("environment"), tier: v.String("tier"), component: v.String("component"),
-		pr: v.Int("pr"), run: v.Int("run"), issues: v.Ints("issue"), fixes: v.Strings("fixes"),
+		prs: v.Ints("pr"), run: v.Int("run"), issues: v.Ints("issue"), fixes: v.Strings("fixes"),
 		anyone: v.Bool("anyone"), mine: v.Bool("mine"), all: v.Bool("any")}, nil
 }
+
+// wantsPR is whether the pull request numbered n is one pr asks for (#5436): any, when pr is
+// not given.
+func (a args) wantsPR(n int) bool { return mcpevents.Wants(a.prs, n) }
+
+// onePR is the pull request pr names when it names one, so a read can ask the forge for only
+// it; 0 when it names none or several.
+func (a args) onePR() int { return mcpevents.One(a.prs) }

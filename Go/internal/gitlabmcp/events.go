@@ -30,7 +30,7 @@ var (
 	projectProperty = property{Name: "project", Kind: "string",
 		Description: "The GitLab project, by its path (group/name, subgroups too) or its id. Left out, the project this folder pushes to.",
 		Pattern:     projectPattern, LooksLike: "group/name or a project id"}
-	prProperty = property{Name: "pr", Kind: "integer", Description: "Only this merge request, by number (its iid, as !12)."}
+	prProperty = property{Name: "pr", Kind: "integers", Description: "Only this merge request, or these, by number (its iid, as !12)."}
 	// anyoneProperty opts into anyone's issue, comment or merge request (#728); left out, only the project's own people.
 	anyoneProperty = property{Name: "anyone", Kind: "boolean",
 		Description: "true: from anyone, bots, forks and people outside the project too. Left out, only the project's members with Reporter access or more, never a bot, and for a merge request never one from a fork."}
@@ -390,7 +390,7 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 		all, err := states()
 		var out []mcpevents.State
 		for _, st := range all {
-			if (a.pr != 0 && st.mr.Number != a.pr) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
+			if !a.wantsPR(st.mr.Number) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
 				continue
 			}
 			id := fmt.Sprintf("%s:%s:%d", name, a.project, st.mr.Number)
@@ -433,7 +433,7 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 	// mine: the owner's own merge request, open or merged or closed, trusted or not; else the
 	// trust filter (#728, #3797). fixes narrows every one by the issues it closes.
 	wanted := func(m MR, trusted bool) bool {
-		return (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) && a.closesOne(m) &&
+		return a.wantsPR(m.Number) && (a.branch == "" || m.Branch == a.branch) && a.closesOne(m) &&
 			(a.mine && a.byMe(m, yours) || !a.mine && (a.anyone || trusted))
 	}
 	if kind, ok := strings.CutPrefix(name, "issue."); ok {
@@ -475,7 +475,7 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 		for _, c := range comments {
 			// Trust is the commenter's; mine only narrows the merge request (#3797).
 			m := c.MR
-			if at := mcpevents.Normalized(c.At); at != "" && (a.pr == 0 || m.Number == a.pr) && (a.branch == "" || m.Branch == a.branch) &&
+			if at := mcpevents.Normalized(c.At); at != "" && a.wantsPR(m.Number) && (a.branch == "" || m.Branch == a.branch) &&
 				a.closesOne(m) && a.byMe(m, yours) && (a.anyone || c.Trusted) {
 				list = append(list, candidate{EventID: fmt.Sprintf("review.comment:%s:%d", project, c.ID), Time: at,
 					Data:    func() (map[string]any, error) { return c.data(), nil },
@@ -558,7 +558,7 @@ func candidates(ctx context.Context, gl GitLab, name string, a args, yours *Your
 			list = append(list, candidate{EventID: fmt.Sprintf("checks.failed:%s:%d:%s", project, pl.ID, at), Time: at,
 				Subject: pipelineRef(project, pl.ID), Key: at,
 				Data: func() (map[string]any, error) {
-					if a.pr != 0 && pl.MRNumber != 0 && pl.MRNumber != a.pr {
+					if pl.MRNumber != 0 && !a.wantsPR(pl.MRNumber) {
 						return nil, nil
 					}
 					details, err := gl.PipelineDetails(ctx, project, pl)

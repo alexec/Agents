@@ -3,6 +3,7 @@ package mcpevents
 import (
 	"encoding/json"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -264,4 +265,16 @@ func List[E Declared](events []E) map[string]any {
 		list[i] = e.Declared().JSON()
 	}
 	return map[string]any{"events": list}
+}
+
+// Wants is whether n is one of an "integers" argument's list (#5436): any n, when the list is
+// empty because the argument was not given.
+func Wants(list []int, n int) bool { return len(list) == 0 || slices.Contains(list, n) }
+
+// One is the one item of an "integers" argument's list, or 0 when it has none or several.
+func One(list []int) int {
+	if len(list) == 1 {
+		return list[0]
+	}
+	return 0
 }
