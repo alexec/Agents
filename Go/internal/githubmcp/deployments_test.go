@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // #5240: GitHub's Deployments read as the deploy model. One page of the newest made is listed,
