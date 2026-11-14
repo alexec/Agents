@@ -125,7 +125,7 @@ export function DocsList({ store }: { store: Store }) {
   const problems = (l ?? []).filter((h) => h.problem).map((h) => `${h.name}: ${h.problem}`);
   const open = (doc: Doc, line?: number) => {
     openAt.value = line ? { ref: doc.ref, line } : undefined;
-    go({ nav: "docs", section: "docs", item: doc.ref });
+    go({ nav: "work", section: "docs", item: doc.ref });
   };
 
   return (
@@ -298,7 +298,7 @@ export function DocPage({ store, docRef }: { store: Store; docRef: string }) {
       copied.value = null;
     }
   };
-  const link = location.origin + location.pathname + location.search + routeHash({ nav: "docs", section: "docs", item: docRef });
+  const link = location.origin + location.pathname + location.search + routeHash({ nav: "work", section: "docs", item: docRef });
   const filesPlace = doc && got.value ? folderPlace(store, got.value.host, doc) : undefined;
   // A page in the doc's folder that a link names opens as the folder's page, as Open in Files does (#5068).
   const opens: OpenPageFile | undefined = filesPlace && {
@@ -313,7 +313,7 @@ export function DocPage({ store, docRef }: { store: Store; docRef: string }) {
       <div class="work-page-bar">
         <button type="button" title="Back" aria-label="Back" onClick={() => history.back()}>‹</button>
         <button type="button" title="Forward" aria-label="Forward" onClick={() => history.forward()}>›</button>
-        <button type="button" class="link" onClick={() => go({ nav: "docs" })}>All docs</button>
+        <button type="button" class="link" onClick={() => go({ nav: "work", section: "docs" })}>All docs</button>
       </div>
       <header class="work-page-head">
         <h2><span class="work-title">{doc ? shortForm(doc) : docRef}</span></h2>
@@ -420,7 +420,7 @@ export function WorkDocs({ store, itemRef, title, body, asked }: { store: Store;
     const beside = titleBeside(doc);
     return (
       <li key={doc.ref} data-ref={doc.ref}>
-        <button type="button" class="work-doc-row" title={doc.ref} onClick={() => go({ nav: "docs", section: "docs", item: doc.ref })}>
+        <button type="button" class="work-doc-row" title={doc.ref} onClick={() => go({ nav: "work", section: "docs", item: doc.ref })}>
           <span aria-hidden="true" class="quiet">▤</span>
           <span class="work-doc-words">
             <span class={doc.path ? "docs-path" : undefined}>{shortForm(doc)}</span>

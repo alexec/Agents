@@ -100,7 +100,7 @@
   {
     "name": "manage_accounts",
     "title": "The person's outside accounts",
-    "description": "The person's outside accounts (gitlab.com, AWS, Slack and the like), as Settings ▸ You ▸ Accounts in the app keeps them for every machine of theirs. Before you make an account on a service, list with service to find out whether there is one already, and use it. list gives each account's id, service and description only, and whether it asks before use; get with its id gives the whole account. A get of an account that asks before use (each one asks, at first) waits on the person's approval: when the answer says to wait, wait with wait_for_event on the request it names, then call get again. When you make one, add it, with a description. An account holds no secret: card and secret are the names of secrets in Settings ▸ You ▸ Secrets (or where one is), never a value; a value that looks like a token, a key or a card number is refused. add puts in a new account at once; one that would replace the account with the same service and address asks the person first, with each changed field, and changes nothing unless they say yes. Give every field again when you change one: a field you leave out is lost. import adds the old registry's files in ~/.agents/accounts/ on this machine, once.",
+    "description": "The person's outside accounts (gitlab.com, AWS, Slack and the like), as Settings ▸ You ▸ Accounts in the app keeps them for every machine of theirs. Before you make an account on a service, list with service to find out whether there is one already, and use it. list gives each account's id, service and description only, and whether it asks before use; get with its id gives the whole account. A get of an account that asks before use (each one asks, at first) waits on the person's approval: when the answer says to wait, wait with wait_for_event on the request it names, then call get again. When you make one, add it, with a description. An account holds no secret: card and secret are the names of secrets in Settings ▸ You ▸ Secrets (or where one is), never a value; a value that looks like a token, a key or a card number is refused. add puts in a new account at once; one that would replace the account with the same service and address asks the person first, with each changed field, and changes nothing unless they say yes. Give every field again when you change one: a field you leave out is lost. remove with ids takes accounts out, such as one a new account replaced: one an agent added goes at once; one the person added asks them first, and nothing is removed unless they say yes. import adds the old registry's files in ~/.agents/accounts/ on this machine, once.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -114,9 +114,10 @@
             "list",
             "get",
             "add",
+            "remove",
             "import"
           ],
-          "description": "list (the default), get, add or import."
+          "description": "list (the default), get, add, remove or import."
         },
         "service": {
           "type": "string",
@@ -129,6 +130,13 @@
         "id": {
           "type": "string",
           "description": "For get: the account's id, as list gives it."
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "For remove: the ids of the accounts to take out, as list gives them."
         },
         "account": {
           "type": "object",

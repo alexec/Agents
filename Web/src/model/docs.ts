@@ -280,12 +280,12 @@ export function repoPrefix(itemRef: string): string | undefined {
 }
 
 /** The docs an issue's or a PR's body names, in its order, each once: a doc's ref, its address
- * (#/docs/<ref>, agents://docs/<ref>), and a specs/ or docs/ Markdown path, which is a doc of the
+ * (#/work/docs/<ref>, before #5267 #/docs/<ref>; agents://docs/<ref>), and a specs/ or docs/ Markdown path, which is a doc of the
  * item's own repo. */
 export function linkedRefs(body: string, itemRef: string): string[] {
   const found: { at: number; ref: string }[] = [];
-  // #/docs/<ref> (the web page's, its ref encoded) or agents://docs/<ref> (the Mac window's).
-  for (const m of body.matchAll(/(?:#\/docs\/|agents:\/\/docs\/)([^\s)\]>`'"]+)/g)) {
+  // #/work/docs/<ref> or #/docs/<ref> (the web page's, its ref encoded) or agents://docs/<ref> (the Mac window's).
+  for (const m of body.matchAll(/(?:#\/(?:work\/)?docs\/|agents:\/\/docs\/)([^\s)\]>`'"]+)/g)) {
     let ref = m[1]!;
     try { ref = decodeURIComponent(ref); } catch { /* kept as written */ }
     found.push({ at: m.index, ref });

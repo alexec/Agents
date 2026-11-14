@@ -32,6 +32,13 @@ type ACPProviderInfo struct {
 	Configured *bool `json:"configured,omitzero"`
 }
 
+// An outside account by what tells it from the others (#5253): its service and address, as the control plane matches them, case aside.
+type AccountKey struct {
+	Service string `json:"service"`
+
+	Address *string `json:"address,omitzero"`
+}
+
 // An account's newest operation (#4157), for the time ago its row shows.
 type AccountLastOp struct {
 	What AccountOperationWhat `json:"what"`
@@ -54,12 +61,13 @@ type AccountOperation struct {
 	Agent *UUID `json:"agent,omitzero"`
 }
 
-// What an operation on an account was (#4157): read (by manage_accounts, or a read of its secret or card), added, or edited (it took another's place).
+// What an operation on an account was (#4157): read (by manage_accounts, or a read of its secret or card), added, edited (it took another's place), or removed (#5253). An account's lastOp is never removed: a removed account has none.
 type AccountOperationWhat string
 
 const AccountOperationWhatRead AccountOperationWhat = "read"
 const AccountOperationWhatAdded AccountOperationWhat = "added"
 const AccountOperationWhatEdited AccountOperationWhat = "edited"
+const AccountOperationWhatRemoved AccountOperationWhat = "removed"
 
 // An account added to a runtime (#840), beside the runtime's own sign-in, which is the Default account and is not one of these. The person picks one when they start a session.
 type AccountProfile struct {
@@ -8156,12 +8164,15 @@ type MacTerminalRequest struct {
 	Path *string `json:"path,omitzero"`
 }
 
-// machine/accounts (#3967), for an agent on a machine: its person's outside accounts, after add is added (one with the same service and address goes in its place).
+// machine/accounts (#3967), for an agent on a machine: its person's outside accounts, after add is added (one with the same service and address goes in its place) and remove is taken out (#5253).
 type MachineAccountsCall struct {
 	Add []OutsideAccount `json:"add,omitzero"`
 
 	// What manage_accounts did to the accounts (#4157): the control plane writes an audit entry for each.
 	Ops []AccountOperation `json:"ops,omitzero"`
+
+	// The accounts to take out, by service and address (#5253), after add. Needs machine.accounts/2: an older control plane does not know it.
+	Remove []AccountKey `json:"remove,omitzero"`
 }
 
 // machines/announce, on an enrolment connection.
@@ -9794,6 +9805,9 @@ type OutsideAccount struct {
 
 	// The projects that use it, by name. Absent or empty: all of them.
 	Projects []string `json:"projects,omitzero"`
+
+	// The session whose manage_accounts add made it (#5253): an agent may remove such an account with no card; one with none is the person's, and its removal asks them. The control plane keeps it from the add that made it, and keeps it through a change by an agent or a client. Absent for one a person added, or one made before it.
+	AddedBy *UUID `json:"addedBy,omitzero"`
 
 	// Ask before use (#4163): an agent's manage_accounts get of it waits on a person's approval, as a secret's use does (#4015). Absent is on, also for an account an agent adds; false is off, which a person sets, or Always Approve on its request does. Not sealed: kept with the account, and agentsd enforces it.
 	AskBeforeUse *bool `json:"askBeforeUse,omitzero"`

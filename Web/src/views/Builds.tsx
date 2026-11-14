@@ -22,6 +22,7 @@ import { CallFailed } from "../wire/link";
 import { toWireDate } from "../protocol/dates";
 import { Choice } from "./Choice";
 import { LastUpdate } from "./LastUpdate";
+import { RunDrill } from "./BuildsRun";
 
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -68,7 +69,7 @@ export function BuildsPage({ store, down }: { store: Store; down: boolean }) {
   const list = repos.value ?? [];
   const repo = ask.repo ?? list[0];
   const repoOptions = repo && !list.includes(repo) ? [repo, ...list] : list;
-  const set = (change: Partial<BuildsAsk>) => replace(at({ ...ask, repo, ...change, change: undefined }));
+  const set = (change: Partial<BuildsAsk>) => replace(at({ ...ask, repo, ...change, change: undefined, drill: undefined }));
 
   // The history of the range, and the tiles' windows, asked again when a filter changes.
   const wanted = JSON.stringify([repo, ask.range, ask.workflow, ask.job, ask.branch, hostKey]);
@@ -112,6 +113,9 @@ export function BuildsPage({ store, down }: { store: Store; down: boolean }) {
   const shown = read.value?.key === wanted ? read.value : null;
   const h = shown?.history;
   const picked = ask.change && h?.changes.find((c) => c.job === ask.change!.job && c.firstSlow.ref === ask.change!.ref);
+  if (ask.drill && h && shown) {
+    return <RunDrill store={store} host={shown.host} repo={repo} ask={{ ...ask, repo, drill: ask.drill }} history={h} change={picked || undefined} at={at} />;
+  }
   if (ask.change && h && picked) return <ChangePicked store={store} host={shown.host} repo={repo} ask={ask} change={picked} history={h} />;
 
   const branch = branchWords(ask.branch, h?.defaultBranch);
@@ -213,7 +217,10 @@ function Trend({ history: h, last, before, ask, repo, branch, releases, pick }: 
         </ul>
       )}
       {h.longestRunnerWait && h.longestRunnerWait.wait >= 60 && (
-        <p class="quiet small">{`The longest wait for a runner: ${h.longestRunnerWait.job} on ${runWhen(h.longestRunnerWait.run.made, timeZone)}, ${secondsWords(h.longestRunnerWait.wait)}, then it ran for ${secondsWords(h.longestRunnerWait.ran)}. Load, not code.`}</p>
+        <p class="quiet small">
+          {`The longest wait for a runner: ${h.longestRunnerWait.job} on ${runWhen(h.longestRunnerWait.run.made, timeZone)}, ${secondsWords(h.longestRunnerWait.wait)}, then it ran for ${secondsWords(h.longestRunnerWait.ran)}. Load, not code. `}
+          <a href={routeHash(at({ ...ask, repo, drill: { ref: h.longestRunnerWait.run.ref, job: h.longestRunnerWait.job } }))}>Open the run ›</a>
+        </p>
       )}
     </>
   );
@@ -361,6 +368,9 @@ function ChangePicked({ store, host, repo, ask, change: c, history: h }: { store
         <RunCard title="Run before" refRun={c.lastFast} run={runs.value?.before} loading={runs.value === null} />
         <RunCard title="Run after" refRun={c.firstSlow} run={runs.value?.after} loading={runs.value === null} />
       </div>
+      <p>
+        <a href={routeHash(at({ ...ask, repo, drill: { ref: c.firstSlow.ref, against: c.lastFast.ref, job: c.job } }))}>Compare the two runs</a>
+      </p>
       <p class="quiet small">{cardsNote}</p>
     </div>
   );

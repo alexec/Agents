@@ -70,8 +70,8 @@ Do one of these:
 - Choose **Window ▸ Open Folder Window**, then the folder.
 - Right-click the Agents icon in the Dock and choose the folder.
 
-The window has a sidebar of only that folder: **New Session**, its **Pinned** and
-**Needs You**, its sessions, its workflows, **Archived Sessions** and **Archived Workflows**, and **Project Settings…** at the
+The window has a sidebar of only that folder: its **Pinned** and
+**Needs You**, its sessions with **New Session** first, its workflows, **Archived Sessions** and **Archived Workflows**, and **Project Settings…** at the
 foot. A session you start or select there opens in that window. The window has its own
 inspector, and it keeps the pane and the width for that folder. Its toolbar also has the
 folder's shell (Control-`).

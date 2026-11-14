@@ -117,14 +117,17 @@ test("search results from every machine, each doc once, the most matches first",
   assert.deepEqual(merged.map((r) => [r.doc.title, r.host]), [["Plans in Work", "mac"], ["Docs, first-class beside Work", "mac"]]);
 });
 
-test("Docs is in the bar after Work, and #/docs/<ref> is a doc's page", () => {
-  assert.equal(nav.navSections.indexOf("docs"), nav.navSections.indexOf("work") + 1);
-  assert.equal(nav.sectionKeys.d, "docs");
+test("Docs is Work's first page (#5267), #/work/docs/<ref> is a doc's page, and #/docs/<ref> still opens it", () => {
+  assert.ok(!nav.navSections.includes("docs"));
+  assert.equal(nav.navPages.work[0].id, "docs");
+  assert.equal(nav.openPage("work", undefined, false).id, "issue", "Work still opens on Issues");
   const ref = "github:alexec/agents/doc/specs/3319-docs/spec.md";
-  const hash = route.routeHash({ nav: "docs", section: "docs", item: ref });
-  assert.equal(hash, `#/docs/${encodeURIComponent(ref)}`);
-  assert.deepEqual(route.parseRoute(hash), { nav: "docs", section: "docs", item: ref });
-  assert.deepEqual(route.parseRoute("#/docs"), { nav: "docs" });
+  const hash = route.routeHash({ nav: "work", section: "docs", item: ref });
+  assert.equal(hash, `#/work/docs/${encodeURIComponent(ref)}`);
+  assert.deepEqual(route.parseRoute(hash), { nav: "work", section: "docs", item: ref });
+  assert.deepEqual(route.parseRoute(`#/docs/${encodeURIComponent(ref)}`), { nav: "work", section: "docs", item: ref });
+  assert.deepEqual(route.parseRoute("#/docs"), { nav: "work", section: "docs" });
+  assert.ok(route.isOldAddress("#/docs") && route.isOldAddress(`#/docs/${encodeURIComponent(ref)}`));
 });
 
 // Start Agent on a doc and the Docs section on Work's pages (#3322), as DocsStartTests has them.
@@ -160,6 +163,8 @@ Not these: https://github.com/alexec/Agents/blob/main/specs/0001/spec.md, src/do
     "notion:1f2e",
   ]);
   assert.deepEqual(d.linkedRefs("specs/a.md and notion:9", "linear:ENG-4"), ["notion:9"]);
+  // The page's address since Docs went into Work (#5267).
+  assert.deepEqual(d.linkedRefs("See #/work/docs/notion%3A9 now", "linear:ENG-4"), ["notion:9"]);
   assert.equal(d.repoPrefix("gitlab:acme/web!12"), "gitlab:acme/web/doc/");
 });
 

@@ -116,6 +116,8 @@ func newFake(t *testing.T) *fake {
 		f.write("stderr/"+name+".txt", text, 0o644)
 	}
 	f.write("bin/uname", "#!/bin/sh\necho \"${FAKE_SSH_UNAME:-Linux aarch64}\"\n", 0o755)
+	// No sudo on the fake server, so the browser step (#5228) never installs Chrome here.
+	f.write("bin/sudo", "#!/bin/sh\nexit 1\n", 0o755)
 	if err := os.MkdirAll(f.home, 0o755); err != nil {
 		t.Fatal(err)
 	}

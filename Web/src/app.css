@@ -1362,6 +1362,41 @@ dialog.image-viewer .image-viewer-frame:hover .image-viewer-arrow, dialog.image-
 .builds-sha { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.8125rem; }
 .builds-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin-top: 8px; }
 .builds-run-card { gap: 4px; }
+/* Builds ▸ one run (#5179, board 3): the Gantt chart (hatched wait, accent run, white step ticks, the run before as a
+   dashed outline), the step table with a bar a change, and the queue panel beside them. */
+.builds-drill h2 { margin: 0; font-size: 1.375rem; }
+.builds-drill-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.builds-drill-body { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 20px; align-items: start; }
+.builds-drill-body:has(> :only-child) { grid-template-columns: minmax(0, 1fr); max-width: 1040px; }
+@media (max-width: 1000px) { .builds-drill-body { grid-template-columns: minmax(0, 1fr); } }
+.builds-gantt-key { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--paper-secondary); }
+.builds-gantt-key li { display: inline-flex; align-items: center; gap: 6px; }
+.builds-gantt-key .builds-swatch { margin-top: 0; }
+.builds-swatch.before { background: none; border: 1px dashed var(--paper-secondary); height: 6px; }
+.builds-gantt-name { fill: currentColor; font-size: 0.8125rem; font-weight: 600; }
+.builds-gantt-runner { fill: var(--paper-secondary); font-size: 0.6875rem; }
+.builds-gantt-row.picked .builds-gantt-name { fill: var(--accent); }
+.builds-gantt-row.failed .builds-gantt-bar { fill: var(--tint-failure); }
+.builds-gantt-tick { stroke: var(--paper-raised); stroke-width: 1.5; }
+.builds-gantt-step { fill: var(--paper-raised); font-size: 0.6875rem; pointer-events: none; }
+.builds-gantt-turn-label { fill: var(--paper-secondary); font-size: 0.6875rem; }
+.builds-gantt-before { fill: none; stroke: var(--paper-secondary); stroke-width: 1; stroke-dasharray: 3 2; }
+.builds-steps { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.builds-steps th { text-align: left; font-weight: 600; color: var(--paper-secondary); border-bottom: 1px solid var(--paper-rule); padding: 4px 8px 4px 0; }
+.builds-steps td { padding: 4px 8px 4px 0; border-bottom: 1px solid var(--paper-wash); }
+.builds-steps .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.builds-steps-bar { width: 22%; }
+.builds-steps-bar span { display: block; height: 8px; border-radius: 2px; }
+.builds-steps-bar .slower { background: var(--line-failure); }
+.builds-steps-bar .faster { background: var(--tint-vouched); opacity: 0.5; }
+.builds-queue-panel { gap: 6px; }
+.builds-queue-panel h3 { margin: 0; }
+.builds-queue-jobs { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.8125rem; }
+.builds-queue-jobs li { display: grid; grid-template-columns: 6.5em minmax(0, 1fr); gap: 6px; align-items: center; }
+.builds-queue-jobs li > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.builds-queue-track { display: flex; height: 8px; }
+.builds-queue-wait { background: repeating-linear-gradient(45deg, var(--paper-edge) 0 1.5px, var(--paper-wash) 1.5px 4px); }
+.builds-queue-ran { background: var(--accent); border-radius: 0 2px 2px 0; }
 /* A feature with no use in 90 days (#2165), as the window's orange mark. */
 .report-unused { color: var(--tint-warning); }
 /* The Console's pages draw Settings' sections (People, Groups): Settings' rows, as sidebar.css has them under .with-sidebar. */

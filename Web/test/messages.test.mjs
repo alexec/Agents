@@ -39,12 +39,14 @@ test("a row's words are the window's", () => {
   assert.equal(m.senderName({ channel: "email", identity: "sam@example.com" }), "sam@example.com");
 });
 
-test("Messages is in the bar after Docs, and #/messages/<key> is a conversation's page", () => {
-  assert.equal(nav.navSections.indexOf("messages"), nav.navSections.indexOf("docs") + 1);
-  const hash = route.routeHash({ nav: "messages", section: "messages", item: "slack:C1" });
-  assert.equal(hash, "#/messages/slack%3AC1");
-  assert.deepEqual(route.parseRoute(hash), { nav: "messages", section: "messages", item: "slack:C1" });
-  assert.deepEqual(route.parseRoute("#/messages"), { nav: "messages" });
+test("Messages is Work's page after Docs (#5267), #/work/messages/<key> is a conversation's page, and #/messages/<key> still opens it", () => {
+  assert.ok(!nav.navSections.includes("messages"));
+  assert.equal(nav.navPages.work[1].id, "messages");
+  const hash = route.routeHash({ nav: "work", section: "messages", item: "slack:C1" });
+  assert.equal(hash, "#/work/messages/slack%3AC1");
+  assert.deepEqual(route.parseRoute(hash), { nav: "work", section: "messages", item: "slack:C1" });
+  assert.deepEqual(route.parseRoute("#/messages/slack%3AC1"), { nav: "work", section: "messages", item: "slack:C1" });
+  assert.deepEqual(route.parseRoute("#/messages"), { nav: "work", section: "messages" });
 });
 
 test("the reply field (#4345) sends trimmed text and says who it goes as", () => {
