@@ -8,8 +8,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/orgtoken"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/orgtoken"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Tokens and checks on the machine (#3397). An admin's client seals a route's cloud

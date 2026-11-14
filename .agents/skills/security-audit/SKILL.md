@@ -87,7 +87,7 @@ at the keyboard, that is true only of a run of the workflow.
      7. `logs`: what gets into logs, events, crash notes and transcripts: tokens,
         prompts, file contents, paths with secrets.
    - `dependencies` (#1910): every **open** Dependabot alert, whatever the diff touches:
-     `gh api --paginate 'repos/alexec/Agents/dependabot/alerts?state=open'`. That is every
+     `gh api --paginate 'repos/agentloops-dev/Agents/dependabot/alerts?state=open'`. That is every
      manifest (`Web/`, `Go/`, `App/Resources/toolsets/*`). For each alert, note its number,
      the package and manifest, its severity (`security_advisory.severity`), the advisory
      (`security_advisory.ghsa_id`), the first patched version
@@ -108,7 +108,7 @@ patched version (or Dependabot's pull request). One whose package has no patched
 or whose vulnerable code the app cannot reach, is still a finding: say why, and record it
 as "needs a decision: dismiss alert <n> as <no_bandwidth | tolerable_risk | inaccurate |
 not_used>?". Only Alex dismisses one (`gh api -X PATCH
-repos/alexec/Agents/dependabot/alerts/<n> -f state=dismissed -f dismissed_reason=…`).
+repos/agentloops-dev/Agents/dependabot/alerts/<n> -f state=dismissed -f dismissed_reason=…`).
 
 For each finding, give **severity** (critical, high, medium, low), **evidence**
 (`file:line` and the code), **the attack** in one or two sentences (who, from where,

@@ -5004,7 +5004,7 @@ type FirstBuildStartRequest struct {
 	Another *bool `json:"another,omitzero"`
 }
 
-// The starter that a first build begins from (#5048): iphone-app is alexec/iphone-app-starter, web-service is alexec/web-service-starter, as make_app_repository names them.
+// The starter that a first build begins from (#5048): iphone-app is agentloops-dev/iphone-app-starter, web-service is agentloops-dev/web-service-starter, as make_app_repository names them.
 type FirstBuildStarter string
 
 const FirstBuildStarterIphoneApp FirstBuildStarter = "iphone-app"

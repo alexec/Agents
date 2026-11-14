@@ -11,7 +11,7 @@ import { failedWords, fleetFilterTitle, fleetFilters, fleetFoot, fleetShown, fle
 import type { FleetFilter } from "../model/console";
 import type { FleetBoard, PolicyKept } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
-import { ago } from "../model/connectorSetup";
+import { lastUpdateAge } from "../model/lastUpdate";
 import { missingWords, stateWords, versionWords } from "../model/capabilities";
 import { runtimeNameIn } from "./Reports";
 import { DataTable } from "./DataTable";
@@ -128,8 +128,9 @@ export function MachinesPage({ store, down }: { store: Store; down: boolean }) {
                 );
               } },
               { id: "running", title: "Running", num: true, first: "desc", sort: (m) => m.running, cell: runningWords },
-              { id: "heard", title: "Last listed", first: "desc", sort: (m) => m.heardAt,
-                cell: (m) => <span class="quiet">{m.heardAt === undefined ? "—" : ago(fromWireDate(m.heardAt))}</span> },
+              // The same words as every "Last update" line (#5146): when the control plane last heard the machine.
+              { id: "heard", title: "Last update", first: "desc", sort: (m) => m.heardAt,
+                cell: (m) => <span class="quiet">{m.heardAt === undefined ? "—" : lastUpdateAge(fromWireDate(m.heardAt).getTime())}</span> },
             ]} />
           <p class="hint">{fleetFoot}</p>
         </>

@@ -7,10 +7,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/controlplane/hostinstall"
-	"github.com/alexec/agents/Go/internal/controlplane/providers"
-	"github.com/alexec/agents/Go/internal/controlplane/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/hostinstall"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/providers"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // JSON-RPC as the daemon speaks it, enough for the control plane: it reads a request's

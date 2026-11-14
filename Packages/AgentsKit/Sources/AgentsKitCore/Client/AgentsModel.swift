@@ -372,6 +372,8 @@ public final class AgentsModel {
     /// consult its own clock: it may be in a different time zone from the daemon's,
     /// and the daemon's is the one the limit uses.
     public private(set) var costState: DaemonAPI.CostState?
+    /// When `costState` was last read or heard (#5144), for Cost's and Tokens' "Last update".
+    public private(set) var costStateReadAt: Date?
     /// How long archived agents are kept and what the archive holds (051). Nil until the
     /// daemon has said, which leaves the settings section out.
     /// Every runtime's state on the Mac (065, US4): Agent Runtimes, the prompt bar's
@@ -381,6 +383,8 @@ public final class AgentsModel {
     /// This machine's backups and their settings (#1810). Nil until the host has said, or
     /// from a host too old to keep backups, which leaves the section out.
     public private(set) var backupState: DaemonAPI.BackupState?
+    /// When `backupState` was last read or told (#5146), for its "Last update" line.
+    public private(set) var backupStateAt: Date?
     /// Every resource an agent can lease, who holds it and who is waiting (036), as
     /// the daemon last said. Replaced whole by each `resources/changed`, never merged. Nil
     /// from a daemon too old to have leases, which draws nothing.
@@ -423,6 +427,9 @@ public final class AgentsModel {
     }
     /// Where the bus log's next page back starts; nil when there is none.
     public private(set) var busNext: String?
+    /// When the bus log's newest page was last read (#5146): it is read every 30 s, so the
+    /// Events page says how old other machines' events are.
+    public private(set) var busReadAt: Date?
     /// This machine's producer ref, as `events/list` last said it (#4732).
     public private(set) var eventsProducer: String?
     /// What `recentEvents` is narrowed to. Set by whoever asks for a page, before it
@@ -441,6 +448,7 @@ public final class AgentsModel {
         moreEvents = false
         busEvents = []
         busNext = nil
+        busReadAt = nil
         lastEventAt = nil
         eventsLoaded = false
     }
@@ -461,6 +469,8 @@ public final class AgentsModel {
     /// The Multiplier (#3903), for the hero page (#3904); nil until the host has said, or
     /// from a host that predates it.
     public private(set) var multiplier: DaemonAPI.Multiplier?
+    /// When `multiplier` was last read or heard (#5144), for the Multiplier page's "Last update".
+    public private(set) var multiplierReadAt: Date?
 
     /// What each command the agent on screen ran has printed (033, #203).
     ///
@@ -857,13 +867,14 @@ public final class AgentsModel {
             replacePlugins(list)
 
         case .costChanged(let state):
-            costState = state
+            replaceCostState(state)
 
         case .retentionChanged(let state):
             retentionState = state
 
         case .backupsChanged(let state):
             backupState = state
+            backupStateAt = Date()
 
         case .runtimeAllowancesChanged(let allowances):
             runtimeAllowances = allowances
@@ -910,7 +921,7 @@ public final class AgentsModel {
             self.achievements = achievements
 
         case .multiplierChanged(let multiplier):
-            self.multiplier = multiplier
+            replaceMultiplier(multiplier)
 
         case .showFile(let notification):
             filesToShow[notification.agentID] = notification.file
@@ -1374,9 +1385,15 @@ public final class AgentsModel {
         }
     }
 
-    public func replaceCostState(_ state: DaemonAPI.CostState) { costState = state }
+    public func replaceCostState(_ state: DaemonAPI.CostState, at read: Date = Date()) {
+        costState = state
+        costStateReadAt = read
+    }
     public func replaceRetentionState(_ state: DaemonAPI.RetentionState) { retentionState = state }
-    public func replaceBackupState(_ state: DaemonAPI.BackupState) { backupState = state }
+    public func replaceBackupState(_ state: DaemonAPI.BackupState) {
+        backupState = state
+        backupStateAt = Date()
+    }
     public func replaceRuntimeAllowances(_ allowances: RuntimeAllowances) { runtimeAllowances = allowances }
     public func replaceHostedMCP(_ snapshot: DaemonAPI.HostedMCPSnapshot) { hostedMCP = snapshot }
     public func replaceMCPHealth(_ snapshot: DaemonAPI.MCPHealthSnapshot, from host: MachineRef = .mac) {
@@ -1500,6 +1517,7 @@ public final class AgentsModel {
         if events.count > Self.eventsPagedMost { events.removeLast(events.count - Self.eventsPagedMost) }
         busEvents = events
         busNext = page.hasMore && events.count < Self.eventsPagedMost ? page.next : nil
+        if !appending { busReadAt = Date() }
     }
 
     /// Whether the Events page has older events to page in, from this machine's log or the bus's.
@@ -1601,7 +1619,10 @@ public final class AgentsModel {
     public func replaceWakeState(_ state: DaemonAPI.WakeState) { wakeState = state }
     public func replaceStoreNotes(_ notes: DaemonAPI.StoreNotes) { storeNotes = notes.notes }
     public func replaceAchievements(_ achievements: Achievements) { self.achievements = achievements }
-    public func replaceMultiplier(_ multiplier: DaemonAPI.Multiplier) { self.multiplier = multiplier }
+    public func replaceMultiplier(_ multiplier: DaemonAPI.Multiplier, at read: Date = Date()) {
+        self.multiplier = multiplier
+        multiplierReadAt = read
+    }
 
     // MARK: Choices in flight
 

@@ -37,6 +37,10 @@ struct AccountsPane: View {
         let secrets = state.secrets?.secrets ?? []
         let only = SecretInfoWords.onlyMachine(secrets)
         Form {
+            // Read when it opens and on each change (#5146): how old the accounts are, at the top.
+            if let readAt = state.readAt {
+                Section {} header: { LastUpdateText(read: readAt) }
+            }
             if let problem = problem ?? state.problem {
                 Section {
                     Text(problem).appText(.supporting).tinted(.failure)

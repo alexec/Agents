@@ -7,7 +7,11 @@ const c = await load("src/model/console.ts");
 
 test("Reports' pages are listed in Reports, in their order", async () => {
   const n = await load("src/model/nav.ts");
-  assert.deepEqual(n.navPages.reports.slice(0, c.reportSections.length).map((p) => p.id), c.reportSections.map((s) => s.id));
+  // Builds sits under Planning (#5178), a page of its own, not a report section.
+  const pages = n.navPages.reports.filter((p) => p.draw.kind === "report").map((p) => p.id);
+  assert.deepEqual(pages, c.reportSections.map((s) => s.id));
+  const ids = n.navPages.reports.map((p) => p.id);
+  assert.equal(ids[ids.indexOf("value") + 1], "builds");
 });
 
 const machine = (over = {}, host = {}) => ({

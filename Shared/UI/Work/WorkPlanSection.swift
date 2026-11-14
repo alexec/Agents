@@ -35,6 +35,16 @@ struct WorkPlanSection: View {
     @State private var problem: String?
     /// The plan on screen came from this device's copy (#4930): no changes until its machine answers.
     @State private var fromDevice = false
+    /// When the plan on screen was read from its machine (#5142): this device's copy's time, or
+    /// the last read that worked. The "Last update" line of a plan from the copy or a failed read.
+    @State private var planRead: Date?
+
+    /// When the plan drawn from the copy was read, until the machine answers: the page's one
+    /// "From this device" strip says the oldest of it and the item's (#5142). A failed read
+    /// says it in its own strip instead.
+    private var copyRead: Date? { fromDevice && problem == nil ? planRead : nil }
+    /// Told `copyRead` each time it changes, and nil when the plan goes.
+    var fromCopy: (Date?) -> Void = { _ in }
     @State private var rollups: [DaemonAPI.LineageNode: DaemonAPI.LineageCostRollup] = [:]
     @State private var links: [DaemonAPI.LineageNode: [DaemonAPI.LineageLink]] = [:]
     @State private var said: (words: String, failed: Bool)?
@@ -69,7 +79,7 @@ struct WorkPlanSection: View {
             if let plan {
                 header(plan)
                 if let problem {
-                    WorkErrorStrip(lines: [problem]) { changed += 1 }
+                    WorkErrorStrip(lines: [problem], read: planRead) { changed += 1 }
                         .padding(.horizontal, 12).padding(.bottom, 10)
                 }
                 Group {
@@ -89,6 +99,8 @@ struct WorkPlanSection: View {
         .clipShape(RoundedRectangle(cornerRadius: Paper.Radius.card))
         .overlay(RoundedRectangle(cornerRadius: Paper.Radius.card).strokeBorder(Paper.rule))
         .workTask(id: ask) { await load() }
+        .onChange(of: copyRead, initial: true) { fromCopy(copyRead) }
+        .onDisappear { fromCopy(nil) }
         .onChange(of: asked) { folded = [:] }
     }
 
@@ -467,8 +479,9 @@ struct WorkPlanSection: View {
         let mine = ask
         if mine.changed == 0 { said = nil }
         // Seen before: this device's copy at once, until the machine answers (#4930).
-        if plan == nil, let kept = await model.keptWork(DaemonAPI.ForgePlan.self, .plan, mine.node.ref), ask == mine, plan == nil {
+        if plan == nil, case let (kept, at)? = await model.keptWorkRead(DaemonAPI.ForgePlan.self, .plan, mine.node.ref), ask == mine, plan == nil {
             plan = kept
+            planRead = at
             fromDevice = true
         }
         let got: DaemonAPI.ForgePlan
@@ -482,6 +495,7 @@ struct WorkPlanSection: View {
         }
         guard ask == mine else { return }
         plan = got
+        planRead = Date()
         fromDevice = false
         problem = nil
         model.keepWork(got, .plan, mine.node.ref)

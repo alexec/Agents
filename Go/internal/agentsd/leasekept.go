@@ -3,7 +3,7 @@ package agentsd
 import (
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A kept place (#4041): an agent that lost its place in a line through no act of its own

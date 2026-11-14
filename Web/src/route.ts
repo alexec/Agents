@@ -99,7 +99,9 @@ export function parseRoute(hash: string): Route {
     if (nav === "reports" && section === "events") return { nav: "status", section };
     // The Multiplier page took the Achievements page's place (#3990): an old link opens it.
     if (nav === "reports" && section === "achievements") return { nav, section: "multiplier" };
-    if (item) return { nav, section: decodeURIComponent(section), item: decodeURIComponent(item) };
+    // An item keeps its own state after the "?" too: #/reports/value/builds?repo=… (#5178).
+    if (item) return query ? { nav, section: decodeURIComponent(section), item: decodeURIComponent(item), query }
+      : { nav, section: decodeURIComponent(section), item: decodeURIComponent(item) };
     return query ? { nav, section: decodeURIComponent(section), query } : { nav, section: decodeURIComponent(section) };
   }
   const parts = path.split("/").map((part) => decodeURIComponent(part));
@@ -164,7 +166,9 @@ export function aloneFolder(r: Route): AloneFolder | undefined {
 /** A section's page's address: #/reports/spend; #/ for the Overview. */
 function sectionHash(r: Route): string {
   if (!r.nav) return "#/";
-  return `#/${r.nav}` + (r.section ? "/" + encodeURIComponent(r.section) + (r.item ? "/" + encodeURIComponent(r.item) : r.query ? `?${r.query}` : "") : "");
+  return `#/${r.nav}` + (r.section ? "/" + encodeURIComponent(r.section) + (r.item ? "/" + encodeURIComponent(r.item) : "")
+    // A list's filters stay off an item's page, but Reports' pages under another keep theirs: #/reports/value/builds?… (#5178).
+    + (r.query && (!r.item || r.nav === "reports") ? `?${r.query}` : "") : "");
 }
 
 /** Whether an address is one from before #2141, or Machines ▸ Runtimes or Connectors from before #3631 and #3632, which the page writes

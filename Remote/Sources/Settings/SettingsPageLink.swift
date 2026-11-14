@@ -17,6 +17,7 @@ struct SettingsPageLink<Content: View>: View {
             Form { content() }
                 .scrollContentBackground(.hidden)
                 .background(Paper.ground)
+                .staleBanner()
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
         } label: {

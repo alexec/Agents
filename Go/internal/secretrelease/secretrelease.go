@@ -24,8 +24,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/machinelock"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/machinelock"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Info is the HPKE info of every release layer.

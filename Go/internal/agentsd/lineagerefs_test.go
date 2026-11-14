@@ -1,8 +1,8 @@
 package agentsd
 
 import (
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // sessionNode is a session's node in a test whose folder has no origin: agents:session:#<id>.

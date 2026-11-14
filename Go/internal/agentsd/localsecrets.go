@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // secrets/localList (#5122): the secrets this machine keeps for itself, for Settings ▸ You ▸

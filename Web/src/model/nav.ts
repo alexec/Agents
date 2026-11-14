@@ -23,6 +23,7 @@ export type PageDraw =
   | { kind: "activity"; page: ActivityPage }
   | { kind: "console"; id: string }
   | { kind: "report"; section: Section }
+  | { kind: "builds" }
   | { kind: "work"; work: WorkKind }
   | { kind: "features" }
   | { kind: "timeline" }
@@ -42,6 +43,9 @@ export interface NavPage {
   group: string;
   /** Only an admin sees it in the list; a member who opens it by its address is told why. */
   admin?: boolean;
+  /** A page under another of the list (#5178): its row is indented under that page's, and its address is the
+   * other page's item, #/reports/value/builds. */
+  under?: string;
   draw: PageDraw;
 }
 
@@ -79,7 +83,11 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
     adminPage("team", "Team Workflows", "Workflows", "workflows"),
   ],
   reports: [
-    ...reportSections.map((s): NavPage => ({ id: s.id, title: s.title, group: s.group, draw: { kind: "report", section: s } })),
+    ...reportSections.flatMap((s): NavPage[] => [
+      { id: s.id, title: s.title, group: s.group, draw: { kind: "report", section: s } },
+      // Build trends (#5178, spec 5166) under Planning: #/reports/value/builds.
+      ...s.id === "value" ? [{ id: "builds", title: "Builds", group: s.group, under: "value", draw: { kind: "builds" } } satisfies NavPage] : [],
+    ]),
     // The Multiplier page first (#3990), as the window's first row under Usage; it took the Achievements page's place.
     { id: "multiplier", title: "Multiplier", group: "Yours", draw: { kind: "multiplier" } },
     { id: "usage", title: "Usage", group: "Yours", draw: { kind: "usage" } },
@@ -134,6 +142,16 @@ export function sectionsShown(admin: boolean | null, current: NavSection): NavSe
 /** The pages in a section's list: every one for an admin; a member's, and the one open. */
 export function pagesShown(section: NavSection, admin: boolean | null, open?: string, more: readonly NavPage[] = []): NavPage[] {
   return withPages(section, more).filter((p) => admin === true || !p.admin || p.id === open);
+}
+
+/** The id of the page a route names: a page under another (#5178) is that page's item. */
+export function routePageID(section: NavSection, r: { section?: string | undefined; item?: string | undefined }): string | undefined {
+  return r.item && navPages[section].some((p) => p.under === r.section && p.id === r.item) ? r.item : r.section;
+}
+
+/** Where a page's row goes: its own address, or its parent's item. */
+export function pageRoute(section: Exclude<NavSection, "overview">, p: NavPage): { nav: Exclude<NavSection, "overview">; section: string; item?: string } {
+  return p.under ? { nav: section, section: p.under, item: p.id } : { nav: section, section: p.id };
 }
 
 /** The page a route opens: the one named, or the section's first that this person may use. */

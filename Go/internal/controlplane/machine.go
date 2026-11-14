@@ -17,8 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/machine"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/machine"
 )
 
 // MachineID is machine.ID: the id a host gives the control plane.

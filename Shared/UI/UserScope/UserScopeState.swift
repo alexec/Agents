@@ -12,6 +12,9 @@ import Observation
 final class UserScopeState {
     private(set) var settings: DaemonAPI.UserSettings?
     private(set) var secrets: DaemonAPI.UserSecretNames?
+    /// When `settings` and `secrets` were last read (#5146), for the "Last update" line of
+    /// Secrets and Accounts.
+    private(set) var readAt: Date?
     /// The last control/secretsLeft, until the person reads it.
     var left: DaemonAPI.SecretsLeft?
     /// Why the user scope could not be read, or nil.
@@ -29,6 +32,7 @@ final class UserScopeState {
                                               returning: DaemonAPI.UserSettings.self)
             secrets = try await control.call(DaemonAPI.Method.userSecretNames, DaemonAPI.Empty(),
                                              returning: DaemonAPI.UserSecretNames.self)
+            readAt = Date()
             problem = nil
         } catch {
             problem = UserScopeWords.refusal(error)

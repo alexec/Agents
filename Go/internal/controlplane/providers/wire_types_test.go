@@ -3,7 +3,7 @@ package providers
 import (
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/wiretest"
+	"github.com/agentloops-dev/agents/Go/internal/wiretest"
 )
 
 // Every type providers write or read on the wire reads the bytes in

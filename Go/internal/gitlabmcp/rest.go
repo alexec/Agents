@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // RealGitLab reads GitLab's REST API v4 as the person, with the token Token gives: the GitLab

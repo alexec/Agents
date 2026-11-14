@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/alexec/agents/Go/internal/agentsd/store"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A suspended person on their machine (#1002, spec 1002 slice 2b, FR-018). When the

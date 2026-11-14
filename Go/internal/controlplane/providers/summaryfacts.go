@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The daily summary's facts from the person's other machines (#3354). A machine cannot read

@@ -7,7 +7,7 @@ func (s *Server) config() map[string]any {
 	no := map[string]any{"supported": false}
 	return map[string]any{
 		"schemas":          []string{schemaConfig},
-		"documentationUri": "https://github.com/alexec/Agents/blob/main/docs/reference/sign-in.md",
+		"documentationUri": "https://github.com/agentloops-dev/Agents/blob/main/docs/reference/sign-in.md",
 		"patch":            map[string]any{"supported": true},
 		"bulk":             map[string]any{"supported": false, "maxOperations": 0, "maxPayloadSize": 0},
 		"filter":           map[string]any{"supported": true, "maxResults": MaxResults},

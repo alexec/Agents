@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/mac"
+	"github.com/agentloops-dev/agents/Go/internal/mac"
 )
 
 // scratchPersonKeys is a scratch root's Keychain store for the person key, its item deleted

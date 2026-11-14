@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // #4427: a release's figures are its rollup's cost and sessions, the runtimes and how many

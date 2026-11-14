@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/alexec/agents/Go/internal/agentsd/acp"
-	"github.com/alexec/agents/Go/internal/agentsd/diskjson"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/acp"
+	"github.com/agentloops-dev/agents/Go/internal/agentsd/diskjson"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // The brief (#1801): what every agent is told once, before its first turn, that it cannot
@@ -320,7 +320,7 @@ func toolsBrief(browser, screen, bot, github bool) string {
 			"set_ci_secret puts a secret I gave you with ask_secret into it, without you seeing the value; never put a secret's value in a variable. "+
 			"For a secret with Ask before use it waits on my approval; when it names a request, wait for it with wait_for_event, then call it again.",
 			"- make_app_repository: make a new app's private GitHub repository from a starter, cloned here and added as a folder. "+
-				"The starters are template repositories: iphone-app (alexec/iphone-app-starter), web-service (alexec/web-service-starter), "+
+				"The starters are template repositories: iphone-app (agentloops-dev/iphone-app-starter), web-service (agentloops-dev/web-service-starter), "+
 				"or one I name as owner/name. Call it again after a step fails: it skips what is there.",
 			"- make_public_repository: make a public GitHub repository from a folder's files. It is the only way to make one: "+
 				"it asks me on a card and makes nothing until I say yes. Never make a repository public with gh or git.",

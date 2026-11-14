@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // A wait on a server's event (#577), as the Swift host has it: a subscription the wait

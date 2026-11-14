@@ -3,7 +3,7 @@ package agentsd
 import (
 	"os/exec"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // macOpen runs /usr/bin/open, as DaemonCore.macOpen does: started, not waited on.

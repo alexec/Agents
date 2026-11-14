@@ -28,6 +28,18 @@ struct WorkItemPage: View {
     @State private var reading = false
     /// The item on screen came from this device's copy (#4930): no writes until its machine answers.
     @State private var fromDevice = false
+    /// When the item on screen was read from its machine (#5142): this device's copy's time, or
+    /// the last read that worked. The "Last update" line of the strips.
+    @State private var detailRead: Date?
+    /// When the plan drawn from this device's copy was read, until its machine answers (#5142).
+    @State private var planCopyRead: Date?
+
+    /// The page's one "From this device" strip (#5142): the oldest of the item's and the plan's
+    /// copies on screen, while a machine is asked again.
+    private var copyRead: Date? {
+        guard forgeProblem == nil else { return nil }
+        return [fromDevice ? detailRead : nil, planCopyRead].compactMap { $0 }.min()
+    }
     @State private var olderLoading = false
     @State private var estimate: DaemonAPI.LineageEstimate?
     @State private var estimateRange = false
@@ -418,9 +430,9 @@ struct WorkItemPage: View {
     @ViewBuilder
     private var problemStrip: some View {
         if detail != nil, let forgeProblem {
-            WorkErrorStrip(lines: [forgeProblem]) { asked += 1 }
+            WorkErrorStrip(lines: [forgeProblem], read: detailRead) { asked += 1 }
         }
-        WorkFromDeviceStrip(on: fromDevice && forgeProblem == nil)
+        WorkFromDeviceStrip(read: copyRead)
     }
 
     /// Nothing read: in the middle, the warning glyph, *Could not read #4331*, the forge's words,
@@ -454,7 +466,8 @@ struct WorkItemPage: View {
         if let detail, WorkPlan.hasPlan(detail.got.item) {
             WorkPlanSection(model: model, host: detail.host, lineageHost: lineageHost, detail: detail.got, asked: asked,
                             estimates: estimate?.children ?? [], compact: compact,
-                            writes: writes, waiting: fromDevice, wrote: { Task { await reread() } })
+                            writes: writes, waiting: fromDevice, wrote: { Task { await reread() } },
+                            fromCopy: { planCopyRead = $0 })
         }
     }
 
@@ -915,8 +928,9 @@ struct WorkItemPage: View {
         reading = true
         defer { if asked == mine { reading = false } }
         // Seen before: this device's copy at once, until a machine answers (#4930).
-        if detail == nil, let kept = await model.keptWork(KeptItem.self, .item, node.ref), asked == mine, detail == nil {
+        if detail == nil, case let (kept, at)? = await model.keptWorkRead(KeptItem.self, .item, node.ref), asked == mine, detail == nil {
             detail = (kept.host, kept.got)
+            detailRead = at
             fromDevice = true
         }
         var last: String?
@@ -925,6 +939,7 @@ struct WorkItemPage: View {
                 let got = try await model.forgeItem(node, cursor: nil, on: machine.id)
                 guard asked == mine else { return }
                 detail = (machine.id, got)
+                detailRead = Date()
                 fromDevice = false
                 forgeProblem = nil
                 model.keepWork(KeptItem(host: machine.id, got: got), .item, node.ref)
@@ -944,6 +959,7 @@ struct WorkItemPage: View {
         do {
             let got = try await model.forgeItem(node, cursor: nil, on: had.host)
             detail = (had.host, got)
+            detailRead = Date()
             fromDevice = false
             model.keepWork(KeptItem(host: had.host, got: got), .item, node.ref)
         } catch {

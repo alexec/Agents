@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/connections"
+	"github.com/agentloops-dev/agents/Go/internal/connections"
 )
 
 // The person's agents' bot (#3858). When the person made one and installed it on the owner of

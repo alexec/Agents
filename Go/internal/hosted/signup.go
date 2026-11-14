@@ -15,9 +15,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/controllink"
-	"github.com/alexec/agents/Go/internal/controlplane/signin"
-	"github.com/alexec/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/signin"
+	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
 )
 
 // Who may sign up (#2152, spec 1003 FR-001–FR-012). A person with an account signs in as

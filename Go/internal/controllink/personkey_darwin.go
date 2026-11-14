@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/alexec/agents/Go/internal/mac"
+	"github.com/agentloops-dev/agents/Go/internal/mac"
 )
 
 // personKeyAccount is the Keychain item's account under the root's service: distinct from

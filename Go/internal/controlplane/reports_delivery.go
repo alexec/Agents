@@ -6,8 +6,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/alexec/agents/Go/internal/lineage"
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Reports ▸ Planning's Delivery row (#4555, epic #4551): the delivery figures of the repos a

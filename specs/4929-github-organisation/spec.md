@@ -18,7 +18,7 @@ A survey of `git grep alexec` on main (1431 files). Most of them need no change.
 | What | Why |
 |---|---|
 | Bundle ids `com.alexecollins.*` (`project.yml` `bundleIdPrefix`, the App Store records, Keychain groups) | They are App Store records. A change makes new apps. They are not GitHub names. |
-| The Go module path `github.com/alexec/agents/Go` (about 2000 imports) | Nothing outside this repo imports it, and the module is never fetched by its path. A rename is a large change across many files; do it on a quiet day, on its own issue (follow-up 3). |
+| The Go module path `github.com/agentloops-dev/agents/Go` (about 2000 imports) | Nothing outside this repo imports it, and the module is never fetched by its path. A rename is a large change across many files; do it on a quiet day, on its own issue (follow-up 3). |
 | Test fixtures and examples (`*_test.go`, `Tests/`, `Web/test`, `specs/`, `.agents/reviews/`, doc comments in `WireRef.swift`, `ref.ts`, `WorkLook.swift`…) | They are sample data. `alexec/agents` in a test is as good as any repo. |
 | `.github/CODEOWNERS` (`@alexec`) | Alex stays a person and is an owner of the organisation. A user name is valid in an organisation's CODEOWNERS. |
 | `alex-todo` assignments to `alexec`, `<!-- agent -->` markers, "posts as `alexec`" | They name Alex the person, not the repo's owner. |

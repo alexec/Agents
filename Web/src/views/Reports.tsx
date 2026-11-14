@@ -24,6 +24,7 @@ import {
 import { assumesLine, burnLine, burnRuntime, forecastScoreLine, landsLine, laneOptions, loadedLine, mergeBurns, mixOptions, nextNote, noNext,
   noNextHere, noNextOffline, serviceLevelLine, spendLines, whatIfLines, whatIfNote, whatIfOf } from "../model/planning";
 import { deliveryCards, deliveryNote, noDelivery, repoTitle, sparkPath } from "../model/delivery";
+import { buildsLinkQuery } from "../model/builds";
 import { Capability } from "../protocol/capabilities.generated";
 import type { Section } from "../model/console";
 import { Choice } from "./Choice";
@@ -424,7 +425,7 @@ function PlanningPane({ store, scope, initial }: { store: Store; scope: ReportSc
           {unlinked && <li><span class="quiet">{unlinked}</span></li>}
         </ul>
       )}
-      {shown?.delivery && <DeliveryPart delivery={shown.delivery} />}
+      {shown?.delivery && <DeliveryPart delivery={shown.delivery} range={range.value} />}
       <NextPart store={store} epics={shown?.openEpics ?? []} />
       {(estimates || forecasts) && <h3>How the estimates and forecasts scored</h3>}
       {(estimates || forecasts) && (
@@ -449,7 +450,7 @@ function PlanningPane({ store, scope, initial }: { store: Store; scope: ReportSc
 /** Reports ▸ Planning's Delivery row (#4555): a card a figure for each repo the scope merged most in, with its
  * 4-week figure, a line of its weeks and DORA 2024's band where one exists. A repo's name heads its row only when
  * there are more than one. */
-function DeliveryPart({ delivery }: { delivery: readonly ReportDelivery[] }) {
+function DeliveryPart({ delivery, range }: { delivery: readonly ReportDelivery[]; range: ReportRange }) {
   return (
     <>
       <h3>Delivery</h3>
@@ -471,6 +472,10 @@ function DeliveryPart({ delivery }: { delivery: readonly ReportDelivery[] }) {
                   ) : <span class="delivery-spark" aria-hidden="true" />}
                   <span class="quiet small">{c.detail}</span>
                   {c.band && <span class="delivery-band">{`DORA: ${c.band}`}</span>}
+                  {/* The way in to Builds (#5178, spec 5166 board 4 note 5), with the card's repo and the range. */}
+                  {c.key === "ciTimeToGreen" && (
+                    <a class="small" href={routeHash({ nav: "reports", section: "value", item: "builds", query: buildsLinkQuery(d.repo, range) })}>Build trends ›</a>
+                  )}
                 </li>
               );
             })}

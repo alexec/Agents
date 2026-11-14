@@ -1,4 +1,4 @@
-module github.com/alexec/agents/Go
+module github.com/agentloops-dev/agents/Go
 
 go 1.26.9
 

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexec/agents/Go/wire"
+	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Updates is whether a skill's source has moved on since it was added (SkillUpdates). Per

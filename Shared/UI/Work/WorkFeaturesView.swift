@@ -52,7 +52,9 @@ final class WorkFeaturesState {
     /// A read runs: the features on screen stay until the new ones come (#4930), and Refresh spins.
     var reading = false
     /// The features on screen came from this device's copy (#4930), until the machines answer.
-    var fromDevice = false
+    var fromDevice: Bool { fromDeviceRead != nil }
+    /// When this device's copy on screen was read from the machines (#5142); nil once they answered.
+    var fromDeviceRead: Date?
     /// The board the features on screen were read for.
     private var shownFor: String?
 
@@ -106,10 +108,10 @@ final class WorkFeaturesState {
         let board = board
         // The features on screen stay until the machines answer (#4930); a board not shown yet
         // draws this device's copy first.
-        if shownFor != board, let kept = await model.keptWork(Kept.self, .features, board), ask == mine, shownFor != board {
+        if shownFor != board, case let (kept, at)? = await model.keptWorkRead(Kept.self, .features, board), ask == mine, shownFor != board {
             draw(kept)
             shownFor = board
-            fromDevice = true
+            fromDeviceRead = at
         }
         let found = await model.workBoards()
         guard ask == mine else { return }
@@ -184,7 +186,7 @@ final class WorkFeaturesState {
         pulls = WorkFeatures.pullsByLabel(prs)
         features = merged
         shownFor = board
-        fromDevice = false
+        fromDeviceRead = nil
         guard !older.isEmpty else {
             // Kept whole only when every machine gave it in one read, and none failed.
             if errors.isEmpty {
@@ -421,7 +423,7 @@ struct WorkFeaturesPane: View {
     private func list(_ features: [DaemonAPI.ForgeFeature]) -> some View {
         List {
             if state.fromDevice {
-                WorkFromDeviceStrip(on: true).listRowSeparator(.hidden)
+                WorkFromDeviceStrip(read: state.fromDeviceRead).listRowSeparator(.hidden)
             }
             if !state.errors.isEmpty {
                 WorkErrorStrip(lines: state.errors) { state.asked += 1 }

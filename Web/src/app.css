@@ -1300,6 +1300,68 @@ dialog.image-viewer .image-viewer-frame:hover .image-viewer-arrow, dialog.image-
 .delivery-spark { display: block; height: 22px; }
 .delivery-spark path { fill: none; stroke: var(--accent, currentColor); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .delivery-band { align-self: flex-start; font-size: 0.6875rem; padding: 0 6px; border-radius: 8px; border: 1px solid var(--paper-rule); }
+/* Reports ▸ Planning ▸ Builds (#5178, spec 5166): run time is the accent, waiting for a runner is hatched, waiting
+   its turn is the rule's grey; a release tag is a dashed purple line; slower is red, faster is green. */
+.sub-app-row.under { padding-left: 24px; }
+.builds-filters { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.builds-filters select { max-width: 16rem; }
+.builds-tiles { list-style: none; margin: 4px 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+.builds-tile-title { text-transform: uppercase; letter-spacing: 0.02em; font-size: 0.6875rem; }
+.builds-tile-value { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.builds-tile-value .delivery-value { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.builds-delta { font-size: 0.8125rem; font-variant-numeric: tabular-nums; color: var(--paper-secondary); }
+.builds-delta.slower, .builds-slower { color: var(--tint-failure); }
+.builds-delta.faster, .builds-faster { color: var(--tint-vouched); }
+.builds-empty { max-width: 320px; }
+.builds-chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.builds-chart-head h3 { margin: 8px 0 0; }
+.builds-stat { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--radius-control); background: var(--paper-wash); }
+.builds-stat button { border: none; background: none; padding: 2px 12px; border-radius: var(--radius-control); font: inherit; color: inherit; cursor: pointer; }
+.builds-stat button.on { background: var(--paper-raised); box-shadow: 0 0 0 1px var(--paper-rule); font-weight: 600; }
+.builds-trend { display: grid; grid-template-columns: minmax(0, 1fr) 200px; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .builds-trend { grid-template-columns: minmax(0, 1fr); } }
+.builds-chart { width: 100%; height: auto; display: block; }
+.builds-run { fill: var(--accent); }
+.builds-turn { fill: var(--paper-rule); }
+.builds-hatch-ground { fill: var(--paper-wash); }
+.builds-hatch-line { stroke: var(--paper-edge); stroke-width: 1.6; }
+.builds-p90 { fill: none; stroke: var(--paper-secondary); stroke-width: 1; stroke-dasharray: 2 3; }
+.builds-p90-dot { fill: var(--paper-secondary); }
+.builds-release line { stroke: var(--forge-done); stroke-width: 1; stroke-dasharray: 4 3; }
+.builds-release.patch line { opacity: 0.35; }
+.builds-release text { fill: var(--forge-done); font-size: 0.6875rem; }
+.builds-lane-title { fill: currentColor; font-size: 0.75rem; font-weight: 600; }
+.builds-mark { cursor: pointer; }
+.builds-mark text { fill: currentColor; font-size: 0.6875rem; }
+.builds-mark.slower path { fill: var(--tint-failure); }
+.builds-mark.faster path { fill: var(--tint-vouched); }
+.builds-mark:hover text, .builds-mark:focus text { text-decoration: underline; }
+.builds-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.builds-legend li { display: flex; gap: 8px; align-items: flex-start; }
+.builds-swatch { flex: none; width: 12px; height: 12px; margin-top: 3px; border-radius: 2px; }
+.builds-swatch.run { background: var(--accent); }
+.builds-swatch.runner { background: repeating-linear-gradient(45deg, var(--paper-edge) 0 1.5px, var(--paper-wash) 1.5px 4px); }
+.builds-swatch.turn { background: var(--paper-rule); }
+.builds-changes a { text-decoration: none; }
+.builds-changes a:hover { text-decoration: underline; }
+.builds-change h2 { margin: 0; font-size: 1.375rem; }
+.builds-change-body { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .builds-change-body { grid-template-columns: minmax(0, 1fr); } }
+.builds-cut { fill: var(--line-failure); opacity: 0.5; }
+.builds-dot { fill: var(--accent); opacity: 0.55; }
+.builds-dot.after { opacity: 1; }
+.builds-queue-mark { fill: var(--paper-edge); opacity: 0.6; }
+.builds-step { fill: none; stroke: var(--tint-failure); stroke-width: 2; }
+.builds-step-label { fill: var(--tint-failure); font-size: 0.75rem; paint-order: stroke; stroke: var(--paper-ground); stroke-width: 3px; }
+.builds-between { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.builds-between li { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); gap: 8px; padding: 4px 8px; border-radius: var(--radius-control); }
+.builds-between li > span:last-child { display: flex; flex-wrap: wrap; gap: 0 6px; align-items: baseline; }
+.builds-between li.notRun, .builds-between li.cancelled { color: var(--paper-tertiary); }
+.builds-between li.firstSlow { border: 1px solid var(--line-failure); background: color-mix(in srgb, var(--line-failure) 25%, transparent); }
+.builds-between li.firstSlow .small { color: var(--tint-failure); }
+.builds-sha { font-family: var(--font-mono, ui-monospace, monospace); font-size: 0.8125rem; }
+.builds-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin-top: 8px; }
+.builds-run-card { gap: 4px; }
 /* A feature with no use in 90 days (#2165), as the window's orange mark. */
 .report-unused { color: var(--tint-warning); }
 /* The Console's pages draw Settings' sections (People, Groups): Settings' rows, as sidebar.css has them under .with-sidebar. */
@@ -1384,9 +1446,8 @@ dialog.sheet:has(.account-details) { width: min(600px, calc(100vw - 32px)); max-
 .machine-swipe.trailing { justify-content: flex-end; }
 .machine-swipe.stop, .machine-swipe.remove { background: var(--paper-rule); color: inherit; }
 .machine-swipe.delete { background: var(--tint-failure); }
-.section-head.with-add { display: flex; justify-content: space-between; align-items: center; }
-.section-head .head-add { border: 0; background: none; padding: 0 4px; font: inherit; font-size: 0.9375rem; line-height: 1; color: inherit; cursor: pointer; opacity: 0.6; }
-.section-head .head-add:hover { opacity: 1; }
+/* + New Machine, the Machines group's last row (#5265): the mark in the accent, as the Remote's. */
+.new-machine-row .new-mark { color: var(--accent); }
 .team-workflows { display: flex; flex-direction: column; gap: 12px; max-width: 720px; }
 .bot-card { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); padding: 10px 12px; background: var(--paper-raised); }
 .bot-card h3 { margin: 0 0 2px; font-size: 0.875rem; }
@@ -1498,7 +1559,6 @@ dialog.sheet:has(.account-details) { width: min(600px, calc(100vw - 32px)); max-
   .sub-app-list { display: flex; flex-wrap: wrap; gap: 4px; border-right: none; border-bottom: 1px solid var(--paper-rule); }
   .sub-app-group { flex-direction: row; flex-wrap: wrap; }
   .sub-app-group .section-head { display: none; }
-  .sub-app-group .section-head.with-add { display: flex; width: 100%; }
 }
 .triggers { list-style: none; margin: 0; padding: 0; background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: var(--radius-card); }
 .trigger { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 10px; padding: 10px 14px; align-items: start; }
@@ -3015,6 +3075,12 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 /* How old what is shown is (#5141): after a banner's words in its own colour; on its own, ink.secondary at the caption step. */
 .last-update { white-space: nowrap; }
 :not(.message-words) > .last-update { color: var(--paper-secondary); font-size: var(--type-fine); }
+/* At the top of a pane with no banner (#5144), at its trailing end. */
+.page-fresh { margin: 0 0 8px; text-align: end; }
+.multiplier-page > .page-fresh { align-self: stretch; margin: 0; }
+/* A section's heading with the line at its trailing end (#5146). */
+.section-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.section-head-row > .last-update { margin-right: 8px; }
 .message-actions { flex: none; display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 /* A banner: inset at the top of its pane, under the toolbar; it comes and goes with a short animation. */
 .message-banner { display: flex; align-items: center; gap: 8px; margin: 8px 12px; padding: 7px 12px; font-size: 0.8125rem;

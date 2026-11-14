@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/alexec/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
 )
 
 // The forge reads and writes (#3786) against a stand-in Bitbucket Cloud over HTTP: the issues

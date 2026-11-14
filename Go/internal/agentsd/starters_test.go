@@ -60,7 +60,7 @@ var webTemplate = map[string]string{
 
 func TestStarterRepo(t *testing.T) {
 	for in, want := range map[string]string{
-		"iphone-app": "alexec/iphone-app-starter", "web-service": "alexec/web-service-starter",
+		"iphone-app": "agentloops-dev/iphone-app-starter", "web-service": "agentloops-dev/web-service-starter",
 		"someone/my-starter": "someone/my-starter",
 	} {
 		if got, ok := starterRepo(in); !ok || got != want {
