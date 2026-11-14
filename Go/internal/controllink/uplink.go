@@ -48,11 +48,15 @@ type Uplink struct {
 	// OnRefused is told why the control plane refused this host, such as Forgotten when the
 	// person removed it (#3950); nil hears none of it.
 	OnRefused func(reason string)
-	tunnels  map[string]chan *channel
-	asks     map[int64]chan askReply // Ask's requests on channel 0, by id, until answered
+	tunnels   map[string]chan *channel
+	asks      map[int64]chan askReply // Ask's requests on channel 0, by id, until answered
 	// control is what the control plane said it can do in its answer to machine/hello
 	// (#4100): nil until it answers on this link, empty from one older than the answer.
 	control atomic.Pointer[[]string]
+	// OnCapabilities is told the control plane's capabilities when it answers machine/hello
+	// on a link (#5410), after OnChange said it is up, so what waits on one can go then; nil
+	// hears none of it.
+	OnCapabilities func(capabilities []string)
 	// Lend is where this host's relay for a runtime listens on loopback, for a tunnel the
 	// control plane opens to it (the lending Mac's end, T091); 0 when it lends none.
 	Lend func(runtime string) int
@@ -390,6 +394,9 @@ func (u *Uplink) hello(ctx context.Context, hello MachineHello) {
 			}
 			list := append([]string{}, answer.Capabilities...)
 			u.control.Store(&list)
+			if u.OnCapabilities != nil {
+				u.OnCapabilities(list)
+			}
 		case <-time.After(askWait):
 		case <-ctx.Done():
 		}

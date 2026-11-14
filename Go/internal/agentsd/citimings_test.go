@@ -584,3 +584,43 @@ func TestCITimingsForgejo(t *testing.T) {
 		t.Fatalf("pull request run %+v %v", pr.Run, err)
 	}
 }
+
+// #5410: at connect the control plane has not said what it can do yet, so the first send finds
+// no builds.copy/1 and sends nothing; once it says, the send goes then, not on the next hour.
+func TestCITimingsSendWhenTheCapabilitiesAreKnown(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	srv, _ := ciFakeGitHub(t, now)
+	d, err := New(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Shutdown()
+	d.ciAPI = srv.URL
+	if err := d.readCIRepo(context.Background(), ciRepoHere{forgeRepo{"github", "alexec/agents"}, t.TempDir()}); err != nil {
+		t.Fatal(err)
+	}
+	var caps atomic.Pointer[[]string]
+	d.SetControlCapabilities(func() []string {
+		if list := caps.Load(); list != nil {
+			return *list
+		}
+		return nil
+	})
+	var sent atomic.Int32
+	d.SetControlAsk(askControl(func(_ context.Context, method string, _ any) (json.RawMessage, error) {
+		if method == wire.CallBuildsSync.Name {
+			sent.Add(1)
+		}
+		return json.RawMessage(`{}`), nil
+	}))
+	// The link is up, the hello answer is not in.
+	d.sendCITimings()
+	if n := sent.Load(); n != 0 {
+		t.Fatalf("sent %d before the capabilities were known", n)
+	}
+	caps.Store(&[]string{wire.CapBuildsCopy1})
+	d.ControlCapabilitiesKnown()
+	if n := sent.Load(); n != 1 {
+		t.Fatalf("sent %d once the capabilities were known, want 1", n)
+	}
+}
