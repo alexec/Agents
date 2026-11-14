@@ -1,0 +1,1652 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agents.alexecollins.com/schema/core.schema.json",
+  "title": "The wire: core types",
+  "description": "Part of the source of every type on the wire (#1135, #5380): one file per domain in Packages/Wire/schema. A $ref to another file names it (core.schema.json#/definitions/JSONValue); scripts/wire.sh gen reads them all.",
+  "definitions": {
+    "ActivityToken": {
+      "type": "object",
+      "description": "clients/setActivityToken (#1744): the push token of this device's Live Activity, in hex, for one session it speaks for (#2991: one activity for every turn sent from the device, so one token for several sessions), for the control plane to update it by APNs while the Remote is not running. startedAt is when the session's turn began. No token takes the session out of it.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "token": {
+          "type": "string"
+        },
+        "environment": {
+          "$ref": "connections.schema.json#/definitions/PushEnvironment"
+        },
+        "startedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "agentID",
+        "environment",
+        "startedAt"
+      ],
+      "additionalProperties": false
+    },
+    "Admitted": {
+      "type": "object",
+      "description": "What either announce is answered with: who the new party now is.",
+      "properties": {
+        "client": {
+          "$ref": "#/definitions/UUID"
+        },
+        "host": {
+          "$ref": "machines.schema.json#/definitions/MachineRef"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AutoField": {
+      "type": "string",
+      "description": "A field Auto maps (#2658): the model level, the permission mode, the permission requests and the sandbox.",
+      "enum": [
+        "model",
+        "permission",
+        "permissionRequests",
+        "sandbox"
+      ]
+    },
+    "AutoMapping": {
+      "type": "object",
+      "description": "One cell of Settings ▸ Agent Runtimes ▸ Auto ▸ Mappings (#2658): what a level is on one runtime. native is absent when the runtime cannot honour the level.",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "field": {
+          "$ref": "#/definitions/AutoField"
+        },
+        "level": {
+          "type": "string",
+          "description": "A ModelLevel, PermissionLevel, ClientPermissionMode or SandboxChoice, by field."
+        },
+        "native": {
+          "$ref": "#/definitions/NativeSetting"
+        },
+        "words": {
+          "type": "string",
+          "description": "The runtime's own words for native, such as Sonnet 5 or Accept edits."
+        },
+        "mark": {
+          "$ref": "#/definitions/AutoMark"
+        },
+        "note": {
+          "type": "string",
+          "description": "One line, such as nearest safer: no plan mode."
+        }
+      },
+      "required": [
+        "runtimeID",
+        "field",
+        "level",
+        "words",
+        "mark"
+      ],
+      "additionalProperties": false
+    },
+    "AutoMappings": {
+      "type": "object",
+      "description": "auto/mappings: every cell, and each runtime's own choices a cell can be set to.",
+      "properties": {
+        "cells": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AutoMapping"
+          }
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AutoNativeChoice"
+          }
+        }
+      },
+      "required": [
+        "cells",
+        "choices"
+      ],
+      "additionalProperties": false
+    },
+    "AutoMark": {
+      "type": "string",
+      "description": "How a cell got its value: the shipped map, the nearest value with less access, the person's own, none possible, or a value the runtime no longer offers.",
+      "enum": [
+        "autoMapped",
+        "nearestSafer",
+        "yours",
+        "notPossible",
+        "dropped"
+      ],
+      "x-fallback": "autoMapped"
+    },
+    "AutoNativeChoice": {
+      "type": "object",
+      "description": "One of a runtime's own settings that a cell of a field can be set to.",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "field": {
+          "$ref": "#/definitions/AutoField"
+        },
+        "native": {
+          "$ref": "#/definitions/NativeSetting"
+        },
+        "words": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "field",
+        "native",
+        "words"
+      ],
+      "additionalProperties": false
+    },
+    "AutoOverride": {
+      "type": "object",
+      "description": "The person's own value for one cell (#2658, FR-016).",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "field": {
+          "$ref": "#/definitions/AutoField"
+        },
+        "level": {
+          "type": "string"
+        },
+        "native": {
+          "$ref": "#/definitions/NativeSetting"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "field",
+        "level",
+        "native"
+      ],
+      "additionalProperties": false
+    },
+    "AutoPick": {
+      "type": "object",
+      "description": "On an Auto agent (#2658, FR-007): the runtime Auto picked, the levels asked for, the native settings given, and why each runtime before it was not used. The runtime never changes in the session.",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "levels": {
+          "$ref": "#/definitions/Levels"
+        },
+        "native": {
+          "$ref": "#/definitions/NativeSetting"
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AutoSkip"
+          }
+        }
+      },
+      "required": [
+        "runtimeID",
+        "levels",
+        "native",
+        "skipped"
+      ],
+      "additionalProperties": false
+    },
+    "AutoSettings": {
+      "type": "object",
+      "description": "The person's Auto settings (#2658, FR-017), in <settings>/auto.json: the order Auto tries the runtimes in (one not named goes last, in the shipped order), the runtimes it never uses, and their own values for cells.",
+      "properties": {
+        "order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "overrides": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AutoOverride"
+          }
+        },
+        "setBy": {
+          "$ref": "org.schema.json#/definitions/PolicySetBy"
+        }
+      },
+      "required": [
+        "order",
+        "excluded",
+        "overrides"
+      ],
+      "additionalProperties": false
+    },
+    "AutoSkip": {
+      "type": "object",
+      "description": "Why Auto did not use a runtime, in short: out, not signed in, not installed, excluded, no Runtime sandbox.",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtimeID",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "Base64": {
+      "type": "string",
+      "description": "Standard base64, with padding: Data in Swift.",
+      "contentEncoding": "base64",
+      "x-swift-type": "Data",
+      "x-go-type": "Data",
+      "x-ts-type": "string & { readonly __brand: \"Base64\" }"
+    },
+    "BuildOutputRemoved": {
+      "type": "object",
+      "properties": {
+        "removed": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "freed": {
+          "$ref": "reports.schema.json#/definitions/WorktreeSize"
+        }
+      },
+      "required": [
+        "removed",
+        "freed"
+      ],
+      "additionalProperties": false
+    },
+    "CapReached": {
+      "type": "object",
+      "description": "control/capReached (#1761, FR-033): to admins, a bot stopped starting work at its own or its group's cap.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "spentUSD": {
+          "type": "number"
+        },
+        "capUSD": {
+          "type": "number"
+        },
+        "until": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "user",
+        "name",
+        "spentUSD",
+        "capUSD",
+        "until"
+      ],
+      "additionalProperties": false
+    },
+    "Changed": {
+      "type": "boolean"
+    },
+    "DailySummaryMode": {
+      "type": "string",
+      "description": "How much the daily summary does (#3351, #3395): off, the summary only, or the summary and the read-only checks between summaries (the home folder's Daily checks workflow).",
+      "enum": [
+        "off",
+        "summary",
+        "summaryAndChecks"
+      ]
+    },
+    "DailySummarySettings": {
+      "type": "object",
+      "description": "The daily summary's one control, for all folders (#3351). It is the home folder's ready-made Daily summary workflow: the mode turns it on or off, and the time is its schedule's. The days stay as the workflow says (weekdays by default).",
+      "properties": {
+        "mode": {
+          "$ref": "#/definitions/DailySummaryMode"
+        },
+        "at": {
+          "type": "string",
+          "description": "The time it runs, HH:MM in this machine's time zone, on the hour or the half hour. 08:00 by default."
+        },
+        "checksEvery": {
+          "type": "integer",
+          "description": "With summaryAndChecks, how many hours apart the checks run, counted from the summary's time and never at it (#3395): 2, 3, 4, 6, 8 or 12. 4 by default."
+        }
+      },
+      "required": [
+        "mode",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "DeliveredRoute": {
+      "type": "object",
+      "description": "One org route as a machine gets it (#999, FR-005, #3397): the route without its groups, fingerprint and stamps, and each secret as an admin's client sealed it to this machine (OrgRouteSealed's envelope). A cloud credential comes as it is, and the machine makes its own token. waiting: the machine may use the route but has no copy yet, and sealed is empty.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "org.schema.json#/definitions/OrgRouteKind"
+        },
+        "vendor": {
+          "$ref": "org.schema.json#/definitions/OrgRouteVendor"
+        },
+        "runtimes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "settings": {
+          "$ref": "org.schema.json#/definitions/OrgRouteSettings"
+        },
+        "models": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "defaultFor": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "secretFields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "version": {
+          "type": "integer"
+        },
+        "sealed": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "org.schema.json#/definitions/SealedEnvelope"
+          },
+          "description": "Each secret value, by field."
+        },
+        "sealVersion": {
+          "type": "integer"
+        },
+        "waiting": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "runtimes",
+        "defaultFor",
+        "secretFields",
+        "version",
+        "sealed",
+        "sealVersion"
+      ],
+      "additionalProperties": false
+    },
+    "Deploy": {
+      "type": "object",
+      "description": "One try to put a version into a target (#5262, spec 5239): GitHub's Deployment, GitLab's deployment, Argo CD's sync, Kargo's Promotion, Octopus's Deployment. system and id are the system that said it and its id there, as a re-run of the same job is the same deploy; ref is its lineage ref, <system>:deploy:<topic>#<id>, when the source makes one. state is the model's, rawState the system's own word (GitHub's in_progress, Kargo's Errored). started and finished are when it went running and when it ended. rollback is set when the system says it is one (GitOps Promoter's RestoreActiveCommit, helm rollback); otherwise a rollback is computed. share is the per cent of the target's traffic the version takes when it is less than 100 (a canary, a Cloud Run split). observed is true for a deploy made from a change in what the target reports it runs, not from a system's record.",
+      "properties": {
+        "system": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/definitions/DeployTarget"
+        },
+        "version": {
+          "$ref": "#/definitions/DeployVersion"
+        },
+        "state": {
+          "$ref": "#/definitions/DeployState"
+        },
+        "rawState": {
+          "type": "string"
+        },
+        "started": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "finished": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "rollback": {
+          "type": "boolean"
+        },
+        "share": {
+          "type": "number"
+        },
+        "observed": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "sessions.schema.json#/definitions/DeployCheck"
+          }
+        }
+      },
+      "required": [
+        "system",
+        "id",
+        "target",
+        "version",
+        "state",
+        "rawState"
+      ],
+      "additionalProperties": false
+    },
+    "DeployComponent": {
+      "type": "object",
+      "description": "What runs and has versions (#5262): a service, an app, a site. kind is an open string (service, app, site…); id is its id in system; with none, it is the repo. repo is the forge repo it is built from, owner/name, when there is one.",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "system": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "repo": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "system",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "DeployEnvironment": {
+      "type": "object",
+      "description": "A place where components run (#5262), shared by many components and repos: GitHub's and GitLab's environments, Argo CD's destination, Kargo's Stage's place, TestFlight. name is its name in system; tier is GitLab's five, other when a system does not say. ephemeral is true for a preview for each PR (Vercel's previews, GitLab's review apps).",
+      "properties": {
+        "system": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "tier": {
+          "$ref": "#/definitions/EnvironmentTier"
+        },
+        "ephemeral": {
+          "type": "boolean"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "system",
+        "name",
+        "tier"
+      ],
+      "additionalProperties": false
+    },
+    "DeployOutcome": {
+      "type": "string",
+      "enum": [
+        "failed",
+        "cancelled"
+      ],
+      "description": "How a deploy that did not succeed ended, as deploy.failed says it."
+    },
+    "DeployState": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "running",
+        "succeeded",
+        "failed",
+        "cancelled"
+      ],
+      "description": "A deploy's or a check's state (#5262). Every system's states map to these five, and its own word is kept beside it as rawState: GitHub's queued and in_progress are running, success is succeeded, failure and error are failed. A deploy that a newer one replaced, or a rollback, is computed, not a state."
+    },
+    "DeployTarget": {
+      "type": "object",
+      "description": "One component in one environment (#5262), where a version runs: Argo CD's Application, Kargo's Stage, a Cloud Run service in a region. labels tell instances apart (region, cluster, namespace, tenant, machine); with none, it is component × environment. system and id are set when the system has a target of its own; ref is its lineage ref, <system>:target:<topic>#<component>@<environment>.",
+      "properties": {
+        "component": {
+          "$ref": "#/definitions/DeployComponent"
+        },
+        "environment": {
+          "$ref": "#/definitions/DeployEnvironment"
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "system": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "component",
+        "environment"
+      ],
+      "additionalProperties": false
+    },
+    "DeployVersion": {
+      "type": "object",
+      "description": "The set of artifacts that go out together (#5262); one artifact is the simple case. name is set for a Release (v0.18.0), a Kargo alias, an Octopus release; system and id are set when the version is a thing of its own there (Kargo's Freight, Octopus's Release). ref is a Release's ref when it has a name, else its one artifact's.",
+      "properties": {
+        "artifacts": {
+          "type": "array",
+          "items": {
+            "$ref": "files.schema.json#/definitions/DeployArtifact"
+          },
+          "minItems": 1
+        },
+        "name": {
+          "type": "string"
+        },
+        "system": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifacts"
+      ],
+      "additionalProperties": false
+    },
+    "DestinationState": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "free": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "free"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "sameSkill": {
+              "type": "object",
+              "properties": {
+                "update": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "update"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "sameSkill"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "managedOther": {
+              "type": "object",
+              "properties": {
+                "source": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "source"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "managedOther"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unmanaged": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unmanaged"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unavailable": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "$ref": "mcp.schema.json#/definitions/CatalogError"
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "unavailable"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "DestinationStateRequest": {
+      "type": "object",
+      "properties": {
+        "previewID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "destination": {
+          "$ref": "mcp.schema.json#/definitions/SkillDestination"
+        }
+      },
+      "required": [
+        "previewID",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "Empty": {
+      "type": "object",
+      "additionalProperties": false
+    },
+    "EnvironmentTier": {
+      "type": "string",
+      "enum": [
+        "production",
+        "staging",
+        "testing",
+        "development",
+        "other"
+      ],
+      "x-fallback": "other",
+      "description": "An environment's tier, as GitLab's five (#5262). A tier this build does not know reads as `other`."
+    },
+    "Event": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "lastAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "scope": {
+          "$ref": "workflows.schema.json#/definitions/EventScope"
+        },
+        "sentence": {
+          "type": "string"
+        },
+        "details": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "publisher": {
+          "$ref": "workflows.schema.json#/definitions/EventPublisher"
+        },
+        "message": {
+          "type": "string"
+        },
+        "chainDepth": {
+          "type": "integer"
+        },
+        "consequences": {
+          "type": "array",
+          "items": {
+            "$ref": "org.schema.json#/definitions/Consequence"
+          }
+        },
+        "actor": {
+          "$ref": "org.schema.json#/definitions/AuditActor",
+          "description": "Who raised it, when a person's call through the control plane did (#1751, spec 736 FR-040): the actor the control plane gave the call's channel, never taken from the client. None for what an agent, a workflow or the machine did."
+        },
+        "specversion": {"type": "string", "description": "The CloudEvents version of the envelope (#4728, spec 4724-event-bus, \"An event\"): always \"1.0\"."},
+        "id": {"type": "string", "description": "The event's ref (#4728): the subject's ref, \"@\", the type, and, when the same type can happen again to that thing, \"/\" and the provider's key for this one, such as github:pr:alexec/agents#4702@pr.commented/2457. It comes from the provider's data only, never from the machine or the clock, so two machines make the same id for the same happening."},
+        "type": {"type": "string", "description": "The event's type, noun.verbed (#4728): the same as name, which stays for one release."},
+        "provider": {"type": "string", "description": "Who the event is about (#4728): github, jira, slack and so on; agents for the app's own events; server:<name> for an MCP server's event that says no subject."},
+        "topic": {"type": "string", "description": "The provider's space (#4728, spec 4724-event-bus, \"Topics\"): a repo's full name, a Jira project, a Slack channel; the project or the machine for the app's own events. Lower case; can be empty."},
+        "subject": {"$ref": "#/definitions/Ref", "description": "The ref of the thing the event happened to (#4728). None for an MCP server's event that says no subject."},
+        "source": {"type": "string", "description": "provider:topic, as CloudEvents asks for one (#4728)."},
+        "time": {"type": "string", "format": "date-time", "description": "When it happened, in RFC 3339 (#4728): the provider's own time when it says one."},
+        "producer": {"type": "string", "description": "The machine that raised it (#4728), as agents:machine:#<machine>. Not part of the event's identity."},
+        "data": {"$ref": "#/definitions/JSONValue", "description": "What the event carries (#4728): an MCP server's event data, or the app's own event's details. The details stay for one release."}
+      },
+      "required": [
+        "position",
+        "name",
+        "at",
+        "count",
+        "scope",
+        "sentence",
+        "details",
+        "chainDepth",
+        "consequences"
+      ],
+      "additionalProperties": false
+    },
+    "HelperLimits": {
+      "type": "object",
+      "properties": {
+        "running": {
+          "type": "integer"
+        },
+        "notArchived": {
+          "type": "integer"
+        },
+        "queued": {
+          "type": "integer"
+        },
+        "agentsMayArchive": {
+          "type": "boolean"
+        },
+        "continueWhenBack": {
+          "description": "A helper's turn refused for a spent allowance waits for it at once, as if the person had chosen Continue (#1918). Off unless set.",
+          "type": "boolean"
+        },
+        "archiveWhenMerged": {
+          "description": "A session whose pull request merges is archived, when its turn has ended and its worktree has nothing uncommitted (#2886). On unless set.",
+          "type": "boolean"
+        },
+        "agentsMayStartOnMachines": {
+          "description": "start_session with a machine starts the session on another of the person's machines without asking first (#2928). Off unless set; only the person sets it, from Folder Settings.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "JSONValue": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/JSONValue"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/JSONValue"
+          }
+        }
+      ],
+      "description": "Any JSON: JSONValue in Swift.",
+      "x-swift-type": "JSONValue",
+      "x-go-type": "JSONValue",
+      "x-ts-type": "null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue }"
+    },
+    "Levels": {
+      "type": "object",
+      "description": "The values a session asks for in the words every runtime shares (#2658). Each is mapped to the runtime's own setting; a native value in startOptions for the same option wins.",
+      "properties": {
+        "model": {
+          "$ref": "#/definitions/ModelLevel"
+        },
+        "permission": {
+          "$ref": "org.schema.json#/definitions/PermissionLevel"
+        },
+        "permissionRequests": {
+          "$ref": "org.schema.json#/definitions/ClientPermissionMode"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LineMember": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "askedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "isCallOpen": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agentID",
+        "askedAt",
+        "isCallOpen"
+      ],
+      "additionalProperties": false
+    },
+    "ListCursor": {
+      "type": "object",
+      "properties": {
+        "lastActivityAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "id": {
+          "$ref": "#/definitions/UUID"
+        },
+        "archivedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "lastActivityAt",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "ListRequest": {
+      "type": "object",
+      "properties": {
+        "includeArchived": {
+          "type": "boolean"
+        },
+        "archivedCommands": {
+          "type": "boolean"
+        },
+        "archivedOnly": {
+          "type": "boolean"
+        },
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "startedByWorkflow": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "lean": {
+          "type": "boolean"
+        },
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "after": {
+          "$ref": "#/definitions/ListCursor"
+        },
+        "query": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string",
+          "description": "Only the sessions whose folder is in this project (#3276), as .agents/folder.json names it: the project's sessions on this machine."
+        },
+        "changedSince": {
+          "$ref": "#/definitions/ListRevision",
+          "description": "Only the records changed since this point (#4785), every one, archived ones too: limit, after, includeArchived and archivedOnly do not apply, so a client sees a session archived or brought back. The records removed come in client/catchUp's agentChanges. When the point is too old or of another epoch, agents/list fails with revisionGone and client/catchUp answers as without it, with agentChanges.all. A host that predates it answers the whole list."
+        }
+      },
+      "required": [
+        "includeArchived",
+        "archivedCommands",
+        "archivedOnly",
+        "lean"
+      ],
+      "additionalProperties": false
+    },
+    "ListRevision": {
+      "type": "object",
+      "description": "A point in a host's order of changes to its session records (#4785). The epoch names the order: the host makes a new one when it cannot vouch for the old one.",
+      "properties": {
+        "epoch": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "epoch",
+        "revision"
+      ],
+      "additionalProperties": false
+    },
+    "ModelLevel": {
+      "type": "string",
+      "description": "Fast: the runtime's smallest quick model; Balanced: its usual model; Smart: its most capable model (#2658).",
+      "enum": [
+        "fast",
+        "balanced",
+        "smart"
+      ],
+      "x-fallback": "balanced"
+    },
+    "NativeSetting": {
+      "type": "object",
+      "description": "A runtime's own setting for one level: config option values (mode, model, effort), a sandbox choice, or the answer to permission requests.",
+      "properties": {
+        "options": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/JSONValue"
+          }
+        },
+        "sandbox": {
+          "$ref": "org.schema.json#/definitions/SandboxChoice"
+        },
+        "clientPermission": {
+          "$ref": "org.schema.json#/definitions/ClientPermissionMode"
+        }
+      },
+      "additionalProperties": false
+    },
+    "NeedID": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "permission": {
+              "$ref": "#/definitions/UUID"
+            }
+          },
+          "required": [
+            "permission"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "elicitation": {
+              "$ref": "#/definitions/UUID"
+            }
+          },
+          "required": [
+            "elicitation"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "report": {
+              "type": "object",
+              "properties": {
+                "agentID": {
+                  "$ref": "#/definitions/UUID"
+                },
+                "at": {
+                  "$ref": "#/definitions/WireDate"
+                }
+              },
+              "required": [
+                "agentID",
+                "at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "report"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "guardedChange": {
+              "type": "object",
+              "properties": {
+                "folder": {
+                  "$ref": "#/definitions/URLString"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "folder",
+                "path"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "guardedChange"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "notice": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "notice"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "request": {
+              "$ref": "#/definitions/UUID"
+            }
+          },
+          "required": [
+            "request"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "NeedID (Attention/Need.swift): what is being answered, one key per kind. A notice (#2805) is what an agent told the person with `notify`: posted, never a Needs you row. A request (#4017) is a Needs you request posted so a phone can answer it: today only a secret's use (#4015), whose banner has its four answers."
+    },
+    "NotCommittedResponse": {
+      "type": "object",
+      "description": "folders/notCommitted (#3448): what in the folder's .agents Git ignores, so it stays on this machine and the project's other folders do not get it.",
+      "properties": {
+        "isRepository": {
+          "type": "boolean",
+          "description": "False when the folder is not in a Git repository: then nothing in .agents is committed, and paths is empty."
+        },
+        "paths": {
+          "type": "array",
+          "description": "Paths from the folder, such as .agents/worktrees/. A folder that Git ignores whole is one path, with a slash at its end. At most 500.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "more": {
+          "type": "integer",
+          "description": "How many more paths there are after the first 500."
+        }
+      },
+      "required": [
+        "isRepository",
+        "paths",
+        "more"
+      ],
+      "additionalProperties": false
+    },
+    "OTLPExport": {
+      "type": "object",
+      "description": "The OTLP exporter of the report figures (#2019, #1804 decision 4), set on agents-control by OTEL_EXPORTER_OTLP_ENDPOINT, as this copy runs it: where it sends, the last send and the last failure.",
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "every": {
+          "type": "integer",
+          "description": "Seconds between sends."
+        },
+        "lastSent": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "lastFailure": {
+          "type": "string"
+        },
+        "failedAt": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "endpoint",
+        "every"
+      ],
+      "additionalProperties": false
+    },
+    "PassThroughName": {
+      "type": "object",
+      "description": "One name in the person's own pass-through list (#998, FR-011a), as runtime-environment.json has it.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "A variable's name, or a prefix ending in *."
+        },
+        "runtime": {
+          "type": "string",
+          "description": "The runtime it is passed to; absent for every runtime."
+        },
+        "setBy": {
+          "$ref": "org.schema.json#/definitions/PolicySetBy",
+          "description": "Set when the organisation's policy does not allow the name: it is not passed."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "PassThroughState": {
+      "type": "object",
+      "description": "settings/passThrough (#998): the person's own pass-through names, each marked when the policy refuses it.",
+      "properties": {
+        "names": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PassThroughName"
+          }
+        }
+      },
+      "required": [
+        "names"
+      ],
+      "additionalProperties": false
+    },
+    "ProviderID": {
+      "type": "string",
+      "x-ts-type": "string & { readonly __brand: \"ProviderID\" }"
+    },
+    "RateLimitInfo": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "resetsAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "rateLimitType": {
+          "type": "string"
+        },
+        "utilization": {
+          "type": "number"
+        },
+        "overageStatus": {
+          "type": "string"
+        },
+        "overageResetsAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "isUsingOverage": {
+          "type": "boolean"
+        },
+        "overageInUse": {
+          "type": "boolean"
+        },
+        "overageDisabledReason": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Ref": {
+      "type": "string",
+      "description": "A ref (#4727, spec 4724-event-bus): one thing, as provider:type:topic#id, such as github:pr:alexec/agents#4702 or agents:machine:#mac-mini. Provider, type and topic are lower case; the first # ends the topic, and the id keeps its case and can hold # and /. Always the full form on the wire; a short form (#123, P#123, owner/repo#123) is input only.",
+      "pattern": "^[a-z0-9-]+:[a-z0-9-]+:[^:#A-Z]*#.+$",
+      "x-swift-type": "WireRef",
+      "x-go-type": "Ref",
+      "x-ts-type": "string & { readonly __brand: \"Ref\" }"
+    },
+    "RemoveRequest": {
+      "type": "object",
+      "description": "A Remove request (#1002, D13, FR-017): an org provider deleted a person by SCIM; the person is suspended, and an admin confirms the removal with people/remove.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "user",
+        "name",
+        "provider",
+        "at"
+      ],
+      "additionalProperties": false
+    },
+    "Request": {
+      "type": "object",
+      "description": "Something an agent asked a person for (#3862, spec 3862 \u00a71): a question, a secret, a step. Kept in <root>/requests/<id>.json, an ended one for 14 days.",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/UUID",
+          "description": "For an app request, the same id as its ElicitationRequest."
+        },
+        "kind": {
+          "$ref": "workflows.schema.json#/definitions/RequestKind"
+        },
+        "source": {
+          "$ref": "workflows.schema.json#/definitions/RequestSource"
+        },
+        "state": {
+          "$ref": "workflows.schema.json#/definitions/RequestState"
+        },
+        "title": {
+          "type": "string",
+          "description": "One line, for the row."
+        },
+        "detail": {
+          "$ref": "workflows.schema.json#/definitions/RequestDetail"
+        },
+        "folder": {
+          "type": "string",
+          "description": "The folder's URL."
+        },
+        "askedBy": {
+          "$ref": "#/definitions/UUID",
+          "description": "The session that asked."
+        },
+        "forge": {
+          "$ref": "forge.schema.json#/definitions/RequestForge",
+          "description": "A forge item's (#3865): an issue labelled alex-todo or needs-account, or a pull request labelled needs-approval."
+        },
+        "waiters": {
+          "type": "array",
+          "items": {
+            "$ref": "workflows.schema.json#/definitions/RequestWaiter"
+          },
+          "description": "Every session that waits on it; the asker first. Kept as history once it ends."
+        },
+        "askedAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "answeredAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "answeredBy": {
+          "$ref": "org.schema.json#/definitions/AuditActor"
+        },
+        "answer": {
+          "type": "string",
+          "description": "A summary for the row; never a secret's value."
+        },
+        "droppedWhy": {
+          "$ref": "workflows.schema.json#/definitions/RequestDroppedWhy"
+        },
+        "deferred": {
+          "$ref": "workflows.schema.json#/definitions/RequestDeferral",
+          "description": "Later (#4233): the request is still open, but out of Needs you, the counts and the notices until it comes back. Absent when it is not deferred; an answer or a drop clears it."
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "source",
+        "state",
+        "title",
+        "detail",
+        "folder",
+        "waiters",
+        "askedAt"
+      ],
+      "additionalProperties": false
+    },
+    "ResetRule": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "dailyAt": {
+              "type": "object",
+              "properties": {
+                "hour": {
+                  "type": "integer"
+                },
+                "timeZone": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "hour",
+                "timeZone"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "dailyAt"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unknown": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "unknown"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ServedRequest": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "workflows.schema.json#/definitions/ServedRequestKind"
+        },
+        "outcome": {
+          "$ref": "workflows.schema.json#/definitions/ServedRequestOutcome"
+        }
+      },
+      "required": [
+        "kind",
+        "outcome"
+      ],
+      "additionalProperties": false
+    },
+    "SetCeilingRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "ceiling": {
+          "$ref": "reports.schema.json#/definitions/Cost"
+        },
+        "tokenCeiling": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
+    "SetHelperLimitsRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "#/definitions/URLString"
+        },
+        "limits": {
+          "$ref": "#/definitions/HelperLimits"
+        }
+      },
+      "required": [
+        "folder",
+        "limits"
+      ],
+      "additionalProperties": false
+    },
+    "SetLevelsRequest": {
+      "type": "object",
+      "description": "Change a running agent's model level or permission mode on its own runtime (#2658): each is mapped as at its start. An Auto agent keeps its runtime.",
+      "properties": {
+        "agentID": {
+          "$ref": "#/definitions/UUID"
+        },
+        "levels": {
+          "$ref": "#/definitions/Levels"
+        }
+      },
+      "required": [
+        "agentID",
+        "levels"
+      ],
+      "additionalProperties": false
+    },
+    "SetLimitsRequest": {
+      "type": "object",
+      "properties": {
+        "perAgent": {
+          "anyOf": [
+            {
+              "$ref": "reports.schema.json#/definitions/Cost"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "daily": {
+          "anyOf": [
+            {
+              "$ref": "reports.schema.json#/definitions/Cost"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "perAgentTokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "dailyTokens": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "StoreNotes": {
+      "type": "object",
+      "properties": {
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "notes"
+      ],
+      "additionalProperties": false
+    },
+    "SummaryFacts": {
+      "type": "object",
+      "description": "agents/summaryFacts (#3354): one machine's lines for the daily summary since a time, each list at most 40 lines, newest last; folders is how many folders it has.",
+      "properties": {
+        "folders": {
+          "type": "integer"
+        },
+        "landed": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+        "failed": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+        "waiting": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+        "suggested": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+        "checked": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+      },
+      "required": [
+        "folders",
+        "landed",
+        "failed",
+        "waiting",
+        "suggested",
+        "checked"
+      ],
+      "additionalProperties": false
+    },
+    "SummaryFactsRequest": {
+      "type": "object",
+      "description": "agents/summaryFacts and machines/summaryFacts (#3354): the facts since this time.",
+      "properties": {
+        "since": {
+          "$ref": "#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "since"
+      ],
+      "additionalProperties": false
+    },
+    "SummaryReadRequest": {
+      "type": "object",
+      "description": "summaries/read (#3721): the page to read, as SummaryPage.name says it.",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "URLString": {
+      "type": "string",
+      "description": "An absolute URL as text: URL in Swift.",
+      "format": "uri",
+      "x-swift-type": "URL",
+      "x-go-type": "URL",
+      "x-ts-type": "string & { readonly __brand: \"URLString\" }"
+    },
+    "UUID": {
+      "type": "string",
+      "description": "Upper case, as Swift's uuidString writes it.",
+      "format": "uuid",
+      "pattern": "^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$",
+      "x-swift-type": "UUID",
+      "x-go-type": "UUID",
+      "x-ts-type": "string & { readonly __brand: \"UUID\" }"
+    },
+    "Weekday": {
+      "type": "string",
+      "enum": [
+        "sun",
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+        "sat"
+      ]
+    },
+    "WireDate": {
+      "type": "number",
+      "description": "Seconds since 2001-01-01T00:00:00Z: Date in Swift, through a plain JSONEncoder.",
+      "x-swift-type": "Date",
+      "x-go-type": "Date",
+      "x-ts-type": "number & { readonly __brand: \"WireDate\" }"
+    }
+  }
+}

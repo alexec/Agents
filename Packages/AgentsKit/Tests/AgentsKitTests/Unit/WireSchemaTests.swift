@@ -4,7 +4,7 @@ import Testing
 
 /// Today's Swift encoders against Packages/Wire, the schema every other language is made from
 /// (#1135). The Swift `Model` types stay written by hand; this is what keeps them and the
-/// schema the same. A change to a type on the wire changes `daemon.schema.json` first, then
+/// schema the same. A change to a type on the wire changes `Packages/Wire/schema` first, then
 /// `scripts/wire.sh gen` makes the Go and the TypeScript, and this test says what to change in
 /// Swift by hand.
 @Suite("Wire schema")
@@ -19,6 +19,18 @@ struct WireSchemaTests {
 
     static func read(_ name: String) throws -> JSONValue {
         try JSONValue.parse(Data(contentsOf: wire.appending(path: name)))
+    }
+
+    /// The schema: the definitions of every file under Packages/Wire/schema, one per domain (#5380).
+    static func readSchema() throws -> JSONValue {
+        let directory = wire.appending(path: "schema")
+        var definitions: [String: JSONValue] = [:]
+        for file in try FileManager.default.contentsOfDirectory(atPath: directory.path()).sorted()
+        where file.hasSuffix(".schema.json") {
+            let document = try JSONValue.parse(Data(contentsOf: directory.appending(path: file)))
+            for (name, definition) in document["definitions"]?.objectValue ?? [:] { definitions[name] = definition }
+        }
+        return .object(["definitions": .object(definitions)])
     }
 
     /// The records in the web fixtures, told apart by their keys, and the Swift type each is.
@@ -75,7 +87,7 @@ struct WireSchemaTests {
     }
 
     @Test func todaysEncodersWriteWhatTheSchemaSays() throws {
-        let schema = try WireSchema(Self.read("daemon.schema.json"))
+        let schema = try WireSchema(Self.readSchema())
         var found: [String: Int] = [:]
         var failures: [String] = []
         let files = FileManager.default.enumerator(at: Self.fixtures, includingPropertiesForKeys: nil)?
@@ -114,7 +126,7 @@ struct WireSchemaTests {
     /// `personal/shared` (#1299): every reach and both skill sources, as the Swift host
     /// writes them, fit the schema the Go host is made from.
     @Test func sharedSnapshotFitsTheSchema() throws {
-        let schema = try WireSchema(Self.read("daemon.schema.json"))
+        let schema = try WireSchema(Self.readSchema())
         let reach: [String: DaemonAPI.Reach] = [
             "claude": .gets("sent at start"), "codex": .ownCopy("/h/.codex/config.toml"),
             "copilot": .leftOut("needs sign-in"), "cursor": .noWay("no way in"),
@@ -145,7 +157,7 @@ struct WireSchemaTests {
     /// Personas from a marketplace (#3665): what the window reads, written with today's
     /// encoder, fits the schema the Go host is made from.
     @Test func personaCatalogFitsTheSchema() throws {
-        let schema = try WireSchema(Self.read("daemon.schema.json"))
+        let schema = try WireSchema(Self.readSchema())
         let result = DaemonAPI.CatalogResult(id: "o/r/personas/reviewer.md", name: "reviewer", owner: "o", repo: "r",
                                              skillID: "reviewer", installs: 0, known: false,
                                              marketplace: "provided:anthropic-skills", skillPath: "personas/reviewer.md")
@@ -172,7 +184,7 @@ struct WireSchemaTests {
     /// with today's encoder, fits the schema and comes back whole, so neither has a field
     /// the other lacks.
     @Test func controlTypesFitTheSchema() throws {
-        let schema = try WireSchema(Self.read("daemon.schema.json"))
+        let schema = try WireSchema(Self.readSchema())
         let samples = try JSONValue.parse(Data(contentsOf: URL(filePath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent()
             .appending(path: "Fixtures/control-wire/samples.json")))
@@ -345,7 +357,7 @@ struct WireSchemaTests {
 
     /// The checker itself finds what is wrong, so a pass above means something.
     @Test func theCheckerRefusesWhatTheSchemaDoesNot() throws {
-        let schema = try WireSchema(Self.read("daemon.schema.json"))
+        let schema = try WireSchema(Self.readSchema())
         let entry: [String: JSONValue] = [
             "id": "00000000-0000-0000-0000-000000000001", "at": 812_500_000,
             "kind": ["agentMessage": ["text": "hello"]],
@@ -407,7 +419,7 @@ struct WireSchemaTests {
     }
 }
 
-/// The part of JSON Schema draft-07 that daemon.schema.json uses, checked against a value.
+/// The part of JSON Schema draft-07 that Packages/Wire/schema uses, checked against a value.
 struct WireSchema {
     let definitions: [String: JSONValue]
 

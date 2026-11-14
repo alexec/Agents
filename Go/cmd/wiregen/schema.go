@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -242,65 +243,85 @@ func ordered(b []byte) ([]string, map[string]json.RawMessage, error) {
 	return keys, values, nil
 }
 
-// Document is daemon.schema.json: the definitions, by name.
+// Document is the schema, the definitions of every file under Packages/Wire/schema, by name.
 type Document struct {
 	Names       []string // sorted
 	Definitions map[string]*Schema
+	File        map[string]string // the file each definition is in, by name
 }
 
-func readDocument(b []byte) (*Document, error) {
-	var top struct {
-		Definitions json.RawMessage `json:"definitions"`
-	}
-	if err := json.Unmarshal(b, &top); err != nil {
-		return nil, err
-	}
-	names, definitions, err := ordered(top.Definitions)
-	if err != nil {
-		return nil, fmt.Errorf("definitions: %w", err)
-	}
-	if err := inNameOrder("definitions", names); err != nil {
-		return nil, err
-	}
-	doc := &Document{Definitions: map[string]*Schema{}}
-	for name, raw := range definitions {
-		s := &Schema{}
-		if err := json.Unmarshal(raw, s); err != nil {
-			return nil, fmt.Errorf("definitions/%s: %w", name, err)
+// Part is one schema file: its path (as the $refs between files name it) and its text.
+type Part struct {
+	Path string
+	Data []byte
+}
+
+// readDocument merges the schema files. Each file keeps its definitions in name order, a
+// definition is in one file only, and a $ref names the file that has it (`#/definitions/X`
+// for its own file, `other.schema.json#/definitions/X` for another).
+func readDocument(parts ...Part) (*Document, error) {
+	doc := &Document{Definitions: map[string]*Schema{}, File: map[string]string{}}
+	for _, part := range parts {
+		var top struct {
+			Definitions json.RawMessage `json:"definitions"`
 		}
-		doc.Names = append(doc.Names, name)
-		doc.Definitions[name] = s
+		if err := json.Unmarshal(part.Data, &top); err != nil {
+			return nil, fmt.Errorf("%s: %w", part.Path, err)
+		}
+		names, definitions, err := ordered(top.Definitions)
+		if err != nil {
+			return nil, fmt.Errorf("%s: definitions: %w", part.Path, err)
+		}
+		if err := inNameOrder("definitions", names); err != nil {
+			return nil, fmt.Errorf("%s: %w", part.Path, err)
+		}
+		for name, raw := range definitions {
+			if other, ok := doc.File[name]; ok {
+				return nil, fmt.Errorf("%s: definition %s is also in %s", part.Path, name, other)
+			}
+			s := &Schema{}
+			if err := json.Unmarshal(raw, s); err != nil {
+				return nil, fmt.Errorf("%s: definitions/%s: %w", part.Path, name, err)
+			}
+			doc.Names = append(doc.Names, name)
+			doc.Definitions[name] = s
+			doc.File[name] = part.Path
+		}
 	}
 	sort.Strings(doc.Names)
 	for _, name := range doc.Names {
-		if err := doc.checkRefs(doc.Definitions[name], name); err != nil {
+		if err := doc.checkRefs(doc.Definitions[name], name, doc.File[name]); err != nil {
 			return nil, err
 		}
 	}
 	return doc, nil
 }
 
-func (d *Document) checkRefs(s *Schema, where string) error {
+func (d *Document) checkRefs(s *Schema, where, file string) error {
 	if s == nil {
 		return nil
 	}
 	if s.Ref != "" {
-		if _, ok := d.Definitions[s.RefName()]; !ok {
+		have, ok := d.File[s.RefName()]
+		if !ok {
 			return fmt.Errorf("%s: $ref %s names no definition", where, s.Ref)
+		}
+		if want := strings.SplitN(s.Ref, "#", 2)[0]; (want == "" && have != file) || (want != "" && filepath.Base(want) != filepath.Base(have)) {
+			return fmt.Errorf("%s: $ref %s is in %s", where, s.Ref, filepath.Base(have))
 		}
 	}
 	for _, p := range s.Properties {
-		if err := d.checkRefs(p.Schema, where+"."+p.Name); err != nil {
+		if err := d.checkRefs(p.Schema, where+"."+p.Name, file); err != nil {
 			return err
 		}
 	}
 	for _, m := range s.AnyOf {
-		if err := d.checkRefs(m, where); err != nil {
+		if err := d.checkRefs(m, where, file); err != nil {
 			return err
 		}
 	}
 	for _, c := range []*Schema{s.More, s.Items, s.Not} {
-		if err := d.checkRefs(c, where); err != nil {
+		if err := d.checkRefs(c, where, file); err != nil {
 			return err
 		}
 	}
@@ -399,7 +420,7 @@ func readRPC(b []byte, target string, doc *Document) (*RPC, error) {
 			method.Result = m.Result.Schema
 		}
 		for _, s := range []*Schema{method.Params, method.Result} {
-			if err := doc.checkRefs(s, m.Name); err != nil {
+			if err := doc.checkRefs(s, m.Name, ""); err != nil {
 				return nil, err
 			}
 		}

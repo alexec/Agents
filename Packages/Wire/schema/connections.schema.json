@@ -1,0 +1,2448 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agents.alexecollins.com/schema/connections.schema.json",
+  "title": "The wire: connections types",
+  "description": "Part of the source of every type on the wire (#1135, #5380): one file per domain in Packages/Wire/schema. A $ref to another file names it (core.schema.json#/definitions/JSONValue); scripts/wire.sh gen reads them all.",
+  "definitions": {
+    "AttentionDelivery": {
+      "type": "object",
+      "properties": {
+        "needID": {
+          "$ref": "core.schema.json#/definitions/NeedID"
+        },
+        "to": {
+          "$ref": "#/definitions/Surface"
+        }
+      },
+      "required": [
+        "needID"
+      ],
+      "additionalProperties": false
+    },
+    "AttentionNeed": {
+      "type": "object",
+      "description": "attention/need, unsealed, on a host's channel 0 (R6): a need to offer, or `withdraw`, and the host's whole Needs you count (#1163).",
+      "properties": {
+        "need": {
+          "$ref": "workflows.schema.json#/definitions/Need"
+        },
+        "headline": {
+          "$ref": "reports.schema.json#/definitions/Headline"
+        },
+        "buzz": {
+          "type": "boolean"
+        },
+        "withdraw": {
+          "$ref": "core.schema.json#/definitions/NeedID"
+        },
+        "waiting": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AttentionNotification": {
+      "type": "object",
+      "properties": {
+        "needID": {
+          "$ref": "core.schema.json#/definitions/NeedID"
+        },
+        "need": {
+          "$ref": "workflows.schema.json#/definitions/Need"
+        },
+        "to": {
+          "$ref": "#/definitions/Surface"
+        },
+        "alert": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "needID",
+        "alert"
+      ],
+      "additionalProperties": false
+    },
+    "AttentionPending": {
+      "type": "object",
+      "properties": {
+        "needs": {
+          "type": "array",
+          "items": {
+            "$ref": "workflows.schema.json#/definitions/Need"
+          }
+        },
+        "deliveries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AttentionDelivery"
+          }
+        }
+      },
+      "required": [
+        "needs",
+        "deliveries"
+      ],
+      "additionalProperties": false
+    },
+    "AttentionTurn": {
+      "type": "object",
+      "description": "attention/turn (#1744): a host says that a session's turn moved to a new phase, so the control plane can update each device's Live Activity that speaks for the session by APNs. No words: the phase, and when it ended.",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "phase": {
+          "$ref": "sessions.schema.json#/definitions/TurnPhase"
+        },
+        "endedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "agentID",
+        "phase"
+      ],
+      "additionalProperties": false
+    },
+    "BotCaps": {
+      "type": "object",
+      "description": "bots/setCaps (#1761): the bot's caps, and optionally its group.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "caps": {
+          "$ref": "reports.schema.json#/definitions/SpendCaps"
+        },
+        "group": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "user",
+        "caps"
+      ],
+      "additionalProperties": false
+    },
+    "BotMade": {
+      "type": "object",
+      "description": "bots/make's answer: the bot's user id.",
+      "properties": {
+        "user": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "user"
+      ],
+      "additionalProperties": false
+    },
+    "BotMake": {
+      "type": "object",
+      "description": "bots/make (#1761, FR-030): a bot, in a group, with caps. It has no clients and no sign-in; admins approve its machines.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "caps": {
+          "$ref": "reports.schema.json#/definitions/SpendCaps"
+        }
+      },
+      "required": [
+        "name",
+        "group"
+      ],
+      "additionalProperties": false
+    },
+    "BotStopRun": {
+      "type": "object",
+      "description": "bots/stopRun (#1761, FR-031): an admin stops an agent on a bot's machine, the one way a client acts there.",
+      "properties": {
+        "host": {
+          "$ref": "machines.schema.json#/definitions/MachineRef"
+        },
+        "agent": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "host",
+        "agent"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelDKIM": {
+      "type": "object",
+      "description": "ChannelSender.dkim (#1762, FR-037): the DKIM result the email server read for a message, from its own Authentication-Results.",
+      "properties": {
+        "result": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelLink": {
+      "type": "object",
+      "description": "links/list (#1762, data-model.md \"Channel link\"): a channel identity linked to a person, and who approved it when.",
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "approvedBy": {
+          "type": "string"
+        },
+        "approvedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "channel",
+        "identity",
+        "user",
+        "approvedBy",
+        "approvedAt"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelLinkChecked": {
+      "type": "object",
+      "description": "links/check's answer (#1762): user is the linked person; with none, nothing starts, and refused says why when it is not only that the identity is not linked yet.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "refused": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ChannelLinkDecide": {
+      "type": "object",
+      "description": "links/approve, links/deny (#1762). An admin approving a request that names nobody names the person in for, and the request goes to them.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "for": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelLinkDecided": {
+      "type": "object",
+      "description": "control/linkDecided (#1762): a request ended (approved, denied, expired) or went to another person (sent), so every card for it goes.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "result": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "request",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelLinkRemove": {
+      "type": "object",
+      "description": "links/remove (#1762): unlink a channel identity.",
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "channel",
+        "identity"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelLinkRequest": {
+      "type": "object",
+      "description": "links/requests, control/linkRequested (#1762): a channel identity waiting to be linked. for is the person asked; with none, the admins send it on to a person.",
+      "properties": {
+        "request": {
+          "type": "string"
+        },
+        "channel": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "for": {
+          "type": "string"
+        },
+        "forName": {
+          "type": "string"
+        },
+        "expires": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "request",
+        "channel",
+        "identity",
+        "expires"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelOpen": {
+      "type": "object",
+      "description": "What a channel on a host's uplink is opened as (ControlWire.ChannelOpen).",
+      "properties": {
+        "client": {
+          "type": "string"
+        },
+        "device": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "tunnel": {
+          "type": "string"
+        },
+        "tunnelRef": {
+          "type": "string"
+        },
+        "fanOut": {
+          "type": "boolean"
+        },
+        "fanOutLock": {
+          "type": "boolean",
+          "description": "The control plane reads a fan-out frame's l, each channel's lock member, and adds it to that channel's copy (#3541)."
+        },
+        "actor": {
+          "$ref": "org.schema.json#/definitions/AuditActor",
+          "description": "Who the channel's calls are from, written by the control plane (#996)."
+        }
+      },
+      "required": [
+        "client"
+      ],
+      "additionalProperties": false
+    },
+    "ChannelSender": {
+      "type": "object",
+      "description": "links/check (#1762, FR-037), and an MCP event's sender: who sent a channel message. channel is the channel's kind (slack, email), identity the sender on it (for email, the address).",
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "dkim": {
+          "$ref": "#/definitions/ChannelDKIM"
+        }
+      },
+      "required": [
+        "channel",
+        "identity"
+      ],
+      "additionalProperties": false
+    },
+    "ClientConnection": {
+      "type": "object",
+      "description": "One row of clients/connections: a client connected now.",
+      "properties": {
+        "client": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "client"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectAnotherRequest": {
+      "type": "object",
+      "description": "Connect to Another… asked by a client of the control plane on this Mac (#4257): the Mac's window does it, as its own Connect to Another… does (#4228). Either code, a client code from Pair a Mac on another control plane, or hosted, which opens the window's sign-in to agentloops.dev.",
+      "properties": {
+        "code": {
+          "type": "string",
+          "description": "A client code from Settings ▸ Clients ▸ Pair a Mac… on the other control plane."
+        },
+        "hosted": {
+          "type": "boolean",
+          "description": "Sign in to agentloops.dev in the window on this Mac: Hosted sends the client code to the app only (agents://hosted)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "Connection": {
+      "type": "object",
+      "description": "The person's sign-in to one provider, as the host keeps it. Never its tokens.",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/ConnectionProvider"
+        },
+        "login": {
+          "type": "string",
+          "description": "The account's name on the provider, such as alexec."
+        },
+        "state": {
+          "$ref": "#/definitions/ConnectionState"
+        },
+        "connectedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "installURL": {
+          "type": "string",
+          "description": "Where the person installs the provider's App: a GitHub user token reaches only the repositories where it is installed. Set only for GitHub's App user token, the default (#3857)."
+        },
+        "workspace": {
+          "type": "string",
+          "description": "The part of the provider the token reaches, such as a Linear workspace's name, or a self-managed GitLab's host."
+        },
+        "expiresAt": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When a token the host cannot renew ends: a GitLab personal access token's expiry. The person makes a new one before then."
+        },
+        "byToken": {
+          "type": "boolean",
+          "description": "The connection is a token the person made and the host does not renew: a Jira API token or Data Center personal access token (#3304), or a GitHub personal access token, the fallback for the App's user token (#3857), whose end, when it has one, is expiresAt. Left out for OAuth and for GitHub's App user token."
+        },
+        "newest": {
+          "$ref": "#/definitions/ConnectorProof",
+          "description": "Only in the answer that made the connection: the one real read that proves it, such as Jira's newest issue (#3304). Left out when the read found nothing or failed."
+        }
+      },
+      "required": [
+        "provider",
+        "state",
+        "connectedAt"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionBot": {
+      "type": "object",
+      "description": "The person's agents' bot on this machine (#3858). Never its key.",
+      "properties": {
+        "made": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string",
+          "description": "The bot's GitHub name: <slug>[bot]."
+        },
+        "slug": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string",
+          "description": "The account the App is on."
+        },
+        "installURL": {
+          "type": "string",
+          "description": "Where the person installs the App on repositories."
+        },
+        "appURL": {
+          "type": "string",
+          "description": "The App's page on GitHub, where the person deletes it."
+        },
+        "installations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConnectionBotInstallation"
+          },
+          "description": "Absent when GitHub could not be asked."
+        },
+        "keyOn": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConnectionBotMachine"
+          },
+          "description": "The person's machines in their lock and whether each holds the bot's key, as this machine knows (#3950). Absent with no lock: then the key is on this machine only."
+        },
+        "message": {
+          "type": "string",
+          "description": "What failed, in words."
+        }
+      },
+      "required": [
+        "made"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionBotCompleteRequest": {
+      "type": "object",
+      "description": "What the hand-back page gave the client after GitHub made the App: the code and the state, or GitHub's error. The host checks the state and turns the code into the App's key at once; the key stays on this machine.",
+      "properties": {
+        "state": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionBotCopy": {
+      "type": "object",
+      "description": "The bot's key, sealed by one of the person's machines to another (#3950): HPKE to the receiving machine's sealing key from the person's lock, under com.alexecollins.agents.githubbot.v1, with the associated data githubbot.v1|<person>|m:<machine>|<appId>|<version>. Delivered as connections/bot/take, signed by the giving machine. No client and not the control plane can open it.",
+      "properties": {
+        "appId": {
+          "type": "integer"
+        },
+        "version": {
+          "type": "integer",
+          "description": "When the bot was made, in Unix milliseconds: a machine keeps the newest bot."
+        },
+        "sealed": {
+          "$ref": "org.schema.json#/definitions/SealedEnvelope"
+        }
+      },
+      "required": [
+        "appId",
+        "version",
+        "sealed"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionBotDrop": {
+      "type": "object",
+      "description": "Forget the Bot on one machine, sent to the others (#3950): each deletes its copy of that App's key, and takes no copy of it again.",
+      "properties": {
+        "appId": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "appId"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionBotInstallation": {
+      "type": "object",
+      "description": "An account the bot is installed on.",
+      "properties": {
+        "account": {
+          "type": "string"
+        },
+        "all": {
+          "type": "boolean",
+          "description": "True when it reaches every repository of the account, false for the ones chosen."
+        },
+        "settingsURL": {
+          "type": "string",
+          "description": "Where the installation's repositories are chosen on GitHub."
+        }
+      },
+      "required": [
+        "account",
+        "all"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionBotMachine": {
+      "type": "object",
+      "description": "One of the person's machines, and whether it holds the bot's key (#3950).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "here": {
+          "type": "boolean",
+          "description": "The machine that answered."
+        },
+        "has": {
+          "type": "boolean",
+          "description": "False while it waits: it gets the key when it and a machine with the key are both online."
+        }
+      },
+      "required": [
+        "name",
+        "has"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionBotStart": {
+      "type": "object",
+      "description": "What the client posts to GitHub (#3858): an HTML form to action, method POST, with one field, manifest. GitHub sends the code and the state to the hand-back page.",
+      "properties": {
+        "action": {
+          "type": "string",
+          "description": "GitHub's page for a new App, with the state in its query."
+        },
+        "manifest": {
+          "type": "string",
+          "description": "The App manifest's JSON, with the fixed permissions."
+        },
+        "state": {
+          "type": "string"
+        },
+        "expiresAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "action",
+        "manifest",
+        "state",
+        "expiresAt"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionBotStartRequest": {
+      "type": "object",
+      "description": "Make the person's agents' bot (#3858): the host makes the GitHub App manifest for its GitHub connection's account.",
+      "properties": {
+        "origin": {
+          "type": "string",
+          "description": "The web page's origin, as connections/sign-in takes it; left out on the Mac."
+        },
+        "public": {
+          "type": "boolean",
+          "description": "True when an organisation must install the bot: GitHub lets only the owning account install a private App (spec 3856 §4)."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ConnectionDisconnectAnswer": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ConnectionEmailRequest": {
+      "type": "object",
+      "description": "connections/sign-in/email (#1780): one IMAP mailbox for the email server. The host signs in once to check it, keeps the app password in its own store, and never logs it or gives it back. The answer is a ConnectionTokenAnswer.",
+      "properties": {
+        "server": {
+          "type": "string",
+          "description": "The IMAP server, such as imap.fastmail.com (imaps:// on 993 when it names no scheme), imap://host for STARTTLS on 143, or with a port."
+        },
+        "user": {
+          "type": "string",
+          "description": "Who signs in, usually the mail address."
+        },
+        "password": {
+          "type": "string",
+          "description": "An app password made for Agents at the mail provider."
+        }
+      },
+      "required": [
+        "server",
+        "user",
+        "password"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionProvider": {
+      "type": "string",
+      "description": "A tool the person connects to: GitHub (#1335) and Linear (#1343) with OAuth, GitLab (#1630) with OAuth on gitlab.com or a personal access token on any GitLab, email (#1780): one IMAP mailbox with an app password, Atlassian (#3304): one sign-in for Jira and Confluence, with OAuth on Atlassian Cloud or a token on one site, Forgejo (#3752): an access token on Codeberg or any Forgejo or Gitea, Bitbucket (#3785): an Atlassian API token with its email, or an access token, on Bitbucket Cloud, and Azure DevOps (#3802): a personal access token on one organization of dev.azure.com or one collection of an Azure DevOps Server.",
+      "enum": [
+        "github",
+        "linear",
+        "gitlab",
+        "email",
+        "atlassian",
+        "forgejo",
+        "bitbucket",
+        "azuredevops"
+      ]
+    },
+    "ConnectionProviderRequest": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/ConnectionProvider"
+        },
+        "origin": {
+          "type": "string",
+          "description": "For connections/sign-in from the web page: the page's origin. The hand-back page sends the code to this origin only, by postMessage. Without it, the hand-back page sends the code to agents://oauth/callback (the Mac and the Remote)."
+        },
+        "url": {
+          "type": "string",
+          "description": "For connections/sign-in to Azure DevOps (#3921): the organization the Microsoft Entra sign-in is for, such as dev.azure.com/acme. Entra's token reaches every organization the account is in; the host checks this one and keeps it, as a personal access token's."
+        }
+      },
+      "required": [
+        "provider"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionSignIn": {
+      "type": "object",
+      "description": "A sign-in under way on the host (#1335, #1343). The host keeps the secrets (the device code, the PKCE verifier); a client shows the code or opens the address, and waits.",
+      "properties": {
+        "flowID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "provider": {
+          "$ref": "#/definitions/ConnectionProvider"
+        },
+        "status": {
+          "$ref": "#/definitions/ConnectionSignInStatus"
+        },
+        "grant": {
+          "$ref": "#/definitions/ConnectionSignInGrant"
+        },
+        "userCode": {
+          "type": "string",
+          "description": "deviceCode only: the code the person types at verificationURL, such as WDJB-MJHT."
+        },
+        "verificationURL": {
+          "type": "string",
+          "description": "Where the person goes: the device page, or the provider's authorize page (with the state and the PKCE challenge, never the verifier)."
+        },
+        "installURL": {
+          "type": "string"
+        },
+        "expiresAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "connection": {
+          "$ref": "#/definitions/Connection"
+        },
+        "message": {
+          "type": "string",
+          "description": "Why it failed, in words. Never a token."
+        }
+      },
+      "required": [
+        "flowID",
+        "provider",
+        "status",
+        "grant",
+        "verificationURL",
+        "expiresAt"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionSignInCompleteRequest": {
+      "type": "object",
+      "description": "What the hand-back page gave the client (#1343): the code and the state, or the provider's error. The host checks the state, then spends the code with its own verifier.",
+      "properties": {
+        "flowID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "state": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string",
+          "description": "The provider's error code, such as access_denied."
+        }
+      },
+      "required": [
+        "flowID",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionSignInFlowRequest": {
+      "type": "object",
+      "properties": {
+        "flowID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "flowID"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionSignInGrant": {
+      "type": "string",
+      "description": "deviceCode: the person types userCode at verificationURL (GitHub), and the host polls. authorizationCode: the person approves at verificationURL in an authentication session (agents:// on the Mac and the Remote, a pop-up on the web page); the hand-back page gives the code back to the client, which gives it to the host with connections/sign-in/complete (Linear).",
+      "enum": [
+        "deviceCode",
+        "authorizationCode"
+      ]
+    },
+    "ConnectionSignInStatus": {
+      "type": "string",
+      "description": "waiting: for the person to approve on the provider's page. connected: done. expired: the code or the sign-in ended. denied: the person pressed Cancel on the provider's page. cancelled: a client stopped it. failed: see message.",
+      "enum": [
+        "waiting",
+        "connected",
+        "expired",
+        "denied",
+        "cancelled",
+        "failed"
+      ]
+    },
+    "ConnectionState": {
+      "type": "string",
+      "description": "connected: the host has a token and renews it. signInAgain: the provider refused the renewal, so the person signs in again.",
+      "enum": [
+        "connected",
+        "signInAgain"
+      ]
+    },
+    "ConnectionTokenAnswer": {
+      "type": "object",
+      "description": "The connection the token made, or why it made none, in words.",
+      "properties": {
+        "connection": {
+          "$ref": "#/definitions/Connection"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "ConnectionTokenRequest": {
+      "type": "object",
+      "description": "connections/sign-in/token (#1630, #3304, #3752, #3785, #3857): a personal access token the person made, for a provider with no Agents application there (a self-managed GitLab, a Jira site, any Forgejo or Gitea, Bitbucket Cloud), or on github.com in place of the App's user token. The host checks it with the provider, keeps it in its own store, and never logs it or gives it back.",
+      "properties": {
+        "provider": {
+          "$ref": "#/definitions/ConnectionProvider"
+        },
+        "url": {
+          "type": "string",
+          "description": "The provider's address, such as gitlab.example.com, example.atlassian.net or git.example.com (https:// when it names no scheme). gitlab.com, or codeberg.org for Forgejo, when left out; a Jira site must be given. Bitbucket takes none: it is Bitbucket Cloud's. Azure DevOps takes its organization (dev.azure.com/acme) or an Azure DevOps Server's collection (server/tfs/DefaultCollection), which must be given."
+        },
+        "user": {
+          "type": "string",
+          "description": "Atlassian and Bitbucket: the account's email, sent with a Jira Cloud or Atlassian API token. Left out for a Jira Data Center personal access token or a Bitbucket access token."
+        },
+        "token": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider",
+        "token"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectionsList": {
+      "type": "object",
+      "properties": {
+        "connections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Connection"
+          }
+        },
+        "providers": {
+          "type": "array",
+          "description": "The providers this host connects (#3824), so a client newer than its host offers only those. A client drops a name it does not know. Absent from a host older than #3824: it connects GitHub, Linear, GitLab, Atlassian and, with connections.email/1, Email.",
+          "items": {
+            "$ref": "#/definitions/ConnectionProvider"
+          }
+        }
+      },
+      "required": [
+        "connections"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectorCodespace": {
+      "type": "object",
+      "description": "A GitHub Codespace for a folder's repository (#1591).",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "ssh": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "repository",
+        "state",
+        "ssh"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectorCodespaces": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "codespaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConnectorCodespace"
+          }
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "codespaces"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectorCodespacesRequest": {
+      "type": "object",
+      "description": "Lists or changes the folder's GitHub Codespaces (#1591).",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "action": {
+          "type": "string",
+          "enum": [
+            "list",
+            "create",
+            "start",
+            "stop",
+            "prepareSSH"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder",
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectorEvents": {
+      "type": "object",
+      "description": "The github events the set-up turned on, and the folder's workflows that start on one of them.",
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/ConnectorEventsState"
+        },
+        "names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The events, such as pr.opened."
+        },
+        "server": {
+          "type": "string",
+          "description": "The mcp.json name that offers them."
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConnectorWorkflow"
+          }
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "state",
+        "names",
+        "workflows"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectorEventsState": {
+      "type": "string",
+      "description": "on: the github connector is in the folder's or the person's mcp.json, so its events reach this folder. off: not yet (nothing connected, or every GitHub slot skipped). taken: an mcp.json entry not made by Agents already has the name github, and it is left alone. failed: the entry could not be written; message says why.",
+      "enum": [
+        "on",
+        "off",
+        "taken",
+        "failed"
+      ]
+    },
+    "ConnectorProof": {
+      "type": "object",
+      "description": "The one real thing a slot read: the newest issue or pull request, the last workflow run, or the newest doc in the folder (its path as the title).",
+      "properties": {
+        "number": {
+          "type": "integer",
+          "description": "The issue or pull request number."
+        },
+        "title": {
+          "type": "string",
+          "description": "Its title, or the run's workflow and branch, such as \"CI on main\"."
+        },
+        "outcome": {
+          "type": "string",
+          "description": "A run's outcome in a word: passed, failed, running, cancelled."
+        },
+        "url": {
+          "type": "string"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectorSetup": {
+      "type": "object",
+      "description": "A folder's Connectors set-up (#1336): its GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps repository (#1632, #3752, #3785, #3802), the person's connection to that forge, four slots that each prove themselves with one read, and the events.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string",
+          "description": "owner/name on GitHub or Forgejo, workspace/name on Bitbucket, organization/project/name on Azure DevOps, or group/project on GitLab, from the folder's git remote (origin first). Absent with no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote."
+        },
+        "forge": {
+          "$ref": "#/definitions/ConnectionProvider",
+          "description": "The forge the repository is on, which fills Tasks, Code review and CI: github, gitlab (#1632), forgejo (#3752), bitbucket (#3785) or azuredevops (#3802). Absent is github."
+        },
+        "site": {
+          "type": "string",
+          "description": "The repository's host, as the page says it before the repository: github.com, gitlab.com, codeberg.org, bitbucket.org, dev.azure.com, or a self-managed GitLab's, Forgejo's or Azure DevOps Server's host."
+        },
+        "repositoryURL": {
+          "type": "string",
+          "description": "The repository's page on its forge, where the person asks for access when a read is refused (GitLab, Forgejo, Bitbucket, Azure DevOps)."
+        },
+        "connection": {
+          "$ref": "#/definitions/Connection"
+        },
+        "installed": {
+          "type": "boolean",
+          "description": "Whether the Agents App is installed on the repository. Absent when not known."
+        },
+        "installURL": {
+          "type": "string"
+        },
+        "repositories": {
+          "type": "integer",
+          "description": "How many repositories the connection sees through the App."
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConnectorSlot"
+          }
+        },
+        "events": {
+          "$ref": "#/definitions/ConnectorEvents"
+        },
+        "done": {
+          "type": "integer",
+          "description": "Slots that read or were skipped, of the four."
+        },
+        "project": {
+          "type": "string",
+          "description": "The folder's project id (#2669), whose owner or an admin sets Tasks, Code review and CI for every folder in it. Absent when the folder is in no project."
+        },
+        "projectName": {
+          "type": "string",
+          "description": "The project's name, as this machine last heard it from the control plane."
+        }
+      },
+      "required": [
+        "folder",
+        "slots",
+        "events",
+        "done"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectorSetupReading": {
+      "type": "string",
+      "description": "stored: no call to the provider, only what was read before (for a list of every folder). cached: a read at most five minutes old is used again. fresh: read now (Try Again).",
+      "enum": [
+        "stored",
+        "cached",
+        "fresh"
+      ]
+    },
+    "ConnectorSetupRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "reading": {
+          "$ref": "#/definitions/ConnectorSetupReading"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectorSkipRequest": {
+      "type": "object",
+      "description": "Skip a slot, or set it up again. Kept in the folder's .agents/folder.json.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "slot": {
+          "$ref": "#/definitions/ConnectorSlotKind"
+        },
+        "skipped": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "slot",
+        "skipped"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectorSlot": {
+      "type": "object",
+      "description": "One slot and what it read. A slot that has read keeps its proof when a later read cannot reach the provider; only a refusal unticks it.",
+      "properties": {
+        "slot": {
+          "$ref": "#/definitions/ConnectorSlotKind"
+        },
+        "choice": {
+          "type": "string",
+          "description": "What fills it, in words: GitHub Issues, GitHub pull requests, GitHub Actions, This folder (docs), Slack and Email or None (messaging), This Mac."
+        },
+        "state": {
+          "$ref": "#/definitions/ConnectorSlotState"
+        },
+        "proof": {
+          "$ref": "#/definitions/ConnectorProof"
+        },
+        "readAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "message": {
+          "type": "string",
+          "description": "Why a read failed or was refused, in words. Never a token."
+        },
+        "repository": {
+          "type": "string",
+          "description": "The repository that fills this slot (#2669): the project's when fromProject, else the folder's own. Absent for workspace and with no remote."
+        },
+        "fromProject": {
+          "type": "boolean",
+          "description": "The folder's project sets this slot (#2669), so it is the same in every folder of the project."
+        },
+        "servers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Docs only (#3248): the docs connectors that fill the slot beside this folder, by their names in the folder's or the person's mcp.json. Absent with none."
+        },
+        "docsServers": {
+          "type": "array",
+          "items": {
+            "$ref": "mcp.schema.json#/definitions/DocsServer"
+          },
+          "description": "Docs only (#3307): each docs connector's own read, in the order of servers: one real search through the map an agent wrote of its tools (.agents/docs-maps.json), and the first doc it found. Absent with none."
+        },
+        "messagingServers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessagingServer"
+          },
+          "description": "Messaging only (#1787): each messaging connector in the folder's or the person's mcp.json (Slack, email, Google Chat and the like) with its one real read, in the order of servers. Present also when the slot is skipped, so a client can offer Set Up; absent with none, when the slot is None."
+        }
+      },
+      "required": [
+        "slot",
+        "choice",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectorSlotKind": {
+      "type": "string",
+      "description": "One slot of a folder's set-up (#1336), in the page's order: tasks (the tracker), codeReview, ci, docs (where the docs live, #3248), messaging (where agents reach the person: Slack, email, chat connectors, #1787), and workspace (where agents run).",
+      "enum": [
+        "tasks",
+        "codeReview",
+        "ci",
+        "docs",
+        "messaging",
+        "workspace"
+      ]
+    },
+    "ConnectorSlotState": {
+      "type": "string",
+      "description": "notConnected: the slot comes with a connection that is not there yet. notRead: connected, but not read yet (a stored reading). read: its one read worked (a tick). failed: the read did not reach the provider; message says why. refused: the provider refused the read, so the person grants it on the provider's site. noRemote: the folder has no GitHub, GitLab, Forgejo, Bitbucket or Azure DevOps remote. skipped: the person skipped it; it counts as done.",
+      "enum": [
+        "notConnected",
+        "notRead",
+        "read",
+        "failed",
+        "refused",
+        "noRemote",
+        "skipped"
+      ]
+    },
+    "ConnectorToolLevel": {
+      "type": "string",
+      "enum": [
+        "allow",
+        "ask",
+        "off"
+      ],
+      "description": "What agents may do with one tool of a connector (#4099): allow (use it without asking), ask (ask the person first) or off (never use it). A layer can only move a tool towards off."
+    },
+    "ConnectorWorkflow": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ControlNotice": {
+      "type": "object",
+      "description": "control/notice (#1002): something an admin should know, that no click caused: lastAdminKept, groupSharesOrphaned or removeRequested; words to show, and whom it is about.",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "lastAdminKept",
+            "groupSharesOrphaned",
+            "removeRequested"
+          ]
+        },
+        "words": {
+          "type": "string"
+        },
+        "user": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "words"
+      ],
+      "additionalProperties": false
+    },
+    "Device": {
+      "type": "object",
+      "description": "A paired device (021 US5), as devices.json keeps it.",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "publicKey": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/DeviceKind"
+        },
+        "announcedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "lastSeenAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "mayNotify": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "publicKey",
+        "name",
+        "kind",
+        "announcedAt"
+      ],
+      "additionalProperties": false
+    },
+    "DeviceAnnouncement": {
+      "type": "object",
+      "description": "devices/announce: this device, and the public half of its key.",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "publicKey": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/DeviceKind"
+        }
+      },
+      "required": [
+        "id",
+        "publicKey",
+        "name",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "DeviceBinding": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "DeviceKind": {
+      "type": "string",
+      "enum": [
+        "iPhone",
+        "iPad",
+        "unknown"
+      ]
+    },
+    "DeviceNotification": {
+      "type": "object",
+      "description": "device/changed: the whole record, or that it was forgotten (046).",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "device": {
+          "$ref": "#/definitions/Device"
+        },
+        "removed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "MachineBotKey": {
+      "type": "object",
+      "description": "machines/botKey through machine/machines (#3950): one of the person's machines gives the bot's key, sealed, to another of theirs (copy), or tells it to forget it (drop). Exactly one of them.",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "The machine's id, as the person's lock names it."
+        },
+        "copy": {
+          "$ref": "#/definitions/ConnectionBotCopy"
+        },
+        "drop": {
+          "$ref": "#/definitions/ConnectionBotDrop"
+        }
+      },
+      "required": [
+        "host"
+      ],
+      "additionalProperties": false
+    },
+    "MessageSender": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "MessagesConversation": {
+      "type": "object",
+      "description": "One conversation in messages/conversations (#4343): the connector it is on (server, its name in mcp.json, and a folder that reaches it, which messages/read takes) and the conversation as the connector's list_conversations gave it. replyAs (#4345) is who a reply from the page goes as, in words (the Slack bot, the WhatsApp number): present only when the connector has the contract's reply tool, so a client shows a reply field only then.",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "conversation": {
+          "$ref": "#/definitions/MessagingConversation"
+        },
+        "replyAs": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "server",
+        "folder",
+        "conversation"
+      ],
+      "additionalProperties": false
+    },
+    "MessagesConversations": {
+      "type": "object",
+      "description": "messages/conversations (#4343): a page of the conversations of every connector in the Messaging slot that follows the messaging contract, merged by lastActivity, the newest first. cursor is the next page, absent at the end. errors says a connector that failed or did not answer in time, and the conversations of the others still come.",
+      "properties": {
+        "conversations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessagesConversation"
+          }
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessagesError"
+          }
+        }
+      },
+      "required": [
+        "conversations"
+      ],
+      "additionalProperties": false
+    },
+    "MessagesConversationsRequest": {
+      "type": "object",
+      "description": "messages/conversations (#4343): the conversations of every folder's messaging connectors on this machine, or of one folder's. limit is 1 to 100, 20 when not said; cursor is the last page's. unread: only the conversations with unread messages.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "unread": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MessagesError": {
+      "type": "object",
+      "description": "A connector messages/conversations could not read (#4343): its name in mcp.json, a folder that reaches it, and why, in a sentence.",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "server",
+        "folder",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "MessagesMarkAllReadRequest": {
+      "type": "object",
+      "description": "messages/markAllRead (#5137): mark every conversation of folder's messaging connectors read, or of every folder's when folder is absent.",
+      "properties": {
+        "folder": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MessagesMarked": {
+      "type": "object",
+      "description": "One connector that messages/markAllRead marked read (#5137): its name in mcp.json, a folder that reaches it, and how many messages it marked.",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "marked": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "server",
+        "folder",
+        "marked"
+      ],
+      "additionalProperties": false
+    },
+    "MessagesMarkedAllRead": {
+      "type": "object",
+      "description": "messages/markAllRead (#5137): the connectors that marked their conversations read, and those that could not, with why. A connector with no mark_conversation_read (its service gives no read state) is in neither.",
+      "properties": {
+        "marked": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessagesMarked"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessagesError"
+          }
+        }
+      },
+      "required": [
+        "marked"
+      ],
+      "additionalProperties": false
+    },
+    "MessagesRead": {
+      "type": "object",
+      "description": "messages/read (#4343): one page of a conversation's messages, newest first, as the connector's read_messages gave it. cursor gives the older page; absent on the last. untrusted is always true: every text is outside content. markedRead (#5137): the connector's mark_conversation_read marked the conversation read on its service, so a client sets its unread count to 0; absent when the connector cannot mark read, on an older page, and on one thread's read.",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "conversation": {
+          "type": "string"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessagingMessage"
+          }
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "untrusted": {
+          "type": "boolean"
+        },
+        "markedRead": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "server",
+        "folder",
+        "conversation",
+        "messages",
+        "untrusted"
+      ],
+      "additionalProperties": false
+    },
+    "MessagesReadRequest": {
+      "type": "object",
+      "description": "messages/read (#4343): a conversation from messages/conversations, by its server, folder and id. cursor is the last page's; thread: only that thread's messages; limit is 1 to 100, 20 when not said.",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "conversation": {
+          "type": "string"
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "thread": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "server",
+        "folder",
+        "conversation"
+      ],
+      "additionalProperties": false
+    },
+    "MessagesReplied": {
+      "type": "object",
+      "description": "messages/reply (#4345): the message that the connector's reply tool sent.",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "conversation": {
+          "type": "string"
+        },
+        "message": {
+          "$ref": "#/definitions/MessagingMessage"
+        }
+      },
+      "required": [
+        "server",
+        "folder",
+        "conversation",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "MessagesReplyRequest": {
+      "type": "object",
+      "description": "messages/reply (#4345): the person's own reply, from the Messages page, to a conversation from messages/conversations, by its server, folder and id; thread: the thread to answer in (absent: the conversation itself). The connector's reply tool sends it, as the connector's replyAs says.",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        },
+        "conversation": {
+          "type": "string"
+        },
+        "thread": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "server",
+        "folder",
+        "conversation",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "MessagingConversation": {
+      "type": "object",
+      "description": "One conversation in a messaging contract server's list_conversations (#4338, docs/reference/messaging-contract.md): a channel, a space, a direct chat or a mail thread. source is the service (slack, email, googlechat, whatsapp, or the server's own word), the same word as ChannelSender.channel. unread is the service's own count of unread messages; absent when the service does not say. lastActivity is the newest message's time.",
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string",
+          "description": "The server's id for the conversation, which read_messages and reply take. Opaque to the daemon and the clients."
+        },
+        "title": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/MessagingConversationKind"
+        },
+        "unread": {
+          "type": "integer"
+        },
+        "lastActivity": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sender": {
+          "$ref": "#/definitions/ChannelSender",
+          "description": "Who sent the newest message, so the list can say who a conversation is from. Absent when the service's list does not say (a Slack channel, a Google Chat space)."
+        },
+        "link": {
+          "$ref": "core.schema.json#/definitions/URLString",
+          "description": "The conversation on the service's own site or app. Absent when it has none."
+        }
+      },
+      "required": [
+        "source",
+        "id",
+        "title",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "MessagingConversationKind": {
+      "type": "string",
+      "description": "channel: a channel or space that many people read. direct: a chat with one person or a small group. thread: a mail thread (References and In-Reply-To).",
+      "enum": [
+        "channel",
+        "direct",
+        "thread"
+      ]
+    },
+    "MessagingConversations": {
+      "type": "object",
+      "description": "list_conversations' structuredContent (#4338): the conversations, newest lastActivity first. cursor is absent on the last page. replyAs (#4345): who the server's reply tool sends as, in words (the Slack bot @agents, the WhatsApp number); absent when the server has no reply tool.",
+      "properties": {
+        "conversations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessagingConversation"
+          }
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "replyAs": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "conversations"
+      ],
+      "additionalProperties": false
+    },
+    "MessagingListRequest": {
+      "type": "object",
+      "description": "list_conversations' input (#4338). cursor is a page's cursor from the last answer; limit is at most 100, 20 when left out. unread: only the conversations with unread messages. A server may take more inputs of its own, each optional (the email server's folder).",
+      "properties": {
+        "cursor": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "unread": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MessagingMarkReadRequest": {
+      "type": "object",
+      "description": "mark_conversation_read's input (#5137, docs/reference/messaging-contract.md): conversation, a conversation's id from list_conversations, marks its messages read on the service; all: true marks every conversation that list_conversations lists with no input. One of the two.",
+      "properties": {
+        "conversation": {
+          "type": "string"
+        },
+        "all": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MessagingMarkedRead": {
+      "type": "object",
+      "description": "mark_conversation_read's structuredContent (#5137): how many messages it marked read.",
+      "properties": {
+        "marked": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "marked"
+      ],
+      "additionalProperties": false
+    },
+    "MessagingMessage": {
+      "type": "object",
+      "description": "One message in read_messages' structuredContent (#4338). text is outside content: the result says so (untrusted), and a client draws it as Markdown that loads nothing: no HTML, no image from the network, and only http, https and mailto links. thread is the id of the message that starts its thread; absent when it is in no thread. link is the message on the service's own site or app.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "conversation": {
+          "type": "string"
+        },
+        "sender": {
+          "$ref": "#/definitions/ChannelSender"
+        },
+        "time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "text": {
+          "type": "string"
+        },
+        "thread": {
+          "type": "string"
+        },
+        "link": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "id",
+        "conversation",
+        "sender",
+        "time",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "MessagingMessages": {
+      "type": "object",
+      "description": "read_messages' structuredContent (#4338): one page of a conversation's messages, newest first. cursor gives the older page; absent on the last. untrusted is always true: every text is outside content.",
+      "properties": {
+        "conversation": {
+          "type": "string"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessagingMessage"
+          }
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "untrusted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "conversation",
+        "messages",
+        "untrusted"
+      ],
+      "additionalProperties": false
+    },
+    "MessagingReadRequest": {
+      "type": "object",
+      "description": "read_messages' input (#4338): a conversation's id from list_conversations, and a page's cursor from the last answer. thread: only that thread's messages. limit is at most 100, 20 when left out. A server may take more inputs of its own, each optional.",
+      "properties": {
+        "conversation": {
+          "type": "string"
+        },
+        "cursor": {
+          "type": "string"
+        },
+        "thread": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "conversation"
+      ],
+      "additionalProperties": false
+    },
+    "MessagingReplyRequest": {
+      "type": "object",
+      "description": "reply's input (#4338, #4345): the conversation, the thread to answer in (a message's thread, or the id of the message that starts one; absent: the conversation itself), and the text. Its structuredContent is the sent message, a MessagingMessage.",
+      "properties": {
+        "conversation": {
+          "type": "string"
+        },
+        "thread": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "conversation",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "MessagingServer": {
+      "type": "object",
+      "description": "One messaging connector in the Messaging slot (#1787): its name in mcp.json, what it is in words (Slack, Email, Google Chat, or its name), its one real read (a list of its channels, folders or spaces) and the events it declares.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "word": {
+          "type": "string",
+          "description": "What it is, in words: Slack, Email, Google Chat, WhatsApp, Discord, Telegram, Microsoft Teams, or its name."
+        },
+        "state": {
+          "$ref": "#/definitions/MessagingServerState"
+        },
+        "proof": {
+          "$ref": "#/definitions/ConnectorProof",
+          "description": "What the read found: how many channels, folders or spaces, or its first line. Absent when it did not read."
+        },
+        "message": {
+          "type": "string",
+          "description": "failed: why, in a sentence."
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The events it declares (slack.message, email.received), from its events/list. Absent with none."
+        }
+      },
+      "required": [
+        "name",
+        "word",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "MessagingServerState": {
+      "type": "string",
+      "description": "notRead: not read yet. read: its one read worked. failed: the read did not work; message says why.",
+      "enum": [
+        "notRead",
+        "read",
+        "failed"
+      ]
+    },
+    "NoticeDelivered": {
+      "type": "object",
+      "description": "notices/delivered (#2860): the control plane sent a host's notice to one of the person's devices.",
+      "properties": {
+        "need": {
+          "$ref": "core.schema.json#/definitions/NeedID"
+        },
+        "to": {
+          "$ref": "#/definitions/NoticeDevice"
+        }
+      },
+      "required": [
+        "need",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "NoticeDelivery": {
+      "type": "object",
+      "description": "Where the notice recorded as entry `notice` went (#2860), recorded after it once the host knows: when it sends it to the computer, or when the control plane says which device it sent it to. A client draws it on that notice's line.",
+      "properties": {
+        "notice": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "to": {
+          "$ref": "#/definitions/NoticeDevice"
+        }
+      },
+      "required": [
+        "notice",
+        "to"
+      ],
+      "additionalProperties": false
+    },
+    "NoticeDevice": {
+      "type": "string",
+      "enum": [
+        "computer",
+        "iPhone",
+        "iPad",
+        "device"
+      ],
+      "description": "Where a notice went (#2860): the computer (the Mac window or the web page, the \"mac\" surface), an iPhone, an iPad, or a device of a kind the control plane does not know."
+    },
+    "NoticeLimits": {
+      "type": "object",
+      "description": "The person's attention (#2805, #2859): how many notices agents may send at once (burst, 1–20), and the minutes until one comes back (cooldownMinutes, 1–1440). The notifications part of the user settings, user/setNoticeLimits, and notices/take, which a host asks on its channel 0 before it posts a notice.",
+      "properties": {
+        "burst": {
+          "type": "integer"
+        },
+        "cooldownMinutes": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "burst",
+        "cooldownMinutes"
+      ],
+      "additionalProperties": false
+    },
+    "NoticeOutcome": {
+      "type": "string",
+      "enum": [
+        "sent",
+        "shownHere",
+        "muted",
+        "coolingDown"
+      ],
+      "description": "What became of a notice an agent sent with `notify` (#2805): sent to where the person is, shown here (the person was looking at that chat), muted (#2003), or held in the cool-down."
+    },
+    "NoticeTaken": {
+      "type": "object",
+      "description": "notices/take (#2859): whether a notice may go now, from the one bucket the control plane keeps for the person and every machine of theirs: how many more can go now, and when the next comes back.",
+      "properties": {
+        "sent": {
+          "type": "boolean"
+        },
+        "left": {
+          "type": "integer"
+        },
+        "nextAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "sent",
+        "left",
+        "nextAt"
+      ],
+      "additionalProperties": false
+    },
+    "PolicyConnectorRule": {
+      "type": "object",
+      "description": "The levels a layer sets for one connector's tools (#4099). A tool's own level comes before the layer's writes switch.",
+      "properties": {
+        "writes": {
+          "$ref": "#/definitions/ConnectorToolLevel",
+          "description": "The level of every tool that writes and that tools does not name."
+        },
+        "tools": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ConnectorToolLevel"
+          },
+          "description": "A level for each tool, by its name."
+        }
+      },
+      "additionalProperties": false
+    },
+    "PolicyNoticeLimits": {
+      "type": "object",
+      "description": "How many notices a burst allows, and how long to wait after one, before an agent may send another (#2957). Unset means 3 and 10 minutes. Not notices: OrgPolicy.notices already means the Antigravity terms (spec 998).",
+      "properties": {
+        "burst": {
+          "type": "integer"
+        },
+        "waitMinutes": {
+          "type": "integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PolicyNotices": {
+      "type": "object",
+      "description": "The notices a policy decides for every member (#999, FR-008).",
+      "properties": {
+        "antigravityTerms": {
+          "type": "string",
+          "enum": [
+            "show",
+            "accepted",
+            "refuse"
+          ],
+          "description": "Google's terms notice for Antigravity: show (as absent), accepted (the organisation reviewed them; no notice), refuse (Antigravity is refused)."
+        }
+      },
+      "additionalProperties": false
+    },
+    "PushEnvironment": {
+      "type": "string",
+      "enum": [
+        "development",
+        "production"
+      ],
+      "description": "Which APNs a device token belongs to (#1460): a Debug build's (sandbox) or a TestFlight and App Store build's."
+    },
+    "PushToken": {
+      "type": "object",
+      "description": "clients/setPushToken (#1460): a device's own APNs token, in hex, for the control plane to push its notices to. No token takes it away.",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "environment": {
+          "$ref": "#/definitions/PushEnvironment"
+        }
+      },
+      "required": [
+        "environment"
+      ],
+      "additionalProperties": false
+    },
+    "RelayDelivery": {
+      "type": "object",
+      "description": "A notice for one device (T097), which the control plane sends through APNs or Web Push: seal the headline to `publicKey` and post it for `device`; no headline is a withdrawal.",
+      "properties": {
+        "needID": {
+          "$ref": "core.schema.json#/definitions/NeedID"
+        },
+        "device": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "publicKey": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        },
+        "headline": {
+          "$ref": "reports.schema.json#/definitions/Headline"
+        },
+        "alert": {
+          "type": "boolean"
+        },
+        "waiting": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "needID",
+        "device",
+        "alert"
+      ],
+      "additionalProperties": false
+    },
+    "RelayGrantReply": {
+      "type": "object",
+      "properties": {
+        "runtime": {
+          "type": "string"
+        },
+        "caCertificate": {
+          "type": "string"
+        },
+        "standIn": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtime",
+        "caCertificate",
+        "standIn"
+      ],
+      "additionalProperties": false
+    },
+    "RelayGrantRequest": {
+      "type": "object",
+      "properties": {
+        "runtime": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtime"
+      ],
+      "additionalProperties": false
+    },
+    "RelayOffer": {
+      "type": "object",
+      "properties": {
+        "runtime": {
+          "type": "string"
+        },
+        "socketPath": {
+          "type": "string"
+        },
+        "caCertificate": {
+          "type": "string"
+        },
+        "standIn": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "runtime",
+        "socketPath",
+        "caCertificate",
+        "standIn"
+      ],
+      "additionalProperties": false
+    },
+    "RelayTokens": {
+      "type": "object",
+      "description": "The tokens the machine's model relay counted from the provider's own answers (#999, FR-019): fresh input, output, and cache reads and writes.",
+      "properties": {
+        "input": {
+          "type": "integer"
+        },
+        "output": {
+          "type": "integer"
+        },
+        "cacheRead": {
+          "type": "integer"
+        },
+        "cacheWrite": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "input",
+        "output",
+        "cacheRead",
+        "cacheWrite"
+      ],
+      "additionalProperties": false
+    },
+    "SentNotice": {
+      "type": "object",
+      "description": "What an agent told the person with `notify` (#2805), on the record where it called it: the notification's words, what became of it, and, in the cool-down, when the next can go.",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "outcome": {
+          "$ref": "#/definitions/NoticeOutcome"
+        },
+        "nextAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "to": {
+          "$ref": "#/definitions/NoticeDevice"
+        }
+      },
+      "required": [
+        "title",
+        "outcome"
+      ],
+      "additionalProperties": false
+    },
+    "SessionNotice": {
+      "type": "object",
+      "properties": {
+        "severity": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "severity",
+        "title"
+      ],
+      "additionalProperties": false
+    },
+    "Surface": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "mac": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "mac"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "device": {
+              "$ref": "core.schema.json#/definitions/UUID"
+            }
+          },
+          "required": [
+            "device"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "Surface (Attention/Surface.swift): a tagged object, `{ mac: {} }` or `{ device: \"<uuid>\" }`."
+    },
+    "SurfaceIdentification": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/DeviceKind"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "TeamBot": {
+      "type": "object",
+      "description": "A bot on Console ▸ Team Workflows (#1804, M6): its group, caps and spend today, its machines, the workflows it ran and what runs now.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "groupName": {
+          "type": "string"
+        },
+        "caps": {
+          "$ref": "reports.schema.json#/definitions/SpendCaps"
+        },
+        "spentTodayUSD": {
+          "type": "number"
+        },
+        "capped": {
+          "type": "boolean",
+          "description": "It is at its own or its group's cap until midnight UTC."
+        },
+        "machines": {
+          "type": "integer"
+        },
+        "online": {
+          "type": "integer"
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "$ref": "workflows.schema.json#/definitions/TeamWorkflowRuns"
+          }
+        },
+        "live": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TeamBotRun"
+          }
+        }
+      },
+      "required": [
+        "user",
+        "name",
+        "spentTodayUSD",
+        "capped",
+        "machines",
+        "online",
+        "workflows",
+        "live"
+      ],
+      "additionalProperties": false
+    },
+    "TeamBotRun": {
+      "type": "object",
+      "description": "An agent running on a bot's machine (#1804, M6), as the machine last listed it, for bots/stopRun. No title, nothing it said.",
+      "properties": {
+        "host": {
+          "$ref": "machines.schema.json#/definitions/MachineRef"
+        },
+        "hostName": {
+          "type": "string"
+        },
+        "agent": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "workflow": {
+          "type": "string",
+          "description": "The workflow that started it."
+        },
+        "since": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "host",
+        "hostName",
+        "agent"
+      ],
+      "additionalProperties": false
+    },
+    "WebPushKey": {
+      "type": "object",
+      "description": "clients/webPushKey (#1486): the control plane's VAPID public key, X9.63, base64url without padding, as pushManager.subscribe takes it. None when this control plane sends no Web Push.",
+      "properties": {
+        "publicKey": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "WebPushSubscription": {
+      "type": "object",
+      "description": "clients/setWebPush (#1486): a browser's push endpoint and its two keys, base64url, as PushSubscription.toJSON() gives them. No endpoint takes it away.",
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "p256dh": {
+          "type": "string"
+        },
+        "auth": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

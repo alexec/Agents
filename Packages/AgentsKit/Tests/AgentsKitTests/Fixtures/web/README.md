@@ -15,4 +15,4 @@ the port follows. Do not edit these files by hand.
 
 Each folder's README names the Swift it pins. `overrides/` holds Swift-encoded samples of the
 types whose Swift encoder is written by hand; `WireSchemaTests` and `Go/wire`'s round-trip test
-check them against `Packages/Wire/daemon.schema.json`.
+check them against `Packages/Wire/schema`.

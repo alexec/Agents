@@ -2,7 +2,7 @@ import Foundation
 
 /// Your layer (#2957): the person's own rules, kept on the Mac's host (the keeper), signed with
 /// the person key, and sent to each of the person's other machines (FR-009 to FR-013). The
-/// types are hand-written against `Packages/Wire/daemon.schema.json` (`WireSchemaTests`).
+/// types are hand-written against `Packages/Wire/schema` (`WireSchemaTests`).
 public extension DaemonAPI {
     /// A policy's signature (#998, FR-004; #2957 reuses it for the person key): ECDSA P-256
     /// with SHA-256 (`es256`), over the policy's canonical JSON. `sig` is the 64 bytes r then s.

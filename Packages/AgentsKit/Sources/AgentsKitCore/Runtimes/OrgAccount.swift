@@ -5,7 +5,7 @@ import Foundation
 /// secrets sealed by an admin's client to each machine that may use it (#3397, `ClientSealing`):
 /// the control plane cannot open them. An admin manages them in Console ▸
 /// Model Access on the web page; the window and the Remote show the routes a person may use, read
-/// only, in Settings ▸ Policy. The types are hand-written against `Packages/Wire/daemon.schema.json`
+/// only, in Settings ▸ Policy. The types are hand-written against `Packages/Wire/schema`
 /// (`WireSchemaTests`); a value is never in any of them (spec D14).
 public extension DaemonAPI {
     /// An org route's settings that are not secret.

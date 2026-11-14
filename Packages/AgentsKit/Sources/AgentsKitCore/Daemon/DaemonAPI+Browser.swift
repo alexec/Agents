@@ -1,7 +1,7 @@
 import Foundation
 
 /// The machine's browser on the wire (#3528, spike #3527): a client watches its page as a
-/// screencast and sends the person's input back. `Packages/Wire/daemon.schema.json` has the
+/// screencast and sends the person's input back. `Packages/Wire/schema` has the
 /// same types; `WireSchemaTests` holds them to it.
 public extension DaemonAPI {
     /// browser/watch: show the page in a view of this size, in points.

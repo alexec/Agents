@@ -109,7 +109,7 @@ machines' copies of one node add up, as each banked its own turns.
   a line of the 4 weeks and, for the four DORA keys, DORA 2024's band. The bands come from
   teams of people, and agents merge many small PRs, so they are a reference, not a grade.
   The control plane works them out with `lineage.DeliveryOf` (the definitions are in
-  `LineageDelivery` in `Packages/Wire/daemon.schema.json`) over the scope's nodes, with each
+  `LineageDelivery` in `Packages/Wire/schema`) over the scope's nodes, with each
   release tag's time from its links (`v1/lineage-graph/<host>/links.json`). They follow the
   scope and the Report Policy, and are never a person's.
 - **What comes next** (#4528), from `lineage/forecast` (#4526) on the person's own machines,

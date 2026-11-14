@@ -1,0 +1,3668 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://agents.alexecollins.com/schema/files.schema.json",
+  "title": "The wire: files types",
+  "description": "Part of the source of every type on the wire (#1135, #5380): one file per domain in Packages/Wire/schema. A $ref to another file names it (core.schema.json#/definitions/JSONValue); scripts/wire.sh gen reads them all.",
+  "definitions": {
+    "AddFolderRequest": {
+      "type": "object",
+      "description": "folders/add: the folder, and the project to put it in (#2671). With no project, a folder that names none gets one of its own.",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "project": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "AgentChanges": {
+      "type": "object",
+      "description": "Where a client/catchUp's agents are in the host's order of changes (#4785). The client asks next time with ListRequest.changedSince set to this epoch and revision.",
+      "properties": {
+        "epoch": {
+          "type": "string"
+        },
+        "revision": {
+          "type": "integer",
+          "description": "Every change up to here is in this answer or an earlier one."
+        },
+        "removed": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/UUID"
+          },
+          "description": "The records removed since changedSince."
+        },
+        "all": {
+          "type": "boolean",
+          "description": "True when agents is the list as without changedSince: none was given, or it was too old or of another epoch. The client then drops each record it holds that is not in it."
+        }
+      },
+      "required": [
+        "epoch",
+        "revision",
+        "removed",
+        "all"
+      ],
+      "additionalProperties": false
+    },
+    "AgentConfigEditorFile": {
+      "description": "A Markdown file under skills, personas or workflows in Agent Configuration.",
+      "type": "object",
+      "properties": {
+        "path": { "type": "string" },
+        "content": { "type": "string" }
+      },
+      "required": ["path", "content"],
+      "additionalProperties": false
+    },
+    "AgentConfigEditorFiles": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/AgentConfigEditorFile" }
+    },
+    "AgentConfigFile": {
+      "type": "object",
+      "description": "One agent configuration file (#2129), or a deletion tombstone. contents is base64 encoded. Logical time and machine ID resolve concurrent offline edits.",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "contents": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "time": {
+          "type": "integer"
+        },
+        "counter": {
+          "type": "integer"
+        },
+        "machine": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "time",
+        "counter",
+        "machine",
+        "digest"
+      ],
+      "additionalProperties": false
+    },
+    "AgentConfigFileRequest": {
+      "type": "object",
+      "description": "One local edit or deletion of an agent configuration file (#2129).",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "contents": {
+          "type": "string"
+        },
+        "deleted": {
+          "type": "boolean"
+        },
+        "time": {
+          "type": "integer"
+        },
+        "counter": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "time",
+        "counter"
+      ],
+      "additionalProperties": false
+    },
+    "AgentConfigFiles": {
+      "type": "object",
+      "description": "The per-path configuration files and tombstones for a person (#2129).",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentConfigFile"
+          }
+        },
+        "updated": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "files"
+      ],
+      "additionalProperties": false
+    },
+    "AgentsExport": {
+      "type": "object",
+      "description": "What agents/export made (#1001): a .tar.gz in the backup format, read in parts with agents/exportRead. `name` is a file name to save it as.",
+      "properties": {
+        "file": {
+          "$ref": "machines.schema.json#/definitions/SendFile"
+        },
+        "agents": {
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "file",
+        "agents",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "AgentsExportRequest": {
+      "type": "object",
+      "description": "agents/export (#1001): one agent (`agentID`) or every agent of one folder (`folder`). Give one of the two.",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AgentsImportRequest": {
+      "type": "object",
+      "description": "What agents/import takes (#1001): the export sent with agents/importUpload. Its agents come back archived, as a restore brings them; one this machine has, or deleted, is skipped. With `folder`, a folder on this machine (the one whose menu was used, #2389), every agent comes back in that folder; without it, each in the folder it had where it was exported.",
+      "properties": {
+        "upload": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "upload"
+      ],
+      "additionalProperties": false
+    },
+    "AppViewCall": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "server": {
+          "type": "string"
+        },
+        "tool": {
+          "type": "string"
+        },
+        "resourceUri": {
+          "type": "string"
+        },
+        "arguments": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "result": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "state": {
+          "$ref": "#/definitions/AppViewCallState"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "pinnable": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "server",
+        "tool",
+        "resourceUri",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "AppViewCallState": {
+      "type": "string",
+      "enum": [
+        "running",
+        "done",
+        "cancelled"
+      ]
+    },
+    "ArtifactWriteRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "path": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "base": {
+          "type": "string",
+          "description": "The SHA-256, in lower-case hex, of the text the edit started from (#1858). When the file on disk is not that text any more, the write is refused with fileChanged and nothing is written. Left out, the text is written whatever is on disk."
+        }
+      },
+      "required": [
+        "agentID",
+        "path",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "AutoPreview": {
+      "type": "object",
+      "description": "auto/preview: the runtime Auto would pick now and what it would give, or why none can.",
+      "properties": {
+        "runtimeID": {
+          "type": "string"
+        },
+        "native": {
+          "$ref": "core.schema.json#/definitions/NativeSetting"
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/AutoSkip"
+          }
+        }
+      },
+      "required": [
+        "skipped"
+      ],
+      "additionalProperties": false
+    },
+    "AutoPreviewRequest": {
+      "type": "object",
+      "properties": {
+        "cwd": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "levels": {
+          "$ref": "core.schema.json#/definitions/Levels"
+        },
+        "sandbox": {
+          "$ref": "org.schema.json#/definitions/SandboxChoice"
+        },
+        "needs": {
+          "$ref": "sessions.schema.json#/definitions/ACPPromptCapabilities",
+          "description": "What the draft's attachments need the runtime to take (#3162): Auto passes by a runtime that said it does not."
+        }
+      },
+      "required": [
+        "cwd"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserAckRequest": {
+      "type": "object",
+      "description": "browser/ack: the client drew browser/frame number ack, so the host may send the next one (#3528). The host asks Chromium for a new frame only after an ack, so a slow client gets fewer frames, not a backlog.",
+      "properties": {
+        "ack": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ack"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserClearRequest": {
+      "type": "object",
+      "description": "browser/clear (#3535): clear one site's cookies and storage in the machine's browser, or every site's when site is left out.",
+      "properties": {
+        "site": {
+          "type": "string",
+          "description": "A site as browser/state names it (github.com). Left out: every site."
+        }
+      },
+      "additionalProperties": false
+    },
+    "BrowserEditCommand": {
+      "type": "string",
+      "description": "edit's command (#5119): selectAll, undo and redo act in the page as Chromium's editing commands; copy says the page's selection back in copied, and cut also deletes it.",
+      "enum": [
+        "selectAll",
+        "undo",
+        "redo",
+        "copy",
+        "cut"
+      ]
+    },
+    "BrowserFrame": {
+      "type": "object",
+      "description": "browser/frame: a JPEG of the machine's browser's page (#3528, spike #3527), from CDP Page.startScreencast, sent only to the clients that watch it. Never recorded.",
+      "properties": {
+        "image": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        },
+        "ack": {
+          "type": "integer",
+          "description": "Send it back in browser/ack once the frame is drawn."
+        },
+        "width": {
+          "type": "number",
+          "description": "The page's width in CSS pixels: browser/input's x is from 0 to this."
+        },
+        "height": {
+          "type": "number",
+          "description": "The page's height in CSS pixels: browser/input's y is from 0 to this."
+        }
+      },
+      "required": [
+        "image",
+        "ack",
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserInputKind": {
+      "type": "string",
+      "enum": [
+        "mouse",
+        "wheel",
+        "key",
+        "text",
+        "edit"
+      ]
+    },
+    "BrowserInputRequest": {
+      "type": "object",
+      "description": "browser/input: the person's input in the page (#3528). mouse and wheel are CDP Input.dispatchMouseEvent, key is Input.dispatchKeyEvent, text is Input.insertText (a paste), edit is an editing command for a client's shortcut (#5119). x and y are in the page's CSS pixels.",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/BrowserInputKind"
+        },
+        "type": {
+          "type": "string",
+          "description": "mouse: mousePressed, mouseReleased or mouseMoved. key: keyDown, keyUp or char."
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "button": {
+          "type": "string",
+          "description": "left, middle, right or none."
+        },
+        "clickCount": {
+          "type": "integer"
+        },
+        "deltaX": {
+          "type": "number"
+        },
+        "deltaY": {
+          "type": "number"
+        },
+        "key": {
+          "type": "string",
+          "description": "The DOM key value, such as Enter or a."
+        },
+        "code": {
+          "type": "string",
+          "description": "The DOM code value, such as KeyA."
+        },
+        "keyCode": {
+          "type": "integer",
+          "description": "The Windows virtual key code, which Chromium needs for keys such as Backspace and the arrows."
+        },
+        "text": {
+          "type": "string"
+        },
+        "modifiers": {
+          "type": "integer",
+          "description": "Alt 1, Control 2, Meta 4, Shift 8, as CDP has them."
+        },
+        "command": {
+          "$ref": "#/definitions/BrowserEditCommand"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserInputResult": {
+      "type": "object",
+      "description": "browser/input's answer. copied is said after an edit's copy or cut. editing is said after a mouseReleased only: whether the click left the page's focus in a field that takes text (an input, a textarea, a contenteditable), so a touch client opens or closes its keyboard. Left out for other input, and by a host before it was added.",
+      "properties": {
+        "editing": {
+          "type": "boolean"
+        },
+        "copied": {
+          "type": "string",
+          "description": "After an edit's copy or cut: the page's selected text (the focused field's selection, else the page's), for the client's clipboard. Empty when nothing is selected or the field is a password."
+        }
+      },
+      "additionalProperties": false
+    },
+    "BrowserNavigateAction": {
+      "type": "string",
+      "enum": [
+        "go",
+        "back",
+        "forward",
+        "reload"
+      ]
+    },
+    "BrowserNavigateRequest": {
+      "type": "object",
+      "description": "browser/navigate: the bar over the page (#3528). go opens url, and starts the browser when it does not run.",
+      "properties": {
+        "action": {
+          "$ref": "#/definitions/BrowserNavigateAction"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserPageState": {
+      "type": "object",
+      "description": "The machine's browser's page as a client shows it (#3528): browser/watch's answer, and browser/pageChanged to the clients that watch it when it changes. Not BrowserState, which is Settings ▸ Browser's.",
+      "properties": {
+        "status": {
+          "$ref": "#/definitions/BrowserStatus"
+        },
+        "detail": {
+          "type": "string",
+          "description": "starting: the step, such as Downloading Chromium. failed: why."
+        },
+        "url": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "noTab": {
+          "type": "boolean",
+          "description": "True when the watch names a session whose agent has opened no tab in the browser (#3916): the client shows that, not a page."
+        },
+        "holder": {
+          "$ref": "core.schema.json#/definitions/UUID",
+          "description": "The session whose agent holds browser:agents now, when one does (#3916)."
+        },
+        "holderTitle": {
+          "type": "string",
+          "description": "That session's title."
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserSite": {
+      "type": "object",
+      "description": "One site that keeps cookies in the machine's browser (#3535), which is how a site remembers a sign-in.",
+      "properties": {
+        "site": {
+          "type": "string",
+          "description": "The site's registrable domain (github.com), with every subdomain's cookies under it."
+        },
+        "cookies": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "site",
+        "cookies"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserState": {
+      "type": "object",
+      "description": "Settings ▸ Browser (#3535): the machine's browser (#3533). Whether Chromium is downloaded, its size on disk, whether it runs, and the sites its kept profile has cookies for, most cookies first.",
+      "properties": {
+        "installed": {
+          "type": "boolean",
+          "description": "Chromium is downloaded on this machine. False until an agent first uses the browser."
+        },
+        "running": {
+          "type": "boolean"
+        },
+        "downloadBytes": {
+          "type": "integer",
+          "description": "The size on disk of the Chromium download, in bytes."
+        },
+        "sites": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BrowserSite"
+          }
+        },
+        "problem": {
+          "type": "string",
+          "description": "Why the sites could not be read, when they could not."
+        }
+      },
+      "required": [
+        "installed",
+        "running",
+        "downloadBytes",
+        "sites"
+      ],
+      "additionalProperties": false
+    },
+    "BrowserStatus": {
+      "type": "string",
+      "enum": [
+        "stopped",
+        "starting",
+        "running",
+        "failed"
+      ]
+    },
+    "BrowserWatchRequest": {
+      "type": "object",
+      "description": "browser/watch: the client shows the machine's browser in a view of this size, in points (#3528). The page is laid out at that size. Watch again to change it.",
+      "properties": {
+        "width": {
+          "type": "integer"
+        },
+        "height": {
+          "type": "integer"
+        },
+        "agent": {
+          "$ref": "core.schema.json#/definitions/UUID",
+          "description": "The session whose tab the client shows (#3916): the newest tab its agent opened. Without it, the machine's newest tab."
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
+    },
+    "ChangeSource": {
+      "type": "string",
+      "enum": [
+        "reported",
+        "reportedAndSeen",
+        "seen"
+      ]
+    },
+    "ChangeState": {
+      "type": "string",
+      "enum": [
+        "modified",
+        "added",
+        "deleted",
+        "binary",
+        "renamed",
+        "untracked"
+      ]
+    },
+    "ChangedFile": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "relativePath": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/definitions/ChangeSource"
+        },
+        "state": {
+          "$ref": "#/definitions/ChangeState"
+        },
+        "editCount": {
+          "type": "integer"
+        },
+        "added": {
+          "type": "integer"
+        },
+        "removed": {
+          "type": "integer"
+        },
+        "beyondReported": {
+          "type": "boolean"
+        },
+        "inProgress": {
+          "type": "boolean"
+        },
+        "outsideFolder": {
+          "type": "boolean"
+        },
+        "firstLine": {
+          "type": "integer"
+        },
+        "oldPath": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "source",
+        "state",
+        "editCount",
+        "beyondReported",
+        "inProgress",
+        "outsideFolder"
+      ],
+      "additionalProperties": false
+    },
+    "ChangedFileDetail": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "$ref": "#/definitions/ChangedFile"
+        },
+        "edits": {
+          "type": "array",
+          "items": {
+            "$ref": "reports.schema.json#/definitions/ReportedEdit"
+          }
+        },
+        "hunks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FolderHunk"
+          }
+        },
+        "whole": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DiffLine"
+          }
+        }
+      },
+      "required": [
+        "file",
+        "edits"
+      ],
+      "additionalProperties": false
+    },
+    "ChangesFileRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "path": {
+          "type": "string"
+        },
+        "whole": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agentID",
+        "path",
+        "whole"
+      ],
+      "additionalProperties": false
+    },
+    "ChangesList": {
+      "type": "object",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ChangedFile"
+          }
+        },
+        "git": {
+          "$ref": "org.schema.json#/definitions/GitView"
+        },
+        "reportsEdits": {
+          "type": "boolean"
+        },
+        "more": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "files",
+        "git",
+        "reportsEdits"
+      ],
+      "additionalProperties": false
+    },
+    "ChangesListRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
+    "ChangesUnavailable": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "notARepository": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "notARepository"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "gitNotInstalled": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "gitNotInstalled"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "folderGone": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "folderGone"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "failed": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "message"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "failed"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ContinueInFolderRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "text": {
+          "type": "string"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "$ref": "sessions.schema.json#/definitions/Attachment"
+          }
+        },
+        "requestID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "agentID",
+        "text",
+        "attachments"
+      ],
+      "additionalProperties": false
+    },
+    "DeletePreview": {
+      "type": "object",
+      "description": "How many archived agents a retention change would delete at once, and the bytes that frees.",
+      "properties": {
+        "count": {
+          "type": "integer"
+        },
+        "bytes": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "count",
+        "bytes"
+      ],
+      "additionalProperties": false
+    },
+    "DeployArtifact": {
+      "type": "object",
+      "description": "One immutable thing that a build made or a deploy uses (#5262): a commit, an image digest, a Helm chart version, a package version, a mobile build, a hydrated commit. kind is an open string (commit, image, chart, package, build, hydrated-commit…); id is its digest or version in system (github, oci, testflight…); ref is its lineage ref, <system>:artifact:<topic>#<id>, when the source makes one. builtFrom are the refs of the changes it was built from (a commit's, a PR's); with none, the commit itself is the change.",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "system": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "ref": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "builtFrom": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "system",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "DiffLine": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/DiffLineKind"
+        },
+        "text": {
+          "type": "string"
+        },
+        "newLine": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "DiffLineKind": {
+      "type": "string",
+      "enum": [
+        "context",
+        "added",
+        "removed"
+      ]
+    },
+    "DirectoryEntry": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "name": {
+          "type": "string"
+        },
+        "isDirectory": {
+          "type": "boolean"
+        },
+        "size": {
+          "type": "integer"
+        },
+        "modifiedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "url",
+        "name",
+        "isDirectory"
+      ],
+      "additionalProperties": false
+    },
+    "DirectoryListing": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DirectoryEntry"
+          }
+        },
+        "omitted": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "url",
+        "entries",
+        "omitted"
+      ],
+      "additionalProperties": false
+    },
+    "Doc": {
+      "type": "object",
+      "description": "One doc (#3319): a *.md file of a folder (at its top, or under specs/ or docs/), or a page of a docs connector. ref is its lineage ref, kind doc: <forge>:<owner>/<repo>/doc/<path> for a folder in a repo, folder:<machine>/<folder name>/doc/<path> for one with no forge remote, confluence:<site>/<page id>, notion:<page id>, gdrive:<file id>, or mcp:<server>/<id> for another mapped server. source is its DocsSource's id. path is a folder doc's, relative to folder; url a connector doc's.",
+      "properties": {
+        "ref": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string",
+          "description": "Its first # heading, or its file name; a connector doc's title."
+        },
+        "source": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string",
+          "description": "A folder doc's folder, or the folder whose mcp.json reaches the connector."
+        },
+        "path": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "updated": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "ref",
+        "title",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "FileCompletion": {
+      "type": "object",
+      "description": "One thing to write: what the list shows, what goes in the text (the label when left out), and a line about it.",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "insert": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "additionalProperties": false
+    },
+    "FileCompletionRequest": {
+      "type": "object",
+      "description": "files/complete (#844): what the language server would write at a place in a file, as the editor holds it. line from 1; column from 1, in UTF-16 units as the text views count.",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "path": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer"
+        },
+        "column": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "path",
+        "text",
+        "line",
+        "column"
+      ],
+      "additionalProperties": false
+    },
+    "FileCompletions": {
+      "type": "object",
+      "description": "At most 50 completions, in the server's order; reason says why there are none (no server, or none installed).",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FileCompletion"
+          }
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "FileDiagnostic": {
+      "type": "object",
+      "description": "One problem a language server found: where (line and column from 1), how bad (error, warning, info or hint), and what.",
+      "properties": {
+        "line": {
+          "type": "integer"
+        },
+        "column": {
+          "type": "integer"
+        },
+        "severity": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "line",
+        "column",
+        "severity",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "FileDiagnostics": {
+      "type": "object",
+      "description": "A file's problems, at most 200, and the server that found them. Reason says why there is no server for it (none installed for the language, or the file too big).",
+      "properties": {
+        "diagnostics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FileDiagnostic"
+          }
+        },
+        "server": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "diagnostics"
+      ],
+      "additionalProperties": false
+    },
+    "FileDiagnosticsRequest": {
+      "type": "object",
+      "description": "files/diagnostics (#844): what the language server for a file's language says of it, as the editor holds it (text) or as it is on disk.",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "path": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "FileMentionDTO": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "relativePath": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "relativePath"
+      ],
+      "additionalProperties": false
+    },
+    "FileMentionRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "term": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "term"
+      ],
+      "additionalProperties": false
+    },
+    "FileReading": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "text"
+            },
+            "stamp": {
+              "$ref": "#/definitions/FileStamp"
+            },
+            "text": {
+              "type": "string"
+            },
+            "isTruncated": {
+              "type": "boolean"
+            },
+            "size": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "stamp",
+            "text",
+            "isTruncated",
+            "size"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "image"
+            },
+            "stamp": {
+              "$ref": "#/definitions/FileStamp"
+            },
+            "bytes": {
+              "$ref": "core.schema.json#/definitions/Base64"
+            },
+            "describedAs": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "stamp",
+            "bytes",
+            "describedAs"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "other"
+            },
+            "stamp": {
+              "$ref": "#/definitions/FileStamp"
+            },
+            "describedAs": {
+              "type": "string"
+            },
+            "size": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "stamp",
+            "describedAs",
+            "size"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "unchanged"
+            },
+            "stamp": {
+              "$ref": "#/definitions/FileStamp"
+            }
+          },
+          "required": [
+            "kind",
+            "stamp"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "FileReading (Model/FileReading.swift), as its encode(to:) writes it: one shape per `kind`."
+    },
+    "FileStamp": {
+      "type": "object",
+      "properties": {
+        "size": {
+          "type": "integer"
+        },
+        "modifiedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        }
+      },
+      "required": [
+        "size",
+        "modifiedAt"
+      ],
+      "additionalProperties": false
+    },
+    "FilesBrowseRequest": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FilesChangedNotification": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "many": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "agentID",
+        "folders"
+      ],
+      "additionalProperties": false
+    },
+    "FilesListRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "folder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "FilesReadRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "path": {
+          "type": "string"
+        },
+        "knownStamp": {
+          "$ref": "#/definitions/FileStamp"
+        }
+      },
+      "required": [
+        "agentID",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "FilesSaveTextRequest": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "onlyIfAbsent": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "FilesText": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "FilesTextRequest": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "FilesWatchRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "folder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "FilesWriteRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        }
+      },
+      "required": [
+        "agentID",
+        "name",
+        "data"
+      ],
+      "additionalProperties": false
+    },
+    "FilesWriteResponse": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "FindMatch": {
+      "type": "object",
+      "description": "One message that holds the text: where it is in the transcript (its first chunk), and the line it is on.",
+      "properties": {
+        "index": {
+          "type": "integer"
+        },
+        "entryID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "line": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "index",
+        "entryID",
+        "line"
+      ],
+      "additionalProperties": false
+    },
+    "FindRequest": {
+      "type": "object",
+      "description": "agents/find (#1532): what was said in one chat, prompts and replies, that holds the text, any case.",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "text": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "FindResult": {
+      "type": "object",
+      "description": "The matches, oldest first: the newest `limit` of them. More is true when older ones were left out.",
+      "properties": {
+        "matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FindMatch"
+          }
+        },
+        "more": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "matches",
+        "more"
+      ],
+      "additionalProperties": false
+    },
+    "Folder": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "archivedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "addedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "helperLimits": {
+          "$ref": "core.schema.json#/definitions/HelperLimits"
+        },
+        "diskSpace": {
+          "$ref": "machines.schema.json#/definitions/DiskThresholds"
+        },
+        "pinned": {
+          "type": "boolean"
+        },
+        "prCostComment": {
+          "$ref": "reports.schema.json#/definitions/PRCostComment",
+          "description": "Absent is off (#2352)."
+        },
+        "workingHours": {
+          "$ref": "workflows.schema.json#/definitions/WorkflowHours",
+          "description": "The project's working hours (#4821), for a workflow's hours: working and hours: not-working, from .agents/folder.json. Absent is 09:00-17:00, Mon-Fri. Never named."
+        }
+      },
+      "required": [
+        "folder",
+        "addedAt"
+      ],
+      "additionalProperties": false
+    },
+    "FolderDetection": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "enabled",
+        "paths"
+      ],
+      "additionalProperties": false
+    },
+    "FolderHunk": {
+      "type": "object",
+      "properties": {
+        "oldStart": {
+          "type": "integer"
+        },
+        "newStart": {
+          "type": "integer"
+        },
+        "noNewlineAtEnd": {
+          "type": "boolean"
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DiffLine"
+          }
+        }
+      },
+      "required": [
+        "oldStart",
+        "newStart",
+        "noNewlineAtEnd",
+        "lines"
+      ],
+      "additionalProperties": false
+    },
+    "FolderPins": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "pins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PinView"
+          }
+        },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/UUID"
+          }
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "views": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PinView"
+          }
+        },
+        "reviews": {
+          "type": "array",
+          "description": "Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host with none.",
+          "items": {
+            "$ref": "forge.schema.json#/definitions/ReviewPull"
+          }
+        },
+        "suggestions": {
+          "type": "array",
+          "description": "What the read-only daily checks found in it for the person (#3331), newest first, until a session is started from one or it is dismissed. Nil from a host with none.",
+          "items": {
+            "$ref": "sessions.schema.json#/definitions/CheckSuggestion"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "pins"
+      ],
+      "additionalProperties": false
+    },
+    "FolderRemovedNotification": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "FolderRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "FolderSummary": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "lastActivityAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "counts": {
+          "type": "object",
+          "properties": {
+            "needsAttention": {
+              "type": "integer"
+            },
+            "blocked": {
+              "type": "integer"
+            },
+            "waiting": {
+              "type": "integer"
+            },
+            "running": {
+              "type": "integer"
+            },
+            "finished": {
+              "type": "integer"
+            },
+            "stopped": {
+              "type": "integer"
+            },
+            "archived": {
+              "type": "integer"
+            }
+          },
+          "additionalProperties": false,
+          "x-ts-type": "Partial<Record<AgentGroup, number>>"
+        },
+        "costToDate": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "unmeasuredAgents": {
+          "type": "integer"
+        },
+        "guardedChanges": {
+          "type": "array",
+          "items": {
+            "$ref": "org.schema.json#/definitions/GuardedChange"
+          }
+        },
+        "approvals": {
+          "type": "array",
+          "items": {
+            "$ref": "workflows.schema.json#/definitions/Approval"
+          }
+        },
+        "project": {
+          "type": "string",
+          "description": "The project id that .agents/folder.json names (#2317). Absent when it names none or one that is not valid."
+        },
+        "projectProblem": {
+          "type": "string",
+          "description": "Why the folder is in no project (#2317): .agents/folder.json is not an object, names an id that is not valid, or .agents is a link."
+        },
+        "machine": {
+          "$ref": "machines.schema.json#/definitions/MachineRef",
+          "description": "The machine the folder is on, as the control plane names it (#3276). Absent on a machine that has joined no control plane: the folder is on this one."
+        },
+        "helperLimitsSetBy": {
+          "$ref": "org.schema.json#/definitions/PolicySetBy",
+          "description": "Set when the organisation's policy caps this folder's helper limits (#998, #64): the lower number is used."
+        },
+        "folder": {
+          "$ref": "#/definitions/Folder"
+        }
+      },
+      "required": [
+        "folder",
+        "name",
+        "exists",
+        "lastActivityAt",
+        "counts",
+        "costToDate",
+        "unmeasuredAgents"
+      ],
+      "additionalProperties": false
+    },
+    "FoldersFindRequest": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "FoldersListRequest": {
+      "type": "object",
+      "properties": {
+        "includeArchived": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "includeArchived"
+      ],
+      "additionalProperties": false
+    },
+    "LiveAgent": {
+      "type": "object",
+      "description": "One agent on Console ▸ Live Now (#2019, M9): whose machine, which runtime, its state, since when and its cost so far. No title and nothing it said.",
+      "properties": {
+        "host": {
+          "$ref": "machines.schema.json#/definitions/MachineRef"
+        },
+        "hostName": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string",
+          "description": "The person or bot whose machine it is, by id."
+        },
+        "ownerName": {
+          "type": "string"
+        },
+        "bot": {
+          "type": "boolean",
+          "description": "Whether the machine is a bot's."
+        },
+        "agent": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "runtime": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "sessions.schema.json#/definitions/AgentState"
+        },
+        "waitsOnOthers": {
+          "type": "boolean",
+          "description": "It waits for an event or another agent (eventWait), not for its person."
+        },
+        "workflow": {
+          "type": "string",
+          "description": "The workflow that started it."
+        },
+        "since": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "costToDate": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number"
+          },
+          "description": "Its cost so far, by currency."
+        },
+        "heardAt": {
+          "$ref": "core.schema.json#/definitions/WireDate",
+          "description": "When the machine last listed its agents."
+        }
+      },
+      "required": [
+        "host",
+        "hostName",
+        "owner",
+        "ownerName",
+        "bot",
+        "agent",
+        "runtime",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "LiveBoard": {
+      "type": "object",
+      "description": "console/live's answer (#2019, M9): every agent running now on every machine, as each machine last listed them, for an admin. The most costly first.",
+      "properties": {
+        "agents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/LiveAgent"
+          }
+        }
+      },
+      "required": [
+        "agents"
+      ],
+      "additionalProperties": false
+    },
+    "LiveFrame": {
+      "type": "object",
+      "description": "A live tile's frame of what an agent drives (#4138, #4139): the Mac's screen, the session's tab of the machine's browser, or a simulator. Sent only while the agent drives it (a call on it in the last 10 seconds) and only to the connections whose presence/report is active and shows that agent; never recorded, never replayed (as FR-016 of #3004).",
+      "properties": {
+        "source": {
+          "$ref": "#/definitions/LiveSource"
+        },
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "image": {
+          "type": "string",
+          "description": "Base64 JPEG. Absent while the screen is locked, or when no picture could be taken."
+        },
+        "locked": {
+          "type": "boolean",
+          "description": "The Mac's screen is locked: the tile says so and shows no picture."
+        },
+        "narration": {
+          "type": "string",
+          "description": "What the agent last did on it, in words, such as Clicked Save in TextEdit. Absent when the source says nothing."
+        },
+        "title": {
+          "type": "string",
+          "description": "The source by name, for the tile's head (#4140): the page's title, or the simulator's name. Absent for the screen, and before a page has a title."
+        },
+        "capturedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "width": {
+          "type": "integer",
+          "description": "The picture's width in pixels, when the source says it."
+        },
+        "height": {
+          "type": "integer",
+          "description": "The picture's height in pixels, when the source says it."
+        }
+      },
+      "required": [
+        "source",
+        "agentID",
+        "capturedAt"
+      ],
+      "additionalProperties": false
+    },
+    "LiveSource": {
+      "type": "string",
+      "description": "What a live tile shows (#4139): the Mac's screen (drive_screen), the machine's browser (browser_* tools) or a simulator.",
+      "enum": [
+        "screen",
+        "browser",
+        "simulator"
+      ]
+    },
+    "PagesChangedNotification": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "folders"
+      ],
+      "additionalProperties": false
+    },
+    "PeopleChanged": {
+      "type": "object",
+      "description": "control/peopleChanged (#994): a person was added, changed or removed.",
+      "properties": {
+        "user": {
+          "type": "string"
+        },
+        "removed": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PeopleForViews": {
+      "type": "object",
+      "description": "people/forViews (#2951): every person and bot on this control plane, with their forge logins and which is the caller, for the github, gitlab, linear and jira servers' Team section and \"An agent is on it\". Narrower than PeopleList: open to a member as much as an admin, and holds no role, clients or machines.",
+      "properties": {
+        "people": {
+          "type": "array",
+          "items": {
+            "$ref": "org.schema.json#/definitions/TeamPerson"
+          }
+        }
+      },
+      "required": [
+        "people"
+      ],
+      "additionalProperties": false
+    },
+    "PinArrangeRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "paths"
+      ],
+      "additionalProperties": false
+    },
+    "PinArrangeSessionsRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "agentIDs": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/UUID"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "agentIDs"
+      ],
+      "additionalProperties": false
+    },
+    "PinHideViewRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "hidden": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "folder",
+        "uri",
+        "hidden"
+      ],
+      "additionalProperties": false
+    },
+    "PinKind": {
+      "type": "string",
+      "enum": [
+        "markdown",
+        "html",
+        "view"
+      ]
+    },
+    "PinPathRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "PinReadRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "path": {
+          "type": "string"
+        },
+        "knownStamp": {
+          "$ref": "#/definitions/FileStamp"
+        }
+      },
+      "required": [
+        "folder",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "PinRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "path": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "view": {
+          "$ref": "#/definitions/ViewPin"
+        }
+      },
+      "required": [
+        "folder",
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "PinSessionRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        }
+      },
+      "required": [
+        "folder",
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
+    "PinView": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/PinKind"
+        },
+        "missing": {
+          "type": "boolean"
+        },
+        "pinnedBy": {
+          "$ref": "#/definitions/PinnerView"
+        },
+        "view": {
+          "$ref": "#/definitions/ViewPin"
+        },
+        "missingReason": {
+          "type": "string"
+        },
+        "hidden": {
+          "type": "boolean"
+        },
+        "count": {
+          "type": "integer"
+        },
+        "attention": {
+          "type": "integer"
+        },
+        "countAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "countStale": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "path",
+        "title",
+        "kind",
+        "missing",
+        "pinnedBy"
+      ],
+      "additionalProperties": false
+    },
+    "PinWriteRequest": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "path": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder",
+        "path",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "PinnerKind": {
+      "type": "string",
+      "enum": [
+        "person",
+        "agent",
+        "workflow",
+        "server"
+      ]
+    },
+    "PinnerView": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/PinnerKind"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "PinsChangedNotification": {
+      "type": "object",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "pins": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PinView"
+          }
+        },
+        "sessions": {
+          "type": "array",
+          "items": {
+            "$ref": "core.schema.json#/definitions/UUID"
+          }
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "views": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PinView"
+          }
+        },
+        "reviews": {
+          "type": "array",
+          "description": "Its open pull requests waiting for the person's approval (#3330), newest first. Nil from a host with none.",
+          "items": {
+            "$ref": "forge.schema.json#/definitions/ReviewPull"
+          }
+        },
+        "suggestions": {
+          "type": "array",
+          "description": "What the read-only daily checks found in it for the person (#3331), newest first, until a session is started from one or it is dismissed. Nil from a host with none.",
+          "items": {
+            "$ref": "sessions.schema.json#/definitions/CheckSuggestion"
+          }
+        }
+      },
+      "required": [
+        "folder",
+        "pins"
+      ],
+      "additionalProperties": false
+    },
+    "PreviewFile": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "bytes": {
+          "type": "integer"
+        },
+        "runnable": {
+          "type": "boolean"
+        },
+        "via": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "bytes",
+        "runnable",
+        "via"
+      ],
+      "additionalProperties": false
+    },
+    "PreviewProblem": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "noSkillFile": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "noSkillFile"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "notFoundInRepo": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "notFoundInRepo"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "tooLarge": {
+              "type": "object",
+              "properties": {
+                "bytes": {
+                  "type": "integer"
+                },
+                "files": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "bytes",
+                "files"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "tooLarge"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "skipped": {
+              "type": "object",
+              "properties": {
+                "_0": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "_0"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "skipped"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Project": {
+      "type": "object",
+      "description": "A project (#2317): what people work on, the record that folders join. folders is what the machines last reported.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectFolder"
+          }
+        },
+        "mayChange": {
+          "type": "boolean",
+          "description": "The caller is the owner or an admin, so may rename and remove it, and set its slots and boards."
+        },
+        "slots": {
+          "type": "array",
+          "description": "The project's Tasks, Code review and CI (#2669), one per slot: every folder in the project uses them. A slot that is not here is each folder's own.",
+          "items": {
+            "$ref": "#/definitions/ProjectSlot"
+          }
+        },
+        "boards": {
+          "type": "array",
+          "description": "The boards in the project's Tasks slot (#3282), in their order. Absent with none.",
+          "items": {
+            "$ref": "#/definitions/ProjectBoard"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "owner",
+        "folders",
+        "mayChange"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectBoard": {
+      "type": "object",
+      "description": "One board in a project's Tasks slot (#3282): a GitHub Projects board, a Jira board, a Linear team, a GitLab group board or an Azure Boards board (a team's, #3816), by its address and a name (the team's). Work's Issues and Features lists narrow to one. A client sends name and url; the control plane reads forge, key and site from the url.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "description": "The board's address on the web: github.com/orgs/<org>/projects/<n> (or users/<login>), <site>/jira/software/…/boards/<id>, linear.app/<workspace>/team/<KEY>, <gitlab>/groups/<group>/-/boards/<id>, or dev.azure.com/<org>/<project>/_boards/board/t/<team> (or an Azure DevOps Server's). It names the board in forge/issues' board."
+        },
+        "forge": {
+          "$ref": "connections.schema.json#/definitions/ConnectionProvider",
+          "description": "github, atlassian (Jira), linear, gitlab or azuredevops (Azure Boards)."
+        },
+        "key": {
+          "type": "string",
+          "description": "The board on its forge: <owner>/<number> on GitHub, the board id on Jira, the team key on Linear, <group>#<id> on GitLab, <org>/<project>/<team> on Azure Boards."
+        },
+        "site": {
+          "type": "string",
+          "description": "The board's host: github.com, the Jira site, linear.app, gitlab.com or a self-managed GitLab, dev.azure.com or an Azure DevOps Server."
+        }
+      },
+      "required": [
+        "name",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectBoardsSet": {
+      "type": "object",
+      "description": "projects/setBoards (#3282): the project's boards, all of them each time, in their order; none leaves Tasks with no boards. Only the owner or an admin. At most 20.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "boards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectBoard"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "boards"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectFolder": {
+      "type": "object",
+      "description": "A folder in a project (#2317), as its machine last reported it.",
+      "properties": {
+        "machine": {
+          "$ref": "machines.schema.json#/definitions/MachineRef"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "machine",
+        "folder",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectFolders": {
+      "type": "object",
+      "description": "machines/projectFolders (#3277): the project's folders on each of the person's machines, as they joined it, so start_session with machine alone picks the project's folder there.",
+      "properties": {
+        "machines": {
+          "type": "array",
+          "items": {
+            "$ref": "machines.schema.json#/definitions/ProjectMachineFolders"
+          }
+        }
+      },
+      "required": [
+        "machines"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectFoldersRequest": {
+      "type": "object",
+      "description": "machines/projectFolders (#3277): the project.",
+      "properties": {
+        "project": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "project"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectList": {
+      "type": "object",
+      "description": "projects/list (#2317): the organisation's projects, by name.",
+      "properties": {
+        "projects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Project"
+          }
+        }
+      },
+      "required": [
+        "projects"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectRequest": {
+      "type": "object",
+      "description": "projects/remove (#2317): the project. Refused while a folder names it.",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectSession": {
+      "type": "object",
+      "description": "One session of projects/sessions (#3276): the machine it runs on, and the session as that machine lists it, lean.",
+      "properties": {
+        "machine": {
+          "$ref": "machines.schema.json#/definitions/MachineRef"
+        },
+        "machineName": {
+          "type": "string"
+        },
+        "session": {
+          "$ref": "sessions.schema.json#/definitions/Agent"
+        }
+      },
+      "required": [
+        "machine",
+        "machineName",
+        "session"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectSessions": {
+      "type": "object",
+      "description": "projects/sessions (#3276): the project's sessions on each of the caller's machines that has a folder of it, newest activity first. unreached is the machines that have a folder of it but did not answer (offline, or too slow): their sessions are not in sessions.",
+      "properties": {
+        "sessions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectSession"
+          }
+        },
+        "unreached": {
+          "type": "array",
+          "items": {
+            "$ref": "machines.schema.json#/definitions/ProjectMachine"
+          }
+        }
+      },
+      "required": [
+        "sessions",
+        "unreached"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectSessionsRequest": {
+      "type": "object",
+      "description": "projects/sessions (#3276): the project, and whether to list archived sessions too.",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "includeArchived": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "project"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectSet": {
+      "type": "object",
+      "description": "projects/set (#2317): makes a project, or with id renames one.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectSlot": {
+      "type": "object",
+      "description": "A project's Tasks, Code review or CI slot (#2669): the forge and the repository (GitHub owner/name, GitLab group/project) that fill it for every folder in the project, or skipped.",
+      "properties": {
+        "slot": {
+          "$ref": "connections.schema.json#/definitions/ConnectorSlotKind"
+        },
+        "forge": {
+          "$ref": "connections.schema.json#/definitions/ConnectionProvider"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "site": {
+          "type": "string",
+          "description": "The repository's host: github.com, gitlab.com, or a self-managed GitLab's host."
+        },
+        "skipped": {
+          "type": "boolean",
+          "description": "Skipped for every folder in the project. forge, repository and site are then absent."
+        }
+      },
+      "required": [
+        "slot"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectSlotSet": {
+      "type": "object",
+      "description": "projects/setSlot (#2669): sets one of the project's slots, or with no value gives it back to each folder. Only the owner or an admin.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "slot": {
+          "$ref": "connections.schema.json#/definitions/ConnectorSlotKind"
+        },
+        "value": {
+          "$ref": "#/definitions/ProjectSlot"
+        }
+      },
+      "required": [
+        "id",
+        "slot"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectTools": {
+      "type": "object",
+      "description": "One project's slots, as a machine gets them (#2669).",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectSlot"
+          }
+        },
+        "boards": {
+          "type": "array",
+          "description": "The boards in the project's Tasks slot (#3282), in their order. Absent with none.",
+          "items": {
+            "$ref": "#/definitions/ProjectBoard"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "slots"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectsChanged": {
+      "type": "object",
+      "description": "control/projectsChanged (#2317): a project was made, renamed, adopted or removed, or a folder joined one.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "removed": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SaidMatch": {
+      "type": "object",
+      "description": "A session that said the text, and the line it is on.",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "line": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "agentID",
+        "line"
+      ],
+      "additionalProperties": false
+    },
+    "SaidSearchRequest": {
+      "type": "object",
+      "description": "agents/said (#1585): the sessions whose prompts or replies hold the text, any case, in one folder when folder says.",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "limit": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "SaidSearchResult": {
+      "type": "object",
+      "description": "The sessions that said it, the most recently active first.",
+      "properties": {
+        "matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SaidMatch"
+          }
+        }
+      },
+      "required": [
+        "matches"
+      ],
+      "additionalProperties": false
+    },
+    "SetFolderProjectRequest": {
+      "type": "object",
+      "description": "folders/setProject (#2317): the project id to write into the folder's .agents/folder.json.",
+      "properties": {
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "project": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "folder",
+        "project"
+      ],
+      "additionalProperties": false
+    },
+    "SharedInstructions": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "reach": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/SharedReach"
+          }
+        }
+      },
+      "required": [
+        "path",
+        "exists",
+        "reach"
+      ],
+      "additionalProperties": false
+    },
+    "SharedLook": {
+      "description": "Something the overview lists under Needs a look, and the page it opens.",
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/SharedLookKind"
+        },
+        "page": {
+          "$ref": "#/definitions/SharedLookPage"
+        },
+        "item": {
+          "description": "What it is about: a skill, a server, a runtime's name.",
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "page",
+        "item",
+        "text"
+      ],
+      "additionalProperties": false
+    },
+    "SharedLookKind": {
+      "type": "string",
+      "enum": [
+        "clash",
+        "leftOut",
+        "noWay",
+        "noFile",
+        "problem"
+      ]
+    },
+    "SharedLookPage": {
+      "type": "string",
+      "enum": [
+        "instructions",
+        "skills",
+        "mcp",
+        "plugins",
+        "other"
+      ]
+    },
+    "SharedOtherFile": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "description": "Relative to `~/.agents`, or to a folder's `.agents`.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/SharedOtherFileKind"
+        }
+      },
+      "required": [
+        "path",
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "SharedOtherFileKind": {
+      "type": "string",
+      "enum": [
+        "persona",
+        "git",
+        "managed",
+        "unused",
+        "app"
+      ]
+    },
+    "SharedProblem": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "SharedReach": {
+      "description": "What one runtime does with one thing: it gets it (how), uses its own copy at a path, is left out (why), has no way to take it, or is not measured yet (`\"unchecked\"`, or with a note).",
+      "anyOf": [
+        {
+          "type": "string",
+          "const": "unchecked"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "gets": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "gets"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ownCopy": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "ownCopy"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "leftOut": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "leftOut"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "noWay": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "noWay"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "unchecked": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "unchecked"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "SharedRequest": {
+      "description": "`personal/shared`'s params: none reads the person's `~/.agents`; `folder` reads that folder's `.agents` (#754), which has no per-runtime reach.",
+      "type": "object",
+      "properties": {
+        "folder": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SharedSnapshot": {
+      "description": "`personal/shared` (054): what is in the person's `~/.agents` and which runtime gets each thing, for Settings ▸ Agent Configuration. Read from disk on every call. Nothing in it is a value from `mcp.json`: env and headers go by name only (FR-023).",
+      "type": "object",
+      "properties": {
+        "home": {
+          "description": "`~/.agents`, or a folder's `.agents` (#754).",
+          "type": "string"
+        },
+        "laidOut": {
+          "description": "False for a copy of the app with no personal home (a scratch root), when everything else is empty.",
+          "type": "boolean"
+        },
+        "runtimes": {
+          "description": "The installed runtimes with a rule, by name: the columns.",
+          "type": "array",
+          "items": {
+            "$ref": "machines.schema.json#/definitions/SharedRuntimeName"
+          }
+        },
+        "instructions": {
+          "$ref": "#/definitions/SharedInstructions"
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "$ref": "mcp.schema.json#/definitions/SharedSkill"
+          }
+        },
+        "mcp": {
+          "$ref": "mcp.schema.json#/definitions/SharedMCP"
+        },
+        "plugins": {
+          "type": "array",
+          "items": {
+            "$ref": "mcp.schema.json#/definitions/SharedPlugin"
+          }
+        },
+        "otherFiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SharedOtherFile"
+          }
+        },
+        "needsALook": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SharedLook"
+          }
+        }
+      },
+      "required": [
+        "home",
+        "laidOut",
+        "runtimes",
+        "skills",
+        "mcp",
+        "plugins",
+        "otherFiles",
+        "needsALook"
+      ],
+      "additionalProperties": false
+    },
+    "ShellAttachRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        },
+        "rows": {
+          "type": "integer"
+        },
+        "cols": {
+          "type": "integer"
+        },
+        "since": {
+          "type": "integer"
+        },
+        "startedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
+    "ShellAttachResponse": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "$ref": "#/definitions/ShellState"
+        },
+        "scrollback": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        },
+        "dropped": {
+          "type": "integer"
+        },
+        "startedAt": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        },
+        "offset": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "state",
+        "scrollback",
+        "dropped",
+        "startedAt",
+        "folder"
+      ],
+      "additionalProperties": false
+    },
+    "ShellInputRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        },
+        "bytes": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        },
+        "rows": {
+          "type": "integer"
+        },
+        "cols": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "bytes"
+      ],
+      "additionalProperties": false
+    },
+    "ShellListResponse": {
+      "type": "object",
+      "properties": {
+        "shells": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        }
+      },
+      "required": [
+        "shells"
+      ],
+      "additionalProperties": false
+    },
+    "ShellOpenResponse": {
+      "type": "object",
+      "properties": {
+        "shell": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "shell"
+      ],
+      "additionalProperties": false
+    },
+    "ShellOutputNotification": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        },
+        "bytes": {
+          "$ref": "core.schema.json#/definitions/Base64"
+        },
+        "offset": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "shell",
+        "bytes"
+      ],
+      "additionalProperties": false
+    },
+    "ShellRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID"
+      ],
+      "additionalProperties": false
+    },
+    "ShellResizeRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        },
+        "rows": {
+          "type": "integer"
+        },
+        "cols": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "rows",
+        "cols"
+      ],
+      "additionalProperties": false
+    },
+    "ShellSignalRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        },
+        "signal": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "agentID",
+        "signal"
+      ],
+      "additionalProperties": false
+    },
+    "ShellState": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "live": {
+              "type": "object",
+              "additionalProperties": {
+                "not": {}
+              }
+            }
+          },
+          "required": [
+            "live"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "exited": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "status"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "exited"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "failed": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "failed"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "released": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "released"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ShellStateNotification": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "shell": {
+          "type": "integer"
+        },
+        "state": {
+          "$ref": "#/definitions/ShellState"
+        }
+      },
+      "required": [
+        "agentID",
+        "shell",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "ShowFileNotification": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "file": {
+          "$ref": "#/definitions/ShownFile"
+        }
+      },
+      "required": [
+        "agentID",
+        "file"
+      ],
+      "additionalProperties": false
+    },
+    "ShownFile": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer"
+        },
+        "chart": {
+          "$ref": "sessions.schema.json#/definitions/ChartHint"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    },
+    "TurnChangedFile": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "relativePath": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/definitions/ChangeState"
+        }
+      },
+      "required": [
+        "path",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "TurnChanges": {
+      "type": "object",
+      "description": "What one turn changed (#3437): the files that differ between the snapshots the host took as the turn began and as it ended, at most 50 (more counts the rest), and the files the agent edited that a snapshot does not hold (cannotUndo: outside the folder, or ignored by git).",
+      "properties": {
+        "turn": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TurnChangedFile"
+          }
+        },
+        "more": {
+          "type": "integer"
+        },
+        "cannotUndo": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "onlyReported": {
+          "type": "boolean",
+          "description": "Another agent's turn ran in the same folder, so files names only what this agent reported editing."
+        },
+        "before": {
+          "type": "string",
+          "description": "The git tree of the snapshot as the turn began, for the host's undo."
+        },
+        "after": {
+          "type": "string",
+          "description": "The git tree of the snapshot as the turn ended."
+        },
+        "undone": {
+          "$ref": "sessions.schema.json#/definitions/TurnUndo",
+          "description": "Never recorded: the later turnUndone entry, said on this card by the fold that draws it (the clients' and the host's turn summary)."
+        }
+      },
+      "required": [
+        "turn",
+        "files"
+      ],
+      "additionalProperties": false
+    },
+    "ViewAsk": {
+      "description": "What a third-party server's view waits on before it is drawn: the person's Show (#191). The data of a viewNeedsShow failure.",
+      "type": "object",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "isNew": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "server",
+        "uri",
+        "hash",
+        "isNew"
+      ],
+      "additionalProperties": false
+    },
+    "ViewCallRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "viewID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "name": {
+          "type": "string"
+        },
+        "arguments": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "feed": {
+          "type": "boolean"
+        },
+        "server": {
+          "type": "string"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "agentID",
+        "viewID",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "ViewContextRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "viewID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "content": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        },
+        "structuredContent": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "agentID",
+        "viewID"
+      ],
+      "additionalProperties": false
+    },
+    "ViewLogRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "viewID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "level": {
+          "type": "string"
+        },
+        "data": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "agentID",
+        "viewID"
+      ],
+      "additionalProperties": false
+    },
+    "ViewPin": {
+      "type": "object",
+      "properties": {
+        "server": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "tool": {
+          "type": "string"
+        },
+        "arguments": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "server",
+        "uri",
+        "tool"
+      ],
+      "additionalProperties": false
+    },
+    "ViewReadRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "server": {
+          "type": "string"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "agentID",
+        "uri"
+      ],
+      "additionalProperties": false
+    },
+    "ViewShowRequest": {
+      "type": "object",
+      "properties": {
+        "agentID": {
+          "$ref": "core.schema.json#/definitions/UUID"
+        },
+        "server": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "show": {
+          "type": "boolean"
+        },
+        "folder": {
+          "$ref": "core.schema.json#/definitions/URLString"
+        }
+      },
+      "required": [
+        "agentID",
+        "server",
+        "uri",
+        "hash",
+        "show"
+      ],
+      "additionalProperties": false
+    },
+    "ViewToolCallRequest": {
+      "description": "An agent's call of one of the agents server's tools that has a view, relayed with its token.",
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "arguments": {
+          "$ref": "core.schema.json#/definitions/JSONValue"
+        }
+      },
+      "required": [
+        "token",
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "WriteFailure": {
+      "type": "object",
+      "properties": {
+        "cause": {
+          "$ref": "#/definitions/WriteFailureCause"
+        },
+        "path": {
+          "type": "string"
+        },
+        "what": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "cause",
+        "what",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "WriteFailureCause": {
+      "type": "string",
+      "enum": [
+        "diskFull",
+        "notAllowed",
+        "readOnly"
+      ]
+    }
+  }
+}

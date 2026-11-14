@@ -4,7 +4,7 @@ import Foundation
 /// signed by its control key and followed by every machine as a ceiling over the person's and
 /// the folder's own settings. The window and the Remote read it in Settings ▸ Control plane ▸
 /// Policy; an admin edits it in Console ▸ Policy on the web page, and has the kill switch on
-/// every client. The types are hand-written against `Packages/Wire/daemon.schema.json`
+/// every client. The types are hand-written against `Packages/Wire/schema`
 /// (`WireSchemaTests`); the words are `OrgPolicyWords`, the same as `Web/src/model/orgPolicy.ts`.
 public extension DaemonAPI {
     /// One allowed runtime: the models allowed (absent = every model, `*` at the end allowed),

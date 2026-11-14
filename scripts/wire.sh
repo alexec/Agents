@@ -1,5 +1,5 @@
 #!/bin/sh
-# The wire's types (#1135). Packages/Wire is the source: the schema (daemon.schema.json) and
+# The wire's types (#1135). Packages/Wire is the source: the schema (Packages/Wire/schema) and
 # the methods (daemon.openrpc.json, control.openrpc.json). Go and TypeScript are made from it;
 # Swift's Model types are written by hand and checked against it (WireSchemaTests).
 #

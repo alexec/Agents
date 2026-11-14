@@ -60,7 +60,7 @@ Host's *Move to another machine* works with it.
 
 **Its wire is `Go/wire`'s** (#1313): every method's params and result, what it says to
 clients and hosts, the exchange's lines and a channel's open frame are the generated types,
-from `control.openrpc.json` and `daemon.schema.json`. A date is worked out as before
+from `control.openrpc.json` and `Packages/Wire/schema`. A date is worked out as before
 (`dateOf`), so no byte moved: `testdata/wire.golden` and each package's
 `testdata/wire-types.golden` were written by the hand-made types and still pass. What stays
 written by hand is not the wire: the store's records (ISO dates, and the fields a later

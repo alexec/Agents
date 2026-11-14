@@ -17,14 +17,15 @@ What a server sends (results and notifications) keeps the rule that a new option
 new enum value keeps the number. Run by `scripts/wire.sh compat`, and by CI's lint job when
 Packages/Wire changes.
 """
+import glob
 import json
 import subprocess
 import sys
 
 DOCUMENTS = ["Packages/Wire/daemon.openrpc.json", "Packages/Wire/control.openrpc.json"]
-SCHEMA = "Packages/Wire/daemon.schema.json"
+SCHEMA_DIR = "Packages/Wire/schema"  # one *.schema.json per domain (#5380)
+OLD_SCHEMA = "Packages/Wire/daemon.schema.json"  # a release before the split has this one file
 PREFIX = "daemon.schema.json#/definitions/"
-LOCAL = "#/definitions/"
 
 
 def git(*args):
@@ -44,6 +45,20 @@ def last_tag():
     tag = max(releases, key=lambda t: [int(p) if p.isdigit() else 0 for p in t.lstrip("v").split(".")])
     git("fetch", "--quiet", "--depth=1", "origin", f"refs/tags/{tag}:refs/tags/{tag}")
     return tag
+
+
+def read_schema(revision):
+    """The schema's definitions at a revision (or in the working tree): every file under
+    Packages/Wire/schema, or the one daemon.schema.json of a release before the split."""
+    if revision is None:
+        paths = sorted(glob.glob(SCHEMA_DIR + "/*.schema.json"))
+    else:
+        listed = git("ls-tree", "--name-only", revision, SCHEMA_DIR + "/")
+        paths = sorted(p for p in listed.stdout.splitlines() if p.endswith(".schema.json")) if listed.returncode == 0 else []
+    definitions = {}
+    for path in paths or [OLD_SCHEMA]:
+        definitions.update((read(revision, path) or {}).get("definitions", {}))
+    return {"definitions": definitions}
 
 
 def read(revision, path):
@@ -71,10 +86,9 @@ class Side:
     def resolve(self, schema):
         """The schema, and the name of the definition it refers to, if any."""
         ref = schema.get("$ref", "")
-        for prefix in (PREFIX, LOCAL):
-            if ref.startswith(prefix):
-                name = ref[len(prefix):]
-                return self.definitions.get(name, {}), name
+        if "#/definitions/" in ref:
+            name = ref.split("#/definitions/", 1)[1]
+            return self.definitions.get(name, {}), name
         return schema, None
 
 
@@ -159,7 +173,7 @@ def compare(before, after):
 
 
 def side(revision):
-    return Side([read(revision, d) for d in DOCUMENTS], read(revision, SCHEMA))
+    return Side([read(revision, d) for d in DOCUMENTS], read_schema(revision))
 
 
 def selftest():

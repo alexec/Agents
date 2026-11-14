@@ -53,7 +53,7 @@ struct MessagesListTests {
 
     /// What the window reads and asks, written with today's encoder, fits the schema the Go host is made from.
     @Test func theTypesFitTheSchema() throws {
-        let schema = try WireSchema(WireSchemaTests.read("daemon.schema.json"))
+        let schema = try WireSchema(WireSchemaTests.readSchema())
         let list = DaemonAPI.MessagesConversations(
             conversations: [.init(server: "slack", folder: "/p",
                                   conversation: .init(source: "slack", id: "C1", title: "#general", kind: .channel, unread: 2,

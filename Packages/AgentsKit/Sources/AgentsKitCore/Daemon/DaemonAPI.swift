@@ -4047,7 +4047,7 @@ public enum DaemonAPI {
     }
 
     /// What `devices/announce` answers: the device's record, under `device`, as
-    /// `daemon.schema.json` and the Go host have it (#4905).
+    /// `Packages/Wire/schema` and the Go host have it (#4905).
     public struct AnnounceReply: Codable, Sendable, Hashable {
         public var device: Device
 
