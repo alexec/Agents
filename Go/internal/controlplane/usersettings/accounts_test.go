@@ -96,3 +96,39 @@ func jsonDate(t time.Time) string {
 	raw, _ := json.Marshal(wire.DateOf(t))
 	return string(raw)
 }
+
+// #5253: a machine's add keeps who added a new account, through a change by an agent or a
+// client; a client cannot say it; remove takes accounts out by service and address.
+func TestAccountsAddedByAndRemove(t *testing.T) {
+	ctx := context.Background()
+	b := localBook(t, store.NewMemory())
+	now := time.Date(2026, 11, 13, 9, 0, 0, 0, time.UTC)
+	agent, other := wire.UUID("0E3D0A52-6C0C-4A4E-9A51-000000000001"), wire.UUID("0E3D0A52-6C0C-4A4E-9A51-000000000002")
+	addr := "old@example.com"
+	if _, _, err := b.AddAccounts(ctx, "ana", []wire.OutsideAccount{{Service: "gitlab.com", Address: &addr, AddedBy: &agent}, {Service: "aws.amazon.com", Address: &addr}}, now); err != nil {
+		t.Fatal(err)
+	}
+	listed, _, _ := b.AddAccounts(ctx, "ana", []wire.OutsideAccount{{Service: "gitlab.com", Address: &addr, Plan: new("Pro"), AddedBy: &other},
+		{Service: "aws.amazon.com", Address: &addr, Plan: new("Pro"), AddedBy: &other}}, now)
+	if a := listed.Accounts; *a[0].AddedBy != agent || a[1].AddedBy != nil {
+		t.Fatalf("a change keeps who added it: %+v", a)
+	}
+	// A client's Edit… that leaves it out, and a client's new one that says it.
+	if _, err := b.SetPart(ctx, "ana", wire.UserSettingsPartNameAccounts, []byte(`{"accounts":[{"service":"gitlab.com","address":"old@example.com"},{"service":"aws.amazon.com","address":"old@example.com"},{"service":"slack.com","addedBy":"0E3D0A52-6C0C-4A4E-9A51-000000000002"}]}`)); err != nil {
+		t.Fatal(err)
+	}
+	kept, _ := b.Accounts(ctx, "ana")
+	if a := kept.Accounts; len(a) != 3 || a[0].AddedBy == nil || *a[0].AddedBy != agent || a[2].AddedBy != nil {
+		t.Fatalf("%+v", a)
+	}
+	listed, removed, err := b.RemoveAccounts(ctx, "ana", []wire.AccountKey{{Service: "GitLab.com", Address: new("OLD@example.com")}, {Service: "nowhere.com"}})
+	if err != nil || removed != 1 || len(listed.Accounts) != 2 || listed.Accounts[0].Service != "aws.amazon.com" {
+		t.Fatal(listed, removed, err)
+	}
+	if kept, _ := b.Accounts(ctx, "ana"); len(kept.Accounts) != 2 {
+		t.Fatal(kept)
+	}
+	if _, removed, _ := b.RemoveAccounts(ctx, "ana", []wire.AccountKey{{Service: "nowhere.com"}}); removed != 0 {
+		t.Fatal(removed)
+	}
+}

@@ -129,6 +129,7 @@ public enum Capability {
     public static let lock1 = "lock/1"
     public static let mac1 = "mac/1"
     public static let machineAccounts1 = "machine.accounts/1"
+    public static let machineAccounts2 = "machine.accounts/2"
     public static let machineUsage1 = "machine.usage/1"
     public static let machine1 = "machine/1"
     public static let machines1 = "machines/1"
@@ -770,7 +771,7 @@ public enum Capability {
         "lock/joinRequests": "lock-join/1",
         "lock/joinReveal": "lock-join/1",
         "lock/reset": "lock-reset/1",
-        "machine/accounts": "machine.accounts/1",
+        "machine/accounts": "machine.accounts/2",
         "machine/hello": "machine/1",
         "machine/lockAdd": "host.lock/2",
         "machine/lockAgain": "host.lock/4",
@@ -991,6 +992,7 @@ public enum Capability {
         ],
         "control": [
             "attention/1",
+            "machine.accounts/1",
         ],
         "host": [
             "host.wire/1",

@@ -1317,6 +1317,14 @@ func (m *Methods) HostSaid(host, method string, params json.RawMessage) (any, er
 		if err != nil {
 			return nil, userFailure(err)
 		}
+		if len(request.Remove) > 0 {
+			// Only an agent the person said yes to, or one that added them, gets here (#5253): agentsd asks.
+			var removed int
+			if listed, removed, err = m.s.users.RemoveAccounts(ctx, user, request.Remove); err != nil {
+				return nil, userFailure(err)
+			}
+			changed = changed || removed > 0
+		}
 		m.s.auditAccountOps(host, user, request.Ops)
 		m.s.noteAccountOps(user, request.Ops, wire.DateOf(time.Now()))
 		if changed {

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -94,8 +95,8 @@ func (b *Book) Accounts(ctx context.Context, user string) (wire.OutsideAccounts,
 
 // AddAccounts adds each account to the person's, or puts it in place of the one with the same
 // service and address. It says whether anything changed. An account that takes another's place
-// keeps its made and, when it differs, is edited now (#4157). No lastOp is stored: a machine
-// gives it.
+// keeps its made and who added it (#5253) and, when it differs, is edited now (#4157). A new one
+// keeps the addedBy the machine gave. No lastOp is stored: a machine gives it.
 func (b *Book) AddAccounts(ctx context.Context, user string, add []wire.OutsideAccount, now time.Time) (wire.OutsideAccounts, bool, error) {
 	part, err := b.Accounts(ctx, user)
 	if err != nil || len(add) == 0 {
@@ -113,6 +114,7 @@ func (b *Book) AddAccounts(ctx context.Context, user string, add []wire.OutsideA
 		if a.Made == nil {
 			a.Made = have.Made
 		}
+		a.AddedBy = have.AddedBy
 		a.Edited = have.Edited
 		if !sameAccount(have, a) {
 			at := wire.DateOf(now)
@@ -124,14 +126,43 @@ func (b *Book) AddAccounts(ctx context.Context, user string, add []wire.OutsideA
 	if err != nil {
 		return part, false, err
 	}
-	changed, err := b.SetPart(ctx, user, wire.UserSettingsPartNameAccounts, raw)
+	changed, err := b.setPart(ctx, user, wire.UserSettingsPartNameAccounts, raw, true)
 	return part, changed, err
+}
+
+// RemoveAccounts takes out each of the person's accounts with the service and address of one of
+// remove (#5253). It says how many it took out; one that is not there is not an error.
+func (b *Book) RemoveAccounts(ctx context.Context, user string, remove []wire.AccountKey) (wire.OutsideAccounts, int, error) {
+	part, err := b.Accounts(ctx, user)
+	if err != nil || len(remove) == 0 {
+		return part, 0, err
+	}
+	before := len(part.Accounts)
+	part.Accounts = slices.DeleteFunc(part.Accounts, func(a wire.OutsideAccount) bool {
+		return slices.ContainsFunc(remove, func(k wire.AccountKey) bool {
+			return accountIndex([]wire.OutsideAccount{a}, wire.OutsideAccount{Service: k.Service, Address: k.Address}) == 0
+		})
+	})
+	removed := before - len(part.Accounts)
+	if removed == 0 {
+		return part, 0, nil
+	}
+	raw, err := json.Marshal(part)
+	if err != nil {
+		return part, 0, err
+	}
+	if _, err := b.setPart(ctx, user, wire.UserSettingsPartNameAccounts, raw, true); err != nil {
+		return part, 0, err
+	}
+	return part, removed, nil
 }
 
 // stampAccounts is the accounts part to keep, from what was kept (#4160): no lastOp, which a
 // machine gives; an account that takes another's place keeps its made, and its edited unless
-// it differs, when it is edited now. So an Edit… on a client is edited as an add is.
-func stampAccounts(had, value json.RawMessage, now time.Time) json.RawMessage {
+// it differs, when it is edited now. So an Edit… on a client is edited as an add is. Who added
+// an account (#5253) is only a machine's to say (byMachine), for a new one: a new one from a
+// client is the person's, and one that takes another's place keeps the other's.
+func stampAccounts(had, value json.RawMessage, now time.Time, byMachine bool) json.RawMessage {
 	var old, part wire.OutsideAccounts
 	if json.Unmarshal(value, &part) != nil {
 		return value
@@ -142,6 +173,9 @@ func stampAccounts(had, value json.RawMessage, now time.Time) json.RawMessage {
 		j := accountIndex(old.Accounts, a)
 		if j < 0 {
 			a.Edited = nil
+			if !byMachine {
+				a.AddedBy = nil
+			}
 			part.Accounts[i] = a
 			continue
 		}
@@ -149,6 +183,7 @@ func stampAccounts(had, value json.RawMessage, now time.Time) json.RawMessage {
 		if a.Made == nil {
 			a.Made = have.Made
 		}
+		a.AddedBy = have.AddedBy
 		// AddAccounts stamps its own time; a client sends back the edited it read.
 		stamped := a.Edited != nil && (have.Edited == nil || *a.Edited != *have.Edited)
 		switch {
