@@ -31,6 +31,9 @@ type fakeGitHub struct {
 	completed  []CompletedRun
 	deploys    map[int][]string
 	waiting    []WaitingDeploy
+	// deployments and jobs are the repo's Deployments and its jobs' conclusions (#5240).
+	deployments []Deployment
+	jobs        map[int64]string
 	err        error
 	noRepo     bool
 	// reviews and assigned are what ask the connection's owner, alexec (#2034).
@@ -188,6 +191,24 @@ func (f *fakeGitHub) WaitingDeploys(_ context.Context, _, workflow, branch strin
 		}
 	}
 	return out, nil
+}
+
+func (f *fakeGitHub) Deployments(_ context.Context, _, environment, since string) ([]Deployment, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []Deployment
+	for _, d := range f.deployments {
+		if (environment == "" || d.Environment == environment) && mcpevents.Normalized(d.Updated) >= since {
+			out = append(out, d)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeGitHub) JobConclusion(_ context.Context, _ string, job int64) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.jobs[job], nil
 }
 
 func (f *fakeGitHub) addCompleted(id, attempt int, workflow, branch, at, conclusion string, trusted bool) {
@@ -433,8 +454,10 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 		equal(t, e["payloadSchema"].(map[string]any)["type"], "object", name+" payload")
 		// The person's own (#2034) are anyone's already.
 		personal := name == "review.requested" || name == "issue.assigned"
+		// A deploy's state change has no person's words in it: every Deployment of the repo (#5240).
+		deploy := name == "deploy.started" || name == "deploy.succeeded" || name == "deploy.failed"
 		_, hasAnyone := props["anyone"]
-		equal(t, hasAnyone, !personal, name+" anyone")
+		equal(t, hasAnyone, !personal && !deploy, name+" anyone")
 		_, hasMine := props["mine"]
 		// Every event about one PR names it by mine too (#3797), and all of them take any.
 		named := map[string]bool{"checks.failed": true, "checks.passed": true, "pr.merged": true, "pr.closed": true,
@@ -453,12 +476,16 @@ func TestEventsListGivesEveryEventPollOnlyWithTheirSchemas(t *testing.T) {
 			equal(t, props["run"].(map[string]any)["type"], "integer", name+" run")
 		} else if name == "deploy.waiting" {
 			equal(t, props["workflow"].(map[string]any)["type"], "string", name+" workflow")
+		} else if deploy {
+			for _, filter := range []string{"environment", "tier", "component"} {
+				equal(t, props[filter].(map[string]any)["type"], "string", name+" "+filter)
+			}
 		} else {
 			equal(t, props["pr"].(map[string]any)["type"], "integer", name+" pr")
 		}
 	}
 	sort.Strings(names)
-	equal(t, names, []string{"checks.failed", "checks.passed", "deploy.waiting", "issue.assigned", "issue.closed", "issue.commented", "issue.labelled", "issue.opened",
+	equal(t, names, []string{"checks.failed", "checks.passed", "deploy.failed", "deploy.started", "deploy.succeeded", "deploy.waiting", "issue.assigned", "issue.closed", "issue.commented", "issue.labelled", "issue.opened",
 		"pr.closed", "pr.commented", "pr.conflicted", "pr.labelled", "pr.merged", "pr.opened", "pr.reviewed", "pr.unlabelled", "review.comment", "review.posted",
 		"review.requested", "run.completed"}, "names")
 }

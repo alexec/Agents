@@ -28,6 +28,8 @@ type schema = mcpevents.Schema
 // args are an event's checked arguments.
 type args struct {
 	repo, branch, label, workflow string
+	// environment, tier and component narrow deploy.* (#5240).
+	environment, tier, component string
 	pr, run                       int
 	issues                        []int
 	fixes                         []string
@@ -85,6 +87,7 @@ func check(s schema, raw json.RawMessage) (args, *rpcError) {
 		return args{}, bad
 	}
 	return args{repo: v.String("repo"), branch: v.String("branch"), label: v.String("label"), workflow: v.String("workflow"),
+		environment: v.String("environment"), tier: v.String("tier"), component: v.String("component"),
 		pr: v.Int("pr"), run: v.Int("run"), issues: v.Ints("issue"), fixes: v.Strings("fixes"),
 		anyone: v.Bool("anyone"), mine: v.Bool("mine"), all: v.Bool("any")}, nil
 }
