@@ -38,7 +38,7 @@ down for a runtime that has none. [Overall score](#overall-score), after the
 tables, adds every feature up.
 
 The matrix was filled in on 2026-10-12 from each app's own docs, changelog, README,
-releases and, where open, source. Agent Loops' row was last brought up to date on 2026-11-12. Every app is held to the same bar, Agent Loops included: a ●
+releases and, where open, source. Agent Loops' row was last brought up to date on 2026-11-14. Every app is held to the same bar, Agent Loops included: a ●
 needs the whole feature, documented by the app itself, and a ○ needs evidence, such as an
 app that ships for macOS alone having no Android app. Once per release, after the
 Competitor check, the Feature matrix workflow (`.agents/workflows/feature-matrix.md`)
@@ -345,8 +345,8 @@ Agent Loops has none of these at all:
 | Parallel Code | ● | ● | ◐ | ?⃝ | ● | ● | ○ | ◐ | ○ | ○ | 50% |
 | Pragma | ● | ◐ | ?⃝ | ● | ● | ● | ?⃝ | ?⃝ | ?⃝ | ○ | 45% |
 | Threadlines | ?⃝ | ● | ?⃝ | ● | ● | ● | ○ | ◐ | ○ | ○ | 45% |
+| Ace | ● | ?⃝ | ◐ | ?⃝ | ● | ● | ?⃝ | ◐ | ?⃝ | ○ | 40% |
 | Nuphos | ?⃝ | ?⃝ | ● | ● | ● | ● | ○ | ○ | ○ | ○ | 40% |
-| Ace | ● | ?⃝ | ?⃝ | ?⃝ | ● | ● | ?⃝ | ◐ | ?⃝ | ○ | 35% |
 | CodeAgentSwarm | ● | ?⃝ | ◐ | ?⃝ | ● | ● | ?⃝ | ?⃝ | ?⃝ | ?⃝ | 35% |
 | Emdash | ○ | ● | ● | ● | ?⃝ | ○ | ○ | ○ | ○ | ◐ | 35% |
 | T3 Code | ?⃝ | ?⃝ | ○ | ● | ● | ● | ○ | ◐ | ○ | ○ | 35% |
@@ -375,7 +375,7 @@ Agent Loops has none of these at all:
 | OpenAI Codex | ● | ● | ● | ● | ?⃝ | ?⃝ | 80% |
 | Paradev (was Superset) | ● | ● | ● | ?⃝ | ● | ?⃝ | 80% |
 | Nimbalyst | ● | ● | ● | ◐ | ?⃝ | ?⃝ | 70% |
-| Orca | ◐ | ● | ● | ○ | ● | ○ | 70% |
+| Orca | ◐ | ● | ● | ○ | ● | ◐ | 70% |
 | Warp | ● | ?⃝ | ● | ● | ◐ | ?⃝ | 70% |
 | Maestro | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
 | Paseo | ?⃝ | ● | ● | ?⃝ | ● | ?⃝ | 60% |
@@ -464,8 +464,8 @@ Each app's score in every table, and overall: its points over the 51 scored feat
 | 16 | Nuphos | 83% | 58% | 69% | 70% | 40% | 40% | 20% | 83% | **58%** |
 | 17 | Happy | 92% | 100% | 69% | 30% | 20% | 30% | 40% | 67% | **56%** |
 | 18 | Maestro | 50% | 50% | 63% | 50% | 60% | 55% | 60% | 50% | **55%** |
+| 19 | Ace | 67% | 67% | 75% | 50% | 40% | 40% | 40% | 50% | **54%** |
 | 19 | Emdash | 83% | 33% | 50% | 70% | 70% | 35% | 40% | 67% | **54%** |
-| 20 | Ace | 67% | 67% | 75% | 50% | 40% | 35% | 40% | 50% | **53%** |
 | 21 | Parallel Code | 67% | 75% | 69% | 60% | 20% | 50% | 20% | 33% | **51%** |
 | 22 | Conductor | 75% | 25% | 44% | 80% | 40% | 50% | 10% | 67% | **49%** |
 | 23 | Rove | 67% | 33% | 25% | 60% | 20% | 55% | 40% | 50% | **44%** |
