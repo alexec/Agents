@@ -17,15 +17,15 @@ every client uses the same ones.
 
 ## The rules that keep it general
 
-1. **The model takes the widest form that a real system has.** When one system has a set
-   and another has one item, the model has a set. A set of one is the simple case.
-2. **A system's own words and states are kept** beside the model's. `kind` and labels are
-   open strings. Each item keeps its `system`, its `id` there, and its `rawState`.
-3. **Who does the work is not part of the model.** A system that runs the deploy (Argo CD,
+- **The model takes the widest form that a real system has.** When one system has a set
+  and another has one item, the model has a set. A set of one is the simple case.
+- **A system's own words and states are kept** beside the model's. `kind` and labels are
+  open strings. Each item keeps its `system`, its `id` there, and its `rawState`.
+- **Who does the work is not part of the model.** A system that runs the deploy (Argo CD,
    Kargo) and a system that only records it (GitHub Deployments) give the same types.
-4. **Defaults fill what a system does not say.** A system that says only "sha X went to
-   production" still fills the model.
-5. **Only what all systems share is a required field.** The rest is optional or a label.
+- **Defaults fill what a system does not say.** A system that says only "sha X went to
+  production" still fills the model.
+- **Only what all systems share is a required field.** The rest is optional or a label.
 
 ## The types
 
