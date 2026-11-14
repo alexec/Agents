@@ -280,7 +280,7 @@ func (g githubForge) ReleaseCommits(ctx context.Context, repo, base, head string
 	}
 	out := make([]compareCommit, len(commits))
 	for i, c := range commits {
-		out[i] = compareCommit{c.SHA, c.Message}
+		out[i] = compareCommit{SHA: c.SHA, Message: c.Message}
 	}
 	return out, fmt.Sprintf("https://github.com/%s/compare/%s...%s", repo, url.PathEscape(base), url.PathEscape(head)), nil
 }
@@ -317,7 +317,7 @@ func (g gitlabForge) ReleaseCommits(ctx context.Context, repo, base, head string
 	}
 	out := make([]compareCommit, len(commits))
 	for i, c := range commits {
-		out[i] = compareCommit{c.SHA, c.Message}
+		out[i] = compareCommit{SHA: c.SHA, Message: c.Message}
 	}
 	page := ""
 	if gl, ok := g.d.gitlabConnection(); ok {
@@ -355,7 +355,7 @@ func (g forgejoForge) ReleaseCommits(ctx context.Context, repo, base, head strin
 	}
 	out := make([]compareCommit, len(commits))
 	for i, c := range commits {
-		out[i] = compareCommit{c.SHA, c.Message}
+		out[i] = compareCommit{SHA: c.SHA, Message: c.Message}
 	}
 	_, root := g.d.forgejoRoot()
 	page := ""

@@ -1117,6 +1117,113 @@
       ],
       "additionalProperties": false
     },
+    "DeployDeliveryTarget": {
+      "type": "object",
+      "description": "One target's DORA figures in deploys/delivery (#5245, spec 5239-deploy-model): a component (the repo, by default) in one environment, from the deploys this machine keeps. ended is the deploys that succeeded or failed in the range (a cancelled one is neither), failed those that failed, rollbacks the succeeded ones that put an older release back. deploymentFrequency is the succeeded deploys a week; leadTime is a PR's merge to the first succeeded deploy that brings it, the median and p90; changeFailureRate is the failed deploys and rollbacks over the ended ones, 0 to 1; recoveryTime is a failed deploy's end, or a health signal seen in a deploy, to the next succeeded deploy, the median. Each has a series of its weeks and DORA 2024's band, as Planning's Delivery row has them.",
+      "properties": {
+        "component": {
+          "type": "string",
+          "description": "The component's id: owner/name for a repo."
+        },
+        "environment": {
+          "type": "string",
+          "description": "The environment's name: github-releases, app-store."
+        },
+        "environmentRef": {
+          "type": "string",
+          "description": "The environment's lineage ref, github:environment:<owner>/<repo>#<name>."
+        },
+        "tier": {
+          "$ref": "core.schema.json#/definitions/EnvironmentTier"
+        },
+        "ended": {
+          "type": "integer"
+        },
+        "failed": {
+          "type": "integer"
+        },
+        "rollbacks": {
+          "type": "integer"
+        },
+        "deploymentFrequency": {
+          "$ref": "lineage.schema.json#/definitions/LineageDeliveryFigure"
+        },
+        "leadTime": {
+          "$ref": "lineage.schema.json#/definitions/LineageDeliveryFigure"
+        },
+        "changeFailureRate": {
+          "$ref": "lineage.schema.json#/definitions/LineageDeliveryFigure"
+        },
+        "recoveryTime": {
+          "$ref": "lineage.schema.json#/definitions/LineageDeliveryFigure"
+        }
+      },
+      "required": [
+        "component",
+        "environment",
+        "environmentRef",
+        "tier",
+        "ended",
+        "failed",
+        "rollbacks",
+        "deploymentFrequency",
+        "leadTime",
+        "changeFailureRate",
+        "recoveryTime"
+      ],
+      "additionalProperties": false
+    },
+    "DeploysDelivery": {
+      "type": "object",
+      "description": "deploys/delivery's answer (#5245): the targets with a deploy that ended in [since, at], production first, then by tier and the most deploys. resolving is true while what some deploys bring is still being asked of the forge, so lead time may grow on the next read. deploys is how many deploys this machine keeps, of every target and age, so a page can pick the machine that knows most.",
+      "properties": {
+        "since": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "at": {
+          "$ref": "core.schema.json#/definitions/WireDate"
+        },
+        "windowDays": {
+          "type": "integer"
+        },
+        "deploys": {
+          "type": "integer"
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DeployDeliveryTarget"
+          }
+        },
+        "resolving": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "since",
+        "at",
+        "windowDays",
+        "deploys",
+        "targets"
+      ],
+      "additionalProperties": false
+    },
+    "DeploysDeliveryRequest": {
+      "type": "object",
+      "description": "deploys/delivery (#5245): the DORA figures of each target this machine keeps deploys of, over the range (day is the last 7 days, as week), of one tier or of every tier when none is said.",
+      "properties": {
+        "range": {
+          "$ref": "#/definitions/ReportRange"
+        },
+        "tier": {
+          "$ref": "core.schema.json#/definitions/EnvironmentTier"
+        }
+      },
+      "required": [
+        "range"
+      ],
+      "additionalProperties": false
+    },
     "DiskWorktree": {
       "type": "object",
       "properties": {

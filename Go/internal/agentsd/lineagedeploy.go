@@ -41,8 +41,9 @@ import (
 const (
 	// deploysKept bounds lineage-deploys.json: the deploys seen longest ago go first.
 	deploysKept = 1_000
-	// bringsCached bounds the brings cache: the deploys asked longest ago go first.
-	bringsCached = 500
+	// bringsCached bounds the brings cache: the deploys asked longest ago go first. As many as
+	// are kept, so deploys/delivery's lead time does not ask the same deploys again (#5245).
+	bringsCached = deploysKept
 	// mostBroughtShown bounds the PRs a walk's answer says one deploy brings.
 	mostBroughtShown = 100
 	// bringsWorkers is how many compares run at once.
@@ -66,8 +67,10 @@ type deploysFile struct {
 type bringsEntry struct {
 	prev string
 	prs  []int
-	ok   bool
-	at   time.Time
+	// merged is each PR's merge, its commit's time on the branch, when the forge said it.
+	merged map[int]time.Time
+	ok     bool
+	at     time.Time
 }
 
 type lineageDeployBook struct {
@@ -460,13 +463,13 @@ func (d *Daemon) workOutBrings(ref, prev string, repo forgeRepo, base, head stri
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	prs, ok := d.prsBetween(ctx, repo, base, head)
+	prs, merged, ok := d.prsBetween(ctx, repo, base, head)
 	d.deployBookMu.Lock()
 	defer d.deployBookMu.Unlock()
 	if d.brings == nil {
 		d.brings = map[string]bringsEntry{}
 	}
-	d.brings[ref] = bringsEntry{prev: prev, prs: prs, ok: ok, at: nowFunc()}
+	d.brings[ref] = bringsEntry{prev: prev, prs: prs, merged: merged, ok: ok, at: nowFunc()}
 	if len(d.brings) > bringsCached {
 		oldest := ""
 		for k, e := range d.brings {
@@ -484,12 +487,12 @@ func (d *Daemon) workOutBrings(ref, prev string, repo forgeRepo, base, head stri
 }
 
 // prsBetween is the PRs of the commits after base up to head, by their squash titles or the
-// forge's commits/<sha>/pulls, as a release's (lineagerelease.go); ok is false when the forge
-// could not say.
-func (d *Daemon) prsBetween(ctx context.Context, repo forgeRepo, base, head string) ([]int, bool) {
+// forge's commits/<sha>/pulls, as a release's (lineagerelease.go), and each one's merge: the
+// time of its first commit there that the forge dated. ok is false when the forge could not say.
+func (d *Daemon) prsBetween(ctx context.Context, repo forgeRepo, base, head string) ([]int, map[int]time.Time, bool) {
 	folder := d.repoFolder(repo)
 	if folder == "" {
-		return nil, false
+		return nil, nil, false
 	}
 	compare, commitPR := forgeCompareCommits, forgeCommitPR
 	if c, ok := d.connectionAsks(repo.forge); ok {
@@ -504,10 +507,11 @@ func (d *Daemon) prsBetween(ctx context.Context, repo forgeRepo, base, head stri
 	commits, err := compare(ctx, folder, repo, base, head)
 	if err != nil {
 		log.Printf("lineage: the commits of %s %s..%s: %v", repo.path, base, head, err)
-		return nil, false
+		return nil, nil, false
 	}
 	commits = commits[:min(len(commits), releaseCommitsMax)]
 	var prs []int
+	merged := map[int]time.Time{}
 	for _, c := range commits {
 		n, found := squashPRNumber(repo.forge, c.Message)
 		if !found {
@@ -518,8 +522,11 @@ func (d *Daemon) prsBetween(ctx context.Context, repo forgeRepo, base, head stri
 		if n > 0 && !slices.Contains(prs, n) {
 			prs = append(prs, n)
 		}
+		if _, dated := merged[n]; n > 0 && !dated && !c.At.IsZero() {
+			merged[n] = c.At
+		}
 	}
-	return prs, true
+	return prs, merged, true
 }
 
 // deploySettle waits up to wait for the deploys whose brings are being worked out.

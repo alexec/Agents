@@ -20,7 +20,7 @@ export interface DeliveryCard {
 }
 
 /** timeWords up to 2 days, then days and hours: "51h 5m" reads as "2d 3h". */
-function spanWords(seconds: number): string {
+export function spanWords(seconds: number): string {
   const hours = Math.round(seconds / 3600);
   if (hours < 48) return timeWords(seconds);
   const rest = hours % 24;

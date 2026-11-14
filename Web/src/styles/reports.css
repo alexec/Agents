@@ -16,6 +16,14 @@
 .builds-tile-title { text-transform: uppercase; letter-spacing: 0.02em; font-size: 0.6875rem; }
 .builds-tile-value { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .builds-tile-value .delivery-value { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+/* Reports ▸ Planning ▸ Delivery (#5245, spec 5239 board 5): a block of four tiles for each target; dimmed under 5 deploys (note 18). */
+.deploys-target { margin: 18px 0 8px; }
+.deploys-target-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 8px; }
+.deploys-target-head h3 { margin: 0; }
+.deploys-tiles { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.deploys-tiles .delivery-value { font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.deploys-target.few .delivery-value { color: var(--paper-tertiary); font-weight: 500; }
+.deploys-few { margin: 6px 0 0; }
 .builds-delta { font-size: 0.8125rem; font-variant-numeric: tabular-nums; color: var(--paper-secondary); }
 .builds-delta.slower, .builds-slower { color: var(--tint-failure); }
 .builds-delta.faster, .builds-faster { color: var(--tint-vouched); }

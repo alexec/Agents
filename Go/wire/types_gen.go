@@ -3970,6 +3970,34 @@ type DeployComponent struct {
 	Repo *string `json:"repo,omitzero"`
 }
 
+// One target's DORA figures in deploys/delivery (#5245, spec 5239-deploy-model): a component (the repo, by default) in one environment, from the deploys this machine keeps. ended is the deploys that succeeded or failed in the range (a cancelled one is neither), failed those that failed, rollbacks the succeeded ones that put an older release back. deploymentFrequency is the succeeded deploys a week; leadTime is a PR's merge to the first succeeded deploy that brings it, the median and p90; changeFailureRate is the failed deploys and rollbacks over the ended ones, 0 to 1; recoveryTime is a failed deploy's end, or a health signal seen in a deploy, to the next succeeded deploy, the median. Each has a series of its weeks and DORA 2024's band, as Planning's Delivery row has them.
+type DeployDeliveryTarget struct {
+	// The component's id: owner/name for a repo.
+	Component string `json:"component"`
+
+	// The environment's name: github-releases, app-store.
+	Environment string `json:"environment"`
+
+	// The environment's lineage ref, github:environment:<owner>/<repo>#<name>.
+	EnvironmentRef string `json:"environmentRef"`
+
+	Tier EnvironmentTier `json:"tier"`
+
+	Ended int64 `json:"ended"`
+
+	Failed int64 `json:"failed"`
+
+	Rollbacks int64 `json:"rollbacks"`
+
+	DeploymentFrequency LineageDeliveryFigure `json:"deploymentFrequency"`
+
+	LeadTime LineageDeliveryFigure `json:"leadTime"`
+
+	ChangeFailureRate LineageDeliveryFigure `json:"changeFailureRate"`
+
+	RecoveryTime LineageDeliveryFigure `json:"recoveryTime"`
+}
+
 // A place where components run (#5262), shared by many components and repos: GitHub's and GitLab's environments, Argo CD's destination, Kargo's Stage's place, TestFlight. name is its name in system; tier is GitLab's five, other when a system does not say. ephemeral is true for a preview for each PR (Vercel's previews, GitLab's review apps).
 type DeployEnvironment struct {
 	System string `json:"system"`
@@ -4037,6 +4065,28 @@ type DeployVersion struct {
 	ID *string `json:"id,omitzero"`
 
 	Ref *string `json:"ref,omitzero"`
+}
+
+// deploys/delivery's answer (#5245): the targets with a deploy that ended in [since, at], production first, then by tier and the most deploys. resolving is true while what some deploys bring is still being asked of the forge, so lead time may grow on the next read. deploys is how many deploys this machine keeps, of every target and age, so a page can pick the machine that knows most.
+type DeploysDelivery struct {
+	Since Date `json:"since"`
+
+	At Date `json:"at"`
+
+	WindowDays int64 `json:"windowDays"`
+
+	Deploys int64 `json:"deploys"`
+
+	Targets []DeployDeliveryTarget `json:"targets"`
+
+	Resolving *bool `json:"resolving,omitzero"`
+}
+
+// deploys/delivery (#5245): the DORA figures of each target this machine keeps deploys of, over the range (day is the last 7 days, as week), of one tier or of every tier when none is said.
+type DeploysDeliveryRequest struct {
+	Range ReportRange `json:"range"`
+
+	Tier *EnvironmentTier `json:"tier,omitzero"`
 }
 
 // The live tile's latest look at the Mac's screen while an agent holds the screen lease (#3004, US4, FR-011): a downscaled JPEG of the whole screen, base64, or, while the screen is locked, locked and no image (FR-012). Sent only to the clients showing that agent, never recorded, never replayed (FR-016).

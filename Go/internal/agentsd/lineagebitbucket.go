@@ -53,7 +53,7 @@ func (d *Daemon) bitbucketCompareCommits(ctx context.Context, _ string, repo for
 	}
 	out := make([]compareCommit, 0, len(commits))
 	for _, c := range commits {
-		out = append(out, compareCommit{c.SHA, c.Message})
+		out = append(out, compareCommit{SHA: c.SHA, Message: c.Message})
 	}
 	return out, nil
 }
