@@ -27,7 +27,7 @@ final class AppModel {
     let work = AgentsModel()
     /// This window's local copy (#4791): sessions and chat ends kept in its root's Caches,
     /// drawn at launch before the host answers. The host always wins.
-    @ObservationIgnored private(set) var localCopy: LocalCopyKeeper?
+    @ObservationIgnored var localCopy: LocalCopyKeeper?
 
     var runtimes: [RuntimeStatus] = []
     /// The start-up sheet offering to install what is missing (048). Raised once per
@@ -118,7 +118,7 @@ final class AppModel {
     /// each, until the control plane lists the machine as joining.
     var machinesBeingMade = 0
     /// Goes up on each `control/lineageChanged` (#4276): Work ▸ Timeline reads the sessions again.
-    private(set) var lineageChanges = 0
+    var lineageChanges = 0
     /// A runtime of this Mac's that refused for want of a sign-in: the window answers
     /// with its sign-in sheet rather than an error nobody can act on.
     var signInRuntimeID: String?
@@ -1293,7 +1293,7 @@ final class AppModel {
     @ObservationIgnored var controlWatch: Task<Void, Never>?
     /// Every host the control plane last listed, this Mac's included. Nil when the
     /// window is not its client; empty until the first list arrives (058, R11).
-    private(set) var controlPlaneHosts: [DaemonAPI.ControlMachine]? = ControlConfig.endpoint == nil ? nil : []
+    var controlPlaneHosts: [DaemonAPI.ControlMachine]? = ControlConfig.endpoint == nil ? nil : []
     /// The control plane's list has arrived at least once, so an empty one means none.
     private var controlPlaneListed = false
     /// `control/status.thisMacHost` (#303): how this Mac's host says its join stands.
@@ -3574,7 +3574,7 @@ final class AppModel {
         kept = (try? await control.call(DaemonAPI.Method.hostsListKept, returning: DaemonAPI.KeptList.self))?.kept ?? []
     }
 
-    private func heardKept(_ method: String, _ params: JSONValue?) async {
+    func heardKept(_ method: String, _ params: JSONValue?) async {
         if method == DaemonAPI.Notification.controlKeptChanged {
             kept = (try? params?.decode(DaemonAPI.KeptList.self))?.kept ?? []
             return
