@@ -406,6 +406,16 @@ A tag that already exists for this version means another release ran: end with
    run the `integration-videos` workflow with `manage_workflows run`, with the note
    `release v<version>: <the ids>`, so each title names this release (#4962). Do not wait for it: it is not part of the gate, and its result is not in
    your report.
+8. **Alex's Claude sign-in on a server, once a release** (Alex, 2026-11-13, #5304,
+   #5331). CI tests the server's `claude setup-token` sign-in with a fake `claude` and a
+   code as long as a real one (`TestSigningClaudeInWithACodeAsLongAsARealOne`); only a
+   real code from Alex's Claude account proves the real Claude. Put it on Alex's list:
+   reuse the open issue titled `Release check by Alex: Claude sign-in on a server` (add
+   `- [ ] v<version>` to its `## What Alex does`), or file it once (labels `alex-todo`,
+   `task`, `feature:autonomy`, `size:XS`, assigned `alexec`, no milestone) with the step:
+   on a new server, in Runtimes, sign Claude in with the link and paste the code. Do not
+   wait for it, and never ask a lane for it. No agent holds a Claude account or a Claude
+   sign-in in its browser (#5304).
 
 ## 9. Close the finished milestones
 

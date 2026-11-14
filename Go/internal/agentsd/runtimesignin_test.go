@@ -28,7 +28,8 @@ while :; do
   code="$code$(printf '%s' "$chunk" | tr -d '\r')"
   printf '*'
 done
-if [ "$code" = good ]; then
+good=good; [ -f "$HOME/claude-good-code" ] && good=$(cat "$HOME/claude-good-code")
+if [ "$code" = "$good" ]; then
   printf '\n\033[32mLong-lived authentication token created\033[0m\n\nsk-ant-oat01-abc_DEF-123\n'
   sleep 30
 else
@@ -144,6 +145,49 @@ func TestSigningClaudeInOnAServer(t *testing.T) {
 	c.call(t, 10, "runtimes/signInKey", map[string]any{"runtimeID": "claude", "key": " sk-ant-api03-xyz "})
 	if got := d.storedClaudeSignIn(); got != "ANTHROPIC_API_KEY=sk-ant-api03-xyz" {
 		t.Fatalf("kept %q", got)
+	}
+}
+
+// A code as long as a real one (#5331). The code platform.claude.com gives is 92
+// characters, letters, digits, "-", "_" and a "#" before the state; #5202 was such a code
+// waiting at Claude's prompt, because its Enter came in the same write and Claude took it
+// as a paste. The fake takes only the whole code, so a code cut short or run together with
+// its Enter fails here as it failed on a server. No Claude account or person is needed;
+// Alex's real code is checked once a release (the release skill).
+func TestSigningClaudeInWithACodeAsLongAsARealOne(t *testing.T) {
+	fakeRuntimes(t)
+	home := fakeSignInTools(t)
+	code := strings.Repeat("aB3-_x9Z", 6) + "Qw7#" + strings.Repeat("st4T-_e9", 5)
+	if len(code) != 92 {
+		t.Fatalf("the code is %d characters, not 92", len(code))
+	}
+	os.WriteFile(filepath.Join(home, "claude-good-code"), []byte(code), 0o600)
+	d, c := start(t, t.TempDir())
+	defer d.Shutdown()
+	asAServer(t)
+
+	var step wire.RuntimeSignInStep
+	json.Unmarshal(c.call(t, 1, "runtimes/signInStart", map[string]any{"runtimeID": "claude"}), &step)
+	if !step.WantsCode {
+		t.Fatalf("%+v", step)
+	}
+	// Cut short, it is refused: the fake compares the whole code.
+	e := c.callError(t, 2, "runtimes/signInFinish", map[string]any{"signInID": step.SignInID, "code": code[:91]})
+	if e.Code != wire.FailureNeedsSignIn || !strings.Contains(e.Message, "not accepted") {
+		t.Fatalf("a code cut short: %+v", e)
+	}
+
+	json.Unmarshal(c.call(t, 3, "runtimes/signInStart", map[string]any{"runtimeID": "claude"}), &step)
+	var s wire.RuntimeStatus
+	json.Unmarshal(c.call(t, 4, "runtimes/signInFinish", map[string]any{"signInID": step.SignInID, "code": code + "\n"}), &s)
+	if s.SignIn == nil || !s.SignIn.SignedIn {
+		t.Fatalf("after the long code: %+v", s.SignIn)
+	}
+	if got := d.storedClaudeSignIn(); got != "CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-abc_DEF-123" {
+		t.Fatalf("kept %q", got)
+	}
+	if fi, _ := os.Stat(d.claudeSignInFile()); fi.Mode().Perm() != 0o600 {
+		t.Fatalf("mode %v", fi.Mode())
 	}
 }
 
