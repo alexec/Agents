@@ -246,6 +246,8 @@ type Service struct {
 	bus eventBus
 	// What Reports and the Console read from the store, by entity tag (#2054, #2056).
 	storeReads readCache
+	// buildsChanges is each repository's change points over the build timings' copy (#5232).
+	buildsChanges buildsChangesCache
 	// What each machine here was last sent of its projects (#2735).
 	toldProjects toldProjects
 

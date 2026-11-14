@@ -48,6 +48,16 @@ public struct DraftStore: @unchecked Sendable {
     // MARK: The words
 
     public func draft(for key: DraftKey) -> Draft? {
+        if let kept = stored(key) { return kept }
+        // A project's draft (#5376), typed before drafts were kept by project: its folder's
+        // moves here once, so an update loses nothing.
+        guard let former = key.formerKey, let kept = stored(former) else { return nil }
+        save(kept, for: key)
+        clear(former)
+        return kept
+    }
+
+    private func stored(_ key: DraftKey) -> Draft? {
         guard let data = defaults.data(forKey: defaultsKey(for: key)) else { return nil }
         guard let draft = try? JSONDecoder().decode(Draft.self, from: data) else {
             // Discarded rather than migrated, and rather than failed over: nothing about

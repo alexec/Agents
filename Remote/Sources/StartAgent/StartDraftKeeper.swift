@@ -33,12 +33,18 @@ final class StartDraftKeeper {
         }
     }
 
-    func draft(in folder: URL) -> Draft? { draft(for: .newAgent(folder: folder)) }
-    func note(_ text: String, _ attachments: [Attachment], in folder: URL) {
-        note(text, attachments, for: .newAgent(folder: folder))
+    /// New session's draft is its project's (#5376), so On ▾ to the project's folder on
+    /// another machine keeps the words: `DraftKey.newSession(in:folders:)`.
+    func draft(in folder: FolderKey, folders: [DaemonAPI.FolderSummary]) -> Draft? {
+        draft(for: .newSession(in: folder, folders: folders))
+    }
+    func note(_ text: String, _ attachments: [Attachment], in folder: FolderKey, folders: [DaemonAPI.FolderSummary]) {
+        note(text, attachments, for: .newSession(in: folder, folders: folders))
     }
     /// It became an agent, and a draft exists only until it does.
-    func clear(in folder: URL) { clear(.newAgent(folder: folder)) }
+    func clear(in folder: FolderKey, folders: [DaemonAPI.FolderSummary]) {
+        clear(.newSession(in: folder, folders: folders))
+    }
 
     // MARK: Any conversation's (033)
 

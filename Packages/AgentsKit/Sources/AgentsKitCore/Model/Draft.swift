@@ -8,6 +8,11 @@ import Foundation
 public enum DraftKey: Hashable, Sendable {
     case agent(UUID)
     case newAgent(folder: URL?)
+    /// New Session's draft in a folder of a project (#5376): the project's, so On ▾ moves
+    /// the form to the project's folder on another machine and the words stay. The folder
+    /// is only where a draft kept before #5376 is looked for (`formerKey`): two folders of
+    /// one project are one draft.
+    case newSession(project: String, folder: URL)
 
     /// Its name within a store. Stable, and one of two shapes, so a store can sweep its
     /// drafts without an index to keep in step. `DraftStore.defaultsKey(for:)` is where it
@@ -18,11 +23,30 @@ public enum DraftKey: Hashable, Sendable {
             return Self.agentPrefix + id.uuidString
         case .newAgent(let folder):
             return Self.newAgentPrefix + (folder.map { Folder.standardize($0).path } ?? "")
+        case .newSession(let project, _):
+            // A folder's path starts with "/", so no folder's key is a project's.
+            return Self.newAgentPrefix + Self.projectMark + project
         }
+    }
+
+    /// New Session's draft in `key`'s folder: its project's when `folders` says it is in
+    /// one, else the folder's own, as before (#5376). The web page's `newSessionDraftKey`.
+    public static func newSession(in key: FolderKey, folders: [DaemonAPI.FolderSummary]) -> DraftKey {
+        let project = folders.first(where: { $0.key == key })?.project
+        guard let project, !project.isEmpty else { return .newAgent(folder: key.folder) }
+        return .newSession(project: project, folder: key.folder)
+    }
+
+    /// Where this draft was kept before #5376: under its folder. A draft there moves here
+    /// the first time it is read (`DraftStore.draft(for:)`).
+    var formerKey: DraftKey? {
+        if case .newSession(_, let folder) = self { return .newAgent(folder: folder) }
+        return nil
     }
 
     static let agentPrefix = "agent."
     static let newAgentPrefix = "new."
+    static let projectMark = "project:"
 
     public static func == (lhs: DraftKey, rhs: DraftKey) -> Bool { lhs.name == rhs.name }
     public func hash(into hasher: inout Hasher) { hasher.combine(name) }

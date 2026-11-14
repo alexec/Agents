@@ -49,7 +49,7 @@ struct StartAgentView: View {
             // What it starts opens in this scene (#1089).
             model.composingScene = sceneFolder
             model.startPageAppeared(in: key, page: page)
-            let kept = StartDraftKeeper.shared.draft(in: folder)
+            let kept = StartDraftKeeper.shared.draft(in: key, folders: model.folders)
             text = kept?.text ?? ""
             attachments = kept?.attachments ?? []
             if kept?.droppedInlineData == true {
@@ -412,7 +412,7 @@ struct StartAgentView: View {
     }
 
     private func keep() {
-        StartDraftKeeper.shared.note(text, attachments, in: folder)
+        StartDraftKeeper.shared.note(text, attachments, in: key, folders: model.folders)
     }
 
     private func send() {

@@ -3691,7 +3691,7 @@
     },
     "BuildsHistoryRequest": {
       "type": "object",
-      "description": "builds/history (#5177): a repository (github:alexec/agents), runs made in [from, to), and the filters: a workflow's file name (ci.yml), a job, and the default branch (no branch and no pullRequests), the pull requests' runs, or one branch. timeZone (an IANA name) says the days; UTC when not said.",
+      "description": "builds/history (#5177): a repository (github:alexec/agents), runs made in [from, to), and the filters: a workflow's file name (ci.yml), a job, and the default branch (no branch and no pullRequests), the pull requests' runs, or one branch. timeZone (an IANA name) says the days; UTC when not said. scope is for builds/historyAll (#5232): whose machines' copies the control plane reads, as reports/value's; a machine leaves it out.",
       "properties": {
         "repo": {
           "type": "string"
@@ -3716,6 +3716,9 @@
         },
         "pullRequests": {
           "type": "boolean"
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope"
         }
       },
       "required": [
@@ -3922,7 +3925,7 @@
     },
     "BuildsRunRequest": {
       "type": "object",
-      "description": "builds/run (#5177): a repository and a run's ci-run ref; its first attempt when attempt is not said.",
+      "description": "builds/run (#5177): a repository and a run's ci-run ref; its first attempt when attempt is not said. scope is for builds/runAll (#5232), as builds/historyAll's.",
       "properties": {
         "repo": {
           "type": "string"
@@ -3932,6 +3935,9 @@
         },
         "attempt": {
           "type": "integer"
+        },
+        "scope": {
+          "$ref": "#/definitions/ReportScope"
         }
       },
       "required": [
@@ -4011,6 +4017,68 @@
         "number",
         "started",
         "ended"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsSync": {
+      "type": "object",
+      "description": "builds/sync (#5232): what changed in one repository's build timings on a machine since its last send, for the control plane's copy. Each day is a UTC day the runs were made (YYYY-MM-DD) and all its runs as the machine has them now, so a day with no runs is gone; reset starts the copy of the repository again from this send, the first of a whole send. defaultBranch, readAt and filledFrom are as builds/history says them. Only refs, times, attempts, conclusions, runner labels and the names of workflows, jobs and steps: no titles, no logs (principle 7).",
+      "properties": {
+        "repo": {
+          "type": "string"
+        },
+        "reset": {
+          "type": "boolean"
+        },
+        "defaultBranch": {
+          "type": "string"
+        },
+        "readAt": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "filledFrom": {
+          "$ref": "#/definitions/WireDate"
+        },
+        "days": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsSyncDay"
+          }
+        }
+      },
+      "required": [
+        "repo",
+        "days"
+      ],
+      "additionalProperties": false
+    },
+    "BuildsSyncAnswer": {
+      "type": "object",
+      "description": "builds/sync's answer (#5232). full: the control plane has no copy of this repository from this machine (a new or moved control plane), so the machine sends all its days again, the first with reset.",
+      "properties": {
+        "full": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "BuildsSyncDay": {
+      "type": "object",
+      "description": "One UTC day of a repository's build timings (#5232): its date (YYYY-MM-DD) and every run attempt made on it.",
+      "properties": {
+        "day": {
+          "type": "string"
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BuildsRun"
+          }
+        }
+      },
+      "required": [
+        "day",
+        "runs"
       ],
       "additionalProperties": false
     },

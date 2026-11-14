@@ -79,7 +79,9 @@ struct PromptBar: View {
     /// page's bar is that folder's; the chat's is its agent's.
     private var draftKey: DraftKey {
         if let agent { return .agent(agent.id) }
-        return .newAgent(folder: folderIsFixed ? model.selectedFolder : nil)
+        // The project's (#5376): On ▾ moves to its folder on another machine, the words stay.
+        guard folderIsFixed, let key = model.selectedFolderKey else { return .newAgent(folder: nil) }
+        return .newSession(in: key, folders: model.liveFolders)
     }
 
     // MARK: What the agent thinks you might ask

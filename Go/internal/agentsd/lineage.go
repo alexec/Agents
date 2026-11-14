@@ -45,6 +45,7 @@ func (d *Daemon) closeLineage() {
 	d.resolveSettle(2 * time.Second)
 	d.closeCost()
 	d.closeLineageSync()
+	d.closeCISync()
 	d.lineage().Close()
 }
 

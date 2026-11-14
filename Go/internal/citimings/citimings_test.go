@@ -6,6 +6,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 )
@@ -84,8 +85,16 @@ func TestSweepKeepsTheBounds(t *testing.T) {
 	if err := s.Put(repo, old, pr20, main20, pr2); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.Sweep(repo, now); err != nil {
+	changed, err := s.Sweep(repo, now)
+	if err != nil {
 		t.Fatal(err)
+	}
+	// It says the days it changed, for the control plane's copy (#5232).
+	if want := []string{DayOf(old.MadeAt()), DayOf(pr20.MadeAt())}; !slices.Equal(changed, want) {
+		t.Fatalf("changed %v, want %v", changed, want)
+	}
+	if again, _ := s.Sweep(repo, now); len(again) != 0 {
+		t.Fatalf("a second sweep changed %v", again)
 	}
 	runs, _ := s.Runs(repo, now.AddDate(-1, 0, 0), now)
 	if len(runs) != 3 {
@@ -98,7 +107,7 @@ func TestSweepKeepsTheBounds(t *testing.T) {
 	// Past the run bound, the oldest PR runs go first, then the oldest of any kind.
 	mostRuns = 1
 	defer func() { mostRuns = MostRuns }()
-	if err := s.Sweep(repo, now); err != nil {
+	if _, err := s.Sweep(repo, now); err != nil {
 		t.Fatal(err)
 	}
 	runs, _ = s.Runs(repo, now.AddDate(-1, 0, 0), now)
@@ -223,5 +232,31 @@ func TestFromGitHubKeepsEachAttempt(t *testing.T) {
 	}
 	if second.Attempt != 2 || second.Conclusion != "success" || second.Started != 6000 || second.Ended != 6300 || !second.Default {
 		t.Fatalf("second %+v", second)
+	}
+}
+
+// #5232: a run goes to the control plane and back the same, and two machines' runs of one
+// repository are one for each ref and attempt.
+func TestRunOverTheWireAndOnce(t *testing.T) {
+	at := time.Date(2026, 11, 8, 12, 0, 0, 0, time.UTC)
+	r := run(1, at, false, 60, "go", "lint")
+	r.Event, r.HeadSHA, r.URL, r.Jobs[0].Conclusion = "pull_request", "abc", "https://x/1", "failure"
+	back := RunFromWire(RunToWire(r))
+	if fmt.Sprintf("%+v", back) != fmt.Sprintf("%+v", r) {
+		t.Fatalf("back\n%+v\nwant\n%+v", back, r)
+	}
+	second := r
+	second.Attempt = 2
+	once := Once([]Run{second, r, r, run(2, at.Add(-time.Hour), true, 60, "go")})
+	if len(once) != 3 || once[0].ID != 2 || once[1].Attempt != 1 || once[2].Attempt != 2 {
+		t.Fatalf("once %+v", once)
+	}
+	// A copy bounds each day it is sent: no PR steps past StepDays, nothing past KeepDays.
+	now := at.AddDate(0, 0, StepDays+1)
+	if b := BoundDay(DayOf(at), []Run{r}, now); len(b) != 1 || b[0].hasSteps() || !r.hasSteps() {
+		t.Fatalf("bound %+v", b)
+	}
+	if b := BoundDay(DayOf(at), []Run{r}, at.AddDate(0, 0, KeepDays+1)); len(b) != 0 {
+		t.Fatalf("kept past %d days: %+v", KeepDays, b)
 	}
 }
