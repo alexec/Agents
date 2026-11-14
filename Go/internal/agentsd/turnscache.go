@@ -10,9 +10,9 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/diskjson"
-	"github.com/agentloops-dev/agents/Go/internal/safe"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/diskjson"
+	"github.com/agentloops-dev/agent-loops/Go/internal/safe"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Where a chat's turns start, and their summaries kept (AgentStore.turns, #91). Where

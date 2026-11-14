@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/skillcatalog"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/skillcatalog"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Ports MCPPreviewAndAddTests, MCPFolderTests and MCPRemoveSecretTests: a server found in

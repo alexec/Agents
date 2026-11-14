@@ -12,10 +12,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/providers"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/providers"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Bots (#1761, spec 736 US6, FR-030–FR-035): a user with no clients and no sign-in, in a

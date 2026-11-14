@@ -16,9 +16,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controllink"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controllink"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
 	"github.com/coder/websocket"
 )
 

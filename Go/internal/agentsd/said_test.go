@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The session search over what was said (#1585): agents/said finds the session and its line,

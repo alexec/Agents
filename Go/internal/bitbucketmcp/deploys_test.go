@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // run.completed and its deploys over the fake Bitbucket (#4217).

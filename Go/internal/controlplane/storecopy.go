@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
 )
 
 // ErrDestinationInUse is StoreCopy.Failure.destinationInUse: the destination is already

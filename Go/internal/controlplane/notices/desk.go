@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // AttentionNeed is DaemonAPI.AttentionNeed, as a host says it on channel 0: a need to

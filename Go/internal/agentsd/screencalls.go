@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // drive_screen (#3004, US1): an agent drives a named app through its own screen, mouse and

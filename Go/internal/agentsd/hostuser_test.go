@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A bot's machine (#1761, FR-032, FR-034): told it is a bot's, it matches runs-on: by the

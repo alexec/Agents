@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Waiting on other agents (039, #481, #1915), as DaemonCore+Blocks keeps it on the Swift host:

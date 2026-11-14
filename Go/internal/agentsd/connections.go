@@ -15,12 +15,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/internal/connections"
-	"github.com/agentloops-dev/agents/Go/internal/emailmcp"
-	"github.com/agentloops-dev/agents/Go/internal/jiramcp"
-	"github.com/agentloops-dev/agents/Go/internal/safe"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/connections"
+	"github.com/agentloops-dev/agent-loops/Go/internal/emailmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/jiramcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/safe"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Connections (#1335): the person's sign-ins to tools, kept by this host. A client starts a

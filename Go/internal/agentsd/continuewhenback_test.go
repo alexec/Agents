@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A chat paused by a spent allowance carries on when it is back (#1859): it waits for the

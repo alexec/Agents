@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // folder.changed is sent at most once a folder in each folderChangedWindow (#4508). Each

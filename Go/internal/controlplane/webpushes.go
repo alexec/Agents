@@ -9,11 +9,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/apns"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/notices"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/webpush"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/apns"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/notices"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/webpush"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // WebPusher is what posts the control plane's Web Push to a browser (#1486):

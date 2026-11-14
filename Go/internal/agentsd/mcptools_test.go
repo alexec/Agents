@@ -11,8 +11,8 @@ import (
 
 	sdk "github.com/coder/acp-go-sdk"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/acp"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/acp"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Allow, Ask or Off for each tool of a connector (#4099).

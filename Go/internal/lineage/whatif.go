@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // What-if (#4531): the same forecast with another lane limit or runtime mix.

@@ -4,9 +4,9 @@ import (
 	"math"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/internal/safe"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/safe"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A place in a lease's line is an event wait (#2361): lease_resource answers at once, and

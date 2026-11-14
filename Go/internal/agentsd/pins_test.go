@@ -7,9 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/yamlnode"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/yamlnode"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Ports PinsTests and DaemonPinsTests: a folder's pins in .agents/pins.json, in the bytes

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Saved views of Reports (#2019, R8): a page with its scope, range and way to add up, kept

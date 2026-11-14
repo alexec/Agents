@@ -17,11 +17,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controllink"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/signin"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controllink"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/signin"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A generic OIDC org provider on a real issuer (#3415): scripts/oidc-walk.sh starts Dex

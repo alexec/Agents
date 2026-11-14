@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Reports (#1811): a turn's cost, tokens and time go into its UTC hour by folder and

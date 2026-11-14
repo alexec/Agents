@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // MaxEvents is the most events one poll gives; a poll that asks for none gives 50.

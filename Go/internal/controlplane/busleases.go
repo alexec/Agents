@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Producer leases (#4731, spec 4724-event-bus, "The bus", step 6). Before each poll of a

@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 func waitUntil(t *testing.T, what string, ok func() bool) {

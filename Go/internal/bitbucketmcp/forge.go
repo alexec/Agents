@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // The daemon's forge reads (#3786, after Forgejo's in #3753): the issues or pull requests of

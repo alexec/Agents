@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
-	"github.com/agentloops-dev/agents/Go/internal/hosted"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/hosted"
 )
 
 // The admin verbs (#2152) reach the hosted package, and a wrong one says how to use it.

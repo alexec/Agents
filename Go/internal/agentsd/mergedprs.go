@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The pull requests merged from the branches the app makes (#985, #1987), for the Time

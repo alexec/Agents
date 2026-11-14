@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // #3863: a form an agent shows is a request, kept on disk; answering or dropping it ends it

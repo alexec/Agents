@@ -9,8 +9,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/controllink"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controllink"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // start_session on another machine (#2887): it goes to the control plane as

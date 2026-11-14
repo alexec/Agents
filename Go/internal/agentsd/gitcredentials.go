@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/internal/connections"
-	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/connections"
+	"github.com/agentloops-dev/agent-loops/Go/internal/githubmcp"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // An agent's gh and git as the GitHub App (#3926, spec 3856 §2 and §3). The github MCP

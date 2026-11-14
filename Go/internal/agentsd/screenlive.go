@@ -1,8 +1,8 @@
 package agentsd
 
 import (
-	"github.com/agentloops-dev/agents/Go/internal/safe"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/safe"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The live tile (#3004, US4, research R7): while an agent holds the "screen" lease, every

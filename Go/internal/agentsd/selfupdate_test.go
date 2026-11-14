@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Agents updates itself (#2178): the release is downloaded and checked, put in place

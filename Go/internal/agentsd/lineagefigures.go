@@ -6,8 +6,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/lineage"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/lineage"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A release's Lineage panel (#4427, specs/4328-work-look/milestones.md notes 15, 16, 27 and

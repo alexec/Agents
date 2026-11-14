@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controllink"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controllink"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Reports ▸ Value (#2351): the machines' copies of a node add up; an issue's cost is its

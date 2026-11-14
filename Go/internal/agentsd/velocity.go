@@ -3,8 +3,8 @@ package agentsd
 import (
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/lineage"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/lineage"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Velocity (#4595, #4596): velocity/history, the PRs the agents worked on that landed, by

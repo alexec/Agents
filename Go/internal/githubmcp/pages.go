@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // IssueReader reads the upstream issue_read result for a single issue.

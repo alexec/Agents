@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/agentloops-dev/agents/Go/internal/lineage"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/lineage"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // One forge interface (#4329, specs/4329-forge-interface/spec.md): each forge or tracker behind

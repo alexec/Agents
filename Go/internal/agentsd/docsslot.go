@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The Docs slot (#3248): where the folder's docs live, so that agents find the requirements

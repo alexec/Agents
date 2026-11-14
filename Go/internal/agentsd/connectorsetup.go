@@ -13,16 +13,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/mcpcatalog"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/internal/azureboardsmcp"
-	"github.com/agentloops-dev/agents/Go/internal/azuredevopsmcp"
-	"github.com/agentloops-dev/agents/Go/internal/bitbucketmcp"
-	"github.com/agentloops-dev/agents/Go/internal/connections"
-	"github.com/agentloops-dev/agents/Go/internal/forgejomcp"
-	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
-	"github.com/agentloops-dev/agents/Go/internal/gitlabmcp"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/mcpcatalog"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/azureboardsmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/azuredevopsmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/bitbucketmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/connections"
+	"github.com/agentloops-dev/agent-loops/Go/internal/forgejomcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/githubmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/gitlabmcp"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A folder's Connectors set-up (#1336): its GitHub repository (from its git remote), the

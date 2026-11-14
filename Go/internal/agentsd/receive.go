@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Send to ‹host›… (#1123): a Mac sends its repository here as a git bundle of the branches

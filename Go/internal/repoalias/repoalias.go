@@ -1,5 +1,5 @@
 // Package repoalias keeps the repos whose owner moved (#4957): an old full name and the new
-// one, such as alexec/agents and agentloops-dev/agents, as the forge's own redirect said it.
+// one, such as agentloops-dev/agents and agentloops-dev/agent-loops, as the forge's own redirect said it.
 // Refs are read and matched by the new name (Ref, Topic, SameRepo), so a ref stored before
 // the move and an event after it name one thing. The stored files are not written again.
 //
@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Most bounds the aliases kept; past it, a new one is not added.

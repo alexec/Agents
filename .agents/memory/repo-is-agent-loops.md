@@ -9,4 +9,4 @@ The GitHub repo is `agentloops-dev/agent-loops` (renamed from `agentloops-dev/Ag
 
 **Why:** the product is Agent Loops (Alex, 2026-11-13, #4925).
 
-**How to apply:** use the new name in new links and commands. The Go module path and most links still say `agentloops-dev/agents` until #5320. The daemon's repo alias book (#4957, `repo-aliases.json` in the store root) learns `agentloops-dev/agents → agentloops-dev/agent-loops` at its daily check, or 2 minutes after it starts; until then an old ref and a new event may not match.
+**How to apply:** use the new name in new links and commands. The Go module path is `github.com/agentloops-dev/agent-loops/Go` and the links say `agent-loops` since #5320. The daemon's repo alias book (#4957, `repo-aliases.json` in the store root) learns `agentloops-dev/agents → agentloops-dev/agent-loops` at its daily check, or 2 minutes after it starts; until then an old ref and a new event may not match.

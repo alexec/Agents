@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/bitbucketmcp"
-	"github.com/agentloops-dev/agents/Go/internal/connections"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/bitbucketmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/connections"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // fakeForgeBitbucket is Bitbucket's lists, item reads and writes, and what each was asked.

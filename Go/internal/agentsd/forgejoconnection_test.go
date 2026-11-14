@@ -13,9 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/connections"
-	"github.com/agentloops-dev/agents/Go/internal/forgejomcp"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/connections"
+	"github.com/agentloops-dev/agent-loops/Go/internal/forgejomcp"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A Forgejo (#3752): an access token is checked with that Forgejo, kept with its address,

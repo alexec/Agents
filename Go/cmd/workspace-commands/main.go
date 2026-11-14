@@ -13,8 +13,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/agentloops-dev/agents/Go/internal/buildinfo"
-	"github.com/agentloops-dev/agents/Go/internal/workspacecommands"
+	"github.com/agentloops-dev/agent-loops/Go/internal/buildinfo"
+	"github.com/agentloops-dev/agent-loops/Go/internal/workspacecommands"
 )
 
 func main() {

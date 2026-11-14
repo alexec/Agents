@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // #4729: a machine publishes each new event it records, envelope only; an event the bus

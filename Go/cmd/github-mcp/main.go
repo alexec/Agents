@@ -27,8 +27,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/agentloops-dev/agents/Go/internal/buildinfo"
-	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/buildinfo"
+	"github.com/agentloops-dev/agent-loops/Go/internal/githubmcp"
 )
 
 func main() {

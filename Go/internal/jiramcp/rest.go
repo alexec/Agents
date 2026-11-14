@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/connections"
+	"github.com/agentloops-dev/agent-loops/Go/internal/connections"
 )
 
 // RealJira reads Jira's REST API (version 2, which Jira Cloud and Jira Data Center both

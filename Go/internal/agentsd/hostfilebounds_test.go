@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
 )
 
 // #2292: host files that were never removed each have a bound. Each test makes one more

@@ -23,7 +23,7 @@ import (
 
 	sdk "github.com/coder/acp-go-sdk"
 
-	"github.com/agentloops-dev/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agent-loops/Go/internal/safe"
 )
 
 // Sink is what the daemon hears from a session.

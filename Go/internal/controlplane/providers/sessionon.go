@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // MachineSessionStart is DaemonAPI.MachineSessionStart: machines/startSession (#2887).

@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // A fake Bitbucket Cloud over HTTP (no account, #2828): the REST API 2.0 paths the server

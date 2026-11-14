@@ -3,7 +3,7 @@ package lineage
 import (
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Node refs in the full form (#4800, spec 4724-event-bus, "A ref"): every node is written as

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // file.added and file.removed (#3795): raised only for the paths a wait or a trigger

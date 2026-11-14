@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/connections"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/connections"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // "An agent is on it" (#2951): a non-archived session labelled #n or P#n, in a folder

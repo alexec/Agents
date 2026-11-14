@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Forms (elicitations), as DaemonCore+Serving holds them: the daemon's rather than a

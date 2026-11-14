@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/signin"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/signin"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // SignInNonce is the nonce a client signs in with (#995, R2): made by the client itself

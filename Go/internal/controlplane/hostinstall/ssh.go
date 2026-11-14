@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/procgroup"
+	"github.com/agentloops-dev/agent-loops/Go/internal/procgroup"
 )
 
 // DefaultSSH is SSHCommand.system.

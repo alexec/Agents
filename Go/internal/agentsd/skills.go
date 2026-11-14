@@ -9,9 +9,9 @@ import (
 	goruntime "runtime"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/skillcatalog"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/skillcatalog"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The skills in the person's ~/.agents/skills or a folder's .agents/skills, each with

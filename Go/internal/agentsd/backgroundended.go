@@ -11,10 +11,10 @@ import (
 
 	"github.com/shirou/gopsutil/v4/process"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/acp"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/diskjson"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/acp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/diskjson"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A background command that ends after the turn (#4577). Claude's runtime starts a cycle

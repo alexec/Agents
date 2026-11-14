@@ -1,6 +1,6 @@
 package agentsd
 
-import "github.com/agentloops-dev/agents/Go/wire"
+import "github.com/agentloops-dev/agent-loops/Go/wire"
 
 // A token split across two message chunks (#1001, slice a2). Redaction (redact.Text) runs
 // on each transcript line alone, so `ghp_abc` in one chunk and `def…` in the next would go

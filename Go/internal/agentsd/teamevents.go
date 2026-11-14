@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Scoped events (#2011, spec 736 FR-035). On a bot's machine, a runs-on: workflow's

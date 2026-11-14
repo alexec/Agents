@@ -3,7 +3,7 @@ package policylayers
 import (
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Looser is true only for a looser rule (research R10): used to decide whether an outside

@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
 )
 
 // Credentials are the bucket's keys. SessionToken is for temporary keys, and may be

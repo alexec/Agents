@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Later (#4233, epic #4232): a person defers an open request to a time, or until they are

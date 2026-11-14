@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/signin"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/signin/signintest"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/signin"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/signin/signintest"
 )
 
 const app = "app-client-id.apps.example"

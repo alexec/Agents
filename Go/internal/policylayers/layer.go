@@ -5,7 +5,7 @@
 // layers from the top down.
 package policylayers
 
-import "github.com/agentloops-dev/agents/Go/wire"
+import "github.com/agentloops-dev/agent-loops/Go/wire"
 
 // Layer is one layer's rules, with the reference that names it in the effective policy.
 // Callers pass Resolve layers from the top down: organisation, then you, then a folder

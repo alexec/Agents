@@ -18,14 +18,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/redact"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/internal/buildinfo"
-	"github.com/agentloops-dev/agents/Go/internal/controllink"
-	"github.com/agentloops-dev/agents/Go/internal/machine"
-	"github.com/agentloops-dev/agents/Go/internal/rolllog"
-	"github.com/agentloops-dev/agents/Go/internal/safe"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/redact"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/buildinfo"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controllink"
+	"github.com/agentloops-dev/agent-loops/Go/internal/machine"
+	"github.com/agentloops-dev/agent-loops/Go/internal/rolllog"
+	"github.com/agentloops-dev/agent-loops/Go/internal/safe"
 )
 
 // logLine writes each line as DaemonLog does: the time in UTC to the second, then the words,

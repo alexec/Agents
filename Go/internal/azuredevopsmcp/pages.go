@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 

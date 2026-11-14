@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // JoinAsk is control-join-ask: what a host with no code asks to join (#994), written by

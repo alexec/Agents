@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // #4731: a wait's subscription whose poll another machine holds stands by: it does not

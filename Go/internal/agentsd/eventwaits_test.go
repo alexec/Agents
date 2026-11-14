@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Ports EventWaitTests and EventPatternTests: what a wait refuses and why, a call answered

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"syscall"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Status is DaemonAPI.WebRemoteStatus (071 R3): whether the control plane serves the web

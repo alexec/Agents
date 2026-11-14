@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/agentloops-dev/agents/Go/internal/controllink"
-	"github.com/agentloops-dev/agents/Go/internal/machinelock"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controllink"
+	"github.com/agentloops-dev/agent-loops/Go/internal/machinelock"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // An event's data on the bus (#4825, spec 4724-event-bus, "What the control plane keeps").

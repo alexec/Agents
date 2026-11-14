@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/policylayers"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/policylayers"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Untrusted copies of your layer (#3230). After the root moves to another Mac,

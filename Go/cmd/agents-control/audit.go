@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/audit"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/audit"
 )
 
 // verifyAudit is `agents-control audit verify` (#1001): every chain of the audit and every

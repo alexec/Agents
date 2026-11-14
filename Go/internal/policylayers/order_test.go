@@ -3,7 +3,7 @@ package policylayers
 import (
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // FR-004's table, as a direct check of each Order function: tighter ranks higher.

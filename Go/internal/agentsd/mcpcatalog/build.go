@@ -5,8 +5,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/skillcatalog"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/skillcatalog"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Tools is what this machine can run a package with.

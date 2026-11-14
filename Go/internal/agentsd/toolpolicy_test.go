@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/acp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/acp"
 )
 
 // Ports ToolPolicyCatalogTests' levers (#1445): each runtime's tool policy rides on its

@@ -3,7 +3,7 @@ package skillcatalog
 import (
 	"fmt"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Error is a catalogue call that could not do what it was asked (DaemonAPI.CatalogError):

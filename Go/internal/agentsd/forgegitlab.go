@@ -8,9 +8,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/gitlabmcp"
-	"github.com/agentloops-dev/agents/Go/internal/lineage"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/gitlabmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/lineage"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // gitlabForge is GitLab on the forge interface (#4329, #4353): the host's GitLab connection,

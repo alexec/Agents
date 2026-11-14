@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The connectorTools rule (#4099): Allow, Ask or Off for each tool of a connector, by the

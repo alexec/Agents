@@ -14,8 +14,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd"
-	"github.com/agentloops-dev/agents/Go/internal/controllink"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controllink"
 )
 
 func hostCode(t *testing.T, n byte) string {

@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // lockWith is a lock with the client mac, the machine dev-1 and a second client phone.

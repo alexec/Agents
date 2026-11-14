@@ -12,9 +12,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/diskjson"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/diskjson"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The app's own files in a folder (#502, #531), as DaemonCore+GuardedFiles keeps them:

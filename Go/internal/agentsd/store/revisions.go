@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The host's order of changes to its records (#4785): each Save gives the record the next

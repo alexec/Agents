@@ -12,10 +12,10 @@ import (
 
 	sdk "github.com/coder/acp-go-sdk"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/mcpcatalog"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/skillcatalog"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/mcpcatalog"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/skillcatalog"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A server typed on the sheet (#305): connected to before anything is written, then written

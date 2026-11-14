@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Membership is control-host.json, in the Swift ControlMembership's own shape ([]byte is

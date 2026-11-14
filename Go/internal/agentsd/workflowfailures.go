@@ -5,7 +5,7 @@ import (
 	"log"
 	"sort"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Needs You lists a workflow that has stopped working (#989), as the Swift host did (#1036):

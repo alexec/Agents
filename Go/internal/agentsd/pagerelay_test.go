@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controllink"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
-	cpstore "github.com/agentloops-dev/agents/Go/internal/controlplane/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controllink"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/records"
+	cpstore "github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The page this host serves when the control plane runs elsewhere (#1951): a browser pairs

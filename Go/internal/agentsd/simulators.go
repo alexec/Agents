@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The iOS Simulator pane (#842): the simulators on this Mac, booted and shut down only on

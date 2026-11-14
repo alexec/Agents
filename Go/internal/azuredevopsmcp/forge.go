@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // The daemon's forge reads (#3803, after Bitbucket's in #3786): the pull requests of many

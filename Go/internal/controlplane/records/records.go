@@ -22,7 +22,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
 )
 
 const (

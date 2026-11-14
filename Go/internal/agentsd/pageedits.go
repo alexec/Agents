@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Page edits (022 FR-016): the person typed on a live page, artifact/write put it on disk,

@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // failed_log (#3761, decided in #3754): the end of each failed job's log in a Forgejo Actions

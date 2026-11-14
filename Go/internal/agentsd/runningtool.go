@@ -3,7 +3,7 @@ package agentsd
 import (
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // What a working agent is doing, for the sidebars (#1902): running a tool, or thinking

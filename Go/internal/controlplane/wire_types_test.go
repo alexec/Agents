@@ -3,8 +3,8 @@ package controlplane
 import (
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/wiretest"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/wiretest"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Every type the control plane writes or reads on the wire reads the bytes in

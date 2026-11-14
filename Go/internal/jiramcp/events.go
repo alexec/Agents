@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The MCP events (#3247) of the Jira site's issues, in the linear server's shape

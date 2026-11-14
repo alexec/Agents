@@ -11,8 +11,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/skillcatalog"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/skillcatalog"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // #4120: an http MCP server whose header names a secret with Ask before use reaches its server

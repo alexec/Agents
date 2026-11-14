@@ -15,10 +15,10 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
-	"github.com/agentloops-dev/agents/Go/internal/workspacecommands"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/workspacecommands"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // MachineRecords is what Providers needs of ControlRecords; records.Records has it.

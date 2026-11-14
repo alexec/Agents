@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/acp"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/diskjson"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/acp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/diskjson"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The brief (#1801): what every agent is told once, before its first turn, that it cannot

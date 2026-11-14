@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Boards (#3282, specs/3273-project-unit "Boards"): a project's Tasks slot holds one or more

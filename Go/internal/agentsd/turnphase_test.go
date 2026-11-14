@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The phase is TurnActivityContent.make's (#1744): what waits on the person first, then

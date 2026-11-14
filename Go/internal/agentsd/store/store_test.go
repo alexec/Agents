@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 var fixtures = filepath.Join("..", "..", "..", "..", "Packages", "AgentsKit", "Tests", "AgentsKitTests", "Fixtures")

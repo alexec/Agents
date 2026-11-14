@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/sentrymcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/sentrymcp"
 )
 
 // #3583: a new issue in a scratch Sentry project raises health.issue_new from the sentry

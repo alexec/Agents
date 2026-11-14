@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
 )
 
 // SignInFile is ~/.agents-secrets/mcp-sign-ins.json (MCPSignInFile): the person's MCP

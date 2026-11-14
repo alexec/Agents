@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // #4531: an hour with four issues in flight keeps half of its landings at two lanes, and all

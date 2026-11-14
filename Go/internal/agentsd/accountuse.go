@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Ask before use on an account (#4163): an agent's manage_accounts get of an account that asks

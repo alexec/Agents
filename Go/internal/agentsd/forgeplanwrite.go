@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/forgejomcp"
-	"github.com/agentloops-dev/agents/Go/internal/lineage"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/forgejomcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/lineage"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The plan's writes (#3271): a person changes an epic's plan from its page. Add child adds a new

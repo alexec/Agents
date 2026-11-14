@@ -1,6 +1,6 @@
 package agentsd
 
-import "github.com/agentloops-dev/agents/Go/wire"
+import "github.com/agentloops-dev/agent-loops/Go/wire"
 
 // waitingOnEvents is whether the agent has an open wait on something the app watches: an
 // event (wait_for_event), or its place in a lease's line (#2361), which is the same wait.

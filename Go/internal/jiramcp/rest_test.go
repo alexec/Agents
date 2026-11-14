@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // RealJira over a fake site: Jira Cloud's answers (accountId, /search/jql) and Data Center's

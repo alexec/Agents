@@ -74,7 +74,7 @@ tmp=$(mktemp -d "$root/Go/out/helpers/.build-$name.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
 for arch in arm64 amd64; do
 	if ! GOOS=darwin GOARCH=$arch "$root/Go/scripts/go.sh" build -trimpath \
-		-ldflags "-s -w -X github.com/agentloops-dev/agents/Go/internal/buildinfo.Version=$version" \
+		-ldflags "-s -w -X github.com/agentloops-dev/agent-loops/Go/internal/buildinfo.Version=$version" \
 		-o "out/helpers/$(basename "$tmp")/$name-$arch" "./cmd/$name"; then
 		echo "warning: go-github-mcp.sh: $name did not build for $arch, so Agents Host carries none." >&2
 		rm -f "$out"

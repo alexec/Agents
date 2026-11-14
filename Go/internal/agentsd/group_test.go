@@ -3,7 +3,7 @@ package agentsd
 import (
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A wait only the connected person can settle (#3051) shows as needing them, as a

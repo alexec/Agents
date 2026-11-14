@@ -7,8 +7,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/machinelock"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/machinelock"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // #4825: an event's data goes on the bus sealed to each other machine of the person's lock:

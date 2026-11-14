@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // New Machine with no questions (#3972): a make with no provider, name or options takes

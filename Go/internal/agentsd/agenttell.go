@@ -4,7 +4,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // agentMu is held only for a change's read, edit and save (#4509). What a change tells

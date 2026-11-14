@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/azuredevopsmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/azuredevopsmcp"
 )
 
 // The Tasks read of an Azure DevOps set-up (#3802): the project's newest changed work item,

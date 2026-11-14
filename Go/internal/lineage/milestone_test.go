@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // #4620: a milestone's landing date is method H on its repo's last 14 days, with the closed

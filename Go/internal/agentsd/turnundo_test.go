@@ -8,7 +8,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Undo These Changes (#3437): a turn's snapshots, its card, and the undo.

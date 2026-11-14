@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/codespacessh"
+	"github.com/agentloops-dev/agent-loops/Go/internal/codespacessh"
 )
 
 // GitHub stops a codespace after its idle timeout, and counts no background process as use

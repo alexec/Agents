@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Sinks (#1001, T8 slice d2): each audit entry this copy of the control plane writes also

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A fake GitHub with three finished runs: one on main (attempt 2, its first attempt failed),

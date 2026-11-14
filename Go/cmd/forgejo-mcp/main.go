@@ -27,9 +27,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/agentloops-dev/agents/Go/internal/buildinfo"
-	"github.com/agentloops-dev/agents/Go/internal/connections"
-	"github.com/agentloops-dev/agents/Go/internal/forgejomcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/buildinfo"
+	"github.com/agentloops-dev/agent-loops/Go/internal/connections"
+	"github.com/agentloops-dev/agent-loops/Go/internal/forgejomcp"
 )
 
 func main() {

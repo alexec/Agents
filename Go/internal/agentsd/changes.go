@@ -13,9 +13,9 @@ import (
 
 	sdk "github.com/coder/acp-go-sdk"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/acp"
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/acp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // An agent's changes, as DaemonCore+Changes answers: the edits it reported (the diffs in

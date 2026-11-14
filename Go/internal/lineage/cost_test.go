@@ -3,7 +3,7 @@ package lineage
 import (
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // #2350: the shares add up to the whole, tokens too.

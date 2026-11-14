@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/agentloops-dev/agents/Go/internal/connections"
+	"github.com/agentloops-dev/agent-loops/Go/internal/connections"
 	"github.com/github/github-mcp-server/v2/pkg/github"
 	"github.com/github/github-mcp-server/v2/pkg/http/transport"
 	"github.com/github/github-mcp-server/v2/pkg/observability"

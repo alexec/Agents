@@ -4,7 +4,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The moves to another machine under way (#4641): Move to Machine… answers once the move is

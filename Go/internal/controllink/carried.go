@@ -3,7 +3,7 @@ package controllink
 import (
 	"encoding/json"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Carried is what the control plane tells a host that carries a page from its loopback

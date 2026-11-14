@@ -3,7 +3,7 @@ package providers
 import (
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // StartToJoin starts a stopped workspace that no host is linked to, before machines/install

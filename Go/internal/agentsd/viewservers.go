@@ -11,7 +11,7 @@ import (
 
 	sdk "github.com/coder/acp-go-sdk"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
 )
 
 // Which of a person's MCP servers a view may come from, and what views it has

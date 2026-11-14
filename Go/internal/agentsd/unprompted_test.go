@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // An unprompted turn (#4323): a runtime's cycle of its own after its prompt was answered,

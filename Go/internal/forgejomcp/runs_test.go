@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // run.completed over the fake Forgejo (#4217): Forgejo's runs and Gitea's.

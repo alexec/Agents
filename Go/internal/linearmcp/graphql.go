@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
 )
 
 // RealLinear reads Linear's GraphQL API with a personal API key (Linear ▸ Settings ▸ Security

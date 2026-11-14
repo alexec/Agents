@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/controlplane/records"
+	"github.com/agentloops-dev/agent-loops/Go/internal/controlplane/records"
 )
 
 // Key lifetimes (#997, spec 736 FR-042). A client's or machine's key expires 90 days

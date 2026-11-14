@@ -3,7 +3,7 @@ package agentsd
 import (
 	"log"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // A session's state in lineage (#4274): each change of an agent's record that moves it from

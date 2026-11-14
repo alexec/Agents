@@ -25,9 +25,9 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/agentloops-dev/agents/Go/internal/azureboardsmcp"
-	"github.com/agentloops-dev/agents/Go/internal/azuredevopsmcp"
-	"github.com/agentloops-dev/agents/Go/internal/buildinfo"
+	"github.com/agentloops-dev/agent-loops/Go/internal/azureboardsmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/azuredevopsmcp"
+	"github.com/agentloops-dev/agent-loops/Go/internal/buildinfo"
 )
 
 func main() {

@@ -16,7 +16,7 @@ import (
 
 	sdk "github.com/coder/acp-go-sdk"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Docs maps (#3307): a docs connector proves itself with one real search, as the forge slots

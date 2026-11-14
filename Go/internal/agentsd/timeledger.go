@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Where each turn's time went (#852, TimeLedger): the agent working, its tools, waiting on

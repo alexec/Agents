@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Leases that follow the machine's capacity (#4579, epic #4584). A compute resource (the

@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/agentloops-dev/agents/Go/internal/agentsd/store"
-	"github.com/agentloops-dev/agents/Go/internal/noticebucket"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/agentsd/store"
+	"github.com/agentloops-dev/agent-loops/Go/internal/noticebucket"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // notify is the person told something happened (#2805): a notice, which goes the way a
