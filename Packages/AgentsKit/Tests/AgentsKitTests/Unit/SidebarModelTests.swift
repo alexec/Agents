@@ -83,6 +83,7 @@ struct SidebarModelTests {
         #expect(!folded.showsArchivedFold(held))
         #expect(!folded.showsPinnedPages)
         #expect(!folded.showsNoSessions)
+        #expect(!folded.showsNewSession)
         #expect(folded.groups.isEmpty && folded.pinned.isEmpty && folded.archived.isEmpty)
         #expect(folded.workflows.isEmpty && folded.archivedWorkflows.isEmpty)
 
@@ -91,12 +92,15 @@ struct SidebarModelTests {
         #expect(open.showsArchivedFold(held))
         #expect(open.showsPinnedPages)
         #expect(open.showsNoSessions)
+        // New Session first in Sessions (#5267), also with no live session.
+        #expect(open.showsNewSession)
 
         // A search unfolds it, and the search is for sessions, not pages.
         let searched = SidebarFolderFold(key, label: "api", in: model, query: "old", isOpen: false)
         #expect(searched.isUnfolded)
         #expect(!searched.showsPinnedPages)
         #expect(!searched.showsNoSessions)
+        #expect(!searched.showsNewSession)
     }
 
     @Test func pinnedComeFirstInTheirOrderAndLeaveTheirGroups() {
