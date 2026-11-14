@@ -426,6 +426,8 @@ func TestCITimingsBitbucket(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A daemon left running scans on its clock into a later test's AGENTS_PERSONAL_HOME (#5368).
+	t.Cleanup(d.Shutdown)
 	d.ciBitbucketAPI = srv.URL + "/2.0/"
 	h := ciRepoHere{forgeRepo{"bitbucket", "team/app"}, t.TempDir()}
 	if err := d.readCIRepo(context.Background(), h); err != nil {
@@ -548,6 +550,8 @@ func TestCITimingsForgejo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// A daemon left running scans on its clock into a later test's AGENTS_PERSONAL_HOME (#5368).
+	t.Cleanup(d.Shutdown)
 	d.ciForgejoAPI = srv.URL + "/"
 	h := ciRepoHere{forgeRepo{"forgejo", "scratch/app"}, t.TempDir()}
 	if err := d.readCIRepo(context.Background(), h); err != nil {
