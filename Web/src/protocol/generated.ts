@@ -3718,6 +3718,34 @@ export interface DeployComponent {
 }
 
 /**
+ * One target's DORA figures in deploys/delivery (#5245, spec 5239-deploy-model): a component (the
+ * repo, by default) in one environment, from the deploys this machine keeps. ended is the deploys
+ * that succeeded or failed in the range (a cancelled one is neither), failed those that failed,
+ * rollbacks the succeeded ones that put an older release back. deploymentFrequency is the succeeded
+ * deploys a week; leadTime is a PR's merge to the first succeeded deploy that brings it, the median
+ * and p90; changeFailureRate is the failed deploys and rollbacks over the ended ones, 0 to 1;
+ * recoveryTime is a failed deploy's end, or a health signal seen in a deploy, to the next succeeded
+ * deploy, the median. Each has a series of its weeks and DORA 2024's band, as Planning's Delivery
+ * row has them.
+ */
+export interface DeployDeliveryTarget {
+  /** The component's id: owner/name for a repo. */
+  component: string;
+  /** The environment's name: github-releases, app-store. */
+  environment: string;
+  /** The environment's lineage ref, github:environment:<owner>/<repo>#<name>. */
+  environmentRef: string;
+  tier: EnvironmentTier;
+  ended: number;
+  failed: number;
+  rollbacks: number;
+  deploymentFrequency: LineageDeliveryFigure;
+  leadTime: LineageDeliveryFigure;
+  changeFailureRate: LineageDeliveryFigure;
+  recoveryTime: LineageDeliveryFigure;
+}
+
+/**
  * A place where components run (#5262), shared by many components and repos: GitHub's and GitLab's
  * environments, Argo CD's destination, Kargo's Stage's place, TestFlight. name is its name in
  * system; tier is GitLab's five, other when a system does not say. ephemeral is true for a preview
@@ -3790,6 +3818,31 @@ export interface DeployVersion {
   system?: string;
   id?: string;
   ref?: string;
+}
+
+/**
+ * deploys/delivery's answer (#5245): the targets with a deploy that ended in [since, at],
+ * production first, then by tier and the most deploys. resolving is true while what some deploys
+ * bring is still being asked of the forge, so lead time may grow on the next read. deploys is how
+ * many deploys this machine keeps, of every target and age, so a page can pick the machine that
+ * knows most.
+ */
+export interface DeploysDelivery {
+  since: WireDate;
+  at: WireDate;
+  windowDays: number;
+  deploys: number;
+  targets: DeployDeliveryTarget[];
+  resolving?: boolean;
+}
+
+/**
+ * deploys/delivery (#5245): the DORA figures of each target this machine keeps deploys of, over the
+ * range (day is the last 7 days, as week), of one tier or of every tier when none is said.
+ */
+export interface DeploysDeliveryRequest {
+  range: ReportRange;
+  tier?: EnvironmentTier;
 }
 
 /**
@@ -15672,6 +15725,7 @@ export interface Methods {
   "daemon/policyState": { params: Empty; result: PolicyState };
   "dailySummary/setSettings": { params: DailySummarySettings; result: DailySummarySettings };
   "dailySummary/settings": { params: Empty; result: DailySummarySettings };
+  "deploys/delivery": { params: DeploysDeliveryRequest; result: DeploysDelivery };
   "desktopControl/resume": { params: AgentRequest; result: Empty };
   "desktopControl/set": { params: DesktopControlSettings; result: DesktopControlSettings };
   "desktopControl/state": { params: Empty; result: DesktopControlSettings };
@@ -16122,6 +16176,7 @@ export const MethodTarget = {
   "daemon/policyState": "host",
   "dailySummary/setSettings": "host",
   "dailySummary/settings": "host",
+  "deploys/delivery": "host",
   "desktopControl/resume": "host",
   "desktopControl/set": "host",
   "desktopControl/state": "host",
@@ -16794,10 +16849,13 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeployCheck: { required: ["kind", "system", "when", "state", "rawState"], optional: ["id", "name", "url"] },
   DeployCheckEvent: { required: ["check", "target", "component", "environment", "tier"], optional: ["deploy"] },
   DeployComponent: { required: ["system", "id"], optional: ["kind", "name", "repo"] },
+  DeployDeliveryTarget: { required: ["component", "environment", "environmentRef", "tier", "ended", "failed", "rollbacks", "deploymentFrequency", "leadTime", "changeFailureRate", "recoveryTime"], optional: [] },
   DeployEnvironment: { required: ["system", "name", "tier"], optional: ["ephemeral", "url"] },
   DeployEvent: { required: ["deploy", "component", "environment", "tier"], optional: ["outcome"] },
   DeployTarget: { required: ["component", "environment"], optional: ["labels", "system", "id", "ref"] },
   DeployVersion: { required: ["artifacts"], optional: ["name", "system", "id", "ref"] },
+  DeploysDelivery: { required: ["since", "at", "windowDays", "deploys", "targets"], optional: ["resolving"] },
+  DeploysDeliveryRequest: { required: ["range"], optional: ["tier"] },
   DesktopControlLiveFrame: { required: ["agentID", "capturedAt"], optional: ["image", "locked", "narration"] },
   DesktopControlPause: { required: ["app", "pausedAt"], optional: [] },
   DesktopControlSettings: { required: ["enabled"], optional: ["mode"] },

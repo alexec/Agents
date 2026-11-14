@@ -211,3 +211,26 @@ The deploy events make the lineage nodes (#5241). The code is
 - **Old nodes:** before #5241, a `deploy` node was an artifact (`testflight:deploy:…#812`),
   `part-of` a `target`, and a release was `deployed-as` it. Nothing makes those now. They
   are read until they age out of the store's bounds.
+
+## The DORA figures of each environment
+
+Reports ▸ Planning ▸ Delivery on the web page (#5245) shows the four DORA figures for each
+target: a component (its repo) in one environment. A host answers `deploys/delivery` from
+the deploys it keeps (`Go/internal/agentsd/deploydelivery.go`), and the page takes the
+answer of the machine that keeps the most deploys, as the Builds page does.
+
+| Figure | How it is counted |
+|---|---|
+| Deploy frequency | the deploys that succeeded, a week |
+| Lead time for changes | a PR's merge (its commit's time on the branch, from the forge's compare) to the first succeeded deploy that brings it; the median and p90 |
+| Change failure rate | the failed deploys and the rollbacks, of the deploys that succeeded or failed (a cancelled one is neither) |
+| Time to restore | a failed deploy's end, or a health signal `seen-in` a deploy, to the next succeeded deploy; the median |
+
+- **The tier** is the forge's for the forge's own environment (GitHub's production
+  environments, and names such as `production` or `prod`). An environment that a deploy
+  notice names gets its tier from its name, else `other`. The page shows `production` first,
+  and the Tier filter shows another tier or every tier.
+- **Lead time fills in:** what a deploy brings is asked of the forge in the background, at
+  most 20 deploys a read, newest first. The answer says `resolving` until they are all
+  known, and the page reads again.
+- **Fewer than 5 deploys** that ended in the range: the figures are dimmed, with the count.

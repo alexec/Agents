@@ -24,6 +24,7 @@ export type PageDraw =
   | { kind: "console"; id: string }
   | { kind: "report"; section: Section }
   | { kind: "builds" }
+  | { kind: "deploys" }
   | { kind: "work"; work: WorkKind }
   | { kind: "features" }
   | { kind: "timeline" }
@@ -85,8 +86,12 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   reports: [
     ...reportSections.flatMap((s): NavPage[] => [
       { id: s.id, title: s.title, group: s.group, draw: { kind: "report", section: s } },
-      // Build trends (#5178, spec 5166) under Planning: #/reports/value/builds.
-      ...s.id === "value" ? [{ id: "builds", title: "Builds", group: s.group, under: "value", draw: { kind: "builds" } } satisfies NavPage] : [],
+      // Build trends (#5178, spec 5166) and the DORA figures of each environment (#5245, spec 5239 board 5) under Planning:
+      // #/reports/value/builds, #/reports/value/delivery.
+      ...s.id === "value" ? [
+        { id: "builds", title: "Builds", group: s.group, under: "value", draw: { kind: "builds" } },
+        { id: "delivery", title: "Delivery", group: s.group, under: "value", draw: { kind: "deploys" } },
+      ] satisfies NavPage[] : [],
     ]),
     // The Multiplier page first (#3990), as the window's first row under Usage; it took the Achievements page's place.
     { id: "multiplier", title: "Multiplier", group: "Yours", draw: { kind: "multiplier" } },

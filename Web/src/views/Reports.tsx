@@ -24,6 +24,7 @@ import {
 import { assumesLine, burnLine, burnRuntime, forecastScoreLine, landsLine, laneOptions, loadedLine, mergeBurns, mixOptions, nextNote, noNext,
   noNextHere, noNextOffline, serviceLevelLine, spendLines, whatIfLines, whatIfNote, whatIfOf } from "../model/planning";
 import { deliveryCards, deliveryNote, noDelivery, repoTitle, sparkPath } from "../model/delivery";
+import { deploysQuery } from "../model/deploys";
 import { buildsLinkQuery } from "../model/builds";
 import { Capability } from "../protocol/capabilities.generated";
 import type { Section } from "../model/console";
@@ -483,6 +484,8 @@ function DeliveryPart({ delivery, range }: { delivery: readonly ReportDelivery[]
         </section>
       ))}
       {delivery.length > 0 && <p class="quiet small">{deliveryNote}</p>}
+      {/* The figures of each environment, from the deploys themselves (#5245, spec 5239 board 5). */}
+      <p class="small"><a href={routeHash({ nav: "reports", section: "value", item: "delivery", query: deploysQuery({ range: range === "day" ? "week" : range, tier: "production" }) })}>The DORA figures of each environment ›</a></p>
     </>
   );
 }

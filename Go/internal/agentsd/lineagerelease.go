@@ -319,6 +319,9 @@ func versionLess(a, b [3]int) bool {
 type compareCommit struct {
 	SHA     string
 	Message string
+	// At is when it was committed, zero when the forge did not say: a squash merge's is its
+	// merge, the lead time's start (#5245).
+	At time.Time
 }
 
 var (
@@ -438,7 +441,10 @@ func compareCommitsOf(forge string, out []byte) ([]compareCommit, error) {
 			Commits []struct {
 				SHA    string `json:"sha"`
 				Commit struct {
-					Message string `json:"message"`
+					Message   string `json:"message"`
+					Committer struct {
+						Date time.Time `json:"date"`
+					} `json:"committer"`
 				} `json:"commit"`
 			} `json:"commits"`
 		}
@@ -447,14 +453,15 @@ func compareCommitsOf(forge string, out []byte) ([]compareCommit, error) {
 		}
 		out2 := make([]compareCommit, 0, len(r.Commits))
 		for _, c := range r.Commits {
-			out2 = append(out2, compareCommit{c.SHA, c.Commit.Message})
+			out2 = append(out2, compareCommit{SHA: c.SHA, Message: c.Commit.Message, At: c.Commit.Committer.Date})
 		}
 		return out2, nil
 	case "gitlab":
 		var r struct {
 			Commits []struct {
-				ID      string `json:"id"`
-				Message string `json:"message"`
+				ID            string    `json:"id"`
+				Message       string    `json:"message"`
+				CommittedDate time.Time `json:"committed_date"`
 			} `json:"commits"`
 		}
 		if err := json.Unmarshal(out, &r); err != nil {
@@ -462,7 +469,7 @@ func compareCommitsOf(forge string, out []byte) ([]compareCommit, error) {
 		}
 		out2 := make([]compareCommit, 0, len(r.Commits))
 		for _, c := range r.Commits {
-			out2 = append(out2, compareCommit{c.ID, c.Message})
+			out2 = append(out2, compareCommit{SHA: c.ID, Message: c.Message, At: c.CommittedDate})
 		}
 		return out2, nil
 	}
