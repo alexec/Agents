@@ -3547,6 +3547,177 @@ export interface DeliveredRoute {
 }
 
 /**
+ * One try to put a version into a target (#5262, spec 5239): GitHub's Deployment, GitLab's
+ * deployment, Argo CD's sync, Kargo's Promotion, Octopus's Deployment. system and id are the system
+ * that said it and its id there, as a re-run of the same job is the same deploy; ref is its lineage
+ * ref, <system>:deploy:<topic>#<id>, when the source makes one. state is the model's, rawState the
+ * system's own word (GitHub's in_progress, Kargo's Errored). started and finished are when it went
+ * running and when it ended. rollback is set when the system says it is one (GitOps Promoter's
+ * RestoreActiveCommit, helm rollback); otherwise a rollback is computed. share is the per cent of
+ * the target's traffic the version takes when it is less than 100 (a canary, a Cloud Run split).
+ * observed is true for a deploy made from a change in what the target reports it runs, not from a
+ * system's record.
+ */
+export interface Deploy {
+  system: string;
+  id: string;
+  ref?: string;
+  target: DeployTarget;
+  version: DeployVersion;
+  state: DeployState;
+  rawState: string;
+  started?: WireDate;
+  finished?: WireDate;
+  rollback?: boolean;
+  share?: number;
+  observed?: boolean;
+  url?: string;
+  checks?: DeployCheck[];
+}
+
+/**
+ * One immutable thing that a build made or a deploy uses (#5262): a commit, an image digest, a Helm
+ * chart version, a package version, a mobile build, a hydrated commit. kind is an open string
+ * (commit, image, chart, package, build, hydrated-commit…); id is its digest or version in system
+ * (github, oci, testflight…); ref is its lineage ref, <system>:artifact:<topic>#<id>, when the
+ * source makes one. builtFrom are the refs of the changes it was built from (a commit's, a PR's);
+ * with none, the commit itself is the change.
+ */
+export interface DeployArtifact {
+  kind: string;
+  system: string;
+  id: string;
+  ref?: string;
+  name?: string;
+  builtFrom?: string[];
+}
+
+/**
+ * A condition with a state on a deploy or a target (#5262): an approval, a test, a health status, a
+ * soak time, a window, an App Review. kind is an open string (approval, test, health, soak, window,
+ * review…). when is before (it can hold the deploy) or after (it says how what runs there is).
+ * state is the model's, rawState the system's own word. Checks are details and events, not lineage
+ * nodes.
+ */
+export interface DeployCheck {
+  kind: string;
+  system: string;
+  id?: string;
+  name?: string;
+  when: DeployCheckWhen;
+  state: DeployState;
+  rawState: string;
+  url?: string;
+}
+
+/**
+ * check.changed's details (#5262): the check, and what it is on: the deploy's ref when it is a
+ * deploy's check, and the target either way. component, environment and tier are the target's,
+ * flat, so a wait or a trigger can narrow by them.
+ */
+export interface DeployCheckEvent {
+  check: DeployCheck;
+  deploy?: string;
+  target: DeployTarget;
+  component: string;
+  environment: string;
+  tier: EnvironmentTier;
+}
+
+/** Whether a check is before a deploy (it can hold it) or after it (on what runs there). */
+export type DeployCheckWhen =
+  | "before"
+  | "after";
+
+/**
+ * What runs and has versions (#5262): a service, an app, a site. kind is an open string (service,
+ * app, site…); id is its id in system; with none, it is the repo. repo is the forge repo it is
+ * built from, owner/name, when there is one.
+ */
+export interface DeployComponent {
+  kind?: string;
+  system: string;
+  id: string;
+  name?: string;
+  repo?: string;
+}
+
+/**
+ * A place where components run (#5262), shared by many components and repos: GitHub's and GitLab's
+ * environments, Argo CD's destination, Kargo's Stage's place, TestFlight. name is its name in
+ * system; tier is GitLab's five, other when a system does not say. ephemeral is true for a preview
+ * for each PR (Vercel's previews, GitLab's review apps).
+ */
+export interface DeployEnvironment {
+  system: string;
+  name: string;
+  tier: EnvironmentTier;
+  ephemeral?: boolean;
+  url?: string;
+}
+
+/**
+ * deploy.started, deploy.succeeded and deploy.failed's details (#5262), and deploy.waiting's beside
+ * its own: the deploy, and its target's component, environment and tier, flat, so a wait or a
+ * trigger can narrow by them (tier: production). outcome is deploy.failed's: failed or cancelled.
+ */
+export interface DeployEvent {
+  deploy: Deploy;
+  component: string;
+  environment: string;
+  tier: EnvironmentTier;
+  outcome?: DeployOutcome;
+}
+
+/** How a deploy that did not succeed ended, as deploy.failed says it. */
+export type DeployOutcome =
+  | "failed"
+  | "cancelled";
+
+/**
+ * A deploy's or a check's state (#5262). Every system's states map to these five, and its own word
+ * is kept beside it as rawState: GitHub's queued and in_progress are running, success is succeeded,
+ * failure and error are failed. A deploy that a newer one replaced, or a rollback, is computed, not
+ * a state.
+ */
+export type DeployState =
+  | "waiting"
+  | "running"
+  | "succeeded"
+  | "failed"
+  | "cancelled";
+
+/**
+ * One component in one environment (#5262), where a version runs: Argo CD's Application, Kargo's
+ * Stage, a Cloud Run service in a region. labels tell instances apart (region, cluster, namespace,
+ * tenant, machine); with none, it is component × environment. system and id are set when the system
+ * has a target of its own; ref is its lineage ref,
+ * <system>:target:<topic>#<component>@<environment>.
+ */
+export interface DeployTarget {
+  component: DeployComponent;
+  environment: DeployEnvironment;
+  labels?: Record<string, string>;
+  system?: string;
+  id?: string;
+  ref?: string;
+}
+
+/**
+ * The set of artifacts that go out together (#5262); one artifact is the simple case. name is set
+ * for a Release (v0.18.0), a Kargo alias, an Octopus release; system and id are set when the
+ * version is a thing of its own there (Kargo's Freight, Octopus's Release). ref is a Release's ref
+ * when it has a name, else its one artifact's.
+ */
+export interface DeployVersion {
+  artifacts: DeployArtifact[];
+  name?: string;
+  system?: string;
+  id?: string;
+  ref?: string;
+}
+
+/**
  * The live tile's latest look at the Mac's screen while an agent holds the screen lease (#3004,
  * US4, FR-011): a downscaled JPEG of the whole screen, base64, or, while the screen is locked,
  * locked and no image (FR-012). Sent only to the clients showing that agent, never recorded, never
@@ -4160,6 +4331,17 @@ export interface EntryNotification {
   index?: number;
   oversized?: number;
 }
+
+/**
+ * An environment's tier, as GitLab's five (#5262). A tier this build does not know reads as
+ * `other`.
+ */
+export type EnvironmentTier =
+  | "production"
+  | "staging"
+  | "testing"
+  | "development"
+  | "other";
 
 export interface Event {
   position: number;
@@ -16459,6 +16641,15 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   DeletePreview: { required: ["count", "bytes"], optional: [] },
   DeleteSessionRequest: { required: ["runtimeID", "sessionID"], optional: ["confirmed"] },
   DeliveredRoute: { required: ["id", "name", "kind", "runtimes", "defaultFor", "secretFields", "version", "sealed", "sealVersion"], optional: ["vendor", "settings", "models", "waiting"] },
+  Deploy: { required: ["system", "id", "target", "version", "state", "rawState"], optional: ["ref", "started", "finished", "rollback", "share", "observed", "url", "checks"] },
+  DeployArtifact: { required: ["kind", "system", "id"], optional: ["ref", "name", "builtFrom"] },
+  DeployCheck: { required: ["kind", "system", "when", "state", "rawState"], optional: ["id", "name", "url"] },
+  DeployCheckEvent: { required: ["check", "target", "component", "environment", "tier"], optional: ["deploy"] },
+  DeployComponent: { required: ["system", "id"], optional: ["kind", "name", "repo"] },
+  DeployEnvironment: { required: ["system", "name", "tier"], optional: ["ephemeral", "url"] },
+  DeployEvent: { required: ["deploy", "component", "environment", "tier"], optional: ["outcome"] },
+  DeployTarget: { required: ["component", "environment"], optional: ["labels", "system", "id", "ref"] },
+  DeployVersion: { required: ["artifacts"], optional: ["name", "system", "id", "ref"] },
   DesktopControlLiveFrame: { required: ["agentID", "capturedAt"], optional: ["image", "locked", "narration"] },
   DesktopControlPause: { required: ["app", "pausedAt"], optional: [] },
   DesktopControlSettings: { required: ["enabled"], optional: ["mode"] },

@@ -3840,6 +3840,174 @@ type DeliveredRoute struct {
 	Waiting *bool `json:"waiting,omitzero"`
 }
 
+// One try to put a version into a target (#5262, spec 5239): GitHub's Deployment, GitLab's deployment, Argo CD's sync, Kargo's Promotion, Octopus's Deployment. system and id are the system that said it and its id there, as a re-run of the same job is the same deploy; ref is its lineage ref, <system>:deploy:<topic>#<id>, when the source makes one. state is the model's, rawState the system's own word (GitHub's in_progress, Kargo's Errored). started and finished are when it went running and when it ended. rollback is set when the system says it is one (GitOps Promoter's RestoreActiveCommit, helm rollback); otherwise a rollback is computed. share is the per cent of the target's traffic the version takes when it is less than 100 (a canary, a Cloud Run split). observed is true for a deploy made from a change in what the target reports it runs, not from a system's record.
+type Deploy struct {
+	System string `json:"system"`
+
+	ID string `json:"id"`
+
+	Ref *string `json:"ref,omitzero"`
+
+	Target DeployTarget `json:"target"`
+
+	Version DeployVersion `json:"version"`
+
+	State DeployState `json:"state"`
+
+	RawState string `json:"rawState"`
+
+	Started *Date `json:"started,omitzero"`
+
+	Finished *Date `json:"finished,omitzero"`
+
+	Rollback *bool `json:"rollback,omitzero"`
+
+	Share *float64 `json:"share,omitzero"`
+
+	Observed *bool `json:"observed,omitzero"`
+
+	URL *string `json:"url,omitzero"`
+
+	Checks []DeployCheck `json:"checks,omitzero"`
+}
+
+// One immutable thing that a build made or a deploy uses (#5262): a commit, an image digest, a Helm chart version, a package version, a mobile build, a hydrated commit. kind is an open string (commit, image, chart, package, build, hydrated-commit…); id is its digest or version in system (github, oci, testflight…); ref is its lineage ref, <system>:artifact:<topic>#<id>, when the source makes one. builtFrom are the refs of the changes it was built from (a commit's, a PR's); with none, the commit itself is the change.
+type DeployArtifact struct {
+	Kind string `json:"kind"`
+
+	System string `json:"system"`
+
+	ID string `json:"id"`
+
+	Ref *string `json:"ref,omitzero"`
+
+	Name *string `json:"name,omitzero"`
+
+	BuiltFrom []string `json:"builtFrom,omitzero"`
+}
+
+// A condition with a state on a deploy or a target (#5262): an approval, a test, a health status, a soak time, a window, an App Review. kind is an open string (approval, test, health, soak, window, review…). when is before (it can hold the deploy) or after (it says how what runs there is). state is the model's, rawState the system's own word. Checks are details and events, not lineage nodes.
+type DeployCheck struct {
+	Kind string `json:"kind"`
+
+	System string `json:"system"`
+
+	ID *string `json:"id,omitzero"`
+
+	Name *string `json:"name,omitzero"`
+
+	When DeployCheckWhen `json:"when"`
+
+	State DeployState `json:"state"`
+
+	RawState string `json:"rawState"`
+
+	URL *string `json:"url,omitzero"`
+}
+
+// check.changed's details (#5262): the check, and what it is on: the deploy's ref when it is a deploy's check, and the target either way. component, environment and tier are the target's, flat, so a wait or a trigger can narrow by them.
+type DeployCheckEvent struct {
+	Check DeployCheck `json:"check"`
+
+	Deploy *string `json:"deploy,omitzero"`
+
+	Target DeployTarget `json:"target"`
+
+	Component string `json:"component"`
+
+	Environment string `json:"environment"`
+
+	Tier EnvironmentTier `json:"tier"`
+}
+
+// Whether a check is before a deploy (it can hold it) or after it (on what runs there).
+type DeployCheckWhen string
+
+const DeployCheckWhenBefore DeployCheckWhen = "before"
+const DeployCheckWhenAfter DeployCheckWhen = "after"
+
+// What runs and has versions (#5262): a service, an app, a site. kind is an open string (service, app, site…); id is its id in system; with none, it is the repo. repo is the forge repo it is built from, owner/name, when there is one.
+type DeployComponent struct {
+	Kind *string `json:"kind,omitzero"`
+
+	System string `json:"system"`
+
+	ID string `json:"id"`
+
+	Name *string `json:"name,omitzero"`
+
+	Repo *string `json:"repo,omitzero"`
+}
+
+// A place where components run (#5262), shared by many components and repos: GitHub's and GitLab's environments, Argo CD's destination, Kargo's Stage's place, TestFlight. name is its name in system; tier is GitLab's five, other when a system does not say. ephemeral is true for a preview for each PR (Vercel's previews, GitLab's review apps).
+type DeployEnvironment struct {
+	System string `json:"system"`
+
+	Name string `json:"name"`
+
+	Tier EnvironmentTier `json:"tier"`
+
+	Ephemeral *bool `json:"ephemeral,omitzero"`
+
+	URL *string `json:"url,omitzero"`
+}
+
+// deploy.started, deploy.succeeded and deploy.failed's details (#5262), and deploy.waiting's beside its own: the deploy, and its target's component, environment and tier, flat, so a wait or a trigger can narrow by them (tier: production). outcome is deploy.failed's: failed or cancelled.
+type DeployEvent struct {
+	Deploy Deploy `json:"deploy"`
+
+	Component string `json:"component"`
+
+	Environment string `json:"environment"`
+
+	Tier EnvironmentTier `json:"tier"`
+
+	Outcome *DeployOutcome `json:"outcome,omitzero"`
+}
+
+// How a deploy that did not succeed ended, as deploy.failed says it.
+type DeployOutcome string
+
+const DeployOutcomeFailed DeployOutcome = "failed"
+const DeployOutcomeCancelled DeployOutcome = "cancelled"
+
+// A deploy's or a check's state (#5262). Every system's states map to these five, and its own word is kept beside it as rawState: GitHub's queued and in_progress are running, success is succeeded, failure and error are failed. A deploy that a newer one replaced, or a rollback, is computed, not a state.
+type DeployState string
+
+const DeployStateWaiting DeployState = "waiting"
+const DeployStateRunning DeployState = "running"
+const DeployStateSucceeded DeployState = "succeeded"
+const DeployStateFailed DeployState = "failed"
+const DeployStateCancelled DeployState = "cancelled"
+
+// One component in one environment (#5262), where a version runs: Argo CD's Application, Kargo's Stage, a Cloud Run service in a region. labels tell instances apart (region, cluster, namespace, tenant, machine); with none, it is component × environment. system and id are set when the system has a target of its own; ref is its lineage ref, <system>:target:<topic>#<component>@<environment>.
+type DeployTarget struct {
+	Component DeployComponent `json:"component"`
+
+	Environment DeployEnvironment `json:"environment"`
+
+	Labels map[string]string `json:"labels,omitzero"`
+
+	System *string `json:"system,omitzero"`
+
+	ID *string `json:"id,omitzero"`
+
+	Ref *string `json:"ref,omitzero"`
+}
+
+// The set of artifacts that go out together (#5262); one artifact is the simple case. name is set for a Release (v0.18.0), a Kargo alias, an Octopus release; system and id are set when the version is a thing of its own there (Kargo's Freight, Octopus's Release). ref is a Release's ref when it has a name, else its one artifact's.
+type DeployVersion struct {
+	Artifacts []DeployArtifact `json:"artifacts"`
+
+	Name *string `json:"name,omitzero"`
+
+	System *string `json:"system,omitzero"`
+
+	ID *string `json:"id,omitzero"`
+
+	Ref *string `json:"ref,omitzero"`
+}
+
 // The live tile's latest look at the Mac's screen while an agent holds the screen lease (#3004, US4, FR-011): a downscaled JPEG of the whole screen, base64, or, while the screen is locked, locked and no image (FR-012). Sent only to the clients showing that agent, never recorded, never replayed (FR-016).
 type DesktopControlLiveFrame struct {
 	AgentID UUID `json:"agentID"`
@@ -4587,6 +4755,34 @@ type EntryNotification struct {
 	Index *int64 `json:"index,omitzero"`
 
 	Oversized *int64 `json:"oversized,omitzero"`
+}
+
+// An environment's tier, as GitLab's five (#5262). A tier this build does not know reads as `other`.
+type EnvironmentTier string
+
+const EnvironmentTierProduction EnvironmentTier = "production"
+const EnvironmentTierStaging EnvironmentTier = "staging"
+const EnvironmentTierTesting EnvironmentTier = "testing"
+const EnvironmentTierDevelopment EnvironmentTier = "development"
+const EnvironmentTierOther EnvironmentTier = "other"
+
+// UnmarshalJSON reads a value this build does not know as "other".
+func (v *EnvironmentTier) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	switch EnvironmentTier(s) {
+	case EnvironmentTierProduction,
+		EnvironmentTierStaging,
+		EnvironmentTierTesting,
+		EnvironmentTierDevelopment,
+		EnvironmentTierOther:
+		*v = EnvironmentTier(s)
+	default:
+		*v = EnvironmentTierOther
+	}
+	return nil
 }
 
 type Event struct {
