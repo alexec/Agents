@@ -572,6 +572,8 @@ public extension DaemonAPI {
                 Row(Method.reportsScopes, params: Empty.self, result: ReportScopes.self, kind: .controlRequest),
                 // Lineage over every machine's copy (#4276): Work ▸ Timeline's sessions.
                 Row(Method.lineageWalkAll, params: LineageWalkAllRequest.self, result: LineageGraph.self, kind: .controlRequest),
+                Row(Method.buildsHistoryAll, params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
+                Row(Method.buildsRunAll, params: JSONValue.self, result: JSONValue.self, kind: .controlRequest),
                 Row(Method.lineageSessionsOn, params: LineageSessionsOnRequest.self, result: LineageSessionsOn.self,
                     kind: .controlRequest),
                 Row(Method.reportsPolicy, params: Empty.self, result: ReportPolicy.self, kind: .controlRequest),
