@@ -81,6 +81,12 @@ starts lanes.
    - `checks.passed` (#3035): run `scripts/rearm-automerge.sh --stalled`, and wait
      again — checks going green is exactly when a clean PR can be left unmerged
      (#1741), so this wakes for that without waiting for the time limit.
+   - **The wait is refused** with "No server here offers pr.blocked" (#5437: the
+     installed app is older than #5321): wait instead on
+     `["pr.merged", "pr.closed", "checks.failed", "checks.passed", "pr.conflicted"]`,
+     with the same `where` and `until_minutes`, and use that list for the rest of this
+     session. `checks.failed` is `required_check_failed` above, and `pr.conflicted` is
+     `conflict`.
    - No event before the time limit: run `scripts/rearm-automerge.sh --stalled`, and
      wait again.
 
