@@ -21,7 +21,8 @@ import (
 )
 
 // Build timings (#5177, specs/5166-build-deploy-trends/spec.md, "The data spike"): this
-// machine reads each GitHub repository's CI runs, with their jobs and steps, into the timing
+// machine reads each GitHub repository's CI runs (and Azure DevOps's builds, #5222,
+// citimingsazure.go), with their jobs and steps, into the timing
 // store (citimings), and answers builds/history and builds/run from it.
 //
 //   - Live: every ciLiveEvery, and soon after a run.completed or checks.* event, the newest
@@ -96,6 +97,8 @@ type ciTimingsFile struct {
 	Hour  time.Time `json:"hour"`
 	Calls int       `json:"calls"`
 	Limit int       `json:"limit,omitempty"`
+	// AzureDevOpsCalls counts Azure DevOps's calls this hour apart (citimingsazure.go).
+	AzureDevOpsCalls int `json:"azureDevOpsCalls,omitempty"`
 }
 
 type ciRepoState struct {
@@ -185,14 +188,15 @@ func (d *Daemon) ciTimingsClock(ctx context.Context) {
 	}
 }
 
-// ciRepoHere is a GitHub repository a folder pushes to, and that folder, for gh.
+// ciRepoHere is a GitHub or Azure DevOps repository a folder pushes to, and that folder, for
+// gh or for the Azure DevOps it is on.
 type ciRepoHere struct {
 	repo   forgeRepo
 	folder string
 }
 
-// ciReposHere is the GitHub and GitLab repositories the folders push to, at most ciMostRepos. A
-// GitLab one counts when the person's GitLab connection is on its root.
+// ciReposHere is the GitHub, GitLab and Azure DevOps repositories the folders push to, at most
+// ciMostRepos. A GitLab one counts when the person's GitLab connection is on its root.
 func (d *Daemon) ciReposHere(ctx context.Context) []ciRepoHere {
 	seen := map[string]bool{}
 	var out []ciRepoHere
@@ -205,7 +209,7 @@ func (d *Daemon) ciReposHere(ctx context.Context) []ciRepoHere {
 				continue
 			}
 		}
-		if r.forge != "github" && r.forge != "gitlab" || seen[r.forge+":"+r.path] || len(out) >= ciMostRepos {
+		if !ciReads(r.forge) || seen[r.forge+":"+r.path] || len(out) >= ciMostRepos {
 			continue
 		}
 		seen[r.forge+":"+r.path] = true
@@ -243,16 +247,18 @@ func (d *Daemon) readCITimings(ctx context.Context) {
 	}
 }
 
+// ciReads says the build timings read a forge's CI: its builds/history reader.
+func ciReads(forge string) bool {
+	return forge == "github" || forge == "gitlab" || forge == "azuredevops"
+}
+
 func (d *Daemon) readCIRepo(ctx context.Context, h ciRepoHere) error {
 	key := citimings.Repo{Forge: h.repo.forge, Path: h.repo.path}.String()
-	def, err := d.ciDefaultBranch(ctx, h, key)
-	if err != nil {
-		return err
+	read := d.ciGitHubRead
+	if h.repo.forge == "azuredevops" {
+		read = d.ciAzureRead
 	}
-	if err := d.ciLive(ctx, h, key, def); err != nil {
-		return err
-	}
-	if err := d.ciBackfill(ctx, h, key, def); err != nil {
+	if err := read(ctx, h, key); err != nil {
 		return err
 	}
 	d.ciMu.Lock()
@@ -272,6 +278,19 @@ func (d *Daemon) readCIRepo(ctx context.Context, h ciRepoHere) error {
 	}
 	d.ciSendSlowed(citimings.Repo{Forge: h.repo.forge, Path: h.repo.path})
 	return nil
+}
+
+// ciGitHubRead is one read of a GitHub repository: its default branch, live, then the backfill
+// within its budget.
+func (d *Daemon) ciGitHubRead(ctx context.Context, h ciRepoHere, key string) error {
+	def, err := d.ciDefaultBranch(ctx, h, key)
+	if err != nil {
+		return err
+	}
+	if err := d.ciLive(ctx, h, key, def); err != nil {
+		return err
+	}
+	return d.ciBackfill(ctx, h, key, def)
 }
 
 // ciDefaultBranch is the repository's default branch, asked once a day.
@@ -523,7 +542,7 @@ func (d *Daemon) ciBudgetLeft() bool {
 
 func (d *Daemon) ciHourLocked(f *ciTimingsFile) {
 	if hour := nowFunc().Truncate(time.Hour); !f.Hour.Equal(hour) {
-		f.Hour, f.Calls = hour, 0
+		f.Hour, f.Calls, f.AzureDevOpsCalls = hour, 0, 0
 	}
 }
 
@@ -699,7 +718,7 @@ func (d *Daemon) buildsHistory(r wire.BuildsHistoryRequest) (wire.BuildsHistory,
 	}
 	out := wire.BuildsHistory{Repo: repo.String(), Reader: "none", Workflows: []string{}, Jobs: []string{},
 		Branches: []string{}, Days: []wire.BuildsDay{}, Changes: []wire.BuildsChange{}, Total: buildsFigures(citimings.Figures{})}
-	if repo.Forge != "github" && repo.Forge != "gitlab" {
+	if !ciReads(repo.Forge) {
 		return out, nil
 	}
 	out.Reader = repo.Forge

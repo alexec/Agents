@@ -364,8 +364,9 @@ func waitIdle(t *testing.T, d *Daemon, id wire.UUID) {
 		t.Fatal(text)
 	}
 	later := time.Now().Add(warmIdle + time.Minute)
-	warmNow = func() time.Time { return later }
-	t.Cleanup(func() { warmNow = time.Now })
+	clock := func() time.Time { return later }
+	warmClock.Store(&clock)
+	t.Cleanup(func() { warmClock.Store(nil) })
 }
 
 // An agent that waits past releaseAfterMinutes has no runtime; its ACP session id is kept,

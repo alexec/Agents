@@ -214,6 +214,9 @@ func (p *plane) serveHost(root string, member *controllink.Membership, private [
 	}()
 	p.t.Cleanup(h.stop)
 	p.waitFor(func() bool { s, ok := p.s.Router().State(member.Host); return ok && s.online() }, "the host online")
+	// The host is online when its link is taken, before its machine/hello is settled. Wait
+	// for the answer too, so a test that says its own hello is not undone by this one (#5307).
+	p.waitFor(func() bool { return u.ControlCapabilities() != nil }, "the answer to the host's hello")
 	return h
 }
 

@@ -119,6 +119,12 @@ type process struct {
 	webauthn bool
 	// store is its cookies, for Settings ▸ Browser (sites.go).
 	store cookieStore
+	// below is whether its windows are kept below the screen (keepBelow, #5313): Google
+	// Chrome on a screen a person sees, not on an Xvfb screen.
+	below bool
+	// shown is how many hand-offs have its window on the screen now (ShowWindow), under
+	// the machine's lock: the keeper moves nothing then.
+	shown int
 }
 
 // mode is how Chromium starts: Google Chrome stable (#5207), always with a window; with a
@@ -195,6 +201,9 @@ func (m *Machine) Endpoint(progress func(string)) (string, error) {
 	}
 	m.running = p
 	m.startLoop()
+	if p.below {
+		go m.keepBelow(p)
+	}
 	m.changed(true, p.endpoint)
 	started := "headless"
 	if p.chrome && p.display != "" {
@@ -585,7 +594,11 @@ func chromePaths(goos, home string) []string {
 // start is tried again on a new one.
 func launchChrome(exe, profile string, env []string, how mode) (*process, error) {
 	if canHead(env) {
-		return launchChromeOn(exe, profile, env, how, moveBelowScreen)
+		p, err := launchChromeOn(exe, profile, env, how, moveBelowScreen)
+		if p != nil {
+			p.below = true
+		}
+		return p, err
 	}
 	x, err := startXvfb(env)
 	if err != nil {
@@ -870,6 +883,17 @@ func dropCaches(profile string) {
 }
 
 func (m *Machine) pidFile() string { return filepath.Join(filepath.Dir(m.Profile), "chromium.pid") }
+
+// EndLeftover ends a Chromium that the last host left running (endLeftover) when the host
+// starts (#5313), not at the first start of the browser: that Chrome can have a hand-off's
+// window on the screen, and its window keeper ended with that host.
+func (m *Machine) EndLeftover() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.running == nil {
+		m.endLeftover()
+	}
+}
 
 // endLeftover ends a Chromium that a host which stopped without closing it left on a
 // profile: a second one on the same profile hands its window to the first and exits.
