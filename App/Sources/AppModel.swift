@@ -91,12 +91,12 @@ final class AppModel {
     @ObservationIgnored private var connectGeneration = 0
     /// Its wait, and the control plane watch's, both cut short by a wake or a network
     /// change (#82).
-    @ObservationIgnored private let backoff = Backoff()
+    @ObservationIgnored let backoff = Backoff()
     /// When this window last asked each session's host to warm it, and why (#183).
     @ObservationIgnored private var prewarmed: [String: Date] = [:]
     /// The control plane's own client: from 2 s, doubling to a minute, not every 2 s for
     /// ever (#172).
-    @ObservationIgnored private let controlBackoff = Backoff(first: .seconds(2), longest: .seconds(60))
+    @ObservationIgnored let controlBackoff = Backoff(first: .seconds(2), longest: .seconds(60))
     @ObservationIgnored private let wakeAndNetwork = WakeAndNetwork()
     @ObservationIgnored private var checkingAfterWake = false
     var problem: String?
@@ -111,9 +111,9 @@ final class AppModel {
     var machineProviders: [DaemonAPI.ProviderSummary] { listedProviders.filter { $0.capabilities.contains("create") } }
     /// Every machine provider this person may use, as the control plane last listed them: the
     /// Machines group shows each one's machines that have not joined (#4978).
-    private(set) var listedProviders: [DaemonAPI.ProviderSummary] = []
+    var listedProviders: [DaemonAPI.ProviderSummary] = []
     /// How each click on a machine that never joined goes (#4978), by its row's id.
-    private(set) var machineJoins: [String: MachineJoin] = [:]
+    var machineJoins: [String: MachineJoin] = [:]
     /// How many New Machine calls wait for the provider's answer (#4610): a *Making…* row
     /// each, until the control plane lists the machine as joining.
     private(set) var machinesBeingMade = 0
@@ -864,7 +864,7 @@ final class AppModel {
 
     static let newSessionFolderDefault = "newSessionFolder"
 
-    private func rememberNewSessionFolder(_ key: FolderKey) {
+    func rememberNewSessionFolder(_ key: FolderKey) {
         rememberProjectFolder(key)
         guard rememberedNewSessionFolder != key else { return }
         rememberedNewSessionFolder = key
@@ -1123,34 +1123,34 @@ final class AppModel {
     }
     /// The kinds of session the draft folder offers (#760): the folder's personas and
     /// the home's, as the host lists them.
-    private(set) var draftPersonas: [Persona] = []
+    var draftPersonas: [Persona] = []
     /// The one picked, by id, sent with the start so the agent gets its prompt.
-    private(set) var draftPersona: String?
+    var draftPersona: String?
     /// A persona picked while its runtime's options were still to come: laid over them
     /// when they arrive.
-    private var pendingPersona: Persona?
+    var pendingPersona: Persona?
     /// The live pick (#4559, #4721): always on for a new draft, until a segment is picked
     /// by hand, and the pick it made from the prompt as it is typed.
-    private(set) var draftPersonaAuto = true
-    private(set) var draftAutoPick: Persona.AutoPick?
+    var draftPersonaAuto = true
+    var draftAutoPick: Persona.AutoPick?
     /// The draft's prompt, as the live pick last read it, so new personas are read against it.
-    private var draftPromptWords = ""
+    var draftPromptWords = ""
     /// Where in the folder the next agent works, when not the folder (030).
     /// Deliberately not kept with the rest of the form: a worktree is decided per
     /// agent, so it goes back to the folder after every start (FR-004).
     var draftWorktree: WorktreeChoice?
     /// What the draft folder's repository has, for the Worktree chooser. Not a
     /// repository until the daemon says otherwise, which keeps the chooser hidden.
-    private(set) var draftWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
-    private var draftWorktreesGeneration = 0
+    var draftWorktrees: DaemonAPI.WorktreesListResponse = .notARepository
+    var draftWorktreesGeneration = 0
     /// Each open agent's folder's worktrees, for the Worktree choice on its page (053).
     /// Asked when the page opens and after each move, never polled.
-    private(set) var agentWorktrees: [URL: DaemonAPI.WorktreesListResponse] = [:]
+    var agentWorktrees: [URL: DaemonAPI.WorktreesListResponse] = [:]
     /// Why the last move asked for an agent was refused, shown under its choice until
     /// the next one. A move that fails later, when it is made, says so in the chat.
-    private(set) var moveProblems: [UUID: String] = [:]
-    private(set) var draftOptions: [ConfigOption] = []
-    private(set) var draftCommands: [SlashCommand] = []
+    var moveProblems: [UUID: String] = [:]
+    var draftOptions: [ConfigOption] = []
+    var draftCommands: [SlashCommand] = []
     var draftChosen: [String: JSONValue] = [:]
     /// The next agent's own sandbox choice (064). Nil follows its runtime's default.
     var draftSandbox: SandboxChoice? { didSet { draftSandboxRefusal = nil; draftAutoRefusal = nil } }
@@ -1182,7 +1182,7 @@ final class AppModel {
     /// A new agent is on its way to its host (#87): a worktree to make and a runtime to
     /// start can take seconds, and the bar shows it rather than nothing. One at a time,
     /// so a second Return is not a second agent.
-    private(set) var isStarting = false
+    var isStarting = false
     /// Folders beyond the working one, and MCP servers, for the agent about to start.
     var draftFolders: [URL] = []
     var draftServers: [MCPServer] = []
@@ -1198,26 +1198,26 @@ final class AppModel {
     /// folder is this one: the prompt, the labels and the worktree. Starting it is still
     /// the person's move.
     var offeredStart: OfferedStart?
-    private(set) var isLoadingDraftOptions = false
+    var isLoadingDraftOptions = false
     /// Why the last fetch of a runtime's options failed, if it did.
     ///
     /// Its own thing rather than the global `problem` banner: the row under the prompt
     /// has to say this, and offer to try again, and a modal alert can be dismissed
     /// leaving the row looking like a runtime with nothing to adjust.
-    private(set) var draftOptionsFailure: String?
+    var draftOptionsFailure: String?
     /// Which fetch is the current one.
     ///
     /// Changing the folder and then the runtime issues two calls, and without this the
     /// first to answer wins and is shown as settled while the right one is still in
     /// flight.
-    private var draftOptionsGeneration = 0
-    private var draftID: UUID?
+    var draftOptionsGeneration = 0
+    var draftID: UUID?
 
     /// This Mac's host: directly over its local socket when it is there (#1118), else
     /// through the control plane (058). Set once more when first run chooses one.
     var client = DaemonClient(link: UnreachableLink())
     /// The one connection to the control plane every host's client is carried on (058).
-    private var controlLink: ControlLink? = ControlConfig.endpoint.flatMap(ControlConfig.link)
+    var controlLink: ControlLink? = ControlConfig.endpoint.flatMap(ControlConfig.link)
 
     init() {
         userScope.lock = lock
@@ -1290,7 +1290,7 @@ final class AppModel {
     var kept: [DaemonAPI.KeptRequest] = []
     /// The kept starts the New Agent prompt has shown here: the one that reaches its host opens.
     @ObservationIgnored var keptStartsShown: Set<UUID> = []
-    @ObservationIgnored private var controlWatch: Task<Void, Never>?
+    @ObservationIgnored var controlWatch: Task<Void, Never>?
     /// Every host the control plane last listed, this Mac's included. Nil when the
     /// window is not its client; empty until the first list arrives (058, R11).
     private(set) var controlPlaneHosts: [DaemonAPI.ControlMachine]? = ControlConfig.endpoint == nil ? nil : []
@@ -1298,9 +1298,9 @@ final class AppModel {
     private var controlPlaneListed = false
     /// `control/status.thisMacHost` (#303): how this Mac's host says its join stands.
     /// Nil when that process is not writing one, or this plane is not beside it.
-    private(set) var macHostJoin: DaemonAPI.MachineJoinStatus?
+    var macHostJoin: DaemonAPI.MachineJoinStatus?
     /// `control/status.machineID`, so a missing host on this Mac is not a plane elsewhere.
-    private var controlPlaneMachine: String?
+    var controlPlaneMachine: String?
 
     /// Whether this window has a host on this Mac (058, T093a). Always without a control
     /// plane, and until its first list arrives; after that, only if it lists `.mac`. A
@@ -1331,15 +1331,15 @@ final class AppModel {
     private(set) var controlPlaneName: String?
     /// The control plane's own client has answered. Distinct from `isConnected`, which
     /// is this Mac's host: a host can be offline while the control plane is up.
-    private(set) var controlPlaneReachable = false
+    var controlPlaneReachable = false
     /// A try to reach the control plane failed. Stays quiet during the first try.
-    private(set) var controlPlaneMissed = false
+    var controlPlaneMissed = false
     /// When the window last read from the control plane (#5141): it is live until its link
     /// goes, so the time it went, or the first answer. Nil before it answered once.
-    private(set) var controlPlaneReadAt: Date?
+    var controlPlaneReadAt: Date?
     /// The address itself refused the connection (suspended, over a plan's limit,
     /// #2235): its words, shown in the away strip in place of "can't reach".
-    private(set) var controlPlaneRefusalLine: String?
+    var controlPlaneRefusalLine: String?
     /// No control plane and nothing of the old way: the window asks how to work, and
     /// starts nothing until it is told (058, FR-017).
     private(set) var needsFirstRun = ControlConfig.needsFirstRun
@@ -1568,8 +1568,8 @@ final class AppModel {
     var selectedHostClient: DaemonClient { client(for: selectedFolderHost) }
     /// Where a new session's prompt starts it: the folder whose own window it is in
     /// (#1089), or the selected one.
-    private var draftHost: MachineRef { composingWindow?.host ?? selectedFolderHost }
-    private var draftHostClient: DaemonClient { client(for: draftHost) }
+    var draftHost: MachineRef { composingWindow?.host ?? selectedFolderHost }
+    var draftHostClient: DaemonClient { client(for: draftHost) }
     private var listening: Task<Void, Never>?
 
     /// The panes listening for shell output, one per shell in this window: an agent
@@ -2600,7 +2600,7 @@ final class AppModel {
     }
 
     /// The draft's value for a field put into the named runtime's own options.
-    private func applyDraftLevel(_ field: AutoField) {
+    func applyDraftLevel(_ field: AutoField) {
         guard let runtimeID = draftRuntimeID, !isAutoDraft else { return }
         let level: String? = switch field {
         case .model: draftLevels.model?.rawValue
@@ -3547,7 +3547,7 @@ final class AppModel {
 
     /// Sends a prompt or a start for a host whose link is closed while it is stopped, to the
     /// control plane, which keeps it. What was kept, or nil with `problem` saying why not.
-    private func keepThroughControl(_ host: MachineRef, _ method: String, _ params: some Encodable) async -> DaemonAPI.KeptRequest? {
+    func keepThroughControl(_ host: MachineRef, _ method: String, _ params: some Encodable) async -> DaemonAPI.KeptRequest? {
         guard let controlRequests, let params = try? JSONValue.encoding(params) else {
             problem = "Not sent — the control plane can’t be reached."
             return nil
@@ -3609,7 +3609,7 @@ final class AppModel {
         }
     }
 
-    private func syncControlHosts(_ control: DaemonClient) async {
+    func syncControlHosts(_ control: DaemonClient) async {
         guard let controlLink,
               let listed = try? await control.call(DaemonAPI.Method.hostsList, returning: [DaemonAPI.ControlMachine].self),
               let status = try? await control.call(DaemonAPI.Method.controlStatus, returning: DaemonAPI.ControlStatus.self)
@@ -3718,7 +3718,7 @@ final class AppModel {
         runtimes.first { $0.id == runtimeID }?.availability.isAvailable ?? false
     }
 
-    private func receivedFromServer(_ host: MachineRef, _ method: String, _ params: JSONValue?,
+    func receivedFromServer(_ host: MachineRef, _ method: String, _ params: JSONValue?,
                                     _ update: AgentsModel.Update?) async {
         // The machine's browser is each host's own (#3528).
         if Self.browserNotifications.contains(method) {
@@ -5305,7 +5305,7 @@ final class AppModel {
 
     /// A server's new connection knows none of this window's screens: they attach
     /// again, and are given only what they missed (#401).
-    private func reattachShells(on host: MachineRef) async {
+    func reattachShells(on host: MachineRef) async {
         for shell in shellClients(on: host) {
             shell.lostConnection()
             await shell.reattachIfLost()
