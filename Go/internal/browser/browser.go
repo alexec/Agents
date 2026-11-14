@@ -567,7 +567,8 @@ func chromePaths(goos, home string) []string {
 // launchChrome starts Google Chrome stable (#5207): headed, on the kept profile, its
 // debugging port on 127.0.0.1 and a free port agentsd picks, and none of chromedp's test
 // defaults (no mock keychain, no basic password store, sync and extensions as Chrome has
-// them), so a site sees the Chrome it is. Its user agent is its own. WebAuthn is off unless
+// them), so a site sees the Chrome it is, except that a covered window's pages stay
+// visible. Its user agent is its own. WebAuthn is off unless
 // how asks for it (#4085), as for Chrome for Testing. Its window goes just below the screen
 // before the first page opens.
 //
@@ -622,6 +623,11 @@ func launchChromeOn(exe, profile string, env []string, how mode, place func(cont
 			chromedp.NoFirstRun,
 			chromedp.NoDefaultBrowserCheck,
 			chromedp.WindowSize(windowWidth, windowHeight),
+			// A window that macOS says is covered (by another window, or below the
+			// screen with its strip under the Dock) has hidden pages: they run no
+			// requestAnimationFrame, so Playwright's clicks wait for ever and a sign-in
+			// page stops after its first step (#5230). A page cannot see this flag.
+			chromedp.Flag("disable-backgrounding-occluded-windows", true),
 		}
 		var p *process
 		at := func() (string, error) { return listening(port) }

@@ -37,10 +37,10 @@ against. It is never Alex's personal account.
   - **The form** to make the account, and **a form per charge** (#3910).
   - **A CAPTCHA or bot check** (reCAPTCHA, HUMAN's press-and-hold): `hand_to_person` on the
     page (#3907). It is one short step per account; after sign-up, use the site's API, a
-    token or a TOTP sign-in, never the sign-up page again. When the check is in the agents'
-    own Chrome (`.agents/signups/cdp.mjs`, for Google and Microsoft), give
-    `hand_to_person` that Chrome's `cdp_port` (9226, 9233, …): the card names that window
-    (#5095). Never do the check with synthetic input (`cdp.mjs mclick` or a held press).
+    token or a TOTP sign-in, never the sign-up page again. Google and Microsoft too: the
+    agents' browser is Google Chrome (#5207), signed in to both (#5230), and the card
+    brings its real window to the front (#5208). Never do the check with synthetic input
+    (a scripted click or a held press).
   - **An SMS code or a phone call** (#3914 is not planned: TOTP only). Ask with
     `ask_question` and name who asks ("the <provider> sign-up lane asks: …"), then type the
     code Alex gives.
