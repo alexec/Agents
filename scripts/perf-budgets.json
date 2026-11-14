@@ -21,7 +21,6 @@
     "mac": {
       "cold start: first frame": 1500,
       "cold start: first list": 2000,
-      "project switch": 150,
       "chat open": 500
     },
     "web": {

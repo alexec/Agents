@@ -1,8 +1,8 @@
 #!/bin/bash
 # The night's performance times (#4784): on a seeded scratch root on this Mac, the host's
-# answers (scripts/perf-budgets.py), the window's cold start, first list, project switch and
-# chat open (scripts/perf-window.sh), the web page's first list, session open, long transcript
-# and send to echo (Web/test/walk/budgets.mjs), the calls the Mac window and the Remote make
+# answers (scripts/perf-budgets.py), the window's cold start, first list and chat open, in one
+# folder and across two (scripts/perf-window.sh), the web page's first list, session open, long
+# transcript and send to echo (Web/test/walk/budgets.mjs), the calls the Mac window and the Remote make
 # before their first list (the host's `first list:` lines, #4891), and the .perfBudget tests
 # (scripts/perf-tests.sh), each against the `night` budgets in scripts/perf-budgets.json. A run over budget files a `feature:performance` issue with the
 # numbers, or comments on the one still open. The Performance budgets workflow runs it.
@@ -19,9 +19,9 @@
 # the host is given: a seeded session's runtime is the real Claude, which the run never prompts,
 # and the run stops when the host would start any other `grok`. It builds Agents (Debug) with run-app's launch.sh, unless --no-build, and takes the
 # scratch set-up down at the end, also when a step fails. The report goes to
-# ~/.agents/reviews/performance-nightly/<date>.md. The window's switches and chat opens need
-# Accessibility permission for the process that runs this; without it only its cold start is
-# timed. The phone on Wi-Fi and cellular is Alex's check (docs/how-to/performance-budgets.md).
+# ~/.agents/reviews/performance-nightly/<date>.md. The window's chat opens go through its walk
+# socket (#1172), so they need no Accessibility permission and a locked screen does not stop
+# them (#5427). The phone on Wi-Fi and cellular is Alex's check (docs/how-to/performance-budgets.md).
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 RUNAPP="$REPO/.agents/skills/run-app/scripts"
@@ -64,7 +64,15 @@ mkdir -p "$ROOT/work"
 git -C "$ROOT/work" init -q
 python3 "$REPO/scripts/seed-big-repo.py" "$ROOT/big" >/dev/null || { echo "perf-nightly: seeding the big repo failed" >&2; exit 1; }
 swift "$REPO/scripts/seed-archived.swift" --root "$ROOT" --live --count 40 --folder "$ROOT/work" --transcript-bytes 200000 >/dev/null
-swift "$REPO/scripts/seed-archived.swift" --root "$ROOT" --live --count 1 --folder "$ROOT/big" >/dev/null
+BIGONE=$(swift "$REPO/scripts/seed-archived.swift" --root "$ROOT" --live --count 1 --folder "$ROOT/big")
+# A title of its own: the seed calls it "Seeded live agent 1", as it calls one in `work`, and
+# the window's chat opens find it by its row's text (perf-window.sh).
+python3 - "$ROOT/agents/$BIGONE/agent.json" <<'PY'
+import json, sys
+record = json.load(open(sys.argv[1]))
+record["title"] = "Seeded live agent in big"
+json.dump(record, open(sys.argv[1], "w"))
+PY
 LONG=$(swift "$REPO/scripts/seed-archived.swift" --root "$ROOT" --live --count 1 --folder "$ROOT/work" --transcript-bytes 1000)
 python3 "$REPO/scripts/seed-long-transcript.py" "$ROOT" "$LONG" 100000 >/dev/null
 python3 - "$ROOT/agents/$LONG/agent.json" <<'PY'
@@ -116,7 +124,8 @@ ECHOID=$(python3 "$RUNAPP/rpc.py" "$ROOT" call agents/start "{\"runtimeID\": \"g
 
 over=0
 "$REPO/scripts/perf-budgets.py" "$ROOT" --markdown >"$OUT/host.md" 2>&1 || over=1
-"$REPO/scripts/perf-window.sh" "$SLUG" work big "Seeded live agent 20" "Long transcript 100k" >"$OUT/mac.txt" 2>&1 || over=1
+"$REPO/scripts/perf-window.sh" "$SLUG" "$ROOT/work" "$ROOT/big" \
+  "Seeded live agent 20" "Seeded live agent in big" "Long transcript 100k" >"$OUT/mac.txt" 2>&1 || over=1
 HOSTAPP="$REPO/build/DD/Build/Products/Debug/Agent Loops.app"
 CODE=$("$HOSTAPP/Contents/Helpers/agents-control" code --client --browser --home "$ROOT/control" 2>/dev/null | tail -1)
 SESSION=$(grep -l '"Seeded live agent 20"' "$ROOT"/agents/*/agent.json | head -1 | xargs dirname | xargs basename)
@@ -145,10 +154,16 @@ if [ "$REMOTE" = 1 ]; then
       sleep 2
     done
     # Opened again as a member of the lock, keeping its pairing: this connection is the one counted.
-    [ -n "$(calls remote)" ] || "$RUNAPP/remote.sh" up "$SIMAPP" >>"$OUT/remote.txt" 2>&1
-    for _ in $(seq 1 30); do
+    # The host learns of the new member a few seconds after the control plane does, and a
+    # launch before then is refused and does not try again ("Open Agent Loops on this device
+    # again"), so it is opened again until the host logs its first list (#5427).
+    for _ in $(seq 1 4); do
       [ -n "$(calls remote)" ] && break
-      sleep 2
+      "$RUNAPP/remote.sh" up "$SIMAPP" >>"$OUT/remote.txt" 2>&1
+      for _ in $(seq 1 10); do
+        [ -n "$(calls remote)" ] && break
+        sleep 2
+      done
     done
   fi
 fi
