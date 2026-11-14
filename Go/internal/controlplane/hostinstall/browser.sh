@@ -28,7 +28,8 @@ install_browser() {
         return 0
     fi
     echo "Installing Google Chrome and Xvfb for the agents' browser…"
-    # Where Chrome's own package puts its key and its source, so its updates keep them.
+    # Enough for the first install. Chrome's package then writes its own source,
+    # google-chrome.sources, signed by its own keyring, and removes this .list.
     key=$(mktemp) || return 0
     if command -v curl >/dev/null 2>&1; then
         curl -fsSL -o "$key" https://dl.google.com/linux/linux_signing_key.pub
@@ -44,7 +45,12 @@ install_browser() {
         $as tee /etc/apt/sources.list.d/google-chrome.list >/dev/null || return 0
     if $as env DEBIAN_FRONTEND=noninteractive apt-get -qq update >/dev/null &&
         $as env DEBIAN_FRONTEND=noninteractive apt-get -qq install -y google-chrome-stable xvfb >/dev/null; then
-        echo "Installed $(google-chrome-stable --version 2>/dev/null) and Xvfb."
+        # Its source names its own keyring, so the key above need not be trusted for
+        # every repository.
+        if [ -f /etc/apt/sources.list.d/google-chrome.sources ]; then
+            $as rm -f /etc/apt/trusted.gpg.d/google-chrome.asc
+        fi
+        echo "Installed $(google-chrome-stable --version 2>/dev/null | sed 's/ *$//') and Xvfb."
     else
         echo "$headless apt-get could not install Google Chrome and Xvfb."
     fi
