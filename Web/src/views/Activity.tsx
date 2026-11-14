@@ -41,7 +41,6 @@ import { OrgBudget, OrgPolicyLine, PassThroughList } from "./OrgPolicyLine";
 import { PageTitle } from "./TopBar";
 import { pageCrumbs, sectionOfActivity } from "../model/crumbs";
 import { ask } from "./MessageKinds";
-import { LastUpdate } from "./LastUpdate";
 import { busRow, envelopeChoices, envelopeMatches, joinBus, producerMachine, type EnvelopeFilter, type EventItem } from "../model/eventBus";
 
 function navigate(destination: { host: string; folder: string; session?: string; workflow?: string }): void {
