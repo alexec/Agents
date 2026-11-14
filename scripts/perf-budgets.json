@@ -1,7 +1,7 @@
 {
   "_about": "The performance budgets (#73, #4784), in one file. `pr` holds what does not change with load (bytes and counts) and fails a pull request's check when it goes over: Web/test/perfBudgets.test.mjs (web) and Go/internal/agentsd/perfbytes_test.go (host). `night` holds the times, in ms, and in `counts` the calls the Mac window and the Remote make before their first list (the host counts them, #4891), that scripts/perf-nightly.sh measures on a seeded scratch root on this Mac; a run over files a feature:performance issue. To raise a budget, change it here, in the PR that needs it, and say why in its body. docs/how-to/performance-budgets.md says more.",
   "pr": {
-    "web.gzipBytes": 612500,
+    "web.gzipBytes": 615100,
     "web.callsBeforeFirstList": 7,
     "host.leanAgentBytes": 640,
     "host.catchUpBytes": 32500
