@@ -1,6 +1,6 @@
 ---
 diataxis: explanation
-description: What planning means in Agents, the three questions it answers, and how the figures earn trust.
+description: What planning means in Agent Loops, the three questions it answers, and how the figures earn trust.
 ---
 
 # Planning

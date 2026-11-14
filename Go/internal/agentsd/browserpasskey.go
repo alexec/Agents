@@ -12,6 +12,7 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/cdproto/webauthn"
 
+	"github.com/agentloops-dev/agents/Go/internal/browser"
 	"github.com/agentloops-dev/agents/Go/wire"
 )
 
@@ -24,8 +25,8 @@ import (
 // (its sign count goes up each time, and a site may refuse one that goes back). The agent
 // never sees a key: it is told how many passkeys there are, for which site. Using a kept
 // secret that has Ask before use waits on a person's approval for the site, as fill_secret
-// does (#4015). The passkey holds for the session's tabs, and the ones they open, until the
-// agent takes it away, its tabs all close, or the browser stops.
+// does (#4015). The passkey holds for the session's tabs, and every tab it gets after the
+// call (#5196), until the agent takes it away, its tabs all close, or the browser stops.
 
 const passkeyName = "browser_passkey"
 
@@ -36,7 +37,7 @@ var passkeyTool = json.RawMessage(`{"name":"browser_passkey","title":"Use a soft
 	`It is kept as one of the person's secrets (Settings ▸ Secrets), one secret per account. When the secret is set, its passkeys are put back, so the site's passkey sign-in works; ` +
 	`when it is not, the first passkey the site makes (Add a passkey, Set up a passkey) is saved as it. Each sign-in saves it again. You are told how many passkeys there are, never a key. ` +
 	`Call it before you open the page: the first call starts the browser again with passkeys on, which closes its tabs (sign-ins are kept). ` +
-	`It holds for this session's tabs and the ones they open, until you call it with off, the tabs close or the browser stops. ` +
+	`It holds for this session's tabs and every tab it opens after the call, until you call it with off, the tabs close or the browser stops. ` +
 	`Record the account's second factor as a software passkey with manage_accounts.",` +
 	`"inputSchema":{"type":"object","properties":{` +
 	`"secret":{"type":"string","description":"The secret that keeps the passkeys, e.g. GITHUB_AGENT_PASSKEY: letters, digits and underscores."},` +
@@ -288,14 +289,36 @@ func (d *Daemon) giveTabPasskey(owner wire.UUID, tab target.ID) {
 		return
 	}
 	// Away from the browser's own events, which must not wait on a call to it.
-	go func() {
-		kept, refusal := d.keptPasskeys(owner, p.secret, p.site)
-		if refusal != "" {
-			log.Printf("browser: no passkey on a new tab: %s", refusal)
-			return
+	go d.putPasskey(owner, t, p, tab)
+}
+
+// keepSessionPasskey gives each of agent's tabs that has no software passkey its session's,
+// before a browser call (#5196): a tab that became its after browser_passkey, and that no
+// event gave one to, has it before the agent uses the page.
+func (d *Daemon) keepSessionPasskey(agent wire.UUID) {
+	key := sessionKey(agent)
+	d.tabsMu.Lock()
+	t, p := d.tabs, d.passkeys[key]
+	own := append([]target.ID(nil), d.ownTabs[key]...)
+	d.tabsMu.Unlock()
+	if t == nil || p == nil {
+		return
+	}
+	for _, tab := range own {
+		if !t.HasPasskey(tab) {
+			d.putPasskey(key, t, p, tab)
 		}
-		if err := t.Passkey(tab, kept, d.passkeySaver(owner, p)); err != nil {
-			log.Printf("browser: couldn't give a tab its session's passkey: %v", err)
-		}
-	}()
+	}
+}
+
+// putPasskey puts p's passkeys, as its secret keeps them now, on tab.
+func (d *Daemon) putPasskey(owner wire.UUID, t *browser.Tabs, p *sessionPasskey, tab target.ID) {
+	kept, refusal := d.keptPasskeys(owner, p.secret, p.site)
+	if refusal != "" {
+		log.Printf("browser: no passkey on a new tab: %s", refusal)
+		return
+	}
+	if err := t.Passkey(tab, kept, d.passkeySaver(owner, p)); err != nil {
+		log.Printf("browser: couldn't give a tab its session's passkey: %v", err)
+	}
 }

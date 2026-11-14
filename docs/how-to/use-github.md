@@ -6,7 +6,7 @@ description: Connect GitHub once, set up a folder's Tasks, Code review and CI fr
 
 # Use GitHub
 
-Agents talks to GitHub through its own `github` connector (an MCP server). The connector
+Agent Loops talks to GitHub through its own `github` connector (an MCP server). The connector
 has the tools of GitHub's official MCP server, events such as `checks.failed`, and three
 pages: **Pull requests**, **Issues** and a pull request's page. It does not use `gh`. It
 reads GitHub as you, with one connection that the host keeps.
@@ -22,7 +22,7 @@ the same set-up and the same pages, because the host keeps the state.
 
 ## Connect GitHub
 
-You connect once, and the connection is for every folder on that host. Agents uses the
+You connect once, and the connection is for every folder on that host. Agent Loops uses the
 GitHub App `agents-loops`. You choose on github.com which repositories it can see.
 
 1. Open the connection sheet:
@@ -31,7 +31,7 @@ GitHub App `agents-loops`. You choose on github.com which repositories it can se
    - Or open **Connectors** (under Activity in the sidebar; on the Mac also
      **View ▸ Connectors**). On the Mac, choose **Connect… ▸ GitHub**. On the Remote
      and the web page, choose **Connect GitHub…**.
-2. The sheet lists what Agents will be able to do: read and write issues, pull requests
+2. The sheet lists what Agent Loops will be able to do: read and write issues, pull requests
    and reviews, read checks and Actions runs, and read and push code. Choose
    **Continue on github.com**.
 3. The sheet shows a code and copies it. Your browser opens github.com/login/device. Type
@@ -39,8 +39,8 @@ GitHub App `agents-loops`. You choose on github.com which repositories it can se
 4. The sheet closes by itself when GitHub says yes. If the browser closed, choose
    **Open github.com Again**.
 
-If the Agents app is not installed on the folder's repository, the sheet stays open. It
-says "The Agents app is not installed on ‹repository›, so agents can't write there."
+If the Agent Loops app is not installed on the folder's repository, the sheet stays open. It
+says "The Agent Loops app is not installed on ‹repository›, so agents can't write there."
 Choose **Install on github.com**, pick the repository, and come back.
 
 The host keeps the token: on a Mac in the Keychain, on a Linux host in
@@ -63,13 +63,13 @@ The connection's row on **Connectors ▸ Connections** says which kind of token 
   GitHub** opens github.com's page for a classic token, named Agents, with the `repo` and
   `codespace` scopes. Paste the token (it starts with `ghp` or `github_pat`) and choose **Connect**. The
   host checks the token with github.com and keeps it; the host does not renew it, so make a
-  new one when it ends. Agents connects only github.com, not a GitHub Enterprise Server.
+  new one when it ends. Agent Loops connects only github.com, not a GitHub Enterprise Server.
 
 The token stays on the host. It never goes to the control plane.
 
 An agent's own `gh` and `git` use the same token (#3926), in a folder whose repository the
 App reaches: the `agents-loops` App is installed on it, or your bot is installed on its owner
-(then the bot's token). Agents puts its own `gh` first on the agent's PATH, and makes
+(then the bot's token). Agent Loops puts its own `gh` first on the agent's PATH, and makes
 `agentsd credential` git's only credential helper for `https://github.com`. Both ask the host
 for the current token at each call, so a session of any length gets no error. The agent's
 environment holds only a grant for that one session, which the host takes back when the
@@ -125,7 +125,7 @@ and each commit ends with a `Co-authored-by` trailer for you (#3858).
 2. To use the bot on an organisation's repositories, turn on **Organisations can install
    it**. The organisation's owner then approves the install.
 3. Choose **Continue on github.com**, then **Create GitHub App** on GitHub.
-4. Back in Agents, choose **Install on Repositories…** and select the repositories that
+4. Back in Agent Loops, choose **Install on Repositories…** and select the repositories that
    agents work on.
 
 The bot can read and write code, issues and pull requests, read checks and statuses, and run
@@ -138,14 +138,14 @@ Keychain, or in `~/.agents-secrets` on Linux. The github server on a machine use
 the bot is installed on the owner of the folder's repository.
 
 Your other machines get the key from that machine, sealed to each one (#3950). The machine seals
-it to the key that your machine lock gives for each of your machines, and signs it. Agents'
+it to the key that your machine lock gives for each of your machines, and signs it. Agent Loops'
 servers pass it on and cannot read it, and no app or browser sees it. A machine of another
 person never gets it. A machine that is offline gets the key when it and a machine with the key
 are both online. The bot's row says which machines have the key. With no machine lock, the key
 stays on the machine that made it.
 
 **Forget the Bot…** deletes the key on all your machines and opens the App's page on GitHub,
-where you delete the App. A machine that you remove deletes its key when Agents' servers tell
+where you delete the App. A machine that you remove deletes its key when Agent Loops' servers tell
 it that it was removed. A removed machine that is not honest can keep a copy: when you remove a
 machine that you do not trust, also make a new private key for the App on its GitHub page, and
 delete the old one.
@@ -166,7 +166,7 @@ so you know that it works and not only that it is configured:
 
 Each slot shows what it read, such as "Newest: #12 Fix the walk". What you can do on a slot:
 
-- **Skip** turns the slot off. Agents will not use it here, and nothing is turned on.
+- **Skip** turns the slot off. Agent Loops will not use it here, and nothing is turned on.
   **Set Up** takes it back.
 - **Change…** opens the slot in place. On the Mac, **Tasks** can use Linear instead
   (**Use Linear instead…**, or **Linear…**), or a tracker **From a catalogue…**. On the
@@ -183,7 +183,7 @@ When the first slot has read, the page adds the `github` connector to the folder
 `.agents/mcp.json`, approved, once. Its events then reach the folder. The page shows
 them, such as `issue.* pr.* checks.*`, and the workflows that start on them.
 
-To add the connector by hand, add **GitHub** from the **Agents** marketplace in the catalogue on the
+To add the connector by hand, add **GitHub** from the **Agent Loops** marketplace in the catalogue on the
 Mac, or write the entry yourself:
 
 ```json
@@ -238,7 +238,7 @@ Under the tabs is a box for your words, and these buttons. Each one acts on GitH
   asks you before it sends. With no agent on that branch, the new-agent form opens on the
   branch instead, and you press Start.
 
-Agents can't merge, approve or comment from this page. These are tools that only a view
+Agent Loops can't merge, approve or comment from this page. These are tools that only a view
 can call, so a person does them. Merge, auto-merge and a review carry the commit that the
 page shows. When the pull request has a newer commit, nothing happens and the page says so.
 Open it again to see the new commit.
@@ -253,16 +253,16 @@ when you are one of its reviewers. The row says the tag or branch, and what it w
 - Choose the row to see what ships: the run, the environment, its reviewers, the commit,
   and, for a version tag, each commit since the version tag before it.
 - **Approve** lets the run go on. **Reject** stops it. Both act on GitHub as you, so
-  GitHub keeps who answered, with the comment "Approved in Agents" or "Rejected in Agents".
+  GitHub keeps who answered, with the comment "Approved in Agent Loops" or "Rejected in Agent Loops".
   The Mac and the Remote also have both in the row's menu.
-- The gate is GitHub's. Agents adds none of its own, and an agent can't answer one: only
+- The gate is GitHub's. Agent Loops adds none of its own, and an agent can't answer one: only
   a window or a device can. GitHub refuses an answer from a person who is not a reviewer.
-- Agents reads the waiting runs every two minutes. A workflow can wait on the github
+- Agent Loops reads the waiting runs every two minutes. A workflow can wait on the github
   server's `deploy.waiting` event instead.
 
 A release to the App Store is one of these (#3657): the **app-store** workflow waits at its
 `app-store` environment, and Approve sends the version to App Review
-([Release Agents Host](release-agents-host.md)). The version is then on the release's Work
+([Release Agent Loops](release-agents-host.md)). The version is then on the release's Work
 page as **App Store 0.17.0**, after its TestFlight build.
 
 To approve here, the GitHub App `agents-loops` must have the **Deployments** permission
@@ -278,7 +278,7 @@ private repository in your GitHub account, or in an organisation you name, with 
 your other clones and adds it as a folder, so it shows in the session list on every client.
 When a step fails, ask again: each step that is done already is skipped.
 
-The first open of Agents does this for a newcomer: see
+The first open of Agent Loops does this for a newcomer: see
 [Build your first app](build-your-first-app.md). Later, the agent follows the ready-made
 skill `start-a-new-app` (#3712), in voice mode or typed,
 from the first question to the first deploy. It asks the kind of app (an iPhone app, a web
@@ -313,8 +313,8 @@ page, the form opens in the pin's folder.
 
 ## Work with CodeRabbit
 
-Agents works with CodeRabbit through the `github` connector. It needs no CodeRabbit
-account in Agents. Install the CodeRabbit GitHub App on the repository first. Agents knows
+Agent Loops works with CodeRabbit through the `github` connector. It needs no CodeRabbit
+account in Agent Loops. Install the CodeRabbit GitHub App on the repository first. Agent Loops knows
 CodeRabbit by its GitHub App, not by a name that a person could take.
 
 When CodeRabbit is on a pull request, the **Conversation** tab starts with its block: its

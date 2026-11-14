@@ -1,12 +1,12 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Publish Agents for the Mac on GitHub and the iPhone and iPad app on TestFlight by tagging main, and set up the signing secrets the release needs once.
+description: Publish Agent Loops for the Mac on GitHub and the iPhone and iPad app on TestFlight by tagging main, and set up the signing secrets the release needs once.
 ---
 
-# Release Agents
+# Release Agent Loops
 
-On a Mac, Agents is one app, a Developer ID download from the folder's GitHub releases. It
+On a Mac, Agent Loops is one app, a Developer ID download from the folder's GitHub releases. It
 is not in the Mac App Store. The iPhone and iPad app (the Remote) goes to TestFlight and
 the App Store. Pushing a version tag on main publishes a release. The tag starts the
 `release` workflow, which:
@@ -41,7 +41,7 @@ The program inside the app keeps the name `Agents Host` (`Contents/MacOS/Agents 
 because each login item was registered with that path. Do not rename it.
 
 Beside it, the **app-store** workflow (`app-store.yml`, #3657) waits at the `app-store`
-environment's gate for a person to approve the release for App Review. Approve it in Agents
+environment's gate for a person to approve the release for App Review. Approve it in Agent Loops
 (Needs You ▸ **Deploy**, see [Use GitHub](use-github.md#approve-a-waiting-deploy)) or on
 GitHub. Then it waits for the processed build, sets "What's New" to the tag's message and
 submits the iOS version for App Review. If you reject it, the release stays on TestFlight
@@ -131,7 +131,7 @@ You set this up once, as the Apple Developer account's Account Holder.
 
 3. Follow the **release** run in the repository's Actions. The Linux job takes about ten
    minutes. The Mac job takes longer, mostly waiting for Apple's notary.
-4. When it finishes, the release is on the Releases page as **Agents 0.2.0**, and
+4. When it finishes, the release is on the Releases page as **Agent Loops 0.2.0**, and
    0.2.0 (the run number) is on TestFlight for iOS.
    `swift scripts/asc-builds.swift 0.2.0 <run number>` says each build's state.
 5. The **app-store** run waits for your approval. When you approve it, App Review gets
@@ -146,7 +146,7 @@ the **release** workflow by hand and give it the tag. It replaces the release's 
 Developer ID identity in your keychain, and `ASC_KEY_ID`,
 `ASC_ISSUER_ID` and `ASC_KEY_PATH` set. It needs the Linux agentsd in `App/Resources/servers`,
 from `scripts/build-linux-agentsd.sh`, and Go installed (`brew install go`) for the Go
-programs Agents carries. It writes `Agent-Loops-0.2.0.dmg`, `Agent-Loops-0.2.0.zip`,
+programs Agent Loops carries. It writes `Agent-Loops-0.2.0.dmg`, `Agent-Loops-0.2.0.zip`,
 `Agents-0.2.0.zip`, `Agents-Host-0.2.0.zip`, the Linux tarballs and `SHA256SUMS` into `build/release/`.
 
 `scripts/release-host.sh --dry-run 0.2.0` needs none of that. It signs ad hoc and doesn't

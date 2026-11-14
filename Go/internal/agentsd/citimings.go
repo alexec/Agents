@@ -16,11 +16,13 @@ import (
 	"time"
 
 	"github.com/agentloops-dev/agents/Go/internal/citimings"
+	"github.com/agentloops-dev/agents/Go/internal/gitlabmcp"
 	"github.com/agentloops-dev/agents/Go/wire"
 )
 
 // Build timings (#5177, specs/5166-build-deploy-trends/spec.md, "The data spike"): this
-// machine reads each GitHub repository's CI runs, with their jobs and steps, into the timing
+// machine reads each GitHub repository's CI runs (and Azure DevOps's builds, #5222,
+// citimingsazure.go), with their jobs and steps, into the timing
 // store (citimings), and answers builds/history and builds/run from it.
 //
 //   - Live: every ciLiveEvery, and soon after a run.completed or checks.* event, the newest
@@ -63,6 +65,8 @@ const (
 	// ciDefaultEvery is how often a repository's default branch is asked again.
 	ciDefaultEvery = 24 * time.Hour
 	githubAPI      = "https://api.github.com"
+	// ciGitLabJobPages bounds the pages of one pipeline's jobs: 500.
+	ciGitLabJobPages = 5
 )
 
 type ciTimingsBook struct {
@@ -75,8 +79,9 @@ type ciTimingsBook struct {
 	// found at a generation.
 	ciGen     map[string]int
 	ciChanges map[string]ciChangesFound
-	// ciAPI is GitHub's API; "" is api.github.com. A test sets it.
-	ciAPI string
+	// ciAPI is GitHub's API; "" is api.github.com. A test sets it. ciGitLabAPI is the same for
+	// GitLab's root, with no connection needed.
+	ciAPI, ciGitLabAPI string
 }
 
 type ciChangesFound struct {
@@ -92,6 +97,8 @@ type ciTimingsFile struct {
 	Hour  time.Time `json:"hour"`
 	Calls int       `json:"calls"`
 	Limit int       `json:"limit,omitempty"`
+	// AzureDevOpsCalls counts Azure DevOps's calls this hour apart (citimingsazure.go).
+	AzureDevOpsCalls int `json:"azureDevOpsCalls,omitempty"`
 }
 
 type ciRepoState struct {
@@ -105,6 +112,8 @@ type ciRepoState struct {
 	FilledFrom *time.Time `json:"filledFrom,omitempty"`
 	Filled     bool       `json:"filled,omitempty"`
 	SweptAt    time.Time  `json:"sweptAt"`
+	// Slowed is each change ci.slowed was sent for, by its id (#5200, cislowed.go).
+	Slowed map[string]ciSlowedSent `json:"slowed,omitempty"`
 }
 
 func (d *Daemon) ciTimingsDir() string { return filepath.Join(d.Store.Loc.Root, "ci-timings") }
@@ -179,31 +188,56 @@ func (d *Daemon) ciTimingsClock(ctx context.Context) {
 	}
 }
 
-// ciRepoHere is a GitHub repository a folder pushes to, and that folder, for gh.
+// ciRepoHere is a GitHub or Azure DevOps repository a folder pushes to, and that folder, for
+// gh or for the Azure DevOps it is on.
 type ciRepoHere struct {
 	repo   forgeRepo
 	folder string
 }
 
-// ciReposHere is the GitHub repositories the folders push to, at most ciMostRepos.
-func (d *Daemon) ciReposHere() []ciRepoHere {
+// ciReposHere is the GitHub, GitLab and Azure DevOps repositories the folders push to, at most
+// ciMostRepos. A GitLab one counts when the person's GitLab connection is on its root.
+func (d *Daemon) ciReposHere(ctx context.Context) []ciRepoHere {
 	seen := map[string]bool{}
 	var out []ciRepoHere
 	for _, f := range d.folderPaths() {
 		r := d.folderRepo(f)
-		if r.forge != "github" || seen[r.path] || len(out) >= ciMostRepos {
+		if r.forge == "gitlab" {
+			if root, project := d.ciGitLabAt(ctx, f); root != "" {
+				r.path = project
+			} else {
+				continue
+			}
+		}
+		if !ciReads(r.forge) || seen[r.forge+":"+r.path] || len(out) >= ciMostRepos {
 			continue
 		}
-		seen[r.path] = true
+		seen[r.forge+":"+r.path] = true
 		out = append(out, ciRepoHere{r, f})
 	}
 	return out
 }
 
+// ciGitLabAt is the connected GitLab's root, when folder's project is on it, and the project.
+func (d *Daemon) ciGitLabAt(ctx context.Context, folder string) (root, project string) {
+	if d.ciGitLabAPI != "" {
+		return d.ciGitLabAPI, d.folderRepo(folder).path
+	}
+	c, ok := d.gitlabConnection()
+	if !ok || !c.Usable(nowFunc()) {
+		return "", ""
+	}
+	at, project := d.gitlabProjectAt(ctx, folder, c.URL)
+	if at != gitlabmcp.BaseURL(c.URL) || project == "" {
+		return "", ""
+	}
+	return at, project
+}
+
 // readCITimings is one read of every repository: live, then the backfill within its budget,
 // then the bounds once an hour.
 func (d *Daemon) readCITimings(ctx context.Context) {
-	for _, h := range d.ciReposHere() {
+	for _, h := range d.ciReposHere(ctx) {
 		if ctx.Err() != nil {
 			return
 		}
@@ -213,16 +247,18 @@ func (d *Daemon) readCITimings(ctx context.Context) {
 	}
 }
 
+// ciReads says the build timings read a forge's CI: its builds/history reader.
+func ciReads(forge string) bool {
+	return forge == "github" || forge == "gitlab" || forge == "azuredevops"
+}
+
 func (d *Daemon) readCIRepo(ctx context.Context, h ciRepoHere) error {
 	key := citimings.Repo{Forge: h.repo.forge, Path: h.repo.path}.String()
-	def, err := d.ciDefaultBranch(ctx, h, key)
-	if err != nil {
-		return err
+	read := d.ciGitHubRead
+	if h.repo.forge == "azuredevops" {
+		read = d.ciAzureRead
 	}
-	if err := d.ciLive(ctx, h, key, def); err != nil {
-		return err
-	}
-	if err := d.ciBackfill(ctx, h, key, def); err != nil {
+	if err := read(ctx, h, key); err != nil {
 		return err
 	}
 	d.ciMu.Lock()
@@ -240,7 +276,21 @@ func (d *Daemon) readCIRepo(ctx context.Context, h ciRepoHere) error {
 		}
 		d.ciChanged(key)
 	}
+	d.ciSendSlowed(citimings.Repo{Forge: h.repo.forge, Path: h.repo.path})
 	return nil
+}
+
+// ciGitHubRead is one read of a GitHub repository: its default branch, live, then the backfill
+// within its budget.
+func (d *Daemon) ciGitHubRead(ctx context.Context, h ciRepoHere, key string) error {
+	def, err := d.ciDefaultBranch(ctx, h, key)
+	if err != nil {
+		return err
+	}
+	if err := d.ciLive(ctx, h, key, def); err != nil {
+		return err
+	}
+	return d.ciBackfill(ctx, h, key, def)
 }
 
 // ciDefaultBranch is the repository's default branch, asked once a day.
@@ -252,7 +302,7 @@ func (d *Daemon) ciDefaultBranch(ctx context.Context, h ciRepoHere, key string) 
 	if def != "" && nowFunc().Sub(at) < ciDefaultEvery {
 		return def, nil
 	}
-	raw, err := d.ciGet(ctx, h, "repos/"+h.repo.path)
+	raw, err := d.ciGet(ctx, h, d.ciRepoPath(h))
 	if err != nil {
 		return "", err
 	}
@@ -260,7 +310,7 @@ func (d *Daemon) ciDefaultBranch(ctx context.Context, h ciRepoHere, key string) 
 		DefaultBranch string `json:"default_branch"`
 	}
 	if err := json.Unmarshal(raw, &repo); err != nil || repo.DefaultBranch == "" {
-		return "", errors.New("GitHub did not say the default branch")
+		return "", fmt.Errorf("%s did not say the default branch", ciForgeName(h))
 	}
 	d.ciMu.Lock()
 	st = d.ciRepoLocked(key)
@@ -273,15 +323,11 @@ func (d *Daemon) ciDefaultBranch(ctx context.Context, h ciRepoHere, key string) 
 // ciLive reads the newest finished runs, until a page has nothing new.
 func (d *Daemon) ciLive(ctx context.Context, h ciRepoHere, key, def string) error {
 	for page := 1; page <= ciLivePages; page++ {
-		list, err := d.ciList(ctx, h, url.Values{"status": {"completed"}, "per_page": {"100"}, "page": {strconv.Itoa(page)}})
+		listed, added, err := d.ciPage(ctx, h, def, page, nil, nowFunc())
 		if err != nil {
 			return err
 		}
-		added, err := d.ciKeepRuns(ctx, h, def, list.WorkflowRuns, nowFunc())
-		if err != nil {
-			return err
-		}
-		if added == 0 || len(list.WorkflowRuns) < 100 {
+		if added == 0 || listed < 100 {
 			break
 		}
 	}
@@ -314,15 +360,11 @@ func (d *Daemon) ciBackfill(ctx context.Context, h ciRepoHere, key, def string) 
 				done = false
 				break
 			}
-			list, err := d.ciList(ctx, h, url.Values{"status": {"completed"}, "per_page": {"100"}, "page": {strconv.Itoa(page)},
-				"created": {from.UTC().Format(time.RFC3339) + ".." + to.UTC().Format(time.RFC3339)}})
+			listed, _, err := d.ciPage(ctx, h, def, page, &[2]time.Time{from, to}, now)
 			if err != nil {
 				return err
 			}
-			if _, err := d.ciKeepRuns(ctx, h, def, list.WorkflowRuns, now); err != nil {
-				return err
-			}
-			if len(list.WorkflowRuns) < 100 {
+			if listed < 100 {
 				break
 			}
 		}
@@ -339,6 +381,95 @@ func (d *Daemon) ciBackfill(ctx context.Context, h ciRepoHere, key, def string) 
 		d.ciMu.Unlock()
 	}
 	return nil
+}
+
+// ciPage reads one page of finished runs, in window when there is one, and keeps each the store
+// does not have: how many the page listed and how many it kept.
+func (d *Daemon) ciPage(ctx context.Context, h ciRepoHere, def string, page int, window *[2]time.Time, now time.Time) (listed, added int, err error) {
+	if h.repo.forge == "gitlab" {
+		q := url.Values{"scope": {"finished"}, "per_page": {"100"}, "page": {strconv.Itoa(page)}}
+		if window != nil {
+			q.Set("created_after", window[0].UTC().Format(time.RFC3339))
+			q.Set("created_before", window[1].UTC().Format(time.RFC3339))
+		}
+		raw, err := d.ciGet(ctx, h, fmt.Sprintf("projects/%s/pipelines?%s", ciGitLabID(h), q.Encode()))
+		if err != nil {
+			return 0, 0, err
+		}
+		var list []citimings.GitLabPipeline
+		if err := json.Unmarshal(raw, &list); err != nil {
+			return 0, 0, fmt.Errorf("the pipeline list: %v", err)
+		}
+		added, err = d.ciKeepPipelines(ctx, h, def, list, now)
+		return len(list), added, err
+	}
+	q := url.Values{"status": {"completed"}, "per_page": {"100"}, "page": {strconv.Itoa(page)}}
+	if window != nil {
+		q.Set("created", window[0].UTC().Format(time.RFC3339)+".."+window[1].UTC().Format(time.RFC3339))
+	}
+	list, err := d.ciList(ctx, h, q)
+	if err != nil {
+		return 0, 0, err
+	}
+	added, err = d.ciKeepRuns(ctx, h, def, list.WorkflowRuns, now)
+	return len(list.WorkflowRuns), added, err
+}
+
+// ciKeepPipelines is ciKeepRuns for GitLab: the jobs of each pipeline the store does not have,
+// retried tries included (one call, or one a page of 100 jobs).
+func (d *Daemon) ciKeepPipelines(ctx context.Context, h ciRepoHere, def string, pipelines []citimings.GitLabPipeline, now time.Time) (int, error) {
+	repo := citimings.Repo{Forge: h.repo.forge, Path: h.repo.path}
+	added := 0
+	for _, p := range pipelines {
+		if ctx.Err() != nil {
+			return added, ctx.Err()
+		}
+		made, err := time.Parse(time.RFC3339, p.CreatedAt)
+		if err != nil || !p.Finished() {
+			continue
+		}
+		onDefault := p.Ref == def && p.Source != "merge_request_event"
+		onTag := versionTagPattern.MatchString(p.Ref)
+		keep := citimings.StepDays
+		if onDefault || onTag {
+			keep = citimings.KeepDays
+		}
+		ref := h.repo.ciRun(p.ID).Ref
+		// Decided: a pipeline the store has is not read again, so a retry after the first read
+		// is not seen (GitHub's list says the attempt; GitLab's does not).
+		if now.Sub(made) > time.Duration(keep)*24*time.Hour || d.ciTimings().Has(repo, ref, 1, made) {
+			continue
+		}
+		var jobs []json.RawMessage
+		for page := 1; page <= ciGitLabJobPages; page++ {
+			raw, err := d.ciGet(ctx, h, fmt.Sprintf("projects/%s/pipelines/%d/jobs?include_retried=true&per_page=100&page=%d", ciGitLabID(h), p.ID, page))
+			if err != nil {
+				return added, err
+			}
+			var got []json.RawMessage
+			if err := json.Unmarshal(raw, &got); err != nil {
+				return added, fmt.Errorf("pipeline %d: the jobs answer: %v", p.ID, err)
+			}
+			jobs = append(jobs, got...)
+			if len(got) < 100 {
+				break
+			}
+		}
+		all, _ := json.Marshal(jobs)
+		got, err := citimings.FromGitLab(p, all, ref, onDefault, onTag)
+		if err != nil {
+			log.Printf("build timings: %s: %v", h.repo.path, err)
+			continue
+		}
+		if err := d.ciTimings().Put(repo, got...); err != nil {
+			return added, err
+		}
+		added++
+	}
+	if added > 0 {
+		d.ciChanged(repo.String())
+	}
+	return added, nil
 }
 
 // ciKeepRuns reads the jobs of each run the store does not have, within its bounds, and keeps
@@ -411,7 +542,7 @@ func (d *Daemon) ciBudgetLeft() bool {
 
 func (d *Daemon) ciHourLocked(f *ciTimingsFile) {
 	if hour := nowFunc().Truncate(time.Hour); !f.Hour.Equal(hour) {
-		f.Hour, f.Calls = hour, 0
+		f.Hour, f.Calls, f.AzureDevOpsCalls = hour, 0, 0
 	}
 }
 
@@ -423,6 +554,9 @@ func (d *Daemon) ciGet(ctx context.Context, h ciRepoHere, path string) ([]byte, 
 	d.ciHourLocked(f)
 	f.Calls++
 	d.ciMu.Unlock()
+	if h.repo.forge == "gitlab" {
+		return d.ciGetGitLab(ctx, h, path)
+	}
 	owner, _, _ := strings.Cut(h.repo.path, "/")
 	token, _ := d.githubTokenFor(ctx, owner)
 	if token == "" && d.ciAPI == "" {
@@ -465,6 +599,59 @@ func (d *Daemon) ciGet(ctx context.Context, h ciRepoHere, path string) ([]byte, 
 		return nil, fmt.Errorf("GitHub answered %d", resp.StatusCode)
 	}
 	return body, nil
+}
+
+// ciGetGitLab is one GET of GitLab's API with the person's connection.
+func (d *Daemon) ciGetGitLab(ctx context.Context, h ciRepoHere, path string) ([]byte, error) {
+	root, token := d.ciGitLabAPI, "test"
+	if root == "" {
+		c, ok := d.gitlabConnection()
+		if !ok || !c.Usable(nowFunc()) {
+			return nil, errors.New(gitlabmcp.NotConnected)
+		}
+		root, token = gitlabmcp.BaseURL(c.URL), c.Access
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(root, "/")+"/api/v4/"+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitLab answered %d", resp.StatusCode)
+	}
+	return body, nil
+}
+
+// ciRepoPath is the path of the repository itself.
+func (d *Daemon) ciRepoPath(h ciRepoHere) string {
+	if h.repo.forge == "gitlab" {
+		return "projects/" + ciGitLabID(h)
+	}
+	return "repos/" + h.repo.path
+}
+
+// ciGitLabID is the project's path as GitLab's URLs take it.
+func ciGitLabID(h ciRepoHere) string {
+	return strings.ReplaceAll(url.PathEscape(h.repo.path), "/", "%2F")
+}
+
+func ciForgeName(h ciRepoHere) string {
+	if h.repo.forge == "gitlab" {
+		return "GitLab"
+	}
+	return "GitHub"
 }
 
 // ciChanged notes that key's runs changed, so its change points are found again.
@@ -531,10 +718,10 @@ func (d *Daemon) buildsHistory(r wire.BuildsHistoryRequest) (wire.BuildsHistory,
 	}
 	out := wire.BuildsHistory{Repo: repo.String(), Reader: "none", Workflows: []string{}, Jobs: []string{},
 		Branches: []string{}, Days: []wire.BuildsDay{}, Changes: []wire.BuildsChange{}, Total: buildsFigures(citimings.Figures{})}
-	if repo.Forge != "github" {
+	if !ciReads(repo.Forge) {
 		return out, nil
 	}
-	out.Reader = "github"
+	out.Reader = repo.Forge
 	d.ciMu.Lock()
 	if st := d.ciFileLocked().Repos[repo.String()]; st != nil {
 		if st.Default != "" {
@@ -572,7 +759,9 @@ func (d *Daemon) buildsHistory(r wire.BuildsHistoryRequest) (wire.BuildsHistory,
 		if at.Before(from) || !at.Before(to) || f.Workflow != "" && c.Workflow != f.Workflow || f.Job != "" && c.Job != f.Job {
 			continue
 		}
-		out.Changes = append(out.Changes, buildsChange(c))
+		bc := buildsChange(c)
+		bc.SlowedSent = d.ciSlowedSentAt(repo, c)
+		out.Changes = append(out.Changes, bc)
 	}
 	return out, nil
 }

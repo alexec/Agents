@@ -10,14 +10,14 @@ something particular done.
 
 ### Setting up
 
-- [Set up Agents on this Mac](set-up-on-this-mac.md): install Agents, which runs your
+- [Set up Agent Loops on this Mac](set-up-on-this-mac.md): install Agent Loops, which runs your
   agents and the control plane here and pairs its window by itself.
 - [Build your first app](build-your-first-app.md): type an idea the first time you open
-  Agents, and an agent takes you to the first deploy of an iPhone app or a web service.
+  Agent Loops, and an agent takes you to the first deploy of an iPhone app or a web service.
 - [Connect a window or phone](connect-a-window-or-phone.md): pair another Mac, an iPhone,
   an iPad or a browser, connect this Mac to another control plane, and forget a client.
-- [Use Agents in a browser](use-agents-in-a-browser.md): open Agents in Safari or Chrome on
-  the Mac that runs Agents, pair it once, and forget it.
+- [Use Agent Loops in a browser](use-agents-in-a-browser.md): open Agent Loops in Safari or Chrome on
+  the Mac that runs Agent Loops, pair it once, and forget it.
 - [Sign in with Google, Apple or GitHub](sign-in-with-google-apple-or-github.md): pair a
   client with no code, and turn those sign-ins on for your control plane.
 - [Set up Google, Apple and GitHub sign-in for your own build](set-up-sign-in-for-your-own-build.md):
@@ -29,7 +29,7 @@ something particular done.
 - [Send a folder to a server](send-a-folder-to-a-machine.md): a repository on this Mac,
   with its unpushed branches and uncommitted changes, made a folder on the server, and
   the server's work brought back.
-- [Start machines from Agents](start-machines-from-agents.md): let the control plane
+- [Start machines from Agent Loops](start-machines-from-agents.md): let the control plane
   start and stop the machines your servers run on, and press Start on a stopped one.
 - [Add a machine provider](add-a-machine-provider.md): a preset, your own commands, a
   tool map, or a provider of your own.
@@ -38,23 +38,23 @@ something particular done.
   each one needs.
 - [Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md): on a
   machine you rent, at your own domain with a public certificate.
-- [Run Agents with no Mac](run-agents-with-no-mac.md): a control plane in the cloud, the
+- [Run Agent Loops with no Mac](run-agents-with-no-mac.md): a control plane in the cloud, the
   web page and a GitHub Codespace that runs your agents.
 - [Run the control plane as several copies](run-several-copies.md): over one bucket,
   behind a load balancer, so it stays up when your Mac sleeps.
 - [Move an existing set-up across](move-an-existing-set-up.md): bring the earlier app's
-  agents to Agents, pair its devices again, and add its servers as machines.
+  agents to Agent Loops, pair its devices again, and add its servers as machines.
 - [Back up and restore a machine](back-up-and-restore.md): keep a fixed number of backups
   of a machine's agents and conversations in a folder, and restore one on a new machine.
 - [Back up and restore a control plane](back-up-a-control-plane.md): its store, key,
   secrets key and certificate in one folder, restored so that every device stays paired.
-- [Release Agents](release-agents-host.md): publish the Mac's Developer ID download on
+- [Release Agent Loops](release-agents-host.md): publish the Mac's Developer ID download on
   GitHub and the iPhone and iPad app on TestFlight by tagging main, and set up the signing
   secrets once.
 - [Keep the performance budgets](keep-the-performance-budgets.md): the bytes and calls CI
   holds on each pull request, the times this Mac measures at night, and the phone's check.
-- [Fix Agents when it won't start](fix-agents-host-not-starting.md): see why a login
-  item isn't running, Repair it, send diagnostics with a report, and remove Agents.
+- [Fix Agent Loops when it won't start](fix-agents-host-not-starting.md): see why a login
+  item isn't running, Repair it, send diagnostics with a report, and remove Agent Loops.
 
 ### Folders
 
@@ -74,7 +74,7 @@ something particular done.
 - [Use Auto](use-auto.md): start a session on Auto, choose which runtimes it uses and in
   what order, and read or change what each value is on each runtime.
 - [Pick up a conversation started somewhere else](pick-up-a-conversation.md): carry on
-  in Agents with one you began in Terminal, or delete one.
+  in Agent Loops with one you began in Terminal, or delete one.
 - [Answer a question or a permission request](answer-a-question.md): from the Mac, the
   iPhone or iPad, or a notification.
 - [Read a chat](read-a-chat.md): open a chat at its latest message, follow the plan card,
@@ -173,7 +173,7 @@ something particular done.
   own tools, and an agent when an issue is opened, labelled, commented on or assigned to you.
 - [Wait for mail](wait-for-mail.md): a mailbox for agents, the Mail page, and sign-up codes
   given to the session that waits for them.
-- [Reach agents from Slack](reach-agents-from-slack.md): a Slack app for Agents, a workflow
+- [Reach agents from Slack](reach-agents-from-slack.md): a Slack app for Agent Loops, a workflow
   that starts on a Slack message, and questions with options as buttons.
 - [Use Google Chat](use-google-chat.md): a Google Chat app that starts agents, brings their
   questions to a space and takes the answer back.

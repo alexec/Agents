@@ -83,7 +83,7 @@ A restored agent is kept for your **Archived agents** time from the day you rest
 
 ## In each shape
 
-- **Single user** (Agents on your Mac): everything above. Choose a folder on a second
+- **Single user** (Agent Loops on your Mac): everything above. Choose a folder on a second
   disk or a synced folder, so the backups outlive the Mac.
 - **Self-hosted** and **Hosted** (a control plane elsewhere, with servers as hosts): each
   server backs up every day to the control plane's store, and the store keeps the newest 3

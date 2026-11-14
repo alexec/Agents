@@ -6,8 +6,8 @@ description: Connect Bitbucket with an Atlassian API token or an access token an
 
 # Use Bitbucket
 
-Agents talks to Bitbucket Cloud through its own `bitbucket` connector (#2828), an MCP
-server in the shape of the gitlab one, on Bitbucket's REST API 2.0. Agents on the Mac carries
+Agent Loops talks to Bitbucket Cloud through its own `bitbucket` connector (#2828), an MCP
+server in the shape of the gitlab one, on Bitbucket's REST API 2.0. Agent Loops on the Mac carries
 it, and every Linux host installs it beside agentsd. It is for Bitbucket Cloud
 (bitbucket.org) only, not Bitbucket Data Center.
 
@@ -25,7 +25,7 @@ Remote on iPhone and iPad, and the web page show the same pages.
 
 ## Connect Bitbucket
 
-Bitbucket has no sign-in page for Agents, so you connect it with a token (#3785).
+Bitbucket has no sign-in page for Agent Loops, so you connect it with a token (#3785).
 
 1. Make a token. Use one of these:
    - **An API token with scopes** (Atlassian account ▸ **Security** ▸ **Create API token
@@ -36,7 +36,7 @@ Bitbucket has no sign-in page for Agents, so you connect it with a token (#3785)
    - **An access token** of the repository, project or workspace (its **Settings ▸
      Access tokens**), with the same scopes. It acts as its own bot user, so
      `review.requested`, `issue.assigned` and `mine` are that bot's.
-2. In Agents, open **Settings ▸ You ▸ Connectors** and choose **Connect… ▸ Bitbucket** (on the
+2. In Agent Loops, open **Settings ▸ You ▸ Connectors** and choose **Connect… ▸ Bitbucket** (on the
    web page, **Connect Bitbucket…** on Connections). Or, on a folder whose remote is on
    bitbucket.org, choose **Connect Bitbucket…** on its Connectors page.
 3. For an API token, give its **Atlassian email**. For an access token, leave it empty.
@@ -69,9 +69,9 @@ its events, once.
 
 The set-up adds it for you. To add it to another folder:
 
-1. In Agents, open **Settings ▸ Agent Configuration ▸ Connectors** (or a folder's
+1. In Agent Loops, open **Settings ▸ Agent Configuration ▸ Connectors** (or a folder's
    **Connectors** page) and choose **Add Connector…**.
-2. Choose the **Agents** marketplace, then **Bitbucket**, and add it.
+2. Choose the **Agent Loops** marketplace, then **Bitbucket**, and add it.
 3. It asks for nothing: it reads the Bitbucket connection. Without a connection, name your
    token by hand in the entry's `env` in `.agents/mcp.json`: `"BITBUCKET_TOKEN":
    "${BITBUCKET_TOKEN}"` (and `"BITBUCKET_EMAIL": "${BITBUCKET_EMAIL}"` for an API token),
@@ -168,7 +168,7 @@ Under the tabs is a box for your words, and these buttons. Each one acts on Bitb
   open line comments, with the box's words. The app asks you before it sends. With no agent
   on that branch, the new-agent form opens on the branch.
 
-Agents can't merge or approve from this page. Those tools are for a person only. They carry
+Agent Loops can't merge or approve from this page. Those tools are for a person only. They carry
 the commit that the page shows. When the pull request has a newer commit, nothing happens:
 open the page again.
 

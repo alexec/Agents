@@ -1,12 +1,12 @@
 ---
 diataxis: explanation
 devices: [mac, iphone, ipad, web, server]
-description: "How Agents keeps your organisation's machines and data safe: people, keys and sign-in, the audit, sandboxes, where secrets live, logs, the coming policy, and how to report a vulnerability."
+description: "How Agent Loops keeps your organisation's machines and data safe: people, keys and sign-in, the audit, sandboxes, where secrets live, logs, the coming policy, and how to report a vulnerability."
 ---
 
 # Security overview
 
-This page says how Agents protects your machines and your data today, for an
+This page says how Agent Loops protects your machines and your data today, for an
 organisation's security team. Where something is planned and not built, it says so and
 names its issue.
 
@@ -17,7 +17,7 @@ names its issue.
 - **The control plane routes and remembers little.** It knows who is paired and which
   machines there are. Agents, conversations, files and runtime sign-ins stay on the machine
   that runs them.
-- **Machines never escalate.** Agents and `agentsd` run as the machine's user. On a Mac
+- **Machines never escalate.** Agent Loops and `agentsd` run as the machine's user. On a Mac
   they are the user's own login items (`SMAppService.agent`). On Linux they are a
   `systemctl --user` service. Nothing asks for admin rights, and nothing installs a
   privileged helper. A machine provider's start script for Google Compute Engine runs as
@@ -38,7 +38,7 @@ names its issue.
 
 ## Sign-in
 
-- **The local owner** signs in with the codes that Agents and `agents-control` make. No
+- **The local owner** signs in with the codes that Agent Loops and `agents-control` make. No
   outside account is needed, also on a control plane on the internet.
 - **Google and Apple** (T2, #995). The control plane checks the ID token against the
   provider's keys, its issuer, audience and expiry, and a nonce bound to that control
@@ -150,7 +150,7 @@ answering cards and changing settings are recorded. Reads and prompts are not.
 
 ## Sandboxes
 
-Agents has no operating-system sandbox of its own. It turns on each runtime's own sandbox
+Agent Loops has no operating-system sandbox of its own. It turns on each runtime's own sandbox
 (spec 064):
 
 | Runtime | Its sandbox |
@@ -220,7 +220,7 @@ them as they pass.
 | Log | Where | What it holds | Size |
 | --- | --- | --- | --- |
 | `daemon.log` | `~/Library/Logs/Agents` on a Mac, `$XDG_STATE_HOME/agents/logs` on Linux | What the machine did | Rolls at 4 MB, keeps one older file |
-| `control.log` | Agents' log folder, or the container's output in the cloud | Joins, people, keys, sign-in changes, refused connections with their address | Rolls at 4 MB, keeps one older file |
+| `control.log` | Agent Loops' log folder, or the container's output in the cloud | Joins, people, keys, sign-in changes, refused connections with their address | Rolls at 4 MB, keeps one older file |
 | `machine-relay.log` | The Mac's log folder | The sign-in relay (what was asked and how it was answered) | 1 MB |
 | `app-tools.jsonl` | Each agent's folder | Every call to the app's own tools, with a `token` argument left out and answers cut to 2,000 characters | Deleted with the agent |
 
@@ -237,11 +237,11 @@ bytes). The report of a turn says its last message redacted as well.
 Redaction does not catch:
 
 - text that is not a known shape, such as a password in plain words;
-- what a runtime writes to its standard error, and what Agents writes to `daemon.log`;
+- what a runtime writes to its standard error, and what Agent Loops writes to `daemon.log`;
 - the runtimes' own session files (see [Erasure](data-and-retention.md#erasure)).
 
 `control.log` cuts out codes, `Bearer` tokens, `token=`, `secret=` and `password=`
-values, and the same known token shapes (#1001). Agents' diagnostics bundle (Help ▸ Diagnostics) masks codes, secrets, tokens, passwords, keys, and
+values, and the same known token shapes (#1001). Agent Loops' diagnostics bundle (Help ▸ Diagnostics) masks codes, secrets, tokens, passwords, keys, and
 long base64 and hex strings.
 
 ## The web page

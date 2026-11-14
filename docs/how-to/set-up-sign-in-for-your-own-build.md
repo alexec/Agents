@@ -1,14 +1,14 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad]
-description: Make your own Apple, Google and GitHub ids for a build of Agents from source, put them in the build, and check that sign-in works.
+description: Make your own Apple, Google and GitHub ids for a build of Agent Loops from source, put them in the build, and check that sign-in works.
 ---
 
 # Set up Google, Apple and GitHub sign-in for your own build
 
-The app that Agents ships has its own client ids, so its control plane needs no set-up (see
+The app that Agent Loops ships has its own client ids, so its control plane needs no set-up (see
 [Sign in with Google, Apple or GitHub](sign-in-with-google-apple-or-github.md)). When you
-build Agents from source, with your own bundle ids and your own Apple team, your build does
+build Agent Loops from source, with your own bundle ids and your own Apple team, your build does
 not have these ids. Until you make them, **Settings ▸ Control plane ▸ Sign-in** shows Google
 and GitHub as not available:
 
@@ -155,7 +155,7 @@ must install the App before GitHub tells the App about its members.
 
 ## Build again
 
-Build Agents and the Remote again. The control plane in Agents has the
+Build Agent Loops and the Remote again. The control plane in Agent Loops has the
 ids from `config.go`, and the window and the Remote have the entitlement.
 
 You can also give the ids to a control plane that you start yourself, with no new build of
@@ -179,7 +179,7 @@ on](sign-in-with-google-apple-or-github.md#turn-a-provider-on).
 ## Check that it works
 
 1. In **Settings ▸ Control plane ▸ Sign-in**, make sure that no provider says "This build
-   has no … yet". If one does, its id did not get into the control plane: build Agents
+   has no … yet". If one does, its id did not get into the control plane: build Agent Loops
    again, or check the environment variable.
 2. Turn the provider on.
 3. On a paired client, open **Settings ▸ Account** on the Mac, or **Settings ▸ Sign-ins** on

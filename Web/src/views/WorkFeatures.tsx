@@ -25,6 +25,7 @@ import {
 } from "../model/workFeatures";
 import { go, routeHash } from "../route";
 import { ForgeTitle } from "../render/ForgeTitle";
+import { Icon } from "./Icon";
 
 // The list's state lives for the tab, so Back from an epic's page finds it as it was left.
 const features = signal<ForgeFeature[] | null>(null);
@@ -227,7 +228,7 @@ function FeatureGroups({ store, list }: { store: Store; list: ForgeFeature[] }) 
               aria-label={`${words}, ${shown.length}`}
               onClick={() => { groupOpen.value = { ...groupOpen.value, [group]: !isOpen }; }}
               title={isOpen ? `Fold ${words}` : `Show ${words}`}>
-              <span class="chevron" aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
+              <Icon name={isOpen ? "chevron-down" : "chevron-right"} class="chevron" />
               <span class="words">{words}</span>
               <span class="count">{shown.length}</span>
             </button>
@@ -288,7 +289,7 @@ function FeatureRow({ store, feature, agents, group, approvals: waiting, startOp
     <li>
       <button type="button" class="work-feature-head" aria-expanded={isOpen} onClick={() => toggle(feature.name, isOpen)}
         title={isOpen ? `Fold ${feature.name}` : `Show ${feature.name}'s epics in flight`}>
-        <span class="chevron" aria-hidden="true">{isOpen ? "▾" : "▸"}</span>
+        <Icon name={isOpen ? "chevron-down" : "chevron-right"} class="chevron" />
         <span class="dot" style={dot ? { background: dot } : undefined} aria-hidden="true" />
         <span class="work-row-main">
           <span class="work-row-head">
@@ -297,7 +298,7 @@ function FeatureRow({ store, feature, agents, group, approvals: waiting, startOp
           </span>
           <span class={`work-row-line small${needs ? " work-needs" : ""}`}>
             <span class={needs ? undefined : "quiet"}>{line2.join(" · ")}</span>
-            {needs && <><span aria-hidden="true">·</span><span><span aria-hidden="true">⚠ </span>{needs}</span></>}
+            {needs && <><span aria-hidden="true">·</span><span><Icon name="triangle-alert" /> {needs}</span></>}
           </span>
         </span>
         {delivery && delivery.total > 0 ? (
@@ -406,7 +407,7 @@ function FlightLine({ flight, phone }: { flight: InFlight; phone: boolean }) {
     <li class={phone ? undefined : "wide-only"}>
       <a class={`work-feature-row work-flight-row is-${mark}`} href={itemHref(item)} title={`Open ${shortRef(item.node.ref)}'s page`}
         onClick={(e) => openItem(e, item)}>
-        <span class="mark" role="img" aria-label={mark === "attention" ? "Needs you" : "Working"}>{mark === "attention" ? "⚠" : "●"}</span>
+        <span class="mark" role="img" aria-label={mark === "attention" ? "Needs you" : "Working"}><Icon name={mark === "attention" ? "triangle-alert" : "loader-circle"} /></span>
         <span class="name"><span class="ref quiet">{shortRef(item.node.ref)}</span> <ForgeTitle text={item.title} /></span>
         <span class="words"><span class="sep" aria-hidden="true">· </span>{words}</span>
         {pr && <span class="pr small"><StateIcon kind="pr" state="open" size={12} />{pr}</span>}

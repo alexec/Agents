@@ -16,7 +16,7 @@ is no published image yet: you build it from the source.
 
 ## Before you start
 
-- A clone of the Agents repository on a Mac with Go installed (`brew install go`), to build
+- A clone of the Agent Loops repository on a Mac with Go installed (`brew install go`), to build
   the Linux programs: they are Go, cross-compiled on the Mac.
 - Docker, or anywhere else that runs containers.
 - An S3-compatible bucket (Amazon S3, Cloudflare R2 or MinIO, for example) and an access
@@ -55,7 +55,7 @@ them, on one machine with Docker.
    docker compose -f deploy/compose.yaml exec -T cp1 /agents-control code --client
    ```
 
-   Paste it into Agents; see [Connect a window or phone](connect-a-window-or-phone.md).
+   Paste it into Agent Loops; see [Connect a window or phone](connect-a-window-or-phone.md).
    For a host, ask for `code --host` instead.
 
 5. To see it keep going, stop a copy with `docker compose -f deploy/compose.yaml stop cp1`.
@@ -142,5 +142,5 @@ trying it out only.
 
 ## Related
 
-- [Set up Agents on this Mac](set-up-on-this-mac.md), for a single copy on a Mac.
+- [Set up Agent Loops on this Mac](set-up-on-this-mac.md), for a single copy on a Mac.
 - [The control plane](../explanation/control-plane.md).

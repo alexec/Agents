@@ -1,18 +1,18 @@
 ---
 diataxis: how-to
 devices: [mac, iphone, ipad, server]
-description: Bring the agents of the earlier Agents app on this Mac to Agents, pair your devices again, and add your servers as machines.
+description: Bring the agents of the earlier Agents app on this Mac to Agent Loops, pair your devices again, and add your servers as machines.
 ---
 
 # Move an existing set-up across
 
 The earlier Agents app ran its own daemon on this Mac, paired your iPhone and iPad itself,
-and reached your servers over ssh. Agents now has a control plane and runs this Mac's host
+and reached your servers over ssh. Agent Loops now has a control plane and runs this Mac's host
 (`agentsd`) for you. When you open it, this Mac's host takes over the earlier app's agents
 where they are, so your agents and their conversations stay. Your devices pair again, and
 your servers join as machines.
 
-Agents no longer has a **Move Across…** step that moves devices and servers for you
+Agent Loops no longer has a **Move Across…** step that moves devices and servers for you
 (#4227). Do the steps below instead.
 
 To move a control plane that already runs on this Mac to a server, see
@@ -26,12 +26,12 @@ To move a control plane that already runs on this Mac to a server, see
 
 ## Steps
 
-### Start Agents
+### Start Agent Loops
 
 1. Quit the earlier Agents app, so that its daemon stops.
-2. Install Agents and open it. See [Set up Agents on this Mac](set-up-on-this-mac.md).
+2. Install Agent Loops and open it. See [Set up Agent Loops on this Mac](set-up-on-this-mac.md).
 
-   Agents sets up a control plane and this Mac's host, and the window pairs itself. This
+   Agent Loops sets up a control plane and this Mac's host, and the window pairs itself. This
    Mac's host uses the earlier app's folder where it is, and copies nothing. Every agent is
    listed with its history, under this Mac in the folders list.
 

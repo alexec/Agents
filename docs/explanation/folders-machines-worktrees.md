@@ -36,7 +36,7 @@ ordinary folder: archive it, or keep using it, as any other.
 
 ## A folder lives on one machine
 
-A machine is a machine where agents can do their work. Your Mac is one, once Agents runs
+A machine is a machine where agents can do their work. Your Mac is one, once Agent Loops runs
 on it. A Linux server can be another, and so can a second Mac, once it joins your control
 plane (see [The control plane](control-plane.md)).
 

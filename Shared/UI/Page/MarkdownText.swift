@@ -274,14 +274,10 @@ struct MarkdownText: View {
         }
     }
 
-    /// Whether a message's code goes in its one text too, so a drag goes from a paragraph
-    /// into the code (#5182). The Mac's text view draws the code's well, colours and Run;
-    /// the Remote's keeps each code block apart.
-    #if os(macOS)
+    /// Whether a message's code goes in its one text too, so a selection goes from a
+    /// paragraph into the code (the Mac #5182, the Remote #5234). The text view draws the
+    /// code's well, colours and Run.
     private static let codeInText = true
-    #else
-    private static let codeInText = false
-    #endif
 
     /// Lists sit a little looser on a touch screen, where a line is a target.
     #if os(macOS)

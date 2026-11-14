@@ -192,6 +192,10 @@ So **all five forge servers have a CI reader** (`run.completed`), and **none rea
 - **Backfill,** when a repository is first watched: the run list in 3-day windows (the list gives at most 1,000 runs for one query), newest first, then one jobs call a run. **Default-branch and tag runs for 90 days, PR runs for 14 days.** For alexec/Agents: about 100 list calls + 6,300 + 1,300 jobs calls ≈ 7,700 calls. **Paced at 10 % of the token's hourly limit** (500 an hour on GitHub), so that the forge's other events never wait: about 15 hours, the page filling from today backwards. The spec's own fetch (3,400 calls) took jobs for only each 4th PR run.
 - A run that the backfill and the live read both see is the same line (same `ci-run` ref and attempt).
 
+### GitLab (#5221)
+
+The daemon reads GitLab pipelines as it reads GitHub's (`Go/internal/citimings/gitlab.go`): the project's finished pipelines (`scope=finished`, windows by `created_after` and `created_before`), and each one's jobs with `include_retried=true`. A pipeline is a run, and a job's nth try is attempt n. A job is made at its `started_at` less its `queued_duration`, so "waiting its turn" is the stages before it and "waiting for a runner" is `queued_duration`. There are no steps. Decided: a pipeline the store has is not read again, so a retry after the first read is not seen, because GitLab's list does not say the attempt. Alex can overrule.
+
 ### Where
 
 **Alex chose (2026-11-13, #5176): the machine reads and keeps the store, and sends a copy to the control plane, as lineage's merged copy does.**
@@ -214,8 +218,8 @@ So **all five forge servers have a CI reader** (`run.completed`), and **none rea
 When the change finder finds a step up in a job's run time on the default branch, the daemon sends an event, **`ci.slowed`** (in the style of `checks.passed`), with:
 
 - `repo`, `workflow`, `job`, `branch`;
-- `firstSlowRun` (its `ci-run` ref and URL) and `lastFastRun`;
-- `medianBefore` and `medianAfter` in seconds, and the `score`.
+- `first_slow_run` (its `ci-run` ref) and `first_slow_run_url`, and `last_fast_run` and `last_fast_run_url`;
+- `median_before` and `median_after` in seconds, and the `score` (names settled in #5200: open question 5).
 
 A workflow can start on it (Alex makes the workflows), and the report marks it (board 2, note 6). A faster step makes no event. A change in queue time makes no event, because it is load, not a commit.
 
@@ -253,7 +257,7 @@ The stories add a new page, controls and a link, so each PR waits for Alex with 
 2. ~~Forge API or extend the `ci-run` nodes?~~ **Decided (Alex, 2026-11-13):** a timing store of its own, keyed by the `ci-run` ref (see "Where the timings live"). The spike (#5176) answered the data, the bounds and the fill (see "The data spike"); Alex chose where it lives: the machine, with a copy on the control plane.
 3. ~~What is a deploy?~~ **Out of this epic** (Alex, 2026-11-13): the later Release × Environment epic.
 4. ~~The detector's floor and its library?~~ **Answered (#5177):** no Go library fits AGENTS.md's rule (pgregory.net/changepoint was last updated in 2023, github.com/lytics/impact in 2015; Otava is Python), so `Go/internal/citimings/changes.go` has its own binary segmentation, as `derive.py`. The floor stays 30 s and 20 % with a score of 8: on the spike's cache it finds the same 8 changes in 90 days, `go-darwin` on 8 November among them, with its 6 runs between.
-5. ~~Should a change found on `main` tell someone?~~ **Yes (Alex, 2026-11-13):** the daemon sends `ci.slowed` (see "A slowdown makes an event"). Open: the event's final name and fields, in #5200.
+5. ~~Should a change found on `main` tell someone?~~ **Yes (Alex, 2026-11-13):** the daemon sends `ci.slowed` (see "A slowdown makes an event"). **Settled (#5200):** the name stays `ci.slowed`, an app event in `Packages/Wire/event-catalogue.json` (not a forge server's: the machine finds it in its own store). Its details are in the catalogue's own style, snake_case and all text: `repo` (owner/name), `workflow`, `job`, `branch`, `first_slow_run` and `last_fast_run` (`ci-run` refs) with their `_url`, `median_before`, `median_after` and `score`; `repo`, `workflow` and `job` narrow a wait. Two machines send it once on the bus: its envelope id is `<first_slow_run>@ci.slowed/<workflow>/<job>` on both. A change whose first slow run is more than 7 days old is not sent, so the first backfill sends no old change. `builds/history` says `slowedSent` on each change sent, for board 2's label (#5178).
 
 ## Sizes
 

@@ -1775,6 +1775,9 @@ type BuildsChange struct {
 
 	Runner *string `json:"runner,omitzero"`
 
+	// When this machine sent ci.slowed for the change (#5200); absent when it sent none (a speed-up, or a change found too long after its first slow run).
+	SlowedSent *Date `json:"slowedSent,omitzero"`
+
 	Between []BuildsBetween `json:"between"`
 
 	Points []BuildsPoint `json:"points"`
@@ -1804,7 +1807,7 @@ type BuildsFigures struct {
 	Turn BuildsStat `json:"turn"`
 }
 
-// builds/history's answer (#5177): the filters' choices in the range (workflows, jobs, branches), the range's figures and each day's, the change points found in the range (on the default branch, whatever the branch filter), and the job that waited longest for a runner. readAt is when this machine last read the forge's runs (Last update); filledFrom is the oldest day the backfill reached, absent before it starts. reader is none when Agents does not read CI timings from the repository's forge.
+// builds/history's answer (#5177): the filters' choices in the range (workflows, jobs, branches), the range's figures and each day's, the change points found in the range (on the default branch, whatever the branch filter), and the job that waited longest for a runner. readAt is when this machine last read the forge's runs (Last update); filledFrom is the oldest day the backfill reached, absent before it starts. reader is github or gitlab, or none when Agents does not read CI timings from the repository's forge.
 type BuildsHistory struct {
 	Repo string `json:"repo"`
 

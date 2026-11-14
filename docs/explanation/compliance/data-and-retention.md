@@ -1,12 +1,12 @@
 ---
 diataxis: explanation
 devices: [mac, iphone, ipad, web, server]
-description: "What each store of Agents keeps, how long and how large, when that bound is applied, how it is backed up and restored, and what is not backed up today."
+description: "What each store of Agent Loops keeps, how long and how large, when that bound is applied, how it is backed up and restored, and what is not backed up today."
 ---
 
 # Data and retention
 
-Agents keeps plain files, not a database. Most stores have a bound: a time, a count or a
+Agent Loops keeps plain files, not a database. Most stores have a bound: a time, a count or a
 size. Some have none. A conversation has none: it is kept until its agent is deleted. This
 page lists the stores, then says what a backup holds and what it does not.
 
@@ -131,7 +131,7 @@ These are in `<folder>/.agents/`.
 
 ## Outside our folders
 
-Agents starts these tools. It does not own what they keep.
+Agent Loops starts these tools. It does not own what they keep.
 
 | Store | What it keeps | How long, how large |
 | --- | --- | --- |
@@ -143,7 +143,7 @@ Agents starts these tools. It does not own what they keep.
 | `~/.claude/history.jsonl`, Codex's history and indexes | Each runtime's own history | **Not erased** |
 | Docker images and named volumes | What Docker workspaces pulled and kept | **Delete Machine** removes the workspace's container, its volumes and its image, when no other container uses them (#3728). Docker keeps an image with a second tag or a child image. |
 | DigitalOcean, Codespaces, EC2 and GCP machines | Cloud machines | **No limit in count.** A linked machine stops after **2 hours** idle by default: no turn running, no answer waited on, no terminal open (#3729). Each machine's **Stop when idle** sets the time, or **Never**, on the Mac and the web. A stopped machine keeps its disk; only **Delete Machine** removes one. |
-| `~/.ssh/config` (or `AGENTS_SSH_CONFIG`) | A block for each codespace | A codespace's block goes when **Delete Machine** deletes it (#3746). A codespace deleted outside Agents keeps its block. The one block that agentsd keeps for all codespaces is written again each time it prepares ssh. |
+| `~/.ssh/config` (or `AGENTS_SSH_CONFIG`) | A block for each codespace | A codespace's block goes when **Delete Machine** deletes it (#3746). A codespace deleted outside Agent Loops keeps its block. The one block that agentsd keeps for all codespaces is written again each time it prepares ssh. |
 | `/tmp/agents-tunnels-<uid>-<pid>` | ssh control sockets | Removed at a clean stop; one whose process is gone goes when a control plane's tunnels start (#3649) |
 | `$TMPDIR/agents-output-*` | Output that the Mac window opened in TextEdit | 1 day: the Mac window removes older copies when it starts (#3747) |
 
@@ -242,7 +242,7 @@ The service keeps nothing for a signed-in browser: a session is a signed cookie 
 invites its sign-in used, the account and its sign-in link. It does not delete the
 account's machines. It leaves the operator's backups of it, and Stripe's own records.
 
-## Agents on the Mac
+## Agent Loops on the Mac
 
 | Store | What it keeps | How long, how large |
 | --- | --- | --- |

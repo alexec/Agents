@@ -1627,6 +1627,11 @@ export interface BuildsChange {
   queueAfter: number;
   score: number;
   runner?: string;
+  /**
+   * When this machine sent ci.slowed for the change (#5200); absent when it sent none (a speed-up,
+   * or a change found too long after its first slow run).
+   */
+  slowedSent?: WireDate;
   between: BuildsBetween[];
   points: BuildsPoint[];
 }
@@ -1659,13 +1664,13 @@ export interface BuildsFigures {
  * the range's figures and each day's, the change points found in the range (on the default branch,
  * whatever the branch filter), and the job that waited longest for a runner. readAt is when this
  * machine last read the forge's runs (Last update); filledFrom is the oldest day the backfill
- * reached, absent before it starts. reader is none when Agents does not read CI timings from the
- * repository's forge.
+ * reached, absent before it starts. reader is github or gitlab, or none when Agents does not read
+ * CI timings from the repository's forge.
  */
 export interface BuildsHistory {
   repo: string;
   defaultBranch?: string;
-  reader: "github" | "none";
+  reader: "azuredevops" | "github" | "gitlab" | "none";
   workflows: string[];
   jobs: string[];
   branches: string[];
@@ -16313,7 +16318,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BudgetRequestList: { required: ["requests"], optional: [] },
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   BuildsBetween: { required: ["run", "ran"], optional: ["jobRun"] },
-  BuildsChange: { required: ["workflow", "job", "slower", "at", "lastFast", "firstSlow", "medianBefore", "medianAfter", "queueBefore", "queueAfter", "score", "between", "points"], optional: ["runner"] },
+  BuildsChange: { required: ["workflow", "job", "slower", "at", "lastFast", "firstSlow", "medianBefore", "medianAfter", "queueBefore", "queueAfter", "score", "between", "points"], optional: ["runner", "slowedSent"] },
   BuildsDay: { required: ["day", "figures"], optional: [] },
   BuildsFigures: { required: ["runs", "green", "reruns", "toGreen", "run", "runner", "turn"], optional: [] },
   BuildsHistory: { required: ["repo", "reader", "workflows", "jobs", "branches", "total", "days", "changes"], optional: ["defaultBranch", "longestRunnerWait", "readAt", "filledFrom"] },

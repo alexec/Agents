@@ -78,9 +78,10 @@ type Machine struct {
 	// Filter is what every browser tool's result goes through (#3534): the values filled
 	// into its pages come out, and its images are masked.
 	Filter Filter
-	// Changed hears that Chromium started (true) or stopped (false), off the machine's
-	// lock: the clients that watch the page are told (#3528).
-	Changed func(running bool)
+	// Changed hears that Chromium started (true) or stopped (false), with its address, off
+	// the machine's lock: the clients that watch the page are told (#3528). Each call runs
+	// on its own goroutine, so a restart's stop can be heard after its start (#5196).
+	Changed func(running bool, endpoint string)
 
 	// launch starts Chromium as how says, and says how to reach it; a test gives its own.
 	launch func(exe, profile string, env []string, how mode) (*process, error)
@@ -203,7 +204,7 @@ func (m *Machine) Endpoint(progress func(string)) (string, error) {
 	if p.below {
 		go m.keepBelow(p)
 	}
-	m.changed(true)
+	m.changed(true, p.endpoint)
 	started := "headless"
 	if p.chrome && p.display != "" {
 		started = "as Google Chrome, on the Xvfb screen " + p.display
@@ -407,6 +408,7 @@ func (m *Machine) stopLocked() {
 	}
 	m.running.stop()
 	log.Printf("browser: Chromium (pid %d) stopped", m.running.pid)
+	endpoint := m.running.endpoint
 	m.running = nil
 	// The next start is headless again, unless a site asks for a window (Headed), and has
 	// no WebAuthn, unless an agent asks for a software passkey (Passkeys).
@@ -414,13 +416,13 @@ func (m *Machine) stopLocked() {
 	// The pages are gone, and every value filled into them with the pages.
 	m.Filter.Forget()
 	os.Remove(m.pidFile())
-	m.changed(false)
+	m.changed(false, endpoint)
 }
 
 // changed tells Changed, on its own goroutine, as mu is held.
-func (m *Machine) changed(running bool) {
+func (m *Machine) changed(running bool, endpoint string) {
 	if m.Changed != nil {
-		go m.Changed(running)
+		go m.Changed(running, endpoint)
 	}
 }
 

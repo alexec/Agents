@@ -6,14 +6,14 @@ description: Connect Sentry, so that agents can read your app's crashes and erro
 
 # Use Sentry
 
-Sentry tells you when your app crashes or throws an error. Agents uses it in two parts
-(#3583), both in the **Agents** marketplace:
+Sentry tells you when your app crashes or throws an error. Agent Loops uses it in two parts
+(#3583), both in the **Agent Loops** marketplace:
 
 - **Sentry** is Sentry's own MCP server (`getsentry/sentry-mcp`, at
   `https://mcp.sentry.dev/mcp`). It has the tools: search issues and events, read a stack
   trace, a release or a trace, and ask Seer for a fix. You sign in to Sentry; you give no
   token.
-- **Sentry events** is `sentry-mcp`, a small server that Agents ships. Agents on the Mac carries
+- **Sentry events** is `sentry-mcp`, a small server that Agent Loops ships. Agent Loops on the Mac carries
   it, and every Linux host installs it beside agentsd. It has the events and no tools:
   - `health.issue_new`: Sentry saw an issue for the first time.
   - `health.issue_regressed`: an issue that was resolved came back. Each time it comes back
@@ -23,7 +23,7 @@ Sentry tells you when your app crashes or throws an error. Agents uses it in two
   culprit, level and page) and the release that saw it. The release is empty when your app
   sends none to Sentry.
 
-Sentry's own server has tools but no events, so Agents adds the events with a server of its
+Sentry's own server has tools but no events, so Agent Loops adds the events with a server of its
 own, as it does for GitHub. Its events are also how Lineage links an issue to the release
 that saw it (#3585).
 
@@ -37,7 +37,7 @@ that saw it (#3585).
 
 1. Open **Settings ▸ Agent Configuration ▸ Connectors** (or a folder's **Connectors** page)
    and choose **Add Connector…**.
-2. Choose the **Agents** marketplace, then **Sentry**, and add it.
+2. Choose the **Agent Loops** marketplace, then **Sentry**, and add it.
 3. Its row says **needs sign-in**. Choose **Sign in…**, sign in to Sentry in your browser,
    and choose the organization. See [Sign in to a connector](sign-in-to-a-connector.md).
 
@@ -46,7 +46,7 @@ that saw it (#3585).
 1. In Sentry, open **Settings ▸ Account ▸ Personal Tokens** (User Auth Tokens) and make a
    token with `event:read`, `org:read` and `project:read`. An organization token
    (`sntrys_…`) cannot read issues.
-2. In **Add Connector…**, choose **Sentry events** from the **Agents** marketplace.
+2. In **Add Connector…**, choose **Sentry events** from the **Agent Loops** marketplace.
 3. Fill in:
    - `SENTRY_AUTH_TOKEN`: the token, `sntryu_…`.
    - `SENTRY_ORG`: the organization's slug, as `acme` in `acme.sentry.io`.

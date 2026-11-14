@@ -20,8 +20,8 @@ In the folder's `.agents/mcp.json`, or your own `~/.agents/mcp.json`, add
     "github": { "command": "github-mcp", "hosted": true } } }
 ```
 
-`github-mcp` is one of the connectors Agents ships: a single binary beside the app's own
-`agentsd`, in Agents on a Mac and in `~/.agents-server/bin` on a Linux host, which the
+`github-mcp` is one of the connectors Agent Loops ships: a single binary beside the app's own
+`agentsd`, in Agent Loops on a Mac and in `~/.agents-server/bin` on a Linux host, which the
 app puts first on the PATH of every server it starts. Named by its bare name, the same entry
 runs on any host, with nothing else installed there.
 

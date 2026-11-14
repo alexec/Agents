@@ -1,12 +1,12 @@
 ---
 name: sign-up
-description: Make a new outside account for Agents (gitlab.com, DigitalOcean, AWS and the like) with the app's browser tools, with Alex's rules for terms, cookies, the Privacy.com card, passwords and tokens (#1692). One provider per session. Use when an issue needs an account (`needs-account`), or when Alex asks to sign up to a service.
+description: Make a new outside account for Agent Loops (gitlab.com, DigitalOcean, AWS and the like) with the app's browser tools, with Alex's rules for terms, cookies, the Privacy.com card, passwords and tokens (#1692). One provider per session. Use when an issue needs an account (`needs-account`), or when Alex asks to sign up to a service.
 ---
 
 # Sign up to a service
 
 Alex asked for this skill (2026-10-16, 2026-10-19). The 0.7 sign-ups (gitlab.com #1634,
-DigitalOcean #865, AWS #1345) wrote it. An account made here is for Agents to test and run
+DigitalOcean #865, AWS #1345) wrote it. An account made here is for Agent Loops to test and run
 against. It is never Alex's personal account.
 
 ## Rules from Alex
@@ -248,7 +248,7 @@ accounts", and only for this step.
   preferences, Add payment method, make the other card the default, then open the sign-up
   URL again and it finishes. Type the card with `fill_secret`.
 - Never make root access keys. Root MFA is Alex's. Make an IAM user (`agents-ec2`) whose
-  policy allows only EC2 describe, start, stop and run/terminate on instances with an Agents
+  policy allows only EC2 describe, start, stop and run/terminate on instances with an Agent Loops
   tag; keep a copy of the policy in the account's notes. Its key goes in
   `~/.agents/secrets/aws-ec2` (credentials-file format, profile `agents-ec2`). The
   access-key description refuses "~".

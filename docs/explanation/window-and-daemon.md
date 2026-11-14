@@ -5,7 +5,7 @@ description: Why your agents keep working when the window is closed, what runs i
 
 # The window and the host
 
-On a Mac, Agents is one app, **Agents**. It is a download signed by us, not an App Store
+On a Mac, Agent Loops is one app, **Agent Loops**. It is a download signed by us, not an App Store
 app. It has the window that you see, and it runs this Mac's host in the background. The
 agents belong to the host, not to the window. This page explains why it is built that
 way, and what it means for an agent that is working when you close the window or restart
@@ -40,19 +40,19 @@ file in another app are offered only for folders on this Mac.
 
 ## The first open
 
-When you open Agents for the first time, it needs no code. It makes
+When you open Agent Loops for the first time, it needs no code. It makes
 the control key, and registers two launch agents with macOS: a control plane on this Mac,
 and this Mac's host, `agentsd`. It starts them, and joins this Mac's host to that control
 plane. Then the window pairs itself with the control plane, so you copy and paste nothing.
 
 All of this runs behind the question page, **Let's build your idea.** (#5048): you type an
-idea for an app while Agents sets itself up, and an agent then takes you from it to the
+idea for an app while Agent Loops sets itself up, and an agent then takes you from it to the
 first deploy. See [Build your first app](../how-to/build-your-first-app.md). A person who
 is set up already never sees the question page: the window opens on the session list. If a
 step fails, the question page shows one line under its box with **Try Again** and **Show
 Details**, and keeps your words. When macOS asks you to approve the login
 items, the line says so and has **Open Login Items**. See
-[Set up Agents on this Mac](../how-to/set-up-on-this-mac.md).
+[Set up Agent Loops on this Mac](../how-to/set-up-on-this-mac.md).
 
 Later, you can connect this Mac to another control plane, Hosted at agentloops.dev or one
 that you run, in **Settings ▸ Control plane ▸ Connect to Another…**. See
@@ -61,12 +61,12 @@ that you run, in **Settings ▸ Control plane ▸ Connect to Another…**. See
 ## What runs in the background
 
 macOS keeps the two launch agents running whether or not the window is open, and starts
-them again when you log in. They show under **Login Items** in System Settings as Agents.
+them again when you log in. They show under **Login Items** in System Settings as Agent Loops.
 When the control plane runs somewhere else, only this Mac's host runs here.
 
-Agents also has a menu bar item. It shows how many agents work and how many need you, and
-has **Open Agents**, **Pair a Phone or iPad…**, **Open in Browser**, **Settings…** and
-**Quit Agents**. Quitting Agents closes the window and the menu bar item. It stops neither
+Agent Loops also has a menu bar item. It shows how many agents work and how many need you, and
+has **Open Agent Loops**, **Pair a Phone or iPad…**, **Open in Browser**, **Settings…** and
+**Quit Agent Loops**. Quitting Agent Loops closes the window and the menu bar item. It stops neither
 launch agent: your agents keep running. At login, macOS starts the launch agents and the
 menu bar item, but not the window.
 
@@ -77,17 +77,17 @@ The same diagnostics are in **Help ▸ Diagnostics**.
 The host does not stop when it has nothing to do. It is always there for the next window
 or phone that connects, and for a workflow's next scheduled run.
 
-### Removing Agents
+### Removing Agent Loops
 
-The two login items follow the app, not its path. If you move Agents to the Trash, they
+The two login items follow the app, not its path. If you move Agent Loops to the Trash, they
 keep running from the Trash, and after you empty it, macOS cannot start them but keeps
-them in Login Items. So first use **Settings ▸ Machines ▸ This Mac ▸ Remove Agents from
-This Mac…**. It stops both jobs and removes both login items. Then quit Agents and move it
+them in Login Items. So first use **Settings ▸ Machines ▸ This Mac ▸ Remove Agent Loops from
+This Mac…**. It stops both jobs and removes both login items. Then quit Agent Loops and move it
 to the Trash. Your sessions and folders stay on disk.
 
 ## Closing the window
 
-Close the window, or quit Agents, while an agent is working. The host is still holding
+Close the window, or quit Agent Loops, while an agent is working. The host is still holding
 that agent, so it carries on. It can still ask you a question, and the question waits on
 the host for you. Any window or device connected to your control plane can answer it.
 
@@ -114,7 +114,7 @@ device can reach any of your agents, including those on servers.
 
 ## Restarting the Mac
 
-Restarting the Mac, logging out, an update to Agents and a crash all end the host,
+Restarting the Mac, logging out, an update to Agent Loops and a crash all end the host,
 and every runtime it started ends with it. Nothing that was written down is lost: the
 conversation, the cost, what you had queued, and what you had half typed into the prompt
 are all still there.

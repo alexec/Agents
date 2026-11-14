@@ -6,7 +6,7 @@ description: Connect GitLab with the gitlab.com sign-in or an access token, set 
 
 # Use GitLab
 
-Agents talks to GitLab through its own `gitlab` connector (an MCP server). It works with
+Agent Loops talks to GitLab through its own `gitlab` connector (an MCP server). It works with
 gitlab.com and with a self-managed GitLab. It has tools to read merge requests, pipelines
 and issues and to comment on them, events such as `checks.failed`, and three pages:
 **Merge requests**, **Issues** and a merge request's page. It uses GitLab's REST API, not
@@ -81,14 +81,14 @@ know that it works:
 - **CI** (GitLab pipelines) reads the last pipeline.
 
 **Skip**, **Set Up**, **Change…** and **Try Again** work as they do for GitHub. When GitLab
-refuses a read, the slot says why, such as "GitLab refused: Agents can't see pipelines in
+refuses a read, the slot says why, such as "GitLab refused: Agent Loops can't see pipelines in
 group/app.", and **Open on ‹your GitLab›** opens the folder on GitLab, where you can ask
 for access.
 
 When the first slot has read, the page adds the `gitlab` connector to the folder's
 `.agents/mcp.json`, approved, once. Its events then reach the folder.
 
-To add it by hand, add **GitLab** from the **Agents** marketplace in the catalogue on the Mac, or
+To add it by hand, add **GitLab** from the **Agent Loops** marketplace in the catalogue on the Mac, or
 write the entry:
 
 ```json
@@ -139,7 +139,7 @@ Under the tabs is a box for your words, and these buttons. Each one acts on GitL
   or open discussions, with the box's words. The app asks you before it sends. With no
   agent on that branch, the new-agent form opens on the branch.
 
-Agents can't merge or approve from this page. Those tools are for a view only, so a person
+Agent Loops can't merge or approve from this page. Those tools are for a view only, so a person
 does them. They carry the commit that the page shows. When the merge request has a newer
 commit, nothing happens: open the page again.
 

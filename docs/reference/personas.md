@@ -52,7 +52,7 @@ Every key is optional, and so is the front matter: a file with none is all promp
 
 The body is the persona's prompt. It can name the skills the persona relies on.
 
-## Manage them in Agents
+## Manage them in Agent Loops
 
 Manage your own persona files in **Settings ▸ Agent Configuration ▸ Personas**, on the Mac, the iPhone, the iPad and the web. On the Mac, manage a folder's persona files in **Project Settings ▸ Agent Configuration ▸ Personas**. You choose a persona on the new-session form on every client.
 Choose the folder or personal scope, then open a file, create one, edit its Markdown or

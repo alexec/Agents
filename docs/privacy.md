@@ -1,20 +1,20 @@
 ---
 diataxis: legal
 devices: [mac, iphone, ipad, web, server]
-description: What Agents keeps, where it keeps it, and what it sends to other services. Agents is local first and collects nothing about you.
+description: What Agent Loops keeps, where it keeps it, and what it sends to other services. Agent Loops is local first and collects nothing about you.
 ---
 
 # Privacy
 
 Last changed: 4 November 2026.
 
-Agents is local first. Your folders, conversations, settings and keys stay on machines
-that you control. Agents has no analytics, no tracking and no advertising. The people who
-make Agents do not see your data and do not sell it.
+Agent Loops is local first. Your folders, conversations, settings and keys stay on machines
+that you control. Agent Loops has no analytics, no tracking and no advertising. The people who
+make Agent Loops do not see your data and do not sell it.
 
 ## What stays on your machines
 
-- **Your Mac:** Agents keeps its records in `~/.agents` and the folders of your
+- **Your Mac:** Agent Loops keeps its records in `~/.agents` and the folders of your
   folders: conversations, workflows, labels, usage numbers and settings. It keeps tokens and
   passwords in the Mac's Keychain.
 - **Feature counts (#2165):** each machine counts how many times a day each feature (a
@@ -34,12 +34,12 @@ machine.
 
 ## What goes to other services
 
-Agents sends data to another service only when you set up an integration that needs it.
+Agent Loops sends data to another service only when you set up an integration that needs it.
 Each one sends only what it needs, to that service only:
 
 - **The coding agents (runtimes):** Claude, Codex, Antigravity, Grok, Copilot, Cursor
   and OpenCode run on your machine. Each one sends your prompts and the files it reads
-  to its own company, under that company's terms. Agents does not see that traffic and does
+  to its own company, under that company's terms. Agent Loops does not see that traffic and does
   not copy it.
 - **GitHub, GitLab and Linear:** when you connect one, your host signs in to it and keeps
   the token. It reads and changes issues, pull requests, merge requests and checks for the
@@ -71,8 +71,8 @@ account page stops your control plane and deletes everything it keeps, and the a
 
 ## Videos on YouTube
 
-The Agents folder makes videos of the app with its own scripts, and uploads them to the
-YouTube channel of Agents, which Alex Collins owns. The scripts use one Google account (the
+The Agent Loops folder makes videos of the app with its own scripts, and uploads them to the
+YouTube channel of Agent Loops, which Alex Collins owns. The scripts use one Google account (the
 channel's) with the YouTube scope. They upload videos, put them in a playlist and set them
 private. Every video is private. The scripts read no other Google data and use the token only
 on the Mac that makes the videos. The app that you install never signs in to YouTube or to

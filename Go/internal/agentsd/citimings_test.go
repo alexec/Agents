@@ -136,7 +136,7 @@ func TestCITimingsReadAndAnswer(t *testing.T) {
 		t.Fatalf("attempt 2: %+v %v", second, err)
 	}
 
-	other, err := d.buildsHistory(wire.BuildsHistoryRequest{Repo: "gitlab:group/project",
+	other, err := d.buildsHistory(wire.BuildsHistoryRequest{Repo: "bitbucket:group/project",
 		From: wire.DateOf(now.Add(-time.Hour)), To: wire.DateOf(now)})
 	if err != nil || other.Reader != "none" {
 		t.Fatalf("a forge with no reader: %+v %v", other, err)
@@ -168,5 +168,89 @@ func TestCITimingsBackfillKeepsToItsBudget(t *testing.T) {
 	}
 	if !st.Filled || st.FilledFrom == nil || now.Sub(*st.FilledFrom) < 89*24*time.Hour {
 		t.Fatalf("backfill %+v", st)
+	}
+}
+
+// A fake GitLab with two finished pipelines: one on main with a retried job, one merge request's.
+func TestCITimingsGitLab(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	at := func(d time.Duration) string { return now.Add(d).UTC().Format(time.RFC3339) }
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v4/projects/group/project", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprint(w, `{"default_branch":"main"}`)
+	})
+	mux.HandleFunc("/api/v4/projects/group/project/pipelines", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("scope") != "finished" {
+			t.Errorf("listed %s", r.URL.RawQuery)
+		}
+		if r.URL.Query().Get("page") != "1" || r.URL.Query().Get("created_after") != "" {
+			fmt.Fprint(w, `[]`)
+			return
+		}
+		fmt.Fprintf(w, `[{"id":21,"iid":5,"status":"success","source":"push","ref":"main","sha":"aaa","web_url":"https://gitlab.com/group/project/-/pipelines/21","created_at":%q,"updated_at":%q},
+		 {"id":22,"iid":6,"status":"failed","source":"merge_request_event","ref":"refs/merge-requests/9/head","sha":"bbb","created_at":%q,"updated_at":%q}]`,
+			at(-2*time.Hour), at(-time.Hour), at(-30*time.Minute), at(-20*time.Minute))
+	})
+	mux.HandleFunc("/api/v4/projects/group/project/pipelines/21/jobs", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("include_retried") != "true" {
+			t.Errorf("jobs without include_retried: %s", r.URL.RawQuery)
+		}
+		base := -2 * time.Hour
+		fmt.Fprintf(w, `[{"id":1,"name":"build","status":"success","created_at":%q,"started_at":%q,"finished_at":%q,"queued_duration":5.0,"runner":{"description":"shared-1"}},
+		 {"id":2,"name":"test","status":"failed","created_at":%q,"started_at":%q,"finished_at":%q,"queued_duration":20.0,"runner":{"description":"shared-1"}},
+		 {"id":3,"name":"test","status":"success","created_at":%q,"started_at":%q,"finished_at":%q,"queued_duration":10.0,"runner":{"description":"shared-1"}}]`,
+			at(base), at(base+10*time.Second), at(base+time.Minute),
+			at(base), at(base+90*time.Second), at(base+3*time.Minute),
+			at(base), at(base+5*time.Minute), at(base+7*time.Minute))
+	})
+	mux.HandleFunc("/api/v4/projects/group/project/pipelines/22/jobs", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintf(w, `[{"id":4,"name":"test","status":"failed","created_at":%q,"started_at":%q,"finished_at":%q,"queued_duration":3.0}]`,
+			at(-30*time.Minute), at(-30*time.Minute+10*time.Second), at(-25*time.Minute))
+	})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.URL.RawPath = "" // the project's / arrives as %2F
+		mux.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+
+	d, err := New(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.ciGitLabAPI = srv.URL
+	h := ciRepoHere{forgeRepo{"gitlab", "group/project"}, t.TempDir()}
+	if err := d.readCIRepo(context.Background(), h); err != nil {
+		t.Fatal(err)
+	}
+	hist, err := d.buildsHistory(wire.BuildsHistoryRequest{Repo: "gitlab:group/project",
+		From: wire.DateOf(now.Add(-24 * time.Hour)), To: wire.DateOf(now.Add(time.Hour))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hist.Reader != "gitlab" || hist.DefaultBranch == nil || *hist.DefaultBranch != "main" || hist.ReadAt == nil {
+		t.Fatalf("history %+v", hist)
+	}
+	// Main's first attempt failed its test job, the second is a re-run.
+	if hist.Total.Runs != 1 || hist.Total.Reruns != 1 || hist.Total.Green != 0 {
+		t.Fatalf("total %+v", hist.Total)
+	}
+	got, err := d.buildsRun(wire.BuildsRunRequest{Repo: "gitlab:group/project", Ref: "gitlab:run:group/project#21", Attempt: new(int64(2))})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Attempts != 2 || got.Run.Conclusion == nil || *got.Run.Conclusion != "success" || len(got.Run.Jobs) != 1 || len(got.Run.Jobs[0].Steps) != 0 {
+		t.Fatalf("attempt 2 %+v", got)
+	}
+	first, err := d.buildsRun(wire.BuildsRunRequest{Repo: "gitlab:group/project", Ref: "gitlab:run:group/project#21"})
+	if err != nil || len(first.Run.Jobs) != 2 || first.Run.Jobs[1].Runner == nil || *first.Run.Jobs[1].Runner != "shared-1" {
+		t.Fatalf("attempt 1 %+v %v", first, err)
+	}
+	// The job's wait for a runner is its queued_duration: made 20 s before it started.
+	if w := first.Run.Jobs[1]; w.Started-w.Made != 20 || w.Made != 70 {
+		t.Fatalf("test job made %v started %v", w.Made, w.Started)
+	}
+	mr, err := d.buildsRun(wire.BuildsRunRequest{Repo: "gitlab:group/project", Ref: "gitlab:run:group/project#22"})
+	if err != nil || mr.Run.Pr == nil || *mr.Run.Pr != 9 || (mr.Run.Default != nil && *mr.Run.Default) {
+		t.Fatalf("merge request pipeline %+v %v", mr.Run, err)
 	}
 }

@@ -6,7 +6,7 @@ description: See what agents have cost, and set a limit in money or tokens on wh
 
 # Limit what agents spend
 
-Agents shows what every agent has cost, as its runtime reported it, and can stop the
+Agent Loops shows what every agent has cost, as its runtime reported it, and can stop the
 spending at a limit you set: for one agent across its whole life, and for everything in
 one day. A limit is in money, in tokens, or both. Whichever is reached first stops the
 work.
@@ -39,7 +39,7 @@ work.
 
 **Set a limit**
 
-1. Choose **Agents ▸ Settings…** and click **Policy** in the rail's **Agents** group. On the
+1. Choose **Agent Loops ▸ Settings…** and click **Policy** in the rail's **Agents** group. On the
    web page, open **Settings** and find **Agents ▸ Policy**.
 2. Under **Money**, type an amount in US dollars in **Per agent** and press Return.
 

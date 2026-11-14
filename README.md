@@ -1,8 +1,8 @@
-# Agents
+# Agent Loops
 
-Keep your editor and your coding agent. Agents runs several agents at once, shows which
+Keep your editor and your coding agent. Agent Loops runs several agents at once, shows which
 one needs you, lets them work together and on their own, and lets you answer them from
-your phone. [Why Agents](https://docs.agentloops.dev/explanation/why-agents/)
+your phone. [Why Agent Loops](https://docs.agentloops.dev/explanation/why-agents/)
 
 A Mac app, rebuilt one feature at a time against a written spec.
 
@@ -21,32 +21,32 @@ by themselves on a schedule or when something happens.
 The way in is [agentloops.dev](https://agentloops.dev): sign up in a browser with Apple,
 Google or GitHub, and get a control plane of your own, with nothing to install. A person on
 their own is an account with one person. A Mac then joins it as a machine for its local
-folders: in Agents, **Settings ▸ Control plane ▸ Connect to Another… ▸ Sign In to
+folders: in Agent Loops, **Settings ▸ Control plane ▸ Connect to Another… ▸ Sign In to
 agentloops.dev**.
 
-On a Mac, Agents is one app, **Agents**: a download signed by us (Developer ID), not in
+On a Mac, Agent Loops is one app, **Agent Loops**: a download signed by us (Developer ID), not in
 the Mac App Store (#4224). It has the window, and it runs this Mac's agents and a control
 plane in the background, as two launch agents that macOS keeps running. The window starts
 no agent: it is a screen onto your agents, as the iPhone and iPad app is.
 
-The first time you open Agents, it sets everything up with no question and no code: it
+The first time you open Agent Loops, it sets everything up with no question and no code: it
 makes the control key, registers and starts the two launch agents, joins this Mac's host to
 the control plane, and pairs the window. Closing or quitting the window stops no agent.
 
-Beside the window and the iPhone and iPad app, Agents serves itself as a web page for a
+Beside the window and the iPhone and iPad app, Agent Loops serves itself as a web page for a
 browser on this Mac, at `http://localhost:8792`. **View ▸ Open in Browser** in the window,
 or **Open in Browser** in the menu bar, opens it and pairs that browser the first time. See
-[Use Agents in a browser](https://docs.agentloops.dev/how-to/use-agents-in-a-browser/).
+[Use Agent Loops in a browser](https://docs.agentloops.dev/how-to/use-agents-in-a-browser/).
 
 The control plane is yours: on your Mac, which is the default, or Hosted at agentloops.dev,
 or as several copies of `agents-control` in containers on hosting you rent, sharing an
 S3-compatible bucket. **Settings ▸ Control plane ▸ Connect to Another…** connects this Mac
 to another one. A Linux server becomes a host by running one command the window shows. See
-[Set up Agents on this Mac](https://docs.agentloops.dev/how-to/set-up-on-this-mac/)
+[Set up Agent Loops on this Mac](https://docs.agentloops.dev/how-to/set-up-on-this-mac/)
 and [The control plane](https://docs.agentloops.dev/explanation/control-plane/).
 
 The iPhone and iPad app is not in the App Store yet; its alpha is on TestFlight. The Mac
-app is its own download. Building from source, below, is for working on Agents.
+app is its own download. Building from source, below, is for working on Agent Loops.
 
 ## Build and run
 
@@ -107,14 +107,14 @@ tree-sitter C grammars are the exception, and stay quiet with `-w`.
 ## The daemon
 
 The window runs nothing. The agents belong to a helper, `agentsd`, which is a host of the
-control plane. Agents carries it at `Contents/Helpers/agentsd` and registers it with
+control plane. Agent Loops carries it at `Contents/Helpers/agentsd` and registers it with
 macOS as a launch agent, so it runs with every window closed, starts at login, and never
 exits for being idle. On a Linux server the same daemon lives in `~/.agents-server`.
 
 The rest of this section is about the root every daemon keeps.
 
 ```sh
-# Is it running? (the launch agent that Agents registers)
+# Is it running? (the launch agent that Agent Loops registers)
 launchctl print gui/$(id -u)/com.alexecollins.agentshost.daemon | grep -E 'state|pid'
 
 # Everything it owns
@@ -142,7 +142,7 @@ AGENTS_ROOT=/tmp/agents-branch "./build/DD-machine/Build/Products/Debug/Agent Lo
 ```
 
 Nothing is stored anywhere else, and the daemon is the only writer. To start again from
-nothing, stop both jobs (**Settings ▸ Machines ▸ This Mac ▸ Remove Agents from This Mac…**,
+nothing, stop both jobs (**Settings ▸ Machines ▸ This Mac ▸ Remove Agent Loops from This Mac…**,
 or `launchctl bootout` of both), and delete that directory.
 
 ## A second copy, beside the first
@@ -302,7 +302,7 @@ works in.
 It too arrives turned off.
 
 **Crash reports** (`.agents/workflows/crash-reports.md`, #392) runs once a day at 07:00. It
-reads the crash reports of Agents (also under its old name, Agents Host), `agentsd` and `agents-control` written on
+reads the crash reports of Agent Loops (also under its old names, Agents and Agents Host), `agentsd` and `agents-control` written on
 this Mac since its last run, with the window's crash notes and any of the Remote's reports
 already on the Mac, and files a `bug` issue for each distinct stack nothing tracks yet, or
 comments on the open one with the new count. It marks each crash live or scratch, changes

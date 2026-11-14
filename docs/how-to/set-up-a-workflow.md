@@ -101,11 +101,11 @@ an agent finishes.
 **When the file changes**
 
 A workflow runs only as you approved it. If its file changes afterwards, whether an
-agent edited it, you pulled a change or edited it outside Agents, its row says
+agent edited it, you pulled a change or edited it outside Agent Loops, its row says
 **Changed since you approved it — waiting for your OK** and it does not run until you
 approve it again. The same is true of each skill the workflow names as
 `.agents/skills/<name>/SKILL.md`: what you approve is the workflow with those skills, and
-**Review** shows their text under the workflow's. Changes you make on the workflow's page in Agents count as approved,
+**Review** shows their text under the workflow's. Changes you make on the workflow's page in Agent Loops count as approved,
 unless the workflow was already waiting. Workflows that existed before this version
 were approved as they stood.
 
@@ -245,7 +245,7 @@ A workflow that did not run says why on its row and its page, for example:
   workflows started stop after three steps, so a reviewer that finishes cannot set off
   reviews for ever. That is why the example's prompt tells a reviewer of a reviewer to
   stop at once.
-- **Missed — the app was closed**: the time came while Agents was not running on the
+- **Missed — the app was closed**: the time came while Agent Loops was not running on the
   Mac, or the Mac was off.
 - **Did not run — it is waiting for your OK**: the file is new or has changed since you
   approved it. Open it, read it, and click **Approve**.

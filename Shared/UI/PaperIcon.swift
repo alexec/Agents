@@ -19,6 +19,17 @@ enum PaperIcon {
 extension Image {
     /// The icon for an SF Symbol's name: its Lucide symbol (#4976, #4996).
     init(icon systemName: String) {
+        #if os(iOS)
+        // A toolbar on iOS 27 draws `Image(_:)` of an asset catalogue's symbol as nothing, and
+        // the button falls back to its title (#5337). Handed the `UIImage` itself, it draws it,
+        // and a view still gives it the text's size and colour, as an SF Symbol. Template, or a
+        // tint does not reach it.
+        if let name = PaperIcon.lucide(systemName),
+           let image = UIImage(named: name)?.withRenderingMode(.alwaysTemplate) {
+            self.init(uiImage: image)
+            return
+        }
+        #endif
         if let name = PaperIcon.lucide(systemName) {
             self.init(name)
         } else {
@@ -41,7 +52,7 @@ extension Image {
         }
         self.init(systemName: systemName)
         #else
-        // UIKit draws a toolbar's symbol image from an asset catalogue as it draws an SF Symbol.
+        // `Image(icon:)` already hands UIKit the `UIImage`, which a toolbar draws (#5337).
         self.init(icon: systemName)
         #endif
     }

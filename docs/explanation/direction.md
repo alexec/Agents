@@ -1,12 +1,12 @@
 ---
 diataxis: explanation
-description: What Agents is for, the principles for hosting, trust and data, the three ways to run it, how one organisation's data is kept apart from another's, and where each kind of data lives and is backed up.
+description: What Agent Loops is for, the principles for hosting, trust and data, the three ways to run it, how one organisation's data is kept apart from another's, and where each kind of data lives and is backed up.
 devices: [mac, iphone, ipad, server]
 ---
 
 # Direction
 
-Agents is a software factory you can run yourself. Many coding agents work at once on
+Agent Loops is a software factory you can run yourself. Many coding agents work at once on
 machines in the cloud or on your desk. You watch and answer them from a Mac, a phone or a
 browser. The tools you work with every day, such as the tracker, code review, CI and mail,
 show in the same place.
@@ -55,7 +55,7 @@ decided this on 2026-11-09.
 - **Principle 1 is kept.** The control plane on a Mac is for that one person only. The web
   page is still a full client.
 - **Principle 2: Hosted is not the default way in for the Mac download.** When a person
-  opens Agents on a Mac, the default is a control plane on that Mac, because Alex wants it
+  opens Agent Loops on a Mac, the default is a control plane on that Mac, because Alex wants it
   to work with nothing remote. Hosted is still the default for a person who starts in a
   browser. The person can connect Hosted, or a self-hosted control plane, later in
   **Settings ▸ Control plane ▸ Connect to Another…**.
@@ -80,7 +80,7 @@ second screen today is a gap.
 ## From idea to production
 
 Alex set this north star on 2026-11-05 (#3579). A person dictates the features they want.
-Agents takes them all the way to production: it organises the work, ships it (a TestFlight
+Agent Loops takes them all the way to production: it organises the work, ships it (a TestFlight
 build on a person's iPhone, an update rolled out, a service behind a status page) and
 watches the system's health. What health finds comes back as new work.
 
@@ -88,7 +88,7 @@ watches the system's health. What health finds comes back as new work.
   health and the next issue are each a node in Lineage. A person asks "where is my
   feature?" or "what did this outage come from?" in Lineage, not on a pipeline screen.
 - **A deploy runs in the customer's own CI**, or on one of their machines, never on the
-  control plane (principles 5 and 6). Agents watches it and shows the approval step.
+  control plane (principles 5 and 6). Agent Loops watches it and shows the approval step.
 - **Health comes from an outside service**, as an MCP server, Sentry first.
 
 The spec is `specs/3579-outer-loop/spec.md`.
@@ -101,7 +101,7 @@ organisations it serves, changes.
 | Shape | Who runs the control plane | Organisations on it | For |
 |---|---|---|---|
 | **Hosted** (the default way in) | Us, at agentloops.dev | Many, one per account | Anyone who starts in a browser, alone or as a team |
-| **Single user** | Us, at agentloops.dev: a hosted account with one person. Or, as an option, Agents on your Mac (the Mac download's default, #4224) | One, with one person | One developer on their own |
+| **Single user** | Us, at agentloops.dev: a hosted account with one person. Or, as an option, Agent Loops on your Mac (the Mac download's default, #4224) | One, with one person | One developer on their own |
 | **Self-hosted** (on-premises, or in your own cloud account) | You, as a container on your own hosting | One | A team or a company that keeps everything in its own account |
 
 - In every shape, the agents run on the customer's own machines. "Hosted" means that we run
@@ -109,7 +109,7 @@ organisations it serves, changes.
 - A person on their own is the single-user case. In a browser, they sign up at
   agentloops.dev, and their account has one person. Their Mac joins that account as a
   machine for its local folders.
-- Agents on a Mac can run a control plane for its one person. This is an option, and the
+- Agent Loops on a Mac can run a control plane for its one person. This is an option, and the
   default only for the Mac download (see "What the Mac download leaves out", above). Other
   people and other clients do not need it.
 - The control plane is free in every shape. Its source is visible like the rest, all rights reserved.
@@ -139,6 +139,12 @@ The control plane adopts an id that it does not know, so a clone joins with noth
 
 ### Glossary
 
+- **Agent Loops:** the product: the Mac app, the Remote on iPhone and iPad, the web page
+  and the hosts (#4925). Its internal names keep the old name "agents": the daemon
+  `agentsd`, the folder `~/.agents`, the `agents` MCP server and its tools, the bundle ids,
+  the data folder `~/Library/Application Support/Agents` and the program
+  `Contents/MacOS/Agents Host` (#5297). A change to these names would break the copies that
+  are installed, their settings and their records, and the links to them, so they stay.
 - **Machine:** a computer that runs agents, such as a Mac, a Linux box or a computer a
   provider starts.
 - **Machine provider:** an MCP server that makes, starts and stops machines.
@@ -205,7 +211,7 @@ SQL database unless a measured need shows that the store cannot do the job.
 
 ## Bringing other tools in
 
-Agents shows the tools a person works with, so that they do not leave the app:
+Agent Loops shows the tools a person works with, so that they do not leave the app:
 
 - **Every integration is an MCP server** with tools, events and views (`ui://` pages, MCP
   Apps). There are no built-in adapters. Slack, email and chat are MCP servers too
@@ -229,7 +235,7 @@ People who run an organisation must see what it used and did:
 
 ## Money
 
-Agents' source is visible, with all rights reserved (see `LICENSE`), and this page does not
+Agent Loops' source is visible, with all rights reserved (see `LICENSE`), and this page does not
 depend on how it is paid for. The control plane stays free. If paid parts come later, they
 come from running the hosted service, not from features taken out of the free app.
 

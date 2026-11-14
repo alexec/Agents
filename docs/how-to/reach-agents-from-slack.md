@@ -1,13 +1,13 @@
 ---
 diataxis: how-to
 devices: [mac]
-description: Make a Slack app for Agents, add the Slack connector with its two tokens, and let a workflow start an agent from a Slack message or a question's answer.
+description: Make a Slack app for Agent Loops, add the Slack connector with its two tokens, and let a workflow start an agent from a Slack message or a question's answer.
 ---
 
 # Reach agents from Slack
 
 The `slack` connector lets agents talk in a Slack workspace, and lets a Slack message start
-work. It is `slack-mcp`, a small server that Agents makes (#1351). It speaks as the bot of a
+work. It is `slack-mcp`, a small server that Agent Loops makes (#1351). It speaks as the bot of a
 Slack app that you make, and it uses Socket Mode, so Slack needs no public address.
 
 - **The event** `message.received`: a message came into a channel the bot is in, or to the
@@ -37,7 +37,7 @@ asks the person whose sign-in email is that email.
 ## Before you start
 
 - A Slack workspace where you can make and install an app.
-- Agents on the Mac carries `slack-mcp`, and every Linux host installs it beside agentsd.
+- Agent Loops on the Mac carries `slack-mcp`, and every Linux host installs it beside agentsd.
 
 ## Make the Slack app
 
@@ -88,7 +88,7 @@ asks the person whose sign-in email is that email.
 
 ## Add the connector
 
-1. Add **Slack** from the **Agents** marketplace in the catalogue (**Settings ▸ Agent
+1. Add **Slack** from the **Agent Loops** marketplace in the catalogue (**Settings ▸ Agent
    Configuration ▸ Connectors ▸ Add Connector…**, or **Change… ▸ Slack…** in the connectors
    set-up's **Messaging** slot).
 2. It asks for `SLACK_BOT_TOKEN`, the `xoxb-` token, and `SLACK_APP_TOKEN`, the `xapp-`
