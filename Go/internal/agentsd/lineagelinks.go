@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -51,13 +53,58 @@ type lineageLinker struct {
 	linkerJobs chan func()
 	linkerDone bool
 	repoMu     sync.Mutex
-	// repos is each folder's forge repo, looked up once: a remote seldom changes.
+	// repos is each folder's forge repo, looked up again only when its git config changes.
 	repos map[string]forgeRepo
 	// otherHost is each folder in repos whose origin is on a host forgeOf does not name: it
 	// may be the connected Forgejo's, which can change.
 	otherHost map[string]bool
 	// topics is each folder's topic for its agents nodes (folderTopic), looked up once.
 	topics map[string]string
+	// configs is each folder's git config file and when it last changed, as repos and topics
+	// were read: a change (a new origin after a repo moved) reads them again (#5335).
+	configs map[string]gitConfigStamp
+}
+
+// gitConfigStamp is a folder's git config file and its modification time.
+type gitConfigStamp struct {
+	path string
+	mod  time.Time
+}
+
+// forgetChangedRemote drops what repos, otherHost and topics keep for folder when its git
+// config changed since they were read. It costs one stat a call, and one git the first time.
+func (d *Daemon) forgetChangedRemote(folder string) {
+	d.repoMu.Lock()
+	c, ok := d.configs[folder]
+	d.repoMu.Unlock()
+	if !ok {
+		if dir, err := git(folder, "rev-parse", "--git-common-dir"); err == nil && dir != "" {
+			if !filepath.IsAbs(dir) {
+				dir = filepath.Join(folder, dir)
+			}
+			c.path = filepath.Join(dir, "config")
+		}
+	}
+	var mod time.Time
+	if c.path != "" {
+		if fi, err := os.Stat(c.path); err == nil {
+			mod = fi.ModTime()
+		}
+	}
+	d.repoMu.Lock()
+	defer d.repoMu.Unlock()
+	if ok && mod.Equal(c.mod) {
+		return
+	}
+	if ok {
+		delete(d.repos, folder)
+		delete(d.otherHost, folder)
+		delete(d.topics, folder)
+	}
+	if d.configs == nil {
+		d.configs = map[string]gitConfigStamp{}
+	}
+	d.configs[folder] = gitConfigStamp{path: c.path, mod: mod}
 }
 
 // forgeRepo is a repository on a forge, as lineage refs name it: forge github, gitlab, forgejo,
@@ -315,6 +362,7 @@ func (d *Daemon) agentsTopic(kind, id string) string {
 // no origin. It asks git once per folder, and never a forge, so it does not change with a
 // connection.
 func (d *Daemon) folderTopic(folder string) string {
+	d.forgetChangedRemote(folder)
 	d.repoMu.Lock()
 	t, ok := d.topics[folder]
 	d.repoMu.Unlock()
@@ -410,6 +458,7 @@ func jiraKeys(text string, jira []string) []string {
 // folderRepo is the forge repo a folder pushes to, from its origin remote: on a host whose name
 // says its forge, or on the connected Forgejo, GitLab or Azure DevOps Server.
 func (d *Daemon) folderRepo(folder string) forgeRepo {
+	d.forgetChangedRemote(folder)
 	d.repoMu.Lock()
 	r, ok := d.repos[folder]
 	other := d.otherHost[folder]

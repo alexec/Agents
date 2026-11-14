@@ -10,6 +10,7 @@ import (
 
 	"github.com/agentloops-dev/agents/Go/internal/githubmcp"
 	"github.com/agentloops-dev/agents/Go/internal/lineage"
+	"github.com/agentloops-dev/agents/Go/internal/repoalias"
 	"github.com/agentloops-dev/agents/Go/wire"
 )
 
@@ -78,15 +79,21 @@ func (g githubForge) Sources(_ context.Context, folders []string, _ bool) (forge
 }
 
 // scopeOf is the GitHub repos the folders are on, each once, with the first folder on each.
+// A repo that moved is named as it is now: GitHub's search does not follow a move, and
+// answers 422 for the old name (#5335).
 func (g githubForge) scopeOf(folders []string) githubScope {
 	s := githubScope{folderOf: map[string]string{}}
 	for _, f := range folders {
 		repo := g.d.folderRepo(f)
-		if _, seen := s.folderOf[repo.path]; repo.forge != "github" || repo.path == "" || seen {
+		if repo.forge != "github" || repo.path == "" {
 			continue
 		}
-		s.folderOf[repo.path] = f
-		s.repos = append(s.repos, repo.path)
+		name := repoalias.Topic("github", repo.path)
+		if _, seen := s.folderOf[name]; seen {
+			continue
+		}
+		s.folderOf[name] = f
+		s.repos = append(s.repos, name)
 	}
 	slices.Sort(s.repos)
 	return s
