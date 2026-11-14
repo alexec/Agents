@@ -79,7 +79,7 @@ the control plane moves, because its key and the address stay the same.
 A control plane in the cloud serves the same page at its own address, such as
 `https://agents.example.com/`, for a browser anywhere. **Add a Browser…** in the window, or
 at the foot of the Remote's sidebar, gives the code and says the address. See
-[Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md#use-agents-in-a-browser).
+[Run the control plane in the cloud](run-the-control-plane-in-the-cloud.md#use-agent-loops-in-a-browser).
 
 ### What you can do there
 
