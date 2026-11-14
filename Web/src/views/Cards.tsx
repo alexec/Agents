@@ -334,8 +334,6 @@ function ElicitationCard({ request, asker, hold, answer, openBrowser }: {
   // then was wiped: the form went back empty (the closing walk, T071).
   const values = useSignal<Record<string, JSONValue>>(defaultsOf(request));
   const step = useSignal(0);
-  // No, because… (#4039): the decline being explained, by its key, while the card asks why.
-  const because = useSignal<string | null>(null);
   // The one question of a confirm card is its title (#5028).
   const { title, message } = askHead(request);
   const go = (key: string, action: Action, content: Record<string, JSONValue> = {}, reason?: string) =>
@@ -346,18 +344,19 @@ function ElicitationCard({ request, asker, hold, answer, openBrowser }: {
     return { class: `${base} ${h.class}`.trim() || undefined, disabled: h.disabled, telling: h.telling };
   };
   const done = button("done"), gaveUp = button("gave-up"), none = button("none"), decline = button("decline");
-  /** No, because…, beside the decline it explains. */
-  const sayWhy = (key: string, attrs: Record<string, string> = {}) => (
-    <button class="link" aria-disabled={inert} {...attrs} onClick={() => !inert && (because.value = key)}>{declineReasonOpener}</button>
+  const dismissed = button("dismiss");
+  /** Dismiss (#5295; was No, because…, #4039): the card goes with no answer (the wire's cancel),
+   * and the prompt takes the keyboard for the person's reply. */
+  const dismiss = (attrs: Record<string, string> = {}) => (
+    <button class={`link ${dismissed.class ?? ""}`.trim()} aria-disabled={dismissed.disabled} {...attrs} onClick={() => {
+      if (inert) return;
+      go("dismiss", "cancel");
+      document.querySelector<HTMLTextAreaElement>(".prompt-field textarea")?.focus();
+    }}>{dismissWord}{dismissed.telling}</button>
   );
 
   let body;
-  if (because.value !== null) {
-    const key = because.value;
-    // The question stays in view; the answers give way to the reason.
-    body = <DeclineReason inert={inert} sent={button(key, "prominent")} back={() => (because.value = null)}
-      send={(reason) => go(key, "decline", {}, reason)} />;
-  } else if (request.handOff) {
+  if (request.handOff) {
     // A step on the page in the machine's browser (#3529): Open the page shows it in a tab of its own (#4141).
     body = <HandOffField handOff={request.handOff} inert={inert} open={openBrowser} recipient={hold.recipient}
       done={button("done")} cannot={button("cannot", "prominent")}
@@ -366,7 +365,7 @@ function ElicitationCard({ request, asker, hold, answer, openBrowser }: {
     // A masked field of its own (#2885), never the form's open one.
     const reason = "form" in request.mode ? request.mode.form._0.properties[0]?.title : undefined;
     body = <SecretField secret={request.secret} reason={reason} recipient={hold.recipient} inert={inert}
-      save={button("save", "prominent")} decline={decline} sayWhy={sayWhy("decline")}
+      save={button("save", "prominent")} decline={decline} dismiss={dismiss()}
       send={(typed, sessionOnly, ask, description) => (typed === null ? go("decline", "decline")
         : go("save", "accept", {
           [secretField]: typed,
@@ -380,7 +379,7 @@ function ElicitationCard({ request, asker, hold, answer, openBrowser }: {
       <div class="ask-foot">
         <span class="ask-decline">
           <button class={`link ${gaveUp.class ?? ""}`.trim()} aria-disabled={gaveUp.disabled} {...numbered(1)} onClick={() => go("gave-up", "decline")}>Gave up{gaveUp.telling}</button>
-          {" · "}{sayWhy("gave-up", numbered(2))}
+          {" · "}{dismiss(numbered(2))}
         </span>
         <span class="spacer" />
         <button class={done.class} aria-disabled={done.disabled} {...numbered(0)} onClick={() => go("done", "accept")}>Done{done.telling}</button>
@@ -412,7 +411,7 @@ function ElicitationCard({ request, asker, hold, answer, openBrowser }: {
               <button class={`link ${decline.class ?? ""}`.trim()} aria-disabled={decline.disabled}
                 {...numbered(single.choices.length + (single.property.isRequired ? 0 : 1))}
                 onClick={() => go("decline", "decline")}>No thanks{decline.telling}</button>
-              {" · "}{sayWhy("decline", numbered(single.choices.length + (single.property.isRequired ? 1 : 2)))}
+              {" · "}{dismiss(numbered(single.choices.length + (single.property.isRequired ? 1 : 2)))}
             </span>
             <span class="spacer" />
             {!single.property.isRequired && (
@@ -441,7 +440,7 @@ function ElicitationCard({ request, asker, hold, answer, openBrowser }: {
           <div class="form-row ask-foot">
             <span class="ask-decline">
               <button class={`link ${decline.class ?? ""}`.trim()} aria-disabled={decline.disabled} onClick={() => go("decline", "decline")}>No thanks{decline.telling}</button>
-              {" · "}{sayWhy("decline")}
+              {" · "}{dismiss()}
             </span>
             <span class="spacer" />
             {last > 0 && (
@@ -466,12 +465,12 @@ function ElicitationCard({ request, asker, hold, answer, openBrowser }: {
   }
   const glyph = request.handOff ? "hand" : request.secret ? "lock" : "url" in request.mode ? "globe" : "circle-help";
   // The head says what is asked: the step to do, the secret's name, or the question (#5028).
-  const head = because.value === null && request.handOff ? request.handOff.step
-    : because.value === null && request.secret ? <code>{request.secret.name}</code>
+  const head = request.handOff ? request.handOff.step
+    : request.secret ? <code>{request.secret.name}</code>
     : <Markdown text={title} />;
   return (
     <Ask glyph={glyph} title={head} asker={asker} label="Question" inert={inertOf(hold)}>
-      {!request.secret && !request.handOff && because.value === null && message && <Markdown text={message} />}
+      {!request.secret && !request.handOff && message && <Markdown text={message} />}
       {body}
       <AnsweredNote answered={hold.answered} />
     </Ask>
@@ -487,41 +486,8 @@ function secretMoreWords(secret: ElicitationSecret): string {
   return parts.join(", ");
 }
 
-/** The control that opens DeclineReason, as the window's and the Remote's DeclineReasonField.opener. */
-const declineReasonOpener = "No, because…";
-
-/**
- * Why the person declines a form (#4039): one line, Back and Send. Return sends and Escape goes
- * back. The agent reads what is typed; an empty line declines with no reason, as No thanks does.
- * As the window's and the Remote's DeclineReasonField.
- */
-function DeclineReason({ inert, sent, back, send }: {
-  inert: boolean; sent: AnswerButton; back: () => void; send: (reason: string) => void;
-}) {
-  const reason = useSignal("");
-  return (
-    <>
-      <label class="field">
-        <input type="text" autofocus disabled={inert} placeholder="Why not? The agent reads this" aria-label="Why not? The agent reads this"
-          value={reason.value} onInput={(e) => (reason.value = (e.currentTarget as HTMLInputElement).value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              send(reason.value);
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              back();
-            }
-          }} />
-      </label>
-      <div class="form-row ask-foot">
-        <span class="spacer" />
-        <button disabled={inert} onClick={back}>Back</button>
-        <button class={sent.class} aria-disabled={sent.disabled} onClick={() => send(reason.value)}>Send{sent.telling}</button>
-      </div>
-    </>
-  );
-}
+/** Dismiss (#5295), as the window's and the Remote's AskDecline.dismiss. */
+const dismissWord = "Dismiss";
 
 /**
  * An agent's hand_to_person (#3529): the step, why, Open the page, Done, and Can't do it with a
@@ -575,9 +541,9 @@ function HandOffField({ handOff, inert, open, recipient, done, cannot, send }: {
  * session only (#3548); the chat, the agent and every other client get the name only. Ask before
  * use (#4016) is on unless the person turns it off. As the window's and the Remote's SecretAskCard.
  */
-function SecretField({ secret, reason, recipient, inert, save, decline, sayWhy, send }: {
+function SecretField({ secret, reason, recipient, inert, save, decline, dismiss, send }: {
   secret: ElicitationSecret; reason: string | undefined; recipient: string; inert: boolean;
-  save: AnswerButton; decline: AnswerButton; sayWhy: ComponentChildren;
+  save: AnswerButton; decline: AnswerButton; dismiss: ComponentChildren;
   send: (typed: string | null, sessionOnly: boolean, askBeforeUse: boolean | null, description: string) => void;
 }) {
   const text = useSignal("");
@@ -635,7 +601,7 @@ function SecretField({ secret, reason, recipient, inert, save, decline, sayWhy, 
       <div class="form-row ask-foot">
         <span class="ask-decline">
           <button class={`link ${decline.class ?? ""}`.trim()} aria-disabled={decline.disabled} onClick={() => send(null, false, null, "")}>No thanks{decline.telling}</button>
-          {" · "}{sayWhy}
+          {" · "}{dismiss}
         </span>
         <span class="spacer" />
         <button class={save.class} disabled={!typed} aria-disabled={save.disabled} data-default=""

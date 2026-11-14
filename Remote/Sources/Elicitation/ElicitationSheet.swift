@@ -23,13 +23,11 @@ struct ElicitationSheet: View {
     /// What was tapped, while the answer is in flight — the same guard against a second
     /// tap that `PermissionSheet` makes, and for the same reason.
     @State private var chosen: String?
-    /// No, because… (#4039): the decline being explained, by its title, while the sheet asks why.
-    @State private var because: String?
 
     /// The Ask's head (#5031): the step to do, the secret's name, or the question.
     private var headTitle: String {
-        if because == nil, let handOff = request.handOff { return handOff.step }
-        if because == nil, let secret = request.secret { return secret.name }
+        if let handOff = request.handOff { return handOff.step }
+        if let secret = request.secret { return secret.name }
         return request.title
     }
 
@@ -45,7 +43,7 @@ struct ElicitationSheet: View {
         AskCard(icon: glyph, title: headTitle, asker: model.work.askerLine(request.agentID)) {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                if (request.secret == nil && request.handOff == nil) || because != nil {
+                if request.secret == nil && request.handOff == nil {
                     // The question itself often lives here rather than in the schema: a
                     // one-question form arrives with an untitled field and the whole
                     // question in `message`.
@@ -57,14 +55,7 @@ struct ElicitationSheet: View {
                 }
             }
 
-            if let because {
-                // The question stays in view; the answers give way to the reason.
-                DeclineReasonField(host: model.answerRecipient(request.agentID), sending: chosen != nil,
-                                   back: { self.because = nil }) { reason in
-                    send(because, action: .decline, reason: reason)
-                }
-                .disabled(isStale)
-            } else if let handOff = request.handOff {
+            if let handOff = request.handOff {
                 // A step on the page in the machine's browser (#3529): Open the page takes the
                 // agent browser over (#3800, #4038, #4141), as on the Mac and the web; a host too
                 // old to have one says so. In the take-over, the page is open already.
@@ -81,7 +72,7 @@ struct ElicitationSheet: View {
                 // what was typed is still there if it did not.
                 SecretAskCard(secret: secret, reason: request.secretReason,
                               host: model.answerRecipient(request.agentID), sending: chosen != nil,
-                              because: { because = "No thanks" }) { answer in
+                              dismiss: dismiss) { answer in
                     if let answer {
                         send("Save", action: .accept, content: answer.content)
                     } else {
@@ -100,7 +91,6 @@ struct ElicitationSheet: View {
         // (033, #723).
         .chatColumn()
         .animation(ResponseMotion.snappy, value: chosen)
-        .onChange(of: request.id) { _, _ in because = nil }
     }
 
     private func openAgentBrowser() {
@@ -117,7 +107,7 @@ struct ElicitationSheet: View {
             } else {
                 FormPages(request: request, schema: schema, send: { what, action, content in
                     send(what, action: action, content: content)
-                }, because: { because = "No thanks" })
+                }, dismiss: dismiss)
                 .disabled(isStale)
             }
         case .url(let link):
@@ -213,7 +203,7 @@ struct ElicitationSheet: View {
         model.isStale(on: model.work.agent(request.agentID)?.host ?? .mac)
     }
 
-    /// The decline, one tap, and No, because… beside it to say why first (#4039): the Ask's
+    /// The decline, one tap, and Dismiss beside it (#5295; was No, because…, #4039): the Ask's
     /// foot, as links on the left (#5031). Large enough to tap.
     @ViewBuilder
     private func declineButton(_ title: String = "No thanks") -> some View {
@@ -221,11 +211,18 @@ struct ElicitationSheet: View {
         HStack(spacing: 6) {
             AskDecline(title) { send(title, action: .decline) }
             Text("·").foregroundStyle(.secondary)
-            AskDecline(DeclineReasonField.opener) { because = title }
+            AskDecline(AskDecline.dismiss, action: dismiss)
             Spacer(minLength: 0)
         }
         .appText(.reading)
         .frame(minHeight: 44)
+    }
+
+    /// Dismiss (#5295): the card goes with no answer (the wire's cancel); the person replies
+    /// in the prompt. The keyboard does not come up by itself: on a phone it would cover the
+    /// chat the person may want to read first.
+    private func dismiss() {
+        send(AskDecline.dismiss, action: .cancel)
     }
 
     private func label(_ title: String, note: String?) -> some View {

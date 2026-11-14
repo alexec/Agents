@@ -73,6 +73,9 @@ func (d *Daemon) askSecret(id wire.UUID, args map[string]json.RawMessage) (strin
 	if !answered {
 		return formStillOpen, nil
 	}
+	if r.dismissed {
+		return dismissedSecretWords(name), nil
+	}
 	return d.secretNote(id, name, r.action, r.reason), nil
 }
 

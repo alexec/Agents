@@ -103,8 +103,12 @@ extension AskCard where Decline == EmptyView, Buttons == EmptyView {
     }
 }
 
-/// One of the Ask's ways to say no: a link on the foot's left ("No thanks", "No, because…").
+/// One of the Ask's ways not to answer yes: a link on the foot's left ("No thanks", "Dismiss").
 struct AskDecline: View {
+    /// Dismiss (#5295; was No, because…, #4039): the card goes with no answer (the wire's
+    /// cancel), and the person replies in the prompt. The same word on every client.
+    static let dismiss = "Dismiss"
+
     let title: String
     let action: () -> Void
 

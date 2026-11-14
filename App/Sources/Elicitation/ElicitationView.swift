@@ -11,6 +11,9 @@ struct ElicitationView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.openWindow) private var openWindow
     @Environment(\.inTakeOver) private var inTakeOver
+    /// The window's prompt, which takes the keyboard after a Dismiss (#5295). None in a
+    /// window of its own.
+    @Environment(WindowRequests.self) private var requests: WindowRequests?
     let request: ElicitationRequest
 
     @State private var values: [String: JSONValue] = [:]
@@ -24,13 +27,11 @@ struct ElicitationView: View {
     /// a double click or a repeated ⌘1 is not a second answer, and the button that
     /// sent it says so. Put back if it did not go (#86).
     @State private var sending: String?
-    /// No, because… (#4039): the decline being explained, by its key, while the card asks why.
-    @State private var because: String?
 
     /// The Ask's head (#5031): the step to do, the secret's name, or the question.
     private var headTitle: String {
-        if because == nil, let handOff = request.handOff { return handOff.step }
-        if because == nil, let secret = request.secret { return secret.name }
+        if let handOff = request.handOff { return handOff.step }
+        if let secret = request.secret { return secret.name }
         return request.title
     }
 
@@ -48,13 +49,7 @@ struct ElicitationView: View {
         AskCard(icon: glyph, title: headTitle, asker: model.work.askerLine(request.agentID),
                 accessory: needRequest.map { AnyView(RequestCardLater(request: $0)) }) {
             VStack(alignment: .leading, spacing: 12) {
-                if let because {
-                    // The question stays in view, as the head; the answers give way to the reason.
-                    DeclineReasonField(host: model.answerRecipient(request.agentID), sending: sending != nil,
-                                       back: { self.because = nil }) { reason in
-                        send(because, .decline, reason: reason)
-                    }
-                } else if let handOff = request.handOff {
+                if let handOff = request.handOff {
                     // A step on the page in the machine's browser (#3529): Open the page
                     // takes it over in a window of its own (#4141); in that window, the page
                     // is already open.
@@ -68,7 +63,7 @@ struct ElicitationView: View {
                     // A masked field of its own (#2885), never the form's open one.
                     SecretAskCard(secret: secret, reason: request.secretReason,
                                   host: model.answerRecipient(request.agentID), sending: sending != nil,
-                                  because: { because = "no thanks" }) { answer in
+                                  dismiss: dismiss) { answer in
                         if let answer {
                             send("save", .accept, content: answer.content)
                         } else {
@@ -106,7 +101,7 @@ struct ElicitationView: View {
                             .buttonStyle(.paper)
                             .keyboardShortcut("2")
                             .modifier(Held(sending: sending, key: "gave up"))
-                            Button(DeclineReasonField.opener) { because = "gave up" }
+                            Button(AskDecline.dismiss, action: dismiss)
                             .buttonStyle(.paper)
                             .modifier(Held(sending: sending))
                         }
@@ -122,7 +117,6 @@ struct ElicitationView: View {
         // its own first page, not wherever the last one was left.
         .onChange(of: request.id) { _, _ in
             step = 0
-            because = nil
         }
     }
 
@@ -183,7 +177,7 @@ struct ElicitationView: View {
             Button { send("decline", .decline) } label: { pending("No thanks", "decline") }
             .buttonStyle(.paper)
             .modifier(Held(sending: sending, key: "decline"))
-            Button(DeclineReasonField.opener) { because = "decline" }
+            Button(AskDecline.dismiss, action: dismiss)
             .buttonStyle(.paper)
             .modifier(Held(sending: sending))
             // Always offered, on every page but the last. Clicking an option turns
@@ -396,9 +390,9 @@ struct ElicitationView: View {
                     }
                 }
             }
-            // The Ask's foot (#5031): the two ways to say no, as links on the left. Not the
-            // same thing as answering with nothing, and the daemon already tells the two
-            // apart; saying why is a second step, so No thanks stays one click (#4039).
+            // The Ask's foot (#5031): No thanks and Dismiss, as links on the left. No thanks
+            // is an answer (the agent must not); Dismiss closes the card with none, and the
+            // person replies in the prompt (#5295).
             Divider().overlay(Paper.rule)
             HStack(spacing: 4) {
                 let first = single.choices.count + (single.property.isRequired ? 0 : 1)
@@ -407,7 +401,7 @@ struct ElicitationView: View {
                     .modifier(Held(sending: sending, key: "decline"))
                 if sending == "decline" { Telling(host: model.answerRecipient(request.agentID)) }
                 Text("·").foregroundStyle(.secondary)
-                AskDecline(DeclineReasonField.opener) { because = "decline" }
+                AskDecline(AskDecline.dismiss, action: dismiss)
                     .modifier(ElicitationNumberShortcut(index: first + 1))
                     .modifier(Held(sending: sending))
             }
@@ -461,6 +455,13 @@ struct ElicitationView: View {
 
     private func answer(_ name: String, with value: JSONValue) {
         send("choice:\(value.stringValue ?? "")", .accept, content: [name: value])
+    }
+
+    /// Dismiss (#5295): the card goes with no answer (the wire's cancel), and the prompt
+    /// takes the keyboard for the person's reply.
+    private func dismiss() {
+        send("dismiss", .cancel)
+        requests?.focusPrompt()
     }
 
     /// Sends the answer once, holding the card until it has gone.

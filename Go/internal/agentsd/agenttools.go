@@ -236,6 +236,9 @@ func (d *Daemon) askForm(id wire.UUID, args map[string]json.RawMessage, late fun
 	if r.byMessage {
 		return answeredByMessage, true, nil
 	}
+	if r.dismissed {
+		return dismissedWords, true, nil
+	}
 	var said []wire.ElicitationAnswer
 	if r.action == wire.AnswerElicitationRequestActionAccept {
 		said = answers(schema, r.content, message)
