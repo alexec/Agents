@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="740" viewBox="0 0 1240 740" font-family="-apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif">
+<defs><filter id="shadow" x="-5%" y="-5%" width="110%" height="115%"><feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000" flood-opacity="0.18"/></filter></defs>
+<rect width="1240" height="740" fill="#E7EAEE"/>
+<text x="24.0" y="34.0" font-size="15" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">5 · Reports ▸ Planning ▸ Delivery: the four DORA figures for each production target (web only, #3224)</text>
+<text x="24.0" y="54.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">Real: this repo's deployments. The Mac app and the App Store over 30 days, the docs over 7 (the API's last 100 github-pages deploys reach that far).</text>
+<text x="24.0" y="70.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">Lead time: a PR's merge to the first deploy that brings it. Change failure rate: failed deploys and rollbacks, of all deploys. Time to restore: a failure to the next deploy that went out.</text>
+<g filter="url(#shadow)"><rect x="24" y="112" width="1192" height="604" rx="8" fill="#F7F8F9"/></g>
+<rect x="24.0" y="112.0" width="1192.0" height="44.0" rx="8" fill="#FFFFFF"/>
+<path d="M24.0 156.0L1216.0 156.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="48.0" y="140.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Overview</text>
+<text x="129.6" y="140.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Agents</text>
+<text x="196.8" y="140.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Work</text>
+<text x="249.6" y="140.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Docs</text>
+<text x="302.4" y="140.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Messages</text>
+<text x="384.0" y="140.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Machines</text>
+<text x="465.6" y="140.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Workflows</text>
+<text x="554.4" y="140.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">Reports</text>
+<rect x="552.4" y="153.0" width="54.4" height="2.0" rx="0" fill="#0A6CDB"/>
+<text x="628.8" y="140.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Requests</text>
+<text x="710.4" y="140.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">People</text>
+<text x="777.6" y="140.0" font-size="13" fill="#5B616B" font-variant-numeric="tabular-nums">Settings</text>
+<text x="48.0" y="194.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Reports</text>
+<text x="48.0" y="218.0" font-size="13" fill="#1C1D20" font-variant-numeric="tabular-nums">Spend</text>
+<text x="48.0" y="242.0" font-size="13" fill="#1C1D20" font-variant-numeric="tabular-nums">Outcomes</text>
+<text x="48.0" y="266.0" font-size="13" fill="#1C1D20" font-variant-numeric="tabular-nums">Time</text>
+<text x="48.0" y="290.0" font-size="13" fill="#1C1D20" font-variant-numeric="tabular-nums">Runtimes</text>
+<text x="48.0" y="314.0" font-size="13" fill="#1C1D20" font-variant-numeric="tabular-nums">Planning</text>
+<text x="60.0" y="338.0" font-size="13" fill="#1C1D20" font-variant-numeric="tabular-nums">Builds</text>
+<rect x="40.0" y="346.0" width="176.0" height="26.0" rx="6" fill="#EEF0F3"/>
+<text x="60.0" y="362.0" font-size="13" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">Delivery</text>
+<path d="M234.0 156.0L234.0 716.0" stroke="#DDE1E6" stroke-width="1"/>
+<text x="264.0" y="190.0" font-size="20" fill="#1C1D20" font-weight="700" font-variant-numeric="tabular-nums">Delivery</text>
+<text x="264.0" y="212.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">Repository agentloops-dev/Agents · The last 30 days · Tier: production</text>
+<circle cx="734.0" cy="208.0" r="9" fill="#B35900"/>
+<text x="734.0" y="212.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle" font-variant-numeric="tabular-nums">17</text>
+<text x="264.0" y="230.0" font-size="11" fill="#8A9099" font-variant-numeric="tabular-nums">Last update 4 min ago</text>
+<text x="264.0" y="264.0" font-size="14" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">Mac app @ github-releases</text>
+<text x="524.0" y="264.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">21 deploys went out, 3 failed, in 30 days</text>
+<rect x="264.0" y="278.0" width="216.0" height="84.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="278.0" y="300.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Deploy frequency</text>
+<text x="278.0" y="334.0" font-size="22" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">4.9 a week</text>
+<rect x="494.0" y="278.0" width="216.0" height="84.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="508.0" y="300.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Lead time for changes</text>
+<text x="508.0" y="334.0" font-size="22" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">15 h 7 min</text>
+<rect x="724.0" y="278.0" width="216.0" height="84.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="738.0" y="300.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Change failure rate</text>
+<text x="738.0" y="334.0" font-size="22" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">12 %</text>
+<rect x="954.0" y="278.0" width="216.0" height="84.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="968.0" y="300.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Time to restore</text>
+<text x="968.0" y="334.0" font-size="22" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">3 h 35 min</text>
+<text x="264.0" y="400.0" font-size="14" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">Remote @ app-store</text>
+<text x="524.0" y="400.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">2 deploys went out, 0 failed, in 30 days</text>
+<rect x="264.0" y="414.0" width="216.0" height="84.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="278.0" y="436.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Deploy frequency</text>
+<text x="278.0" y="470.0" font-size="22" fill="#8A9099" font-weight="600" font-variant-numeric="tabular-nums">0.5 a week</text>
+<rect x="494.0" y="414.0" width="216.0" height="84.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="508.0" y="436.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Lead time for changes</text>
+<text x="508.0" y="470.0" font-size="22" fill="#8A9099" font-weight="600" font-variant-numeric="tabular-nums">19 h 23 min</text>
+<rect x="724.0" y="414.0" width="216.0" height="84.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="738.0" y="436.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Change failure rate</text>
+<text x="738.0" y="470.0" font-size="22" fill="#8A9099" font-weight="600" font-variant-numeric="tabular-nums">0 %</text>
+<rect x="954.0" y="414.0" width="216.0" height="84.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="968.0" y="436.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Time to restore</text>
+<text x="968.0" y="470.0" font-size="22" fill="#8A9099" font-weight="600" font-variant-numeric="tabular-nums">no failure</text>
+<text x="264.0" y="516.0" font-size="11" fill="#B35900" font-variant-numeric="tabular-nums">Too few deploys for a figure that means much (2); shown dimmed.</text>
+<circle cx="644.0" cy="512.0" r="9" fill="#B35900"/>
+<text x="644.0" y="516.0" font-size="11" fill="#FFF" font-weight="700" text-anchor="middle" font-variant-numeric="tabular-nums">18</text>
+<text x="264.0" y="556.0" font-size="14" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">Docs @ github-pages</text>
+<text x="524.0" y="556.0" font-size="12" fill="#5B616B" font-variant-numeric="tabular-nums">234 deploys went out, 1 failed, in 7 days</text>
+<rect x="264.0" y="570.0" width="216.0" height="84.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="278.0" y="592.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Deploy frequency</text>
+<text x="278.0" y="626.0" font-size="22" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">33 a day</text>
+<rect x="494.0" y="570.0" width="216.0" height="84.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="508.0" y="592.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Lead time for changes</text>
+<text x="508.0" y="626.0" font-size="22" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">46 s</text>
+<rect x="724.0" y="570.0" width="216.0" height="84.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="738.0" y="592.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Change failure rate</text>
+<text x="738.0" y="626.0" font-size="22" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">0.4 %</text>
+<rect x="954.0" y="570.0" width="216.0" height="84.0" rx="8" fill="#FFFFFF" stroke="#DDE1E6" stroke-width="1"/>
+<text x="968.0" y="592.0" font-size="11" fill="#5B616B" font-weight="600" font-variant-numeric="tabular-nums">Time to restore</text>
+<text x="968.0" y="626.0" font-size="22" fill="#1C1D20" font-weight="600" font-variant-numeric="tabular-nums">4 min</text>
+</svg>
