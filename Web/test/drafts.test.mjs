@@ -10,7 +10,7 @@ class Memory {
   removeItem(key) { this.items.delete(key); }
 }
 
-const { Drafts, draftsKept, attachmentsKept } = await load("src/model/drafts.ts");
+const { Drafts, draftsKept, attachmentsKept, newSessionDraftKey } = await load("src/model/drafts.ts");
 const { promptPlaceholder, willQueue } = await load("src/model/promptWords.ts");
 
 test("a draft comes back on the next visit; an emptied or sent one does not", () => {
@@ -67,4 +67,24 @@ test("a forget clears every draft, held and kept (#3670)", () => {
   assert.equal(drafts.get("mac|a"), undefined);
   assert.equal(new Drafts(storage).get("mac|a"), undefined);
   assert.equal(storage.getItem("agents.drafts"), null);
+});
+
+test("New Session's draft is the project's, so another machine's folder of it has the same words (#5376)", () => {
+  assert.equal(newSessionDraftKey("mac", "file:///a/", "p1"), newSessionDraftKey("box", "file:///home/a/", "p1"));
+  assert.notEqual(newSessionDraftKey("mac", "file:///a/", "p1"), newSessionDraftKey("mac", "file:///a/", "p2"));
+  assert.equal(newSessionDraftKey("mac", "file:///a/", undefined), "new|mac|file:///a/");
+  assert.notEqual(newSessionDraftKey("mac", "file:///a/", undefined), newSessionDraftKey("box", "file:///a/", undefined));
+});
+
+test("a folder's old draft moves to its project's, never over one there (#5376)", () => {
+  const storage = new Memory();
+  const drafts = new Drafts(storage);
+  drafts.set("new|mac|a", { text: "from before", attachments: [] });
+  drafts.move("new|mac|a", "new|project:p1");
+  assert.deepEqual(drafts.get("new|project:p1"), { text: "from before", attachments: [] });
+  assert.equal(drafts.get("new|mac|a"), undefined);
+  drafts.set("new|box|a", { text: "older", attachments: [] });
+  drafts.move("new|box|a", "new|project:p1");
+  assert.equal(drafts.get("new|project:p1").text, "from before");
+  assert.equal(new Drafts(storage).get("new|project:p1").text, "from before");
 });

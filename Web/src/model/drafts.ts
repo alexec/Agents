@@ -13,6 +13,15 @@ export const draftsKept = 40;
 /** The most a draft's attachments may take, as JSON, to be kept with it. */
 export const attachmentsKept = 256 * 1024;
 
+/**
+ * The key of New Session's draft (#5376): the project's, so the words stay when On moves the form
+ * to the project's folder on another machine. A folder in no project keeps a draft of its own,
+ * under the key it had before. The rule of `DraftKey.newSession` in Packages/AgentsKit.
+ */
+export function newSessionDraftKey(host: string, folder: string, project: string | undefined): string {
+  return project ? `new|project:${project}` : `new|${host}|${folder}`;
+}
+
 export class Drafts {
   private readonly held = new Map<string, Draft>();
 
@@ -39,6 +48,15 @@ export class Drafts {
 
   delete(key: string): void {
     if (this.held.delete(key)) this.save();
+  }
+
+  /** The draft under `from` goes to `to`, unless `to` has one already (#5376: a folder's draft, kept before it was a project's). */
+  move(from: string, to: string): void {
+    if (from === to || this.held.has(to)) return;
+    const draft = this.held.get(from);
+    if (!draft) return;
+    this.held.delete(from);
+    this.set(to, draft);
   }
 
   /** Every draft goes: the control plane they were typed to forgot this browser (#3670). */
