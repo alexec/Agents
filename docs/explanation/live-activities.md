@@ -56,7 +56,7 @@ own paired connection. After that, the update goes this way:
 The time on the Live Activity needs neither. The system counts it from the time the turn
 began, so it moves also when nothing reaches the device.
 
-A Live Activity that has heard nothing for 10 minutes while it works says **Open Agents
+A Live Activity that has heard nothing for 10 minutes while it works says **Open Agent Loops
 to see where it is**. The step it showed may be old by then, and a Lock Screen that shows
 an old step as the current one tells you something false.
 
@@ -73,14 +73,14 @@ A pushed update carries only these:
 
 It never carries the session's title, a step, a question or a line of the chat.
 
-The reason is who can read it. A notification from Agents is sealed with your device's
+The reason is who can read it. A notification from Agent Loops is sealed with your device's
 own key, and only your device opens it. A Live Activity's state cannot be sealed. iOS
 gives it straight to the widget that draws it, and no code of ours opens it first. So
 Apple can read every pushed state, and we do not send Apple your words.
 
 That is why the title of a pushed Live Activity says how many sessions, such as
-**2 sessions**, and its line says where to go, not what is there: **Open Agents to answer it**, **Open Agents to decide** or
-**Open Agents to see what it needs**. When you open the app, its own connection gives the
+**2 sessions**, and its line says where to go, not what is there: **Open Agent Loops to answer it**, **Open Agent Loops to decide** or
+**Open Agent Loops to see what it needs**. When you open the app, its own connection gives the
 words back.
 
 ## The end of a turn
@@ -103,7 +103,7 @@ A control plane on your Mac has no key.
 
 Without a key, the Live Activity still starts, still counts the time, and still updates
 while the app runs. While iOS has the app suspended, it does not change. After 10 minutes
-it says **Open Agents to see where it is**, and it catches up when you open the app.
+it says **Open Agent Loops to see where it is**, and it catches up when you open the app.
 
 ## Only on the iPhone and iPad
 

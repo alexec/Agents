@@ -1,12 +1,12 @@
 ---
 diataxis: explanation
-description: The system around Agents, its containers, the components of its host daemon, and which process starts which, as C4 diagrams.
+description: The system around Agent Loops, its containers, the components of its host daemon, and which process starts which, as C4 diagrams.
 devices: [mac, iphone, ipad, server]
 ---
 
 # Architecture
 
-A wireframe first, then four views of Agents, from the outside in, in the style of the
+A wireframe first, then four views of Agent Loops, from the outside in, in the style of the
 [C4 model](https://c4model.com): the system and its neighbours, the containers it is made
 of, the components inside the host daemon, and how they run as processes on a Mac.
 
@@ -33,9 +33,9 @@ numbers are the blue pins.
    and turns" is its heart: every change to an agent is announced from there, so every
    screen agrees. The other parts talk, do the work around an agent, and remember it on
    disk.
-- **5 · The agents are other people's runtimes.** Agents starts Claude Code, Codex and the
+- **5 · The agents are other people's runtimes.** Agent Loops starts Claude Code, Codex and the
    others, and drives them over ACP. They prompt their own model, and call back into
-   Agents for its own tools.
+   Agent Loops for its own tools.
 - **6 · Work and Docs are what the agents work from.** Work is the issues, pull requests and
    epics on every forge, in one list. Docs is the specs and docs, from a folder or from
    Confluence, Notion or Drive. Lineage links each session to the issue, the doc and the
@@ -43,28 +43,28 @@ numbers are the blue pins.
 
 ## System context
 
-![Agents, the person who uses it, and the systems around it](../assets/architecture-context.svg)
+![Agent Loops, the person who uses it, and the systems around it](../assets/architecture-context.svg)
 
-You use Agents to run coding agents on hosts you own, and follow and answer them from a
-Mac, an iPhone, an iPad or a browser. Agents does not talk to a model itself. It starts and
+You use Agent Loops to run coding agents on hosts you own, and follow and answer them from a
+Mac, an iPhone, an iPad or a browser. Agent Loops does not talk to a model itself. It starts and
 drives an **agent runtime** (Claude Code, Codex, Copilot, OpenCode, Cursor or Grok)
-over ACP, and the runtime prompts its own provider. A runtime calls back into Agents for the
+over ACP, and the runtime prompts its own provider. A runtime calls back into Agent Loops for the
 app's own tools (`mcp__agents__*`) over MCP.
 
-Agents also polls **MCP servers** for the events that trigger workflows, clones and pushes
+Agent Loops also polls **MCP servers** for the events that trigger workflows, clones and pushes
 to **GitHub** with git, and installs runtimes from **package registries**. The control
 plane sends notifications to phones itself, through **APNs**.
 
 ## Containers
 
-![The containers of Agents and how they connect](../assets/architecture-containers.svg)
+![The containers of Agent Loops and how they connect](../assets/architecture-containers.svg)
 
 | Container | Code | Technology | What it does |
 | --- | --- | --- | --- |
-| Mac window | `App/`, `Shared/UI` | The window of the macOS app Agents, SwiftUI | A client. Starts no agent; asks a host for everything. |
+| Mac window | `App/`, `Shared/UI` | The window of the macOS app Agent Loops, SwiftUI | A client. Starts no agent; asks a host for everything. |
 | Remote | `Remote/`, `Shared/UI` | iOS and iPadOS app, SwiftUI, with a widget | A client, on the phone and the iPad. |
 | Web page | `Web/` | TypeScript single-page app | A client, served by the control plane on `localhost:8792`. |
-| Agents (the Mac app) | `Host/`, `App/` | macOS app with a menu bar item, a Developer ID download | Carries the daemon and the control plane, registers them with launchd, and pairs its own window. One app with the Mac window. |
+| Agent Loops (the Mac app) | `Host/`, `App/` | macOS app with a menu bar item, a Developer ID download | Carries the daemon and the control plane, registers them with launchd, and pairs its own window. One app with the Mac window. |
 | Control plane | `Go/cmd/agents-control`, `Go/internal/controlplane` | Go server, `agents-control` | Pairs clients, routes each request to its host, sends updates to clients. `:8791` wss, `:8792` loopback http. |
 | Control plane store | | A folder (on a Mac, always a folder on that Mac), or an S3 bucket in the cloud | Who is paired, which hosts there are, unused codes, settings. Nothing about agents. |
 | Host daemon | `Go/cmd/agentsd`, `Go/internal/agentsd` | Go daemon, `agentsd`, macOS and Linux | Owns agents, terminals, files, git and workflows on its host. Serves the agents MCP tools. |
@@ -106,8 +106,8 @@ reach without cgo: `agents-peer` (callers' code signatures) and `agents-watch` (
 This is how the containers above run on a Mac. A solid arrow means one program starts
 another. A dashed arrow is a connection, pointing the way it is made.
 
-**Agents** registers two login items, and launchd runs them whether the app is open or
-not. Quitting Agents stops neither:
+**Agent Loops** registers two login items, and launchd runs them whether the app is open or
+not. Quitting Agent Loops stops neither:
 
 | launchd job | Program |
 | --- | --- |

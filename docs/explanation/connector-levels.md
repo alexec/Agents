@@ -1,6 +1,6 @@
 ---
 diataxis: explanation
-description: What the five levels on every connector mean (Tools, Events, Views, Workflows, Tested), where they come from, why they exist, and where the connectors that Agents makes come from.
+description: What the five levels on every connector mean (Tools, Events, Views, Workflows, Tested), where they come from, why they exist, and where the connectors that Agent Loops makes come from.
 devices: [mac, iphone, ipad, web]
 ---
 
@@ -15,7 +15,7 @@ where the app gets it, and why the levels are there at all.
 
 A connector can do much more than give an agent tools. It can tell the app that something
 happened, so that a workflow starts. It can draw a page that you work with. Before the
-levels, nothing in the app said which connector did which. The connectors that Agents
+levels, nothing in the app said which connector did which. The connectors that Agent Loops
 makes did more than most, and they could look like a separate product, or like any other
 server. Neither was true.
 
@@ -23,7 +23,7 @@ So every connector is one kind of thing. You add it, sign in to it and remove it
 same way, whoever made it. The levels then tell you, at a glance, how far a connector
 goes. Each level is a thing you can count on, not a promise in a description.
 
-The levels are also the bar for the integrations that Agents ships. Each integration for
+The levels are also the bar for the integrations that Agent Loops ships. Each integration for
 1.0 is to reach all five.
 
 ## What each level means
@@ -42,7 +42,7 @@ yourself: merge a pull request, start an agent on an issue. The app reads it fro
 tools and resources that name a `ui://` view. See
 [Views in a conversation](views.md).
 
-**Workflows.** One of Agents' ready-made workflows starts on one of the connector's
+**Workflows.** One of Agent Loops' ready-made workflows starts on one of the connector's
 events. You turn the workflow on, and the dev loop runs: an issue is worked, a failed
 check is fixed, review comments are answered. The events that count are `issue.labelled`,
 `checks.failed`, `review.posted`, `review.comment` and `email.received`. A workflow names
@@ -51,7 +51,7 @@ reaches this level by itself.
 
 **Tested.** The connector was tested on a real account, not only against a stand-in. It is
 the one level that a server can't declare. The date is in the catalogue entry of a
-connector that Agents makes, and the same branch changes its row in
+connector that Agent Loops makes, and the same branch changes its row in
 [Integrations](../reference/integrations.md). The host reads the level from the catalogue
 entry, not from the docs, because a Linux host has no copy of the docs.
 
@@ -59,12 +59,12 @@ entry, not from the docs, because a Linux host has no copy of the docs.
 
 The first four levels come from what a server declares, never from who made it. A
 third-party server that adds events or views lights up those levels with no change in
-Agents. That keeps the levels honest: they say what the server does now, on your host.
+Agent Loops. That keeps the levels honest: they say what the server does now, on your host.
 
 The host checks each connector. A hosted connector keeps the state of its one running
 copy. Any other connector is checked every four hours, and when its entry changes. Until
 its host has checked it, a connector from a registry shows all five levels in grey, and
-its tooltip says "Its levels show once its host has checked it." A connector that Agents
+its tooltip says "Its levels show once its host has checked it." A connector that Agent Loops
 makes shows what it is written to declare before its host has checked it, and a test
 holds that to the server's own list.
 
@@ -78,12 +78,12 @@ such as "Reaches Tools, Events, Views. Not yet Workflows, Tested."
 - In the Mac's catalogue (**Add Connector…**), on each row and on a connector's detail.
   The catalogue is on the Mac only.
 
-## The connectors that Agents makes
+## The connectors that Agent Loops makes
 
-Agents makes four connectors: **GitHub**, **Linear**, **GitLab** and **Email**. They are rows
-like any other, with no mark and no group of their own (#2155). They are in the **Agents**
+Agent Loops makes four connectors: **GitHub**, **Linear**, **GitLab** and **Email**. They are rows
+like any other, with no mark and no group of their own (#2155). They are in the **Agent Loops**
 marketplace, a file that every host carries (`Go/internal/agentsd/mcpcatalog/agents.json`),
-with **Agents** as their publisher. Choose **Agents** in the catalogue's **Marketplace** menu to
+with **Agent Loops** as their publisher. Choose **Agent Loops** in the catalogue's **Marketplace** menu to
 see them. Their levels before a host checks a copy come from that file.
 
 They are added in the same way as any other connector: an entry in an `mcp.json`, with a
@@ -91,7 +91,7 @@ secret named, never written in. They run hosted, one copy on each host, so their
 keep coming when no agent runs. Each one reads a connection that you made once on
 **Connectors**, so it needs no token of its own.
 
-If you add GitHub's own server next to the GitHub connector that Agents makes, the app
+If you add GitHub's own server next to the GitHub connector that Agent Loops makes, the app
 leaves both. It does not offer to replace one with the other, because you may want both.
 
 ## A contract or in-process
@@ -104,12 +104,12 @@ one fits a different case (Alex, 2026-11-09).
   gives the same tools, with the same input and the same `structuredContent`, and the daemon
   calls them over MCP. Messaging is this case (#4337): a conversation and a message have few
   fields, and Discord, Telegram, Teams, Signal and iMessage all have community servers. A
-  server from anyone that follows the contract shows on the page with no change in Agents,
+  server from anyone that follows the contract shows on the page with no change in Agent Loops,
   and channels stay MCP servers, not adapters (#1223). The contract is
   [Messaging contract](../reference/messaging-contract.md).
 - **In-process, when the model is large and we write every provider.** The daemon calls each
   provider's Go package directly. The forges are this case (#3100, #3129): checks, merge
-  rules, boards, plans and typed writes are a large model, there are few forges, and Agents
+  rules, boards, plans and typed writes are a large model, there are few forges, and Agent Loops
   writes the code for each one. A contract that large would be hard for anyone else to
   follow, so it would give nothing that the Go packages do not.
 

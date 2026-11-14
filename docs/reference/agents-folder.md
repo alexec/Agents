@@ -22,7 +22,7 @@ idea, in the folder's own `.agents` folder.
 | `settings/` | The settings below, one file each | The app |
 
 The top of the folder is configuration that other tools read too. `settings/` is what the
-Agents app writes. **Agent configuration, MCP servers, runtime choices and cost limits**
+Agent Loops app writes. **Agent configuration, MCP servers, runtime choices and cost limits**
 have one fixed scope: they belong to you and sync to every machine of yours. Runtime
 sign-ins stay on each machine. Resources are stored in each machine's `resources.json` and
 do not sync (#2410).
@@ -32,22 +32,22 @@ do not sync (#2410).
 | File | What it holds | Set in |
 | --- | --- | --- |
 | `policy-yours.json` | Your own rules (#2957): the spending limits, how many workflows may be on, the notice limits and the variables passed through to runtimes. It is signed with your person key, which stays in this Mac's keychain. | **Settings ▸ Cost**, and the other settings that set your rules |
-| `policy-yours-seen.json` | The highest revision of `policy-yours.json` kept here, and whether the old files below were moved into it | Agents |
+| `policy-yours-seen.json` | The highest revision of `policy-yours.json` kept here, and whether the old files below were moved into it | Agent Loops |
 | `retention.json` | How long archived agents are kept | **Settings ▸ Machines ▸ This Mac** |
 | `person.json` | What agents call you, and your pronouns | **Settings ▸ Account** |
 | `client-permissions.json` | The permission mode of each runtime | Under a supported runtime's prompt |
 | `sandbox.json` | The command sandbox of each runtime | **Settings ▸ Agent Runtimes** |
 | `modes.json` | The mode last chosen for each runtime | The start form |
 | `display.json` | Your display choices, the same on every client: how much of a turn shows, the smart groups that are off, whether Archived folders, Status and Usage are open, the new-session form's runtime and choices, and the marketplace last chosen | Any client |
-| `host.json` | The role of each of your Macs (its control plane here or elsewhere, and its web remote), one entry per Mac, by its local host name. | Agents |
+| `host.json` | The role of each of your Macs (its control plane here or elsewhere, and its web remote), one entry per Mac, by its local host name. | Agent Loops |
 
 A file you change by hand counts at once, without a restart. A file that cannot be read is
 set aside as `<name>.corrupt-<time>`, and the setting goes back to its default. For
-`host.json`, the file is left as it is, and Agents starts with the defaults until you
+`host.json`, the file is left as it is, and Agent Loops starts with the defaults until you
 mend the file or remove it.
 
 `limits.json`, `workflow-limit.json` and `runtime-environment.json` are not read now. On
-the first start, Agents moves what they hold into `policy-yours.json` and renames each one
+the first start, Agent Loops moves what they hold into `policy-yours.json` and renames each one
 `<name>.moved`.
 
 ### Your rules on another Mac
@@ -55,7 +55,7 @@ the first start, Agents moves what they hold into `policy-yours.json` and rename
 `policy-yours.json` is signed with a key that is in the keychain of the Mac that signed it,
 not in this folder. When you copy or sync the folder to another Mac, that Mac cannot check
 the signature, so it does not use the file: your rules do not apply there until you set
-them again. Agents does not write over the file. The first change on that Mac keeps it as
+them again. Agent Loops does not write over the file. The first change on that Mac keeps it as
 `policy-yours.json.untrusted-<time>`, with your rules in it, and starts a new layer
 (#3122).
 
@@ -84,7 +84,7 @@ not be able to change them:
   second disk or a synced folder in **Settings ▸ Machines ▸ This Mac ▸ Backups**, or, on a
   server, back up to the control plane
   ([Back up and restore a machine](../how-to/back-up-and-restore.md)).
-- **The control plane's folder** (Agents): `~/Library/Application Support/Agents Control`.
+- **The control plane's folder** (Agent Loops): `~/Library/Application Support/Agents Control`.
   It holds the store, `secrets-key` and the certificate in `tls/`.
   The control key is in the keychain. To back them up together, and restore
   them on a new Mac, see [Back up and restore a control plane](../how-to/back-up-a-control-plane.md).

@@ -7,18 +7,18 @@ description: Deploy a service to Google Cloud Run from your own GitHub Actions, 
 # Deploy to Cloud Run
 
 Cloud Run is the second deploy target after TestFlight (#3654). The deploy runs in your own
-GitHub Actions, never on the control plane, and Agents only watches it
+GitHub Actions, never on the control plane, and Agent Loops only watches it
 ([direction.md](../explanation/direction.md), "From idea to production"):
 
 - A version tag (`v1.2.0`) starts your deploy workflow.
 - A GitHub environment with required reviewers holds the deploy. It shows in **Needs You** as
   a **Deploy** row, and you approve or reject it from there (#3587).
-- The workflow says what it deployed with one notice. Agents reads it when the run ends and
+- The workflow says what it deployed with one notice. Agent Loops reads it when the run ends and
   links the release `deployed-as` the Cloud Run revision. The Work page of an issue, a pull
   request or a release then shows **Cloud Run web-42**, a link to the service's revisions in
   the Google Cloud console (#3588).
 
-Your Google Cloud credentials stay in your CI. Agents holds none.
+Your Google Cloud credentials stay in your CI. Agent Loops holds none.
 
 ## Before you start
 
@@ -27,7 +27,7 @@ Your Google Cloud credentials stay in your CI. Agents holds none.
 - Workload Identity Federation from GitHub to that service account, so that the workflow
   signs in with no key. See
   [google-github-actions/auth](https://github.com/google-github-actions/auth#preferred-direct-workload-identity-federation).
-- The folder pushes to GitHub, and Agents has your GitHub connection
+- The folder pushes to GitHub, and Agent Loops has your GitHub connection
   ([Use GitHub](use-github.md)).
 
 ## Hold the deploy for a person
@@ -74,7 +74,7 @@ jobs:
 GitHub's `ubuntu-latest` runners have `gcloud`. Deploy an image with `--image` in place of
 `--source .` when another job builds it.
 
-The notice is the only thing Agents needs. Its message is a deploy ref,
+The notice is the only thing Agent Loops needs. Its message is a deploy ref,
 `cloudrun:<project>/<region>/<service>/<revision>`. A run can say at most 10 deploys.
 
 ## See it

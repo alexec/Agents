@@ -59,7 +59,7 @@
 <rect x="262" y="210" width="206" height="18" rx="9" class="box"/>
 <path d="M130,246 L500,246 L516,262 L114,262 Z" class="soft"/>
 <text class="h2" x="315" y="288" text-anchor="middle">Mac window</text>
-<text class="s"  x="315" y="305" text-anchor="middle">part of the Agents app</text>
+<text class="s"  x="315" y="305" text-anchor="middle">part of the Agent Loops app</text>
 
 <!-- Phone -->
 <rect x="560" y="56" width="104" height="206" rx="18" class="box"/>
@@ -162,7 +162,7 @@
 <!-- Agents app strip -->
 <rect x="94" y="650" width="782" height="40" rx="8" class="soft"/>
 <rect x="106" y="662" width="16" height="16" rx="3" class="box"/>
-<text class="h2" x="132" y="675">Agents app</text>
+<text class="h2" x="132" y="675">Agent Loops app</text>
 <text class="t"  x="222" y="675">menu bar + the window · installs the daemon and the control plane, makes pairing codes</text>
 <path class="wire" d="M480,690 L480,712"/>
 <text class="s" x="490" y="706">launchd keeps them running</text>
@@ -272,7 +272,7 @@
   <rect x="488" y="1228" width="84"  height="44" rx="22" class="box"/><text class="h2" x="530" y="1255" text-anchor="middle">Cursor</text>
   <rect x="582" y="1228" width="72"  height="44" rx="22" class="box"/><text class="h2" x="618" y="1255" text-anchor="middle">Grok</text>
 </g>
-<text class="t" x="70" y="1300">Runtimes. Agents never talks to a model: each runtime prompts its own provider,</text>
+<text class="t" x="70" y="1300">Runtimes. Agent Loops never talks to a model: each runtime prompts its own provider,</text>
 <text class="t" x="70" y="1320">and calls back for the app tools over MCP.</text>
 <path class="wire" d="M664,1250 L720,1250"/>
 <path d="M728,1266 C708,1266 708,1234 734,1236 C740,1216 776,1216 784,1232 C806,1224 822,1246 806,1266 Z" class="ghost"/>

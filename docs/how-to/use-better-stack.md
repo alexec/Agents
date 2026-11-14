@@ -6,13 +6,13 @@ description: Connect Better Stack, so that agents can manage your app's monitors
 
 # Use Better Stack
 
-Better Stack watches your deployed app and shows its health on a status page. Agents uses it
-in two parts (#3655), both in the **Agents** marketplace:
+Better Stack watches your deployed app and shows its health on a status page. Agent Loops uses it
+in two parts (#3655), both in the **Agent Loops** marketplace:
 
 - **Better Stack** is Better Stack's own MCP server (at `https://mcp.betterstack.com`). It
   has the tools: monitors, heartbeats, incidents, on-call, and status pages with their
   resources, sections and reports. You sign in to Better Stack; you give no token.
-- **Better Stack events** is `betterstack-mcp`, a small server that Agents ships. Agents
+- **Better Stack events** is `betterstack-mcp`, a small server that Agent Loops ships. Agent Loops
   Host carries it, and every Linux host installs it beside agentsd. It has the events and
   no tools:
   - `health.incident_started`: a monitor or a heartbeat failed. The status page shows it.
@@ -22,7 +22,7 @@ in two parts (#3655), both in the **Agents** marketplace:
   address checked and the monitor's id) and when it started; `health.incident_resolved`
   also says when it was resolved.
 
-Better Stack's own server has tools but no events, so Agents adds the events with a server
+Better Stack's own server has tools but no events, so Agent Loops adds the events with a server
 of its own, as it does for Sentry. Its events are also how Lineage links an incident to the
 release that was out when it started.
 
@@ -36,7 +36,7 @@ release that was out when it started.
 
 1. Open **Settings ▸ Agent Configuration ▸ Connectors** (or a folder's **Connectors** page)
    and choose **Add Connector…**.
-2. Choose the **Agents** marketplace, then **Better Stack**, and add it.
+2. Choose the **Agent Loops** marketplace, then **Better Stack**, and add it.
 3. Its row says **needs sign-in**. Choose **Sign in…** and sign in to Better Stack in your
    browser. See [Sign in to a connector](sign-in-to-a-connector.md).
 
@@ -44,7 +44,7 @@ release that was out when it started.
 
 1. In Better Stack, open **Uptime ▸ Integrations ▸ API** (or **Settings ▸ API tokens**) and
    copy the team's Uptime API token.
-2. In **Add Connector…**, choose **Better Stack events** from the **Agents** marketplace.
+2. In **Add Connector…**, choose **Better Stack events** from the **Agent Loops** marketplace.
 3. Fill in:
    - `BETTERSTACK_API_TOKEN`: the token.
    - `BETTERSTACK_TEAM`: leave it out for a team's token. Use the team's name for a global

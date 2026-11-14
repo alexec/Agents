@@ -1,6 +1,6 @@
 ---
 name: assess-runtime
-description: Assess an agent runtime's integration with the Agents daemon and the app's own tools (#47) — a fixed series of steps, one per tool group, that the daemon scores from its own record, plus a self-report in .agents/reviews/runtimes/<runtime>-<date>.md. Use when asked to assess, check or qualify a runtime (Claude, Codex, Copilot, OpenCode, …), after a runtime or adapter update, or when a new runtime is added.
+description: Assess an agent runtime's integration with the Agent Loops daemon and the app's own tools (#47) — a fixed series of steps, one per tool group, that the daemon scores from its own record, plus a self-report in .agents/reviews/runtimes/<runtime>-<date>.md. Use when asked to assess, check or qualify a runtime (Claude, Codex, Copilot, OpenCode, …), after a runtime or adapter update, or when a new runtime is added.
 ---
 
 # Assess a runtime

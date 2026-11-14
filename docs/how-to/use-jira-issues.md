@@ -10,14 +10,14 @@ Two connectors (MCP servers) work together:
 
 - **Tools** come from Atlassian's own MCP server, `https://mcp.atlassian.com/v1/mcp`. Agents
   use it to find, read and change issues.
-- **The Jira issues page and the events** come from `jira-mcp`, a small server that Agents
+- **The Jira issues page and the events** come from `jira-mcp`, a small server that Agent Loops
   ships. Its tools feed the **Jira issues** page: the open issues, narrowed by project, status
   or label, with **Start Agent** on each. Click a row to expand its description and its
   Lineage section. Its events are `issue.opened`, `issue.labelled`, `issue.commented` and
   `issue.assigned`. A workflow or a wait can use them. See
   [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md).
 
-Agents on the Mac carries `jira-mcp`, and every Linux host installs it beside agentsd. It works with
+Agent Loops on the Mac carries `jira-mcp`, and every Linux host installs it beside agentsd. It works with
 Jira Cloud and with Jira Data Center.
 
 ## Before you start
@@ -35,7 +35,7 @@ Confluence too (the Docs slot). On the Mac, open a folder's **Connectors** page 
 page, choose **Connect Jira…** in the Tasks slot or on **Settings ▸ You ▸ Connectors**.
 
 - **Atlassian Cloud** signs in on atlassian.com, where you choose the site. The machine keeps
-  the token and renews it. Atlassian has no public apps, so the machine needs the Agents app's
+  the token and renews it. Atlassian has no public apps, so the machine needs the Agent Loops app's
   client ID and secret from the Atlassian developer console, in your
   secrets (**Settings ▸ You ▸ Secrets**) as `ATLASSIAN_CLIENT_ID` and `ATLASSIAN_CLIENT_SECRET`. The
   app has the callback `https://oauth.agentloops.dev/oauth/callback` and these scopes:
@@ -58,7 +58,7 @@ Add Atlassian's own server from the registry, or by hand with the URL
 
 ## Add the page and the events
 
-1. Add **Jira** from the **Agents** marketplace in the catalogue. It asks for no secret: it
+1. Add **Jira** from the **Agent Loops** marketplace in the catalogue. It asks for no secret: it
    reads your Atlassian connection (above). Or add it by hand in the folder's
    `.agents/mcp.json`:
 
@@ -142,7 +142,7 @@ The server asks Jira once a minute. Jira's webhooks would need a Jira admin, so 
 
 - **"Jira is not signed in"**: there is no Atlassian connection, and `JIRA_URL` or
   `JIRA_API_TOKEN` is not set for the server. Connect Jira (above).
-- **"This machine has no Agents app on Atlassian"**: `ATLASSIAN_CLIENT_ID` and
+- **"This machine has no Agent Loops app on Atlassian"**: `ATLASSIAN_CLIENT_ID` and
   `ATLASSIAN_CLIENT_SECRET` are not in the machine's secrets. Connect with an API token.
 - **"Jira refused the token"**: the token was revoked, or `JIRA_EMAIL` is not the token's
   account. Make a new token. On Data Center, check that the entry has no `JIRA_EMAIL`.

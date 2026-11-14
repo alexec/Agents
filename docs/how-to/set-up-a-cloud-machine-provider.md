@@ -90,7 +90,7 @@ AWS allows `ec2:DescribeInstances` on all instances or none, so it can't be limi
 5. Give the ssh user in **ssh as** or **ssh user**. The default is `ec2-user`.
 
 The control plane signs each request with AWS's Signature Version 4. The secret key is
-never sent. Agents reaches each instance with plain ssh to its public address. The preset
+never sent. Agent Loops reaches each instance with plain ssh to its public address. The preset
 makes and deletes no instances.
 
 ## Google Compute Engine VMs
@@ -110,7 +110,7 @@ You need a service account's JSON key. Give the service account the smallest rol
 3. Give the **Folder** and the **Zone**, such as `europe-west2-a`.
 4. Give the label key in **VMs labelled** (the Mac) or **Label**. The default is `agents`.
 5. Give the ssh user. The default is `agents`.
-6. To make VMs from Agents, give a public key in **ssh key for new VMs** (the Mac) or
+6. To make VMs from Agent Loops, give a public key in **ssh key for new VMs** (the Mac) or
    **ssh public key**. A new VM lets in that key for the `agents` user.
 
 The control plane gets an access token from the key, and keeps the token until a minute
@@ -118,7 +118,7 @@ before it ends. The key itself is never sent. ssh goes to each VM's external add
 the network must let in port 22. A static address keeps the address the same after a stop.
 
 A VM made with **New Machine…** makes the user `agents` with your key on its first boot,
-and installs Agents as that user, never as root. Its boot disk is deleted with the VM.
+and installs Agent Loops as that user, never as root. Its boot disk is deleted with the VM.
 
 ## Google Cloud Workstations
 
@@ -139,7 +139,7 @@ its state.
 ## DigitalOcean Droplets
 
 Through its API, you need a DigitalOcean API token with custom scopes: droplet read and
-update. To make and delete droplets from Agents, add droplet create and delete.
+update. To make and delete droplets from Agent Loops, add droplet create and delete.
 
 1. Make the token in the DigitalOcean control panel, under API.
 2. Give it in **API token**.
@@ -148,7 +148,7 @@ update. To make and delete droplets from Agents, add droplet create and delete.
 
 **New Machine…** makes a droplet with the tag, in the region, size and image that you
 choose. Choose an image with systemd, such as `ubuntu-24-04-x64`. Its first boot makes a
-user `agents` with root's ssh keys and installs Agents as that user, never as root.
+user `agents` with root's ssh keys and installs Agent Loops as that user, never as root.
 
 Through its CLI, install `doctl` and sign it in on the Mac that runs the control plane.
 
@@ -168,7 +168,7 @@ admin (read and write), or a classic one with the `codespace` scope.
 
 A codespace has no ssh port of its own, so ssh still goes through `gh`. When the machine that
 runs the control plane has no `gh`, the provider's card says "needs gh for ssh". It can make a codespace from a repository, or from GitHub's blank template, `github/codespaces-blank`, when you give no repository, but it can't install
-Agents on its first boot: add it with **Add as Host…** on the Mac.
+Agent Loops on its first boot: add it with **Add as Host…** on the Mac.
 
 Through its CLI, install `gh` and sign it in.
 
@@ -180,7 +180,7 @@ Through its API, you need your deployment's address and a session token.
 2. Give the address in **Deployment**, such as `https://coder.example.com`.
 3. Give the token in **Session token**.
 4. On the Mac that runs the control plane, sign `coder` in with `coder login <address>`,
-   then run `coder config-ssh`. The control plane installs Agents on a Coder machine
+   then run `coder config-ssh`. The control plane installs Agent Loops on a Coder machine
    over the `coder.<name>` host that it writes.
 
 ssh still goes through `coder`, so the card says "needs coder for ssh" when the machine that
@@ -193,7 +193,7 @@ Through its CLI, install `coder`, sign it in, and run `coder config-ssh`.
 When you choose **Add**, the control plane checks that the provider lists its machines.
 If it can't, it says why, in the cloud's own words. The provider's card then shows its
 machines, and you can link each one to a host. See
-[Start machines from Agents](start-machines-from-agents.md).
+[Start machines from Agent Loops](start-machines-from-agents.md).
 
 Machine providers need a control plane with one copy, such as the one on your Mac. A
 control plane with several copies does not run them yet.
@@ -204,4 +204,4 @@ control plane with several copies does not run them yet.
   or a server of your own.
 - [Machine providers](../reference/machine-providers.md): every preset's parameters
   and the contract.
-- [Start machines from Agents](start-machines-from-agents.md)
+- [Start machines from Agent Loops](start-machines-from-agents.md)

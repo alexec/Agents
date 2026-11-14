@@ -6,9 +6,9 @@ description: Connect Forgejo with an access token and add the forgejo connector,
 
 # Use Forgejo or Gitea
 
-Agents talks to Forgejo and Gitea through its own `forgejo` connector (#1753), an MCP
+Agent Loops talks to Forgejo and Gitea through its own `forgejo` connector (#1753), an MCP
 server in the shape of the gitlab one. Forgejo and Gitea have the same REST API, so one
-connector is for both: Codeberg, your own Forgejo, or your own Gitea. Agents on the Mac carries
+connector is for both: Codeberg, your own Forgejo, or your own Gitea. Agent Loops on the Mac carries
 it, and every Linux host installs it beside agentsd.
 
 It has tools to read pull requests, their checks and issues, and a failed job's log, and to
@@ -26,12 +26,12 @@ pages.
 
 ## Connect Forgejo
 
-Forgejo has no sign-in page for Agents, so you connect it with an access token (#3752).
+Forgejo has no sign-in page for Agent Loops, so you connect it with an access token (#3752).
 
 1. On your Forgejo, open **Settings ▸ Applications** and make an access token with
    **Read and write** on **repository** and **issue**, and **Read** on **user** and
    **organization**.
-2. In Agents, open **Settings ▸ You ▸ Connectors** and choose **Connect… ▸ Forgejo** (on the web
+2. In Agent Loops, open **Settings ▸ You ▸ Connectors** and choose **Connect… ▸ Forgejo** (on the web
    page, **Connect Forgejo…** on Connections). Or, on a folder whose remote is on a Forgejo,
    choose **Connect Forgejo…** on its Connectors page.
 3. Fill in the **Forgejo address**: leave it empty for Codeberg, or give your own Forgejo's
@@ -65,9 +65,9 @@ events, once.
 
 The set-up adds it for you. To add it to another folder:
 
-1. In Agents, open **Settings ▸ Agent Configuration ▸ Connectors** (or a folder's
+1. In Agent Loops, open **Settings ▸ Agent Configuration ▸ Connectors** (or a folder's
    **Connectors** page) and choose **Add Connector…**.
-2. Choose the **Agents** marketplace, then **Forgejo**, and add it.
+2. Choose the **Agent Loops** marketplace, then **Forgejo**, and add it.
 3. It asks for nothing: it reads the Forgejo connection. Without a connection, name your
    token by hand in the entry's `env` in `.agents/mcp.json`: `"FORGEJO_TOKEN":
    "${FORGEJO_TOKEN}"` (and `"FORGEJO_URL": "${FORGEJO_URL}"` for your own Forgejo or Gitea),
@@ -145,7 +145,7 @@ Under the tabs is a box for your words, and these buttons. Each one acts on Forg
   open line comments, with the box's words. The app asks you before it sends. With no agent
   on that branch, the new-agent form opens on the branch.
 
-Agents can't merge or approve from this page. Those tools are for a person only. They carry
+Agent Loops can't merge or approve from this page. Those tools are for a person only. They carry
 the commit that the page shows. When the pull request has a newer commit, nothing happens:
 open the page again.
 

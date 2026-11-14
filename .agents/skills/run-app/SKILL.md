@@ -1,6 +1,6 @@
 ---
 name: run-app
-description: Build, launch and drive this Mac app (Agents) on a scratch set-up of its own (a control plane, this Mac's host and the window), so a change can be seen working without touching the real ones or asking the user to click anything. Use whenever asked to run, start, screenshot, walk or manually verify the app, or whenever a change to App/, Host/, Go/, Remote/ or Packages/AgentsKit needs proving beyond `swift test`. Close everything it started and delete the scratch app and its files when done ("When you are done"), also when the walk failed.
+description: Build, launch and drive this Mac app (Agent Loops) on a scratch set-up of its own (a control plane, this Mac's host and the window), so a change can be seen working without touching the real ones or asking the user to click anything. Use whenever asked to run, start, screenshot, walk or manually verify the app, or whenever a change to App/, Host/, Go/, Remote/ or Packages/AgentsKit needs proving beyond `swift test`. Close everything it started and delete the scratch app and its files when done ("When you are done"), also when the walk failed.
 ---
 
 # Run and test this app
@@ -10,17 +10,17 @@ pieces, as on the real Mac:
 - **this Mac's host**, `agentsd`, owns the agents. The root it is pointed at *is* its
   identity: its lock, its socket, its agents;
 - **the control plane**, `agents-control`, which the host dials out to;
-- **the window**, the one app, Agents (`AgentsHost`, #4225), a client of the control
+- **the window**, the one app, Agent Loops (`AgentsHost`, #4225), a client of the control
   plane like the phone. It starts no agent; with `--walk` it has no menu bar item, so it
   never touches the Mac's own login items.
 
-On a real Mac, Agents is one app (#4224): its window, its menu bar item, and the two
+On a real Mac, Agent Loops is one app (#4224): its window, its menu bar item, and the two
 launch agents it registers (the control plane and this Mac's host). There is no second
-app to open, and no Agents Host window.
+app to open, and no Agent Loops window.
 
 That is the whole basis of this skill: you get all three of your own, so nothing you
 do reaches the user's agents, and nothing of theirs reaches yours. The helpers come
-out of the scratch build of Agents; `launch.sh` runs them by hand on your root, and never
+out of the scratch build of Agent Loops; `launch.sh` runs them by hand on your root, and never
 registers them as login items (the real Mac's are the user's).
 
 **Test your own change. Do not hand the user a list of steps to walk.** Almost
@@ -52,7 +52,7 @@ $S/walk.py $ROOT shot /tmp/run-mychange-1.png    # then Read the png; works on a
 $S/stop.sh $ROOT                                  # must print clean
 ```
 
-**Where the window opens.** A scratch window would open on top of Alex's own Agents
+**Where the window opens.** A scratch window would open on top of Alex's own Agent Loops
 window, so `launch.sh` moves it to the bottom-right quarter of its screen (`place.py`).
 `--place top-left|top-right|bottom-left|bottom-right`, `--place X,Y,W,H` (points from the
 main screen's top left) or `--place none` changes that; so does `AGENTS_SCRATCH_PLACE`.
@@ -76,7 +76,7 @@ worktree's own `build/` and `.build` is still the clean-up, and leaves the cache
 Verify only what you touched: the schemes and tests for the paths your branch changes, as
 `.agents/skills/merge-wave/scripts/merge-wave.sh plan <your branch>`, run in your
 worktree, lists them with their commands (#2685): an `App/` or `Host/` change needs
-`AgentsHost` (Agents, the one Mac app), not the Remote or the web page, so no iOS simulator
+`AgentsHost` (Agent Loops, the one Mac app), not the Remote or the web page, so no iOS simulator
 build; a `Remote/` change needs only the Remote; a `Shared/`, `Packages/` or `project.yml`
 change needs both; a `Packages/AgentsKit` change needs its tests filtered by
 `scripts/select-test-suites.sh`. The full suite and every scheme run once, in the wave.
@@ -119,7 +119,7 @@ works only through the loopback listener, and any other only over TLS), where `H
 ## Rules that are not optional
 
 1. **Never `pkill -f agentsd` or `agents-control`, never `killall Agents`.** This
-   session is hosted by the user's own Agents app and its daemon. The only helpers
+   session is hosted by the user's own Agent Loops app and its daemon. The only helpers
    you may kill are the pids in *your* root's `daemon.lock` and
    `control/control.pid`, which is what `stop.sh` does.
 2. **Always stop what you started**, including when the test failed or you are
@@ -458,7 +458,7 @@ no press but a finger's). With `-pair` it takes the app out first, so no pairing
 is kept. APP is the `build/DD-sim` build above, made from this tree: an older Remote may not pair
 with this control plane. When the phone says the code was not taken, `remote.sh log` shows the
 Remote's own log, whose `pairing: failed:` line says why (#2272). To open a banner's or widget row's link as a tap would, launch with `-- -open
-'agents://need?token=…'` (#1367): `simctl openurl` raises "Open in Agents?", which no walk can press. What the walk socket cannot do: the keyboard
+'agents://need?token=…'` (#1367): `simctl openurl` raises "Open in Agent Loops?", which no walk can press. What the walk socket cannot do: the keyboard
 runs in another process, so it is drawn white (`key escape` first, for a full picture);
 `click` at a point, `menu`, `size` and `fold` are the Mac's only; swipes, long presses,
 context menus and feel stay with the user on a device. A fake device

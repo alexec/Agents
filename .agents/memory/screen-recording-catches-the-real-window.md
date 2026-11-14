@@ -1,12 +1,12 @@
 ---
 name: screen-recording-catches-the-real-window
-description: "ScreenCaptureKit \"including app\" takes every process with the bundle id, so a scratch recording caught Alex's real Agents window; filter windows by pid"
+description: "ScreenCaptureKit \"including app\" takes every process with the bundle id, so a scratch recording caught Alex's real Agent Loops window; filter windows by pid"
 metadata:
   type: feedback
   modified: 2026-10-16T16:43:23.845Z
 ---
 
-On 2026-10-16 (#1078 videos) `record.swift` used `SCContentFilter(display:including: [app])` for the scratch window's app. Alex's real Agents window has the same bundle id, was in front at the same place, and its real sessions (Go migration, #1126 …) were recorded into u3.mp4. The file was local only and was deleted at once.
+On 2026-10-16 (#1078 videos) `record.swift` used `SCContentFilter(display:including: [app])` for the scratch window's app. Alex's real Agent Loops window has the same bundle id, was in front at the same place, and its real sessions (Go migration, #1126 …) were recorded into u3.mp4. The file was local only and was deleted at once.
 
 **Why:** an `SCRunningApplication` filter covers every process with that bundle id, not one pid. A scratch copy and the real window are the same app to it.
 

@@ -6,10 +6,10 @@ description: Add the azuredevops connector with a personal access token, so that
 
 # Use Azure DevOps Repos
 
-Agents talks to Azure DevOps Repos through its own `azuredevops` connector (#2829), an MCP
+Agent Loops talks to Azure DevOps Repos through its own `azuredevops` connector (#2829), an MCP
 server in the shape of the gitlab one. It works with Azure DevOps Services
 (`dev.azure.com` and the older `*.visualstudio.com` addresses) and with your own Azure DevOps
-Server. Agents on the Mac carries it, and every Linux host installs it beside agentsd.
+Server. Agent Loops on the Mac carries it, and every Linux host installs it beside agentsd.
 
 It has tools to read pull requests and their builds, to read a failed build's log, and to
 comment, and it has events that start a workflow or a wait. With the Azure DevOps connection
@@ -29,9 +29,9 @@ DevOps…** on the web page's Connectors. The sheet has two ways in:
   Server's collection) and a token with Code (read and write), Build (read) and Work Items
   (read and write). It ends on the date you gave it.
 - **Microsoft Entra** (#3921), for `dev.azure.com` only: give the organization and choose
-  **Sign In with Microsoft**. Agents shows a code and opens Microsoft's device page; type the
+  **Sign In with Microsoft**. Agent Loops shows a code and opens Microsoft's device page; type the
   code there and approve. The machine keeps the sign-in and renews it by itself, and the row
-  says **Microsoft Entra · renews by itself**. It signs in with the Agents app on Entra
+  says **Microsoft Entra · renews by itself**. It signs in with the Agent Loops app on Entra
   (#4873), which takes any work or school account; your organization's admin may have to
   approve it the first time. To use an app of your own, set `AZURE_DEVOPS_CLIENT_ID` in the
   machine's secrets to the client id of an app registration with **Allow public client
@@ -51,9 +51,9 @@ DevOps…** on the web page's Connectors. The sheet has two ways in:
 1. In Azure DevOps, open **User settings ▸ Personal access tokens** and make a token for
    your organization with **Code: Read & write** and **Build: Read**. To run a build's
    failed jobs again (`retry_build`, **Retry**), give it **Build: Read & execute**.
-2. In Agents, open **Settings ▸ Agent Configuration ▸ Connectors** (or a folder's
+2. In Agent Loops, open **Settings ▸ Agent Configuration ▸ Connectors** (or a folder's
    **Connectors** page) and choose **Add Connector…**.
-3. Choose the **Agents** marketplace, then **Azure DevOps**, and add it.
+3. Choose the **Agent Loops** marketplace, then **Azure DevOps**, and add it.
 4. Fill in:
    - `AZURE_DEVOPS_TOKEN`: the token.
    - `AZURE_DEVOPS_URL`: leave it out for Azure DevOps Services. For your own server, give
@@ -170,7 +170,7 @@ you:
   open line comments, with the box's words. The app asks you before it sends. With no agent
   on that branch, the new-agent form opens on the branch.
 
-Agents can't merge or approve from this page. Those tools are for a person only. They carry
+Agent Loops can't merge or approve from this page. Those tools are for a person only. They carry
 the commit that the page shows. When the pull request has a newer commit, nothing happens:
 open the page again.
 

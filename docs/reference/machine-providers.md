@@ -42,14 +42,14 @@ Contract 1 keeps these tool names and the `workspace`/`workspaces` payload field
   `enum` property may have `x-costs`, its values' costs, such as
   `{"s-1vcpu-1gb": "$0.009/hour"}`, which the confirmation shows.
 - **`workspace_create`** takes the name, the chosen `options`, and `firstBoot`: one shell
-  line that installs Agents and joins it as a host, with a join code that works once. It
+  line that installs Agent Loops and joins it as a host, with a join code that works once. It
   ends with the new host's name as its second argument. Run it as the machine's own user on
   its first boot, never with sudo. Answer `firstBootRuns: true` if you will. Otherwise the
   person adds it over its `ssh`, as **Add as Machine…** does.
 - **`workspace_delete`** deletes the machine and everything on it. The control plane then
   removes its host, as **Remove** does.
 
-Agents asks the person before it makes or deletes anything. The first-boot line is never
+Agent Loops asks the person before it makes or deletes anything. The first-boot line is never
 logged.
 
 ## A machine
@@ -109,7 +109,7 @@ logged.
   configured headers. What the server answers goes back with each value said as `${NAME}`.
 - **A codespace over ssh.** The machine that carries a codespaces provider starts a
   codespace's agentsd over ssh with `gh` and the token (`providers/ssh`), reads its host
-  key for a link, and installs Agents in it for Add as Machine… (op `install`, #3497).
+  key for a link, and installs Agent Loops in it for Add as Machine… (op `install`, #3497).
   `machines/install` names the provider and the workspace; the control plane makes a host code
   for the caller, who must own the carrying machine, and sends it with the trusted key's
   fingerprint. That machine checks the host key, then runs
@@ -250,7 +250,7 @@ Its parameters fill them in.
 | `coder` | none | `coder list -o json` / `coder start -y ${id}` / `coder stop -y ${id}`. Read as JSON (`latest_build.status`). | `coder.${name}` (from `coder config-ssh`) |
 | `gcloud-workstations` | `cluster`, `config`, `region`, `project` (optional: gcloud's default), `ssh` | `gcloud workstations list … --format='value(name.basename(),state)'` / `start` / `stop`. States: RUNNING (STATE_RUNNING in older gcloud) and so on; RECONCILING→starting. A workstation's ssh host key is new at each start: the ssh start after a Start takes the new one (#1701). | `ssh` as given (an ssh config host that reaches `gcloud workstations start-tcp-tunnel`), `tunnel: true`, `hostKeyRenews: true` |
 | `digitalocean-api` | `tag`, `user` (default `root`), `sshKeys` (optional, key ids or fingerprints), `tunnel`, `api` (optional) | Secret `DIGITALOCEAN_API_TOKEN`. `GET /v2/droplets?per_page=200&tag_name=${tag}` / `POST /v2/droplets/${id}/actions` `{"type":"power_on"}` / `power_off`. Create `POST /v2/droplets` with the tag and `user_data` that makes the user `agents` and runs `${firstBoot}` as it, with linger; options `region` (`nyc3`), `size` (`s-1vcpu-1gb`), `image` (`ubuntu-24-04-x64`). Delete `DELETE /v2/droplets/${id}`. States as `doctl`. | `${user}@` the public IPv4 |
-| `codespaces-api` | `repo` (optional, owner/name), `ssh` (optional), `api` (optional) | Secret `GITHUB_TOKEN`. `GET /user/codespaces` (or `/repos/${repo}/codespaces`) / `POST /user/codespaces/${id}/start` / `…/stop`. States as `codespaces`, and Queued, Awaiting, Rebuilding→starting. Makes a codespace from a repository (#1809): `POST /repos/${repository.owner}/${repository.name}/codespaces` with the name as `display_name`, the form's one option `repository` (owner/name, optional: with none, `github/codespaces-blank`, #4260); delete is `DELETE /user/codespaces/${id}`. It has no user data, so `firstBootRuns` is false: Add as Machine… installs Agents over ssh. | `cs.${id}.${branch}` (gh's `--config` host, ProxyCommand gh) or `ssh`; `tunnel: true` |
+| `codespaces-api` | `repo` (optional, owner/name), `ssh` (optional), `api` (optional) | Secret `GITHUB_TOKEN`. `GET /user/codespaces` (or `/repos/${repo}/codespaces`) / `POST /user/codespaces/${id}/start` / `…/stop`. States as `codespaces`, and Queued, Awaiting, Rebuilding→starting. Makes a codespace from a repository (#1809): `POST /repos/${repository.owner}/${repository.name}/codespaces` with the name as `display_name`, the form's one option `repository` (owner/name, optional: with none, `github/codespaces-blank`, #4260); delete is `DELETE /user/codespaces/${id}`. It has no user data, so `firstBootRuns` is false: Add as Machine… installs Agent Loops over ssh. | `cs.${id}.${branch}` (gh's `--config` host, ProxyCommand gh) or `ssh`; `tunnel: true` |
 | `aws-ec2-api` | `region` (such as `us-east-1`), `tag` (a tag key, default `agents`), `user` (default `ec2-user`), `tunnel`, `api` (optional) | Secrets `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (and `AWS_SESSION_TOKEN` for a role's keys); each request is signed with SigV4. EC2's Query API, answered in XML: `DescribeInstances` with the tag and every state but terminated, read at `reservationSet[].instancesSet` / `StartInstances` / `StopInstances` with `InstanceId.1=${id}`. Name from the `Name` tag. States: pending→starting, running, stopping and shutting-down→stopping, stopped. No create or delete. | `${user}@` the public IPv4 |
 | `gcp-compute-api` | `project`, `zone` (such as `us-west1-b`), `label` (a label key, default `agents`), `user` (default `agents`), `sshKeys` (optional, public key lines), `tunnel`, `api` (optional) | Secret `GOOGLE_SERVICE_ACCOUNT_KEY` (`googleAuth`). `GET /compute/v1/projects/${project}/zones/${zone}/instances?filter=labels.${label}:*` / `POST …/instances/${id}/start` / `…/stop`. Create `POST …/instances` with the label, a boot disk that is deleted with the VM, an external address on the `default` network, the keys in the metadata `agents-ssh-keys`, and a startup script that runs once: it makes the user `agents` with those keys (not Google's `ssh-keys`, whose user is a sudoer), turns on linger and runs `${firstBoot}` as it; options `machineType` (`e2-small`), `image` (`projects/debian-cloud/global/images/family/debian-12`), `diskSizeGb` (`20`). Delete `DELETE …/instances/${id}`. States: PROVISIONING and STAGING→starting, RUNNING, STOPPING and SUSPENDING→stopping, TERMINATED, STOPPED and SUSPENDED→stopped. | `${user}@` the external IPv4 |
 | `coder-api` | `url` (the deployment) | Secret `CODER_SESSION_TOKEN`. `GET /api/v2/machines?q=owner:me` / `POST /api/v2/machines/${id}/builds` `{"transition":"start"}` / `stop`. States as `coder`. | `coder.${name}` (from `coder config-ssh`, ProxyCommand coder) |
@@ -277,5 +277,5 @@ tests point it at a fake server.
 
 ## Related
 
-- [Start machines from Agents](../how-to/start-machines-from-agents.md)
+- [Start machines from Agent Loops](../how-to/start-machines-from-agents.md)
 - [Add a machine provider](../how-to/add-a-machine-provider.md)

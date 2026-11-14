@@ -1,6 +1,6 @@
 ---
 name: feature-matrix
-description: Bring docs/reference/feature-matrix.md up to date with what Agents shipped since the last update and with what the newest Competitor check report found, on a pull request of its own. Build nothing. Use when the Feature matrix workflow runs in a release (#1462), or when Alex asks to update the feature matrix.
+description: Bring docs/reference/feature-matrix.md up to date with what Agent Loops shipped since the last update and with what the newest Competitor check report found, on a pull request of its own. Build nothing. Use when the Feature matrix workflow runs in a release (#1462), or when Alex asks to update the feature matrix.
 ---
 
 # Feature matrix
@@ -17,7 +17,7 @@ run of the workflow.
 - One pull request per release at most. If an earlier one from this workflow (branch
   `agents/feature-matrix-*`) is still open, do not open another: say so and call
   `archive_session` (no id).
-- Hold every app to the bar the page states, Agents included: a ● needs the whole
+- Hold every app to the bar the page states, Agent Loops included: a ● needs the whole
   feature, merged on `main` and documented; a ○ needs evidence. A feature that is only
   in an open PR or an issue does not count.
 - **Questions.** Nobody is at the keyboard. Do not ask; write anything that needs a
@@ -25,15 +25,15 @@ run of the workflow.
   ending. If you must ever ask, name yourself ("The feature matrix update recommends…
   Alex, do you want…?"), never a bare "I" or "you".
 
-## 1. What Agents shipped
+## 1. What Agent Loops shipped
 
-1. Find when Agents' row was last brought up to date: the date in the page's "Agents' row
+1. Find when Agent Loops' row was last brought up to date: the date in the page's "Agent Loops' row
    was last brought up to date on …" sentence, and `git log -1 --format=%ad --date=short
    -- docs/reference/feature-matrix.md`. Take the earlier.
 2. List the commits on `origin/main` since then: `git log --since=<date> --format='%h %s'
    origin/main`, and read the body of each one that may change a feature in the page's
    "What each feature means".
-3. For each feature, check whether Agents' cell is still right. Where a commit changes
+3. For each feature, check whether Agent Loops' cell is still right. Where a commit changes
    it, note the cell, the new mark and the commit or PR number.
 
 ## 2. What the Competitor check found
@@ -60,9 +60,9 @@ If nothing changes in steps 1 and 2, say so and call `archive_session` (no id).
    place: sorted by score, then by name. Compute the **Overall score** table again (points
    over all scored features) and its ranks; apps with the same overall score share a
    rank.
-3. Bring "Where Agents falls short" in step with Agents' ◐ and ○ cells: take out a line
+3. Bring "Where Agent Loops falls short" in step with Agent Loops' ◐ and ○ cells: take out a line
    whose cell is now ●, and change a line whose reason changed.
-4. Change the date in "Agents' row was last brought up to date on …" to today.
+4. Change the date in "Agent Loops' row was last brought up to date on …" to today.
 5. Commit with a message that lists each changed cell (app, feature, old → new mark,
    source) and ends with `mac: docs only, remote: docs only, web: docs only`.
 6. Push and open a pull request with auto-merge (squash), as every agent here does:
@@ -77,5 +77,5 @@ If nothing changes in steps 1 and 2, say so and call `archive_session` (no id).
 
 1. Remove your worktree once the pull request has merged (move_worktree with
    leave_worktree `remove`).
-2. End with one sentence: how many cells changed, Agents' overall score and rank before
+2. End with one sentence: how many cells changed, Agent Loops' overall score and rank before
    and after, and the pull request's link. Then call `archive_session` (no id).

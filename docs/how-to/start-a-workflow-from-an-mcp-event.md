@@ -19,7 +19,7 @@ is shown as not supported yet.
 ## Before you start
 
 - A folder with a connector that offers events. The github server (`github-mcp`) ships
-  with Agents on the Mac and the Linux host, and needs the host's GitHub connection: the GitHub
+  with Agent Loops on the Mac and the Linux host, and needs the host's GitHub connection: the GitHub
   App `agents-loops`, signed in with a code on github.com (#1335), and installed on the
   repository. On the folder's **Connectors** page, press **Connect GitHub…** and type the
   code on github.com (#1336). Once a slot has read from GitHub, the page adds the github
@@ -53,7 +53,7 @@ another for its tools.
 
 ## Turn on a ready-made workflow
 
-Agents has ready-made workflows for the dev loop on GitHub (#1342) and GitLab (#1633). Each
+Agent Loops has ready-made workflows for the dev loop on GitHub (#1342) and GitLab (#1633). Each
 folder that pushes to GitHub or GitLab shows them on its **Workflows** page, off. One
 workflow works on both forges: it listens to the `github` and the `gitlab` servers, and its
 agent uses the tools of the server that the event came from.

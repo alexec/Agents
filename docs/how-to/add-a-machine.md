@@ -17,7 +17,7 @@ it and no port needs opening. See [Folders, hosts and worktrees](../explanation/
 ## Before you start
 
 - A window paired with your control plane. See
-  [Set up Agents on this Mac](set-up-on-this-mac.md).
+  [Set up Agent Loops on this Mac](set-up-on-this-mac.md).
 - A Linux machine on x86-64 or ARM64. This guide calls it `devbox.example.com`.
 - The server can reach the control plane's address over HTTPS. If the control plane runs
   on your Mac, that means the server is on the same network as the Mac and can resolve its
@@ -87,7 +87,7 @@ you**, with the same code: click **Approve**. See
    nothing is installed: remove the old key with `ssh-keygen -R` if the server was rebuilt,
    and try again.
 
-   The sheet ticks through **Checking the system…** and **Installing Agents…**, then says
+   The sheet ticks through **Checking the system…** and **Installing Agent Loops…**, then says
    **devbox joined.**
 
 The key is read once, for this install. The control plane keeps neither the key nor the ssh
@@ -158,7 +158,7 @@ server needs no browser: the web page opens the sign-in page in yours.
    Codex says **Not usable: not signed in**. Click **Sign In…**.
 2. Click **Open Link**, and sign in to your account on the page it opens.
    - **Claude:** the page gives a code. Paste it into the sheet and click **Sign In**.
-     Claude makes a sign-in that lasts a year, kept on the server for Agents only.
+     Claude makes a sign-in that lasts a year, kept on the server for Agent Loops only.
    - **Codex:** type the code the sheet shows on the page, then click **Done**. If OpenAI
      does not take the code, turn on device code sign-in in ChatGPT's security settings.
 3. Or click **Use an API Key Instead**, and paste an Anthropic or OpenAI API key. For
@@ -193,7 +193,7 @@ A second Mac joins with a code from Pair a Mac. Its window pairs and its host jo
 
 1. In the window on the first Mac, open **Settings ▸ Clients**, click **Pair a Mac…**, and
    copy the code.
-2. On the other Mac, install and open Agents. Open **Settings ▸ Control plane**, click
+2. On the other Mac, install and open Agent Loops. Open **Settings ▸ Control plane**, click
    **Connect to Another…**, then **Use a Code…**. Paste the code, click **Next**, and then
    **Connect**.
 
@@ -214,7 +214,7 @@ If the server is a workspace of a provider you have added (a Docker container, a
 droplet, a Codespace), open **Settings ▸ Machine Providers** and choose **Add as
 Host…** beside it. Add a Machine opens over ssh, with the address the provider gives already
 filled in. Once the server joins, it is linked to its workspace, so it can be started and
-stopped from Agents. See [Start workspaces from Agents](start-machines-from-agents.md).
+stopped from Agent Loops. See [Start workspaces from Agent Loops](start-machines-from-agents.md).
 
 **New Machine…** on a provider's card has **Clone these folders**: git URLs, one a line.
 Once the new workspace joins, it clones each one, with this Mac's git access when you allow
@@ -242,7 +242,7 @@ its row under **Machines** in the sidebar. To update it over ssh:
 3. Click **Update**. If the server's key is new to this Mac, check it, then click **Trust and
    Update**.
 
-The control plane checks that the server is that host, copies its version of Agents there,
+The control plane checks that the server is that host, copies its version of Agent Loops there,
 and starts the host again. Its agents, folders and membership stay. It stops the host for a
 moment, so do it when no agent there is in the middle of a turn.
 
@@ -253,7 +253,7 @@ Otherwise, add it again: click **Add a Machine…** and run the new command on t
 
 - **That is not a join code.** The command was changed on its way. Copy it again.
 - **Hosts other than Macs run Linux.** The machine is not Linux.
-- **… is not a machine the host is built for.** Agents hosts need x86-64 or ARM64.
+- **… is not a machine the host is built for.** Agent Loops hosts need x86-64 or ARM64.
 - **This machine has no CA certificates to check the control plane with.** Install
   `ca-certificates` on the server.
 - **The download did not match its checksum.** Something between the server and the
@@ -266,4 +266,4 @@ Otherwise, add it again: click **Add a Machine…** and run the new command on t
 
 - [Folders, hosts and worktrees](../explanation/folders-machines-worktrees.md).
 - [The control plane](../explanation/control-plane.md).
-- [Start workspaces from Agents](start-machines-from-agents.md).
+- [Start workspaces from Agent Loops](start-machines-from-agents.md).

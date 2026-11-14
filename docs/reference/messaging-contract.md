@@ -9,8 +9,8 @@ description: The tools, input and structuredContent that a messaging MCP server 
 A messaging MCP server that follows this contract gives the same tools, with the same input
 and the same `structuredContent`, whatever service it reads. The daemon calls these tools
 over MCP, and the **Messages** page (#4337) shows the conversations of every such server in
-one list. The servers that Agents makes (Email, Slack, Google Chat, WhatsApp) follow it, and
-a third-party server (Discord, Telegram, Teams) can follow it too, with no change in Agents.
+one list. The servers that Agent Loops makes (Email, Slack, Google Chat, WhatsApp) follow it, and
+a third-party server (Discord, Telegram, Teams) can follow it too, with no change in Agent Loops.
 
 Why messaging is a contract over MCP, and the forges are not, is in
 [Connector levels](../explanation/connector-levels.md#a-contract-or-in-process).
@@ -224,8 +224,8 @@ are in it (#4340). Alex can overrule.
 ### Unread state: the service's own
 
 Decided: `unread` is the **service's own** state (IMAP `\Seen`, Slack's unread count, Google
-Chat's read state), and Agents keeps no read mark of its own, because the person's other
-apps then agree with the page, and Agents stores nothing (no message text on the control
+Chat's read state), and Agent Loops keeps no read mark of its own, because the person's other
+apps then agree with the page, and Agent Loops stores nothing (no message text on the control
 plane, `docs/explanation/direction.md`). Since #5137, reading a conversation's newest page
 with `messages/read` marks it read on the service, by the contract's `mark_conversation_read`,
 as a person who opens it in the service's own app does, and Mark All as Read marks all. A

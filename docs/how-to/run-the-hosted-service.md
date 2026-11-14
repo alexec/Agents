@@ -10,7 +10,7 @@ The hosted service is the shortest way in: a person with only a browser signs up
 Apple, Google or GitHub, and gets a control plane of their own. They type no command and hold no key
 ([Direction](../explanation/direction.md)). This page is for whoever runs the service.
 
-Each account's control plane is the same single-organisation control plane that Agents
+Each account's control plane is the same single-organisation control plane that Agent Loops
 Host runs on a Mac. One `agents-hosted` process runs them all:
 
 - **Sign-up and the account page** are at your domain, such as `agentloops.dev`.
@@ -152,7 +152,7 @@ the VM's `.env`; the others stay.
 ## Who can sign up
 
 Sign-up is by invitation at the start. A person with no invite goes on a waitlist and sees
-their place in it. Agents keeps no email address, so they sign in
+their place in it. Agent Loops keeps no email address, so they sign in
 again later to see if their account is ready.
 
 - **Invite a person** with a link they can use once, within 14 days:
@@ -213,7 +213,7 @@ on, a Free account's page has **Upgrade**, which goes to Stripe Checkout for Pro
 account that has paid has **Manage Billing**, which goes to Stripe's customer portal. Stripe
 keeps the cards. The service keeps only each account's Stripe customer and subscription ids.
 
-1. In Stripe, make a product, Agents Pro, with a monthly price. Keep its id, `price_…`.
+1. In Stripe, make a product, Agent Loops Pro, with a monthly price. Keep its id, `price_…`.
 2. Turn on the customer portal (Settings ▸ Billing ▸ Customer portal), so a person can
    cancel and change their card.
 3. Add a webhook endpoint at `https://<your domain>/billing/webhook` with these events:

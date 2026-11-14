@@ -1,6 +1,6 @@
 ---
 name: competitor-check
-description: Find what tools that run several coding agents at once shipped since the last report, compare it with what Agents does, file at most three gaps as competitor issues, and write the report to ~/.agents/reviews/competitors/. Build nothing. Use when the Competitor check workflow runs in a release (#1462), or when Alex asks for a competitor check.
+description: Find what tools that run several coding agents at once shipped since the last report, compare it with what Agent Loops does, file at most three gaps as competitor issues, and write the report to ~/.agents/reviews/competitors/. Build nothing. Use when the Competitor check workflow runs in a release (#1462), or when Alex asks for a competitor check.
 ---
 
 # Competitor check
@@ -24,17 +24,17 @@ added it.
    what is new since then.
 2. Search the web for each tool's changelog, release notes and launch posts since the last
    report (the past 30 days when there is none).
-3. For each new feature, check whether Agents already has it: search `docs/`, `specs/`
+3. For each new feature, check whether Agent Loops already has it: search `docs/`, `specs/`
    and the GitHub issues, open and closed (`gh issue list --state all --search …`).
 4. Drop gaps the folder has set aside, such as new runtimes or App Store work.
 5. Pick **at most three** gaps that users of those tools would expect from us. File each
    one with `gh issue create --label competitor --label enhancement`, after creating the
    `competitor` label if it does not exist yet. Each issue says which tool has the feature
-   (with a link) and what Agents does today. Do
+   (with a link) and what Agent Loops does today. Do
    not file a duplicate of an existing issue: if one already covers the gap, add a
    comment to it instead.
 6. Write the report to `~/.agents/reviews/competitors/<YYYY-MM-DD>.md`. It lists each
-   tool, what it shipped, whether Agents has it, the issues you filed, and the sources.
+   tool, what it shipped, whether Agent Loops has it, the issues you filed, and the sources.
 
 ## Rules
 

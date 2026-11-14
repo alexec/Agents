@@ -6,17 +6,17 @@ devices: [mac, iphone, ipad, server]
 
 # The control plane
 
-Every screen you use Agents on, and every machine your agents run on, connects to one
+Every screen you use Agent Loops on, and every machine your agents run on, connects to one
 service of your own: the control plane. This page explains what it is made of, where you
 can run it, what happens when it or what it remembers cannot be reached, and why the app is
 built around it.
 
 ## Machines, clients and the control plane
 
-A **machine** runs agents. Your Mac is one, once Agents is installed on it. A Linux server is another, and so is a second Mac. A machine owns its agents: it starts
+A **machine** runs agents. Your Mac is one, once Agent Loops is installed on it. A Linux server is another, and so is a second Mac. A machine owns its agents: it starts
 their runtimes, holds their conversations and keeps their records on its own disk.
 
-A **client** is a screen: the Agents window on a Mac, Agents on an iPhone or iPad, or a
+A **client** is a screen: the Agent Loops window on a Mac, Agent Loops on an iPhone or iPad, or a
 browser on the Mac that runs the control plane. A client runs nothing. It shows what the machines hold and passes on what you type and click.
 
 The **control plane** sits between them. Every machine and every client connects to it, and
@@ -101,7 +101,7 @@ itself, and can't speak as another. An agent's own connection to its machine sti
 only its tools, and anything else on the Mac reaches nothing.
 
 You can forget a client in **Settings ▸ Control plane ▸ Clients**; forgetting cuts it off at
-once, at home and away. Any client may be forgotten, the last one too: Agents, on the
+once, at home and away. Any client may be forgotten, the last one too: Agent Loops, on the
 control plane's own Mac, can always make a new code.
 
 Older builds keep working. A record, a code or a channel still carries the word `grant`,
@@ -237,8 +237,8 @@ the Console page and the MDM pin come in later steps of #998.
 
 The control plane on a Mac has a second, smaller listener: plain HTTP on the loopback
 address only, at **http://localhost:8792**. It serves the web page, which is built into
-Agents and checked against a list of its files' hashes, and takes the page's WebSocket.
-Nothing else on the network can reach it. It is off by default (#4923): **Serve Agents to
+Agent Loops and checked against a list of its files' hashes, and takes the page's WebSocket.
+Nothing else on the network can reach it. It is off by default (#4923): **Serve Agent Loops to
 browsers on this Mac** in **Settings ▸ Control plane** turns it on.
 
 A browser that pairs there becomes a client of the **browser** kind, with a key of its own
@@ -298,7 +298,7 @@ client, those through the control plane too, so every other screen sees the same
 window still uses the control plane for every other machine, for pairing, and for the
 control plane's own settings.
 
-The socket is in a folder that only Agents can reach (its app group), and is named by
+The socket is in a folder that only Agent Loops can reach (its app group), and is named by
 the control plane's key, so a second control plane on the same Mac
 has a socket of its own. When it is not there, the window goes through the control plane as
 before. The iPhone, the iPad and a browser always go through the control plane for now.
@@ -335,7 +335,7 @@ see [Back up and restore a control plane](../how-to/back-up-a-control-plane.md).
 
 There are two ordinary shapes.
 
-**On this Mac.** This is what Agents does when you first open it. Agents is a free
+**On this Mac.** This is what Agent Loops does when you first open it. Agent Loops is a free
 download from us, not in the App Store. It runs this Mac's machine and a single copy of the
 control plane, kept running by macOS with every window closed. Its store is always a folder
 on this Mac (a bucket is for a control plane in the cloud, #4227). This is the shape for
@@ -399,7 +399,7 @@ that reason, rather than left to time out.
 A machine that stops (a cloud machine turned off, a container stopped) is offline like any
 other, and nothing reaches it. When it runs on a provider's workspace, the control plane can
 start it again. It asks a **machine provider**, which is an MCP server, and then waits for
-the machine to connect. See [Start machines from Agents](../how-to/start-machines-from-agents.md).
+the machine to connect. See [Start machines from Agent Loops](../how-to/start-machines-from-agents.md).
 
 Providers run on the control plane, not on a machine, because the machine is what is down. Their
 secrets stay in the control plane's own folder, never in its store. A machine linked to a
@@ -469,10 +469,10 @@ special.
 
 ## Related
 
-- [Set up Agents on this Mac](../how-to/set-up-on-this-mac.md).
+- [Set up Agent Loops on this Mac](../how-to/set-up-on-this-mac.md).
 - [Run the control plane as several copies](../how-to/run-several-copies.md).
 - [Connect a window or phone](../how-to/connect-a-window-or-phone.md).
 - [The window and the machine](window-and-daemon.md).
 - [How the phone and iPad reach your agents](phone-and-ipad.md).
-- [Use Agents in a browser](../how-to/use-agents-in-a-browser.md).
+- [Use Agent Loops in a browser](../how-to/use-agents-in-a-browser.md).
 - [Machine providers](../reference/machine-providers.md).

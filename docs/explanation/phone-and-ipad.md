@@ -12,7 +12,7 @@ what you should know about the connection.
 
 ## The work stays on the hosts
 
-Your agents belong to hosts: your Mac with Agents, and any server you have added (see
+Your agents belong to hosts: your Mac with Agent Loops, and any server you have added (see
 [The window and the host](window-and-daemon.md)). The phone and the iPad connect to your
 control plane, as the Mac window does, and reach every host through it (see
 [The control plane](control-plane.md)). They read the same conversations, and what you do
@@ -35,7 +35,7 @@ A device is paired once, with a code your control plane shows. There are two pla
 get one:
 
 - In the Mac window, **Settings ▸ Control plane ▸ Clients ▸ Pair a Device…** shows a code
-  to scan with Agents on the device.
+  to scan with Agent Loops on the device.
 - In the menu bar on the Mac, **Pair a Phone or iPad…** opens the same pairing.
 
 A code works once, for five minutes. The device keeps a key of its own, and proves it holds
@@ -109,12 +109,12 @@ paired.
 In **Settings ▸ Control plane ▸ Clients** on the Mac, **Forget…** cuts a device off at
 once, on every copy of the control plane. Its next
 attempt to connect is refused. To use it again, pair it again with a new code. Any client
-may be forgotten from any other, the last one too; Agents, on the Mac that runs the control
+may be forgotten from any other, the last one too; Agent Loops, on the Mac that runs the control
 plane, can always make a new code.
 
 ## A browser on this Mac
 
-A browser is one more client. The Agents app on a Mac serves Agents as a web page at
+A browser is one more client. The Agent Loops app on a Mac serves Agent Loops as a web page at
 **http://localhost:8792**, and a browser on the same Mac pairs with a code, as a phone
 does, from **Add a Browser…**. A control plane in the cloud serves the same page at its
 own address, for a browser anywhere (#1459). It may do everything the window may; its page shows what
@@ -128,11 +128,11 @@ It works only on this Mac for now. The page is served on the loopback address, w
 nothing else on the network can reach, so a copy of the browser's profile on another
 computer can do nothing with the key. Serving the page at a public address, so a browser
 elsewhere can use it, waits on issue #61. See
-[Use Agents in a browser](../how-to/use-agents-in-a-browser.md).
+[Use Agent Loops in a browser](../how-to/use-agents-in-a-browser.md).
 
 ## Devices paired before the control plane
 
-An iPhone or iPad paired with an Agents app from before the control plane (058) does not
+An iPhone or iPad paired with an Agent Loops app from before the control plane (058) does not
 move across by itself: the move strip that did this is gone (#4227). Pair it again with
 **Pair a Phone or iPad…** in the menu bar. See
 [Move an existing set-up across](../how-to/move-an-existing-set-up.md).
@@ -140,7 +140,7 @@ move across by itself: the move strip that did this is gone (#4227). Pair it aga
 ## Related
 
 - [Connect a window or phone](../how-to/connect-a-window-or-phone.md), for pairing.
-- [Use Agents in a browser](../how-to/use-agents-in-a-browser.md), for the web page.
+- [Use Agent Loops in a browser](../how-to/use-agents-in-a-browser.md), for the web page.
 - [Answer a question or a permission request](../how-to/answer-a-question.md), for the
   card on every device.
 - [See what needs you from your Home screen](../how-to/see-what-needs-you-from-your-home-screen.md),

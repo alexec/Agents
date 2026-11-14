@@ -16,7 +16,7 @@ and its footer names the host the results come from.
 |---|---|---|
 | **GitHub MCP Registry** | Connectors | Curated by GitHub, most starred first. The default, because it is the easiest to find things in. |
 | **MCP Registry** | Connectors | The official open registry: everything published, in its own order. |
-| **Agents** | Connectors | The connectors Agents makes: GitHub, Linear, GitLab and Email. A file that every host carries, read with no network. It lists all of them before you type. |
+| **Agent Loops** | Connectors | The connectors Agent Loops makes: GitHub, Linear, GitLab and Email. A file that every host carries, read with no network. It lists all of them before you type. |
 | **skills.sh** | Skills | Skills on GitHub, most installed first. The default for skills. |
 | **Anthropic skills** | Skills | The `anthropics/skills` repository. It lists every skill before you type. |
 
@@ -90,7 +90,7 @@ words you type narrow the list.
 
 A path is a full path, starts with `~/`, or is relative: to your home for your own list, and to
 the folder for a folder's. Each entry runs as its `packages` or `remotes` say, as from
-a registry. A file of your own or of a folder cannot name a command to run: only the Agents
+a registry. A file of your own or of a folder cannot name a command to run: only the Agent Loops
 marketplace, carried by the host, does that.
 
 ## If something is wrong

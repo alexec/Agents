@@ -4,7 +4,7 @@ devices: [mac, iphone, ipad, server]
 description: Let the control plane start and stop the machines your servers run on, through a machine provider, and press Start on a stopped server from any screen.
 ---
 
-# Start machines from Agents
+# Start machines from Agent Loops
 
 Some servers stop: a cloud machine you turn off to save money, a Codespace that idles out, a
 Docker container you stopped. Usually a stopped server is just offline, and you have to start
@@ -29,7 +29,7 @@ waits for its agentsd to connect, and the server comes online by itself.
 1. Open **Settings ▸ Machine Providers** on the Mac and choose **Add Provider…**.
 2. Pick the kind:
    - **Docker Containers**: containers on the Mac that runs the control plane.
-   - **DigitalOcean Droplets**: droplets with a tag. Agents reaches each one as `root@` its address
+   - **DigitalOcean Droplets**: droplets with a tag. Agent Loops reaches each one as `root@` its address
      unless you say another user.
    - **GitHub Codespaces**, **Coder Machines**, or **Google Cloud Workstations**.
    - **Your commands**: one machine, given as the commands you already use to start and
@@ -39,7 +39,7 @@ waits for its agentsd to connect, and the server comes online by itself.
      [Add a machine provider](add-a-machine-provider.md).
 3. Fill in its few fields. If it needs a token, add it under **Secrets**. A secret stays on
    the control plane and is never shown again.
-4. Choose **Add**. Agents checks the provider and lists its machines. If it can't, the
+4. Choose **Add**. Agent Loops checks the provider and lists its machines. If it can't, the
    sheet says why, in the provider's words.
 
 ## Link a server to its machine
@@ -64,7 +64,7 @@ The strip then says:
 2. **Waiting for devbox to connect…** once it is up. If the server reaches the control plane
    through an ssh tunnel, the tunnel opens straight away.
 3. **devbox started but agentsd didn't connect; starting it over ssh…** if agentsd hasn't
-   connected after two minutes. Agents starts it over ssh, as an install leaves it, and
+   connected after two minutes. Agent Loops starts it over ssh, as an install leaves it, and
    installs nothing.
 
 The strip goes away when the server is online. A timer beside the words shows how long the
@@ -77,7 +77,7 @@ say why and offer **Start** again.
 ## Stop a server
 
 Choose **Stop** on its row in **Settings ▸ Machines**. If agents are working
-there, Agents names them and asks first. The row says **Stopping…** and then **Stopped**.
+there, Agent Loops names them and asks first. The row says **Stopping…** and then **Stopped**.
 
 ## Start when used and stop when idle
 
@@ -115,29 +115,29 @@ offers **Start**.
 
 ### Stop when idle
 
-A machine costs money while it runs. With **Stop when idle** on, Agents stops it once its
+A machine costs money while it runs. With **Stop when idle** on, Agent Loops stops it once its
 server has been idle for the whole time you chose: 15, 30 or 60 minutes, or 2 hours (the
-default). With **Never**, Agents does not stop it. Idle
+default). With **Never**, Agent Loops does not stop it. Idle
 means:
 
 - no turn running,
 - no agent waiting on your answer,
 - and no terminal or folder shell open.
 
-A turn starting in that time starts the count again. When Agents stops it, its row and the
-strip over its chats say **devbox was stopped by Agents after 2 hours idle**. With **Start
+A turn starting in that time starts the count again. When Agent Loops stops it, its row and the
+strip over its chats say **devbox was stopped by Agent Loops after 2 hours idle**. With **Start
 when used** on as well, your next prompt starts it again.
 
-A server on a build of Agents from before this never says whether it is idle, so it is never
+A server on a build of Agent Loops from before this never says whether it is idle, so it is never
 stopped as idle. Update it from its row.
 
 ### Start for scheduled workflows
 
 A stopped server runs nothing, so its scheduled workflows would not run. With **Start for
-scheduled workflows** on, Agents starts the machine a little before the server's next
+scheduled workflows** on, Agent Loops starts the machine a little before the server's next
 scheduled workflow is due:
 
-- The server's own clock still fires the workflow. Agents only starts the machine.
+- The server's own clock still fires the workflow. Agent Loops only starts the machine.
 - It starts it 5 minutes before the due time. After the first start, it uses how long the
   last start took, plus 2 minutes.
 - It starts it once for each due time.
@@ -150,11 +150,11 @@ says it too, before it stops the server.
 
 With the switch off, the server stays stopped, and its scheduled workflows don't run while it
 is stopped. Its row warns you of that when it has some and **Stop when idle** is on. A server
-on a build of Agents from before this doesn't say when its workflows are due, so it is not
+on a build of Agent Loops from before this doesn't say when its workflows are due, so it is not
 started for them, and its row warns you the same way.
 
 Only scheduled workflows start a server. An event (such as `issue.opened`) is still heard only
-when the server is next up. Agents knows only the due time the server last sent: a workflow
+when the server is next up. Agent Loops knows only the due time the server last sent: a workflow
 added while it is stopped is not seen until it is next up.
 
 ## Make a new machine
@@ -163,15 +163,15 @@ For a provider that can make machines, its card in **Settings ▸ Control plane 
 Providers** has **New Machine…**.
 
 1. Give it a name, and make its choices: its size or region, say.
-2. Choose **Make…**. Agents says what it will make and, if the provider says, what it costs.
+2. Choose **Make…**. Agent Loops says what it will make and, if the provider says, what it costs.
 3. Choose **Make**.
 
-The new machine shows **Joining…** until it has installed Agents and joined. Then it is
+The new machine shows **Joining…** until it has installed Agent Loops and joined. Then it is
 linked to its host. A provider that can't install on first boot opens **Add a Machine** with
 the new machine filled in, as **Add as Machine…** does.
 
 To delete one, choose **Delete Machine…** in its server's `···` menu on Settings ▸ Machines.
-Agents names what is lost first: the machine, everything on its disk, and the server with
+Agent Loops names what is lost first: the machine, everything on its disk, and the server with
 its agents.
 
 ## Let an agent start a session on another machine
@@ -186,14 +186,14 @@ it (#2887). `list_machines` gives the agent the names of all your machines.
    Other machines** (#2928). It is off until you turn it on, it is saved in
    `.agents/folder.json`, and only you can change it.
 2. Choose **Start it**. The session starts on that machine and shows in your list under it.
-   If the machine is stopped, Agents starts it, and the session starts when it connects.
+   If the machine is stopped, Agent Loops starts it, and the session starts when it connects.
    The session's chat says which agent started it, and on which machine.
 
 The folder can be on that machine already. Or the agent can send it there first, with
 `send` (#2929): the branch the agent is on goes to the folder on that machine, with its
 uncommitted changes, as **Send to ‹server›…** does (see
 [Send a folder to a server](send-a-folder-to-a-machine.md)). The question card then says
-which branch goes where. Agents makes the folder if it is not there, and never overwrites
+which branch goes where. Agent Loops makes the folder if it is not there, and never overwrites
 work done there: a folder with changes or commits of its own on that machine stops the send
 before you are asked. For a send, the machine must be running; the agent can start it with
 `start_machine` first. To bring the work back, use **Bring Back from ‹server›…**, or the
@@ -219,7 +219,7 @@ leaves the folder out for the project's folder on that machine.
    session goes where, with which branch. The same **Agents may start sessions on my other
    machines without asking** switch lets it go without asking.
 2. Choose **Move it**. The branch the session works on goes to the folder there, with its
-   commits and its uncommitted changes, as a send does. Agents makes the folder if it is not
+   commits and its uncommitted changes, as a send does. Agent Loops makes the folder if it is not
    there, and a folder with work of its own there stops the move before you are asked.
 3. The session goes on on that machine with the same id, labels, transcript and runtime, in
    that folder on that branch, and shows in your list under that machine. Its chat says where
@@ -238,12 +238,12 @@ checked out in the folder there.
 - **The provider can't list.** Its card says why, and shows what it last listed. Check its
   command-line tool is installed and signed in on the Mac that runs the control plane, then
   choose **List Again** in its `···` menu.
-- **"machine-commands isn't installed beside the control plane".** This build of Agents
+- **"machine-commands isn't installed beside the control plane".** This build of Agent Loops
   Host doesn't carry the command provider yet. Set `AGENTS_WORKSPACE_COMMANDS` to a build
   of it for the control plane, or wait for a build that has it.
 - **The server starts but never connects.** Make agentsd start when the machine boots: on
   Linux, `loginctl enable-linger $USER` keeps the user's services running with nobody
-  logged in. Or give the machine an ssh address, so Agents can start agentsd itself.
+  logged in. Or give the machine an ssh address, so Agent Loops can start agentsd itself.
 
 ## Related
 

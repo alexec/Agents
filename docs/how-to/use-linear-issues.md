@@ -11,14 +11,14 @@ Two connectors (MCP servers) work together:
 - **Tools** come from Linear's own MCP server, `https://mcp.linear.app/mcp`. Agents use it
   to find, read and change issues.
 - **The Linear issues page and the events** come from `linear-mcp`, a small server that
-  Agents ships. Its tools feed the **Linear issues** page: the open issues, narrowed by team,
+  Agent Loops ships. Its tools feed the **Linear issues** page: the open issues, narrowed by team,
   state or label, with **Start Agent** on each. Click a row to expand its rich-text description.
   Its events are
   `issue.opened`, `issue.labelled`, `issue.commented` and `issue.closed`. A workflow or a
   wait can use them. See
   [Start a workflow from an MCP event](start-a-workflow-from-an-mcp-event.md).
 
-Agents on the Mac carries `linear-mcp`, and every Linux host installs it beside agentsd.
+Agent Loops on the Mac carries `linear-mcp`, and every Linux host installs it beside agentsd.
 
 ## Before you start
 
@@ -27,7 +27,7 @@ Agents on the Mac carries `linear-mcp`, and every Linux host installs it beside 
 ## Connect Linear
 
 On **Connectors**, choose **Connect… ▸ Linear** on the Mac (**Connect Linear…** on the
-Remote and the web page), then **Continue on linear.app**. Approve on linear.app; Agents comes
+Remote and the web page), then **Continue on linear.app**. Approve on linear.app; Agent Loops comes
 back by itself. The host keeps the tokens and renews them. `linear-mcp` reads this connection,
 so it needs no key.
 
@@ -44,7 +44,7 @@ Add Linear's own server from the registry, or by hand with the URL
 
 ## Add the page and the events
 
-1. Add **Linear** from the **Agents** marketplace in the catalogue, or by hand in the folder's
+1. Add **Linear** from the **Agent Loops** marketplace in the catalogue, or by hand in the folder's
    `.agents/mcp.json`:
 
    ```json

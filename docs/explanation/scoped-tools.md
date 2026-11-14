@@ -86,7 +86,7 @@ each one has.
   store, and the app does not attach Copilot's built-in MCP servers to its sessions.
 - **Cursor** has no way to take a tool away, and nothing left to take away: its subagent
   tool and its two goal tools are the app's business now too, so they are used. The first
-  briefing points Cursor directly to the Agents app's MCP tools, whose schemas are available
+  briefing points Cursor directly to the Agent Loops app's MCP tools, whose schemas are available
   from the server.
 - **Codex** takes feature switches in a variable set only for the sessions the app starts.
   It loses its sleep tool, its automations, its memories and its ChatGPT connectors. Its

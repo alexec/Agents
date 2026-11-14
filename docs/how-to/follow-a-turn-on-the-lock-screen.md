@@ -19,7 +19,7 @@ page or a workflow does not, because you did not ask for it here.
 
 - The iPhone or iPad app, paired with your control plane. See
   [Connect a window or phone](connect-a-window-or-phone.md).
-- Live Activities allowed for Agents in the system's Settings app. If the system does
+- Live Activities allowed for Agent Loops in the system's Settings app. If the system does
   not allow them, the app starts none.
 
 ## Steps
@@ -95,11 +95,11 @@ are likely to want to follow it. The switch is for this device only.
 ## If it doesn't work
 
 - **No Live Activity starts.** Check that **Live Activities** is on in the app's
-  **Settings…**, and that the system's Settings app allows Live Activities for Agents.
-- **The line says Open Agents to see where it is.** The app has not heard about the
+  **Settings…**, and that the system's Settings app allows Live Activities for Agent Loops.
+- **The line says Open Agent Loops to see where it is.** The app has not heard about the
   turn for 10 minutes, so it does not show a step that may be old. Open the app, and the
   line comes back.
-- **The line says Open Agents to answer it, Open Agents to decide, or Open Agents to see
+- **The line says Open Agent Loops to answer it, Open Agent Loops to decide, or Open Agent Loops to see
   what it needs.** The update came by push from your control plane while the app did
   not run. A push carries no words, so the line cannot say the question, and the title
   says how many sessions, such as **2 sessions**. Open the app to read it.

@@ -1,11 +1,11 @@
 ---
 name: ship-app
-description: Build main and install Agents Host, the Mac window, and the Remote on Alex's paired iPhone and iPad, and, with --control-plane, deploy main to the live control plane (control.agentloops.dev). The Mac install runs by default; use --no-mac to skip it. A merge wave does not run this. Not for testing a change. That is run-app, on a scratch root.
+description: Build main and install Agent Loops, the Mac window, and the Remote on Alex's paired iPhone and iPad, and, with --control-plane, deploy main to the live control plane (control.agentloops.dev). The Mac install runs by default; use --no-mac to skip it. A merge wave does not run this. Not for testing a change. That is run-app, on a scratch root.
 ---
 
 # Ship main to the real app and devices
 
-Run the one script. It builds and installs Agents Host, the Mac window and the Remote.
+Run the one script. It builds and installs Agent Loops, the Mac window and the Remote.
 Do not reimplement its checks or write a watcher around it.
 
 ```sh
@@ -16,12 +16,12 @@ Run it from a worktree of your own at origin/main (#797): the worktree's copy bu
 installs that worktree, and refuses unless it is clean and at origin/main. Run from the
 main checkout, it builds there instead, which a lane's build can write over.
 
-The script installs the Mac app by default. That copies Agents Host and the window into
+The script installs the Mac app by default. That copies Agent Loops and the window into
 `~/Applications` and `launchctl kickstart`s the login-item jobs. Pass `--no-mac` to skip
 the Mac install. `--install-mac` remains accepted as an alias for the default.
 
 `--no-linux` skips rebuilding the Linux hosts (`scripts/build-linux-agentsd.sh`, into
-`App/Resources/servers`), which the build otherwise does first, since Agents Host
+`App/Resources/servers`), which the build otherwise does first, since Agent Loops
 carries them and a stale one cannot join. It is Go (#1314) and takes seconds.
 `--no-devices` skips the iPhone and iPad.
 `--device <UDID>` (repeatable) picks one device. `--now` relaunches the Mac after 3s

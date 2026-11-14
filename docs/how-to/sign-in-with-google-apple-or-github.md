@@ -46,7 +46,7 @@ invite's code, then add their sign-in in the same way.
 
 ## Pair a new client by signing in
 
-1. On a Mac, open the **Connect** sheet. On an iPhone or iPad, open Agents. Both show the
+1. On a Mac, open the **Connect** sheet. On an iPhone or iPad, open Agent Loops. Both show the
    sign-in first. To pair with a code, select **Use a Code Instead…**.
 2. Type the control plane's address, for example `control.example.com`, and select
    **Continue**.

@@ -6,7 +6,7 @@ description: Open the Cost, Tokens and Time pages, read their charts, and see ho
 
 # See usage, cost and time
 
-Agents keeps a record of what your agents cost, the tokens they used, and where their
+Agent Loops keeps a record of what your agents cost, the tokens they used, and where their
 time went. Three pages show it as charts: **Cost**, **Tokens** and **Time**. Use them to
 see which days and which runtimes cost the most, and how long agents wait for you.
 These pages only show figures. To set a limit, see [Limit what agents spend](limit-spending.md).
