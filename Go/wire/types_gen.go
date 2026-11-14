@@ -8840,6 +8840,19 @@ type MachineUserSettings struct {
 	Waiting []UserSecretAbout `json:"waiting,omitzero"`
 }
 
+// machines/versions (#5272, spec 5239, "Alex's question"): the Agents versions a machine ran, from its machine/hello. version is the one it said last; firstSeen is the first time the control plane heard it at that version, and seen the last. deploys are the changes of version the control plane saw, newest first, at most 20: each an observed deploy (observed: true, state succeeded) of the component agents to the environment machines, its target labelled machine=<host>, from the last time the old version was seen (started) to the first machine/hello at the new one (finished). Each version's artifact is its commit: the tag vX.Y.Z for X.Y.Z, the sha after +g for X.Y.Z-dev.N+g<sha>.
+type MachineVersions struct {
+	Host MachineRef `json:"host"`
+
+	Version string `json:"version"`
+
+	FirstSeen *Date `json:"firstSeen,omitzero"`
+
+	Seen *Date `json:"seen,omitzero"`
+
+	Deploys []Deploy `json:"deploys"`
+}
+
 type MachineWorkspace struct {
 	Provider ProviderID `json:"provider"`
 

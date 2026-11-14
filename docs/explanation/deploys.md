@@ -75,6 +75,26 @@ sets the first job's Deployment `inactive` when the second ends, so it does not 
 A target can also report what it runs (Argo CD's live state, a machine's version when it
 connects). A change in that report is a deploy with `observed: true`.
 
+### A machine's Agents versions
+
+Each host says its version in `machine/hello` on each connect. The control plane keeps each
+change of it as an observed deploy (#5272), so a machine's page can say "this version, with
+these changes, since time X" (#5273):
+
+- **The model:** the component is **Agents** (`agents`: agentsd and, on a Mac, the app that
+  carries it), the environment is `machines`, and each machine is a target with the label
+  `machine=<host>`. The deploy's state is `succeeded`, `rawState` is `observed`.
+- **Since when:** a deploy starts at the last time the old version was seen (its last hello,
+  or the end of its uplink) and ends at the first hello at the new one. An update restarts
+  the host, so the time is known to within seconds.
+- **The commit:** `0.18.0` is the tag `v0.18.0`; `0.18.1-dev.544+g8162a5a06` is the sha
+  after `+g` (`scripts/version.sh`). That is the version's one artifact, so the changes
+  between two versions are the forge's compare of their commits.
+- **Bounded:** one object for each machine, `v1/machine-versions/<host>.json`, with the
+  last 20 deploys. It goes when the machine is removed.
+- **Read:** `machines/versions` gives the version now, when it was first and last seen, and
+  the deploys, newest first, to the machine's own person.
+
 ## Events
 
 The sources send these events, from each system's MCP server:

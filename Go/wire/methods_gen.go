@@ -685,6 +685,7 @@ var CallMachinesStop = Method[MachineStop, ControlMachine]{"machines/stop"}
 var CallMachinesSummaryFacts = Method[SummaryFactsRequest, MachinesSummaryFacts]{"machines/summaryFacts"}
 var CallMachinesUnlink = Method[MachineRequest, ControlMachine]{"machines/unlink"}
 var CallMachinesUpdate = Method[MachineUpdate, JSONValue]{"machines/update"}
+var CallMachinesVersions = Method[MachineRequest, MachineVersions]{"machines/versions"}
 var CallMultiplierCount = Method[MultiplierCountParams, Multiplier]{"multiplier/count"}
 var CallNoticesTake = Method[NoticeLimits, NoticeTaken]{"notices/take"}
 var CallOrgRoutesCheck = Method[OrgRouteRequest, OrgRouteCheck]{"orgRoutes/check"}
