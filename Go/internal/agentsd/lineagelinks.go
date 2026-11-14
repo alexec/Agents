@@ -756,7 +756,8 @@ func (d *Daemon) lineageEvent(e wire.Event) {
 		d.lineageCIEvent(e)
 		// A run finished: the build timings read it soon (#5177).
 		d.kickCITimings()
-	case "deploy.started", "deploy.succeeded", "deploy.failed":
+	case "deploy.waiting", "deploy.started", "deploy.succeeded", "deploy.failed":
+		// deploy.waiting makes a node only when it carries its deploy (#5246).
 		d.lineageDeployEvent(e)
 		return
 	case "health.issue_new", "health.issue_regressed":

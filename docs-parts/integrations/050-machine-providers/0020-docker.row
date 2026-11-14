@@ -1,0 +1,1 @@
+| Docker | Mac, web, control plane | walked on scratch | 2026-10-19, on the Go control plane, Mac, Remote and web (`specs/691-workspace-providers/walks/857-go-docker.md`) | `presets.go` (`docker`) | CLI only, by decision on #1119 |

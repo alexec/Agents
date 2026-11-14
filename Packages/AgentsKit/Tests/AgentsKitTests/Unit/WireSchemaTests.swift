@@ -21,6 +21,20 @@ struct WireSchemaTests {
         try JSONValue.parse(Data(contentsOf: wire.appending(path: name)))
     }
 
+    /// The methods of an OpenRPC document. The host's are in Packages/Wire/daemon/*.openrpc.json, one
+    /// file per group (#5381), and its own file has the rest.
+    static func readMethods(_ file: String) throws -> [JSONValue] {
+        var methods = try read(file)["methods"]?.arrayValue ?? []
+        guard file == "daemon.openrpc.json" else { return methods }
+        let directory = wire.appending(path: "daemon")
+        for part in try FileManager.default.contentsOfDirectory(atPath: directory.path()).sorted()
+        where part.hasSuffix(".openrpc.json") {
+            let document = try JSONValue.parse(Data(contentsOf: directory.appending(path: part)))
+            methods += document["methods"]?.arrayValue ?? []
+        }
+        return methods
+    }
+
     /// The schema: the definitions of every file under Packages/Wire/schema, one per domain (#5380).
     static func readSchema() throws -> JSONValue {
         let directory = wire.appending(path: "schema")
@@ -387,7 +401,7 @@ struct WireSchemaTests {
             ("daemon.openrpc.json", DaemonAPI.WebSignatures.Kind.hostRequest, DaemonAPI.WebSignatures.Kind.hostNotification),
             ("control.openrpc.json", .controlRequest, .controlNotification),
         ] {
-            for method in try Self.read(file)["methods"]?.arrayValue ?? [] {
+            for method in try Self.readMethods(file) {
                 let tags = method["tags"]?.arrayValue?.compactMap { $0["name"]?.stringValue } ?? []
                 guard tags.contains("web"), let name = method["name"]?.stringValue else { continue }
                 documented[name] = method["x-notification"]?.boolValue == true ? notification : request
@@ -406,7 +420,7 @@ struct WireSchemaTests {
     @Test func capabilitiesAreWhatTheMethodsName() throws {
         for (file, table) in [("daemon.openrpc.json", Capability.host), ("control.openrpc.json", Capability.control)] {
             var named: [String: String] = [:]
-            for method in try Self.read(file)["methods"]?.arrayValue ?? [] {
+            for method in try Self.readMethods(file) {
                 guard let name = method["name"]?.stringValue else { continue }
                 named[name] = method["x-capability"]?.stringValue
             }

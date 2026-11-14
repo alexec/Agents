@@ -1,0 +1,6 @@
+## Signing a person in to the control plane
+
+Open issues: `is:open label:integration sign-in`. Not a runtime's sign-in or a connector's: this is how a person pairs a client with no code, or adds a sign-in to themselves (#995, spec 736 T2). The client ids are the app's own (`Go/internal/controlplane/signin/config.go`, or `AGENTS_SIGNIN_*` on the control plane), so no operator registers anything. An org provider (#1002) is the exception: the organisation registers its own client for its control plane ([Sign-in providers](sign-in.md)).
+
+| Integration | Clients that show it | State | Last checked | Where | Gaps |
+| --- | --- | --- | --- | --- | --- |

@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+"""Count the merge conflicts pull requests met, per file, before and after the splits (#5387, epic #5379).
+
+  scripts/replay-conflicts.py [--since YYYY-MM-DD] [--until YYYY-MM-DD] [--last N]
+                              [--fixed GLOB ...]
+
+For each pull request merged in the window (the last 150 by default), every force-push
+is replayed: the head from before the push is merged against main as it was at the time
+of the push. If that merge conflicts, the push was a rebase the lane had to do. Each open
+pull request's head is also merged against main now. Merges are done with
+`git merge-tree`, so nothing in the working tree changes.
+
+The report gives each conflict with its files, then the total and the files that conflict
+most. With --fixed, a file that matches no longer counts (a change made it merge by itself,
+#2020). With --hot, it says where each of the epic's files (the default list is the hot
+files of #5379) stands in the ranking: the goal is none of them in the top ten. Run it
+once before a split lands and once after, with the same --last, and compare the counts.
+10–13 October 2026, before areas: 30 conflicts in 150 pull requests (28 rebases, 2 open).
+"""
+
+import argparse
+import fnmatch
+import json
+import subprocess
+import sys
+from collections import Counter
+
+HOT = ["Packages/Wire/daemon.schema.json", "Packages/Wire/daemon.openrpc.json",
+       "App/Sources/AppModel.swift", "Remote/Sources/RemoteModel.swift",
+       "Web/src/app.css", "Web/src/model/store.ts"]
+
+QUERY = """
+query($owner: String!, $repo: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      timelineItems(itemTypes: [HEAD_REF_FORCE_PUSHED_EVENT], first: 100, after: $after) {
+        pageInfo { hasNextPage endCursor }
+        nodes { ... on HeadRefForcePushedEvent {
+          createdAt beforeCommit { oid } afterCommit { oid } } }
+      }
+    }
+  }
+}
+"""
+
+
+def git(*args, check=True):
+    result = subprocess.run(["git", *args], capture_output=True, text=True)
+    if check and result.returncode != 0:
+        raise RuntimeError(result.stderr.strip())
+    return result
+
+
+def gh_json(*args):
+    result = subprocess.run(["gh", *args], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip())
+    return json.loads(result.stdout)
+
+
+def force_pushes(owner, repo, number):
+    pushes, after = [], None
+    while True:
+        args = ["api", "graphql", "-f", f"query={QUERY}", "-f", f"owner={owner}",
+                "-f", f"repo={repo}", "-F", f"number={number}"]
+        if after:
+            args += ["-f", f"after={after}"]
+        items = gh_json(*args)["data"]["repository"]["pullRequest"]["timelineItems"]
+        pushes += [n for n in items["nodes"] if n.get("beforeCommit")]
+        if not items["pageInfo"]["hasNextPage"]:
+            return pushes
+        after = items["pageInfo"]["endCursor"]
+
+
+def have(sha):
+    if git("cat-file", "-e", f"{sha}^{{commit}}", check=False).returncode == 0:
+        return True
+    # GitHub serves a force-pushed-away commit by its id for a while, not for ever.
+    return git("fetch", "-q", "origin", sha, check=False).returncode == 0
+
+
+def main_at(when):
+    out = git("rev-list", "-1", "--first-parent", f"--before={when}", "origin/main").stdout
+    return out.strip()
+
+
+def conflicts(main, head):
+    """The files a merge of head into main conflicts in; empty when it merges."""
+    result = git("merge-tree", "--write-tree", "--name-only", "--no-messages", main, head,
+                 check=False)
+    if result.returncode == 0:
+        return []
+    if result.returncode != 1:
+        raise RuntimeError(result.stderr.strip())
+    return [line for line in result.stdout.splitlines()[1:] if line]
+
+
+def unfixed(files, fixed):
+    """The files that still conflict once those matching a --fixed glob merge by themselves."""
+    return [f for f in files if not any(fnmatch.fnmatch(f, g) for g in fixed)]
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    parser.add_argument("--since", help="merged on or after this date")
+    parser.add_argument("--until", help="merged on or before this date")
+    parser.add_argument("--last", type=int, default=150, help="at most this many merged PRs")
+    parser.add_argument("--hot", nargs="*", default=HOT, metavar="FILE",
+                        help="files whose rank to report (default: the epic's files)")
+    parser.add_argument("--fixed", nargs="*", default=[], metavar="GLOB",
+                        help="files that now merge by themselves: leave them out")
+    options = parser.parse_args()
+
+    owner, repo = gh_json("repo", "view", "--json", "owner,name", "--jq",
+                          "[.owner.login, .name]")
+    git("fetch", "-q", "origin", "main")
+
+    search = []
+    if options.since or options.until:
+        search = ["--search", f"merged:{options.since or '*'}..{options.until or '*'}"]
+    merged = gh_json("pr", "list", "--state", "merged", "--limit", str(options.last),
+                     "--json", "number,title,mergedAt", *search)
+    opened = gh_json("pr", "list", "--state", "open", "--limit", "100",
+                     "--json", "number,title,headRefOid")
+
+    found, skipped = [], 0
+    for pr in sorted(merged, key=lambda p: p["mergedAt"]):
+        for push in force_pushes(owner, repo, pr["number"]):
+            before = push["beforeCommit"]["oid"]
+            if not have(before):
+                skipped += 1
+                continue
+            files = unfixed(conflicts(main_at(push["createdAt"]), before), options.fixed)
+            if files:
+                found.append(("rebase", pr, push["createdAt"], files))
+    for pr in opened:
+        if have(pr["headRefOid"]):
+            files = unfixed(conflicts("origin/main", pr["headRefOid"]), options.fixed)
+            if files:
+                found.append(("open", pr, "now", files))
+
+    by_file = Counter()
+    for kind, pr, when, files in found:
+        by_file.update(files)
+        print(f"#{pr['number']} {kind} {when}: {pr['title']}")
+        for path in files:
+            print(f"    {path}")
+
+    rebases = sum(1 for f in found if f[0] == "rebase")
+    print()
+    print(f"{len(found)} conflicts in {len(merged)} merged PRs and {len(opened)} open: "
+          f"{rebases} rebases, {len(found) - rebases} open now.")
+    if skipped:
+        print(f"{skipped} force-pushes skipped: GitHub no longer serves their old head.")
+    print("Most: " + ", ".join(f"{f} {n}" for f, n in by_file.most_common(10)))
+    ranked = [f for f, _ in by_file.most_common()]
+    for path in options.hot:
+        rank = f"rank {ranked.index(path) + 1}" if path in by_file else "no conflicts"
+        print(f"Hot: {path} {by_file[path]} ({rank}"
+              f"{', in the top ten' if path in ranked[:10] else ''})")
+    if options.fixed:
+        print("Left out, as fixed: " + ", ".join(options.fixed))
+    print("Baseline before areas (10–13 October 2026): 30 conflicts in 150 merged PRs; before the splits, 14 November 2026: 12 in the last 20 (Wire schema 5, rank 1).")
+
+
+if __name__ == "__main__":
+    main()

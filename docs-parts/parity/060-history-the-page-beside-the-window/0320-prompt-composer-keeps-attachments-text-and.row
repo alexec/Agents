@@ -1,0 +1,1 @@
+| Prompt composer keeps attachments, text, and actions in one growing box | #2621 | same | same | same | same | All three clients use the same order and keep their existing actions; the Remote keeps a compact phone row, in its New Session bar too (#2752). |

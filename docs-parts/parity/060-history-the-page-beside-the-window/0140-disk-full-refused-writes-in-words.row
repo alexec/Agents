@@ -1,0 +1,1 @@
+| Disk-full / refused writes in words | #88 | partly (a refused call already said the host's sentence) | **has** | — | — | Now hears `storage/writeFailed` and says its sentence. Unit-tested; not provoked on the scratch host (it needs a full disk). **Protocol:** `storage/writeFailed` added to `WebSignatures`. |

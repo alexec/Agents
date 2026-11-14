@@ -1664,13 +1664,13 @@ export interface BuildsFigures {
  * the range's figures and each day's, the change points found in the range (on the default branch,
  * whatever the branch filter), and the job that waited longest for a runner. readAt is when this
  * machine last read the forge's runs (Last update); filledFrom is the oldest day the backfill
- * reached, absent before it starts. reader is github or gitlab, or none when Agents does not read
- * CI timings from the repository's forge.
+ * reached, absent before it starts. reader is github, gitlab, azuredevops, bitbucket or forgejo, or
+ * none when Agents does not read CI timings from the repository's forge.
  */
 export interface BuildsHistory {
   repo: string;
   defaultBranch?: string;
-  reader: "azuredevops" | "github" | "gitlab" | "none";
+  reader: "azuredevops" | "bitbucket" | "forgejo" | "github" | "gitlab" | "none";
   workflows: string[];
   jobs: string[];
   branches: string[];
@@ -8192,6 +8192,24 @@ export interface MachineUserSettings {
    * them. Never a value.
    */
   waiting?: UserSecretAbout[];
+}
+
+/**
+ * machines/versions (#5272, spec 5239, "Alex's question"): the Agents versions a machine ran, from
+ * its machine/hello. version is the one it said last; firstSeen is the first time the control plane
+ * heard it at that version, and seen the last. deploys are the changes of version the control plane
+ * saw, newest first, at most 20: each an observed deploy (observed: true, state succeeded) of the
+ * component agents to the environment machines, its target labelled machine=<host>, from the last
+ * time the old version was seen (started) to the first machine/hello at the new one (finished).
+ * Each version's artifact is its commit: the tag vX.Y.Z for X.Y.Z, the sha after +g for
+ * X.Y.Z-dev.N+g<sha>.
+ */
+export interface MachineVersions {
+  host: MachineRef;
+  version: string;
+  firstSeen?: WireDate;
+  seen?: WireDate;
+  deploys: Deploy[];
 }
 
 export interface MachineWorkspace {
@@ -17051,6 +17069,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   MachineUsageState: { required: ["machine", "disks"], optional: [] },
   MachineUser: { required: ["user", "kind", "name", "labels"], optional: ["capReachedUntil", "bots"] },
   MachineUserSettings: { required: ["user", "settings", "secrets"], optional: ["waiting"] },
+  MachineVersions: { required: ["host", "version", "deploys"], optional: ["firstSeen", "seen"] },
   MachineWorkspace: { required: ["provider", "providerName", "workspace", "workspaceName", "workspaceState", "canStart", "canStop", "startWhenUsed", "current"], optional: ["hostState", "phase", "since", "problem", "stoppedBy", "stopWhenIdleMinutes", "cost", "idleTimeoutMinutes", "startForSchedules", "tellsSchedule", "nextWorkflow", "nextWorkflowAt", "wakeAt"] },
   MachineWorkspaceCall: { required: ["agent", "method", "params"], optional: ["deliver"] },
   MachinesSummaryFacts: { required: ["machines"], optional: [] },

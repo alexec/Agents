@@ -1,0 +1,1 @@
+| DigitalOcean | Mac, web, control plane | built | 2026-10-19, API preset (list, power on and off, create, delete) against a fake server only (#1119) | `presets.go` (`doctl`, and `digitalocean-api` through its API, nothing to install) | a walk on a real droplet (#3416) |

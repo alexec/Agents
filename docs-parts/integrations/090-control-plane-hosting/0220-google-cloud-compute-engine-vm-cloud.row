@@ -1,0 +1,1 @@
+| Google Cloud (Compute Engine VM, Cloud KMS, daily disk snapshots) for the hosted service (#2226) | none (the operator) | built, tested with a fake gcloud | — | `deploy/gcp/hosted-up.sh` | a real deploy needs Alex's approval of the VM's cost (#2227) |

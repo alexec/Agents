@@ -1,0 +1,1 @@
+| More than one Claude account (`CLAUDE_CONFIG_DIR`) | Mac, Remote, web | built (walked on a scratch set-up with an account not signed in; not tested on a real second account) | 2026-10-21 | `Go/internal/agentsd/accounts.go` | Alex to test with two real sign-ins (#3414) |

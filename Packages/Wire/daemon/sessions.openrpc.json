@@ -1,0 +1,2934 @@
+{
+  "openrpc": "1.3.2",
+  "info": {
+    "title": "agentsd: sessions",
+    "version": "0",
+    "description": "The host methods of the sessions group; see daemon.openrpc.json for the rest of the document."
+  },
+  "methods": [
+    {
+      "name": "achievements/changed",
+      "x-capability": "achievements/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/Achievements"
+          }
+        }
+      ]
+    },
+    {
+      "name": "achievements/state",
+      "x-capability": "achievements/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/Achievements"
+        }
+      }
+    },
+    {
+      "name": "agent/changed",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/Agent"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agent/elicitation",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/ElicitationNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agent/entry",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/EntryNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agent/permission",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/PermissionNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agent/removed",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRemovedNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agent/resuming",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/ResumingNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agent/showFile",
+      "x-capability": "agent/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ShowFileNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agents/answerSandbox",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/AnswerSandboxRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
+      "name": "agents/archive",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/branchFrom",
+      "x-capability": "chat.branch/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/BranchFromRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
+      "name": "agents/cancelContinue",
+      "description": "The chat no longer carries on by itself (#1859). Nothing happens when it was not waiting to.",
+      "x-capability": "chat.continue-when-back/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
+      "name": "agents/continueInFolder",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/ContinueInFolderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
+      "name": "agents/continueInNew",
+      "description": "Continue in New (#999): start a session in the same folder that reads this one and carries on, with its runtime, choices and the person's labels, on another account: the one given, else the runtime's account for new sessions. For a session whose account the organisation removed or no longer allows. Refused with policyRefused when the policy refuses that account.",
+      "x-capability": "host.org-routes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/ContinueInNewRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
+      "name": "agents/continueWhenBack",
+      "description": "A chat paused by a spent allowance carries on when the allowance is back (#1859): at the provider's reset time, or the app's next check, or as soon as a turn on that runtime works or the person marks it available. Refused for a chat that is not paused by a spent allowance.",
+      "x-capability": "chat.continue-when-back/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
+      "name": "agents/delete",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/discardDraft",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/DiscardDraftRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/draftOptions",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/DraftOptionsNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "agents/editQueued",
+      "x-capability": "agents.edit-queued/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/EditQueuedRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/EditQueuedResult"
+        }
+      }
+    },
+    {
+      "name": "agents/endedElsewhere",
+      "x-capability": "sessions.elsewhere/1",
+      "description": "From the control plane only (#2927): a session an agent here started on another machine has ended, so the waits on it close. Refused unless that agent started a session of that id on that machine.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/SessionEnded"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/export",
+      "x-capability": "agents.export/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/AgentsExportRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/AgentsExport"
+        }
+      }
+    },
+    {
+      "name": "agents/exportRead",
+      "x-capability": "agents.export/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SendReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/SendRead"
+        }
+      }
+    },
+    {
+      "name": "agents/find",
+      "x-capability": "agents.find/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/FindRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FindResult"
+        }
+      }
+    },
+    {
+      "name": "agents/fork",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
+      "name": "agents/fromStarter",
+      "x-capability": "sessions.elsewhere/1",
+      "description": "From the control plane only (#2927): the agent on another machine that started a session here reads, messages, stops or archives it, or asks how it stands. Refused unless it started it.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/SessionCall"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/SessionCallReply"
+        }
+      }
+    },
+    {
+      "name": "agents/import",
+      "x-capability": "agents.export/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/AgentsImportRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/BackupRestoreResult"
+        }
+      }
+    },
+    {
+      "name": "agents/importUpload",
+      "x-capability": "agents.export/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/ReceiveUploadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/labelVocabulary",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/LabelVocabularyRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "agents/list",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/ListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/sessions.schema.json#/definitions/Agent"
+          }
+        }
+      }
+    },
+    {
+      "name": "agents/move",
+      "x-capability": "agents/1",
+      "description": "The person moving an agent, or taking back the move that is waiting (053).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/MoveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/MoveAnswer"
+        }
+      }
+    },
+    {
+      "name": "agents/moveIn",
+      "x-capability": "sessions.move/1",
+      "description": "A session moving here from another of the person's machines with move_session (#3717), through the control plane: its export, uploaded with folders/receiveUpload, goes on here with its id, in the folder its branch was sent to.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SessionMoveIn"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/moveToMachine",
+      "x-capability": "sessions.move/1",
+      "description": "Move to Machine… (#3790): the person moves a session to another of their machines, as move_session does (#3717). Its turn stops if one runs, its branch goes there with its uncommitted changes, and it goes on there with the same id; this machine lets it go. It checks the move and answers at once (#4641): move/changed says how it goes, and the session stays here until that machine has it.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/MoveToMachineRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/MoveToMachineAnswer"
+        }
+      }
+    },
+    {
+      "name": "agents/moves",
+      "x-capability": "sessions.moving/1",
+      "description": "The moves to another machine this host is making (#4641), the oldest first, for a client that connects mid-move.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/machines.schema.json#/definitions/MoveNotification"
+          }
+        }
+      }
+    },
+    {
+      "name": "agents/options",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/OptionsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/OptionsResponse"
+        }
+      }
+    },
+    {
+      "name": "agents/prewarm",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/PrewarmRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/prompt",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/PromptRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/recreateWorktree",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
+      "name": "agents/rename",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/RenameRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
+      "name": "agents/resuming",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/ResumingResponse"
+        }
+      }
+    },
+    {
+      "name": "agents/said",
+      "x-capability": "agents.said/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/SaidSearchRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/SaidSearchResult"
+        }
+      }
+    },
+    {
+      "name": "agents/sendNow",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/UnqueueRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/setCeiling",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/SetCeilingRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
+      "name": "agents/setClientPermission",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "An agent's own answer to permission requests on Cursor, Grok and OpenCode (#2658, FR-019); no mode follows Settings. Applied from its next request.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/SetClientPermissionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
+      "name": "agents/setLabels",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/SetLabelsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
+      "name": "agents/setLevels",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Change a running agent's model level or permission mode (#2658, Story 2): mapped on its own runtime, applied from its next step.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/SetLevelsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
+      "name": "agents/setMuted",
+      "x-capability": "mute/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/SetMutedRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/setOption",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/SetOptionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/sessions.schema.json#/definitions/ConfigOption"
+          }
+        }
+      }
+    },
+    {
+      "name": "agents/setSandbox",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/SetSandboxRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/Agent"
+        }
+      }
+    },
+    {
+      "name": "agents/setUnread",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/SetUnreadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/start",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/StartRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
+      "name": "agents/startNow",
+      "x-capability": "agents.start-now/1",
+      "description": "A person starts a queued session at once (#5156): past the folder's running limit, never past its total. Not an agent's: the agent role cannot call it, and no app tool does.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/stop",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentStopRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/stopBackground",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/StopBackgroundRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/JSONValue"
+        }
+      }
+    },
+    {
+      "name": "agents/summaryFacts",
+      "x-capability": "summary.machines/1",
+      "description": "From the control plane only (#3354): this machine's facts for the daily summary that another of the person's machines writes: sessions done and stopped, what waits on the person, suggestions not taken, and what the checks found here.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/SummaryFactsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/SummaryFacts"
+        }
+      }
+    },
+    {
+      "name": "agents/touchedPaths",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "agents/transcript",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/TranscriptRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/TranscriptPage"
+        }
+      }
+    },
+    {
+      "name": "agents/turns",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/TurnsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/TurnsPage"
+        }
+      }
+    },
+    {
+      "name": "agents/unarchive",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "agents/unqueue",
+      "x-capability": "agents/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/UnqueueRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "approvals/answer",
+      "x-capability": "approvals/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/ApprovalAnswer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/FolderSummary"
+        }
+      }
+    },
+    {
+      "name": "approvals/read",
+      "x-capability": "approvals/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/ApprovalReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/GuardedChangeReading"
+        }
+      }
+    },
+    {
+      "name": "attention/changed",
+      "x-capability": "attention/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/AttentionNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "attention/pending",
+      "x-capability": "attention/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/AttentionPending"
+        }
+      }
+    },
+    {
+      "name": "auto/changed",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "description": "The saved Auto settings (#2658).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/AutoSettings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "auto/mappings",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Every cell of the Auto mappings, marked, with each runtime's own choices (#2658).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/AutoMappings"
+        }
+      }
+    },
+    {
+      "name": "auto/preview",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The runtime Auto would pick now for these levels and folder, or why none can (#2658).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/AutoPreviewRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/AutoPreview"
+        }
+      }
+    },
+    {
+      "name": "auto/set",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Save the Auto order, the runtimes left out and the person's own cells (#2658, FR-017).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/AutoSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/AutoSettings"
+        }
+      }
+    },
+    {
+      "name": "auto/state",
+      "x-capability": "auto/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/AutoSettings"
+        }
+      }
+    },
+    {
+      "name": "bringBack/changed",
+      "x-capability": "bring.back/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/BringBackNotification"
+          }
+        }
+      ],
+      "x-notification": true
+    },
+    {
+      "name": "capacity/changed",
+      "x-capability": "capacity/1",
+      "description": "The machine's capacity level moved (#4748): its rows say Near capacity or At capacity, as a low disk.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/CapacityState"
+          }
+        }
+      ]
+    },
+    {
+      "name": "capacity/state",
+      "x-capability": "capacity/1",
+      "description": "The machine's capacity level now (#4748), asked on connect; capacity/changed says each move after.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/CapacityState"
+        }
+      }
+    },
+    {
+      "name": "clientPermissions/changed",
+      "x-capability": "client-permissions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "description": "The saved permission modes (061).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/ClientPermissionSettings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "clientPermissions/set",
+      "x-capability": "client-permissions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Save the permission modes and return what was saved (061).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/ClientPermissionSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/ClientPermissionSettings"
+        }
+      }
+    },
+    {
+      "name": "clientPermissions/state",
+      "x-capability": "client-permissions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/ClientPermissionSettings"
+        }
+      }
+    },
+    {
+      "name": "cost/changed",
+      "x-capability": "cost/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/CostState"
+          }
+        }
+      ]
+    },
+    {
+      "name": "cost/setLimits",
+      "x-capability": "cost/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/SetLimitsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/CostState"
+        }
+      }
+    },
+    {
+      "name": "cost/state",
+      "x-capability": "cost/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/CostState"
+        }
+      }
+    },
+    {
+      "name": "dailySummary/changed",
+      "x-capability": "daily-summary/1",
+      "description": "The daily summary's control changed (#3351): by dailySummary/setSettings, or by a change to the home folder's Daily summary workflow. Sent with every workflow change.",
+      "x-notification": true,
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/DailySummarySettings"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dailySummary/setSettings",
+      "x-capability": "daily-summary/1",
+      "description": "Sets the daily summary's control (#3351): turns the home folder's Daily summary workflow on or off and sets its time. It answers the settings as they now are.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/DailySummarySettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/DailySummarySettings"
+        }
+      }
+    },
+    {
+      "name": "dailySummary/settings",
+      "x-capability": "daily-summary/1",
+      "description": "The daily summary's control (#3351), read from the home folder's Daily summary workflow. dailySummary/changed says when it changes.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/DailySummarySettings"
+        }
+      }
+    },
+    {
+      "name": "elicitations/answer",
+      "x-capability": "elicitations/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/AnswerElicitationRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "elicitations/pending",
+      "x-capability": "elicitations/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/workflows.schema.json#/definitions/ElicitationRequest"
+          }
+        }
+      }
+    },
+    {
+      "name": "live/frame",
+      "x-capability": "live.frame/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A live tile's frame (#4139): what an agent drives (source screen, browser or simulator), sent only within 10 seconds of the agent's last call on it, and only to the connections whose presence/report is active and shows that agent. Never recorded. desktopControl/liveFrame goes on beside it until every client reads this one.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/files.schema.json#/definitions/LiveFrame"
+          }
+        }
+      ]
+    },
+    {
+      "name": "messages/conversations",
+      "x-capability": "messages/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/MessagesConversationsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/MessagesConversations"
+        }
+      }
+    },
+    {
+      "name": "messages/markAllRead",
+      "x-capability": "messages.mark-read/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/MessagesMarkAllReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/MessagesMarkedAllRead"
+        }
+      }
+    },
+    {
+      "name": "messages/read",
+      "x-capability": "messages/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/MessagesReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/MessagesRead"
+        }
+      }
+    },
+    {
+      "name": "messages/reply",
+      "x-capability": "messages.reply/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/MessagesReplyRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/MessagesReplied"
+        }
+      }
+    },
+    {
+      "name": "modes/changed",
+      "x-capability": "modes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "schema/core.schema.json#/definitions/JSONValue"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "modes/remembered",
+      "x-capability": "modes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "schema/core.schema.json#/definitions/JSONValue"
+          }
+        }
+      }
+    },
+    {
+      "name": "move/changed",
+      "x-capability": "sessions.moving/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/MoveNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "multiplier/changed",
+      "x-capability": "multiplier/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The Multiplier changed (#3903): a PR of the person's agents merged or a revert merged, with the PR in changedBy, or the person changed their baseline (#3991), with no changedBy. The Mac window follows it; it does not poll.",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/Multiplier"
+          }
+        }
+      ]
+    },
+    {
+      "name": "multiplier/state",
+      "x-capability": "multiplier/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The Multiplier now (#3903): from the control plane's count of the person's machines when this machine has one, else from this machine's lineage. Cheap: the Mac window asks on each open.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/Multiplier"
+        }
+      }
+    },
+    {
+      "name": "options/remembered",
+      "x-capability": "options/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/RememberedOptionsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/sessions.schema.json#/definitions/ConfigOption"
+          }
+        }
+      }
+    },
+    {
+      "name": "permissions/answer",
+      "x-capability": "permissions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/AnswerRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "permissions/pending",
+      "x-capability": "permissions/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/org.schema.json#/definitions/PermissionRequest"
+          }
+        }
+      }
+    },
+    {
+      "name": "presence/report",
+      "x-capability": "presence/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/PresenceReport"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "requests/answer",
+      "x-capability": "requests/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/RequestsAnswer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/RequestUpdate"
+        }
+      }
+    },
+    {
+      "name": "requests/changed",
+      "x-capability": "requests/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/RequestUpdate"
+          }
+        }
+      ]
+    },
+    {
+      "name": "requests/defer",
+      "x-capability": "requests.defer/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/RequestsDefer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/RequestUpdate"
+        }
+      }
+    },
+    {
+      "name": "requests/drop",
+      "x-capability": "requests/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/RequestsDrop"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/RequestUpdate"
+        }
+      }
+    },
+    {
+      "name": "requests/list",
+      "x-capability": "requests/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/RequestsList"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/RequestsListResult"
+        }
+      }
+    },
+    {
+      "name": "requests/undefer",
+      "x-capability": "requests.defer/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/workflows.schema.json#/definitions/RequestsUndefer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/RequestUpdate"
+        }
+      }
+    },
+    {
+      "name": "reviews/dismiss",
+      "x-capability": "reviews/1",
+      "description": "Take a pull request out of the sidebar's For Review (#3330) for good: the host keeps the dismissal.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ReviewDismissRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "reviews/open",
+      "x-capability": "reviews/2",
+      "description": "Say that the person opened a pull request in the sidebar's For Review (#3464): the host keeps it, and its row is drawn read.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ReviewOpenRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "send/changed",
+      "x-capability": "send/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SendNotification"
+          }
+        }
+      ]
+    },
+    {
+      "name": "sessions/adopt",
+      "x-capability": "sessions/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/AdoptRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
+      "name": "sessions/delete",
+      "x-capability": "sessions/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/DeleteSessionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "sessions/list",
+      "x-capability": "sessions/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/SessionsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/machines.schema.json#/definitions/RuntimeSession"
+          }
+        }
+      }
+    },
+    {
+      "name": "store/notes",
+      "x-capability": "store/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/StoreNotes"
+        }
+      }
+    },
+    {
+      "name": "store/notesChanged",
+      "x-capability": "store/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/StoreNotes"
+          }
+        }
+      ]
+    },
+    {
+      "name": "suggestions/dismiss",
+      "x-capability": "suggestions/1",
+      "description": "Take a suggestion of the daily checks out of the sidebar's For Review (#3331) for good: the host keeps the dismissal, so neither For Review nor the next daily summary lists it, and the checks do not keep it again.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/SuggestionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "suggestions/start",
+      "x-capability": "suggestions/1",
+      "description": "Start on a suggestion of the daily checks in For Review (#3331): the host starts a session in its folder with its prompt, on the Auto runtime, and takes the suggestion out. The result is the new session's id.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/SuggestionRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/UUID"
+        }
+      }
+    },
+    {
+      "name": "summaries/changed",
+      "x-capability": "summaries/1",
+      "description": "The daily summary's saved pages changed (#3721): a page was saved, or read with summaries/read. The pages, newest first, as summaries/list answers.",
+      "x-notification": true,
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "schema/sessions.schema.json#/definitions/SummaryPage"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "summaries/list",
+      "x-capability": "summaries/1",
+      "description": "The daily summary's saved pages on this machine (#3721), newest first: at most the last three. summaries/changed says when they change.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/sessions.schema.json#/definitions/SummaryPage"
+          }
+        }
+      }
+    },
+    {
+      "name": "summaries/read",
+      "x-capability": "summaries/1",
+      "description": "A saved page of the daily summary and its Markdown (#3721). Reading the newest page marks it read, and the session that wrote it too.",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/SummaryReadRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/sessions.schema.json#/definitions/SummaryPageText"
+        }
+      }
+    },
+    {
+      "name": "usage/history",
+      "x-capability": "usage/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/UsageHistory"
+        }
+      }
+    },
+    {
+      "name": "velocity/history",
+      "x-capability": "velocity/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The PRs the agents worked on that landed, by the hour and the day and by repository (#4596), counted from this machine's lineage store on each ask: the same PRs the Multiplier counts.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/VelocityHistory"
+        }
+      }
+    },
+    {
+      "name": "wake/changed",
+      "x-capability": "wake/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/WakeState"
+          }
+        }
+      ]
+    },
+    {
+      "name": "wake/set",
+      "x-capability": "wake/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/WakeSettings"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/WakeSettings"
+        }
+      }
+    },
+    {
+      "name": "wake/settings",
+      "x-capability": "wake/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/WakeSettings"
+        }
+      }
+    },
+    {
+      "name": "wake/state",
+      "x-capability": "wake/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/WakeState"
+        }
+      }
+    }
+  ]
+}

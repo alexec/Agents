@@ -501,6 +501,10 @@ func (s *Service) Start(ctx context.Context) (int, error) {
 	if s.mesh != nil && s.phase.now() != phaseReceiving {
 		s.startMesh()
 	}
+	if s.mesh == nil {
+		// With copies, startMesh's own tells it too.
+		s.router.OnLocalEnded(s.uplinkEnded)
+	}
 	if s.providers != nil && s.phase.now() != phaseReceiving {
 		s.providers.Start()
 	}
@@ -819,6 +823,7 @@ func (s *Service) startMesh() {
 	m := s.mesh
 	s.router.OnLocalEnded(func(host string) {
 		s.log("host " + host + " disconnected")
+		s.uplinkEnded(host)
 		if epoch := m.leases.release(context.Background(), host); epoch != 0 {
 			m.released(host, epoch)
 		}

@@ -1,0 +1,7 @@
+## Runtime downloads
+
+What the app downloads to install or update a runtime.
+Open issues: `is:open label:integration install`.
+
+| Integration | Clients that show it | State | Last checked | Where | Gaps |
+| --- | --- | --- | --- | --- | --- |

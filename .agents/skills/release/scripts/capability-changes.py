@@ -24,7 +24,11 @@ def named(document):
 
 def at(revision):
     names, deprecated = set(), set()
-    for path in DOCUMENTS:
+    # The host's methods are in Packages/Wire/daemon/*.openrpc.json since the split (#5381).
+    listed = subprocess.run(["git", "ls-tree", "--name-only", revision, "Packages/Wire/daemon/"],
+                            capture_output=True, text=True)
+    split = sorted(p for p in listed.stdout.splitlines() if p.endswith(".openrpc.json")) if listed.returncode == 0 else []
+    for path in DOCUMENTS + split:
         shown = subprocess.run(["git", "show", f"{revision}:{path}"], capture_output=True, text=True)
         if shown.returncode != 0:
             continue

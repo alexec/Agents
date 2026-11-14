@@ -209,6 +209,19 @@ func (s *Store) Has(r Repo, ref string, attempt int, made time.Time) bool {
 	return slices.ContainsFunc(runs, func(k Run) bool { return k.Ref == ref && k.Attempt == attempt })
 }
 
+// HasRun says the store has a line for the run ref, made at made, at any attempt: for a forge
+// whose run list does not say the attempt.
+func (s *Store) HasRun(r Repo, ref string, made time.Time) bool {
+	dir, err := s.dir(r)
+	if err != nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	runs, _ := readDay(filepath.Join(dir, dayOf(made)+".jsonl"))
+	return slices.ContainsFunc(runs, func(k Run) bool { return k.Ref == ref })
+}
+
 // Runs is every run attempt made in [from, to), oldest first.
 func (s *Store) Runs(r Repo, from, to time.Time) ([]Run, error) {
 	dir, err := s.dir(r)

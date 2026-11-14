@@ -1,0 +1,20 @@
+
+### Left out by design
+
+- Settings, Folder Settings, helper limits and the disk space lines (#195).
+- The terminal.
+- Dictation.
+- HTML as a live page.
+- Declaring, editing and removing resources, and ending leases (#116): the Mac's.
+
+### Counts
+
+Of the rows above, the page lacked or partly had 12 before this branch. All 12 are closed:
+#87, #98, #100, #83 (page side), #88, #101, the sessions column, #63 (Changes), #63 (Files), #66, #82, #90.
+
+The window's shots found two more, both closed: answer cards held while their host is down (#83), and the Changes total line (#63).
+
+What is still different, and why:
+- **#83, "said at once":** neither the window nor the page hears a paused host for about a minute. Both learn of it from the control plane, which is #106's lane.
+- **Event trigger words (#260):** the page says an event's name, not the window's catalogue meaning. Its filters read as the window's since 073.
+- **The window's Try Again for its host:** nothing on the page to redial.

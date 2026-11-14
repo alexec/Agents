@@ -1,0 +1,2080 @@
+{
+  "openrpc": "1.3.2",
+  "info": {
+    "title": "agentsd: mcp",
+    "version": "0",
+    "description": "The host methods of the mcp group; see daemon.openrpc.json for the rest of the document."
+  },
+  "methods": [
+    {
+      "name": "agentConfig/editorFiles",
+      "x-capability": "personal/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentConfigEditorRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/files.schema.json#/definitions/AgentConfigEditorFiles"
+        }
+      }
+    },
+    {
+      "name": "agentConfig/editorSave",
+      "x-capability": "personal/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentConfigEditorSaveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "catalog/destination-state",
+      "x-capability": "catalog/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/DestinationStateRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/workflows.schema.json#/definitions/DestinationStateAnswer"
+        }
+      }
+    },
+    {
+      "name": "catalog/preview",
+      "x-capability": "catalog/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/CatalogPreviewRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/CatalogPreviewAnswer"
+        }
+      }
+    },
+    {
+      "name": "catalog/search",
+      "x-capability": "catalog/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/CatalogSearchRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/JSONValue"
+        }
+      }
+    },
+    {
+      "name": "connection/bindDevice",
+      "x-capability": "connection/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/DeviceBinding"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "connections/bot",
+      "x-capability": "connections.bot/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectionBot"
+        }
+      }
+    },
+    {
+      "name": "connections/bot/complete",
+      "x-capability": "connections.bot/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectionBotCompleteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectionBot"
+        }
+      }
+    },
+    {
+      "name": "connections/bot/drop",
+      "x-capability": "connections.botkey/1",
+      "description": "From another of the person's machines only, signed by it (#3950): that machine forgot the bot, so this one deletes its copy of the App's key and takes no copy of it again.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectionBotDrop"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "connections/bot/remove",
+      "x-capability": "connections.bot/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectionBot"
+        }
+      }
+    },
+    {
+      "name": "connections/bot/start",
+      "x-capability": "connections.bot/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectionBotStartRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectionBotStart"
+        }
+      }
+    },
+    {
+      "name": "connections/bot/take",
+      "x-capability": "connections.botkey/1",
+      "description": "From another of the person's machines only, signed by it (#3950): the bot's key, sealed to this machine's key from the person's lock. This machine opens it and keeps it in its own store. Refused with no lock, or for an App it was told to forget.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectionBotCopy"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "connections/disconnect",
+      "x-capability": "connections/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectionProviderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectionDisconnectAnswer"
+        }
+      }
+    },
+    {
+      "name": "connections/list",
+      "x-capability": "connections/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectionsList"
+        }
+      }
+    },
+    {
+      "name": "connections/sign-in",
+      "x-capability": "connections/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectionProviderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectionSignIn"
+        }
+      }
+    },
+    {
+      "name": "connections/sign-in/cancel",
+      "x-capability": "connections/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectionSignInFlowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectionSignIn"
+        }
+      }
+    },
+    {
+      "name": "connections/sign-in/complete",
+      "x-capability": "connections/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectionSignInCompleteRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectionSignIn"
+        }
+      }
+    },
+    {
+      "name": "connections/sign-in/email",
+      "x-capability": "connections.email/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectionEmailRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectionTokenAnswer"
+        }
+      }
+    },
+    {
+      "name": "connections/sign-in/token",
+      "x-capability": "connections/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectionTokenRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectionTokenAnswer"
+        }
+      }
+    },
+    {
+      "name": "connections/sign-in/wait",
+      "x-capability": "connections/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectionSignInFlowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectionSignIn"
+        }
+      }
+    },
+    {
+      "name": "connectors/codespaces",
+      "x-capability": "connectors.setup/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectorCodespacesRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectorCodespaces"
+        }
+      }
+    },
+    {
+      "name": "connectors/setup",
+      "x-capability": "connectors.setup/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectorSetupRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectorSetup"
+        }
+      }
+    },
+    {
+      "name": "connectors/setup/skip",
+      "x-capability": "connectors.setup/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/connections.schema.json#/definitions/ConnectorSkipRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/connections.schema.json#/definitions/ConnectorSetup"
+        }
+      }
+    },
+    {
+      "name": "marketplaces/add",
+      "x-capability": "marketplaces/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MarketplaceAddRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MarketplacesListAnswer"
+        }
+      }
+    },
+    {
+      "name": "marketplaces/list",
+      "x-capability": "marketplaces/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MarketplacesListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MarketplacesListAnswer"
+        }
+      }
+    },
+    {
+      "name": "marketplaces/remove",
+      "x-capability": "marketplaces/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MarketplaceIDRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MarketplacesListAnswer"
+        }
+      }
+    },
+    {
+      "name": "marketplaces/set-enabled",
+      "x-capability": "marketplaces/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MarketplaceSetEnabledRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MarketplacesListAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/add",
+      "x-capability": "mcp/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPAddRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPAddAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/add-by-hand",
+      "x-capability": "mcp/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPAddByHandRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPAddAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/approve",
+      "x-capability": "mcp/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPApproveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPListAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/forgetViews",
+      "x-capability": "mcp/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/MCPViewsForgetRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "mcp/health",
+      "x-capability": "mcp/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPHealthSnapshot"
+        }
+      }
+    },
+    {
+      "name": "mcp/health/check",
+      "x-capability": "mcp/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPHealthCheckRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPHealthSnapshot"
+        }
+      }
+    },
+    {
+      "name": "mcp/healthChanged",
+      "x-capability": "mcp/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPHealthSnapshot"
+          }
+        }
+      ]
+    },
+    {
+      "name": "mcp/hosted",
+      "x-capability": "mcp/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/HostedMCPSnapshot"
+        }
+      }
+    },
+    {
+      "name": "mcp/hostedChanged",
+      "x-capability": "mcp/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/HostedMCPSnapshot"
+          }
+        }
+      ]
+    },
+    {
+      "name": "mcp/list",
+      "x-capability": "mcp/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPListAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/preview",
+      "x-capability": "mcp/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPPreviewRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPPreviewAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/remove",
+      "x-capability": "mcp/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPRemoveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPRemoveAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/set-secret",
+      "x-capability": "mcp/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPSetSecretRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPSetSecretAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/setToolLevel",
+      "x-capability": "mcp.tool-levels/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Sets Allow, Ask or Off for one tool of a connector, or for all its tools that write, in the destination's layer (#4099), and answers the connector's tools again.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPSetToolLevelRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPToolsAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/sign-in",
+      "x-capability": "mcp/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPSignInRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPSignInAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/sign-in/cancel",
+      "x-capability": "mcp/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPSignInFlowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPSignInWaitAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/sign-in/wait",
+      "x-capability": "mcp/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPSignInFlowRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPSignInWaitAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/sign-out",
+      "x-capability": "mcp/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPSignOutRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPSignOutAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/tools",
+      "x-capability": "mcp.tool-levels/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A connector's tools, as its last check's tools/list gave them, each with its level in the destination's layer and the level in force (#4099).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPToolsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPToolsAnswer"
+        }
+      }
+    },
+    {
+      "name": "mcp/verify",
+      "x-capability": "mcp/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/MCPVerifyRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/MCPVerifyAnswer"
+        }
+      }
+    },
+    {
+      "name": "personas/add",
+      "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Write a previewed persona to .agents/personas at the destination and name it in the lock (#3665). replace is true to put it over the one there.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/SkillAddRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/PersonaAddAnswer"
+        }
+      }
+    },
+    {
+      "name": "personas/check-updates",
+      "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Whether each persona added from a marketplace has an update, by id; each repository asked at most once an hour (#3665).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/SkillsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/SkillUpdatesAnswer"
+        }
+      }
+    },
+    {
+      "name": "personas/files",
+      "x-capability": "personas/2",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/PersonasFilesRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/PersonaFilesAnswer"
+        }
+      }
+    },
+    {
+      "name": "personas/list",
+      "x-capability": "personas/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/PersonasListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/mcp.schema.json#/definitions/Persona"
+          }
+        }
+      }
+    },
+    {
+      "name": "personas/managed",
+      "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The personas at a destination that a lock names, added from a marketplace (#3665).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/SkillsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/PersonasManagedAnswer"
+        }
+      }
+    },
+    {
+      "name": "personas/preview",
+      "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Fetch a persona file at its repository's current commit to show before adding (#3665).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/CatalogPreviewRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/PersonaPreviewAnswer"
+        }
+      }
+    },
+    {
+      "name": "personas/remove",
+      "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "Move a persona a lock names to the Trash and take it out of the lock (#3665). name is its id.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/SkillNameRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/SkillRemoveAnswer"
+        }
+      }
+    },
+    {
+      "name": "personas/save",
+      "x-capability": "personas/2",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/PersonaFileSaveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "personas/search",
+      "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "The personas in a GitHub marketplace's personas/ folder whose id holds the query (#3665).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/CatalogSearchRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/CatalogSearchAnswer"
+        }
+      }
+    },
+    {
+      "name": "personas/update-preview",
+      "x-capability": "personas.catalog/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "description": "A persona's source at its current commit, staged, with the file as it is now and the runtime and permission-mode it changes (#3665).",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/SkillNameRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/PersonaUpdatePreviewAnswer"
+        }
+      }
+    },
+    {
+      "name": "plugins/approve",
+      "x-capability": "plugins/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/PluginApproveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/PluginsList"
+        }
+      }
+    },
+    {
+      "name": "plugins/changed",
+      "x-capability": "plugins/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/PluginsList"
+          }
+        }
+      ]
+    },
+    {
+      "name": "plugins/list",
+      "x-capability": "plugins/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/PluginsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/PluginsList"
+        }
+      }
+    },
+    {
+      "name": "providers/carry",
+      "x-capability": "providers.carry/1",
+      "description": "Asked by the control plane on channel 0 of the machine that carries a provider (#3398): call the provider's server, which runs here with the secrets kept here.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/ProviderCarry"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/ProviderCarried"
+        }
+      }
+    },
+    {
+      "name": "providers/forget",
+      "x-capability": "providers.carry/1",
+      "description": "Asked by the control plane on channel 0 (#3398): a provider carried here was removed.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ProviderForget"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/ProviderCarried"
+        }
+      }
+    },
+    {
+      "name": "providers/keepSecrets",
+      "x-capability": "providers.carry/1",
+      "description": "Asked by the control plane on channel 0 (#3398): keep a carried provider's secrets here, in ~/.agents-secrets.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/ProviderSecretsKeep"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/ProviderCarried"
+        }
+      }
+    },
+    {
+      "name": "providers/ssh",
+      "x-capability": "providers.carry/2",
+      "description": "Asked by the control plane on channel 0 (#3398): start a codespace's agentsd over ssh, read its host key, install Agents in it, or keep it awake while its machine works (keepAwake and letSleep, #4637: providers.carry/2), with the token of the codespaces provider carried here.",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/ProviderSSH"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/ProviderCarried"
+        }
+      }
+    },
+    {
+      "name": "runtime/account",
+      "x-capability": "runtime/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/RuntimeAccount"
+          }
+        }
+      ]
+    },
+    {
+      "name": "runtime/changed",
+      "x-capability": "runtime/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/RuntimeStatus"
+          }
+        }
+      ]
+    },
+    {
+      "name": "runtimes/accountProfiles",
+      "x-capability": "runtimes.accounts/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/org.schema.json#/definitions/AccountProfile"
+          }
+        }
+      }
+    },
+    {
+      "name": "runtimes/accountProfilesChanged",
+      "x-capability": "runtimes.accounts/1",
+      "x-notification": true,
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "type": "array",
+            "items": {
+              "$ref": "schema/org.schema.json#/definitions/AccountProfile"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "runtimes/accounts",
+      "x-capability": "runtimes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/org.schema.json#/definitions/RuntimeAccount"
+          }
+        }
+      }
+    },
+    {
+      "name": "runtimes/addAccount",
+      "x-capability": "runtimes.accounts/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/AddAccountRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/AccountProfile"
+        }
+      }
+    },
+    {
+      "name": "runtimes/allowances",
+      "x-capability": "runtimes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/RuntimeAllowances"
+        }
+      }
+    },
+    {
+      "name": "runtimes/allowancesChanged",
+      "x-capability": "runtimes/1",
+      "x-notification": true,
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/reports.schema.json#/definitions/RuntimeAllowances"
+          }
+        }
+      ]
+    },
+    {
+      "name": "runtimes/assess",
+      "x-capability": "runtimes/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/AssessRuntimeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/AssessRuntimeResult"
+        }
+      }
+    },
+    {
+      "name": "runtimes/assessment",
+      "x-capability": "runtimes/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/sessions.schema.json#/definitions/AgentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/RuntimeAssessmentScore"
+        }
+      }
+    },
+    {
+      "name": "runtimes/authenticate",
+      "x-capability": "runtimes/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/AuthenticateRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/RuntimeAccount"
+        }
+      }
+    },
+    {
+      "name": "runtimes/disableProvider",
+      "x-capability": "runtimes/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SetProviderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/RuntimeAccount"
+        }
+      }
+    },
+    {
+      "name": "runtimes/install",
+      "x-capability": "runtimes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/RuntimeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/RuntimeStatus"
+        }
+      }
+    },
+    {
+      "name": "runtimes/list",
+      "x-capability": "runtimes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/Empty"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/machines.schema.json#/definitions/RuntimeStatus"
+          }
+        }
+      }
+    },
+    {
+      "name": "runtimes/logout",
+      "x-capability": "runtimes/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/RuntimeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/core.schema.json#/definitions/UUID"
+          }
+        }
+      }
+    },
+    {
+      "name": "runtimes/markAvailable",
+      "x-capability": "runtimes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/MarkRuntimeAvailable"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/reports.schema.json#/definitions/RuntimeAllowances"
+        }
+      }
+    },
+    {
+      "name": "runtimes/removeAccount",
+      "x-capability": "runtimes.accounts/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/AccountRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "type": "array",
+          "items": {
+            "$ref": "schema/core.schema.json#/definitions/UUID"
+          }
+        }
+      }
+    },
+    {
+      "name": "runtimes/setDefaultAccount",
+      "description": "A runtime's account for new sessions, Reaches the Model By (#999, FR-016): an added account, an org account (org:<route id>) or default for the runtime's own sign-in. Kept on the machine. Refused with policyRefused when the organisation's policy refuses that account.",
+      "x-capability": "host.org-routes/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/DefaultAccountRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/Empty"
+        }
+      }
+    },
+    {
+      "name": "runtimes/setProvider",
+      "x-capability": "runtimes/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/SetProviderRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/RuntimeAccount"
+        }
+      }
+    },
+    {
+      "name": "runtimes/signInFinish",
+      "x-capability": "runtimes.sign-in/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/RuntimeSignInFinish"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/RuntimeStatus"
+        }
+      }
+    },
+    {
+      "name": "runtimes/signInKey",
+      "x-capability": "runtimes.sign-in/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/org.schema.json#/definitions/RuntimeSignInKey"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/machines.schema.json#/definitions/RuntimeStatus"
+        }
+      }
+    },
+    {
+      "name": "runtimes/signInStart",
+      "x-capability": "runtimes.sign-in/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/machines.schema.json#/definitions/RuntimeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/org.schema.json#/definitions/RuntimeSignInStep"
+        }
+      }
+    },
+    {
+      "name": "skills/add",
+      "x-capability": "skills/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/SkillAddRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/SkillAddAnswer"
+        }
+      }
+    },
+    {
+      "name": "skills/check-updates",
+      "x-capability": "skills/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/SkillsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/SkillUpdatesAnswer"
+        }
+      }
+    },
+    {
+      "name": "skills/list",
+      "x-capability": "skills/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/SkillsListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/SkillsListAnswer"
+        }
+      }
+    },
+    {
+      "name": "skills/remove",
+      "x-capability": "skills/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/SkillNameRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/SkillRemoveAnswer"
+        }
+      }
+    },
+    {
+      "name": "skills/update-preview",
+      "x-capability": "skills/1",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/mcp.schema.json#/definitions/SkillNameRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/mcp.schema.json#/definitions/SkillUpdatePreviewAnswer"
+        }
+      }
+    }
+  ]
+}
