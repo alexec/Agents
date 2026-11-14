@@ -29,7 +29,7 @@ final class AppModel {
     /// drawn at launch before the host answers. The host always wins.
     @ObservationIgnored private(set) var localCopy: LocalCopyKeeper?
 
-    private(set) var runtimes: [RuntimeStatus] = []
+    var runtimes: [RuntimeStatus] = []
     /// The start-up sheet offering to install what is missing (048). Raised once per
     /// launch, and only for a runtime not already offered on this root.
     var isOfferingInstall = false
@@ -63,7 +63,7 @@ final class AppModel {
     var achievementsSeen: Set<String>? = AchievementsSeenStore.seen
     /// What each runtime last said about itself: signed in or not, what it takes in a
     /// prompt, which provider is answering.
-    private(set) var accounts: [String: RuntimeAccount] = [:]
+    var accounts: [String: RuntimeAccount] = [:]
     /// The accounts added to this Mac's runtimes (#840), beside each runtime's own sign-in.
     private(set) var accountProfiles: [AccountProfile] = [] {
         didSet { accountProfilesRead = true }
@@ -73,7 +73,7 @@ final class AppModel {
     /// What the terminals the daemon is running for an agent have printed so far. The
     /// kit's, so a phone shows the same (033).
     var terminalOutput: [String: String] { work.terminalOutput }
-    private(set) var isConnected = false
+    var isConnected = false
     /// Whether the daemon's list of folders has arrived at least once. Until it has,
     /// an empty sidebar means "not yet", not "none".
     private(set) var hasLoadedFolders = false
@@ -99,7 +99,7 @@ final class AppModel {
     @ObservationIgnored private let controlBackoff = Backoff(first: .seconds(2), longest: .seconds(60))
     @ObservationIgnored private let wakeAndNetwork = WakeAndNetwork()
     @ObservationIgnored private var checkingAfterWake = false
-    private(set) var problem: String?
+    var problem: String?
     /// A send refused because the agent's folder has gone (#119), with the ways on. Said
     /// in the window's alert instead of `problem`, and the words stay in the bar.
     var folderGone: FolderGoneAsk?
@@ -124,7 +124,7 @@ final class AppModel {
     var signInRuntimeID: String?
     /// Sheets put away without signing in, so that the agents a restart picks back up
     /// do not each raise it again. Forgotten when the runtime says it is signed in.
-    private var signInsPutAway: Set<String> = []
+    var signInsPutAway: Set<String> = []
     /// Clones under way on this Mac, from whichever window started them (027). Each is
     /// a row in the Folders column until it becomes a folder or fails.
     private(set) var clones: [DaemonAPI.CloneSummary] = []
@@ -165,7 +165,7 @@ final class AppModel {
     private(set) var clientPermissions = ClientPermissionSettings()
     /// What agents call the person (#121), as this Mac keeps it; nil until it is read,
     /// so a server is never told a blank before the Mac's own answer is in.
-    private(set) var person: PersonSettings?
+    var person: PersonSettings?
     /// Each runtime's command sandbox default (064).
     private(set) var sandboxSettings = SandboxSettings()
     /// Auto (#2658): the person's order, Include switches and own cells, and every cell
@@ -229,7 +229,7 @@ final class AppModel {
 
     /// Which machine the selected folder is on (037). Set with it, by `select`, never
     /// on its own: a folder names a folder only together with its host.
-    private(set) var selectedFolderHost: MachineRef = .mac
+    var selectedFolderHost: MachineRef = .mac
 
     /// The selected folder as the window identifies folders now that a server can
     /// have the same path as this Mac.
@@ -1215,7 +1215,7 @@ final class AppModel {
 
     /// This Mac's host: directly over its local socket when it is there (#1118), else
     /// through the control plane (058). Set once more when first run chooses one.
-    private var client = DaemonClient(link: UnreachableLink())
+    var client = DaemonClient(link: UnreachableLink())
     /// The one connection to the control plane every host's client is carried on (058).
     private var controlLink: ControlLink? = ControlConfig.endpoint.flatMap(ControlConfig.link)
 
@@ -1260,7 +1260,7 @@ final class AppModel {
     /// here, with the ssh on the control plane's side.
     @ObservationIgnored private var controlHosts: [MachineRef: DaemonClient] = [:]
     /// The control plane's own connection, as the watch made it: for Start on a strip (#691).
-    @ObservationIgnored private(set) var controlRequests: DaemonClient?
+    @ObservationIgnored var controlRequests: DaemonClient?
     /// The names of the projects the sidebar groups (#3278).
     let projectNames = ProjectNames()
     /// The connections that ended, which turn the Connectors rows red (#3407).
@@ -1324,7 +1324,7 @@ final class AppModel {
 
     /// Where an agent lives: the host it was listed from, or, for one not yet listed
     /// (just started, say), the selected folder's host when there is no Mac host.
-    private func host(ofAgent id: UUID?) -> MachineRef {
+    func host(ofAgent id: UUID?) -> MachineRef {
         work.agent(id)?.host ?? id.flatMap { folderShellHosts[$0] } ?? (hasMacHost ? .mac : selectedFolderHost)
     }
     /// The name `control/status` last gave, so the away strip can still say it.
@@ -1370,7 +1370,7 @@ final class AppModel {
     /// This Mac's host, for what is this Mac's own rather than a folder's: its runtimes,
     /// pool, settings and catalogue. `client`, or, with a control plane elsewhere that gave
     /// this Mac's host an id of its own, that host's client (#1496): no host is `.mac` then.
-    private var macClient: DaemonClient {
+    var macClient: DaemonClient {
         guard let mine = macHostElsewhere, let reached = controlHosts[mine] else { return client }
         return reached
     }
@@ -1380,7 +1380,7 @@ final class AppModel {
 
     /// This Mac's host when it is one of the control plane's hosts with an id other than
     /// `.mac` (#1481, #1496). Its work is that host's, by its id; nil when it is `.mac`.
-    private var macHostElsewhere: MachineRef? {
+    var macHostElsewhere: MachineRef? {
         guard controlLink != nil, let mine = thisMacHostID, mine != .mac else { return nil }
         return mine
     }
@@ -1554,7 +1554,7 @@ final class AppModel {
         return nil
     }
 
-    private func client(forAgent id: UUID?) -> DaemonClient {
+    func client(forAgent id: UUID?) -> DaemonClient {
         client(for: host(ofAgent: id))
     }
 
@@ -1565,7 +1565,7 @@ final class AppModel {
 
     /// Where a new agent, a draft, a worktree or a session list for the selected
     /// folder goes: that folder's host.
-    private var selectedHostClient: DaemonClient { client(for: selectedFolderHost) }
+    var selectedHostClient: DaemonClient { client(for: selectedFolderHost) }
     /// Where a new session's prompt starts it: the folder whose own window it is in
     /// (#1089), or the selected one.
     private var draftHost: MachineRef { composingWindow?.host ?? selectedFolderHost }
@@ -1965,194 +1965,6 @@ final class AppModel {
             DaemonAPI.Method.workflowsClearMCPMissed,
             DaemonAPI.WorkflowMCPClearMissedRequest(folder: summary.folder, workflowID: summary.workflowID,
                                                     name: status.name, server: status.server))
-    }
-
-    // MARK: Pinned pages (#159)
-
-    func pins(in folder: URL?) -> [PinView] { work.pins(in: folder) }
-    /// The folder's servers' list views (#2032), the hidden ones too.
-    func serverViews(in folder: URL?) -> [PinView] { work.serverViews(in: folder) }
-    func pageRevision(in folder: URL?) -> Int { work.pageRevision(in: folder) }
-
-    func refreshPins() async {
-        guard let listed = try? await client.call(DaemonAPI.Method.pinsList, DaemonAPI.Empty(),
-                                                  returning: [FolderPins].self) else { return }
-        work.replacePins(listed)
-    }
-
-    /// The open requests to the person (#3864), for Needs You; `requests/changed` keeps them.
-    func refreshRequests() async {
-        guard let listed = try? await client.call(DaemonAPI.Method.requestsList, DaemonAPI.RequestsListRequest(),
-                                                  returning: DaemonAPI.RequestsListResult.self) else { return }
-        work.replaceRequests(listed.requests)
-    }
-
-    /// A file of a folder's, for a pinned page, a page tile, or what an HTML page draws.
-    func readPage(_ path: String, in key: FolderKey, known: FileStamp? = nil) async throws -> FileReading {
-        try await client(for: key.host).call(DaemonAPI.Method.pinsRead,
-                                             DaemonAPI.PinReadRequest(folder: key.folder, path: path, knownStamp: known),
-                                             returning: FileReading.self)
-    }
-
-    /// What the person typed on a pinned Markdown page. Why it was not saved, or nil.
-    func writePage(_ path: String, in key: FolderKey, text: String) async -> String? {
-        do {
-            try await client(for: key.host).call(DaemonAPI.Method.pinsWrite,
-                                                 DaemonAPI.PinWriteRequest(folder: key.folder, path: path, text: text))
-            return nil
-        } catch let error as JSONRPCError {
-            return error.message
-        } catch {
-            return error.localizedDescription
-        }
-    }
-
-    /// Pin to Folder, from the files pane: a path absolute on the folder's host.
-    func pin(_ path: String, in key: FolderKey) async {
-        await attempt(on: key.host) {
-            let pins = try await self.client(for: key.host).call(DaemonAPI.Method.pinsPin,
-                                                                 DaemonAPI.PinRequest(folder: key.folder, path: path),
-                                                                 returning: [PinView].self)
-            self.work.setPins(pins, in: key.folder)
-        }
-    }
-
-    /// Pin a view under a folder (#189), from its menu in a chat. Why it was not, or nil.
-    /// A view's `agents/start-agent` (#834): the folder's page, its bar filled in. Why
-    /// not, or nil.
-    func offerStart(_ start: AppViewStart, in key: FolderKey) -> String? {
-        let wanted = Folder.standardize(key.folder)
-        guard let folder = folders.first(where: {
-            $0.host == key.host && Folder.standardize($0.folder.folder) == wanted
-        }) else {
-            return "\(key.folder.lastPathComponent) is not a folder here."
-        }
-        showFolder(FolderKey(host: key.host, folder: folder.folder.folder))
-        offeredStart = OfferedStart(folder: folder.folder.folder, start: start)
-        return nil
-    }
-
-    /// The session a view's `agents/message-agent` goes to (#837): on the branch, in this folder.
-    func recipient(of message: AppViewAgentMessage, in key: FolderKey) -> AppViewRecipient? {
-        message.recipient(among: agents, host: key.host, folder: key.folder)
-            .map { AppViewRecipient(id: $0.id, name: AppViewAgentMessage.name(of: $0)) }
-    }
-
-    func pinView(_ view: ViewPin, in key: FolderKey) async -> String? {
-        do {
-            let pins = try await client(for: key.host).call(DaemonAPI.Method.pinsPin,
-                                                            DaemonAPI.PinRequest(folder: key.folder, view: view),
-                                                            returning: [PinView].self)
-            work.setPins(pins, in: key.folder)
-            return nil
-        } catch let error as JSONRPCError {
-            return error.message
-        } catch {
-            return error.localizedDescription
-        }
-    }
-
-    func unpin(_ path: String, in key: FolderKey) async {
-        work.setPins(pins(in: key.folder).filter { $0.path != path }, in: key.folder)
-        if openPin == path, selectedFolderKey == key { showFolder(key) }
-        await attempt(on: key.host) {
-            try await self.client(for: key.host).call(DaemonAPI.Method.pinsUnpin,
-                                                      DaemonAPI.PinPathRequest(folder: key.folder, path: path))
-        }
-    }
-
-    /// Dismiss on a pull request in For Review (#3330): gone at once, then the host told,
-    /// which keeps it out for good.
-    func dismissReview(_ pull: ReviewPull, in key: FolderKey) async {
-        work.dismissReview(pull.url, in: key.folder)
-        await attempt(on: key.host) {
-            try await self.client(for: key.host).call(DaemonAPI.Method.reviewsDismiss,
-                                                      DaemonAPI.ReviewDismissRequest(folder: key.folder, url: pull.url))
-        }
-    }
-
-    /// A press on a pull request in For Review (#3464): drawn read at once, then the host told,
-    /// which keeps it, so every client draws it read.
-    func openReview(_ pull: ReviewPull, in key: FolderKey) async {
-        guard pull.isUnread else { return }
-        work.openReview(pull.url, in: key.folder)
-        await attempt(on: key.host) {
-            try await self.client(for: key.host).call(DaemonAPI.Method.reviewsOpen,
-                                                      DaemonAPI.ReviewOpenRequest(folder: key.folder, url: pull.url))
-        }
-    }
-
-    /// Start on a suggestion of the daily checks in For Review (#3331): the host starts a
-    /// session in its folder with its prompt, and the window opens it.
-    func startSuggestion(_ suggestion: CheckSuggestion, in key: FolderKey) async {
-        var started: UUID?
-        let ok = await attempt(on: key.host) {
-            started = try await self.client(for: key.host).call(DaemonAPI.Method.suggestionsStart,
-                                                                DaemonAPI.SuggestionRequest(folder: key.folder, id: suggestion.id),
-                                                                returning: UUID.self)
-        }
-        guard ok, let started else { return }
-        work.dropSuggestion(suggestion.id, in: key.folder)
-        openAgent(started)
-    }
-
-    /// Dismiss on a suggestion of the daily checks in For Review (#3331): gone at once, then
-    /// the host told, which keeps it out for good.
-    func dismissSuggestion(_ suggestion: CheckSuggestion, in key: FolderKey) async {
-        work.dropSuggestion(suggestion.id, in: key.folder)
-        await attempt(on: key.host) {
-            try await self.client(for: key.host).call(DaemonAPI.Method.suggestionsDismiss,
-                                                      DaemonAPI.SuggestionRequest(folder: key.folder, id: suggestion.id))
-        }
-    }
-
-    /// Hide or Show on a server's list view (#2032): shown at once, then the host told.
-    func setViewHidden(_ uri: String, _ hidden: Bool, in key: FolderKey) async {
-        work.setViewHidden(uri, hidden, in: key.folder)
-        if hidden, openPin == uri, selectedFolderKey == key { showFolder(key) }
-        await attempt(on: key.host) {
-            try await self.client(for: key.host).call(DaemonAPI.Method.pinsHideView,
-                                                      DaemonAPI.PinHideViewRequest(folder: key.folder, uri: uri, hidden: hidden))
-        }
-    }
-
-    /// A drop or a Move item: shown at once, then the whole order sent once.
-    func arrangePins(_ paths: [String], in key: FolderKey) async {
-        let held = pins(in: key.folder)
-        work.setPins(paths.compactMap { path in held.first { $0.path == path } }, in: key.folder)
-        await attempt(on: key.host) {
-            try await self.client(for: key.host).call(DaemonAPI.Method.pinsArrange,
-                                                      DaemonAPI.PinArrangeRequest(folder: key.folder, paths: paths))
-        }
-    }
-
-    // MARK: Pinned sessions (#180)
-
-    func pinnedSessions(in folder: URL?) -> [UUID] { work.pinnedSessions(in: folder) }
-
-    func isPinned(_ agent: Agent) -> Bool {
-        pinnedSessions(in: agent.folderPath).contains(agent.id)
-    }
-
-    /// Pin or Unpin from a session's menu or swipe: shown at once, then the host told.
-    func setPinned(_ agent: Agent, _ pinned: Bool) async {
-        let folder = agent.folderPath
-        let held = pinnedSessions(in: folder).filter { $0 != agent.id }
-        work.setSessionPins(pinned ? held + [agent.id] : held, in: folder)
-        await attempt(on: agent.host) {
-            try await self.client(for: agent.host).call(
-                pinned ? DaemonAPI.Method.pinsPinSession : DaemonAPI.Method.pinsUnpinSession,
-                DaemonAPI.PinSessionRequest(folder: folder, agentID: agent.id))
-        }
-    }
-
-    /// A drop or a Move item among the pinned sessions: shown at once, the order sent once.
-    func arrangeSessionPins(_ ids: [UUID], in key: FolderKey) async {
-        work.setSessionPins(ids, in: key.folder)
-        await attempt(on: key.host) {
-            try await self.client(for: key.host).call(DaemonAPI.Method.pinsArrangeSessions,
-                                                      DaemonAPI.PinArrangeSessionsRequest(folder: key.folder, agentIDs: ids))
-        }
     }
 
     // MARK: Pinned workflows (#432)
@@ -2723,43 +2535,6 @@ final class AppModel {
         takeLeases(snapshot, from: host)
     }
 
-    // MARK: The user scope (#1760)
-
-    /// Sets a part at the user scope: nil once done, else why not.
-    func setUserPart(_ part: DaemonAPI.UserSettingsPartName, _ value: some Encodable) async -> String? {
-        guard let encoded = try? JSONValue.encoding(value) else { return "That could not be written." }
-        return await userScope.set(part, to: encoded, on: controlRequests)
-    }
-
-    /// The person's time zone (#4818): this Mac's, set at the user scope when it differs, so
-    /// a workflow's `hours:` with no `time-zone:` go by it on a server too. It has no control.
-    func keepTimeZone() async {
-        guard let settings = userScope.settings else { return }
-        let here = TimeZone.current.identifier
-        if (try? settings.timeZone?.decode(DaemonAPI.UserTimeZone.self))?.identifier == here { return }
-        _ = await setUserPart(.timeZone, DaemonAPI.UserTimeZone(identifier: here))
-    }
-
-    /// After an edit in Agent Configuration or Agent Runtimes: a part that follows the person
-    /// is set again from this Mac, when it changed here.
-    func keepFollowingParts() async {
-        for part in [DaemonAPI.UserSettingsPartName.mcpServers, .agentConfig, .runtimes] {
-            guard let here = try? await macClient.call(DaemonAPI.Method.settingsUserPart, DaemonAPI.UserPartRequest(part: part),
-                                                       returning: DaemonAPI.UserPartHere.self),
-                here.value != userScope.settings?[part] else { continue }
-            _ = await userScope.set(part, to: here.value, on: controlRequests)
-        }
-    }
-
-    func refreshCostState() async {
-        guard let state = try? await macClient.call(DaemonAPI.Method.costState,
-                                                 Optional<String>.none,
-                                                 returning: DaemonAPI.CostState.self) else { return }
-        work.replaceCostState(state)
-    }
-
-    /// The reader setting or clearing a limit. Theirs alone: nothing an agent or a
-    /// workflow can reach calls this.
     // MARK: Retiring archived agents (051)
 
     /// A Settings pane to open on, asked for by a link elsewhere (052): read and cleared
@@ -3650,7 +3425,7 @@ final class AppModel {
     /// One try used to be all there was, and a daemon slow to come back left a window
     /// that looked alive and never would be again. The same loop as the phone's:
     /// backing off to half a minute, and only one of it at a time.
-    private func reconnect() async {
+    func reconnect() async {
         guard reconnecting == nil else { return }
         let backoff = backoff
         backoff.trying()
@@ -4527,7 +4302,7 @@ final class AppModel {
 
     /// A client for one of the control plane's hosts, connected: first directly over its
     /// local socket when it is on this Mac (#1118), else through the control plane.
-    private func reach(_ host: DaemonAPI.ControlMachine, through controlLink: ControlLink) async {
+    func reach(_ host: DaemonAPI.ControlMachine, through controlLink: ControlLink) async {
         let server = controlHosts[host.id]
             ?? DaemonClient(link: hostLink(host.id, through: controlLink, onThisMac: host.machineID == MachineID.current),
                             machine: host.id)
@@ -4937,205 +4712,6 @@ final class AppModel {
             }
         }
         return snapshot
-    }
-
-    // MARK: The catalogue (059)
-
-    /// What a catalogue call said, or why it could not: the sheet shows either, so these
-    /// do not go through `attempt`, which would put a failure in the window's banner too.
-    func catalogSearch(_ query: String, marketplace: String? = nil,
-                       destination: DaemonAPI.SkillDestination? = nil) async -> DaemonAPI.CatalogSearchAnswer {
-        do {
-            return try await macClient.call(DaemonAPI.Method.catalogSearch,
-                                         DaemonAPI.CatalogSearchRequest(query: query, marketplace: marketplace,
-                                                                        destination: destination),
-                                         returning: DaemonAPI.CatalogSearchAnswer.self)
-        } catch {
-            return .init(results: [], error: Self.catalogError(error))
-        }
-    }
-
-    func catalogPreview(_ result: DaemonAPI.CatalogResult,
-                        for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogPreviewAnswer {
-        do {
-            return try await macClient.call(DaemonAPI.Method.catalogPreview,
-                                         DaemonAPI.CatalogPreviewRequest(result: result, destination: destination),
-                                         returning: DaemonAPI.CatalogPreviewAnswer.self)
-        } catch {
-            return .init(preview: nil, error: Self.catalogError(error))
-        }
-    }
-
-    func addSkill(_ previewID: UUID, to destination: DaemonAPI.SkillDestination,
-                  replace: Bool) async -> Result<DaemonAPI.ManagedSkill, DaemonAPI.CatalogError> {
-        do {
-            let answer = try await macClient.call(DaemonAPI.Method.skillsAdd,
-                                               DaemonAPI.SkillAddRequest(previewID: previewID, destination: destination,
-                                                                         replace: replace),
-                                               returning: DaemonAPI.SkillAddAnswer.self)
-            return .success(answer.skill)
-        } catch {
-            return .failure(Self.catalogError(error))
-        }
-    }
-
-    /// Skills in `~/.agents/skills` or a folder's `.agents/skills`.
-    func skills(at destination: DaemonAPI.SkillDestination) async -> [DaemonAPI.ListedSkill]? {
-        try? await macClient.call(DaemonAPI.Method.skillsList,
-                               DaemonAPI.SkillsListRequest(destination: destination),
-                               returning: DaemonAPI.SkillsListAnswer.self).skills
-    }
-
-    /// Whether each added skill at a destination has an update (FR-018). Nil when it could
-    /// not be asked; the page then shows no marks rather than wrong ones.
-    func skillUpdates(at destination: DaemonAPI.SkillDestination) async -> [String: DaemonAPI.UpdateState]? {
-        try? await macClient.call(DaemonAPI.Method.skillsCheckUpdates, DaemonAPI.SkillsListRequest(destination: destination),
-                               returning: DaemonAPI.SkillUpdatesAnswer.self).updates
-    }
-
-    func skillUpdatePreview(_ name: String, at destination: DaemonAPI.SkillDestination)
-        async -> Result<DaemonAPI.SkillUpdatePreviewAnswer, DaemonAPI.CatalogError> {
-        do {
-            return .success(try await macClient.call(DaemonAPI.Method.skillsUpdatePreview,
-                                                  DaemonAPI.SkillNameRequest(destination: destination, name: name),
-                                                  returning: DaemonAPI.SkillUpdatePreviewAnswer.self))
-        } catch {
-            return .failure(Self.catalogError(error))
-        }
-    }
-
-    /// Take out a skill the app or the skills tool added; its folder goes to the Trash.
-    func removeSkill(_ name: String, at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogError? {
-        do {
-            _ = try await macClient.call(DaemonAPI.Method.skillsRemove,
-                                      DaemonAPI.SkillNameRequest(destination: destination, name: name),
-                                      returning: DaemonAPI.SkillRemoveAnswer.self)
-            return nil
-        } catch {
-            return Self.catalogError(error)
-        }
-    }
-
-    // MARK: Personas from a marketplace (#3665)
-
-    func personaSearch(_ query: String, marketplace: String?,
-                       destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogSearchAnswer {
-        do {
-            return try await macClient.call(DaemonAPI.Method.personasSearch,
-                                         DaemonAPI.CatalogSearchRequest(query: query, marketplace: marketplace,
-                                                                        destination: destination),
-                                         returning: DaemonAPI.CatalogSearchAnswer.self)
-        } catch {
-            return .init(results: [], error: Self.catalogError(error))
-        }
-    }
-
-    func personaPreview(_ result: DaemonAPI.CatalogResult,
-                        for destination: DaemonAPI.SkillDestination) async -> DaemonAPI.PersonaPreviewAnswer {
-        do {
-            return try await macClient.call(DaemonAPI.Method.personasPreview,
-                                         DaemonAPI.CatalogPreviewRequest(result: result, destination: destination),
-                                         returning: DaemonAPI.PersonaPreviewAnswer.self)
-        } catch {
-            return .init(preview: nil, error: Self.catalogError(error))
-        }
-    }
-
-    func addPersona(_ previewID: UUID, to destination: DaemonAPI.SkillDestination,
-                    replace: Bool) async -> Result<DaemonAPI.ManagedPersona, DaemonAPI.CatalogError> {
-        do {
-            let answer = try await macClient.call(DaemonAPI.Method.personasAdd,
-                                               DaemonAPI.SkillAddRequest(previewID: previewID, destination: destination,
-                                                                         replace: replace),
-                                               returning: DaemonAPI.PersonaAddAnswer.self)
-            return .success(answer.persona)
-        } catch {
-            return .failure(Self.catalogError(error))
-        }
-    }
-
-    /// The personas at a destination that were added from a marketplace.
-    func managedPersonas(at destination: DaemonAPI.SkillDestination) async -> [DaemonAPI.ManagedPersona]? {
-        try? await macClient.call(DaemonAPI.Method.personasManaged, DaemonAPI.SkillsListRequest(destination: destination),
-                               returning: DaemonAPI.PersonasManagedAnswer.self).personas
-    }
-
-    /// Whether each persona added from a marketplace has an update. Nil when it could not be
-    /// asked, so no marks rather than wrong ones.
-    func personaUpdates(at destination: DaemonAPI.SkillDestination) async -> [String: DaemonAPI.UpdateState]? {
-        try? await macClient.call(DaemonAPI.Method.personasCheckUpdates, DaemonAPI.SkillsListRequest(destination: destination),
-                               returning: DaemonAPI.SkillUpdatesAnswer.self).updates
-    }
-
-    func personaUpdatePreview(_ id: String, at destination: DaemonAPI.SkillDestination)
-        async -> Result<DaemonAPI.PersonaUpdatePreviewAnswer, DaemonAPI.CatalogError> {
-        do {
-            return .success(try await macClient.call(DaemonAPI.Method.personasUpdatePreview,
-                                                  DaemonAPI.SkillNameRequest(destination: destination, name: id),
-                                                  returning: DaemonAPI.PersonaUpdatePreviewAnswer.self))
-        } catch {
-            return .failure(Self.catalogError(error))
-        }
-    }
-
-    /// Take out a persona added from a marketplace; its file goes to the Trash.
-    func removePersona(_ id: String, at destination: DaemonAPI.SkillDestination) async -> DaemonAPI.CatalogError? {
-        do {
-            _ = try await macClient.call(DaemonAPI.Method.personasRemove,
-                                      DaemonAPI.SkillNameRequest(destination: destination, name: id),
-                                      returning: DaemonAPI.SkillRemoveAnswer.self)
-            return nil
-        } catch {
-            return Self.catalogError(error)
-        }
-    }
-
-    /// The daemon's own reason when it gave one, and "can't reach" the daemon otherwise.
-    private static func catalogError(_ error: any Error) -> DaemonAPI.CatalogError {
-        if let rpc = error as? JSONRPCError, rpc.code == DaemonAPI.Failure.catalogRefused,
-           let reason = try? rpc.data?.decode(DaemonAPI.CatalogError.self) {
-            return reason
-        }
-        // The organisation's policy refused it (#998): its own words, as the other clients say them.
-        if let refusal = DaemonAPI.PolicyRefusal(error: error) { return .failed(refusal.line) }
-        if let rpc = error as? JSONRPCError { return .failed(rpc.message) }
-        return .failed(String(describing: error))
-    }
-
-    // MARK: Marketplaces (#687)
-
-    /// The marketplaces for a kind, a folder's among them when it is the destination. Nil
-    /// when the daemon could not be asked.
-    func marketplaces(_ kind: DaemonAPI.CatalogKind,
-                      for destination: DaemonAPI.SkillDestination?) async -> DaemonAPI.MarketplacesListAnswer? {
-        try? await macClient.call(DaemonAPI.Method.marketplacesList,
-                               DaemonAPI.MarketplacesListRequest(kind: kind, destination: destination),
-                               returning: DaemonAPI.MarketplacesListAnswer.self)
-    }
-
-    /// Nil when added, else the daemon's reason in words.
-    func addMarketplace(_ request: DaemonAPI.MarketplaceAddRequest) async -> String? {
-        await marketplaceCall(DaemonAPI.Method.marketplacesAdd, request)
-    }
-
-    func removeMarketplace(_ id: String) async -> String? {
-        await marketplaceCall(DaemonAPI.Method.marketplacesRemove, DaemonAPI.MarketplaceIDRequest(id: id))
-    }
-
-    func setMarketplace(_ id: String, enabled: Bool) async -> String? {
-        await marketplaceCall(DaemonAPI.Method.marketplacesSetEnabled,
-                              DaemonAPI.MarketplaceSetEnabledRequest(id: id, enabled: enabled))
-    }
-
-    private func marketplaceCall<P: Encodable & Sendable>(_ method: String, _ params: P) async -> String? {
-        do {
-            _ = try await macClient.call(method, params, returning: DaemonAPI.MarketplacesListAnswer.self)
-            return nil
-        } catch let rpc as JSONRPCError {
-            return rpc.message
-        } catch {
-            return String(describing: error)
-        }
     }
 
     // MARK: MCP catalogue (060)
@@ -6050,7 +5626,7 @@ final class AppModel {
     /// The first answer may be what the runtime offered last time, with what it
     /// actually offers arriving a few seconds later, so this runs more than once for
     /// one draft and keeps every choice already made that is still on offer.
-    private func show(options: [ConfigOption], commands: [SlashCommand], opening: Bool) {
+    func show(options: [ConfigOption], commands: [SlashCommand], opening: Bool) {
         draftOptions = PromptControlsState.drawable(agentOptions: nil, draftOptions: options)
         draftCommands = commands
         for option in draftOptions {
@@ -6620,7 +6196,7 @@ final class AppModel {
     var sessionUndo: SessionUndo?
 
     /// Offer Undo for an action that went.
-    private func offer(_ undo: SessionUndo?) {
+    func offer(_ undo: SessionUndo?) {
         guard let undo else { return }
         sessionUndo = undo
         archiveUndo = nil
@@ -6763,68 +6339,6 @@ final class AppModel {
             }
             work.settleOption(agentID: agentID, optionID: optionID, sequence: sequence)
         }
-    }
-
-    // MARK: The mode you keep choosing
-
-    /// What was last chosen for this runtime, on this Mac or a phone. The daemon keeps
-    /// it now — it writes on a start and on a conversation's mode changing — and this
-    /// reads the copy `modes/changed` keeps current (029).
-    func rememberedMode(for runtimeID: String) -> JSONValue? {
-        work.rememberedMode(for: runtimeID)
-    }
-
-    /// The daemon's memory. A daemon too old to know the method leaves the form opening
-    /// on the runtime's own current mode, which is what it did before anything was
-    /// remembered.
-    func refreshModes() async {
-        let modes = try? await macClient.call(DaemonAPI.Method.modesRemembered, Optional<Int>.none,
-                                           returning: DaemonAPI.RememberedModes.self)
-        if let modes { work.replaceRememberedModes(modes) }
-    }
-
-    // MARK: Language servers
-
-    /// A source file's problems, from its language server on the agent's host (#844). A
-    /// failure is thrown, for the editor to say (#1687).
-    func diagnose(path: String, text: String, of agentID: UUID) async throws -> DaemonAPI.FileDiagnostics {
-        try await client(forAgent: agentID).call(
-            DaemonAPI.Method.filesDiagnostics,
-            DaemonAPI.FileDiagnosticsRequest(agentID: agentID, path: path, text: text),
-            returning: DaemonAPI.FileDiagnostics.self)
-    }
-
-    /// What the file's language server would write at a line and column (#844), or why
-    /// there is nothing: the host's reason, or the failure (#1688).
-    func complete(path: String, text: String, line: Int, column: Int, of agentID: UUID) async -> DaemonAPI.FileCompletions {
-        do {
-            return try await client(forAgent: agentID).call(
-                DaemonAPI.Method.filesComplete,
-                DaemonAPI.FileCompletionRequest(agentID: agentID, path: path, text: text, line: line, column: column),
-                returning: DaemonAPI.FileCompletions.self)
-        } catch {
-            return DaemonAPI.FileCompletions(items: [], reason: DaemonAPI.FileCompletions.failure(error))
-        }
-    }
-
-    // MARK: Simulators
-
-    /// The Simulator pane's calls (#842), to the session's host.
-    func simulatorCalls(for agentID: UUID) -> SimulatorCalls {
-        SimulatorCalls(
-            list: { try await self.client(forAgent: agentID).call(
-                DaemonAPI.Method.simulatorsList, Optional<String>.none, returning: DaemonAPI.SimulatorList.self) },
-            boot: { udid in _ = try await self.client(forAgent: agentID).call(
-                DaemonAPI.Method.simulatorsBoot, DaemonAPI.SimulatorRequest(udid: udid)) },
-            shutdown: { udid in _ = try await self.client(forAgent: agentID).call(
-                DaemonAPI.Method.simulatorsShutdown, DaemonAPI.SimulatorRequest(udid: udid)) },
-            screen: { udid, maxHeight in try await self.client(forAgent: agentID).call(
-                DaemonAPI.Method.simulatorsScreen, DaemonAPI.SimulatorScreenRequest(udid: udid, maxHeight: maxHeight),
-                returning: DaemonAPI.SimulatorScreen.self) },
-            tap: { udid, x, y in _ = try await self.client(forAgent: agentID).call(
-                DaemonAPI.Method.simulatorsTap, DaemonAPI.SimulatorTapRequest(udid: udid, x: x, y: y)) },
-            home: { udid in _ = try await self.client(forAgent: agentID).call(
-                DaemonAPI.Method.simulatorsHome, DaemonAPI.SimulatorRequest(udid: udid)) })
     }
 
     // MARK: The user's shells
@@ -7277,430 +6791,6 @@ final class AppModel {
         work.takeFileToShow(for: agentID)
     }
 
-    // MARK: Runtimes
-
-    /// Sign the runtime in, or one of its added accounts (#840) when `accountID` is set.
-    func signIn(runtimeID: String, methodID: String, accountID: String? = nil) async -> String? {
-        do {
-            let account = try await macClient.call(DaemonAPI.Method.runtimeAuthenticate,
-                                                DaemonAPI.AuthenticateRequest(runtimeID: runtimeID,
-                                                                              methodID: methodID, accountID: accountID),
-                                                returning: RuntimeAccount.self)
-            if accountID == nil { accounts[runtimeID] = account }
-            await refreshRuntimes()
-            if accountID != nil { await refreshAccountProfiles() }
-            return nil
-        } catch let error as JSONRPCError {
-            // A method that needs a terminal comes back as the command to run, which is
-            // the runtime's own advice rather than ours.
-            if let command = error.data?["command"]?.stringValue { return command }
-            problem = describe(error)
-            return nil
-        } catch {
-            problem = describe(error)
-            return nil
-        }
-    }
-
-    func signOut(runtimeID: String) async {
-        await attempt {
-            _ = try await self.macClient.call(DaemonAPI.Method.runtimeLogOut,
-                                           DaemonAPI.RuntimeRequest(runtimeID: runtimeID),
-                                           returning: [UUID].self)
-        }
-        await refreshAccounts()
-        await refreshAgents()
-    }
-
-    func setProvider(runtimeID: String, providerID: String) async {
-        await attempt {
-            _ = try await self.macClient.call(DaemonAPI.Method.runtimeSetProvider,
-                                           DaemonAPI.SetProviderRequest(runtimeID: runtimeID,
-                                                                        providerID: providerID),
-                                           returning: RuntimeAccount.self)
-        }
-        await refreshAccounts()
-    }
-
-    func disableProvider(runtimeID: String, providerID: String) async {
-        await attempt {
-            _ = try await self.macClient.call(DaemonAPI.Method.runtimeDisableProvider,
-                                           DaemonAPI.SetProviderRequest(runtimeID: runtimeID,
-                                                                        providerID: providerID),
-                                           returning: RuntimeAccount.self)
-        }
-        await refreshAccounts()
-    }
-
-    /// Which agents a sign-out would stop, so the user is told before it happens.
-    func agentsHolding(runtimeID: String) -> [Agent] {
-        agents.filter { $0.runtimeID == runtimeID && $0.state.holdsRuntime }
-    }
-
-    // MARK: Sessions the app did not start
-
-    func runtimeSessions(runtimeID: String, cwd: URL) async -> [RuntimeSession] {
-        do {
-            return try await selectedHostClient.call(DaemonAPI.Method.sessionsList,
-                                         DaemonAPI.SessionsListRequest(runtimeID: runtimeID, cwd: cwd),
-                                         returning: [RuntimeSession].self)
-        } catch {
-            problem = describe(error)
-            return []
-        }
-    }
-
-    func adopt(runtimeID: String, session: RuntimeSession) async {
-        do {
-            let id = try await selectedHostClient.call(DaemonAPI.Method.sessionsAdopt,
-                                           DaemonAPI.AdoptRequest(runtimeID: runtimeID,
-                                                                  sessionID: session.sessionID,
-                                                                  cwd: session.cwd),
-                                           returning: UUID.self)
-            await refreshAgents()
-            selection = id
-        } catch {
-            fail(error, on: selectedFolderHost)
-        }
-    }
-
-    func deleteRuntimeSession(runtimeID: String, sessionID: String) async {
-        await attempt {
-            try await self.selectedHostClient.call(DaemonAPI.Method.sessionsDelete,
-                                       DaemonAPI.DeleteSessionRequest(runtimeID: runtimeID,
-                                                                      sessionID: sessionID,
-                                                                      confirmed: true))
-        }
-    }
-
-    func fork(_ id: UUID) async {
-        do {
-            let branch = try await client(forAgent: id).call(DaemonAPI.Method.agentsFork,
-                                               DaemonAPI.AgentRequest(agentID: id),
-                                               returning: UUID.self)
-            await refreshAgents()
-            selection = branch
-        } catch {
-            problem = describe(error)
-        }
-    }
-
-    /// Branch from Here (#1658): a new session from just before one of the person's prompts,
-    /// opened as Branch opens one, with that prompt in its bar to change and send. The words
-    /// go in as the new session's draft, so its bar has them however it comes on screen.
-    /// Undo These Changes on a turn's card (#3437): the turn's files back as they were
-    /// before it. Thrown errors are the card's to say.
-    func undoTurn(_ turn: UUID, of agentID: UUID, confirmed: Bool) async throws -> DaemonAPI.UndoTurnResult {
-        try await client(forAgent: agentID).call(DaemonAPI.Method.changesUndoTurn,
-                                                 DaemonAPI.UndoTurnRequest(agentID: agentID, turn: turn,
-                                                                           confirmed: confirmed ? true : nil),
-                                                 returning: DaemonAPI.UndoTurnResult.self)
-    }
-
-    func branch(from entryID: UUID, of agentID: UUID, text: String) async {
-        do {
-            let branch = try await client(forAgent: agentID).call(DaemonAPI.Method.agentsBranchFrom,
-                                               DaemonAPI.BranchFromRequest(agentID: agentID, entryID: entryID),
-                                               returning: UUID.self)
-            DraftKeeper.shared.note(text, [], for: .agent(branch))
-            await refreshAgents()
-            selection = branch
-        } catch {
-            problem = describe(error)
-        }
-    }
-
-    /// An answer pressed on a banner (#1170): the card's own answer, through the same call.
-    /// A question no longer held was answered somewhere else, and nothing is sent: the
-    /// daemon would refuse it, and its banner goes with the next sweep.
-    func answerFromBanner(_ token: String, _ quick: QuickAnswer, typed: String?) async {
-        let parts = token.split(separator: ":", maxSplits: 1).map(String.init)
-        guard parts.count == 2 else { return }
-        let sent: Bool
-        switch parts[0] {
-        case "permission":
-            guard let request = permissions.first(where: { $0.id.uuidString == parts[1] }) else {
-                note("banner: \(token) is over, nothing sent")
-                return
-            }
-            sent = await answer(request, optionID: quick.id)
-        case "elicitation":
-            guard let request = elicitations.first(where: { $0.id.uuidString == parts[1] }),
-                  let content = quick.content(typed: typed) else {
-                note("banner: \(token) is over, or nothing typed; nothing sent")
-                return
-            }
-            sent = await answerElicitation(request, action: .accept, content: content)
-        case "request":
-            guard let request = work.requests.first(where: { $0.id.uuidString == parts[1] }),
-                  let action = NeedRequest.Action(rawValue: quick.id) else {
-                note("banner: \(token) is over, nothing sent")
-                return
-            }
-            sent = await answerSecretUse(request, action)
-        default:
-            return
-        }
-        note("banner: \(token) \(quick.kind.rawValue) \(sent ? "answered" : "not sent")")
-    }
-
-    /// A person's answer to a secret's use (#4017), from its Needs you row or its banner: to
-    /// the host of the session that asked. Whether it went; why not is the problem.
-    @discardableResult
-    func answerSecretUse(_ request: NeedRequest, _ action: NeedRequest.Action) async -> Bool {
-        let host = host(ofAgent: request.askedBy)
-        var approval: DaemonAPI.LockDelivery?
-        // A Linux machine opens the value only for an answer this Mac signed (#4149).
-        if let use = request.secretUse, use.signs(action) {
-            guard let signer = await lock.channelSigner(),
-                  let signed = try? LockChannel.secretUseApproval(signer.key, to: host.rawValue, request: request.id,
-                                                                  use: use, action: action) else {
-                problem = "Not sent — this machine opens the secret only for an answer your device signs, and this Mac is not in your lock. Answer on the Remote."
-                return false
-            }
-            approval = signed
-        }
-        let answer = DaemonAPI.RequestsAnswer(id: request.id, secretUse: action, approval: approval)
-        return await attempt(on: host) {
-            let update = try await self.client(forAgent: request.askedBy)
-                .call(DaemonAPI.Method.requestsAnswer, answer, returning: DaemonAPI.RequestUpdate.self)
-            self.work.replaceRequests(self.work.requests.filter { $0.id != update.request.id })
-        }
-    }
-
-    /// Later on a request (#4234), from its Needs you row or its card: to the host of the
-    /// session that asked. It stays open, in Later, until it comes back.
-    @discardableResult
-    func deferRequest(_ request: NeedRequest, _ params: DaemonAPI.RequestsDefer) async -> Bool {
-        let sent = await work.changing(request, to: request.deferring(params)) {
-            await changeRequest(request, DaemonAPI.Method.requestsDefer, params)
-        }
-        // Undo is Bring Back Now (#4793).
-        if sent { offer(SessionUndo.later(request)) }
-        return sent
-    }
-
-    /// Bring back now (#4234): out of Later, to the top of Needs you.
-    @discardableResult
-    func undeferRequest(_ request: NeedRequest) async -> Bool {
-        await work.changing(request, to: request.broughtBack) {
-            await changeRequest(request, DaemonAPI.Method.requestsUndefer, DaemonAPI.RequestsUndefer(id: request.id))
-        }
-    }
-
-    private func changeRequest(_ request: NeedRequest, _ method: String, _ params: some Encodable & Sendable) async -> Bool {
-        await attempt(on: host(ofAgent: request.askedBy)) {
-            let update = try await self.client(forAgent: request.askedBy)
-                .call(method, params, returning: DaemonAPI.RequestUpdate.self)
-            self.work.apply(.requestChanged(update.request))
-        }
-    }
-
-    // MARK: Forms
-
-    /// Whether the answer went, as `answer(_:optionID:)` (#86).
-    @discardableResult
-    func answerElicitation(_ request: ElicitationRequest,
-                           action: DaemonAPI.AnswerElicitationRequest.Action,
-                           content: [String: JSONValue] = [:], reason: String? = nil) async -> Bool {
-        let sendID = UUID()
-        // An empty reason is No thanks (#4039).
-        let reason = reason?.trimmingCharacters(in: .whitespacesAndNewlines)
-        // The card goes at once, and comes back if the answer did not go (#4786).
-        let sent = await work.answering(request) { await attempt {
-            try await self.client(forAgent: request.agentID).call(DaemonAPI.Method.elicitationsAnswer,
-                                       DaemonAPI.AnswerElicitationRequest(requestID: request.id,
-                                                                          action: action,
-                                                                          content: content,
-                                                                          sendID: sendID,
-                                                                          reason: reason?.isEmpty == false ? reason : nil))
-        } }
-        await refreshElicitations()
-        return sent
-    }
-
-    func dismissProblem() { problem = nil }
-
-    /// Something the window worked out for itself, said the same way as anything the
-    /// daemon says.
-    func show(problem: String) { self.problem = problem }
-
-    /// Whether the work went through, for the callers that must undo something when
-    /// it did not.
-    @discardableResult
-    /// Files attached from this Mac, copied to the server first (037, FR-015). A path
-    /// on the Mac means nothing to an agent on a server, so each file that exists here
-    /// is written into the agent's folder there, and the attachment points at that
-    /// copy. Pictures already travel as bytes, and a file named from the server's own
-    /// files pane is already a path there. Nil, with the reason said, when a file
-    /// cannot go: the prompt then stays in the field.
-    private func carry(_ attachments: [Attachment], to host: MachineRef, for agentID: UUID) async -> [Attachment]? {
-        var carried: [Attachment] = []
-        for attachment in attachments {
-            guard case .resourceLink(let uri, let name, let mimeType, _, _) = attachment.block,
-                  let url = URL(string: uri), url.isFileURL,
-                  let agent = work.agent(agentID),
-                  !url.path.hasPrefix(agent.cwd.path),
-                  FileManager.default.fileExists(atPath: url.path) else {
-                carried.append(attachment)
-                continue
-            }
-            // Looked at before it is read, and read off the main thread (#930): a film
-            // attached by mistake is refused at once, not after it is read whole.
-            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
-            guard size <= DaemonAPI.attachmentLimit else {
-                problem = "\(name) is too big to send to \(hosts.label(host))."
-                return nil
-            }
-            let data: Data
-            do {
-                data = try await Task.detached {
-                    try Data(contentsOf: url)
-                }.value
-            } catch {
-                // Not "too big": a file this window may not read, or one gone, says so (073).
-                problem = "\(name) could not be read to send to \(hosts.label(host)): \(error.localizedDescription)"
-                return nil
-            }
-            guard data.count <= DaemonAPI.attachmentLimit else {
-                problem = "\(name) is too big to send to \(hosts.label(host))."
-                return nil
-            }
-            do {
-                let written = try await client(for: host).call(
-                    DaemonAPI.Method.filesWrite, DaemonAPI.FilesWriteRequest(agentID: agentID, name: name, data: data),
-                    returning: DaemonAPI.FilesWriteResponse.self)
-                carried.append(Attachment(block: .resourceLink(uri: URL(filePath: written.path).absoluteString,
-                                                               name: name, mimeType: mimeType, size: data.count),
-                                          displayName: attachment.displayName, byteCount: data.count))
-            } catch {
-                problem = "\(name) could not be sent to \(hosts.label(host))."
-                return nil
-            }
-        }
-        return carried
-    }
-
-    /// A send to a server, delivered once or reported as not sent (037, FR-020).
-    ///
-    /// The caller makes the `sendID` once, so every retry here is the same send: a
-    /// daemon that acted on the first try and lost its reply with the connection answers
-    /// the retry as it did, and acts once. A transport error is retried as the server
-    /// comes back, for up to 30 seconds; a refusal from the daemon is its answer and is
-    /// not retried.
-    private func sendToServer(_ host: MachineRef,
-                              _ work: @escaping (DaemonClient) async throws -> Void) async -> Bool {
-        let deadline = ContinuousClock.now.advanced(by: .seconds(30))
-        while true {
-            do {
-                try await work(client(for: host))
-                return true
-            } catch let refused as JSONRPCError where refused.code == DaemonAPI.Failure.kept {
-                // Kept for a stopped workspace (#691 US3): its bubble says so; it goes when the host is up.
-                noteKept(refused)
-                return true
-            } catch let refused as JSONRPCError {
-                fail(refused, on: host)
-                return false
-            } catch {
-                guard ContinuousClock.now < deadline else {
-                    problem = "Not sent — \(hosts.label(host)) went offline."
-                    return false
-                }
-                try? await Task.sleep(for: .seconds(1))
-            }
-        }
-    }
-
-    @discardableResult
-    /// `quietWhenDown`: a server the offline strip already explains raises no alert (#963),
-    /// and neither does this Mac's own refresh with no host on this Mac (#1503).
-    func attempt(on host: MachineRef = .mac, quietWhenDown: Bool = false, _ work: () async throws -> Void) async -> Bool {
-        // Already known to be quiet: said now, naming why, not after waiting out a
-        // connect the reconnect loop is already making (#83, #303). The strip has Try Again.
-        // With no host on this Mac, nothing is asked: a pane's own refresh (quiet) says
-        // nothing, as the pane says it; what a person asked for says there is none (#1503).
-        if host == .mac, noHostOnThisMac {
-            if !quietWhenDown { problem = HostSet.noMacHostProblem }
-            return false
-        }
-        if host == .mac, !controlPlaneAway, hosts.isOffline(macHostElsewhere ?? .mac) || macHostNotice != nil {
-            problem = macHostNotice?.action ?? HostSet.macDownProblem
-            return false
-        }
-        do {
-            try await work()
-            return true
-        } catch {
-            // One retry through a fresh connection: the daemon having gone idle is not
-            // something the user should have to know about.
-            if !isConnected {
-                await connect()
-                if isConnected, (try? await work()) != nil { return true }
-            }
-            if quietWhenDown, host != .mac, hosts.isOffline(host) || OfflineWords.hostDown(error) { return false }
-            fail(error, on: host)
-            return false
-        }
-    }
-
-    /// A failure put in front of the person. A runtime of this Mac's that needs signing
-    /// in gets its sign-in sheet; everything else is said in words. A server's runtime
-    /// is signed in on the server, which this sheet cannot do, so it stays words.
-    private func fail(_ error: any Error, on host: MachineRef) {
-        if error is SaidAlready { return }
-        if host == .mac, let error = error as? JSONRPCError, error.code == DaemonAPI.Failure.needsSignIn,
-           let runtimeID = error.data?["runtimeID"]?.stringValue {
-            signInRuntimeID = runtimeID
-            return
-        }
-        // A server's Claude signs in through this Mac's own sign-in (056): with none to
-        // relay, the sheet that signs it in on this Mac, and a sentence saying so.
-        if host != .mac, let error = error as? JSONRPCError, error.code == DaemonAPI.Failure.signInWanted,
-           let wanted = try? error.data?.decode(DaemonAPI.SignInWanted.self) {
-            problem = error.message + " Sign it in on this Mac, or use \(hosts.label(host))’s own sign-in in Settings ▸ Machines."
-            signInRuntimeID = wanted.runtime
-            return
-        }
-        problem = describe(error)
-    }
-
-    /// The sign-in sheet, put away. Signed in or not, it does not come back for this
-    /// runtime by itself until the runtime has been signed in once more.
-    func putAwaySignIn() {
-        if let runtimeID = signInRuntimeID, accounts[runtimeID]?.state != .ready {
-            signInsPutAway.insert(runtimeID)
-        }
-        signInRuntimeID = nil
-    }
-
-    /// What a person can read. The daemon's errors are already written for someone
-    /// looking at a screen, so they are shown as they are.
-    func describe(_ error: any Error) -> String {
-        if let error = error as? JSONRPCError {
-            // A runtime that needs signing in says so, and says how. The command is
-            // the runtime's own, which is better advice than any we could invent.
-            if error.code == DaemonAPI.Failure.needsSignIn,
-               let methods = try? error.data?["authMethods"]?.decode([ACP.AuthMethod].self),
-               let command = methods.compactMap(\.terminalCommand).first {
-                return "\(error.message). Run: \(command)"
-            }
-            return error.message
-        }
-        if let error = error as? DaemonClient.ConnectError {
-            switch error {
-            case .couldNotConnect:
-                return macHostNotice?.action ?? HostSet.macDownProblem
-            case .socketPathTooLong(let path):
-                // Only ever seen by somebody who passed `--root`, and the fix is in
-                // their hands: a shorter path.
-                return "That folder is too deep to run a daemon in: \(path) is past the 104 bytes a socket may be named with."
-            }
-        }
-        // This window's own writes: a full disk or a refused folder, in words (#88).
-        if let failure = WriteFailure(error, keeping: "that") { return failure.message }
-        return String(describing: error)
-    }
 }
 
 /// A failure already put in front of the person in its own way, so `fail` says nothing more.
