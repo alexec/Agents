@@ -121,7 +121,7 @@ const eventMeanings: Record<string, string> = {
   "lease.released": "A lease was given back, ended or ran out",
   "mac.sleep": "This Mac is going to sleep",
   "mac.wake": "This Mac woke up",
-  "machine.disk_low": "Free space on a volume holding the Agents root, a folder or a worktree fell below its low or critical threshold",
+  "machine.disk_low": "Free space on a volume holding the Agent Loops root, a folder or a worktree fell below its low or critical threshold",
   "machine.disk_ok": "Free space on a volume that was low climbed back above its threshold",
   "person.away": "You locked the screen or stepped away for 5 minutes",
   "person.back": "You unlocked the screen or came back",
@@ -130,7 +130,7 @@ const eventMeanings: Record<string, string> = {
   "cost.allowance_back": "A runtime's allowance came back",
   "server.offline": "A server went offline",
   "server.online": "A server came back",
-  "system.restarted": "Agents started again, after a stop or a crash",
+  "system.restarted": "Agent Loops started again, after a stop or a crash",
 };
 
 // EventCatalogue.reservedNouns: the app's own subjects, and `custom` (#639), which no server's event may use.

@@ -287,7 +287,7 @@ function LinkDialog({ store, provider, workspace, close }: {
     <Modal label={`Link ${workspace.name} to a Machine`} close={close}>
       <div class="sheet-body connect-sheet provider-sheet">
         <p class="strong">Link {workspace.name} to a Machine</p>
-        <p class="small quiet">Agents already runs on this machine: {provider.name} starts and stops it, and nothing is installed again.</p>
+        <p class="small quiet">Agent Loops already runs on this machine: {provider.name} starts and stops it, and nothing is installed again.</p>
         {hosts.length === 0 ? <p class="small">{words.noHosts}</p> : (
           <form class="token-form" onSubmit={(e) => { e.preventDefault(); void link(); }}>
             <label>Machine

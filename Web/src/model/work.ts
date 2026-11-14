@@ -391,7 +391,7 @@ export function labelInk(color: string | undefined): string | undefined {
 export const labelColor = (color: string | undefined) => labelInk(color) ? `#${color!.replace(/^#/, "")}` : undefined;
 
 export const lineageOnlyNote = "Lineage lists a release once an agent works on one of its issues or pull requests.";
-export const noForgeHere = "No machine reads issues and pull requests yet. Update Agents on a machine to see them.";
+export const noForgeHere = "No machine reads issues and pull requests yet. Update Agent Loops on a machine to see them.";
 
 // The page of one issue, PR or release (#3119): its checks and its review.
 

@@ -44,13 +44,13 @@ export function macHostNoticeTitle(notice: MacHostNotice): string {
 export function macHostNoticeDetail(notice: MacHostNotice): string {
   switch (notice.kind) {
     case "notRunning":
-      return "In Agents on this Mac, Settings ▸ Machines ▸ This Mac says why, Repair there starts it again, and Copy Diagnostics there is what to send with a report.";
+      return "In Agent Loops on this Mac, Settings ▸ Machines ▸ This Mac says why, Repair there starts it again, and Copy Diagnostics there is what to send with a report.";
     case "notJoined":
       return notice.problem?.trim()
-        ? `It’s running, and it has no membership. ${sentence(notice.problem)} In Agents on this Mac, press Try Again in Settings ▸ Machines ▸ This Mac.`
-        : "It’s running, and it still needs to join. In Agents on this Mac, press Try Again in Settings ▸ Machines ▸ This Mac.";
+        ? `It’s running, and it has no membership. ${sentence(notice.problem)} In Agent Loops on this Mac, press Try Again in Settings ▸ Machines ▸ This Mac.`
+        : "It’s running, and it still needs to join. In Agent Loops on this Mac, press Try Again in Settings ▸ Machines ▸ This Mac.";
     case "uplinkFailing":
-      return `It’s running, and its link to the control plane keeps failing. ${sentence(notice.problem)} It’s trying again by itself; Help ▸ Diagnostics in Agents on this Mac says more.`;
+      return `It’s running, and its link to the control plane keeps failing. ${sentence(notice.problem)} It’s trying again by itself; Help ▸ Diagnostics in Agent Loops on this Mac says more.`;
     case "notAnswering":
       return "What’s listed is what it last said. The control plane is trying again by itself.";
   }

@@ -77,7 +77,7 @@ export function machines(row: Pick<UserSecretRow, "machines">): string {
 export function waitingOn(row: Pick<UserSecretRow, "waiting">): string | null {
   const n = row.waiting?.length ?? 0;
   if (n === 0) return null;
-  return `${n === 1 ? "1 machine waits" : `${n} machines wait`} for one of your apps to seal it there. This happens when you open Agents.`;
+  return `${n === 1 ? "1 machine waits" : `${n} machines wait`} for one of your apps to seal it there. This happens when you open Agent Loops.`;
 }
 
 /** The version a secret is set at (#3397): the kept one plus one; for a new name, the time in ms, above a removed one's. */

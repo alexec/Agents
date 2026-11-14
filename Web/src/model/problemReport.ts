@@ -3,7 +3,7 @@
 
 /** The client line a report gives, with the version of the host that serves the page. */
 export function webClient(version: string | undefined): string {
-  return version ? `Web page (served by Agents ${version})` : "Web page";
+  return version ? `Web page (served by Agent Loops ${version})` : "Web page";
 }
 
 /** "Chrome 156 on macOS" from a user agent; the user agent itself when nothing in it is known. */

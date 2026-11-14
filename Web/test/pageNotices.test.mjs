@@ -37,7 +37,7 @@ test("a Web Push shows the need's words, buzzing only for an alert, one a need",
   assert.equal(shown.options.silent, false);
   assert.equal(shown.options.tag, 'need:{"permission":"P"}');
   const quiet = pushItem.notificationFor({ needID: { permission: "P" }, alert: false });
-  assert.equal(quiet.title, "Agents");
+  assert.equal(quiet.title, "Agent Loops");
   assert.equal(quiet.options.body, "An agent needs you");
   assert.equal(quiet.options.silent, true);
   assert.equal(quiet.options.data.open, "/");

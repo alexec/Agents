@@ -88,7 +88,7 @@ export function firstBuildStarter(idea: string): StarterPick {
 
 /** The line above the choice for an idea neither starter makes (section 4). */
 export const neitherLine =
-  "Agents can start with an iPhone app or a web service. Choose one, and the agent builds your idea on it as far as it goes.";
+  "Agent Loops can start with an iPhone app or a web service. Choose one, and the agent builds your idea on it as far as it goes.";
 
 export const starters: readonly Starter[] = ["iphone-app", "web-service"];
 

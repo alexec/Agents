@@ -115,6 +115,6 @@ test("the empty states say why", () => {
   assert.equal(b.noRunsWords("ci.yml", "main", "week"), "No ci runs on main finished in the last 7 days. Try a longer range, or Branch ▸ Pull requests.");
   assert.equal(b.noCIWords("github:alexec/agents-walk"), "alexec/agents-walk has no GitHub Actions runs. Builds come from the forge’s CI runs.");
   assert.equal(b.noReaderWords("forgejo:codeberg.org/scratch/app"),
-    "Forgejo: Agents does not read its CI runs yet, so there is nothing to draw for codeberg.org/scratch/app.");
+    "Forgejo: Agent Loops does not read its CI runs yet, so there is nothing to draw for codeberg.org/scratch/app.");
   assert.equal(b.workflowShown(undefined, ["deploy.yml", "ci.yml"]), "ci.yml");
 });

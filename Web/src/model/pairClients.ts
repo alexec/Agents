@@ -14,7 +14,7 @@ export const pairWords = {
   button: (purpose: PairPurpose) => `${pairWords.title(purpose)}…`,
   title: (purpose: PairPurpose) => (purpose === "device" ? "Pair a Device" : purpose === "mac" ? "Pair a Mac" : "Add a Browser"),
   making: "Making a code…",
-  scan: "Open Agents on your iPhone or iPad and scan this code.",
+  scan: "Open Agent Loops on your iPhone or iPad and scan this code.",
   paired: (name: string) => `${name} is paired`,
   pairedNote: "It reaches your agents through the control plane, as a Device.",
   joined: (name: string) => `${name} joined with this code. It can’t be used again.`,
@@ -34,7 +34,7 @@ export function codeInstructions(purpose: "mac" | "browser", expires: number, no
   const time = left === 0 ? "It has run out; close this and ask again."
     : `It works once, for ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}.`;
   if (purpose === "mac") {
-    return `On the other Mac, open Agents, choose Connect to a control plane and paste this. That Mac can then do all this page can. ${time}`;
+    return `On the other Mac, open Agent Loops, choose Connect to a control plane and paste this. That Mac can then do all this page can. ${time}`;
   }
   return `${browserWhere(web, publicWeb)} That browser can then do all this page can. ${time}`;
 }
@@ -43,7 +43,7 @@ export function codeInstructions(purpose: "mac" | "browser", expires: number, no
 function browserWhere(web: WebRemoteStatus | undefined, publicWeb: string | undefined): string {
   const anywhere = publicWeb ? `In any browser, open ${publicWeb} and paste it in.` : null;
   if (!web || (!web.served && web.reason === "off")) {
-    return anywhere ?? "Turn on Serve Agents to browsers on this Mac in Settings ▸ Control plane first.";
+    return anywhere ?? "Turn on Serve Agent Loops to browsers on this Mac in Settings ▸ Control plane first.";
   }
   // Without its scheme, as the Overview says it (test/lint.mjs).
   const address = `localhost:${web.port}`;

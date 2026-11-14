@@ -29,10 +29,10 @@ test("this Mac's host needing an update is up, not down (#1771)", async () => {
 test("not running and not joined say where in Agents to look", async () => {
   const { macHostNoticeTitle: title, macHostNoticeDetail: detail } = await load("src/model/macHostNotice.ts");
   assert.equal(title({ kind: "notRunning" }), "This Mac isn’t running as a machine");
-  assert.match(detail({ kind: "notRunning" }), /^In Agents on this Mac, Settings ▸ Machines ▸ This Mac says why/);
+  assert.match(detail({ kind: "notRunning" }), /^In Agent Loops on this Mac, Settings ▸ Machines ▸ This Mac says why/);
   assert.equal(title({ kind: "notJoined" }), "This Mac hasn’t joined");
   assert.equal(detail({ kind: "notJoined", problem: "the code expired" }),
-    "It’s running, and it has no membership. The code expired. In Agents on this Mac, press Try Again in Settings ▸ Machines ▸ This Mac.");
+    "It’s running, and it has no membership. The code expired. In Agent Loops on this Mac, press Try Again in Settings ▸ Machines ▸ This Mac.");
   assert.match(detail({ kind: "notAnswering" }), /trying again by itself/);
 });
 

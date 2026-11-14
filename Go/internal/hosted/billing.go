@@ -47,7 +47,7 @@ func (s *Service) upgrade(w http.ResponseWriter, r *http.Request, account string
 			s.log(acc.ID + ": upgrade: " + err.Error())
 		}
 		s.metrics.refused("upgrade_full")
-		s.accountPage(w, r, account, "Agents has no room for more Pro plans just now. Try Upgrade again another day.")
+		s.accountPage(w, r, account, "Agent Loops has no room for more Pro plans just now. Try Upgrade again another day.")
 		return
 	}
 	back := "https://" + s.cfg.Domain + "/account"

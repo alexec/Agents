@@ -154,7 +154,7 @@ func origin(at string) string {
 
 // welcome is the sign-up page, with p's invite and problem.
 func (s *Service) welcome(p page) page {
-	p.Title, p.Welcome, p.Providers, p.Open = "Agents", true, s.offered(), s.cfg.SignUp == SignUpOpen
+	p.Title, p.Welcome, p.Providers, p.Open = "Agent Loops", true, s.offered(), s.cfg.SignUp == SignUpOpen
 	if s.turnstile != nil {
 		p.TurnstileKey, p.TurnstileScript = s.turnstile.siteKey, turnstileScript
 	}
@@ -167,7 +167,7 @@ func (s *Service) startSignIn(w http.ResponseWriter, r *http.Request, provider, 
 		provider = signin.GitHub
 	}
 	if !s.offers(provider) {
-		s.page(w, http.StatusServiceUnavailable, page{Title: "Agents", Problem: "Sign-up is not open yet."})
+		s.page(w, http.StatusServiceUnavailable, page{Title: "Agent Loops", Problem: "Sign-up is not open yet."})
 		return
 	}
 	if validInvite(invite) {
@@ -437,10 +437,10 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 {{if .Place}}
 <h1>You are on the waitlist</h1>
 <p>You are number {{.Place}} on the waitlist. {{.Why}}</p>
-<p class="quiet">Agents keeps no email address and sends you nothing. Sign in again later to see if your account is ready.</p>
+<p class="quiet">Agent Loops keeps no email address and sends you nothing. Sign in again later to see if your account is ready.</p>
 <p><a class="button" href="/">Back</a></p>
 {{else if .Welcome}}
-<h1>Agents</h1>
+<h1>Agent Loops</h1>
 <p>Run many coding agents at once, and watch and answer them from a browser, a Mac or a phone.</p>
 <p>Sign up and you get a control plane of your own. You type no command and hold no key.</p>
 {{if .Problem}}<p class="problem" role="alert">{{.Problem}}</p>{{end}}
@@ -454,8 +454,8 @@ var pageTemplate = template.Must(template.New("page").Parse(`<!doctype html>
 {{else}}{{range .Providers}}<p><a class="button prominent signup" href="/signin?with={{.With}}{{if $.Invite}}&amp;invite={{$.Invite}}{{end}}">Sign Up with {{.Title}}</a></p>
 {{else}}<p>Sign-up is not open yet.</p>
 {{end}}{{end}}
-{{if .Open}}<p class="quiet">You need an email address that Apple, Google or GitHub has verified. Agents does not keep the address. It keeps only a mark of it, so that one email has one account.</p>
-{{else if not .Invite}}<p class="quiet">Sign-up is by invitation while Agents is in beta. Without an invite, you join the waitlist.</p>{{end}}
+{{if .Open}}<p class="quiet">You need an email address that Apple, Google or GitHub has verified. Agent Loops does not keep the address. It keeps only a mark of it, so that one email has one account.</p>
+{{else if not .Invite}}<p class="quiet">Sign-up is by invitation while Agent Loops is in beta. Without an invite, you join the waitlist.</p>{{end}}
 <p class="quiet">Signed up before? The same button signs you in.</p>
 {{else if .Account.Suspended}}
 <h1>Your account</h1>

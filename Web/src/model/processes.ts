@@ -42,4 +42,4 @@ export function isSessionsOwn(process: ProcessUsage, all: readonly ProcessUsage[
   return all.find((p) => p.pid === process.parent)?.agentId !== process.agentId;
 }
 
-export const processesFooter = "Agents’ own processes only. Stop a session to stop its processes.";
+export const processesFooter = "Agent Loops’ own processes only. Stop a session to stop its processes.";

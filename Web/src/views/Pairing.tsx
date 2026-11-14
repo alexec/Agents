@@ -134,15 +134,15 @@ export function Pairing({ session }: { session: Session }) {
         <AskSignIn session={session} busy={busy} />
         {onThisMac() ? (
           <p>
-            Get a code from Agents on this Mac:{" "}
+            Get a code from Agent Loops on this Mac:{" "}
             <strong>Settings ▸ Control plane ▸ Clients ▸ Add a Browser…</strong>. Paste it here. Or choose{" "}
-            <strong>Open in Browser</strong> in Agents' menu bar item: it opens this page paired.
+            <strong>Open in Browser</strong> in Agent Loops' menu bar item: it opens this page paired.
           </p>
         ) : (
           // The page on the control plane's own domain (#1459): any paired window or phone makes one.
           <p>
             {org && "Or pair with a code. "}
-            Get a code from Agents where it is already connected: on a Mac,{" "}
+            Get a code from Agent Loops where it is already connected: on a Mac,{" "}
             <strong>Settings ▸ Control plane ▸ Clients ▸ Add a Browser…</strong>; on an iPhone or iPad,{" "}
             <strong>Add a Browser…</strong> at the foot of the sidebar. Paste it here.
           </p>
@@ -183,7 +183,7 @@ export function Unsupported() {
       <div class="pairing-card">
         <h1>This browser isn't supported</h1>
         <p>
-          It can't keep a key that can't be copied out of it, which is how Agents knows it's you. Use the current Safari or
+          It can't keep a key that can't be copied out of it, which is how Agent Loops knows it's you. Use the current Safari or
           Chrome.
         </p>
       </div>

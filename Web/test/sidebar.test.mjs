@@ -671,7 +671,7 @@ test("a tab holding one folder alone keeps it in every address in it, until ‹ 
 
 test("a tab holding one folder is titled with its name (#1089)", async () => {
   const { titleFor } = await load("src/presence.ts");
-  assert.equal(titleFor(0), "Agents");
+  assert.equal(titleFor(0), "Agent Loops");
   assert.equal(titleFor(2, "alpha"), "(2) alpha");
 });
 

@@ -136,7 +136,7 @@ export class HostedView {
     const proxy = await viewsOrigin();
     if (mine !== this.attempt || this.closed()) return;
     if (!proxy) {
-      this.failure.value = "Views are not drawn on this page: its control plane has no views name. The Agents apps draw them.";
+      this.failure.value = "Views are not drawn on this page: its control plane has no views name. The Agent Loops apps draw them.";
       this.phase.value = "failed";
       return;
     }

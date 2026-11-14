@@ -380,9 +380,9 @@ func whyText(why string, minAge time.Duration) string {
 	case whyAge:
 		return fmt.Sprintf("Your GitHub account is newer than %d days.", int(minAge.Hours()/24))
 	case whyCap:
-		return "Agents has as many accounts as it can take for now."
+		return "Agent Loops has as many accounts as it can take for now."
 	default:
-		return "Sign-up is by invitation while Agents is in beta."
+		return "Sign-up is by invitation while Agent Loops is in beta."
 	}
 }
 

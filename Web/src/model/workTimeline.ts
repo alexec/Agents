@@ -562,4 +562,4 @@ export const showTheWeek = "Show the week";
 /** S12: no project to draw. */
 export const noProjectTitle = "No project to draw";
 export const noProject = "Timeline shows a project’s epics. Add a folder to a project to see them.";
-export const noMachine = "No machine draws the timeline yet. Update Agents on a machine to see it.";
+export const noMachine = "No machine draws the timeline yet. Update Agent Loops on a machine to see it.";

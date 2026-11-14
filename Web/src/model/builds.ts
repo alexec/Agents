@@ -379,7 +379,7 @@ export function noCIWords(repo: string): string {
 
 /** A forge Agents does not read CI timings from yet (board 4 note 4). */
 export function noReaderWords(repo: string): string {
-  return `${forgeName(repo)}: Agents does not read its CI runs yet, so there is nothing to draw for ${buildsRepoWords(repo)}.`;
+  return `${forgeName(repo)}: Agent Loops does not read its CI runs yet, so there is nothing to draw for ${buildsRepoWords(repo)}.`;
 }
 
 /** The machine has not read the repository's runs yet. */

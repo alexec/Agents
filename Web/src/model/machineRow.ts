@@ -158,7 +158,7 @@ export function joinStepWords(step: string | null, stopped = false): string {
     case "start": return "Starting it…";
     case "connect": return stopped ? "Starting it and connecting…" : "Connecting…";
     case "checkSystem": return "Checking the system…";
-    case "setUp": return "Installing Agents…";
+    case "setUp": return "Installing Agent Loops…";
     default: return "Joining…";
   }
 }
@@ -211,6 +211,6 @@ export function makingCanDelete(row: MachineMaking, join?: MachineJoin): boolean
  * codespace made on github.com, can hold the person's own work. */
 export function deleteMakingQuestion(row: MachineMaking): string {
   return row.joinable
-    ? `Delete ${row.name}? ${row.providerName} deletes ${row.name} and its disk. It never joined Agents, so it has no backup: work on it that is not pushed is lost.`
+    ? `Delete ${row.name}? ${row.providerName} deletes ${row.name} and its disk. It never joined Agent Loops, so it has no backup: work on it that is not pushed is lost.`
     : `Delete ${row.name}? ${row.providerName} deletes it. Nothing was installed on it, so there is nothing to back up.`;
 }

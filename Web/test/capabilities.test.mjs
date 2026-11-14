@@ -19,9 +19,9 @@ test("a host has what its list names, and everything when it said no list", () =
 test("a host without the required set says what to update it to", () => {
   const old = row({ state: "needsUpdate", capabilities: ["agents/1"], missing: ["host.wire/1"] });
   assert.equal(caps.stateWords(old), "Needs an update");
-  assert.equal(caps.missingWords(old, "0.7.0"), "Update this machine to Agents 0.7.0. It does not have host.wire/1.");
+  assert.equal(caps.missingWords(old, "0.7.0"), "Update this machine to Agent Loops 0.7.0. It does not have host.wire/1.");
   assert.equal(caps.missingWords(row(), "0.7.0"), null);
-  assert.equal(caps.versionWords(row({ implementation: "go" })), "Agents 0.6.0 (Go)");
+  assert.equal(caps.versionWords(row({ implementation: "go" })), "Agent Loops 0.6.0 (Go)");
 });
 
 test("a host that needs an update still answers; one offline does not (#1771)", () => {
@@ -38,7 +38,7 @@ test("the generated tables name a capability for each method", () => {
 test("the page says when it is too old for the control plane", () => {
   assert.equal(caps.appMissingWords({ host: [], client: ["client.wire/1"] }, "0.7.0"), null);
   assert.equal(caps.appMissingWords({ host: [], client: ["client.wire/2"] }, "0.8.0"),
-    "Update this page to Agents 0.8.0 to use this control plane. It does not have client.wire/2.");
+    "Update this page to Agent Loops 0.8.0 to use this control plane. It does not have client.wire/2.");
   assert.equal(caps.appMissingWords(undefined, "0.6.0"), null);
 });
 

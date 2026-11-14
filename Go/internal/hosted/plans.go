@@ -74,7 +74,7 @@ const limitDisk = "disk"
 
 func (e *LimitError) Error() string {
 	if e.Limit == limitDisk {
-		return "Agents' storage is nearly full just now, so nothing more can be saved. Delete something, or try again later."
+		return "Agent Loops' storage is nearly full just now, so nothing more can be saved. Delete something, or try again later."
 	}
 	return fmt.Sprintf("Your %s plan allows %s. %s, or upgrade at %s.", e.Plan.Name, e.Allows, e.Do, e.Account)
 }

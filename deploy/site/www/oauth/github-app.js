@@ -20,7 +20,7 @@
     ok = false;
   }
   if (!ok) {
-    words.textContent = "This page is for making your agents' bot from Agents. Start again from Agents.";
+    words.textContent = "This page is for making your agents' bot from Agent Loops. Start again from Agent Loops.";
     return;
   }
   form.action = action;
