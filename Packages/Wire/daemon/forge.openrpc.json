@@ -1,0 +1,612 @@
+{
+  "openrpc": "1.3.2",
+  "info": {
+    "title": "agentsd: forge",
+    "version": "0",
+    "description": "The host methods of the forge group; see daemon.openrpc.json for the rest of the document."
+  },
+  "methods": [
+    {
+      "name": "forge/add-child",
+      "x-capability": "forge-write/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeAddChildRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
+      "name": "forge/approve",
+      "x-capability": "forge-write/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeApproveRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
+      "name": "forge/assign",
+      "x-capability": "forge.assign/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeAssignRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
+      "name": "forge/blocked-by",
+      "x-capability": "forge-write/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeBlockedByRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
+      "name": "forge/boards",
+      "x-capability": "forge.boards/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeBoardsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeBoards"
+        }
+      }
+    },
+    {
+      "name": "forge/cancel-auto-merge",
+      "description": "Turn off a pull request's auto-merge (#4410): it no longer merges on its own when its checks pass. Offered where the page's actions has cancelAutoMerge: an open pull request with autoMerge on.",
+      "x-capability": "forge.cancel-auto-merge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
+      "name": "forge/close",
+      "x-capability": "forge-write/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeCloseRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
+      "name": "forge/comment",
+      "x-capability": "forge-write/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeCommentRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
+      "name": "forge/diff",
+      "x-capability": "forge-write/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeDiff"
+        }
+      }
+    },
+    {
+      "name": "forge/features",
+      "x-capability": "forge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeFeaturesRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeFeatures"
+        }
+      }
+    },
+    {
+      "name": "forge/image",
+      "x-capability": "forge.image/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeImageRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeImage"
+        }
+      }
+    },
+    {
+      "name": "forge/issue",
+      "x-capability": "forge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeItemRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeItemDetail"
+        }
+      }
+    },
+    {
+      "name": "forge/issues",
+      "x-capability": "forge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeList"
+        }
+      }
+    },
+    {
+      "name": "forge/label",
+      "x-capability": "forge-write/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeLabelRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
+      "name": "forge/labels",
+      "x-capability": "forge-write/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeLabels"
+        }
+      }
+    },
+    {
+      "name": "forge/log",
+      "x-capability": "forge-write/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeLogRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeLog"
+        }
+      }
+    },
+    {
+      "name": "forge/merge",
+      "x-capability": "forge-write/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeMergeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
+      "name": "forge/plan",
+      "x-capability": "forge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgePlanRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgePlan"
+        }
+      }
+    },
+    {
+      "name": "forge/pull",
+      "x-capability": "forge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeItemRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeItemDetail"
+        }
+      }
+    },
+    {
+      "name": "forge/pulls",
+      "x-capability": "forge/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeListRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeList"
+        }
+      }
+    },
+    {
+      "name": "forge/ready",
+      "description": "Mark a draft pull request ready for review (#4410). Offered where the page's actions has ready: an open pull request that is a draft.",
+      "x-capability": "forge.ready/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeDone"
+        }
+      }
+    },
+    {
+      "name": "forge/release",
+      "x-capability": "forge.releases/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeReleaseRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeReleaseDetail"
+        }
+      }
+    },
+    {
+      "name": "forge/releases",
+      "x-capability": "forge.releases/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeReleasesRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeReleases"
+        }
+      }
+    },
+    {
+      "name": "forge/rerun",
+      "x-capability": "forge-write/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/forge.schema.json#/definitions/ForgeNodeRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/forge.schema.json#/definitions/ForgeDone"
+        }
+      }
+    }
+  ]
+}

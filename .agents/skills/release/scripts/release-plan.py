@@ -55,7 +55,7 @@ def bump(tag):
 # The paths of an enhancement that makes a minor (#2857): the clients, the host and daemon,
 # and the capability list (capability-changes.py's documents).
 SEEN = ("App/Sources/", "Remote/Sources/", "Shared/UI/", "Web/src/", "Go/", "Host/",
-        "Packages/AgentsKit/Sources/", "Packages/Wire/daemon.openrpc.json",
+        "Packages/AgentsKit/Sources/", "Packages/Wire/daemon.openrpc.json", "Packages/Wire/daemon/",
         "Packages/Wire/control.openrpc.json")
 
 
