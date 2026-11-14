@@ -14,7 +14,8 @@ struct TokensView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // Over time, as Health draws it (#823).
-                UsageChartsSection(metric: .tokens, load: { await model.usageHistory() }, refresh: model.costState)
+                UsageChartsSection(metric: .tokens, load: { await model.usageHistory() }, refresh: model.costState,
+                                   alsoRead: model.work.costStateReadAt)
                     .padding(.bottom, 8)
                 if let state = model.costState { TokensToday(state: state) }
             }

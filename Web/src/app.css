@@ -3015,6 +3015,9 @@ dialog.sheet:has(.persona-sheet) { width: min(900px, calc(100vw - 32px)); max-he
 /* How old what is shown is (#5141): after a banner's words in its own colour; on its own, ink.secondary at the caption step. */
 .last-update { white-space: nowrap; }
 :not(.message-words) > .last-update { color: var(--paper-secondary); font-size: var(--type-fine); }
+/* At the top of a pane with no banner (#5144), at its trailing end. */
+.page-fresh { margin: 0 0 8px; text-align: end; }
+.multiplier-page > .page-fresh { align-self: stretch; margin: 0; }
 /* A section's heading with the line at its trailing end (#5146). */
 .section-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .section-head-row > .last-update { margin-right: 8px; }
