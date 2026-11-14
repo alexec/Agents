@@ -35,14 +35,12 @@ import { velocityHere } from "../model/velocity";
 import { TimeCharts } from "./TimeCharts";
 import { VelocityCharts } from "./VelocityCharts";
 import { pageHost } from "./Multiplier";
-import { LastUpdate } from "./LastUpdate";
 import { oldestRead } from "../model/lastUpdate";
 import { Capability } from "../protocol/capabilities.generated";
 import { OrgBudget, OrgPolicyLine, PassThroughList } from "./OrgPolicyLine";
 import { PageTitle } from "./TopBar";
 import { pageCrumbs, sectionOfActivity } from "../model/crumbs";
 import { ask } from "./MessageKinds";
-import { LastUpdate } from "./LastUpdate";
 import { busRow, envelopeChoices, envelopeMatches, joinBus, producerMachine, type EnvelopeFilter, type EventItem } from "../model/eventBus";
 
 function navigate(destination: { host: string; folder: string; session?: string; workflow?: string }): void {
