@@ -3527,6 +3527,10 @@
         "runner": {
           "type": "string"
         },
+        "slowedSent": {
+          "$ref": "#/definitions/WireDate",
+          "description": "When this machine sent ci.slowed for the change (#5200); absent when it sent none (a speed-up, or a change found too long after its first slow run)."
+        },
         "between": {
           "type": "array",
           "items": {

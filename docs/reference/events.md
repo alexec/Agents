@@ -131,6 +131,12 @@ counting again from the next agent that works.
 | --- | --- | --- | --- |
 | `branch.moved` | branch, any | branch, from, to | A branch an agent works on moved; never the default branch. A wait names the branch or sets `any: true` (#3797). |
 
+## Builds
+
+| Event | Filter by | Details | What it means |
+| --- | --- | --- | --- |
+| `ci.slowed` | repo, workflow, job | repo, workflow, job, branch, first_slow_run, first_slow_run_url, last_fast_run, last_fast_run_url, median_before, median_after, score | A job's run time on the default branch stepped up (#5200). The machine's daemon finds it in its build timings, with the per-job change finder of `Go/internal/citimings`. `first_slow_run` and `last_fast_run` are `ci-run` refs, as `github:run:owner/name#123`; `median_before` and `median_after` are the job's run time in seconds on each side; `repo` is `owner/name`. Raised once for each change, in each folder that pushes to the repository, and only for a change whose first slow run is at most 7 days old. A job that got faster sends nothing, and so does a longer wait for a runner or a turn: that is load, not a commit. Each machine that watches the repository finds the same change with the same envelope id (`<first_slow_run>@ci.slowed/<workflow>/<job>`), so the bus keeps one copy. GitHub only, as the build timings are. |
+
 ## Files
 
 `file.added` and `file.removed` are about files in the folder (#3795). A wait or a trigger

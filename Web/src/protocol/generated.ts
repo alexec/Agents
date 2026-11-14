@@ -1627,6 +1627,11 @@ export interface BuildsChange {
   queueAfter: number;
   score: number;
   runner?: string;
+  /**
+   * When this machine sent ci.slowed for the change (#5200); absent when it sent none (a speed-up,
+   * or a change found too long after its first slow run).
+   */
+  slowedSent?: WireDate;
   between: BuildsBetween[];
   points: BuildsPoint[];
 }
@@ -16313,7 +16318,7 @@ export const Shapes: Record<string, { required: readonly string[]; optional: rea
   BudgetRequestList: { required: ["requests"], optional: [] },
   BuildOutputRemoved: { required: ["removed", "freed"], optional: [] },
   BuildsBetween: { required: ["run", "ran"], optional: ["jobRun"] },
-  BuildsChange: { required: ["workflow", "job", "slower", "at", "lastFast", "firstSlow", "medianBefore", "medianAfter", "queueBefore", "queueAfter", "score", "between", "points"], optional: ["runner"] },
+  BuildsChange: { required: ["workflow", "job", "slower", "at", "lastFast", "firstSlow", "medianBefore", "medianAfter", "queueBefore", "queueAfter", "score", "between", "points"], optional: ["runner", "slowedSent"] },
   BuildsDay: { required: ["day", "figures"], optional: [] },
   BuildsFigures: { required: ["runs", "green", "reruns", "toGreen", "run", "runner", "turn"], optional: [] },
   BuildsHistory: { required: ["repo", "reader", "workflows", "jobs", "branches", "total", "days", "changes"], optional: ["defaultBranch", "longestRunnerWait", "readAt", "filledFrom"] },
