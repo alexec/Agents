@@ -1,0 +1,193 @@
+/* Work ▸ Features (#3269), in the Work look (#4418, epic.md, Features): the page's bar, the groups' heads with their count,
+   two-line features with a chip and a bar of epics done, and an open feature's mini rows. */
+.work-features-bar { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-bottom: 8px; }
+.work-features .stale { opacity: 0.5; }
+.work-empty-glyph { opacity: 0.45; margin-bottom: 4px; }
+.work-group-head { display: flex; gap: 8px; align-items: baseline; width: 100%; margin-top: 12px; padding: 4px; border: none; border-radius: 0; background: none;
+  color: color-mix(in srgb, currentColor 70%, transparent); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
+.work-group-head.attention .words { color: var(--tint-attention); }
+.work-group-head .chevron { display: inline-block; width: 12px; font-weight: normal; }
+.work-group-head .count { font-weight: normal; opacity: 0.6; font-variant-numeric: tabular-nums; }
+.work-feature-rows { list-style: none; margin: 0; padding: 0; }
+.work-feature-head { display: flex; gap: 8px; align-items: flex-start; width: 100%; padding: 8px 4px; border: none; border-radius: 0; background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.work-feature-head:hover, .work-feature-row:hover { background: var(--paper-wash); }
+.work-feature-head .chevron { display: inline-block; width: 12px; flex: none; opacity: 0.6; }
+.work-feature-head .dot { flex: none; width: 9px; height: 9px; margin-top: 5px; border-radius: 50%; background: color-mix(in srgb, currentColor 40%, transparent); }
+.work-feature-head .work-row-head { display: flex; gap: 6px; align-items: center; }
+.work-feature-head .work-title { font-weight: 600; }
+.work-feature-head .work-row-line { display: flex; flex-wrap: wrap; gap: 4px; }
+.work-needs { color: var(--tint-attention); font-weight: 600; }
+.work-feature-done { flex: none; display: flex; gap: 10px; align-items: center; margin-left: auto; padding-top: 6px; }
+.work-feature-done .work-plan-bar { width: 120px; }
+.work-feature-done .words { min-width: 110px; text-align: right; font-variant-numeric: tabular-nums; }
+.work-feature-open { padding: 0 0 6px 40px; }
+.work-feature-open .work-error { margin-top: 4px; }
+.work-feature-items { list-style: none; margin: 0; padding: 0; }
+.work-rows .work-feature-items li { border: none; }
+.work-feature-open h4 { margin: 6px 0 2px; font-weight: 600; opacity: 0.7; }
+.work-feature-row { display: flex; gap: 8px; align-items: center; width: 100%; box-sizing: border-box; padding: 3px 4px; color: inherit; text-decoration: none; }
+.work-feature-row .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-feature-epic-end { display: inline-flex; gap: 10px; align-items: center; margin-left: auto; white-space: nowrap; }
+.work-feature-epic-end .work-plan-bar { width: 110px; }
+.work-feature-epic-end .figures { min-width: 50px; font-variant-numeric: tabular-nums; }
+.work-feature-epic-end .lead { min-width: 130px; opacity: 0.75; }
+.work-feature-epic-end .lead.working { color: var(--forge-open); opacity: 1; }
+.work-feature-epic-end .lead.attention { color: var(--tint-attention); opacity: 1; }
+.work-features .work-plan-bar .done { background: var(--forge-done); }
+/* Features as a delivery view (#4589, features-delivery.md): an epic's line with where it is, its children in flight under
+   it (a green dot for Working, the warn glyph and the attention colour for Needs you), and the rest in words. */
+.work-features .work-plan-bar .running { background: var(--forge-open); }
+.work-epic-glyph { flex: none; color: var(--forge-open); }
+.work-epic-glyph.closed { color: var(--forge-done); }
+.work-delivery-epic { margin-top: 4px; }
+.work-delivery-epic-row .work-title { font-weight: 600; }
+.work-delivery-epic-row .where { white-space: nowrap; }
+.work-delivery-phone { display: none; }
+.work-flight-lines { padding-left: 22px; }
+.work-flight-row .mark { flex: none; width: 14px; text-align: center; color: var(--forge-open); font-size: 0.8em; }
+.work-flight-row.is-attention .mark { color: var(--tint-attention); font-size: 1em; }
+.work-flight-row .name { flex: 0 1 auto; }
+.work-flight-row .ref { font-variant-numeric: tabular-nums; }
+.work-flight-row .words { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.75; }
+.work-flight-row.is-attention .words { color: var(--tint-attention); font-weight: 600; opacity: 1; }
+.work-flight-row .pr { flex: none; display: inline-flex; gap: 4px; align-items: center; margin-left: auto; white-space: nowrap; }
+.work-delivery-rest { margin: 2px 0 4px; padding-left: 26px; }
+.work-delivery-rest .short-line { display: none; }
+.work-delivery-rest a { color: inherit; }
+@container (max-width: 899px) {
+  .work-flight-row .pr { display: none; }
+  .work-feature-epic-end .lead { min-width: 0; }
+}
+@container (max-width: 699px) {
+  .work-feature-chip, .work-feature-done .words { display: none; }
+  .work-feature-done .work-plan-bar { width: 60px; }
+  .work-feature-open { padding-left: 20px; }
+  .work-feature-row { flex-wrap: wrap; align-items: baseline; }
+  .work-feature-row .name { flex: 1 1 0; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .work-delivery-epic-row .where, .work-feature-epic-end .figures, .work-feature-epic-end .lead { display: none; }
+  .work-feature-epic-end .work-plan-bar { width: 60px; }
+  .work-delivery-phone { display: block; flex-basis: 100%; padding-left: 22px; opacity: 0.75; }
+  .work-delivery-phone.working { color: var(--forge-open); opacity: 1; }
+  .work-delivery-phone.attention { color: var(--tint-attention); opacity: 1; }
+  .work-flight-lines { padding-left: 14px; }
+  .work-flight-lines .wide-only { display: none; }
+  .work-flight-row .words { flex-basis: 100%; padding-left: 22px; white-space: normal; }
+  .work-flight-row .words .sep { display: none; }
+  .work-delivery-rest { padding-left: 36px; }
+  .work-delivery-rest .wide-line { display: none; }
+  .work-delivery-rest .short-line { display: inline; }
+}
+/* Work ▸ Timeline (#4206), as the window's (#4173): white by day, navy at night, where the lines glow and the
+   features' colours are mixed 25% with white to keep 3:1 on the navy (wireframe section 11). */
+/* One background before and after Now, and Now grey (Alex, 2026-11-10). */
+.timeline-page { --timeline-glow: 0; }
+@media (prefers-color-scheme: dark) {
+  .timeline-page { --timeline-glow: 1; }
+  .timeline-page [style*="--c"] { --c-shown: color-mix(in srgb, var(--c) 75%, var(--paper-on-fill)); }
+}
+.timeline-page .spacer { flex: 1; }
+.timeline { position: relative; }
+.timeline-scroll { position: relative; overflow: auto; height: max(360px, calc(100vh - 240px)); border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control); background: var(--timeline-plot); overscroll-behavior-x: contain; }
+.timeline-content { position: relative; }
+.timeline-plot, .timeline-axis { display: block; font: 11px var(--font-text); }
+.timeline-plot.pointing { cursor: pointer; }
+.timeline-axis { position: sticky; bottom: 0; }
+.timeline-ground { fill: var(--timeline-plot); }
+.timeline-stroke path { fill: none; stroke: var(--c-shown, var(--c)); stroke-linecap: round; }
+.timeline-stroke .glow { opacity: calc(0.7 * var(--timeline-glow)); filter: blur(3px); }
+.timeline-band { fill: var(--c-shown, var(--c)); opacity: 0.13; }
+.timeline-join circle { fill: var(--c-shown, var(--c)); }
+.timeline-join.forecast circle { fill: var(--timeline-plot); stroke: var(--c-shown, var(--c)); stroke-width: 2; }
+.timeline-join text { fill: var(--paper-on-fill); font-weight: 700; }
+.timeline-join.forecast text { fill: var(--c-shown, var(--c)); }
+.timeline-release { fill: var(--timeline-plot); stroke: var(--timeline-release); stroke-width: 2; }
+.timeline-dot { fill: var(--c-shown, var(--c)); }
+.timeline-dot.dropped { fill: var(--timeline-faint); }
+.timeline-dot.ahead { fill: var(--timeline-plot); stroke: var(--c-shown, var(--c)); stroke-width: 1.5; }
+.timeline-working circle { fill: var(--timeline-plot); stroke: var(--c-shown, var(--c)); stroke-width: 1.5; }
+.timeline-working path { fill: var(--c-shown, var(--c)); }
+.timeline-cross { fill: none; stroke: var(--c-shown, var(--c)); stroke-width: 2; }
+.timeline-now { stroke: var(--timeline-now); stroke-width: 1.5; }
+.timeline-label .halo { fill: var(--timeline-plot); opacity: 0.85; }
+.timeline-label .faint, .timeline-project { fill: var(--timeline-faint); }
+.timeline-label .name { fill: var(--c-shown, var(--c)); }
+.timeline-project { font-weight: 600; }
+.timeline-more { font-weight: 700; }
+.timeline-pill text { font-weight: 600; fill: var(--paper-on-fill); }
+.timeline-pill.waits rect { fill: var(--tint-attention); }
+.timeline-pill.now rect { fill: var(--timeline-now); }
+.timeline-pill.tag rect { fill: var(--timeline-release); }
+.timeline-pill.tag text { fill: var(--timeline-plot); }
+.timeline-tick line { stroke: var(--timeline-faint); }
+.timeline-tick text { fill: var(--timeline-faint); }
+.timeline-tick.midnight text { font-weight: 600; }
+/* S11: a card in the middle of the plot, with Show the week. */
+.timeline-empty { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); width: max-content; max-width: 80%; margin: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 14px; border: 1px solid var(--paper-rule);
+  border-radius: 6px; background: var(--paper-raised); text-align: center; }
+.timeline-empty button { margin-top: 4px; }
+/* The bar (notes 30 to 32): the range and a bordered Now at the trailing edge, then Refresh. */
+.timeline-bar .work-menus { gap: 8px; }
+.timeline-trailing { display: inline-flex; gap: 8px; align-items: center; margin-left: auto; }
+.timeline-now-button { padding: 2px 10px; font-size: 0.75rem; border: 1px solid var(--paper-rule); border-radius: 999px; background: none; }
+/* S12: the last plot under the error strip, dimmed. */
+.timeline.dim .timeline-scroll { opacity: 0.45; }
+/* S10: grey bars where the lanes go, shimmering; still with Reduce Motion. */
+.timeline-placeholder rect { fill: var(--timeline-faint); opacity: 0.25; }
+@media (prefers-reduced-motion: no-preference) {
+  .timeline-placeholder rect { animation: timeline-shimmer 1.4s ease-in-out infinite; }
+}
+@keyframes timeline-shimmer { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.35; } }
+/* The list of epics (note 36): what a screen reader reads over the plot; the Timeline itself under 700 px. Now on a
+   line above it, then a row per epic: its colour at the leading edge, the title and line 2, the progress at the end. */
+.timeline-list { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.timeline-list-now { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; color: var(--timeline-now); }
+.timeline-list-now::after { content: ""; flex: 1; height: 1.5px; background: var(--timeline-now); }
+.timeline-list-row { display: flex; flex-direction: row; justify-content: flex-start; align-items: center; gap: 10px; width: 100%;
+  text-align: left; background: none; border: none; border-radius: 0; padding: 8px 4px 8px 0; font: inherit; color: inherit; cursor: pointer; }
+.timeline-list-row .edge { flex: none; align-self: stretch; width: 4px; border-radius: 2px; background: var(--c-shown, var(--c)); }
+.timeline-list-row .work-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.timeline-list-row .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-list-row .waits { color: var(--tint-attention); }
+.timeline-list-progress { flex: none; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.timeline-list-progress .track { width: 56px; height: 4px; border-radius: 2px; background: var(--paper-rule); overflow: hidden; }
+.timeline-list-progress .fill { display: block; height: 100%; background: var(--c-shown, var(--c)); }
+@media (max-width: 699px) {
+  .timeline-scroll { display: none; }
+  .timeline-list { position: static; width: auto; height: auto; overflow: visible; clip-path: none; white-space: normal; }
+  .timeline-empty { position: static; transform: none; width: auto; max-width: none; margin: 8px 0; }
+  .timeline-trailing { margin-left: 0; }
+}
+.timeline-card { position: absolute; z-index: 2; max-width: 360px; padding: 8px; border: 1px solid var(--paper-rule); border-radius: 6px;
+  background: var(--paper-raised); box-shadow: var(--shadow-floating); pointer-events: none; line-height: 1.35; }
+.timeline-card .strong { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-card-title { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.timeline-card-title svg { flex: none; }
+.timeline-card .work-chips, .timeline-card-line { margin-left: 20px; }
+.timeline-card-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-card-row { display: flex; flex-direction: column; gap: 4px; }
+.timeline-card-row + .timeline-card-row { margin-top: 8px; }
+.timeline-card .work-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.timeline-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A dot that landed while the page is open pulses once; not with Reduce Motion. */
+.timeline-pulse { fill: none; stroke: var(--c-shown, var(--c)); stroke-width: 2; opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .timeline-pulse { animation: timeline-pulse 1s ease-out 1; }
+}
+/* An epic worked on now: a glow under its line breathes every 1.6 s, one clock for every line; not with Reduce Motion. */
+.timeline-breathing { display: none; fill: none; stroke-linecap: round; }
+.timeline-breathing path { stroke: var(--c-shown, var(--c)); }
+@media (prefers-reduced-motion: no-preference) {
+  .timeline-breathing { display: inline; animation: timeline-breathe 1.6s ease-in-out infinite; }
+  /* The ◐ turns once a breath, on the same clock (#4265); with Reduce Motion it is still. */
+  .timeline-working path { animation: timeline-turn 1.6s linear infinite; }
+}
+@keyframes timeline-turn { to { transform: rotate(360deg); } }
+@keyframes timeline-breathe {
+  0%, 100% { stroke-width: 4px; stroke-opacity: 0.1; }
+  50% { stroke-width: 12px; stroke-opacity: 0.4; }
+}
+@keyframes timeline-pulse { from { r: 4px; opacity: 1; } to { r: 14px; opacity: 0; } }
+

@@ -1,0 +1,80 @@
+/* The status mark: a spinner while working; the shape says who acts next. Only needs-you is in colour. */
+.status {
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.625rem;
+  font-weight: 700;
+  opacity: 0.55;
+}
+.status.working { border: none; opacity: 0.7; }
+.status.needsYou { background: currentColor; }
+.status.needsYou .glyph { color: var(--paper-ground); }
+.status.needsYou.tinted { color: var(--tint-attention); opacity: 1; }
+/* Waiting (#2456, #2657): no ring round the breathing beacon, and the beacon in the accent at full strength, as the
+   working ring has no ring round it; the breath does the dimming. */
+.status.waiting { border: none; opacity: 1; color: var(--accent); }
+.status.stopped { font-size: 0.4375rem; }
+
+.section-head { font-size: 0.75rem; font-weight: 600; margin: 8px 8px 2px; }
+.subhead { font-size: 0.71875rem; font-weight: 500; opacity: 0.6; margin: 10px 8px 2px; }
+.subhead.needs { opacity: 0.85; }
+.count { font-variant-numeric: tabular-nums; opacity: 0.55; font-weight: 400; }
+details.archived > summary { cursor: pointer; list-style-position: inside; }
+.workflows { margin-top: 8px; }
+.workflow { cursor: default; }
+
+.hint { opacity: 0.55; padding: 8px; margin: 0; }
+
+.search {
+  flex: 1;
+  font: inherit;
+  color: inherit;
+  background: var(--paper-wash);
+  border: none;
+  border-radius: var(--radius-control);
+  padding: 5px 8px;
+}
+
+button.icon { padding: 3px 9px; }
+
+button.link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+}
+
+/* Status ▸ Secrets and Status ▸ Accounts (#4161): a row per item, its age at the end, read only. */
+.status-list { list-style: none; padding: 0; margin: 0 0 12px; }
+.status-list li { border-bottom: 1px solid var(--paper-rule); }
+.status-list-row {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; width: 100%;
+  border: 0; background: none; padding: 8px 0; text-align: left; font: inherit; color: inherit; cursor: pointer;
+}
+.status-list-row > .hint { grid-column: 1 / -1; margin: 0; padding: 0; }
+
+.identity {
+  border-top: 1px solid var(--paper-rule);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
+/* Help (#1327): a link to the docs site, drawn as the Settings button beside it. */
+.identity a.link { color: var(--accent); text-decoration: none; }
+.identity a.link:hover { text-decoration: underline; }
+.identity .confirm { display: flex; gap: 6px; }
+.identity .forget { display: flex; flex-direction: column; gap: 4px; }
+.identity .forget p { margin: 0; }
+

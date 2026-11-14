@@ -1,0 +1,64 @@
+/* The prompt bar, as the window's (#108): where and labels over the input on the left, the runtime
+   on the right; attach and send inside the input; the runtime's menus under it. */
+.bar { display: flex; flex-direction: column; gap: 10px; }
+.bar-head { display: flex; align-items: center; gap: 12px; }
+.bar-where { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.bar-runtime { flex: none; margin-left: auto; }
+
+.prompt {
+  display: flex;
+  flex-direction: column;
+  min-height: 94px;
+  max-height: min(50vh, 24rem);
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-floating);
+  box-shadow: var(--shadow-floating);
+  padding: 12px 12px 12px 14px;
+}
+
+.prompt-field { display: flex; flex: 1 1 auto; min-height: 0; align-items: stretch; }
+.prompt-actions { display: flex; flex: none; align-items: center; gap: 8px; padding-top: 6px; }
+
+/* The runtime's commands and the host's files, over the field (CommandList, MentionList; #255). */
+.completions { list-style: none; margin: 0 0 8px; padding: 6px; max-height: 220px; overflow-y: auto;
+  background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 14px; box-shadow: var(--shadow-floating); }
+.completions li { display: flex; align-items: baseline; gap: 8px; padding: 5px 8px; border-radius: 7px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; }
+.completions li > :last-child { overflow: hidden; text-overflow: ellipsis; }
+.completions li.chosen { background: var(--paper-wash); }
+
+.prompt textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.8em;
+  max-height: min(40vh, 18rem);
+  box-sizing: border-box;
+  border: none;
+  resize: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  outline: none;
+  align-self: stretch;
+  overflow-y: auto;
+}
+
+.send, .prompt .attach {
+  flex: none;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+.send { background: var(--paper-raised); color: var(--accent); border-color: var(--line-accent); }
+/* Send (or Stop) at the right of the action row, Attach at the left, as on the Mac and the Remote (#2751). */
+.prompt-actions .send { margin-left: auto; }
+
+/* Wrapped, not scrolled: a tab out of sight behind a scroll says nothing of itself (#2940). */
+.files .tabs { flex: 1; display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; padding: 6px 0; }
+.files .tab { padding: 3px 10px; border-radius: var(--radius-control); white-space: nowrap; }
+.files .tab.chosen { background: var(--paper-raised); }
+.files ul { list-style: none; }
+.files li { padding: 3px 8px; }
+

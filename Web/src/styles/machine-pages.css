@@ -1,0 +1,112 @@
+/* Activity ▸ Worktrees (#790): a folder's name with Clean up beside it, each row's size at its end. */
+.worktrees .worktrees-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 14px 0 4px; }
+.worktrees .worktree p:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.worktrees .worktree-size { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.worktrees .worktree-size.faint { opacity: 0.6; }
+.worktrees .struck { text-decoration: line-through; }
+.worktrees .worktree-actions { margin-top: 6px; }
+/* A machine's page (#3743): the detail closed under one row until the person opens it. */
+.machine-fold > summary { list-style: none; cursor: pointer; padding: 6px 0; }
+.machine-fold > summary::-webkit-details-marker { display: none; }
+.machine-fold > summary::before { content: "▸"; display: inline-block; width: 1em; opacity: 0.6; }
+.machine-fold[open] > summary::before { content: "▾"; }
+.machine-summary { font-variant-numeric: tabular-nums; }
+/* At near and full, the level and why, over the summary (#4582); tinted by .tinted or .failure. */
+.machine-capacity { font-variant-numeric: tabular-nums; margin: 0 0 4px; }
+/* A view's agents/open-diff (#1341): the files over the chat or the pin, with the Review page's diff. */
+.view-diff { position: fixed; inset: 0; z-index: 40; display: flex; flex-direction: column; background: var(--paper-ground); }
+.view-diff .column-head .spacer { flex: 1; }
+.view-diff .scroll { flex: 1; overflow: auto; }
+.view-diff-file { display: flex; flex-direction: column; gap: 6px; }
+.view-diff-file .file-diff { border: 1px solid var(--paper-rule); border-radius: 8px; overflow: hidden; }
+/* The Simulator pane (#842): the picker and buttons on one line, the screen fitted under it. */
+.simulator-pane { display: flex; flex-direction: column; gap: 10px; padding: 12px; }
+.simulator-bar { display: flex; align-items: center; gap: 10px; }
+.simulator-bar .spacer { flex: 1; }
+.simulator-screen { cursor: pointer; width: auto; height: auto; max-width: 100%; max-height: 75vh; align-self: center; border-radius: 18px; border: 1px solid var(--paper-rule); }
+/* A failed read keeps the last frame, dimmed, with why it is old; a failed list says why in the middle with Try Again (#1666). */
+.simulator-screen.stale { opacity: 0.4; }
+/* The Agent Browser (#3528), in its take-over tab (#4141): the machine's browser, drawn to fit, centred, as the window's pane draws it. */
+.agent-browser { display: flex; flex-direction: column; gap: 8px; height: 100%; min-height: 360px; }
+.agent-browser-bar { display: flex; align-items: center; gap: 6px; }
+.agent-browser-bar .link { min-width: 22px; font-size: 1.1em; }
+.agent-browser-bar input { flex: 1; min-width: 0; }
+.agent-browser-page { position: relative; flex: 1; background: var(--paper-ground); min-height: 320px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); overflow: hidden; outline: none; display: flex; align-items: center; justify-content: center; }
+.agent-browser-page:focus-visible { border-color: var(--accent); }
+/* The field a touch screen's keyboard types into (#4088): out of sight, 16px so Safari does not zoom. */
+.agent-browser-keys { position: absolute; left: 0; top: 0; width: 1px; height: 1px; opacity: 0; border: 0; padding: 0; resize: none; font-size: 16px; pointer-events: none; }
+.agent-browser-frame { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; user-select: none; pointer-events: none; }
+.agent-browser-holder { margin: 0; }
+.agent-browser-status { margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent-browser-note { max-width: 32em; padding: 24px; text-align: center; }
+.agent-browser-note p { opacity: 0.7; margin: 6px 0 0; }
+.simulator-stale { align-self: center; text-align: center; }
+.simulator-problem { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px; text-align: center; }
+.simulator-problem p { margin: 0; opacity: 0.55; }
+
+/* Settings ▸ Machine providers (#1808): a card per provider, a row per workspace with its dot. */
+.provider-card { margin-bottom: 10px; max-width: 640px; }
+.provider-add { margin: 4px 0 6px; }
+/* Add a Machine… (#2131): its three ways, a row each, the chosen one outlined in the accent. */
+.add-machine-ways { display: flex; flex-direction: column; gap: 8px; }
+.add-machine-way { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 12px; }
+.add-machine-way.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.provider-card .grow { flex: 1; min-width: 0; }
+.provider-card .chip { font-weight: normal; }
+.workspace-row .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--paper-rule); }
+.workspace-row .dot.online { background: var(--tint-vouched); }
+.workspace-row .dot.attention { background: var(--tint-attention); }
+.provider-sheet { max-width: 560px; }
+/* Move to Another Machine… and Run It Here Again… (#4255), as the window's sheets. */
+.plane-move-row .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; background: var(--tint-attention); }
+.plane-move-sheet { max-width: 560px; }
+.plane-move-sheet .step-title { margin: 12px 0 4px; font-size: 0.6875rem; font-weight: 600; text-transform: uppercase; opacity: 0.65; }
+.plane-move-sheet pre.command { margin: 6px 0; padding: 8px; font-size: 0.75rem; white-space: pre-wrap; user-select: text;
+  background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 6px; }
+.plane-move-steps { margin: 0; padding-left: 20px; }
+.plane-move-steps p { margin: 4px 0; }
+.plane-move-address { display: flex; gap: 8px; }
+.plane-move-address input { flex: 1; font-family: var(--font-mono, ui-monospace, monospace); }
+.plane-move-lines, .plane-move-members { list-style: none; padding: 0; margin: 8px 0; }
+.plane-move-lines li { display: flex; gap: 10px; padding: 3px 0; }
+.plane-move-lines li .mark { width: 16px; flex: none; text-align: center; opacity: 0.6; }
+.plane-move-lines li.line-yes .mark, .plane-move-lines li.line-done .mark { color: var(--tint-vouched); opacity: 1; }
+.plane-move-lines li.line-bad .mark { color: var(--tint-warning); opacity: 1; }
+.plane-move-lines .hint, .plane-move-members .hint { display: block; font-size: 0.75rem; opacity: 0.65; }
+.plane-move-members { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 8px; }
+.plane-move-members li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 10px; border-top: 1px solid var(--paper-rule); }
+.plane-move-members li:first-child { border-top: 0; }
+.plane-move-members li > span:last-child { width: 250px; flex: none; }
+.plane-move-members li.member-knows > span:last-child { color: var(--tint-vouched); }
+.plane-move-members li.member-cantFollow > span:last-child { color: var(--tint-warning); }
+.plane-move-sheet .sheet-actions .leading { margin-right: auto; }
+.provider-sheet .token-form textarea { font: inherit; font-family: var(--font-mono); font-size: 0.75rem; }
+.provider-sheet .token-form label.setting { flex-direction: row; justify-content: space-between; align-items: center; }
+/* Choose Folders… and Link to Provider… on a machine's row (#4122). */
+.choose-folders .found-folders { list-style: none; margin: 0 0 8px; padding: 8px 10px; max-height: 240px; overflow-y: auto;
+  border: 1px solid var(--paper-rule); border-radius: 8px; }
+.choose-folders .found-folders li + li { margin-top: 6px; }
+.choose-folders .found-folders label, .provider-sheet .link-choices label { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.choose-folders .found-folders .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.connect-sheet .token-form.inline { flex-direction: row; }
+.connect-sheet .token-form.inline input { flex: 1; font-family: var(--font-mono); }
+.provider-sheet .link-choices { max-height: 280px; overflow-y: auto; margin: 0 0 8px; }
+.provider-sheet .link-choices fieldset { border: 0; margin: 0 0 8px; padding: 0; }
+.provider-sheet .link-choices fieldset label { padding: 2px 0 2px 12px; }
+/* Console ▸ Sign-In (#1002): a provider's actions in a row, and its domains and SCIM under it. */
+.org-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 8px 0 4px; }
+.org-domains, .org-scim { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--paper-rule); }
+/* Console ▸ Read API (#2019): a new token's value, shown once. */
+.read-token-made { margin: 8px 0; padding: 8px 10px; border: 1px solid var(--paper-rule); border-radius: 6px; }
+.read-token-value { display: block; word-break: break-all; user-select: all; margin: 4px 0; }
+.live-id { font-family: var(--mono, ui-monospace, monospace); }
+.agent-config-editor { display: grid; gap: 12px; min-width: 0; }
+.agent-config-editor label { display: grid; gap: 5px; min-width: 0; }
+.agent-config-editor textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; }
+.agent-config-controls { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
+.agent-config-controls label { flex: 1 1 180px; }
+.agent-config-controls input, .agent-config-controls select { width: 100%; box-sizing: border-box; }
+.agent-config-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.agent-config-sync { display: grid; gap: 3px; margin-bottom: 12px; }
+.agent-config-sync p { margin: 0; }
+.agent-config-project { min-width: min(760px, 90vw); max-height: 85vh; overflow: auto; }

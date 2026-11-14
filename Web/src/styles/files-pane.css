@@ -1,0 +1,155 @@
+/* US4: the files pane's tabs, the browser, a file, the changes and a live page. */
+.files .tabs button.tab { border: none; background: none; padding: 3px 10px; border-radius: var(--radius-control); }
+.files .tabs button.tab.chosen { background: var(--paper-raised); box-shadow: 0 0 0 1px var(--paper-rule); }
+.files ul { margin: 0; padding: 0; }
+.files li { padding: 0; }
+.pane-body { padding: 10px 12px; }
+.crumbs { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; min-width: 0; }
+.crumbs .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.row.entry { grid-template-columns: 1fr; padding: 4px 8px; }
+.file-text {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--paper-well);
+  border-radius: var(--radius-card);
+  font: 0.75rem/1.5 var(--font-mono);
+  white-space: pre;
+  overflow-x: auto;
+}
+/* Numbers come from the counter, so the text itself stays the file (#258). The newline
+   that keeps that text is not drawn: a row is already its own line, and drawing it too
+   would leave a blank line between every line. */
+.file-text.file-lines { counter-reset: line; white-space: pre-wrap; }
+.file-line { counter-increment: line; display: grid; grid-template-columns: 2.6em 1fr; column-gap: 0.8em; }
+.file-line::before {
+  content: counter(line);
+  text-align: right;
+  color: color-mix(in srgb, currentColor 45%, transparent);
+  user-select: none;
+}
+.file-lines.wide .file-line { grid-template-columns: 4.2em 1fr; }
+.file-line.named { background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.file-line .nl { display: none; }
+.file-line .code { white-space: pre-wrap; min-width: 0; }
+.file-page { line-height: 1.55; }
+.source-editor {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 60vh;
+  border: 1px solid transparent;
+  color: inherit;
+  resize: vertical;
+  tab-size: 4;
+}
+.source-editor:focus { outline: none; border-color: var(--paper-rule); }
+/* Open File… (#415): a field over the window, and what it found under it. */
+.file-search-backdrop { position: fixed; inset: 0; z-index: 50; background: color-mix(in srgb, var(--paper-scrim) 8%, transparent); display: flex; justify-content: center; align-items: flex-start; }
+.file-search { margin-top: 48px; width: min(520px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 8px; }
+.file-search input { width: 100%; box-sizing: border-box; padding: 10px 12px; font: inherit; font-size: 0.9375rem; border-radius: 12px; border: 1px solid var(--paper-rule); background: var(--paper-raised); color: inherit; }
+.file-search .completions { margin: 0; }
+.file-search .hint { margin: 0 12px; }
+/* The Prompts list (#1658): as Open File…, with a heading, and two lines and a ··· to a row. */
+.prompt-list { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 14px; box-shadow: var(--shadow-floating); padding: 12px; }
+.prompt-list h2 { margin: 0 4px; font-size: 0.9375rem; }
+.prompt-list .prompt-earlier { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 4px; }
+.prompt-list .completions { max-height: min(420px, 60vh); box-shadow: none; }
+.prompt-list .completions li { align-items: center; }
+.prompt-list .prompt-number { flex: none; min-width: 1.5em; text-align: right; font-variant-numeric: tabular-nums; }
+.prompt-list .prompt-words { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.prompt-list .prompt-title, .prompt-list .prompt-words > .small { overflow: hidden; text-overflow: ellipsis; }
+.prompt-list .prompt-ending { flex: none; font-size: 0.75rem; }
+.prompt-list .prompt-ending.failed { color: var(--tint-failure); font-weight: 700; }
+.prompt-list .prompt-ending.stopped { opacity: 0.6; }
+.prompt-list .prompt-row-menu { flex: none; margin-right: 0; overflow: visible; }
+.picture { max-width: 100%; height: auto; border-radius: var(--radius-control); background: var(--paper-well); }
+.picture-view { display: flex; flex-direction: column; gap: 8px; }
+.picture-view .picture { max-width: none; cursor: zoom-in; }
+.picture-bar { display: flex; align-items: center; gap: 4px; }
+.picture-bar .caption { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-picture { max-width: 100%; height: auto; border-radius: var(--radius-control); }
+/* A Work page's image (#4011): a click opens it in the viewer. */
+.page-picture-open { padding: 0; border: 0; background: none; max-width: 100%; cursor: zoom-in; vertical-align: bottom; }
+.page-picture-open .page-picture { display: block; }
+/* The viewer, as the Mac's sheet (#4010): the image over a bar with its name, the zoom and Done. */
+dialog.image-viewer {
+  box-sizing: border-box;
+  max-width: 100vw;
+  max-height: 100vh;
+  padding: 0;
+  color: inherit;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-floating);
+  box-shadow: var(--shadow-sheet);
+  overflow: hidden;
+}
+dialog.image-viewer[open] { display: flex; flex-direction: column; }
+/* The viewer holds the focus after a step (#4954); it draws no ring for that. */
+dialog.image-viewer:focus { outline: none; }
+dialog.image-viewer::backdrop { background: color-mix(in srgb, var(--paper-scrim) 45%, transparent); }
+/* The image, with the previous and the next arrows over its sides (#4954). */
+.image-viewer-frame { position: relative; flex: 1; min-height: 0; display: flex; }
+.image-viewer-stage { flex: 1; min-height: 0; display: flex; overflow: auto; touch-action: none; user-select: none; }
+dialog.image-viewer .image-viewer-arrow {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%;
+  font-size: 28px; line-height: 40px; color: var(--paper-on-fill);
+  background: color-mix(in srgb, var(--paper-scrim) 55%, transparent);
+  opacity: 0; transition: opacity 150ms ease-out; cursor: pointer;
+}
+dialog.image-viewer .image-viewer-arrow.previous { left: 12px; }
+dialog.image-viewer .image-viewer-arrow.next { right: 12px; }
+dialog.image-viewer .image-viewer-frame:hover .image-viewer-arrow, dialog.image-viewer .image-viewer-arrow:focus-visible { opacity: 1; }
+/* A touch screen has no pointer to be over the image: the arrows show always. */
+@media (hover: none) { dialog.image-viewer .image-viewer-arrow { opacity: 1; } }
+.image-viewer-bar .counter { flex: none; font-variant-numeric: tabular-nums; }
+.image-viewer-stage.zoomed { cursor: grab; }
+.image-viewer-stage.zoomed:active { cursor: grabbing; }
+/* margin: auto, not justify-content: a zoomed image can then be scrolled to its every edge. */
+.image-viewer-stage img { margin: auto; flex: none; max-width: none; }
+.image-viewer-bar { display: flex; align-items: center; gap: 6px; height: 44px; box-sizing: border-box; padding: 0 12px; border-top: 1px solid var(--paper-rule); }
+.image-viewer-bar .caption { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.image-viewer-bar .spacer { flex: 1; }
+.image-viewer-bar .zoom-level { min-width: 52px; font-variant-numeric: tabular-nums; }
+.image-viewer-bar .done { margin-left: 6px; }
+.entry-mark { display: contents; }
+.exchanged-empty { display: flex; flex-direction: column; gap: 8px; padding: 24px 8px; text-align: center; }
+.exchanged-empty p { margin: 0; }
+.exchanged .subtitle { white-space: normal; }
+.exchanged-doc .page { line-height: 1.6; max-width: 70ch; }
+.changed-files > li { margin-bottom: 4px; }
+.row.changed .added, .row.changed .removed { font-variant-numeric: tabular-nums; }
+.hunk { margin: 4px 0 10px; }
+.diff-lines { margin: 0; font: 0.75rem/1.5 var(--font-mono); white-space: pre; overflow-x: auto; border-radius: var(--radius-control); background: var(--paper-well); padding: 6px 0; }
+.diff-line { display: block; padding: 0 10px; }
+.diff-line .sign { display: inline-block; width: 1.2em; opacity: 0.6; }
+.diff-line.added { background: var(--paper-wash); font-weight: 500; }
+.diff-line.removed { opacity: 0.55; text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
+/* Changed words: a wash stronger than the line's own, never a colour (CodeLine, #545). */
+.diff-word { color: inherit; background: color-mix(in srgb, var(--paper-ink) 14%, transparent); border-radius: 2px; }
+.live-page .page { line-height: 1.6; max-width: 70ch; margin: 0 auto; }
+.live-page .page.gone { opacity: 0.6; }
+.passage { padding: 2px 8px; margin: 0 -8px 10px; border-radius: var(--radius-control); transition: background 0.15s; }
+.passage[role=button] { cursor: text; }
+.passage[role=button]:hover { background: var(--paper-wash); }
+.passage.marked { background: color-mix(in srgb, var(--tint-warning) 10%, transparent); }
+/* The agent's caret (#1236): after the last thing typed, in the passage the caret is in. */
+.passage.typing .markdown:empty::after,
+.passage.typing .markdown > :last-child:not(ul, ol, pre, blockquote, table)::after,
+.passage.typing .markdown > :is(ul, ol):last-child > li:last-child::after,
+.passage.typing .markdown > pre:last-child > code::after { content: "▍"; color: var(--accent); }
+.passage-editor {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 10px;
+  padding: 6px 8px;
+  font: 0.8125rem/1.55 var(--font-mono);
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control);
+  background: var(--paper-raised);
+  color: inherit;
+  resize: vertical;
+}
+

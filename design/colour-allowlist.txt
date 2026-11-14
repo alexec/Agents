@@ -1,7 +1,7 @@
 // The colours that stay outside a token file (#4609; scripts/check-colour-tokens.py).
 // One per line: the path, the colour as found (or * for the whole file), and why.
 // A line that matches nothing fails the check, so remove it when its colour goes.
-Web/src/app.css hsl( an engineer's avatar: a hue of its own from --hue, set per person
+Web/src/styles/work-lists.css hsl( an engineer's avatar: a hue of its own from --hue, set per person
 Web/src/model/multiplier.ts rgb( Crowd.fill: a blue a little different for each engineer, worked out as the window's
 Web/src/model/work.ts #1f2328 labelInk: the text on a forge label's own colour, which no token can know
 Web/src/model/work.ts #ffffff labelInk: the text on a forge label's own colour, which no token can know

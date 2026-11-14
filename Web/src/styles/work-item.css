@@ -1,0 +1,389 @@
+/* An item's page (#4402, specs/4328-work-look/issue.md), as the window's WorkItemPage (#4400): the page's bar, the header
+   with Start Agent, the timeline and the comment box, and the side panel: a 240 px column over 900 px; rows under the
+   header under it, with Linked, Lineage and Docs at the end. Under 700 px, the phone's page. */
+.work-item-page { container-type: inline-size; }
+.work-item-grid { display: grid; grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "bar" "head" "problem" "pulltop" "people" "main" "links" "none"; column-gap: 24px; }
+.work-item-grid > .work-pull-top { grid-area: pulltop; }
+.work-item-grid > .work-page-bar { grid-area: bar; }
+.work-item-grid > .work-page-head { grid-area: head; }
+.work-item-grid > .work-problem { grid-area: problem; }
+.work-item-grid > .work-side.people { grid-area: people; }
+.work-item-grid > .work-main { grid-area: main; min-width: 0; }
+.work-item-grid > .work-side.links { grid-area: links; }
+.work-item-grid > .work-could-not { grid-area: none; }
+/* A read failed after one came: the strip under the header, the last read dimmed under it. */
+.work-item-grid:has(> .work-problem) > :is(.work-side, .work-main) { opacity: 0.5; }
+.work-page-bar { gap: 6px; }
+.work-place { display: inline-flex; gap: 6px; align-items: baseline; min-width: 0; margin-right: auto; white-space: nowrap; }
+.work-place a { color: inherit; opacity: 0.7; text-decoration: none; }
+.work-place a:hover { opacity: 1; text-decoration: underline; }
+.work-place .back { display: none; }
+.work-place .sep { opacity: 0.4; }
+.work-place .here { font-weight: 600; font-variant-numeric: tabular-nums; }
+.work-page-bar .work-stepper { font-variant-numeric: tabular-nums; }
+.work-page-bar > :not(.work-place) { margin-left: 0; }
+.work-page-bar .work-stepper + .work-refresh, .work-page-bar .work-open-icon + .work-refresh { margin-left: 0; }
+.work-stepper .short-line, .work-open-icon, .narrow-only, .work-page-byline .short-line { display: none; }
+.work-open-icon { place-items: center; width: 28px; height: 28px; margin-left: auto; color: inherit; border-radius: var(--radius-control); }
+.work-open-glyph { flex: none; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.work-title-line { display: flex; gap: 12px; align-items: flex-start; }
+.work-title-line h2 { flex: 1; min-width: 0; margin: 0 0 4px; font-weight: 600; overflow-wrap: anywhere; }
+.work-page-head .work-ref { font-weight: normal; opacity: 0.6; }
+.work-start { display: inline-flex; gap: 6px; align-items: center; justify-content: center; white-space: nowrap; }
+.work-page-byline { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; margin: 4px 0 12px; }
+.work-open-on { display: inline-flex; gap: 4px; align-items: center; margin-left: auto; white-space: nowrap; }
+.work-state.with-glyph { display: inline-flex; gap: 4px; align-items: center; padding: 2px 10px 2px 8px; font-size: 0.9em; font-weight: 500; }
+.work-state.with-glyph .work-state-icon { --state: var(--paper-on-fill); }
+.work-state.with-glyph.open { background: var(--forge-fill-open); }
+.work-state.with-glyph.closed.pr-closed { background: var(--forge-fill-closed); }
+.work-state.with-glyph.closed, .work-state.with-glyph.merged { background: var(--forge-fill-done); }
+.work-state.with-glyph.closed.not-planned { background: var(--forge-fill-draft); }
+.work-status-menu { border: none; cursor: pointer; font: inherit; font-size: 0.9em; padding: 2px 10px; }
+.work-status-menu:disabled { cursor: default; opacity: 0.7; }
+/* Placeholders while the page reads (section 7): grey bars with a slow shimmer, no spinner. */
+.work-item-page .bar { display: block; height: 10px; margin: 4px 0; border-radius: 5px; background: var(--paper-wash); width: 100%; }
+.work-item-page .bar.short { width: 40%; }
+.work-page-head.placeholder h2 .bar { height: 22px; width: 60%; }
+.work-state.placeholder { color: transparent; background: var(--paper-wash); }
+.work-side .value > .bar { width: 6em; }
+.work-comment.placeholder .work-avatar { width: 28px; height: 28px; background: var(--paper-wash); }
+@media (prefers-reduced-motion: no-preference) {
+  .work-item-page.loading .bar, .work-item-page.loading .work-state.placeholder { animation: work-shimmer 1.6s ease-in-out infinite alternate; }
+}
+/* Nothing read: in the middle, the warning glyph, Could not read #4331, the forge's words, Try again and Open on GitHub. */
+.work-could-not { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 60px 16px; text-align: center; }
+.work-could-not p { margin: 0; }
+.work-could-not .mark { font-size: 28px; opacity: 0.6; }
+.work-could-not .buttons { display: flex; gap: 12px; align-items: center; margin-top: 6px; }
+.work-side { display: flex; flex-direction: column; font-size: 0.875rem; }
+.work-side .work-side-section { margin: 0; padding: 6px 0; border-top: 1px solid var(--paper-rule); display: flex; gap: 12px; align-items: baseline; position: relative; }
+.work-side-section h3 { flex: none; display: flex; align-items: center; gap: 4px; width: 6.5em; margin: 0; font-size: 0.8em; font-weight: 600; color: color-mix(in srgb, currentColor 65%, transparent); }
+.work-side-section .value { min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+/* The gear on Labels (note 12): faint until the pointer is on the section, so a keyboard and a screen reader find it. */
+.work-gear { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-left: auto; padding: 0; border: none; border-radius: var(--radius-control);
+  background: none; color: inherit; cursor: pointer; opacity: 0.35; margin-block: -4px; }
+.work-gear svg { fill: none; stroke: currentColor; }
+.work-side-section:hover .work-gear, .work-gear:focus-visible, .work-gear[aria-expanded=true] { opacity: 1; }
+.work-gear:hover { background: var(--paper-wash); }
+@media (hover: none) { .work-gear { opacity: 1; width: 32px; height: 32px; } }
+.work-labels-picker { position: absolute; top: 28px; left: 0; z-index: 40; display: flex; flex-direction: column; gap: 6px; width: 240px; max-width: calc(100vw - 32px);
+  padding: 8px; box-sizing: border-box; }
+.work-labels-picker input[type=search] { padding: 5px 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-raised);
+  color: inherit; font: inherit; }
+.work-labels-choices { display: flex; flex-direction: column; max-height: 280px; overflow-y: auto; }
+.work-labels-choices button { display: flex; gap: 8px; align-items: center; padding: 5px 6px; border: none; border-radius: var(--radius-control); background: none;
+  color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.work-labels-choices button:hover, .work-labels-choices button:focus-visible { background: var(--paper-wash); outline: none; }
+.work-labels-choices .tick { width: 1em; flex: none; }
+.work-labels-choices [aria-checked=true]::before { content: none; }
+.work-labels-choices .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-label-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--paper-wash); border: 1px solid var(--paper-rule); }
+.work-person { display: inline-flex; gap: 6px; align-items: center; }
+.work-mini-row { display: inline-flex; gap: 6px; align-items: center; padding: 2px 0; background: none; border: none; color: inherit; font: inherit;
+  cursor: pointer; text-align: left; }
+.work-mini-row:hover { text-decoration: underline; }
+.work-mini-row .work-mini-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.7; }
+.work-progress { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.work-progress progress { width: 100%; height: 6px; }
+.work-session { display: inline-flex; gap: 6px; align-items: center; max-width: 100%; padding: 1px 0; border: none; background: none; color: var(--accent);
+  font: inherit; text-align: left; cursor: pointer; }
+.work-session:disabled { color: inherit; opacity: 0.6; cursor: default; }
+.work-session .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, currentColor 40%, transparent); }
+.work-session .dot.runs { background: var(--forge-open); }
+.work-session .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-doc-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; width: 100%; }
+.work-doc-row { display: flex; gap: 6px; align-items: baseline; width: 100%; padding: 2px 0; border: none; background: none; color: inherit; font: inherit;
+  text-align: left; cursor: pointer; }
+.work-doc-row:hover .docs-path, .work-doc-row:hover .work-doc-words > :first-child { text-decoration: underline; }
+.work-doc-words { display: flex; flex-direction: column; min-width: 0; }
+.work-doc-words > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-item-grid > .work-side.links { margin-top: 16px; }
+.work-item-grid > .work-side.people { margin-bottom: 12px; border-bottom: 1px solid var(--paper-rule); }
+@container (min-width: 900px) {
+  .work-item-grid { grid-template-columns: minmax(0, 1fr) 240px; grid-template-rows: auto auto auto auto auto 1fr;
+    grid-template-areas: "bar bar" "head head" "problem problem" "main people" "main links" "main ."; }
+  .work-item-grid > .work-could-not { grid-column: 1 / -1; }
+  .work-item-grid > .work-side.links { margin-top: 0; }
+  .work-item-grid > .work-side.people { margin-bottom: 0; border-bottom: none; }
+  .work-side-section { flex-direction: column; gap: 6px; padding: 10px 0; }
+  .work-side-section h3 { width: 100%; }
+  .work-side-section .value { flex-direction: column; align-items: flex-start; }
+  .work-side-section .value > .work-chips { flex-direction: row; }
+  .work-item-grid > .work-side.people > .work-side-section:first-child { border-top: none; padding-top: 0; }
+  .work-labels-picker { left: auto; right: 0; }
+}
+/* The timeline (section 6; notes 8 to 10): a line down the leading edge through the avatars, each box with a hairline
+   border; an event a small grey line with its icon on the line. */
+.work-item-page .work-timeline { position: relative; display: flex; flex-direction: column; gap: 14px; margin-top: 4px; }
+.work-timeline::before { content: ""; position: absolute; left: 13px; top: 0; bottom: 0; width: 2px; background: var(--paper-rule); }
+.work-comment { position: relative; display: flex; gap: 10px; align-items: flex-start; }
+.work-comment > .work-avatar { box-shadow: 0 0 0 3px var(--paper-ground); }
+.work-comment-small-avatar { display: none; }
+.work-comment-main { flex: 1; min-width: 0; }
+.work-comment-main > p { margin: 5px 0 6px; display: flex; align-items: center; flex-wrap: wrap; column-gap: 6px; }
+.work-comment-main > p .work-bot { margin-left: 0; }
+.work-comment-body { padding: 4px 12px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); overflow-wrap: anywhere; }
+.work-comment-body .bar { margin: 10px 0; }
+.work-bot { margin-left: 6px; padding: 0 5px; border: 1px solid var(--paper-rule); border-radius: 99px; font-size: 0.8em; opacity: 0.8; }
+.work-event { position: relative; display: flex; gap: 10px; align-items: center; }
+.work-event .mark { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; margin: 0 3px; border-radius: 50%; background: var(--paper-well);
+  font-size: 12px; box-shadow: 0 0 0 3px var(--paper-ground); }
+.work-event .mark.closed { background: var(--forge-fill-done); color: var(--paper-on-fill); }
+.work-event .mark.not-planned { background: var(--forge-fill-draft); color: var(--paper-on-fill); }
+.work-event .mark .work-state-icon { --state: currentColor; }
+/* An icon in a mark's filled circle sits inside it, with room round it (#5164). */
+.work-event .mark svg.lucide { width: 14px; height: 14px; vertical-align: 0; }
+.work-plan-lead-mark svg.lucide { width: 12px; height: 12px; vertical-align: 0; }
+/* The comment box (note 11): the person's glyph on the timeline's column, the field, then Close issue and Comment. */
+.work-comment-box { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; margin-top: 16px; }
+.work-comment-me svg { display: block; fill: var(--paper-wash); }
+.work-comment-me svg .cut { fill: var(--paper-ground); stroke: none; }
+.work-comment-box-main { display: grid; gap: 6px; }
+.work-comment-box textarea { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card);
+  background: var(--paper-raised); color: inherit; font: inherit; resize: vertical; }
+.work-comment-box .work-actions-bar button { display: inline-flex; gap: 6px; align-items: center; }
+.work-close-mark.open { color: var(--forge-done); }
+.work-close-mark.open.pull { color: var(--forge-closed); }
+.work-comment-box p { margin: 0; }
+.work-no-writes { margin: 16px 0 0; }
+/* The phone's page (under 700 px, as an iPhone): ‹ Issues, 3/42 and Open on GitHub's icon in the bar; the short state
+   line; Start Agent full width; the avatar in each box's header, so the box takes the width. */
+@container (max-width: 699px) {
+  .work-place .back { display: inline; }
+  .work-place .sep { display: none; }
+  .work-stepper .wide-line, .work-page-byline .wide-line, .work-open-on, .wide-only { display: none; }
+  .work-stepper .short-line, .work-page-byline .short-line { display: inline; }
+  .work-open-icon { display: inline-grid; }
+  .work-page-bar .work-stepper + .work-open-icon { margin-left: 0; }
+  .narrow-only { display: block; margin-bottom: 12px; }
+  .narrow-only .work-start { width: 100%; padding: 8px; }
+  .work-timeline::before { display: none; }
+  .work-timeline > .work-comment > .work-avatar { display: none; }
+  .work-comment-small-avatar { display: inline-flex; }
+  .work-timeline .work-event { padding-left: 0; }
+  .work-comment-box { grid-template-columns: minmax(0, 1fr); }
+  .work-comment-me { display: none; }
+  .work-side.links .work-side-section h3 { text-transform: uppercase; letter-spacing: 0.04em; }
+}
+/* A pull request's page (#4408, specs/4328-work-look/pull-request.md), as the window's (#4406): Files changed at the
+   title's end; the merge box at the end of the timeline, a pr glyph in a green circle on the line, its border green
+   when it can merge, red when a check failed or it has conflicts; under 700 px the box at the top, then Files changed
+   as a row, and the checks row opens the Checks page. */
+.work-narrow-only { display: none; }
+.work-files button, .work-files-row button, .work-approve, .work-rerun { display: inline-flex; gap: 6px; align-items: center; }
+.work-files-glyph, .work-branch-glyph { fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.work-files { display: inline-flex; flex-direction: column; gap: 4px; align-items: flex-end; flex: none; }
+.work-files-row { display: block; margin-top: 12px; }
+.work-files-row button { width: 100%; padding: 10px 12px; border: none; border-radius: var(--radius-card); background: var(--paper-well); color: inherit; font: inherit; text-align: left; }
+.work-files-row button .words { flex: 1; }
+.work-branch { display: inline-flex; gap: 6px; align-items: center; font-variant-numeric: tabular-nums; }
+.work-merge { position: relative; display: flex; gap: 10px; align-items: flex-start; }
+.work-merge-mark { flex: none; display: inline-grid; place-items: center; width: 26px; height: 26px; margin: 4px 1px 0; border-radius: 50%;
+  background: var(--forge-fill-open); box-shadow: 0 0 0 3px var(--paper-ground); }
+.work-merge-mark.draft { background: var(--forge-fill-draft); }
+.work-merge-mark .work-state-icon { --state: var(--paper-on-fill); }
+.work-merge-box { flex: 1; min-width: 0; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-raised); overflow: hidden; }
+.work-merge-box.pass { border: 1.5px solid var(--forge-open); }
+.work-merge-box.fail { border: 1.5px solid var(--forge-closed); }
+.work-merge-row-wrap { border-bottom: 1px solid var(--paper-rule); }
+.work-merge-row { display: flex; gap: 10px; align-items: baseline; width: 100%; box-sizing: border-box; padding: 12px; }
+button.work-merge-row { border: none; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+button.work-merge-row:hover { background: var(--paper-wash); }
+.work-merge-row .words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
+.work-merge-glyph { flex: none; width: 16px; text-align: center; color: color-mix(in srgb, currentColor 60%, transparent); }
+.work-merge-glyph.pass { color: var(--forge-open); }
+.work-merge-glyph.fail { color: var(--forge-closed); }
+.work-merge-glyph.wait { color: var(--forge-waiting); }
+.work-checks { list-style: none; margin: 0; padding: 0 12px 12px 38px; display: grid; gap: 6px; font-size: 0.875rem; }
+.work-checks li { display: flex; gap: 8px; align-items: baseline; }
+.work-checks .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.work-merge-buttons { padding: 12px; display: grid; gap: 6px; }
+.work-merge-buttons p { margin: 0; }
+.work-merge-button > button.prominent { background: var(--forge-fill-open); border-color: var(--forge-fill-open); color: var(--paper-on-fill); }
+.work-merge-button.waits > button.prominent { background: var(--accent); border-color: var(--accent); color: var(--paper-ground); }
+.work-merged-strip { display: grid; gap: 4px; margin-left: 38px; padding: 12px; border-radius: var(--radius-card); background: var(--paper-well); }
+.work-event .mark.merged { background: var(--forge-fill-done); }
+.work-event .mark.merged .work-state-icon { --state: var(--paper-on-fill); }
+.work-event .mark.pr-closed { background: var(--forge-fill-closed); color: var(--paper-on-fill); }
+/* A release (#4423, specs/4328-work-look/milestones.md notes 19 and 22 to 29), as the window's WorkReleasePage (#4421):
+   the box glyph and the green Latest chip on its row and its header; its page the notes, then the pull requests, and the
+   side panel a 240 px column over 900 px, rows under the notes under it; under 700 px the pull requests a row that
+   opens their list. */
+.work-release-glyph { flex: none; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; opacity: 0.7; }
+.work-release-chip { flex: none; display: inline-block; padding: 0 7px; border: 1px solid; border-radius: 99px; font-size: 0.75rem; font-weight: 500;
+  line-height: 1.5; vertical-align: middle; white-space: nowrap; }
+.work-release-chip.latest { color: var(--forge-open); border-color: color-mix(in srgb, var(--forge-open) 60%, transparent); }
+.work-release-grid { display: grid; grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "bar" "head" "problem" "notes" "people" "main"; column-gap: 24px; }
+.work-release-grid > .work-page-bar { grid-area: bar; }
+.work-release-grid > .work-page-head { grid-area: head; }
+.work-release-grid > .work-problem { grid-area: problem; }
+.work-release-grid > .work-release-notes { grid-area: notes; }
+.work-release-grid > .work-side.people { grid-area: people; margin: 12px 0; border-bottom: 1px solid var(--paper-rule); }
+.work-release-grid > .work-main { grid-area: main; min-width: 0; }
+.work-release-grid:has(> .work-problem) > :is(.work-side, .work-main, .work-release-notes) { opacity: 0.5; }
+.work-release-page .work-page-byline .quiet { font-variant-numeric: tabular-nums; }
+.work-release-range, .work-release-tag { font-family: var(--mono, ui-monospace, monospace); font-size: 0.95em; }
+.work-release-tag { display: inline-flex; gap: 6px; align-items: center; }
+.work-page section.work-release-notes { margin-top: 0; padding: 12px; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); background: var(--paper-well); }
+.work-release-notes h3, .work-release-pulls-head h3 { margin: 0 0 6px; font-size: 0.875rem; font-weight: 600; }
+.work-release-notes p { margin: 0; }
+.work-release-pulls-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin-bottom: 8px; }
+.work-release-pulls-head h3 { margin: 0; margin-right: auto; font-variant-numeric: tabular-nums; }
+.work-release-filters { display: inline-flex; gap: 8px; align-items: center; }
+.work-release-filters input[type="search"] { width: 200px; padding: 5px 8px; border: 1px solid var(--paper-rule); border-radius: var(--radius-control);
+  background: var(--paper-raised); color: inherit; font: inherit; }
+.work-release-pulls { border: 1px solid var(--paper-rule); border-radius: var(--radius-card); overflow: hidden; }
+.work-release-none { display: flex; gap: 8px; align-items: baseline; }
+.work-release-stage { display: inline-flex; gap: 6px; align-items: baseline; }
+.work-release-stage .tick { color: var(--forge-open); font-weight: 600; }
+.work-release-figures { font-variant-numeric: tabular-nums; }
+.work-release-pulls-title { margin: 4px 0 8px; }
+.work-release-pulls-bar { margin-bottom: 8px; }
+.work-release-pulls-bar .work-release-filters { display: flex; }
+.work-release-pulls-bar input[type="search"] { flex: 1; width: auto; min-width: 0; }
+.work-release-back { padding: 0; }
+@container (min-width: 900px) {
+  .work-release-grid { grid-template-columns: minmax(0, 1fr) 240px; grid-template-rows: auto auto auto auto 1fr;
+    grid-template-areas: "bar bar" "head head" "problem problem" "notes people" "main people"; }
+  .work-release-grid > .work-side.people { margin: 0; border-bottom: none; }
+  .work-release-grid > .work-side.people > .work-side-section:first-child { border-top: none; padding-top: 0; }
+}
+/* The Checks page (note 17): ‹ #4402, the counts, Rerun failed full width, a row per check with a chevron. */
+.work-checks-page h2 { margin: 4px 0 2px; }
+.work-checks-page > p { margin: 0 0 12px; }
+.work-rerun.wide { width: 100%; justify-content: center; padding: 8px; margin-bottom: 12px; }
+.work-checks-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--paper-rule); border-radius: var(--radius-card); overflow: hidden; }
+.work-checks-list li + li { border-top: 1px solid var(--paper-rule); }
+.work-checks-list button { display: flex; gap: 10px; align-items: center; width: 100%; min-height: 44px; padding: 8px 12px; border: none; border-radius: 0;
+  background: var(--paper-raised); color: inherit; font: inherit; text-align: left; }
+.work-checks-list button:disabled { opacity: 1; cursor: default; }
+.work-checks-list .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@container (max-width: 699px) {
+  .work-wide-only { display: none; }
+  .work-narrow-only { display: block; margin-bottom: 12px; }
+  .work-merge-buttons .work-actions-bar { display: grid; grid-template-columns: 62fr 38fr; }
+  .work-merge-buttons .work-actions-bar > :only-child, .work-merge-buttons .work-actions-bar > .work-merge-button:last-child { grid-column: 1 / -1; }
+  .work-merge-button { display: flex; }
+  .work-merge-button > button:first-child { flex: 1; }
+  .work-merge-buttons .work-actions-bar > button { justify-content: center; padding: 8px; }
+}
+/* The page's actions (#3130): a row of buttons, the merge button split for its other methods. */
+.work-actions { margin-top: 8px; }
+.work-actions-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.work-actions-bar .spacer { flex: 1; }
+.work-actions .failure { margin: 4px 0 0; }
+.split-button { display: inline-flex; }
+.split-button > button:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.split-button > button:last-child { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 1px; padding: 0 8px; }
+dialog.sheet:has(.work-log) { width: min(860px, calc(100vw - 32px)); }
+.work-log { display: grid; gap: 8px; min-width: 0; }
+.work-log header { display: flex; align-items: center; }
+.work-log header .spacer { flex: 1; }
+.work-log pre { max-height: 60vh; overflow: auto; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* An epic's Plan on its Work page (#3268), in the Work look (#4418, specs/4328-work-look/epic.md), as the window's
+   WorkPlanSection (#4416): a box above the timeline with its header, the lead's line, the steps' bands and the two-line
+   rows; under 700 px the phone's rows. */
+.work-plan { --plan-done: var(--forge-done); --plan-running: var(--forge-open); --plan-red: var(--forge-closed); margin: 0 0 16px; border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-card); background: var(--paper-raised); overflow: hidden; }
+.work-plan-head { display: flex; gap: 10px; align-items: center; padding: 12px 12px 0; }
+.work-plan-name { display: inline-flex; gap: 8px; align-items: center; flex: none; }
+.work-plan-glyph { flex: none; fill: none; stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; opacity: 0.65; }
+.work-plan-bar { flex: none; display: flex; width: 140px; height: 6px; border-radius: 3px; overflow: hidden; background: var(--paper-wash); }
+.work-plan-bar .done { background: var(--plan-done); }
+.work-plan-bar .running { background: var(--plan-running); }
+.work-plan-bar.placeholder { width: 200px; height: 8px; }
+.work-plan-figures { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.work-plan-never { margin-left: auto; }
+.work-plan-lead { display: flex; gap: 6px; align-items: center; margin: 0; padding: 6px 12px 10px; white-space: nowrap; min-width: 0; }
+.work-plan-lead.placeholder { color: transparent; }
+.work-plan-lead-mark { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: var(--plan-done); color: var(--paper-on-fill); font-size: 10px; }
+.work-plan-lead .link { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.work-lead-state { display: inline-flex; gap: 4px; align-items: center; opacity: 0.75; }
+.work-lead-state .dot, .work-open-lead .dot { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, currentColor 40%, transparent); }
+.work-lead-state.working .dot, .work-open-lead .dot.working { background: var(--plan-running, var(--forge-open)); }
+.work-lead-state.attention { color: var(--tint-attention); opacity: 1; }
+.work-lead-state.attention .dot, .work-open-lead .dot.attention { background: var(--tint-attention); }
+.work-plan > .work-placeholder { border-top: 1px solid var(--paper-rule); }
+.work-plan-strip { padding: 0 12px 10px; }
+.work-plan-strip .work-error { margin: 0; }
+.work-plan-body { border-top: 1px solid var(--paper-rule); }
+.work-plan-body.stale { opacity: 0.5; }
+.work-plan-band { display: flex; gap: 6px; align-items: baseline; width: 100%; box-sizing: border-box; padding: 7px 12px; border: none; border-radius: 0;
+  background: var(--paper-well); color: color-mix(in srgb, currentColor 70%, transparent); font: inherit; font-size: 0.875rem; text-align: left; cursor: pointer; }
+.work-plan-band .strong { color: var(--paper-ink); }
+.work-plan-band.still { cursor: default; }
+.work-plan-band { align-items: center; }
+.work-plan-band svg.chevron { width: 14px; height: 14px; vertical-align: 0; opacity: 0.6; }
+.work-plan-band .end { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.work-plan-step + .work-plan-step, .work-plan-rows + .work-plan-step { border-top: 1px solid var(--paper-rule); }
+.work-plan-rows { list-style: none; margin: 0; padding: 0; }
+.work-plan-item { position: relative; display: flex; align-items: center; border-top: 1px solid var(--paper-rule); }
+.work-plan-item:hover { background: color-mix(in srgb, var(--paper-well) 60%, transparent); }
+.work-plan-row { flex: 1; min-width: 0; display: flex; gap: 8px; align-items: flex-start; padding: 7px 4px 7px 12px; color: inherit; text-decoration: none; }
+.work-plan-row .work-row-head { display: flex; gap: 6px; align-items: center; min-width: 0; }
+.work-plan-row .work-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.work-plan-level { flex: none; }
+.work-plan-pr { flex: none; display: inline-flex; gap: 3px; align-items: center; margin-left: auto; opacity: 0.75; font-variant-numeric: tabular-nums; }
+.work-plan-row .work-row-line { align-items: baseline; gap: 4px; font-size: 0.8rem; }
+.work-plan-row .work-row-line .quiet:first-child { font-variant-numeric: tabular-nums; }
+.work-plan-mark { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0.75; }
+.work-plan-mark .short-line { display: none; }
+.work-plan-mark.is-working { color: var(--plan-running); opacity: 1; }
+.work-plan-mark.is-attention { color: var(--tint-attention); font-weight: 600; opacity: 1; }
+.work-plan-mark.is-blocked { color: var(--plan-red); opacity: 1; }
+.work-plan-end { display: inline-flex; gap: 6px; align-items: baseline; margin-left: auto; padding-left: 8px; white-space: nowrap; }
+.work-plan-cost { font-variant-numeric: tabular-nums; }
+/* An estimate (#3560): fainter than what was spent, in the tertiary colour. */
+.work-plan-estimate { opacity: 0.5; }
+.work-estimate { font-variant-numeric: tabular-nums; }
+/* The row's ⋯ (note 9): on hover or keyboard focus; a right-click opens the same menu. */
+.work-plan-more { flex: none; width: 28px; height: 28px; margin-right: 8px; padding: 0; border: none; border-radius: var(--radius-control); background: none;
+  color: inherit; font: inherit; cursor: pointer; opacity: 0; }
+.work-plan-item:hover .work-plan-more, .work-plan-item:focus-within .work-plan-more { opacity: 0.8; }
+.work-plan-more:hover, .work-plan-more:focus-visible { opacity: 1; background: var(--paper-wash); }
+@media (hover: none) { .work-plan-more { opacity: 0.8; } }
+.work-plan-more-rows { display: block; padding: 8px 12px; border-top: 1px solid var(--paper-rule); }
+.work-plan-empty { padding: 12px; }
+.work-plan-empty p { margin: 0 0 2px; }
+.work-plan-add { padding: 10px 12px; border-top: 1px solid var(--paper-rule); }
+.work-plan-body > .work-plan-empty + .work-plan-add { border-top: none; padding-top: 0; }
+.work-plan-add p { margin: 6px 0 0; }
+.work-plan-add-row { display: inline-flex; gap: 6px; align-items: center; padding: 0; border: none; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.work-plan-add-row span { font-size: 1.1em; }
+.work-plan-add-field { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.work-plan-add-field input { flex: 1; min-width: 12em; }
+.work-plan-no-writes { margin: 0; padding: 10px 12px; border-top: 1px solid var(--paper-rule); background: var(--paper-well); }
+.work-plan-could-not { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 24px 12px; text-align: center; }
+.work-plan-could-not p { margin: 0; }
+.work-plan-could-not .mark { font-size: 22px; color: var(--tint-warning); }
+.work-plan-query { padding: 10px 12px; }
+.work-plan-query p { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 4px; }
+.work-plan-query-error { display: flex; gap: 8px; align-items: baseline; padding: 10px; color: var(--plan-red); background: color-mix(in srgb, var(--plan-red) 8%, transparent); }
+.work-plan-query-error .words { flex: 1; min-width: 0; }
+.work-standing { padding: 2px 8px; border: 1px solid var(--paper-rule); border-radius: 99px; background: var(--paper-well); font-size: 0.8em; font-weight: 500; opacity: 0.85; }
+.work-open-lead { display: inline-flex; gap: 6px; align-items: center; }
+/* The phone's page (note 19): the Plan before the panel's rows (note 15); the bar takes the width with the words under
+   it; a child's title on up to two lines, no level chip or pull request, and the short line 2. */
+@container (max-width: 699px) {
+  .work-item-grid { display: flex; flex-direction: column; }
+  .work-item-grid > .work-main { display: contents; }
+  .work-item-grid > * { order: 10; }
+  .work-item-grid > .work-page-bar { order: 1; }
+  .work-item-grid > .work-page-head { order: 2; }
+  .work-item-grid > .work-problem { order: 3; }
+  .work-item-grid > .work-pull-top { order: 4; }
+  .work-item-grid > .work-main > .work-plan { order: 5; }
+  .work-item-grid > .work-side.people { order: 6; }
+  .work-item-grid > .work-main > * { order: 7; min-width: 0; }
+  .work-item-grid > .work-side.links { order: 8; }
+  .work-plan-head { flex-wrap: wrap; }
+  .work-plan-head .work-plan-bar:not(.placeholder) { order: 2; flex: 1 1 100%; width: auto; }
+  .work-plan-head .work-plan-figures { order: 3; flex-basis: 100%; white-space: normal; }
+  .work-plan-row .work-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .work-plan-row .work-plan-level, .work-plan-row .work-plan-pr, .work-plan-more { display: none; }
+  .work-plan-row { padding-right: 12px; }
+  .work-plan-mark .wide-line { display: none; }
+  .work-plan-mark .short-line { display: inline; }
+}

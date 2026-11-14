@@ -4,8 +4,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { appCss } from "./appCss.mjs";
 
-const css = readFileSync(new URL("../src/app.css", import.meta.url), "utf8");
+const css = appCss();
 const rows = readFileSync(new URL("../src/views/chat/Rows.tsx", import.meta.url), "utf8");
 
 test("each turn of the transcript is drawn only near the view, and keeps the height it was drawn at", () => {

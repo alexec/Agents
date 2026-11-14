@@ -1,0 +1,115 @@
+/* The columns (071 US2, US6; #151, #235): the one sidebar and the chat, the files pane a third
+   from 1440 (over the chat below that), and below 760 the sidebar or what it picked. The widths
+   are in sidebar.css. */
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.columns {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 236px 320px minmax(0, 1fr);
+}
+
+.files-open .columns {
+  grid-template-columns: 236px 300px minmax(0, 1fr) 420px;
+}
+
+.folders, .sessions, .chat, .files {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--paper-rule);
+}
+
+.folders { background: var(--paper-sidebar); }
+.chat, .files { border-right: none; }
+.files { border-left: 1px solid var(--paper-rule); background: var(--paper-ground); }
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+  margin: 0;
+}
+
+.view-host { padding: 0; position: relative; }
+
+.column-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--paper-rule);
+  box-sizing: border-box;
+}
+
+.column-head h1 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin: 0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.column-head .actions { display: flex; gap: 6px; }
+
+/* A session's title edited in place (#751): in the chat's header, or its sidebar row. */
+input.rename {
+  font: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+}
+.row.session.renaming { display: flex; align-items: center; }
+
+.host h2 {
+  font-size: 0.65625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--paper-secondary);
+  margin: 12px 8px 4px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  border-radius: var(--radius-card);
+  padding: 6px 8px;
+}
+
+a.row { color: inherit; text-decoration: none; }
+.row:hover { background: var(--paper-wash); }
+.row.chosen { background: var(--paper-selection); box-shadow: inset 3px 0 0 var(--accent); }
+.row .title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.row .subtitle { grid-column: 1; font-size: 0.75rem; color: var(--paper-secondary); }
+.row .dot {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tint-attention);
+}
+.row.offline { opacity: 0.5; padding-top: 0; }
+.session { padding: 8px 10px; grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: 8px; align-items: start; }
+.session .body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.session .subtitle { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.session .subtitle.quiet { color: var(--paper-tertiary); }
+.session .when { font-size: 0.6875rem; color: var(--paper-tertiary); font-variant-numeric: tabular-nums; padding-top: 2px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: 0.6875rem; font-weight: 600; padding: 0 6px; border-radius: var(--radius-pill); background: var(--paper-raised); box-shadow: inset 0 0 0 1px var(--paper-rule); color: var(--paper-secondary); }
+.chip.worktree { background: none; box-shadow: none; font-weight: 400; color: var(--paper-tertiary); padding: 0; }
+

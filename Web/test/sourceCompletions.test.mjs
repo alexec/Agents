@@ -3,8 +3,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { appCss } from "./appCss.mjs";
 
-const css = readFileSync(new URL("../src/app.css", import.meta.url), "utf8");
+const css = appCss();
 const editor = readFileSync(new URL("../src/views/files/SourceEditor.tsx", import.meta.url), "utf8");
 
 test("one .completions rule, the prompt's; the editor's list is .source-completions", () => {

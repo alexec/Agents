@@ -1,0 +1,87 @@
+
+/* 1rem is the root's size, so the root alone sets the scale of the page (#2135): two steps
+   over the browser's own size (18px at its default), which the person's zoom still scales.
+   The body's size is in rem of that root; before, the root was 13px and the body 0.8125 of
+   it. */
+html {
+  font-size: 112.5%;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--paper-ground);
+  color: var(--paper-ink);
+  font-family: var(--font-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-size: 0.8125rem;
+}
+
+::selection {
+  background: var(--paper-selection);
+}
+
+/* Paper v2's icons (#4996; src/views/Icon.tsx): Lucide at a 1.5 stroke, about the size of the text
+   around it (16 in a row of 13px text, 18 in a control) and in its colour, on the text's line. */
+svg.lucide {
+  display: inline-block;
+  flex: none;
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.25em;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--paper-raised);
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control);
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Paper v2 (#4993, the sheet in specs/4926-paper-v2): colour never fills a button. The prominent
+   one, the answer (send, a picked choice, a sheet's primary action), is raised paper with cobalt
+   words, bold, and a 1.5px cobalt edge, as the Mac's PaperProminentButtonStyle (#4999). */
+button.prominent {
+  background: var(--paper-raised);
+  color: var(--accent);
+  font-weight: 650;
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 0.5px var(--accent);
+}
+
+/* Fields: raised paper with an edge of 3:1 or more (WCAG 1.4.11); the focused one an accent edge
+   and ring. A toggle or checkbox that is on is a flat accent. */
+input:is([type=text], [type=search], [type=email], [type=url], [type=password], [type=number], [type=date], [type=time], :not([type])),
+select, textarea {
+  border: 1px solid var(--paper-edge);
+  border-radius: var(--radius-control);
+  background: var(--paper-raised);
+  color: var(--paper-ink);
+}
+input:is([type=text], [type=search], [type=email], [type=url], [type=password], [type=number], [type=date], [type=time], :not([type])):focus-visible,
+select:focus-visible, textarea:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: var(--focus-gap);
+  border-color: var(--accent);
+}
+::placeholder { color: var(--paper-tertiary); opacity: 1; }
+input[type=checkbox], input[type=radio], input[type=range], progress { accent-color: var(--accent); }
+
+a { color: var(--accent); }
+/* Said, not left to the browser: a link in the chat shows the hand (#515). */
+a[href] { cursor: pointer; }
+
+:focus-visible { outline-color: var(--accent); }
+
