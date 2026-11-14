@@ -165,12 +165,23 @@ The deploy events make the lineage nodes (#5241). The code is
 - **A deploy's details** (its artifacts, state, start and end) are not links. The host
   keeps each deploy's last event in `<root>/lineage-deploys.json`, at most 1,000. A walk
   gives them as the deploy's resolved title (*v0.18.0 to testflight*), state and labels.
-- **Computed, not stored:** a succeeded deploy's state is `replaced` when a newer deploy
-  succeeded in each of its environments. It has the label `rollback` when its release is
+- **Computed, not stored:** a succeeded deploy's state is `replaced` when it is no longer
+  live in any of its environments. It has the label `rollback` when its release is
   older than the release it replaced. **What a deploy brings** is the PRs between the last
   deploy that succeeded in the same environment and this deploy, from the forge's compare
   of their commits. A walk gives them as `brings` links with the source `computed`. The
   host works them out in the background and never stores them.
+- **Live and next versions (#5246),** as GitOps Promoter's active and proposed, are
+  computed too. A target is the environment node with the deploy's target labels. Its
+  live versions are the newest succeeded deploy's, at its `share` (100 % with none), then
+  older succeeded deploys of other versions until the shares make 100 %: a canary is live
+  beside the version it splits with. A live version's "since" is the first deploy of its
+  newest unbroken run. Its next versions are the deploys that wait or run there and began
+  after the newest live deploy began; what one brings is its `brings`. A walk from an
+  environment gives them as `live` links (at: since) and `next` links (at: the start),
+  source `computed`. A live deploy with less than all the traffic has the label
+  `share:<per cent>`, and a succeeded deploy is `replaced` when it is live nowhere. The
+  live version of the target before it in a path comes with promotion order.
 - **Old nodes:** before #5241, a `deploy` node was an artifact (`testflight:deploy:…#812`),
   `part-of` a `target`, and a release was `deployed-as` it. Nothing makes those now. They
   are read until they age out of the store's bounds.
