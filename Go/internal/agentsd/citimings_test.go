@@ -222,6 +222,7 @@ func TestCITimingsGitLab(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer d.Shutdown()
 	d.ciGitLabAPI = srv.URL
 	h := ciRepoHere{forgeRepo{"gitlab", "group/project"}, t.TempDir()}
 	if err := d.readCIRepo(context.Background(), h); err != nil {
