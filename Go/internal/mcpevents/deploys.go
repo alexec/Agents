@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // The deploy events every forge's server sends (#5240, #5244, spec 5239-deploy-model):

@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Bitbucket Pipelines' deployments as the deploy model (#5244, spec 5239-deploy-model), in the

@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/agentloops-dev/agents/Go/internal/mcpevents"
-	"github.com/agentloops-dev/agents/Go/wire"
+	"github.com/agentloops-dev/agent-loops/Go/internal/mcpevents"
+	"github.com/agentloops-dev/agent-loops/Go/wire"
 )
 
 // Azure Pipelines environments' deployment records as the deploy model (#5244, spec
