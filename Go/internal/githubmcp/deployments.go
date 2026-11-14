@@ -171,17 +171,7 @@ func tierOf(name string, production bool) wire.EnvironmentTier {
 	if production {
 		return wire.EnvironmentTierProduction
 	}
-	switch strings.ToLower(name) {
-	case "production", "prod":
-		return wire.EnvironmentTierProduction
-	case "staging", "stage":
-		return wire.EnvironmentTierStaging
-	case "testing", "test", "qa":
-		return wire.EnvironmentTierTesting
-	case "development", "dev":
-		return wire.EnvironmentTierDevelopment
-	}
-	return wire.EnvironmentTierOther
+	return mcpevents.TierByName(name)
 }
 
 // releaseTag is a tag that names a release, as v0.18.0.

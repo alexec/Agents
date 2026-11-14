@@ -134,19 +134,29 @@ func pathOf(web, project string) string {
 
 // deploymentJSON is a deployment as GitLab lists it: of a job with an environment:.
 type deploymentJSON struct {
-	ID          int    `json:"id"`
-	IID         int    `json:"iid"`
-	Status      string `json:"status"`
-	CreatedAt   string `json:"created_at"`
-	User        *user  `json:"user"`
+	ID        int    `json:"id"`
+	IID       int    `json:"iid"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"created_at"`
+	User      *user  `json:"user"`
+	// Ref, SHA, UpdatedAt and FinishedAt are what deploy.* read (#5244).
+	Ref         string `json:"ref"`
+	SHA         string `json:"sha"`
+	UpdatedAt   string `json:"updated_at"`
+	FinishedAt  string `json:"finished_at"`
 	Environment struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`
+		// Tier is GitLab's deployment_tier, when it says one; ExternalURL its address.
+		Tier        string `json:"tier"`
+		ExternalURL string `json:"external_url"`
 	} `json:"environment"`
 	Deployable *struct {
-		Name     string        `json:"name"`
-		WebURL   string        `json:"web_url"`
-		Pipeline *pipelineJSON `json:"pipeline"`
+		Name       string        `json:"name"`
+		WebURL     string        `json:"web_url"`
+		StartedAt  string        `json:"started_at"`
+		FinishedAt string        `json:"finished_at"`
+		Pipeline   *pipelineJSON `json:"pipeline"`
 	} `json:"deployable"`
 	// The approvals so far, on GitLab Premium.
 	Approvals []approval `json:"approvals"`
