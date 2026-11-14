@@ -99,6 +99,11 @@ HANDLED = {
         "sessionCapabilities.systemPrompt", "sessionCapabilities.systemPrompt.mode"]},
     "sessionCapabilities.systemPrompt.mode.override": "not sent: replacing Claude Code's own prompt is not offered",
     "auth.logout": "signing out from the app",
+    # Claude 0.102.0 to 0.106.0 (#5124): four unstable ACP RFDs, by @agentclientprotocol/sdk 2.6.0.
+    "auth.status": "not asked: _meta.authStatus and _auth/status_update say the same (RuntimeAccount)",
+    "sessionCapabilities.options": "not asked: the start form reads the options of a session it opens and stops (whatItOffers)",
+    "sessionCapabilities.status": "not asked: the app picks an agent back up by resume or load, and says why when it cannot",
+    "sessionCapabilities.title": "not sent: a name the person gives stays in the app; the runtime's own title is read (#492)",
     "providers": "choosing who answers",
     "mcpCapabilities.http": "attaching an MCP server over http",
     "mcpCapabilities.sse": "attaching an MCP server over sse",
@@ -118,6 +123,8 @@ OPTIONS = {
         "model": (None, UNDER_PROMPT),
         "effort": (["default", "low", "medium", "high", "xhigh", "max"], UNDER_PROMPT),
         "fast": ("boolean", UNDER_PROMPT + "; needs extra usage on the Claude plan"),
+        # Claude 0.10x (#5124): dynamic workflows on every task, on the models with xhigh effort.
+        "ultracode": ("boolean", UNDER_PROMPT + "; only on models with xhigh effort"),
     },
     "codex": {
         "mode": (["read-only", "agent", "agent-full-access"], UNDER_PROMPT + "; its sandbox too (064, #40)"),
