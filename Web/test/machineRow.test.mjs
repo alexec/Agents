@@ -102,7 +102,7 @@ test("every machine the person has shows, also one Agents did not make, and a cl
   // The join says how it goes, and why it failed.
   assert.equal(m.makingLine(beta, { joining: null }), "Joining…");
   assert.equal(m.makingLine(beta, { joining: "connect" }), "Starting it and connecting…");
-  assert.equal(m.makingLine(beta, { joining: "setUp" }), "Installing Agents…");
+  assert.equal(m.makingLine(beta, { joining: "setUp" }), "Installing Agent Loops…");
   assert.equal(m.makingTone(beta, { joining: "setUp" }), "busy");
   assert.equal(m.makingLine(beta, { failed: "ssh: refused" }), "Didn’t join: ssh: refused");
   assert.equal(m.makingTone(beta, { failed: "ssh: refused" }), "failure");
@@ -115,7 +115,7 @@ test("every machine the person has shows, also one Agents did not make, and a cl
   assert.equal(m.makingCanDelete(alpha, { joining: null }), false);
   assert.ok(m.makingCanDelete(alpha, { failed: "no" }));
   assert.equal(m.makingCanDelete({ ...alpha, deletable: false }), false, "a provider that can't delete offers no Delete");
-  assert.equal(m.deleteMakingQuestion(alpha), "Delete alpha? Codespaces deletes alpha and its disk. It never joined Agents, "
+  assert.equal(m.deleteMakingQuestion(alpha), "Delete alpha? Codespaces deletes alpha and its disk. It never joined Agent Loops, "
     + "so it has no backup: work on it that is not pushed is lost.");
 });
 

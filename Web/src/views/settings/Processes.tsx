@@ -44,7 +44,7 @@ export function MachineProcesses({ store, host, name, showsTotals = true, folds 
             <div class="setting" key={process.pid} title={`Process ${process.pid}`}>
               <span style={{ paddingLeft: `${Math.min(process.depth, 6) * 14}px` }}>
                 {process.name}
-                {process.depth === 0 && <span class="faint small"> Agents’ daemon</span>}
+                {process.depth === 0 && <span class="faint small"> Agent Loops’ daemon</span>}
                 {isSessionsOwn(process, state.processes) && (
                   <> <button type="button" class="link small" onClick={() => open(process)}>
                     {process.title ?? "Untitled session"}</button></>

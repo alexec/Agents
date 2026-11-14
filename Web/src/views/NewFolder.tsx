@@ -168,7 +168,7 @@ function NoAgentRuntime({ runtimes }: { runtimes: RuntimeStatus[] }) {
   return (
     <div class="empty-folders">
       <p class="strong">No agent runtime found</p>
-      <p class="quiet">Agents runs the coding CLIs on this Mac. Install one on the Mac, in Settings ▸ Agent Runtimes, or from its own page.</p>
+      <p class="quiet">Agent Loops runs the coding CLIs on this Mac. Install one on the Mac, in Settings ▸ Agent Runtimes, or from its own page.</p>
       {runtimes.length > 0 && (
         <ul class="empty-runtimes">
           {runtimes.map((status) => {

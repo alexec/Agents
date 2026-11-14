@@ -13,9 +13,9 @@ export function machineSheets(host: ControlMachine, macID: string, online: boole
 
 export const updateWords = {
   title: (name: string) => `Update ${name}`,
-  note: (name: string) => `The machine ${name} runs on, as the control plane reaches it over ssh. The control plane checks it is ${name}, copies its version of Agents there and starts it again. Its agents and folders stay.`,
+  note: (name: string) => `The machine ${name} runs on, as the control plane reaches it over ssh. The control plane checks it is ${name}, copies its version of Agent Loops there and starts it again. Its agents and folders stay.`,
   trustNote: (fingerprint: string) => `This machine’s host key is new to the control plane: ${fingerprint}. Update only if this is the key the machine shows (ssh-keygen -lf on its host key).`,
-  updating: "Updating Agents over ssh… This takes a minute or two.",
+  updating: "Updating Agent Loops over ssh… This takes a minute or two.",
   updated: (name: string) => `Updated ${name}. It starts again with this control plane’s version.`,
   noDestination: "Give the ssh destination.",
 };

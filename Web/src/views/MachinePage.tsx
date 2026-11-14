@@ -75,7 +75,7 @@ export function MachinePage({ store, host }: { store: Store; host: string }) {
           onClick={() => { chooseSettingsMachine(host); go({ nav: "settings" }); }}>Settings…</button>
       </div>
       {!answers ? <p class="hint">{name} is offline, so it can’t say how it is doing now.</p>
-        : !asks ? <p class="hint">Update Agents on {name} to see its CPU, memory and disks here.</p>
+        : !asks ? <p class="hint">Update Agent Loops on {name} to see its CPU, memory and disks here.</p>
         : (
           <>
             <section aria-labelledby="machine-summary">

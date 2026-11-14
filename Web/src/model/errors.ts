@@ -29,11 +29,11 @@ export function olderMachine(error: CallFailed): string | undefined {
   const theirs = error.route ? versions.machines.get(error.route) : undefined;
   const ours = versions.page;
   if (!theirs || !ours || compareVersions(theirs, ours) >= 0) return undefined;
-  return `This machine needs an update to do this. It runs Agents ${theirs}; this page is ${ours}.`;
+  return `This machine needs an update to do this. It runs Agent Loops ${theirs}; this page is ${ours}.`;
 }
 
 /** Every paired browser may do everything (#111); only an older control plane or host still refuses by grant. */
-export const notAllowed = "That isn't allowed from this browser. The Mac's Agents may need updating.";
+export const notAllowed = "That isn't allowed from this browser. The Mac's Agent Loops may need updating.";
 export const notKnown = "That machine can't do that yet. It may need updating.";
 
 /** One sentence for the person: the refusal, the link, or the host's own words. */

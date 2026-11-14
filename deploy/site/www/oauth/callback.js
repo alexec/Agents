@@ -24,7 +24,7 @@
   function say(text) { words.textContent = text; }
 
   if (!answer.state) {
-    say("This page is for signing in from Agents. Start again from Agents.");
+    say("This page is for signing in from Agent Loops. Start again from Agent Loops.");
     return;
   }
   var dot = answer.state.indexOf(".");
@@ -32,7 +32,7 @@
     var target = "agents://oauth/callback?" + new URLSearchParams(answer).toString();
     back.href = target;
     back.hidden = false;
-    say(answer.error ? "The sign-in did not finish. Going back to Agents…" : "Going back to Agents…");
+    say(answer.error ? "The sign-in did not finish. Going back to Agent Loops…" : "Going back to Agent Loops…");
     location.replace(target);
     return;
   }
@@ -44,7 +44,7 @@
     origin = "";
   }
   if (!/^https?:\/\//.test(origin) || !window.opener) {
-    say("The Agents page that asked is not open any more. Start the sign-in again from Agents.");
+    say("The Agent Loops page that asked is not open any more. Start the sign-in again from Agent Loops.");
     return;
   }
   function give() {
@@ -60,7 +60,7 @@
     give();
     return;
   }
-  say("Give this sign-in to " + origin + "? Do this only when it is your own Agents page.");
+  say("Give this sign-in to " + origin + "? Do this only when it is your own Agent Loops page.");
   back.textContent = "Give it to " + host;
   back.href = "#";
   back.hidden = false;

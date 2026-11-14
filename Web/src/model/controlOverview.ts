@@ -4,13 +4,13 @@ import type { WebRemoteStatus, WireDate } from "../protocol/generated";
 import { fromWireDate } from "../protocol/dates";
 
 export const overviewWords = {
-  serve: "Serve Agents to browsers on this Mac",
+  serve: "Serve Agent Loops to browsers on this Mac",
   restart: "Restart",
   restarting: "Restarting…",
   tryAgain: "Try Again",
   thisMac: "This Mac",
   // Off closes the listener only: this page keeps its connection until it is closed or reloaded.
-  offHere: "This page stays connected until you close or reload it. Then open Agents on this Mac to turn it on again.",
+  offHere: "This page stays connected until you close or reload it. Then open Agent Loops on this Mac to turn it on again.",
   restartHint: "Every window, device and machine connects again by itself.",
 } as const;
 
@@ -24,9 +24,9 @@ export const isOff = (web: WebRemoteStatus | undefined) => !!web && !web.served 
 export function serveLine(web: WebRemoteStatus): string {
   if (web.served) return `At ${address(web)}, for a browser on this Mac only.`;
   switch (web.reason) {
-    case "off": return `Off. Turn it on to use Agents at ${address(web)}, in a browser on this Mac only.`;
+    case "off": return `Off. Turn it on to use Agent Loops at ${address(web)}, in a browser on this Mac only.`;
     case "portInUse": return `Not serving: port ${web.port} is in use by another app.`;
-    case "build": return "Not serving: this copy of the Agents web app is damaged or missing.";
+    case "build": return "Not serving: this copy of the Agent Loops web app is damaged or missing.";
     default: return `Not serving: port ${web.port} couldn’t be opened${web.detail ? ` (${web.detail})` : ""}.`;
   }
 }

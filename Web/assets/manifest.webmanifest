@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Agents",
-  "short_name": "Agents",
+  "name": "Agent Loops",
+  "short_name": "Agent Loops",
   "description": "Read, answer and steer your coding agents.",
   "start_url": "/",
   "scope": "/",

@@ -24,7 +24,7 @@ test("an offline host says so", () => {
 
 test("a machine older than the page that refuses a call needs an update (#4096)", () => {
   e.knowVersions("0.18.0", [["box", "0.17.0"], ["same", "0.18.0"]]);
-  const words = "This machine needs an update to do this. It runs Agents 0.17.0; this page is 0.18.0.";
+  const words = "This machine needs an update to do this. It runs Agent Loops 0.17.0; this page is 0.18.0.";
   assert.equal(e.describe(new w.CallFailed(-32602, "Those parameters are not a ProviderCreate.", undefined, "box")), words);
   assert.equal(e.describe(new w.CallFailed(-32601, "method not found", undefined, "box")), words);
   // The same version, or the control plane, which serves the page: a real fault, as it said it.

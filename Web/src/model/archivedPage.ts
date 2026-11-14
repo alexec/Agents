@@ -41,7 +41,7 @@ export const sessionsWords = {
   title: "Archived Sessions",
   filter: "Filter archived sessions",
   emptyTitle: "No Archived Sessions",
-  emptyLine: "Sessions you archive in Agents show here.",
+  emptyLine: "Sessions you archive in Agent Loops show here.",
   noMatch: "No archived sessions match",
 } as const;
 
@@ -49,7 +49,7 @@ export const workflowsWords = {
   title: "Archived Workflows",
   filter: "Filter archived workflows",
   emptyTitle: "No Archived Workflows",
-  emptyLine: "Workflows you archive in Agents show here.",
+  emptyLine: "Workflows you archive in Agent Loops show here.",
   noMatch: "No archived workflows match",
 } as const;
 

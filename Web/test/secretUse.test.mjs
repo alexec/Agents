@@ -63,7 +63,7 @@ test("a terminal's agents-secret has no session: once, for 1 hour or deny, and i
   assert.equal(words.isTerminalRequest(request({ name: "X", use: "fill", place: "a.com" })), false);
   const use = words.secretUseOf(terminal);
   assert.deepEqual(words.secretUseActions(use).map((a) => words.secretUseWords[a]), ["Approve", "Approve for 1 Hour", "Deny"]);
-  assert.equal(words.secretUseWhere(use), "Terminal: zsh · Agents cannot tell a terminal from an agent outside its session.");
+  assert.equal(words.secretUseWhere(use), "Terminal: zsh · Agent Loops cannot tell a terminal from an agent outside its session.");
 });
 
 test("a session's secret uses are its chat's cards, Later's too; another's, a question's and a terminal's are not (#4918)", () => {

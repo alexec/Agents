@@ -11,7 +11,7 @@ import (
 // accent; the page names no colour or font outside the token file.
 func TestProminentButtonsAreTheAccent(t *testing.T) {
 	var b strings.Builder
-	if err := pageTemplate.Execute(&b, page{Title: "Agents", Welcome: true}); err != nil {
+	if err := pageTemplate.Execute(&b, page{Title: "Agent Loops", Welcome: true}); err != nil {
 		t.Fatal(err)
 	}
 	html := b.String()

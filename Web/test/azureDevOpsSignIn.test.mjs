@@ -66,7 +66,7 @@ test("an Azure DevOps folder's set-up says work items, pull requests and builds"
 test("a newer host's forge says to update Agents, and its connections are left out", () => {
   const setup = { folder: "/p", repository: "a/b", forge: "sourcehut", site: "git.sr.ht", slots: [], events: { state: "off", names: [], workflows: [] }, done: 0 };
   assert.equal(c.unknownForgeOf(setup), "sourcehut");
-  assert.match(c.unknownForge(setup), /^git\.sr\.ht is on a forge this version of Agents can't connect \(sourcehut\)\. Update Agents/);
+  assert.match(c.unknownForge(setup), /^git\.sr\.ht is on a forge this version of Agent Loops can't connect \(sourcehut\)\. Update Agent Loops/);
   const list = [{ provider: "sourcehut", state: "connected", connectedAt: 0 }, { provider: "github", state: "connected", connectedAt: 0 }];
   assert.deepEqual(c.knownConnections(list).map((x) => x.provider), ["github"]);
 });

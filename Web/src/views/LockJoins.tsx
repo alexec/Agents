@@ -55,7 +55,7 @@ function OwnCard({ store, device, down }: { store: Store; device: ThisDevice; do
       title = <>Approve this device on another of your devices.</>;
       subtitle = device.digits
         ? <>Check that the other device shows <code>{spaced(device.digits)}</code>, then approve it there.</>
-        : <>Open Agents on a device you use already and choose Compare Digits.</>;
+        : <>Open Agent Loops on a device you use already and choose Compare Digits.</>;
       if (!recovering) action = <button type="button" disabled={down} onClick={() => setRecovering(true)}>Use Recovery Key</button>;
       break;
     case "ended":

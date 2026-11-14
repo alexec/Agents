@@ -25,7 +25,7 @@ export function hostHas(hosts: readonly ControlMachine[], host: string, capabili
 
 /** "Agents 0.9 (Go)" for a host written in Go (#1134). */
 export function versionWords(host: ControlMachine): string {
-  return host.implementation === "go" ? `Agents ${host.version} (Go)` : `Agents ${host.version}`;
+  return host.implementation === "go" ? `Agent Loops ${host.version} (Go)` : `Agent Loops ${host.version}`;
 }
 
 /** A host's state as a row says it: "Needs an update" for `needsUpdate`. */
@@ -39,7 +39,7 @@ export function stateWords(host: ControlMachine): string {
 /** What to update a host to, and the names it is missing; null for one that has the control plane's required set. */
 export function missingWords(host: ControlMachine, controlVersion: string | undefined): string | null {
   if (!host.missing || host.missing.length === 0) return null;
-  const to = controlVersion ? ` to Agents ${controlVersion}` : "";
+  const to = controlVersion ? ` to Agent Loops ${controlVersion}` : "";
   return `Update this machine${to}. It does not have ${host.missing.join(", ")}.`;
 }
 
@@ -48,5 +48,5 @@ export function appMissingWords(required: RequiredCapabilities | undefined, cont
   const mine: readonly string[] = DeclaredCapabilities["client"] ?? [];
   const missing = (required?.client ?? []).filter((c) => !mine.includes(c));
   if (missing.length === 0) return null;
-  return `Update this page to Agents ${controlVersion} to use this control plane. It does not have ${missing.join(", ")}.`;
+  return `Update this page to Agent Loops ${controlVersion} to use this control plane. It does not have ${missing.join(", ")}.`;
 }

@@ -529,8 +529,8 @@ export function warnings(p: OrgPolicy, machines: readonly FleetMachine[] | undef
   if (old.length > 0) {
     const which = old.map((m) => m.host.name).sort().join(", ");
     out.push(p.requireFollowing
-      ? `${old.length === 1 ? "1 machine does" : `${old.length} machines do`} not follow policy and will start no agent: ${which}. Update Agents on ${old.length === 1 ? "it" : "them"}.`
-      : `${old.length === 1 ? "1 machine does" : `${old.length} machines do`} not follow policy: ${which}. Update Agents on ${old.length === 1 ? "it" : "them"}.`);
+      ? `${old.length === 1 ? "1 machine does" : `${old.length} machines do`} not follow policy and will start no agent: ${which}. Update Agent Loops on ${old.length === 1 ? "it" : "them"}.`
+      : `${old.length === 1 ? "1 machine does" : `${old.length} machines do`} not follow policy: ${which}. Update Agent Loops on ${old.length === 1 ? "it" : "them"}.`);
   }
   return out;
 }

@@ -48,9 +48,9 @@ function* liveViews(store: Store): Generator<MoodCounts> {
   }
 }
 
-/** The tab's title: Agents, or the folder a tab holds alone (#1089), after how many need the person. */
+/** The tab's title: Agent Loops, or the folder a tab holds alone (#1089), after how many need the person. */
 export function titleFor(count: number, folder?: string): string {
-  const name = folder ?? "Agents";
+  const name = folder ?? "Agent Loops";
   return count > 0 ? `(${count}) ${name}` : name;
 }
 

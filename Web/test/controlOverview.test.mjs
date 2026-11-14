@@ -9,7 +9,7 @@ const o = await load("src/model/controlOverview.ts");
 test("served, it gives the address; off, it says off and where it would be", () => {
   assert.equal(o.serveLine({ port: 8792, served: true }), "At localhost:8792, for a browser on this Mac only.");
   const off = { port: 8792, served: false, reason: "off" };
-  assert.equal(o.serveLine(off), "Off. Turn it on to use Agents at localhost:8792, in a browser on this Mac only.");
+  assert.equal(o.serveLine(off), "Off. Turn it on to use Agent Loops at localhost:8792, in a browser on this Mac only.");
   assert.equal(o.isOff(off), true);
   assert.equal(o.canTryAgain(off), false);
 });

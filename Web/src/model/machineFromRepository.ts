@@ -123,8 +123,8 @@ export const machineWords = {
   noMakers: "No provider here can make a machine. Add DigitalOcean, Compute Engine or Codespaces in Settings ▸ Machine providers.",
   start: "Start",
   starting: (name: string) => `Starting ${name}…`,
-  joining: (name: string, r: Repository) => `${name} is starting. It installs Agents, joins and clones ${r.path} on its first boot. The folder shows when it has.`,
-  notJoining: (name: string, provider: string) => `${provider} made ${name}, but can't install Agents on its first boot. Add it as a machine in Settings ▸ Machine providers, with Add as Machine….`,
+  joining: (name: string, r: Repository) => `${name} is starting. It installs Agent Loops, joins and clones ${r.path} on its first boot. The folder shows when it has.`,
+  notJoining: (name: string, provider: string) => `${provider} made ${name}, but can't install Agent Loops on its first boot. Add it as a machine in Settings ▸ Machine providers, with Add as Machine….`,
   privateNote: "A private repository needs git access on the new machine.",
   blankNote: (provider: string, from: string) => `With no repository, ${provider} makes it from ${from}.`,
 };

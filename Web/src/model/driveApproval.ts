@@ -17,8 +17,8 @@ export function shownMode(settings: DesktopControlSettings): DriveApproval {
 
 export function screenFooter(mode: DriveApproval): string {
   switch (mode) {
-    case "ask": return "Before an agent drives the screen, it asks you in Needs you: Approve, Approve for This Session, Always Approve or Deny. macOS asks you to grant Agents the Accessibility permission the first time.";
-    case "always": return "An agent can click, type and read the screen of any app on this Mac, not only the sandboxed browser, and does not ask first. macOS asks you to grant Agents the Accessibility permission the first time an agent tries.";
+    case "ask": return "Before an agent drives the screen, it asks you in Needs you: Approve, Approve for This Session, Always Approve or Deny. macOS asks you to grant Agent Loops the Accessibility permission the first time.";
+    case "always": return "An agent can click, type and read the screen of any app on this Mac, not only the sandboxed browser, and does not ask first. macOS asks you to grant Agent Loops the Accessibility permission the first time an agent tries.";
     case "off": return "An agent cannot click, type or read the screen of any other app.";
   }
 }
