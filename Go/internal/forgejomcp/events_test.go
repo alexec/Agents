@@ -17,11 +17,12 @@ import (
 
 func TestTheEventsAreTheGitLabServersNames(t *testing.T) {
 	// The gitlab server's, but for run.completed and deploy.waiting, which each forge has
-	// where its API does; run.completed is after checks.failed, as there (#4217).
+	// where its API does; run.completed is after checks.failed, as there (#4217). Forgejo has
+	// no deployments, so none of deploy.started, deploy.succeeded and deploy.failed (#5244).
 	without := func(names []string) []string {
 		var out []string
 		for _, n := range names {
-			if n != "run.completed" && n != "deploy.waiting" {
+			if n != "run.completed" && n != "deploy.waiting" && !mcpevents.IsDeployEvent(n) {
 				out = append(out, n)
 			}
 		}
