@@ -307,6 +307,13 @@ enum Canned {
                 text: "The list and the page are in. Next is the conversation, which is where the paging matters.\n\n"
                     + "What is left:\n\n- the conversation's paging\n- the prompt bar\n\n"
                     + "> Same three levels as the Mac, one at a time.\n\nI keep to that.")),
+            // A reply with code, so a walk can select from its words into the code (#5234).
+            // It streams on from the message above, so it starts a paragraph of its own.
+            TranscriptEntry(at: ago(8), kind: .agentMessage(
+                messageID: nil,
+                text: "\n\nTo try the layout on the simulator, build the remote first. Then run the build:\n\n"
+                    + "```sh\nswift build --product Agents && open build/Agents.app\n```\n\n"
+                    + "The page pushes from the folder list.")),
             TranscriptEntry(at: ago(4), kind: .usageRecorded(
                 TurnUsage(totalTokens: 92_000, inputTokens: 81_000, outputTokens: 11_000,
                           cost: Cost(amount: 0.31, currency: "USD")))),
