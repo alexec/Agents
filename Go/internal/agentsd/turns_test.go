@@ -64,6 +64,8 @@ func TestMain(m *testing.M) {
 	erasing = false
 	// Nor asks a runtime its version (#3674): that starts the runtime too.
 	runtimeVersion = func(string) string { return "" }
+	// Nor fetches the ready-made workflows from GitHub (#5091): every daemon has the fixture's.
+	useReadyMadeFixture()
 	os.Exit(m.Run())
 }
 

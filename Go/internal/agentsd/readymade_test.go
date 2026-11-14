@@ -313,8 +313,8 @@ func TestShutdownEndsTheWorkflowClock(t *testing.T) {
 	}
 }
 
-// A copy the person did not edit takes a newer ready-made version, with its approval when
-// the step does not widen it; an edited copy is left alone (#4048).
+// A copy the person did not edit takes a newer ready-made version, which waits for the
+// person's approval (#5091); an edited copy is left alone (#4048).
 func TestReadyMadeUpdatesOnlyTheUneditedCopy(t *testing.T) {
 	d, c := start(t, t.TempDir())
 	defer d.Shutdown()
@@ -337,14 +337,14 @@ func TestReadyMadeUpdatesOnlyTheUneditedCopy(t *testing.T) {
 	summary, _ := readyMadeText("daily-summary")
 	checks, _ := readyMadeText("daily-checks")
 	work, _ := readyMadeText("work-an-issue")
-	// Daily summary as #3922 found it, turned on: unedited, and plan → ask does not widen it.
+	// Daily summary as #3922 found it, turned on: unedited, so it is updated, and asked again.
 	turnedOn, _ := setFrontMatter("enabled", nil, strings.Replace(summary, "permission-mode: ask", "permission-mode: plan", 1))
 	approve("daily-summary", turnedOn)
 	// Daily checks edited by the person.
 	edited := strings.Replace(checks, "permission-mode: ask", "permission-mode: plan", 1) + "\nMy own line.\n"
 	approve("daily-checks", edited)
 	// Work an issue as the daemon made an earlier version that no one listed, turned on: it
-	// is updated, and asked again. (A copy that is the app's own text is approved anyway.)
+	// is updated, and asked again.
 	work, _ = setFrontMatter("enabled", nil, work)
 	madeEarlier := strings.Replace(work, "agent: new", "agent: new\neffort: high", 1)
 	digest, _ := readyMadeDigest(madeEarlier)
@@ -361,7 +361,7 @@ func TestReadyMadeUpdatesOnlyTheUneditedCopy(t *testing.T) {
 	for _, s := range list {
 		waits[s.Workflow.WorkflowID] = s.AwaitingApproval != nil
 	}
-	if waits["daily-summary"] || waits["daily-checks"] || !waits["work-an-issue"] {
+	if !waits["daily-summary"] || waits["daily-checks"] || !waits["work-an-issue"] {
 		t.Fatalf("approvals: %v", waits)
 	}
 	if want, _ := readyMadeDigest(summary); madeReadyMade(home)["daily-summary"] != want {
@@ -387,7 +387,7 @@ func TestReadyMadeUpdatesOnlyTheUneditedCopy(t *testing.T) {
 	}
 	older, _ := readyMadeDigest(strings.Replace(checks, "permission-mode: ask", "permission-mode: plan", 1))
 	markReadyMadeMade(home, "daily-checks", older)
-	if n := notices()["daily-checks"].NewerReadyMade; n == nil || *n != readyMadeChange["daily-checks"] {
+	if n := notices()["daily-checks"].NewerReadyMade; n == nil || *n != "Its ready-made version changed since this copy was made." {
 		t.Fatalf("an edited copy of an older version: %v", n)
 	}
 

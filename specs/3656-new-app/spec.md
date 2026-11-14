@@ -145,7 +145,8 @@ The person can start again later: each step checks what is already there and ski
   - Decided: agentsd takes the default branch, not a tag, because a fix then reaches the next
     new app at once; a person who wants a fixed version names a fork. Alex can overrule.
 - **Decided: the flow is a ready-made skill, `start-a-new-app`,** with no workflow, as
-  `map-a-docs-server` is (#3307), and a line in the brief that says to follow it when a
+  `map-a-docs-server` is (#3307; since #5091 both are in agentloops-dev/dotagents, not in
+  agentsd), and a line in the brief that says to follow it when a
   person asks for a new app. Because the steps are judgment (which accounts, what is there
   already) and an agent follows a skill; a fixed program could not skip what is already
   set up. Alex can overrule.

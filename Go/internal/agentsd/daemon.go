@@ -108,6 +108,7 @@ type Daemon struct {
 	allowanceBook
 	accountBook
 	mcpBook
+	readyMadeFetching
 	viewBook
 	mcpHealthBook
 	mcpEventsBook

@@ -548,12 +548,21 @@ the days, edit the schedule's `days:`.
   to you, as the app's own tools need no approval, and asks you before any change to a folder
   (#3922). Plan mode made it wait for your approval before it saved. A copy made before
   #3922 that you did not edit (turning it on or off is not an edit) takes `ask` by itself,
-  and keeps its approval, as the step does not widen it (#4048). A copy you edited keeps
+  and asks for your approval again (#4048, #5091). A copy you edited keeps
   `permission-mode: plan`: change it to `ask` by hand.
 - A newer ready-made version replaces your copy only when you did not edit it. The daemon
   keeps the digest of each copy it makes in `~/.agents/settings/ready-made-workflows.json`.
   The copy keeps its `enabled:`, `archived:`, `muted:` and `continue-when-back:`. The new
-  version is asked for your approval again when it widens what the workflow can do.
+  version always asks for your approval again (#5091): it came from a repository, so a push
+  there never changes what a workflow you approved does.
+- The ready-made workflows and skills are not in the app (#5091). They are in the public
+  repository [agentloops-dev/dotagents](https://github.com/agentloops-dev/dotagents), as
+  `workflows/<id>.md` and `skills/<id>/SKILL.md`, the same layout as `~/.agents`: you can
+  use them without Agents. Each release of Agents pins one tag of it, and that tag's commit.
+  The daemon fetches the pinned tag, keeps the last copy in
+  `~/.agents/settings/ready-made-copy.json`, and installs from that copy. With no network
+  and no copy yet, it installs nothing, and tries again 10 minutes later. A first copy of
+  the pinned commit is approved for you; a copy of any other commit waits for you.
 - The workflow's page and its row's help say "Updated to the new ready-made version on <date>"
   for 7 days after an update. A copy you edited is not updated: its page says "A newer
   ready-made version is available", with what the newer version changes (#4071). It says so
