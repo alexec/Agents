@@ -2,7 +2,7 @@ import AgentsKitCore
 import UIKit
 import UniformTypeIdentifiers
 
-/// Share ▸ Agents (#4915): what another app shares goes to the Remote's New session.
+/// Share ▸ Agent Loops (#4915): what another app shares goes to the Remote's New session.
 ///
 /// The extension does no more than it must, inside a share extension's small memory limit:
 /// it turns each item into what the paperclip would attach (`SharedItems`, by
@@ -21,7 +21,7 @@ final class ShareViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
-        label.text = "Sending to Agents…"
+        label.text = "Sending to Agent Loops…"
         label.font = .preferredFont(forTextStyle: .body)
         label.adjustsFontForContentSizeCategory = true
         label.textAlignment = .center
@@ -46,13 +46,13 @@ final class ShareViewController: UIViewController {
     private func share(_ providers: sending [NSItemProvider]) async {
         let items = await ShareReader.read(providers)
         guard SharedInbox.add(items) else {
-            finish(saying: items.isEmpty ? "There was nothing here Agents can take." : "Agents could not save this.")
+            finish(saying: items.isEmpty ? "There was nothing here Agent Loops can take." : "Agent Loops could not save this.")
             return
         }
         if await openRemote() {
             extensionContext?.completeRequest(returningItems: nil)
         } else {
-            finish(saying: "Saved. Open Agents to finish.")
+            finish(saying: "Saved. Open Agent Loops to finish.")
         }
     }
 

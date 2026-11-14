@@ -120,12 +120,12 @@ public struct TurnActivityContent: Codable, Hashable, Sendable {
     /// a while, it says so rather than going on showing a step it may have left; a pushed
     /// state that waits on the person, which has no words, says where they are.
     public func line(isStale: Bool) -> String? {
-        if isStale && !isOver { return "Open Agents to see where it is" }
+        if isStale && !isOver { return "Open Agent Loops to see where it is" }
         if line == nil, title == nil {
             switch phase {
-            case .question: return "Open Agents to answer it"
-            case .approval: return "Open Agents to decide"
-            case .needsYou: return "Open Agents to see what it needs"
+            case .question: return "Open Agent Loops to answer it"
+            case .approval: return "Open Agent Loops to decide"
+            case .needsYou: return "Open Agent Loops to see what it needs"
             case .working, .done, .paused, .failed: return nil
             }
         }
