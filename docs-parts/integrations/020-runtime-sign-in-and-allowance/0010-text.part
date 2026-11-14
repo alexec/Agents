@@ -1,0 +1,7 @@
+## Runtime sign-in and allowance
+
+How the app reads a runtime's account, its plan and what is left of it.
+Open issues: `is:open label:integration allowance`.
+
+| Integration | Clients that show it | State | Last checked | Where | Gaps |
+| --- | --- | --- | --- | --- | --- |

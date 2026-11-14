@@ -1,0 +1,1 @@
+| Reconnect at once on wake and on a network change | #82 | partly (on coming into view) | **has** | — | — | Also on the browser's `online` event. |

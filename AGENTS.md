@@ -41,7 +41,7 @@
   - a web change to a Web + Mac link feature: `mac: tier web+link` when the Mac's link still goes to the right place, else `mac: same` (the link changes in this branch) or `mac: #NNN`.
 - **For example,** a Mac sidebar change ends with `remote: #226` and `web: same`; a new Settings ▸ People control ends with `remote: tier mac+web` and `web: same`; a web-only fix ends with `mac: same, remote: same` when both already do it. A change to docs only says `mac: docs only, remote: docs only, web: docs only`.
 - **A page with cached data says "Last update <time ago>" (Alex, 2026-11-12, #5139).** Every page or pane that shows data from an earlier read (the local copy, a read while its source does not answer, a read when it opens, a poll of 30 s or more) shows the time of that read, with the same words on all three clients. A new page follows it too. The rule is in `docs/reference/design-system.md`, "How fresh the data is".
-- **The table of where each client stands** is `specs/071-web-remote/walks/parity.md`, a file per screen under `walks/parity/` (Mac / Remote / web, a row per feature; #2020). `scripts/parity-counts.py` counts the verdicts and the tiers. A parity line that changes a row updates it in the same branch.
+- **The table of where each client stands** is `specs/071-web-remote/walks/parity.md`, a page that `scripts/docs-parts.py` makes from `docs-parts/parity/` (edit a part there and run it, #5386), a file per screen under `walks/parity/` (Mac / Remote / web, a row per feature; #2020). `scripts/parity-counts.py` counts the verdicts and the tiers. A parity line that changes a row updates it in the same branch.
 
 ## Web/dist and generated.ts
 

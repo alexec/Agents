@@ -1,0 +1,1 @@
+| Labels tag input on start | labels tag input | has | has | `bar.mjs` | `window/sessions.png` | Comma adds, Delete on an empty field removes; above the input on the left (#108). |

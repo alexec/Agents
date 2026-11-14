@@ -1,0 +1,33 @@
+## History: the page beside the window (#110)
+
+The record of the walks that brought the page level with the window, from 2026-10-01 to #233. It is kept for its facts and shots; the table above is where each client stands now. Two of its rows have moved on since: the window locks a workflow's settings when its file can't be read, so #179 is done on all three; and the page now has Archive and Unarchive on the workflow page (`W/views/WorkflowPage.tsx:58-78`), though not in the row's menu (#260).
+
+**Date:** 2026-10-01
+
+**What it covers:** every change to the window's or the Remote's UI merged since 071 was planned (2026-09-29), with the issue's table first and the rest after it. Each row says whether the page had it *before* this branch, and what it has *now*.
+
+**How it was run:**
+- A run-app scratch root, `/tmp/run-p110`, with the window, its host and its control plane.
+- One git folder, `work`, seeded with:
+  - three approved workflows: *After the build* (triggering, on `custom.build_green`, `branch.moved` on `main`, and `greeting` finishing), *Nightly tidy* (weekdays at 10pm, turned off), and *Write a greeting* (Sundays at 3am);
+  - three real Claude sessions: *Repo notes* (wrote `notes.md`, unread), *Ready check* (in a new worktree, labelled `audit` and `ui`) and *Park conversation* (parked).
+- The page was driven in headless Chrome by `Web/test/walk/parity.mjs`, at 1440 × 900.
+- *before* shots are `main`'s `Web/dist`; *after* shots are this branch's.
+- Scenes that need the host away pause the root's own `agentsd` with `SIGSTOP`, and always resume it.
+- The control plane reads `Web/dist` once at start, so only the scratch control plane was restarted after each rebuild.
+- Screenshots are in `walks/parity/`. What each run read off the page is appended to `before-notes.txt` and `after-notes.txt` (the earliest *before* runs predate appending; their readings are quoted in the Notes column).
+
+**Window screenshots:** taken on 2026-10-02 once the Mac was unlocked, of the same scratch window, by window id and over AX (no clicks or keys). They are in `walks/parity/window/`. Rows the window shots don't cover point to the window's own walk for that change.
+
+### Key
+
+- **has**: the page does what the window does.
+- **partly**: the page does some of it; the rest is said.
+- **lacks**: the page does not do it.
+- **by design**: the page leaves it out on purpose (071 spec), and still does.
+- **n/a**: nothing for the page to do.
+
+### The issue's table
+
+| Change | Issue | Before | Now | Page shots | Window | Notes |
+|---|---|---|---|---|---|---|

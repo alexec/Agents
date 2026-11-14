@@ -1,0 +1,1 @@
+| Cloudflare DNS for the docs site: the CNAME `docs` to `agentloops-dev.github.io`, DNS only | — | tested on a real account | 2026-11-13, changed from `alexec.github.io` by `dns.sh --names docs --cname agentloops-dev.github.io` after the move to agentloops-dev (#4959); the site serves with HTTPS (2026-10-21: made, #1914) | `deploy/cloudflare/dns.sh` | |

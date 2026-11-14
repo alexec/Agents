@@ -1,0 +1,10 @@
+## Runtimes
+
+The coding agents the app starts. What each can do is in [Runtimes](runtimes.md). Defined in
+`Packages/AgentsKit/Sources/AgentsKitCore/Runtimes/RuntimeCatalog.swift` (Mac) and
+`Go/internal/agentsd/runtimes.go` (Go hosts).
+Open issues: `is:open label:integration runtime`.
+
+<!-- runtimes:begin -->
+| Integration | Clients that show it | State | Last checked | Where | Gaps |
+| --- | --- | --- | --- | --- | --- |

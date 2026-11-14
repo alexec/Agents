@@ -1,0 +1,1 @@
+| Grok | Mac, Remote, web, server | tested on a real account | 2026-11-12, 1.0.77: a real turn passed, not assessed, in `.agents/reviews/runtimes/grok-2026-11-12.md` | `RuntimeCatalog.swift`, `runtimes.go` | Sandbox control unavailable until Grok supports it over ACP; no question tool over ACP; cannot resume, so it cannot move into a worktree |

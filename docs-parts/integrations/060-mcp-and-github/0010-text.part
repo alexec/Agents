@@ -1,0 +1,17 @@
+## MCP and GitHub
+
+Open issues: `is:open label:integration MCP`.
+
+**Levels (#1428):** each connector reaches up to five levels: **Tools**, **Events**, **Views**,
+**Workflows** and **Tested**. The host reads the first three from what the server declares
+(`tools/list`, `events` in `initialize`, `ui://` views). Workflows is reached when a ready-made
+workflow names one of the server's events (`ReadyMadeEvents`: `issue.labelled`,
+`checks.failed` and `review.posted` since #1342, and `review.comment` for GitLab since #1633;
+the workflows are in agentloops-dev/dotagents, #5091, and its copy for the tests in `Go/internal/agentsd/testdata/dotagents/`). Tested is
+reached when the `tested` field of the connector's entry in the Agent Loops marketplace has a date
+(`Go/internal/agentsd/mcpcatalog/agents.json`, #2155); set it in the same branch that changes the row's
+state to `tested on a real account`. The Mac, the Remote and the web page show the levels on
+every Connectors page, and the Mac's catalogue shows them on each row.
+
+| Integration | Clients that show it | State | Levels | Last checked | Where | Gaps |
+| --- | --- | --- | --- | --- | --- | --- |
