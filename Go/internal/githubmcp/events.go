@@ -134,6 +134,10 @@ var events = append([]event{
 		Description: "An open pull request began to conflict with its base, so it cannot merge and its CI may not run until it is rebased. Once per conflict: it is raised again only after the PR merges cleanly and then conflicts anew." + ownPRs,
 		Input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
 		Payload:     object(map[string]any{"pr": prSchema(nil), "conflictedAt": str})},
+	{Name: "pr.blocked", Title: "Pull request blocked",
+		Description: mcpevents.BlockedDescription("On GitHub: mergeable, mergeStateStatus (BEHIND only under a rule that wants the branch up to date), reviewDecision, the last auto-merge event, and the head's checks against the required checks of the base's rulesets and branch protection."+ownPRs),
+		Input:       schema{repoProperty, branchProperty("Only the PR from this branch."), prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
+		Payload:     mcpevents.BlockedPayload(prSchema(nil))},
 	{Name: "pr.commented", Title: "Pull request commented on",
 		Description: "A comment was left on a pull request's conversation (not a review comment on a line of its diff, which review.comment covers). Its body is the first 4000 characters. A comment whose body starts with <!-- agent --> is left out: an agent's, not a person's, since every PR and comment is posted as the same account. Only comments by the repo's owner, members and collaborators, never a bot, unless anyone is true.",
 		Input:       schema{repoProperty, prProperty, fixesProperty, anyoneProperty, mineProperty, anyProperty},
@@ -356,6 +360,20 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 				} else if a.anyone || c.Trusted {
 					out = append(out, state{pr: c.PR, on: c.Conflicts, json: c.PR.json()})
 				}
+			}
+			return out, err
+		})
+	case "pr.blocked":
+		was := polls.CursorIDs(p)
+		return s.pollDiff(ctx, e.Name, "blockedAt", a, p, func() ([]state, error) {
+			prs, err := s.GitHub.BlockedPRs(ctx, a.repo)
+			var out []state
+			for _, b := range prs {
+				if b.Skip || (yours != nil && !yours.owns(b.PR.Number)) || (yours == nil && !a.anyone && !b.Trusted) {
+					continue
+				}
+				bs := mcpevents.Blocked(fmt.Sprintf("%s:%s:%d", e.Name, a.repo, b.PR.Number), b.Blocking, was)
+				out = append(out, state{pr: b.PR, on: &bs.On, key: bs.Key, json: b.PR.json(), extra: bs.Data})
 			}
 			return out, err
 		})

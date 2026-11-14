@@ -1,6 +1,6 @@
 // gitlab-mcp: the `gitlab` MCP server (#1629), on stdio, in the github server's shape
 // (Go/cmd/github-mcp): polled events of a GitLab folder's merge requests, pipelines and
-// issues (checks.failed, pr.opened, pr.merged, pr.closed, pr.conflicted, review.comment,
+// issues (checks.failed, pr.opened, pr.merged, pr.closed, pr.conflicted, pr.blocked, review.comment,
 // issue.opened, issue.commented, issue.closed), and tools that read them and comment, over
 // GitLab's REST API v4. GitLab's own MCP server is not behind it: it takes no classic access
 // token and needs a setting turned on for the group or instance (see the PR of #1629). For

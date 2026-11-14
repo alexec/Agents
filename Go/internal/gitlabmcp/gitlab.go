@@ -69,6 +69,10 @@ type OpenMR struct {
 	Draft     bool
 	Conflicts *bool
 	Trusted   bool
+	// Blocking is why it cannot merge until its author acts, and SkipsBlocked a draft or one
+	// labelled needs-approval (pr.blocked, #5321).
+	Blocking     mcpevents.Blocking
+	SkipsBlocked bool
 }
 
 // MergedMR is a merge request that merged.

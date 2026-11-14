@@ -121,6 +121,10 @@ var events = append([]event{
 		Description: "An open pull request began to conflict with its base branch, so it cannot merge until it is rebased: a file in its diff is in conflict. Once per conflict: it is raised again only after it merges cleanly and then conflicts anew." + ownPRs,
 		Input:       namedInput(),
 		Payload:     object(map[string]any{"pr": prSchema(nil), "conflictedAt": str})},
+	{Name: "pr.blocked", Title: "Pull request blocked",
+		Description: mcpevents.BlockedDescription("On Bitbucket: only conflict, from the same read as pr.conflicted; Bitbucket's listing says nothing of required checks, changes requested or auto-merge."+ownPRs),
+		Input:       namedInput(),
+		Payload:     mcpevents.BlockedPayload(prSchema(nil))},
 	// For the person, not the repository (#2034): what asks the token's owner for something.
 	{Name: "review.requested", Title: "Review requested from me",
 		Description: "The Bitbucket account whose token this server has was asked to review an open pull request: once per request, so one taken off and put back is a new one. Anyone's pull request, a fork's too.",
@@ -275,6 +279,20 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			}
 			return out, nil
 		})
+	case "pr.blocked":
+		was := polls.CursorIDs(p)
+		return s.pollDiff(e.Name, "blockedAt", a, p, func() ([]state, error) {
+			prs, err := s.Bitbucket.OpenPRs(ctx, a.repo, true)
+			var out []state
+			for _, m := range prs {
+				if m.SkipsBlocked || (a.mine && !a.byMe(m.PR, yours)) || (!a.mine && !a.anyone && !m.Trusted) {
+					continue
+				}
+				bs := mcpevents.Blocked(fmt.Sprintf("%s:%s:%d", e.Name, a.repo, m.PR.Number), m.blocking(), was)
+				out = append(out, state{mr: m.PR, on: &bs.On, key: bs.Key, json: m.PR.json(), extra: bs.Data})
+			}
+			return out, err
+		})
 	case "pr.conflicted":
 		return s.pollDiff(e.Name, "conflictedAt", a, p, func() ([]state, error) {
 			prs, err := s.Bitbucket.OpenPRs(ctx, a.repo, true)
@@ -323,10 +341,14 @@ func contains(list []string, s string) bool { return slices.Contains(list, s) }
 
 // state is a pull request and whether its state (in conflict, or open and ready) is on now;
 // nil keeps the one it had.
+// key, when set, is part of its id and its envelope's key; extra is more of the event's data
+// (pr.blocked's, #5321).
 type state struct {
-	mr   PR
-	on   *bool
-	json map[string]any
+	mr    PR
+	on    *bool
+	json  map[string]any
+	key   string
+	extra map[string]any
 }
 
 func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() ([]state, error)) (map[string]any, *rpcError) {
@@ -341,8 +363,16 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 			if (a.pr != 0 && st.mr.Number != a.pr) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
 				continue
 			}
-			out = append(out, mcpevents.State{ID: fmt.Sprintf("%s:%s:%d", name, a.repo, st.mr.Number), Number: st.mr.Number,
-				On: st.on, Data: map[string]any{root: st.json}, Subject: diffRef(root, a.repo, st.mr.Number)})
+			id := fmt.Sprintf("%s:%s:%d", name, a.repo, st.mr.Number)
+			if st.key != "" {
+				id += ":" + st.key
+			}
+			data := map[string]any{root: st.json}
+			for k, v := range st.extra {
+				data[k] = v
+			}
+			out = append(out, mcpevents.State{ID: id, Number: st.mr.Number,
+				On: st.on, Data: data, Subject: diffRef(root, a.repo, st.mr.Number), Key: st.key})
 		}
 		return out, err
 	})

@@ -18,7 +18,7 @@ import (
 
 // Instructions are the server's words.
 const Instructions = "This repository's pull requests, their checks, and its issues on Bitbucket Cloud, as events polled as the person whose token this server has: " +
-	"checks.failed (a pull request's head commit failed its checks), run.completed (a Pipelines run of any trigger, as main's or a tag's, with what it deployed), pr.opened, pr.merged, pr.closed, pr.conflicted, review.comment (a comment on a line of a pull request's diff), " +
+	"checks.failed (a pull request's head commit failed its checks), run.completed (a Pipelines run of any trigger, as main's or a tag's, with what it deployed), pr.opened, pr.merged, pr.closed, pr.conflicted, pr.blocked (a pull request that cannot merge until its author acts), review.comment (a comment on a line of a pull request's diff), " +
 	"issue.opened, issue.labelled (an issue's kind or component), issue.commented, issue.closed. " +
 	"list_pull_requests, get_pull_request, get_checks, list_issues and get_issue read them; " +
 	"failed_log reads the end of a failed Pipelines run's steps' logs (pipelineId is run.id in checks.failed), retry_pipeline starts it again on the same commit. " +

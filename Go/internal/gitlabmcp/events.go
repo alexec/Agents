@@ -135,6 +135,10 @@ var events = append([]event{
 		Description: "An open merge request began to conflict with its target branch, so it cannot merge until it is rebased. Once per conflict: it is raised again only after it merges cleanly and then conflicts anew." + ownMRs,
 		Input:       namedInput(),
 		Payload:     object(map[string]any{"pr": mrSchema(nil), "conflictedAt": str})},
+	{Name: "pr.blocked", Title: "Merge request blocked",
+		Description: mcpevents.BlockedDescription("On GitLab: detailed_merge_status, one reason at a time (conflict, need_rebase as behind, ci_must_pass as required_check_failed with the head pipeline, requested_changes); automerge_disabled is never read, as GitLab does not say who turned auto-merge off."+ownMRs),
+		Input:       namedInput(),
+		Payload:     mcpevents.BlockedPayload(mrSchema(nil))},
 	// For the person, not the project (#2034): what asks the connection's owner for something.
 	{Name: "review.requested", Title: "Review requested from me",
 		Description: "The GitLab account this server is connected as was made a reviewer of an open merge request: once per request, so one taken off and put back is a new one. Anyone's merge request, a fork's too.",
@@ -313,6 +317,20 @@ func (s *Events) Poll(ctx context.Context, raw json.RawMessage) (map[string]any,
 			}
 			return out, err
 		})
+	case "pr.blocked":
+		was := polls.CursorIDs(p)
+		return s.pollDiff(e.Name, "blockedAt", a, p, func() ([]state, error) {
+			mrs, err := s.GitLab.OpenMRs(ctx, a.project)
+			var out []state
+			for _, m := range mrs {
+				if m.SkipsBlocked || (a.mine && !a.byMe(m.MR, yours)) || (!a.mine && !a.anyone && !m.Trusted) {
+					continue
+				}
+				bs := mcpevents.Blocked(fmt.Sprintf("%s:%s:%d", e.Name, a.project, m.MR.Number), m.Blocking, was)
+				out = append(out, state{mr: m.MR, on: &bs.On, key: bs.Key, json: m.MR.json(), extra: bs.Data})
+			}
+			return out, err
+		})
 	case "pr.opened":
 		return s.pollDiff(e.Name, "openedAt", a, p, func() ([]state, error) {
 			mrs, err := s.GitLab.OpenMRs(ctx, a.project)
@@ -347,10 +365,14 @@ func contains(list []string, s string) bool { return slices.Contains(list, s) }
 
 // state is a merge request and whether its state (in conflict, or open and ready) is on now;
 // nil keeps the one it had.
+// key, when set, is part of its id and its envelope's key; extra is more of the event's data
+// (pr.blocked's, #5321).
 type state struct {
-	mr   MR
-	on   *bool
-	json map[string]any
+	mr    MR
+	on    *bool
+	json  map[string]any
+	key   string
+	extra map[string]any
 }
 
 func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() ([]state, error)) (map[string]any, *rpcError) {
@@ -365,8 +387,16 @@ func (s *Events) pollDiff(name, key string, a args, p pollParams, states func() 
 			if (a.pr != 0 && st.mr.Number != a.pr) || (a.branch != "" && st.mr.Branch != a.branch) || !a.closesOne(st.mr) {
 				continue
 			}
-			out = append(out, mcpevents.State{ID: fmt.Sprintf("%s:%s:%d", name, a.project, st.mr.Number), Number: st.mr.Number,
-				On: st.on, Data: map[string]any{root: st.json}, Subject: diffRef(root, a.project, st.mr.Number)})
+			id := fmt.Sprintf("%s:%s:%d", name, a.project, st.mr.Number)
+			if st.key != "" {
+				id += ":" + st.key
+			}
+			data := map[string]any{root: st.json}
+			for k, v := range st.extra {
+				data[k] = v
+			}
+			out = append(out, mcpevents.State{ID: id, Number: st.mr.Number,
+				On: st.on, Data: data, Subject: diffRef(root, a.project, st.mr.Number), Key: st.key})
 		}
 		return out, err
 	})
