@@ -1,0 +1,95 @@
+/* A server's dot on an MCP Servers page (#753): filled when it answers or runs, the failure tint
+   when it does not, hollow otherwise, as the window's. */
+.mcp-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; vertical-align: 1px;
+  border: 1.5px solid currentColor; box-sizing: border-box; opacity: 0.7; }
+.mcp-dot.good { background: currentColor; border-color: currentColor; opacity: 0.55; }
+.mcp-dot.failing { background: var(--tint-failure); border-color: var(--tint-failure); opacity: 1; }
+.mcp-servers button { margin-top: 8px; }
+/* A connector's five levels (#1428): the reached ones in the accent, the others faint. As the
+   window's ConnectorLevels. */
+.connector-levels { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 0; }
+.connector-levels span { font-size: 11px; padding: 0 5px; border-radius: 4px; opacity: 0.45;
+  background: color-mix(in srgb, currentColor 7%, transparent); }
+.connector-levels span.reached { color: var(--accent); opacity: 1;
+  background: color-mix(in srgb, var(--accent) 14%, transparent); }
+/* A connector's tools, each with Allow, Ask or Off (#4099), as the window's ConnectorToolsList. */
+.connector-tools { margin: 8px 0 0 16px; }
+.connector-tools ul { list-style: none; margin: 0; padding: 0; }
+.connector-tool { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.connector-tool select { margin-left: auto; }
+
+/* A folder's Connectors set-up and the Connect sheet (#1336): the connection card, the slots in the
+   window's grid, each with its mark (a tick once it read, a dashed circle when skipped), and the events. */
+.connector-setup { margin-bottom: 8px; }
+.setup-heading { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em;
+  opacity: 0.6; margin: 18px 0 8px; }
+.setup-card { background: var(--paper-raised); border: 1px solid var(--paper-rule); border-radius: 10px;
+  padding: 12px 14px; margin: 0; }
+.setup-card p { margin: 0 0 3px; }
+.setup-card.connection, .setup-card .connection, .connect-sheet .connection, .connections li.connection {
+  display: flex; align-items: center; gap: 12px; }
+.setup-card.list { list-style: none; padding: 0; }
+.setup-card.list > li { padding: 10px 14px; border-top: 1px solid var(--paper-rule); }
+.setup-card.list > li:first-child { border-top: 0; }
+.setup-row { display: flex; align-items: center; gap: 8px; margin: 0; }
+.setup-row .setup-heading { margin: 18px 0 8px; }
+.connector-setup .grow, .connections .grow, .connect-sheet .grow { flex: 1; min-width: 0; }
+.connector-mark { flex: none; width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center;
+  justify-content: center; font-size: 13px; font-weight: 700; background: var(--paper-ink); color: var(--paper-ground); }
+.connector-mark.soft { background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.setup-card.slot { min-height: 104px; }
+.setup-card.slot.changing { grid-column: 1 / -1; border: 2px solid var(--accent); }
+.slot-head { display: flex; align-items: center; gap: 6px; }
+.slot-kind { font-size: 12px; font-weight: 600; text-transform: uppercase; opacity: 0.6; flex: 1; }
+.slot-mark { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid currentColor; opacity: 0.55;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; box-sizing: border-box; }
+.slot-mark.read { background: var(--accent); border-color: var(--accent); color: var(--paper-ground); opacity: 1; }
+.slot-mark.failed, .slot-mark.refused { color: var(--tint-warning); opacity: 1; }
+.slot-mark.skipped { border-style: dashed; }
+.slot-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
+.slot-actions:empty { display: none; }
+.slot-change { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+/* The project's boards (#3282): a row per board (its name, its address, Remove), then Add a board. */
+.project-boards { margin-top: 12px; }
+.project-boards ul { list-style: none; padding: 0; margin: 6px 0; display: flex; flex-direction: column; gap: 4px; }
+.project-boards li { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.project-boards li a { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.board-name { font-weight: 600; flex: none; }
+.board-add { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.board-add input { font: inherit; color: inherit; padding: 5px 8px; border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control); background: var(--paper-ground); }
+.board-add input:nth-of-type(2) { flex: 1; min-width: 260px; }
+.connector-setup .attention, .connections .attention { color: var(--tint-warning); }
+.connect-sheet { max-width: 480px; }
+.connect-sheet ul.abilities { list-style: none; padding: 0; margin: 0 0 8px; background: var(--paper-raised);
+  border: 1px solid var(--paper-rule); border-radius: 8px; }
+.connect-sheet ul.abilities li { padding: 7px 12px; border-top: 1px solid var(--paper-rule); }
+.connect-sheet ul.abilities li:first-child { border-top: 0; }
+.sign-in-code { padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.sign-in-code p { margin: 0 0 4px; }
+.connect-sheet .button-group { align-self: flex-start; margin-bottom: 8px; }
+.connect-sheet .token-form { display: flex; flex-direction: column; gap: 6px; margin: 0 0 8px; }
+.connect-sheet .token-form label { display: flex; flex-direction: column; gap: 2px; font-size: 0.8125rem; }
+.connect-sheet .token-form .link { align-self: flex-start; }
+.connect-sheet .token-form .attention { color: var(--tint-warning); }
+.user-code { font-size: 1.5rem; font-weight: 600; letter-spacing: 0.06em; user-select: all; }
+
+/* The usage charts on Cost (#823), as Health draws them. */
+.usage-charts { margin-bottom: 24px; }
+.usage-charts .choice { margin: 0 4px 8px 0; }
+.usage-headline p { margin: 0; }
+.usage-figure { font-size: 1.75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.usage-bars { width: 100%; height: auto; display: block; margin: 8px 0 12px; }
+.usage-bar { fill: var(--accent); cursor: pointer; }
+.usage-bar.dim { opacity: 0.35; }
+.usage-hit { fill: transparent; cursor: pointer; }
+.usage-grid { stroke: var(--paper-rule); stroke-width: 1; }
+.usage-average { stroke: currentColor; opacity: 0.5; stroke-width: 1; stroke-dasharray: 4 3; }
+.usage-share { display: flex; justify-content: space-between; gap: 24px; margin: 4px 0; font-variant-numeric: tabular-nums; }
+/* The Time page (#852): each bar stacked by kind, in the accent, then waiting in grey and orange. */
+.time-bar.agent { fill: var(--accent); }
+.time-bar.tools { fill: color-mix(in srgb, var(--accent) 50%, transparent); }
+.time-bar.others { fill: color-mix(in srgb, currentColor 35%, transparent); }
+.time-bar.person { fill: var(--tint-attention); }
+.time-charts g.dim { opacity: 0.35; }

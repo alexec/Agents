@@ -1,0 +1,76 @@
+/* A change waiting for an OK, on its Review page (#1472): the header, the whole change, which the
+   page scrolls, and the answers in a bar that stays at the foot. */
+.review-body { max-width: 1400px; padding: 12px 16px 24px; display: flex; flex-direction: column; gap: 12px; }
+.review-body p { margin: 0; }
+.review-head { display: flex; align-items: flex-start; gap: 8px; }
+.review-head h2 { margin: 0 0 2px; font-size: 1.5rem; }
+.review-head .link { font: inherit; margin-left: 6px; }
+.review-diff-head { display: flex; align-items: baseline; gap: 10px; }
+.review-diff-head .path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.review-diff-head .spacer, .guarded-answers .spacer { flex: 1; }
+.review-bar { border-top: 1px solid var(--paper-rule); padding: 10px 16px; background: var(--paper-ground); display: flex; flex-direction: column; gap: 8px; }
+.review-bar .sheet-actions { margin-top: 0; }
+.review-bar .spacer { flex: 1; }
+.review-bar textarea { font: inherit; color: inherit; padding: 5px 8px; resize: vertical;
+  border: 1px solid var(--paper-rule); border-radius: var(--radius-control); background: var(--paper-ground); }
+.review-page.empty { align-items: center; text-align: center; }
+/* The one diff of a page (FileDiff, #1472): numbers for the old file and the new, wrapped lines,
+   folds and breaks; marked by sign, weight, strike and a faint wash, as .diff-line is. */
+.file-diff { font: 0.75rem/1.5 var(--font-mono); border-radius: var(--radius-control); background: var(--paper-well); padding: 6px 0; }
+.file-diff .line { display: flex; align-items: baseline; padding-right: 10px; }
+.file-diff .number { flex: none; width: 3.5em; padding-right: 0.5em; text-align: right; opacity: 0.4; user-select: none; font-variant-numeric: tabular-nums; }
+.file-diff .sign { flex: none; width: 1.4em; text-align: center; opacity: 0.6; user-select: none; }
+.file-diff .text { flex: 1; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.file-diff .line.added { background: var(--paper-wash); font-weight: 500; }
+.file-diff .line.removed .text { opacity: 0.55; text-decoration: line-through; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); }
+.file-diff .line.removed { background: color-mix(in srgb, var(--paper-ink) 6%, transparent); }
+.file-diff .pair { display: grid; grid-template-columns: 1fr 1fr; }
+.file-diff .pair > :first-child { border-right: 1px solid var(--paper-rule); }
+.file-diff .pair .empty { background: color-mix(in srgb, var(--paper-ink) 4%, transparent); }
+.file-diff .fold { display: block; width: 100%; text-align: left; border: 0; border-radius: 0; background: none; color: inherit;
+  font: inherit; opacity: 0.6; padding: 2px 10px; cursor: pointer; }
+.file-diff .fold:hover { opacity: 1; background: var(--paper-wash); }
+.file-diff .gap { padding: 2px 10px; opacity: 0.5; }
+.folder-list {
+  display: flex;
+  flex-direction: column;
+  height: 260px;
+  overflow-y: auto;
+  margin-top: 10px;
+  padding: 4px;
+  border: 1px solid var(--paper-rule);
+  border-radius: var(--radius-control);
+  background: var(--paper-ground);
+}
+.folder-row { text-align: left; border: none; background: none; padding: 4px 8px; border-radius: var(--radius-control); }
+.folder-row:hover { background: var(--paper-wash); }
+.folder-row.chosen { background: var(--paper-selection); }
+.folder-row.up { opacity: 0.6; }
+.folder-row.file:disabled { opacity: 0.35; cursor: default; }
+
+/* Files as a tree (#133): every row the same height, placed by its index, so only the rows in
+   view are drawn; the file last open marked; the row the keys are on ringed while the tree has focus. */
+.file-tree { position: relative; outline: none; }
+.file-tree > li { position: absolute; left: 0; right: 0; box-sizing: border-box; padding-top: 0; padding-bottom: 0; }
+.file-tree .tree-row { display: flex; align-items: center; gap: 6px; padding-right: 8px; cursor: default; white-space: nowrap; }
+.file-tree .tree-row.note { opacity: 0.6; }
+.file-tree .tree-row .chevron { width: 12px; font-size: 0.75rem; opacity: 0.7; }
+.file-tree .tree-row .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 400; }
+.file-tree .tree-row .icon { display: inline-block; width: 14px; text-align: center; font-size: 0.6875rem; }
+.file-tree:focus-visible .tree-row.cursor, .file-tree:focus .tree-row.cursor { box-shadow: inset 0 0 0 2px var(--accent); }
+
+/* A pinned page (#159) in the chat's place. */
+.pinned-page { display: flex; flex-direction: column; }
+.pinned-page .pin-head { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.pinned-page .pin-head h1 { margin: 0; }
+.pinned-page .live-page { flex: 1; overflow: auto; }
+.pinned-page .page-source { flex: 1; overflow: auto; padding: 8px 16px; }
+.pinned-page .page-source pre { margin: 0; white-space: pre-wrap; font-size: 0.75rem; }
+.pinned-page > .hint { padding: 24px; text-align: center; }
+/* The Summary page (#3721): the saved page, "How this was written", and the daily summary's control under it. */
+.summary-page { display: flex; flex-direction: column; }
+.summary-page .summary-body { flex: 1; overflow: auto; padding: 16px 24px; max-width: 760px; }
+.summary-page .summary-body hr { border: none; border-top: 1px solid var(--paper-rule); margin: 16px 0; }
+/* The daily summary's control under the page, as Settings ▸ Workflows draws it: a row per setting. */
+.summary-page .daily-summary .setting { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; }
+

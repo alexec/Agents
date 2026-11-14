@@ -6,6 +6,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { load } from "./load.mjs";
+import { appCss } from "./appCss.mjs";
 
 const m = await load("src/model/messageKinds.ts");
 
@@ -54,7 +55,7 @@ test("the page asks with its own alert, never window.confirm", () => {
 test("no message is a .hint with role=alert, a red .problem strip or an amber wash", () => {
   const found = files(src).filter((p) => /class="hint[^"]*" role="alert"|class="problem[ "]|class="offline-strip|class="work-error/.test(readFileSync(p, "utf8")));
   assert.deepEqual(found, []);
-  const css = readFileSync(join(src, "app.css"), "utf8");
+  const css = appCss();
   assert.doesNotMatch(css, /^\.problem\s*\{/m);
   assert.doesNotMatch(css, /--tint-success|--danger/);
 });
