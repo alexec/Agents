@@ -2,9 +2,15 @@ package agentsd
 
 import (
 	"context"
+	"encoding/json"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/agentloops-dev/agents/Go/internal/repoalias"
@@ -88,5 +94,111 @@ func TestTheCheckLearnsAMoveFromGitHub(t *testing.T) {
 	}
 	if n := d.checkRepoAliases(context.Background()); n != 0 {
 		t.Fatalf("the second check added %d", n)
+	}
+}
+
+// #5332: the cost ledger keeps the PRs it banked before the repo moved twice (alexec/agents,
+// then agentloops-dev/agents, then agentloops-dev/agent-loops) under the old names, and the
+// lineage names their sessions' links by the name now. Each PR is one node by the name now:
+// its sessions come back, the Multiplier counts every merge, and a PR banked under two names
+// is one merge with both costs.
+func TestTheLedgerNamesAMovedRepoByItsNameNow(t *testing.T) {
+	noAliases(t)
+	repoalias.Add("github", "alexec/agents", "agentloops-dev/agents", nowFunc())
+	repoalias.Add("github", "agentloops-dev/agents", "agentloops-dev/agent-loops", nowFunc())
+	root := t.TempDir()
+	d, err := New(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	merged, ended, last := "merged", wire.DateOf(nowFunc()), wire.DateOf(nowFunc())
+	earlier, parent := last-3600, "github:issue:alexec/agents#1"
+	pr := func(ref string, at wire.Date, cost float64) wire.LineageCostNode {
+		repo := "github:repo:#" + ref[len("github:pr:"):strings.IndexByte(ref, '#')]
+		return wire.LineageCostNode{Node: wire.LineageNode{Kind: "pr", Ref: ref}, Repo: &repo, Outcome: &merged, EndedAt: &ended,
+			LastAt: at, FirstAt: &at, Banked: wire.LineageCost{Cost: map[string]float64{"usd": cost}},
+			Parent: &parent}
+	}
+	nodes := map[string]wire.LineageCostNode{}
+	for _, c := range []wire.LineageCostNode{
+		pr("github:pr:alexec/agents#1", earlier, 1),
+		pr("github:pr:alexec/agents#2", earlier, 1),
+		pr("github:pr:agentloops-dev/agents#3", earlier, 1),
+		pr("github:pr:agentloops-dev/agent-loops#4", last, 1),
+		// One PR under two names: banked before the moves, and merged after.
+		pr("github:pr:alexec/agents#5", earlier, 2),
+		pr("github:pr:agentloops-dev/agent-loops#5", last, 3),
+	} {
+		nodes[costKey(c.Node)] = c
+	}
+	b, _ := json.Marshal(costLedgerFile{Nodes: nodes, Unsent: map[string]int64{"pr\tgithub:pr:alexec/agents#1": 1}, Refs: ledgerRefsFull})
+	if err := os.WriteFile(filepath.Join(root, "lineage-cost.json"), b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	session := wire.LineageNode{Kind: "session", Ref: "agents:session:agentloops-dev/agent-loops#11111111-2222-3333-4444-555555555555"}
+	for n := 1; n <= 5; n++ {
+		to := wire.LineageNode{Kind: "pr", Ref: "github:pr:agentloops-dev/agent-loops#" + strconv.Itoa(n)}
+		if _, err := d.lineage().Link(wire.LineageLinkRequest{From: session, To: to, Rel: "works-on", Source: "person"}, nowFunc()); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	d.workMu.Lock()
+	d.refreshCostLinksLocked()
+	f := d.costLedgerLocked()
+	merges := d.multiplierMergesLocked()
+	d.workMu.Unlock()
+	if len(f.Nodes) != 5 || len(merges) != 5 {
+		t.Fatalf("nodes %d, merges %d, want 5 and 5: %v", len(f.Nodes), len(merges), slices.Collect(maps.Keys(f.Nodes)))
+	}
+	for k, c := range f.Nodes {
+		if !strings.Contains(k, "agentloops-dev/agent-loops#") || len(c.Sessions) != 1 ||
+			*c.Repo != "github:repo:#agentloops-dev/agent-loops" || *c.Parent != "github:issue:agentloops-dev/agent-loops#1" {
+			t.Fatalf("%s: %+v", k, c)
+		}
+	}
+	five := f.Nodes["pr\tgithub:pr:agentloops-dev/agent-loops#5"]
+	if five.Banked.Cost["usd"] != 5 || *five.FirstAt != earlier || five.LastAt != last {
+		t.Fatalf("the PR under two names: %+v", five)
+	}
+	if _, ok := f.Unsent["pr\tgithub:pr:agentloops-dev/agent-loops#1"]; !ok {
+		t.Fatalf("the renamed node is not sent again: %v", f.Unsent)
+	}
+	for k := range f.Unsent {
+		if !strings.Contains(k, "agent-loops") {
+			t.Fatalf("an old key left unsent: %v", f.Unsent)
+		}
+	}
+}
+
+// #5332: a repo that moved twice: the check asks GitHub about the name it has now, so it
+// learns the second move, and the old name follows the chain to the last.
+func TestTheCheckFollowsASecondMove(t *testing.T) {
+	noAliases(t)
+	repoalias.Add("github", "alexec/agents", "agentloops-dev/agents", nowFunc())
+	mux := http.NewServeMux()
+	mux.HandleFunc("/repos/agentloops-dev/agents", func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"full_name":"agentloops-dev/agent-loops"}`))
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	d, err := New(context.Background(), t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	d.repoAliasAPI = srv.URL
+	pr := wire.LineageNode{Kind: "pr", Ref: "github:pr:alexec/agents#12"}
+	if _, err := d.lineage().Link(wire.LineageLinkRequest{From: pr, To: wire.LineageNode{Kind: "issue", Ref: "github:issue:alexec/agents#1"},
+		Rel: "fixes", Source: "person"}, nowFunc()); err != nil {
+		t.Fatal(err)
+	}
+	if n := d.checkRepoAliases(context.Background()); n != 1 {
+		t.Fatalf("added %d, want 1: %+v", n, repoalias.All())
+	}
+	if got := repoalias.Topic("github", "alexec/agents"); got != "agentloops-dev/agent-loops" {
+		t.Fatalf("alias: %q", got)
+	}
+	if got := d.lineage().Links(wire.LineageNode{Kind: "pr", Ref: "github:pr:agentloops-dev/agent-loops#12"}); len(got.Links) != 1 {
+		t.Fatalf("the PR by its name now: %+v", got)
 	}
 }
