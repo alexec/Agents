@@ -18,6 +18,9 @@ struct WorkReleasePage: View {
     private let compact = false
     #endif
     @Environment(\.openURL) private var openURL
+    /// Opens a place on the web page; the Mac window sets it while it can open the page (#5180).
+    @Environment(\.openWebPlace) private var openWebPlace
+    @State private var trendsProblem: String?
 
     @State private var graph: DaemonAPI.LineageGraph?
     @State private var rollup: DaemonAPI.LineageCostRollup?
@@ -339,9 +342,30 @@ struct WorkReleasePage: View {
                         }
                     }
                 }
+                trendsLink
             }
         }
         lineageSection
+    }
+
+    /// **Build trends ↗** under the stages (#5180): the web page's Builds at the release's CI run,
+    /// when this Mac can open the page. A Web + Mac link (#4937): the Remote sets no `openWebPlace`.
+    @ViewBuilder
+    private var trendsLink: some View {
+        let runs = graph?.links.filter { $0.rel == "builds" && $0.to == node && $0.from.kind == "ci-run" }.map(\.from) ?? []
+        if let openWebPlace, let run = BuildTrendsLink.run(in: runs), let place = BuildTrendsLink.place(run: run) {
+            Button("\(BuildTrendsLink.title) ↗") {
+                Task { trendsProblem = await openWebPlace.run(place) }
+            }
+            .linkStyle()
+            .help(BuildTrendsLink.help(kind: "release"))
+            .alert(BuildTrendsLink.cannotOpen, isPresented: Binding(get: { trendsProblem != nil },
+                                                                    set: { if !$0 { trendsProblem = nil } })) {
+                Button("OK") { trendsProblem = nil }
+            } message: {
+                Text(trendsProblem ?? "")
+            }
+        }
     }
 
     /// The cost, the sessions and how many run, the lead time (`lineage/figures`, #4427), the

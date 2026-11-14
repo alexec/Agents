@@ -8,6 +8,10 @@
 
 ## Why this feature exists
 
+> Since #5091 the ready-made workflows are not in the daemon's program: they are in the
+> repository agentloops-dev/dotagents, and the daemon installs them from a pinned tag of it
+> (`docs/reference/workflows.md`). The rest of this spec still holds.
+
 The daemon currently keeps five ready-made workflows inside its program. Each forge
 project shows the same workflows. A person has no single place to read or edit them.
 

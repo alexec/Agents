@@ -127,7 +127,7 @@ targets:
       # The Home-screen widget (068). Same reason: it is not installed on its own, so it
       # ships inside this bundle and is versioned with it.
       - target: RemoteWidget
-      # Share ▸ Agents (#4915): another app's screenshot, picture, text or link, handed to
+      # Share ▸ Agent Loops (#4915): another app's screenshot, picture, text or link, handed to
       # New session through the app group. Shipped inside this bundle, as the widget is.
       - target: RemoteShare
     # The voice's models, copied into the bundle's Voice folder (#2322).
@@ -138,8 +138,8 @@ targets:
     info:
       path: Remote/Info.plist
       properties:
-        CFBundleDisplayName: Agents
-        CFBundleName: Agents
+        CFBundleDisplayName: Agent Loops
+        CFBundleName: Agent Loops
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleShortVersionString: $(MARKETING_VERSION)
         NSHumanReadableCopyright: © 2026 Alex Collins
@@ -242,7 +242,7 @@ targets:
     info:
       path: RemoteNotify/Info.plist
       properties:
-        CFBundleDisplayName: RemoteNotify
+        CFBundleDisplayName: Agent Loops
         CFBundleName: RemoteNotify
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleShortVersionString: $(MARKETING_VERSION)
@@ -300,7 +300,7 @@ targets:
     info:
       path: RemoteWidget/Info.plist
       properties:
-        CFBundleDisplayName: AgentsWidget
+        CFBundleDisplayName: Agent Loops
         CFBundleName: AgentsWidget
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleShortVersionString: $(MARKETING_VERSION)
@@ -331,7 +331,7 @@ targets:
           CODE_SIGN_IDENTITY: Apple Distribution
           PROVISIONING_PROFILE_SPECIFIER: Agents Remote Widget App Store
 
-  # Share ▸ Agents (#4915): in another app's share sheet, it turns a screenshot, picture,
+  # Share ▸ Agent Loops (#4915): in another app's share sheet, it turns a screenshot, picture,
   # file, text or link into what the paperclip would attach, leaves it in the app group, and
   # opens the Remote on New session. AgentsKitCore only, for `PhoneAttachment`'s rules: no
   # link to the Mac, no sign-in and no folder list in a share extension's small memory.
@@ -354,7 +354,7 @@ targets:
       path: RemoteShare/Info.plist
       properties:
         # What the share sheet shows under the icon.
-        CFBundleDisplayName: Agents
+        CFBundleDisplayName: Agent Loops
         CFBundleName: AgentsShare
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleShortVersionString: $(MARKETING_VERSION)

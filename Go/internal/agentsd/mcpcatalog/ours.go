@@ -133,8 +133,8 @@ type Declared struct {
 
 // ReadyMadeEvents is the events that Agents' ready-made workflows start on (#1342). A
 // workflow names events, never a server, so any server that declares one of them reaches
-// the Workflows level. agentsd's readymade folder holds the workflows; a test there keeps
-// this list the same as their triggers.
+// the Workflows level. agentloops-dev/dotagents holds the workflows (#5091); a test in agentsd
+// keeps this list the same as the triggers of its copy in testdata/dotagents.
 var ReadyMadeEvents = []string{"checks.failed", "email.received", "health.issue_new", "health.issue_regressed", "issue.labelled", "review.comment", "review.posted"}
 
 // Levels is the five levels (#1428) from what a server declares, and whether it was tested.

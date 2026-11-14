@@ -25,6 +25,7 @@ import { newSessionProjects } from "../model/projects";
 import { orderedFolders } from "./Sidebar";
 import { lineageUrl, sessionHost } from "../model/lineage";
 import { type PipelineStep, pipelineDepth, pipelineSteps } from "../model/pipeline";
+import { buildsRunLinkHelp, buildsRunLinkQuery } from "../model/builds";
 import { costWords, nodeName, spent } from "../model/value";
 import { actualWords, estimateLine, estimateRangeWords, estimateSpentWords, showsEstimate } from "../model/estimate";
 import { forecastHelp, keptHelp, keptLine, landsLine, toCompleteLine } from "../model/forecast";
@@ -707,7 +708,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
                   <span class="quiet small">Merged{atWords(got.item.closedAt)}</span></div>
                 <div class="work-merged-strip">
                   <span class="strong small">{mergedStrip}</span>
-                  {pipeline.value.length > 0 && <PipelineLine steps={pipeline.value} />}
+                  {pipeline.value.length > 0 && <PipelineLine steps={pipeline.value} kind={node.kind} />}
                 </div>
               </>
             )}
@@ -752,7 +753,7 @@ export function WorkPage({ store, kind, ref }: { store: Store; kind: WorkKind; r
               )}
               {!isOpen && actual && <span class="quiet small">{actual}</span>}
               {forecastLines.map((line) => <span key={line} class="quiet small work-forecast" title={forecastTitle}>{line}</span>)}
-              {pipeline.value.length > 0 && <PipelineLine steps={pipeline.value} />}
+              {pipeline.value.length > 0 && <PipelineLine steps={pipeline.value} kind={node.kind} />}
             </SideSection>
           )}
           {(kind === "issue" || kind === "pr") && (
@@ -841,11 +842,14 @@ function TagGlyph() {
 }
 
 /** The pipeline line (#3588): its releases, CI runs, deploys and health, each a link where it has one. */
-export function PipelineLine({ steps }: { steps: readonly PipelineStep[] }) {
+export function PipelineLine({ steps, kind }: { steps: readonly PipelineStep[]; kind: string }) {
+  // Build trends at the line's newest CI run, on Reports ▸ Planning ▸ Builds (#5180).
+  const run = steps.find((s) => s.node?.kind === "ci-run")?.node;
+  const trends = run && buildsRunLinkQuery(run.ref);
   return (
     <span class="small work-pipeline">{steps.map((s, i) => (
       <Fragment key={i}>{i > 0 && " · "}{s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer">{s.words}</a> : <span class="quiet">{s.words}</span>}</Fragment>
-    ))}</span>
+    ))}{trends && <> · <a href={routeHash({ nav: "reports", section: "value", item: "builds", query: trends })} title={buildsRunLinkHelp(kind)}>Build trends ›</a></>}</span>
   );
 }
 

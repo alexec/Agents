@@ -954,7 +954,7 @@ final class RemoteModel {
             .map { AppViewRecipient(id: $0.id, name: AppViewAgentMessage.name(of: $0)) }
     }
 
-    // MARK: Share ▸ Agents (#4915)
+    // MARK: Share ▸ Agent Loops (#4915)
 
     /// The folder whose New session is to take what the share sheet left, until its page
     /// takes it.
@@ -3662,7 +3662,7 @@ final class RemoteModel {
         let phase: ScenePhase = isActive ? .active : phase
         presence?.scenePhase(phase)
         if phase == .active {
-            // Share ▸ Agents may have left something while this was away (#4915).
+            // Share ▸ Agent Loops may have left something while this was away (#4915).
             lookForShared()
             attentionRefreshTask?.cancel()
             attentionRefreshTask = Task { [weak self] in
