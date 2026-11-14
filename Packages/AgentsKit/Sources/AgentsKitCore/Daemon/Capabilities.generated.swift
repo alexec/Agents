@@ -56,6 +56,7 @@ public enum Capability {
     public static let credentials1 = "credentials/1"
     public static let daemon1 = "daemon/1"
     public static let dailySummary1 = "daily-summary/1"
+    public static let deploysTargets1 = "deploys.targets/1"
     public static let device1 = "device/1"
     public static let devices1 = "devices/1"
     public static let disk1 = "disk/1"
@@ -343,6 +344,7 @@ public enum Capability {
         "daemon/status": "daemon/1",
         "dailySummary/setSettings": "daily-summary/1",
         "dailySummary/settings": "daily-summary/1",
+        "deploys/targets": "deploys.targets/1",
         "desktopControl/resume": "host.desktop-control/1",
         "desktopControl/set": "host.desktop-control/1",
         "desktopControl/state": "host.desktop-control/1",

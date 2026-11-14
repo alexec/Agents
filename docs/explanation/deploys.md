@@ -210,6 +210,11 @@ The deploy events make the lineage nodes (#5241). The code is
   source `computed`. A live deploy with less than all the traffic has the label
   `share:<per cent>`, and a succeeded deploy is `replaced` when it is live nowhere. The
   live version of the target before it in a path comes with promotion order.
+- **Work ▸ Deploys (#5270)** reads `deploys/targets`: every target the host keeps deploys of,
+  each with its live versions (share and since) and its next deploys, as above. The target is
+  in the environment node's name, with its tier by that name when the job's notice moved it.
+  The Mac window and the web page draw it as a grid: environments across in tier order,
+  components down.
 - **Old nodes:** before #5241, a `deploy` node was an artifact (`testflight:deploy:…#812`),
   `part-of` a `target`, and a release was `deployed-as` it. Nothing makes those now. They
   are read until they age out of the store's bounds.

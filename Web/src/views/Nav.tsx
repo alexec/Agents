@@ -25,6 +25,7 @@ import { WorkList, WorkPage } from "./Work";
 import { WorkReleasePage } from "./WorkRelease";
 import { WorkFeatures } from "./WorkFeatures";
 import { WorkTimeline } from "./WorkTimeline";
+import { WorkDeploysPage } from "./WorkDeploysPage";
 import { DocPage, DocsList } from "./Docs";
 import { ConversationPage, MessagesList } from "./Messages";
 import { MachinePage } from "./MachinePage";
@@ -310,6 +311,7 @@ export function PageView({ store, page, down }: { store: Store; page: NavPage; d
         : page.draw.kind === "machine" ? <MachinePage key={page.draw.host} store={store} host={page.draw.host} />
         : page.draw.kind === "features" ? <WorkFeatures store={store} />
         : page.draw.kind === "timeline" ? <WorkTimeline store={store} />
+        : page.draw.kind === "deploys" ? <WorkDeploysPage store={store} />
         // The person's secrets and cards (#1760), then a machine's for one session (#3548), then what agents saved
         // on that machine (#5122); were in Settings ▸ Machines.
         : page.draw.kind === "secrets" ? <><SecretsSection store={store} down={down} /><SessionSecretsSection store={store} down={down} />

@@ -42,7 +42,7 @@ export interface TranscriptCopy {
 }
 
 /** What each Work entry holds (#4930), with how many of it are kept, the newest first; the pictures also to `imageCap`. */
-export const workKept = { list: 30, item: 50, plan: 50, features: 10, timeline: 20, boards: 10, image: 2000 } as const;
+export const workKept = { list: 30, item: 50, plan: 50, features: 10, timeline: 20, deploys: 5, boards: 10, image: 2000 } as const;
 export type WorkGroup = keyof typeof workKept;
 
 /** One of Work's last answers (#4930), kept by what was asked: a cache, never the record. */

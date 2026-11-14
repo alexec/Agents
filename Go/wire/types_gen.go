@@ -4031,6 +4031,17 @@ type DeployEvent struct {
 	Outcome *DeployOutcome `json:"outcome,omitzero"`
 }
 
+// A deploy as deploys/targets says it on its target (#5270): the deploy; release is the lineage ref of its release when a v* tag names its version, for the release's page. A live one has since (the first deploy of its newest unbroken run there) and share (its per cent of the traffic, 100 with no split).
+type DeployOnTarget struct {
+	Deploy Deploy `json:"deploy"`
+
+	Release *string `json:"release,omitzero"`
+
+	Since *Date `json:"since,omitzero"`
+
+	Share *float64 `json:"share,omitzero"`
+}
+
 // How a deploy that did not succeed ended, as deploy.failed says it.
 type DeployOutcome string
 
@@ -4059,6 +4070,26 @@ type DeployTarget struct {
 	ID *string `json:"id,omitzero"`
 
 	Ref *string `json:"ref,omitzero"`
+}
+
+// One target in deploys/targets (#5270): its component, its environment (the environment node's name, with its tier) and its labels; live are the versions that run there now, the most traffic first; next are the deploys that wait or run to go there, oldest first (#5246).
+type DeployTargetNow struct {
+	Target DeployTarget `json:"target"`
+
+	Live []DeployOnTarget `json:"live"`
+
+	Next []DeployOnTarget `json:"next"`
+}
+
+// deploys/targets (#5270, Work ▸ Deploys): every target this host keeps deploys of, with its live and next versions, as lineage computes them (#5246). at is when it was read.
+type DeployTargets struct {
+	Targets []DeployTargetNow `json:"targets"`
+
+	At Date `json:"at"`
+}
+
+// deploys/targets (#5270): no parameters.
+type DeployTargetsRequest struct {
 }
 
 // The set of artifacts that go out together (#5262); one artifact is the simple case. name is set for a Release (v0.18.0), a Kargo alias, an Octopus release; system and id are set when the version is a thing of its own there (Kargo's Freight, Octopus's Release). ref is a Release's ref when it has a name, else its one artifact's.

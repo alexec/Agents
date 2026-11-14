@@ -57,6 +57,31 @@
       }
     },
     {
+      "name": "deploys/targets",
+      "x-capability": "deploys.targets/1",
+      "tags": [
+        {
+          "name": "web"
+        }
+      ],
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "params",
+          "required": true,
+          "schema": {
+            "$ref": "schema/core.schema.json#/definitions/DeployTargetsRequest"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "schema/core.schema.json#/definitions/DeployTargets"
+        }
+      }
+    },
+    {
       "name": "docs/list",
       "description": "The docs of this machine's folders and their docs connectors (#3319).",
       "x-capability": "docs/1",

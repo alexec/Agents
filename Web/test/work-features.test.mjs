@@ -132,7 +132,7 @@ test("a Needs you feature says what waits", () => {
 
 test("Work lists Features after Pull requests", () => {
   // Docs and Messages are in Work since #5267.
-  assert.deepEqual(nav.navPages.work.map((p) => p.title), ["Docs", "Messages", "Issues", "Pull requests", "Features", "Releases", "Timeline"]);
+  assert.deepEqual(nav.navPages.work.map((p) => p.title), ["Docs", "Messages", "Issues", "Pull requests", "Features", "Releases", "Deploys", "Timeline"]);
   assert.deepEqual(nav.navPages.work.find((p) => p.title === "Features")?.draw, { kind: "features" });
   // Work has no Milestones list now (#3878): an old #/work/milestone opens the Work default.
   assert.equal(nav.openPage("work", "milestone", true).id, "issue");

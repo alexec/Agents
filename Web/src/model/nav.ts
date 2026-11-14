@@ -27,6 +27,7 @@ export type PageDraw =
   | { kind: "work"; work: WorkKind }
   | { kind: "features" }
   | { kind: "timeline" }
+  | { kind: "deploys" }
   | { kind: "docs" }
   | { kind: "messages" }
   | { kind: "machine"; host: string }
@@ -62,7 +63,8 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
   // Every issue and pull request from the forges, with lineage on top, and the releases lineage knows
   // (#3119). The page's id is the lineage kind, so #/work/pr/<ref> is a PR's page.
   // Features (#3269) after Pull requests: the feature:<name> labels on the epics, not a lineage kind.
-  // Timeline (#4206) after Releases: the epics in time, from work/timeline.
+  // Deploys (#5270) after Releases: every component in every environment, from deploys/targets.
+  // Timeline (#4206) after Deploys: the epics in time, from work/timeline.
   // Docs and Messages first (#5267), as the window's Work group has them; were sections of their own.
   work: [
     // The folders' docs and the docs connectors' (#3321, spec 3319); #/work/docs/<ref> is a doc's page.
@@ -72,7 +74,10 @@ export const navPages: Record<NavSection, readonly NavPage[]> = {
     ...workKinds.flatMap((k): NavPage[] => [
       { id: k, title: workKindTitle[k], group: "Work", draw: { kind: "work", work: k } },
       ...k === "pr" ? [{ id: "features", title: "Features", group: "Work", draw: { kind: "features" } } satisfies NavPage] : [],
-      ...k === "release" ? [{ id: "timeline", title: "Timeline", group: "Work", draw: { kind: "timeline" } } satisfies NavPage] : [],
+      ...k === "release" ? [
+        { id: "deploys", title: "Deploys", group: "Work", draw: { kind: "deploys" } } satisfies NavPage,
+        { id: "timeline", title: "Timeline", group: "Work", draw: { kind: "timeline" } } satisfies NavPage,
+      ] : [],
     ]),
   ],
   machines: [

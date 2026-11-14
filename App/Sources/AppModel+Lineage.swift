@@ -103,6 +103,12 @@ extension AppModel {
         return forgeMachines.filter { draws.contains($0.id) }
     }
 
+    /// The machines that say their deploys' targets for Work ▸ Deploys (#5270), This Mac first.
+    var deploysMachines: [(id: MachineRef, name: String)] {
+        let keeps = Set((controlPlaneHosts ?? []).filter { $0.has(Capability.deploysTargets1) }.map(\.id))
+        return lineageMachines.filter { keeps.contains($0.id) }
+    }
+
     /// The machines that give Work ▸ Features in one read (#4586), This Mac first.
     var featuresMachines: [(id: MachineRef, name: String)] {
         let reads = Set((controlPlaneHosts ?? []).filter { $0.has(Capability.workFeatures1) }.map(\.id))
