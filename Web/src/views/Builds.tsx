@@ -1,11 +1,13 @@
 // Reports ▸ Planning ▸ Builds (#5178, spec 5166, boards 1, 2 and 4): the trend of a repository's CI runs by day
 // (run, waiting for a runner, waiting its turn), the changes found in each job's run time on the default branch, and
 // a change picked, with the runs around it and the commits between. The figures are builds/history and builds/run
-// (#5177), asked of each of the person's machines that reads build timings; the one with the most runs answers. The
-// control plane's copy (#5232) is its own task. The words and the shapes are model/builds.ts.
+// (#5177) or, when the control plane keeps a copy of the machines' timings, its builds/historyAll and builds/runAll
+// (#5232, #5327), so the page has data while the Mac sleeps. With an older control plane, each of the person's
+// machines that reads build timings is asked, and the one with the most runs answers. Who is asked is
+// model/buildsRead.ts; the words and the shapes are model/builds.ts.
 import { useEffect, useRef } from "preact/hooks";
 import { useSignal } from "@preact/signals";
-import type { BuildsChange, BuildsHistory, BuildsHistoryRequest, BuildsRun, ForgeRelease, MachineRef } from "../protocol/generated";
+import type { BuildsChange, BuildsHistory, BuildsHistoryRequest, BuildsRun, ForgeRelease } from "../protocol/generated";
 import { Capability } from "../protocol/capabilities.generated";
 import type { Store } from "../model/store";
 import { hostAnswers } from "../model/capabilities";
@@ -18,7 +20,7 @@ import {
   pullsBranch, rangeBounds, releaseMarks, releasesNote, runName, runWhen, secondsWords, tileWindows, workflowShown, workflowWords,
   wireMs, type BuildsAsk, type BuildsBar, type ReleaseMark,
 } from "../model/builds";
-import { CallFailed } from "../wire/link";
+import { planeReadsBuilds, readHistory, readProblem, readRun, type BuildsFrom } from "../model/buildsRead";
 import { toWireDate } from "../protocol/dates";
 import { Choice } from "./Choice";
 import { LastUpdate } from "./LastUpdate";
@@ -29,13 +31,8 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 /** The page's address with other filters. */
 const at = (a: BuildsAsk) => ({ nav: "reports" as const, section: "value", item: "builds", query: buildsQuery(a) });
 
-function failed(error: unknown): string {
-  if (error instanceof CallFailed) return error.code === -32601 ? "This machine does not read build timings. Update it to see them." : error.message;
-  return "The machine can’t be reached.";
-}
-
-/** What the page read: the range's history, the tiles' two windows, and the machine that answered. */
-interface Read { host: MachineRef; history: BuildsHistory; last?: BuildsHistory | undefined; before?: BuildsHistory | undefined; key: string }
+/** What the page read: the range's history, the tiles' two windows, and who answered (null: the control plane). */
+interface Read { from: BuildsFrom; history: BuildsHistory; last?: BuildsHistory | undefined; before?: BuildsHistory | undefined; key: string }
 
 export function BuildsPage({ store, down }: { store: Store; down: boolean }) {
   const ask = parseBuildsQuery(route.value.query);
@@ -43,6 +40,9 @@ export function BuildsPage({ store, down }: { store: Store; down: boolean }) {
   const mac = store.macHostID.value;
   // This Mac first, so a tie goes to it.
   hosts.sort((a, b) => Number(b === mac) - Number(a === mac));
+  // The control plane's copy when it keeps one, else each machine.
+  const plane = planeReadsBuilds(store);
+  const sources: BuildsFrom[] = plane ? [null] : hosts;
   const repos = useSignal<string[] | null>(null);
   const releases = useSignal<ForgeRelease[]>([]);
   const read = useSignal<Read | null>(null);
@@ -72,11 +72,11 @@ export function BuildsPage({ store, down }: { store: Store; down: boolean }) {
   const set = (change: Partial<BuildsAsk>) => replace(at({ ...ask, repo, ...change, change: undefined, drill: undefined }));
 
   // The history of the range, and the tiles' windows, asked again when a filter changes.
-  const wanted = JSON.stringify([repo, ask.range, ask.workflow, ask.job, ask.branch, hostKey]);
+  const wanted = JSON.stringify([repo, ask.range, ask.workflow, ask.job, ask.branch, plane ? "plane" : hostKey]);
   const current = useRef(wanted);
   current.current = wanted;
   useEffect(() => {
-    if (down || !repo || hosts.length === 0) return;
+    if (down || !repo || sources.length === 0) return;
     problem.value = null;
     const filters: Omit<BuildsHistoryRequest, "from" | "to"> = {
       repo, timeZone,
@@ -87,36 +87,36 @@ export function BuildsPage({ store, down }: { store: Store; down: boolean }) {
     const now = Date.now();
     const { from, to } = rangeBounds(ask.range, now);
     const range = { ...filters, from: toWireDate(from), to: toWireDate(to) };
-    void Promise.all(hosts.map((host) => store.link.call("builds/history", range, host).then((history) => ({ host, history }), (e: unknown) => e)))
+    void Promise.all(sources.map((from) => readHistory(store, range, from).then((history) => ({ from, history }), (e: unknown) => ({ from, e }))))
       .then(async (got) => {
         if (current.current !== wanted) return;
-        const answers = got.filter((g): g is { host: MachineRef; history: BuildsHistory } => typeof g === "object" && g !== null && "history" in g);
+        const answers = got.filter((g): g is { from: BuildsFrom; history: BuildsHistory } => "history" in g);
         // The machine with the most runs, then the newest read.
         const best = answers.sort((a, b) => b.history.total.runs - a.history.total.runs
           || (b.history.readAt ?? 0) - (a.history.readAt ?? 0))[0];
-        if (!best) { problem.value = failed(got[0]); return; }
+        if (!best) { const first = got[0]; problem.value = first && "e" in first ? readProblem(first.e, first.from) : null; return; }
         // A page opened with no workflow takes ci.yml, or the first (spec: "ci to start with").
         const workflow = workflowShown(ask.workflow, best.history.workflows);
         if (!ask.workflow && workflow) { replace(at({ ...ask, repo, workflow })); return; }
-        read.value = { host: best.host, history: best.history, key: wanted };
+        read.value = { from: best.from, history: best.history, key: wanted };
         const w = tileWindows(now);
         const [last, before] = await Promise.all([w.last, w.before].map((b) =>
-          store.link.call("builds/history", { ...filters, from: toWireDate(b.from), to: toWireDate(b.to) }, best.host).catch(() => undefined)));
-        if (current.current === wanted) read.value = { host: best.host, history: best.history, last, before, key: wanted };
+          readHistory(store, { ...filters, from: toWireDate(b.from), to: toWireDate(b.to) }, best.from).catch(() => undefined)));
+        if (current.current === wanted) read.value = { from: best.from, history: best.history, last, before, key: wanted };
       });
   }, [wanted, down]);
 
   if (down) return <p class="hint">The control plane can’t be reached.</p>;
-  if (hosts.length === 0) return <p class="hint">{noMachine}</p>;
+  if (sources.length === 0) return <p class="hint">{noMachine}</p>;
   if (repos.value === null && !ask.repo) return <p class="hint">Loading…</p>;
   if (!repo) return <p class="hint">{noRepos}</p>;
   const shown = read.value?.key === wanted ? read.value : null;
   const h = shown?.history;
   const picked = ask.change && h?.changes.find((c) => c.job === ask.change!.job && c.firstSlow.ref === ask.change!.ref);
   if (ask.drill && h && shown) {
-    return <RunDrill store={store} host={shown.host} repo={repo} ask={{ ...ask, repo, drill: ask.drill }} history={h} change={picked || undefined} at={at} />;
+    return <RunDrill store={store} from={shown.from} repo={repo} ask={{ ...ask, repo, drill: ask.drill }} history={h} change={picked || undefined} at={at} />;
   }
-  if (ask.change && h && picked) return <ChangePicked store={store} host={shown.host} repo={repo} ask={ask} change={picked} history={h} />;
+  if (ask.change && h && picked) return <ChangePicked store={store} from={shown.from} repo={repo} ask={ask} change={picked} history={h} />;
 
   const branch = branchWords(ask.branch, h?.defaultBranch);
   return (
@@ -317,17 +317,17 @@ function TrendChart({ bars, p90, marks, changes, pick }: { bars: readonly Builds
 }
 
 /** Board 2: a change picked. */
-function ChangePicked({ store, host, repo, ask, change: c, history: h }: { store: Store; host: MachineRef; repo: string; ask: BuildsAsk;
+function ChangePicked({ store, from, repo, ask, change: c, history: h }: { store: Store; from: BuildsFrom; repo: string; ask: BuildsAsk;
   change: BuildsChange; history: BuildsHistory }) {
   const branch = h.defaultBranch ?? "the default branch";
   const runs = useSignal<{ before?: BuildsRun | undefined; after?: BuildsRun | undefined } | null>(null);
   useEffect(() => {
     let live = true;
     runs.value = null;
-    const one = (ref: string) => store.link.call("builds/run", { repo, ref }, host).then((r) => r.run, () => undefined);
+    const one = (ref: string) => readRun(store, { repo, ref }, from).then((r) => r.run, () => undefined);
     void Promise.all([one(c.lastFast.ref), one(c.firstSlow.ref)]).then(([before, after]) => { if (live) runs.value = { before, after }; });
     return () => { live = false; };
-  }, [c.lastFast.ref, c.firstSlow.ref, host]);
+  }, [c.lastFast.ref, c.firstSlow.ref, from]);
   const back = at({ ...ask, repo, change: undefined });
   return (
     <div class="reports-pane builds-page builds-change">
