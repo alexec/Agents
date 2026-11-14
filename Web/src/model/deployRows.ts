@@ -30,7 +30,7 @@ export interface DeployRow {
   more?: string;
   /** The job's page: a failed row's "the job's log ↗" (note 10). */
   url?: string;
-  /** A waiting deploy's GitHub run, for its Approve and Reject (note 9): `owner/name/<run id>`. */
+  /** A waiting deploy's GitHub run, for its Approve and Deny (note 9): `owner/name/<run id>`. */
   gate?: string;
 }
 

@@ -1,13 +1,14 @@
 // Deployed on a release's page and Live in on a pull request's (#5243, spec 5239-deploy-model boards 1 to 3): a
 // row for each environment, its tier chip when it is production and the state's chip, then what went out (the
 // component and its version: the panel is a 240 px column, so the component is under the name, as board 2 draws a
-// phone's row) and since when. A waiting deploy's row has Approve and Reject when the person is one of its gate's
+// phone's row) and since when. A waiting deploy's row has Approve and Deny when the person is one of its gate's
 // reviewers (note 9): the same approval as Needs You (#3587). A failed row opens the job's log (note 10).
 import { useSignal } from "@preact/signals";
 import type { Approval } from "../protocol/generated";
 import type { Store } from "../model/store";
 import { type DeployRow, deployStateWords } from "../model/deployRows";
 import { describe } from "../model/errors";
+import { actionWord } from "../model/approvals";
 
 /** The waiting deploy's approval in a folder's list on any machine: its key is the gate's `owner/name/<run id>`. */
 function gateApproval(store: Store, gate: string): { host: string; folder: string; approval: Approval } | undefined {
@@ -47,8 +48,8 @@ function DeployRowView({ store, row }: { store: Store; row: DeployRow }) {
         : <span class="small quiet work-deploy-more">{row.more}</span>)}
       {gate && (
         <span class="work-deploy-gate">
-          <button type="button" class="primary" onClick={() => answer(true)}>Approve</button>
-          <button type="button" onClick={() => answer(false)}>Reject</button>
+          <button type="button" class="primary" onClick={() => answer(true)}>{actionWord("deploy", "approve")}</button>
+          <button type="button" onClick={() => answer(false)}>{actionWord("deploy", "deny")}</button>
         </span>
       )}
       {problem.value && <span class="small work-deploy-problem">{problem.value}</span>}
