@@ -174,6 +174,11 @@ same way (the organisation's App settings ▸ Advanced ▸ Transfer ownership).
 1. Daemon: repo alias for an owner that moved, so old refs and new events match (task, before the transfer).
 2. Links to `agentloops-dev/Agents` in www, docs, skills, `deploy/` and the docs CNAME (task, after the transfer).
 3. Go module path `github.com/agentloops-dev/agents/Go` (task, on a quiet day).
+4. Repo name `agent-loops` (#5296, done 2026-11-13): `agentloops-dev/Agents` is now
+   `agentloops-dev/agent-loops`, and `origin` is
+   `https://github.com/agentloops-dev/agent-loops.git` in the main checkout. The links and
+   the Go module path, which follow-ups 2 and 3 set to `agentloops-dev/agents`, change
+   again in #5320.
 
 ## Open questions for Alex
 
