@@ -79,9 +79,18 @@ func (d *Daemon) followBrowserTabs(endpoint string) {
 }
 
 // stopFollowingBrowserTabs is the browser stopped: its tabs are gone, and their owners.
-func (d *Daemon) stopFollowingBrowserTabs() {
+func (d *Daemon) stopFollowingBrowserTabs() { d.stopFollowingBrowserTabsOf("") }
+
+// stopFollowingBrowserTabsOf is the browser at endpoint stopped. On a restart (a software
+// passkey's, a window's) its stop can be heard after the next browser started and its tabs
+// were followed (#5196): those, their owners and their passkeys stay. "" is any browser.
+func (d *Daemon) stopFollowingBrowserTabsOf(endpoint string) {
 	d.tabsMu.Lock()
 	t := d.tabs
+	if t != nil && endpoint != "" && d.tabsEndpoint != endpoint {
+		d.tabsMu.Unlock()
+		return
+	}
 	d.tabs, d.tabsEndpoint = nil, ""
 	d.tabOwner, d.ownTabs, d.devices, d.passkeys = nil, nil, nil, nil
 	d.tabsMu.Unlock()

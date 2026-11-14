@@ -318,6 +318,9 @@ func (d *Daemon) driveBrowser(ctx context.Context, agent wire.UUID, name string,
 	if err != nil {
 		return failed("The browser did not start: " + browserWords(err))
 	}
+	if name != passkeyName {
+		d.keepSessionPasskey(agent)
+	}
 	if name == fillSecretName {
 		words, isError, site := d.approveFill(ctx, agent, drive, fill, args)
 		if words != "" {
