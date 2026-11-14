@@ -5,9 +5,10 @@
 # then submit the iOS version for App Review (scripts/asc-submit.swift); the Mac is not in the App
 # Store (#4229). Reject ends it, and the release stays on TestFlight.
 #
-# What it submitted is two deploy notices, for Lineage (#3584): the App Store version,
-# appstore:<bundle id>/<version>, and the TestFlight build it submitted. Agents links the release
-# and that build deployed-as the version.
+# What it submitted is two deploy notices, for Lineage (#3584, #5242), each naming the environment
+# it went to: the App Store version, app-store=appstore:<bundle id>/<version>, and the TestFlight
+# build it submitted, app-store=testflight:<bundle id>/<build>. So both are artifacts of the one
+# deploy to app-store, and the TestFlight build is one artifact in two deploys.
 #
 # The gate job first checks that the `app-store` environment has required reviewers. Without them
 # the submit job does not start: GitHub would make the environment with no gate, and the release
@@ -90,8 +91,8 @@ jobs:
           echo "build=$(tail -n 1 "$RUNNER_TEMP/submit.log")" >> "$GITHUB_OUTPUT"
 
       # What this run deployed, for Lineage (#3584, #3657): Agents reads the notices from the run,
-      # so App Store Connect's key stays here.
+      # so App Store Connect's key stays here. They name their environment, app-store= (#5242).
       - name: Say the deploy
         run: |
-          echo "::notice title=deploy::testflight:$BUNDLE_ID/${{ steps.submit.outputs.build }}"
-          echo "::notice title=deploy::appstore:$BUNDLE_ID/${TAG#v}"
+          echo "::notice title=deploy::app-store=testflight:$BUNDLE_ID/${{ steps.submit.outputs.build }}"
+          echo "::notice title=deploy::app-store=appstore:$BUNDLE_ID/${TAG#v}"
